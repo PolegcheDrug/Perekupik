@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Симулятор Перекупа Mini App</title>
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-dark: #090d16;
+            --bg-card: rgba(18, 26, 43, 0.78);
+            --bg-card-border: rgba(255, 255, 255, 0.08);
+            --accent-cyan: #00f2fe;
+            --accent-blue: #4facfe;
+            --accent-green: #00e676;
+            --accent-gold: #ffb300;
+            --accent-purple: #9d4edd;
+            --accent-red: #ff3366;
+            --text-main: #f0f4f8;
+            --text-sub: #8e9aaf;
+            --radius-lg: 18px;
+            --radius-md: 12px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 10% 10%, rgba(0, 242, 254, 0.07) 0%, transparent 45%),
+                radial-gradient(circle at 90% 80%, rgba(157, 78, 221, 0.07) 0%, transparent 45%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding-bottom: 90px;
+            overflow-x: hidden;
+        }
+
+        .glass-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--bg-card-border);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        /* Top Header & Currencies */
+        .app-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 12px 16px;
+            background: rgba(9, 13, 22, 0.92);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--bg-card-border);
+        }
+
+        .user-profile-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 800;
+            color: #fff;
+            box-shadow: 0 0 12px rgba(0, 242, 254, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .user-details .username {
+            font-weight: 700;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .vip-badge {
+            background: linear-gradient(90deg, #ffe066, #f59f00);
+            color: #000;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 6px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+
+        .level-text {
+            font-size: 11px;
+            color: var(--text-sub);
+        }
+
+        .wallet-container {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .wallet-chip {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 4px 10px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        .wallet-chip.cash { color: var(--accent-green); }
+        .wallet-chip.stars { color: var(--accent-gold); border-color: rgba(255, 179, 0, 0.3); }
+        .wallet-chip.connections { color: var(--accent-purple); border-color: rgba(157, 78, 221, 0.3); }
+
+        .energy-bar-wrap {
+            width: 100%;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .energy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+
+        /* Quick Navigation Chips */
+        .quick-nav-bar {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px 4px 16px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .quick-nav-bar::-webkit-scrollbar { display: none; }
+
+        .nav-chip {
+            padding: 8px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--bg-card-border);
+            border-radius: var(--radius-md);
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-sub);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .nav-chip.active {
+            background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(79, 172, 254, 0.2));
+            border-color: var(--accent-cyan);
+            color: #fff;
+            box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
+        }
+
+        .grid-menu-btn {
+            background: linear-gradient(135deg, rgba(157, 78, 221, 0.25), rgba(255, 51, 102, 0.25));
+            border-color: var(--accent-purple);
+            color: #fff;
+        }
+
+        .content-area { padding: 16px; }
+
+        .view-panel {
+            display: none;
+            animation: fadeIn 0.25s ease-in-out;
+        }
+        .view-panel.active { display: block; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Car Cards */
+        .car-card {
+            margin-bottom: 16px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .car-img-wrapper {
+            position: relative;
+            width: 100%;
+            height: 190px;
+            background: #111522;
+        }
+
+        .car-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .car-badge {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(9, 13, 22, 0.85);
+            backdrop-filter: blur(8px);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .car-plate {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: #ffffff;
+            color: #000000;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-weight: 800;
+            font-family: monospace;
+            font-size: 13px;
+            border: 1px solid #000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+        }
+
+        .car-details { padding: 16px; }
+
+        .car-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .car-title { font-size: 16px; font-weight: 800; }
+        .car-price { font-size: 16px; font-weight: 800; color: var(--accent-green); }
+
+        .car-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 6px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-label { font-size: 10px; color: var(--text-sub); }
+        .stat-value { font-size: 11px; font-weight: 700; margin-top: 2px; }
+
+        .seller-quote {
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 3px solid var(--accent-cyan);
+            padding: 8px 12px;
+            border-radius: 0 8px 8px 0;
+            font-size: 12px;
+            color: var(--text-sub);
+            margin-bottom: 12px;
+            font-style: italic;
+        }
+
+        .legal-warning-badge {
+            background: rgba(255, 51, 102, 0.15);
+            border: 1px solid var(--accent-red);
+            color: #ff6b8b;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Buttons & Forms */
+        .btn-group { display: flex; gap: 8px; }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: var(--radius-md);
+            border: none;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: transform 0.1s, filter 0.2s;
+        }
+        .btn:active { transform: scale(0.97); }
+
+        .btn-primary { background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue)); color: #000; }
+        .btn-secondary { background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid var(--bg-card-border); }
+        .btn-success { background: linear-gradient(135deg, #00e676, #00b0ff); color: #000; }
+        .btn-purple { background: linear-gradient(135deg, var(--accent-purple), #d800ff); color: #fff; }
+        .btn-gold { background: linear-gradient(135deg, var(--accent-gold), #ff6d00); color: #000; }
+
+        .tab-switcher {
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 4px;
+            border-radius: var(--radius-md);
+            margin-bottom: 16px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-sub);
+            font-weight: 700;
+            font-size: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: var(--accent-cyan);
+            color: #000;
+            box-shadow: 0 2px 8px rgba(0, 242, 254, 0.3);
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 280px;
+            height: 280px;
+            margin: 20px auto;
+        }
+
+        #wheelCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 0 25px rgba(0, 242, 254, 0.3);
+            border: 4px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .wheel-pointer {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0; height: 0;
+            border-left: 14px solid transparent;
+            border-right: 14px solid transparent;
+            border-top: 24px solid var(--accent-gold);
+            z-index: 10;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
+        }
+
+        /* Bottom Nav */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 70px;
+            background: rgba(9, 13, 22, 0.94);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid var(--bg-card-border);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 1000;
+            padding: 0 4px;
+        }
+
+        .bottom-nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            color: var(--text-sub);
+            font-size: 10px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            width: 20%;
+            transition: color 0.2s;
+        }
+
+        .bottom-nav-item i { font-size: 18px; }
+        .bottom-nav-item.active { color: var(--accent-cyan); }
+
+        /* Modals & Drawers */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal-drawer {
+            background: #0d121f;
+            border-top: 1px solid var(--bg-card-border);
+            border-radius: 24px 24px 0 0;
+            width: 100%;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 20px;
+            animation: slideUp 0.3s cubic-bezier(0.1, 0.9, 0.2, 1);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .grid-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--bg-card-border);
+            border-radius: var(--radius-md);
+            padding: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .grid-item:hover { background: rgba(255,255,255,0.07); }
+
+        .grid-icon {
+            width: 38px; height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+        }
+
+        /* Toast Notifications */
+        .toast {
+            position: fixed;
+            top: 20px; left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: rgba(18, 26, 43, 0.96);
+            border: 1px solid var(--accent-cyan);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 13px;
+            z-index: 3000;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+
+    <header class="app-header">
+        <div class="user-profile-bar">
+            <div class="user-info">
+                <div class="avatar" id="userAvatar">T</div>
+                <div class="user-details">
+                    <div class="username">
+                        <span id="userName">Taktoje</span> 
+                        <span class="vip-badge" id="vipTag" style="display:none;">VIP</span>
+                    </div>
+                    <div class="level-text">Уровень <span id="userLevel">1</span> (<span id="userXp">0</span>/100 XP)</div>
+                </div>
+            </div>
+            <div class="wallet-container">
+                <div class="wallet-chip cash"><i class="fa-solid fa-ruble-sign"></i> <span id="userCash">500,000</span></div>
+                <div class="wallet-chip stars"><i class="fa-solid fa-star"></i> <span id="userStars">25</span></div>
+                <div class="wallet-chip connections"><i class="fa-solid fa-handshake"></i> <span id="userConnections">2</span></div>
+            </div>
+        </div>
+        <div class="energy-bar-wrap">
+            <div class="energy-fill" id="energyFill"></div>
+        </div>
+    </header>
+
+    <!-- Navigation Bar Chips -->
+    <div class="quick-nav-bar">
+        <div class="nav-chip grid-menu-btn" onclick="toggleMenuDrawer()"><i class="fa-solid fa-border-all"></i> Меню</div>
+        <div class="nav-chip active" id="chip-market" onclick="switchTab('market')"><i class="fa-solid fa-magnifying-glass"></i> Авторынок</div>
+        <div class="nav-chip" id="chip-garage" onclick="switchTab('garage')"><i class="fa-solid fa-car"></i> Гараж</div>
+        <div class="nav-chip" id="chip-business" onclick="switchTab('business')"><i class="fa-solid fa-city"></i> Бизнес</div>
+        <div class="nav-chip" id="chip-wheelspin" onclick="switchTab('wheelspin')"><i class="fa-solid fa-dharmachakra"></i> Вилспин</div>
+        <div class="nav-chip" id="chip-containers" onclick="switchTab('containers')"><i class="fa-solid fa-box-open"></i> Контейнеры</div>
+    </div>
+
+    <main class="content-area">
+
+        <!-- 1. MARKET VIEW -->
+        <section id="view-market" class="view-panel active">
+            <div class="tab-switcher">
+                <button class="tab-btn active" id="mTab1" onclick="switchMarketTab('npc')">Срочный выкуп (AI)</button>
+                <button class="tab-btn" id="mTab2" onclick="switchMarketTab('p2p')">P2P Игроков</button>
+            </div>
+            <div id="marketList">
+                <!-- Dynamic Cars -->
+            </div>
+        </section>
+
+        <!-- 2. GARAGE VIEW -->
+        <section id="view-garage" class="view-panel">
+            <div class="glass-panel" style="padding: 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="font-size: 15px;">Мой Гараж</h3>
+                    <p style="font-size: 11px; color: var(--text-sub);">Занято: <span id="garageOccupied">0</span>/<span id="garageMax">2</span> слотов</p>
+                </div>
+                <button class="btn btn-secondary" style="width: auto; padding: 8px 12px; font-size: 11px;" onclick="expandGarage()"><i class="fa-solid fa-plus"></i> Слоты (250k ₽)</button>
+            </div>
+            <div id="garageCarsList">
+                <!-- Dynamic Garage Cars -->
+            </div>
+        </section>
+
+        <!-- 3. BUSINESS VIEW -->
+        <section id="view-business" class="view-panel">
+            <div class="glass-panel" style="padding: 16px; margin-bottom: 16px; text-align: center;">
+                <h3 style="font-size: 16px; margin-bottom: 4px;">Автосервисы & Услуги</h3>
+                <p style="font-size: 11px; color: var(--text-sub); margin-bottom: 12px;">Приносят пассивный доход и дают скидки на подготовку авто!</p>
+                <button class="btn btn-primary" style="margin: 0 auto; max-width: 220px;" onclick="collectBusinessIncome()"><i class="fa-solid fa-hand-holding-dollar"></i> Собрать доход</button>
+            </div>
+            <div id="businessList">
+                <!-- Dynamic Businesses -->
+            </div>
+        </section>
+
+        <!-- 4. WHEELSPIN VIEW -->
+        <section id="view-wheelspin" class="view-panel">
+            <div class="glass-panel" style="padding: 20px; text-align: center;">
+                <h2>Колесо Фортуны</h2>
+                <p style="font-size: 12px; color: var(--text-sub); margin-top: 4px;">Испытай удачу! Выигрывай авто, Stars и эксклюзивные номера.</p>
+                
+                <div class="wheel-container">
+                    <div class="wheel-pointer"></div>
+                    <canvas id="wheelCanvas" width="280" height="280"></canvas>
+                </div>
+
+                <div class="btn-group" style="max-width: 320px; margin: 0 auto;">
+                    <button class="btn btn-gold" id="btnFreeSpin" onclick="spinWheel('free')"><i class="fa-solid fa-gift"></i> Бесплатный Спин</button>
+                    <button class="btn btn-purple" onclick="spinWheel('stars')"><i class="fa-solid fa-star"></i> За 15 Stars</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. CONTAINERS VIEW -->
+        <section id="view-containers" class="view-panel">
+            <div class="glass-panel" style="padding: 16px; margin-bottom: 16px; text-align: center;">
+                <h3>Таможенный Терминал</h3>
+                <p style="font-size: 12px; color: var(--text-sub);">Открывай контейнеры из ОАЭ, США и Европы!</p>
+            </div>
+            <div id="containersList">
+                <!-- Dynamic Containers -->
+            </div>
+        </section>
+
+        <!-- 6. PLATES STORAGE & AUCTION -->
+        <section id="view-plates" class="view-panel">
+            <div class="glass-panel" style="padding: 16px; margin-bottom: 16px;">
+                <h3>Склад Блатных Номеров</h3>
+                <p style="font-size: 12px; color: var(--text-sub);">Устанавливай номера на авто для повышения ценности или продавай на аукционе.</p>
+            </div>
+            <div id="platesList">
+                <!-- Dynamic Plates -->
+            </div>
+        </section>
+
+        <!-- 7. STREET & CLUBS VIEW -->
+        <section id="view-street" class="view-panel">
+            <div class="glass-panel" style="padding: 16px; margin-bottom: 16px; text-align: center;">
+                <h3>Ночной Стрит-Рейсинг</h3>
+                <p style="font-size: 12px; color: var(--text-sub);">Выигрывай денежные заезды и вступай в автоклубы!</p>
+            </div>
+            <button class="btn btn-primary" onclick="showToast('Заезд сформирован! Ожидание соперников...')"><i class="fa-solid fa-flag-checkered"></i> Участвовать в заезде (1,000 ₽)</button>
+        </section>
+
+        <!-- 8. BARN FIND VIEW -->
+        <section id="view-barnfind" class="view-panel">
+            <div class="glass-panel" style="padding: 16px; margin-bottom: 16px; text-align: center;">
+                <h3>Гаражная Находка</h3>
+                <p style="font-size: 12px; color: var(--text-sub);">Ищи заброшенные капсулы времени в старых гаражах и восстанавливай их.</p>
+            </div>
+            <button class="btn btn-gold" onclick="searchBarn()"><i class="fa-solid fa-magnifying-glass-location"></i> Искать гараж (10,000 ₽)</button>
+        </section>
+
+        <!-- 9. STORE & ADS VIEW -->
+        <section id="view-store" class="view-panel">
+            <div class="glass-panel" style="padding: 16px; margin-bottom: 16px; border-color: rgba(0, 242, 254, 0.3);">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <i class="fa-solid fa-circle-play" style="font-size: 32px; color: var(--accent-cyan);"></i>
+                    <div>
+                        <h4 style="font-size: 14px;">Бесплатные бонусы Adsgram</h4>
+                        <p style="font-size: 11px; color: var(--text-sub);">Смотри рекламу и получай валюту</p>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="watchRewardAd()"><i class="fa-solid fa-film"></i> Смотреть рекламу (+15,000 ₽)</button>
+            </div>
+
+            <h3 style="margin-bottom: 12px;">Магазин за Stars (⭐)</h3>
+            <div class="menu-grid">
+                <div class="grid-item glass-panel" onclick="buyStarsPack(50, 1000000)">
+                    <div class="grid-icon" style="background: rgba(255, 179, 0, 0.2); color: var(--accent-gold);"><i class="fa-solid fa-sack-dollar"></i></div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 13px;">1,000,000 ₽</div>
+                        <div style="font-size: 11px; color: var(--accent-gold);">⭐ 50 Stars</div>
+                    </div>
+                </div>
+                <div class="grid-item glass-panel" onclick="buyConnectionsPack(30, 5)">
+                    <div class="grid-icon" style="background: rgba(157, 78, 221, 0.2); color: var(--accent-purple);"><i class="fa-solid fa-handshake"></i></div>
+                    <div>
+                        <div style="font-weight: 700; font-size: 13px;">5 Связей 🤝</div>
+                        <div style="font-size: 11px; color: var(--accent-gold);">⭐ 30 Stars</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <nav class="bottom-nav">
+        <div class="bottom-nav-item active" id="nav-market" onclick="switchTab('market')">
+            <i class="fa-solid fa-shop"></i>
+            <span>Рынок</span>
+        </div>
+        <div class="bottom-nav-item" id="nav-garage" onclick="switchTab('garage')">
+            <i class="fa-solid fa-warehouse"></i>
+            <span>Гараж</span>
+        </div>
+        <div class="bottom-nav-item" id="nav-business" onclick="switchTab('business')">
+            <i class="fa-solid fa-city"></i>
+            <span>Бизнес</span>
+        </div>
+        <div class="bottom-nav-item" id="nav-wheelspin" onclick="switchTab('wheelspin')">
+            <i class="fa-solid fa-dharmachakra"></i>
+            <span>Вилспин</span>
+        </div>
+        <div class="bottom-nav-item" onclick="toggleMenuDrawer()">
+            <i class="fa-solid fa-bars"></i>
+            <span>Меню</span>
+        </div>
+    </nav>
+
+    <!-- Full Grid Menu Drawer -->
+    <div class="modal-overlay" id="menuDrawer">
+        <div class="modal-drawer">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>Разделы Игры</h3>
+                <i class="fa-solid fa-xmark" style="font-size: 20px; cursor: pointer;" onclick="toggleMenuDrawer()"></i>
+            </div>
+            <div class="menu-grid">
+                <div class="grid-item" onclick="switchTab('containers'); toggleMenuDrawer();">
+                    <div class="grid-icon" style="background: rgba(0,242,254,0.15); color: var(--accent-cyan);"><i class="fa-solid fa-box-open"></i></div>
+                    <div style="font-size: 12px; font-weight: 700;">Контейнеры</div>
+                </div>
+                <div class="grid-item" onclick="switchTab('plates'); toggleMenuDrawer();">
+                    <div class="grid-icon" style="background: rgba(255,179,0,0.15); color: var(--accent-gold);"><i class="fa-solid fa-id-card"></i></div>
+                    <div style="font-size: 12px; font-weight: 700;">Номера</div>
+                </div>
+                <div class="grid-item" onclick="switchTab('street'); toggleMenuDrawer();">
+                    <div class="grid-icon" style="background: rgba(255,51,102,0.15); color: var(--accent-red);"><i class="fa-solid fa-flag-checkered"></i></div>
+                    <div style="font-size: 12px; font-weight: 700;">Стрит & Клубы</div>
+                </div>
+                <div class="grid-item" onclick="switchTab('barnfind'); toggleMenuDrawer();">
+                    <div class="grid-icon" style="background: rgba(157,78,221,0.15); color: var(--accent-purple);"><i class="fa-solid fa-key"></i></div>
+                    <div style="font-size: 12px; font-weight: 700;">Находка</div>
+                </div>
+                <div class="grid-item" onclick="switchTab('store'); toggleMenuDrawer();">
+                    <div class="grid-icon" style="background: rgba(0,230,118,0.15); color: var(--accent-green);"><i class="fa-solid fa-gem"></i></div>
+                    <div style="font-size: 12px; font-weight: 700;">Донат & Ads</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Avtoteka Report Modal -->
+    <div class="modal-overlay" id="inspectModal">
+        <div class="modal-drawer" id="inspectModalContent">
+            <!-- Dynamic Report Content -->
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toastNotification">
+        <i class="fa-solid fa-circle-check" style="color: var(--accent-green);"></i>
+        <span id="toastText">Уведомление</span>
+    </div>
+
+    <script>
+        // =========================================================================
+        //  EASY CUSTOMIZATION DATABASE (ВЫ НАСЫЩАЕТЕ ДАННЫЕ ЗДЕСЬ!)
+        // =========================================================================
+
+        const CAR_DATABASE = [
+            {
+                id: 'car_1',
+                name: 'Lada Priora Sedan',
+                price: 280000,
+                year: 2011,
+                power: '98 л.с.',
+                mileage: '185,000 км',
+                plate: 'Х777АМ 777',
+                owners: 4,
+                quote: '«Пневма, музыка, не бита не крашена братан!»',
+                defect: 'Требует замены порогов и арки',
+                legalStatus: 'CLEAN', // CLEAN, ARREST (Запрет), MORTGAGE (Залог)
+                img: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'car_2',
+                name: 'BMW 3 Series E46',
+                price: 490000,
+                year: 2003,
+                power: '170 л.с.',
+                mileage: '240,000 км',
+                plate: 'О666ОО 99',
+                owners: 6,
+                quote: '«Мотор работает ровно, дрифт комплектация.»',
+                defect: 'Течь прокладки ГБЦ',
+                legalStatus: 'ARREST', // Has restriction!
+                img: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'car_3',
+                name: 'Toyota Camry XV50',
+                price: 1350000,
+                year: 2014,
+                power: '181 л.с.',
+                mileage: '160,000 км',
+                plate: 'В777ВВ 77',
+                owners: 2,
+                quote: '«Надежный аппарат, только обслуживание у ДИЛЕРА.»',
+                defect: 'Требуется покраска бампера',
+                legalStatus: 'MORTGAGE', // Bank mortgage
+                img: 'https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?auto=format&fit=crop&w=600&q=80'
+            }
+        ];
+
+        const CONTAINER_TYPES = [
+            {
+                id: 'cont_1',
+                name: 'Бюджетный Контейнер',
+                price: 300000,
+                currency: 'cash',
+                icon: 'fa-box',
+                color: 'var(--accent-cyan)'
+            },
+            {
+                id: 'cont_2',
+                name: 'Дубайский Контейнер',
+                price: 1500000,
+                currency: 'cash',
+                icon: 'fa-truck-ramp-box',
+                color: 'var(--accent-gold)'
+            },
+            {
+                id: 'cont_3',
+                name: 'Секретный Контейнер Stars',
+                price: 100,
+                currency: 'stars',
+                icon: 'fa-box-archive',
+                color: 'var(--accent-purple)'
+            }
+        ];
+
+        const BUSINESS_TYPES = [
+            {
+                id: 'biz_1',
+                name: 'Детейлинг & Автомойка',
+                price: 200000,
+                incomePerHour: 12000,
+                repairDiscount: 10,
+                level: 0,
+                maxLevel: 5,
+                icon: 'fa-shower'
+            },
+            {
+                id: 'biz_2',
+                name: 'Шиномонтаж & СТО',
+                price: 600000,
+                incomePerHour: 35000,
+                repairDiscount: 20,
+                level: 0,
+                maxLevel: 5,
+                icon: 'fa-wrench'
+            },
+            {
+                id: 'biz_3',
+                name: 'Покрасочный Цех',
+                price: 1500000,
+                incomePerHour: 90000,
+                repairDiscount: 35,
+                level: 0,
+                maxLevel: 5,
+                icon: 'fa-spray-can'
+            }
+        ];
+
+        const WHEELSPIN_ITEMS = [
+            { name: '10,000 ₽', type: 'cash', val: 10000, color: '#1e293b' },
+            { name: '5 Stars ⭐', type: 'stars', val: 5, color: '#b45309' },
+            { name: '50,000 ₽', type: 'cash', val: 50000, color: '#0f766e' },
+            { name: 'Связи 🤝', type: 'connections', val: 2, color: '#6b21a8' },
+            { name: '150,000 ₽', type: 'cash', val: 150000, color: '#0369a1' },
+            { name: 'Номер Е001КХ', type: 'plate', val: 'Е001КХ 77', color: '#be123c' },
+            { name: '25 Stars ⭐', type: 'stars', val: 25, color: '#d97706' },
+            { name: 'Суперкар 🏎️', type: 'car', val: 'BMW M5 F90', color: '#7e22ce' }
+        ];
+
+        let gameState = {
+            cash: 500000,
+            stars: 25,
+            connections: 2,
+            level: 1,
+            xp: 0,
+            vip: false,
+            garageMax: 2,
+            lastSpinTime: 0,
+            garage: [],
+            plates: ['А001АА 777'],
+            businesses: [
+                { id: 'biz_1', level: 0 },
+                { id: 'biz_2', level: 0 },
+                { id: 'biz_3', level: 0 }
+            ],
+            npcMarketCars: JSON.parse(JSON.stringify(CAR_DATABASE)),
+            p2pMarketCars: []
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            updateUI();
+            renderMarket('npc');
+            renderBusinesses();
+            renderContainers();
+            renderPlates();
+            drawWheel();
+        });
+
+        function showToast(text) {
+            const toast = document.getElementById('toastNotification');
+            document.getElementById('toastText').innerText = text;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2500);
+        }
+
+        function updateUI() {
+            document.getElementById('userCash').innerText = gameState.cash.toLocaleString();
+            document.getElementById('userStars').innerText = gameState.stars.toLocaleString();
+            document.getElementById('userConnections').innerText = gameState.connections;
+            document.getElementById('userLevel').innerText = gameState.level;
+            document.getElementById('userXp').innerText = gameState.xp;
+            document.getElementById('garageOccupied').innerText = gameState.garage.length;
+            document.getElementById('garageMax').innerText = gameState.garageMax;
+            
+            if (gameState.vip) {
+                document.getElementById('vipTag').style.display = 'inline-block';
+            }
+            saveState();
+        }
+
+        function saveState() {
+            localStorage.setItem('perekup_master_v4', JSON.stringify(gameState));
+        }
+
+        function loadState() {
+            const saved = localStorage.getItem('perekup_master_v4');
+            if (saved) {
+                try { gameState = { ...gameState, ...JSON.parse(saved) }; } catch (e) {}
+            }
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('view-' + tabId).classList.add('active');
+
+            document.querySelectorAll('.bottom-nav-item').forEach(i => i.classList.remove('active'));
+            document.querySelectorAll('.nav-chip').forEach(i => i.classList.remove('active'));
+
+            const navItem = document.getElementById('nav-' + tabId);
+            const chipItem = document.getElementById('chip-' + tabId);
+            if (navItem) navItem.classList.add('active');
+            if (chipItem) chipItem.classList.add('active');
+
+            if (tabId === 'garage') renderGarage();
+        }
+
+        function toggleMenuDrawer() {
+            document.getElementById('menuDrawer').classList.toggle('active');
+        }
+
+        let currentMarketMode = 'npc';
+
+        function switchMarketTab(mode) {
+            currentMarketMode = mode;
+            document.getElementById('mTab1').classList.toggle('active', mode === 'npc');
+            document.getElementById('mTab2').classList.toggle('active', mode === 'p2p');
+            renderMarket(mode);
+        }
+
+        function renderMarket(mode) {
+            const container = document.getElementById('marketList');
+            container.innerHTML = '';
+            const list = mode === 'npc' ? gameState.npcMarketCars : gameState.p2pMarketCars;
+
+            if (list.length === 0) {
+                container.innerHTML = `<div class="glass-panel" style="padding:20px; text-align:center; color:var(--text-sub);">На рынке пока нет объявлений.</div>`;
+                return;
+            }
+
+            list.forEach(car => {
+                const card = document.createElement('div');
+                card.className = 'glass-panel car-card';
+                card.innerHTML = `
+                    <div class="car-img-wrapper">
+                        <img src="${car.img}" class="car-img">
+                        <div class="car-badge">${mode === 'npc' ? 'AI Продавец' : 'Игрок'}</div>
+                        <div class="car-plate">${car.plate}</div>
+                    </div>
+                    <div class="car-details">
+                        <div class="car-title-row">
+                            <div class="car-title">${car.name}</div>
+                            <div class="car-price">${car.price.toLocaleString()} ₽</div>
+                        </div>
+                        <div class="car-stats-grid">
+                            <div class="stat-item"><div class="stat-label">Мощность</div><div class="stat-value">${car.power}</div></div>
+                            <div class="stat-item"><div class="stat-label">Пробег</div><div class="stat-value">${car.mileage}</div></div>
+                            <div class="stat-item"><div class="stat-label">Владельцев</div><div class="stat-value">${car.owners}</div></div>
+                        </div>
+                        ${car.quote ? `<div class="seller-quote">${car.quote}</div>` : ''}
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="buyCar('${car.id}', '${mode}')"><i class="fa-solid fa-cart-shopping"></i> Купить</button>
+                            <button class="btn btn-secondary" onclick="inspectCarAvtoteka('${car.id}', '${mode}')"><i class="fa-solid fa-shield-halved"></i> Автотека (5,000 ₽)</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function inspectCarAvtoteka(id, mode) {
+            if (gameState.cash < 5000) {
+                showToast('Недостаточно денег для проверки (5,000 ₽)!');
+                return;
+            }
+
+            gameState.cash -= 5000;
+            updateUI();
+
+            const list = mode === 'npc' ? gameState.npcMarketCars : gameState.p2pMarketCars;
+            const car = list.find(c => c.id === id);
+            if (!car) return;
+
+            let legalText = '<span style="color:var(--accent-green);">Чисто (Без ограничений)</span>';
+            if (car.legalStatus === 'ARREST') legalText = '<span style="color:var(--accent-red);">Запрет регистрационных действий</span>';
+            if (car.legalStatus === 'MORTGAGE') legalText = '<span style="color:var(--accent-gold);">Автомобиль в залоге у банка</span>';
+
+            const modal = document.getElementById('inspectModal');
+            const content = document.getElementById('inspectModalContent');
+
+            content.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                    <h3><i class="fa-solid fa-shield-halved" style="color:var(--accent-cyan);"></i> Полный отчет Автотеки</h3>
+                    <i class="fa-solid fa-xmark" style="font-size:20px; cursor:pointer;" onclick="closeInspect()"></i>
+                </div>
+                <div style="margin-bottom:12px;"><strong>${car.name}</strong> (${car.plate})</div>
+                <div class="glass-panel" style="padding:14px; margin-bottom:14px; font-size:12px; line-height:1.7;">
+                    <div>• Статус ДТП: <strong>Не обнаружено</strong></div>
+                    <div>• Юридический статус: ${legalText}</div>
+                    <div>• Диагностика: <strong>${car.defect}</strong></div>
+                </div>
+                <button class="btn btn-primary" onclick="closeInspect()">Понятно</button>
+            `;
+            modal.classList.add('active');
+        }
+
+        function closeInspect() {
+            document.getElementById('inspectModal').classList.remove('active');
+        }
+
+        function buyCar(id, mode) {
+            const list = mode === 'npc' ? gameState.npcMarketCars : gameState.p2pMarketCars;
+            const index = list.findIndex(c => c.id === id);
+            if (index === -1) return;
+
+            const car = list[index];
+            if (gameState.cash < car.price) {
+                showToast('Недостаточно средств!');
+                return;
+            }
+            if (gameState.garage.length >= gameState.garageMax) {
+                showToast('Нет свободных мест в гараже!');
+                return;
+            }
+
+            gameState.cash -= car.price;
+            gameState.garage.push({ ...car, id: 'garage_' + Date.now() });
+            list.splice(index, 1);
+
+            updateUI();
+            renderMarket(mode);
+            showToast('Машина доставлена в ваш гараж!');
+        }
+
+        function renderGarage() {
+            const container = document.getElementById('garageCarsList');
+            container.innerHTML = '';
+
+            if (gameState.garage.length === 0) {
+                container.innerHTML = `<div class="glass-panel" style="padding:20px; text-align:center; color:var(--text-sub);">Гараж пуст. Навестите авторынок!</div>`;
+                return;
+            }
+
+            gameState.garage.forEach((car, index) => {
+                const card = document.createElement('div');
+                card.className = 'glass-panel car-card';
+
+                let legalWarning = '';
+                if (car.legalStatus === 'ARREST') {
+                    legalWarning = `<div class="legal-warning-badge"><i class="fa-solid fa-triangle-exclamation"></i> Запрет регистрационных действий!</div>`;
+                } else if (car.legalStatus === 'MORTGAGE') {
+                    legalWarning = `<div class="legal-warning-badge"><i class="fa-solid fa-building-columns"></i> В залоге у банка!</div>`;
+                }
+
+                card.innerHTML = `
+                    <div class="car-img-wrapper">
+                        <img src="${car.img}" class="car-img">
+                        <div class="car-plate">${car.plate}</div>
+                    </div>
+                    <div class="car-details">
+                        <h4>${car.name}</h4>
+                        <p style="font-size:12px; color:var(--accent-gold); margin:6px 0;">Дефект: ${car.defect}</p>
+                        ${legalWarning}
+                        <div class="btn-group" style="margin-top:12px; flex-wrap:wrap;">
+                            ${car.legalStatus !== 'CLEAN' ? `
+                                <button class="btn btn-purple" onclick="solveLegalIssue(${index})"><i class="fa-solid fa-handshake"></i> Снять запрет (2 Связи 🤝)</button>
+                            ` : ''}
+                            <button class="btn btn-secondary" onclick="repairGarageCar(${index})"><i class="fa-solid fa-wrench"></i> Ремонт (20,000 ₽)</button>
+                            <button class="btn btn-success" onclick="sellCarP2P(${index})"><i class="fa-solid fa-dollar-sign"></i> Продать</button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function solveLegalIssue(index) {
+            const car = gameState.garage[index];
+            if (gameState.connections < 2) {
+                showToast('Нужно 2 Связи 🤝 для снятия ограничений!');
+                return;
+            }
+            gameState.connections -= 2;
+            car.legalStatus = 'CLEAN';
+            updateUI();
+            renderGarage();
+            showToast('Ограничения успешно сняты через связи!');
+        }
+
+        function repairGarageCar(index) {
+            if (gameState.cash < 20000) {
+                showToast('Не хватает денег на ремонт!');
+                return;
+            }
+            gameState.cash -= 20000;
+            gameState.garage[index].defect = 'Идеальное техническое состояние';
+            updateUI();
+            renderGarage();
+            showToast('Автомобиль полностью отремонтирован!');
+        }
+
+        function sellCarP2P(index) {
+            const car = gameState.garage[index];
+            if (car.legalStatus !== 'CLEAN') {
+                showToast('Нельзя продать авто с юридическими ограничениями!');
+                return;
+            }
+
+            const sellPrice = car.price + 80000;
+            gameState.p2pMarketCars.push({
+                ...car,
+                id: 'p2p_' + Date.now(),
+                price: sellPrice,
+                seller: 'Вы'
+            });
+
+            gameState.garage.splice(index, 1);
+            updateUI();
+            renderGarage();
+            showToast(`Выставлено на P2P-рынок за ${sellPrice.toLocaleString()} ₽`);
+        }
+
+        function expandGarage() {
+            if (gameState.cash < 250000) {
+                showToast('Нужно 250,000 ₽!');
+                return;
+            }
+            gameState.cash -= 250000;
+            gameState.garageMax += 1;
+            updateUI();
+            showToast('Гараж расширен!');
+        }
+
+        function renderBusinesses() {
+            const container = document.getElementById('businessList');
+            container.innerHTML = '';
+
+            BUSINESS_TYPES.forEach(biz => {
+                const userBiz = gameState.businesses.find(b => b.id === biz.id) || { level: 0 };
+                const card = document.createElement('div');
+                card.className = 'glass-panel';
+                card.style.padding = '14px';
+                card.style.marginBottom = '12px';
+
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <div class="grid-icon" style="background:rgba(0,242,254,0.15); color:var(--accent-cyan); font-size:20px;">
+                                <i class="fa-solid ${biz.icon}"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight:700; font-size:14px;">${biz.name}</div>
+                                <div style="font-size:11px; color:var(--text-sub);">Доход: +${(biz.incomePerHour * (userBiz.level || 1)).toLocaleString()} ₽/час</div>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" style="width:auto; padding:8px 12px; font-size:11px;" onclick="buyBusiness('${biz.id}')">
+                            ${userBiz.level > 0 ? 'Lvl ' + userBiz.level + ' (Up)' : 'Купить ' + biz.price.toLocaleString() + ' ₽'}
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function buyBusiness(id) {
+            const biz = BUSINESS_TYPES.find(b => b.id === id);
+            let userBiz = gameState.businesses.find(b => b.id === id);
+
+            if (gameState.cash < biz.price) {
+                showToast('Недостаточно средств!');
+                return;
+            }
+
+            gameState.cash -= biz.price;
+            if (!userBiz) {
+                gameState.businesses.push({ id, level: 1 });
+            } else {
+                userBiz.level += 1;
+            }
+
+            updateUI();
+            renderBusinesses();
+            showToast(`Бизнес "${biz.name}" прокачан!`);
+        }
+
+        function collectBusinessIncome() {
+            let total = 0;
+            gameState.businesses.forEach(b => {
+                const spec = BUSINESS_TYPES.find(bt => bt.id === b.id);
+                if (spec && b.level > 0) {
+                    total += spec.incomePerHour * b.level;
+                }
+            });
+
+            if (total === 0) {
+                showToast('У вас нет активных бизнесов!');
+                return;
+            }
+
+            gameState.cash += total;
+            updateUI();
+            showToast(`Собрано пассивного дохода: +${total.toLocaleString()} ₽!`);
+        }
+
+        function renderContainers() {
+            const container = document.getElementById('containersList');
+            container.innerHTML = '';
+
+            CONTAINER_TYPES.forEach(cont => {
+                const card = document.createElement('div');
+                card.className = 'glass-panel';
+                card.style.padding = '16px';
+                card.style.marginBottom = '12px';
+                card.style.display = 'flex';
+                card.style.justifySpaceBetween = 'space-between';
+                card.style.alignItems = 'center';
+
+                card.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <i class="fa-solid ${cont.icon}" style="font-size:28px; color:${cont.color};"></i>
+                        <div>
+                            <div style="font-weight:700; font-size:14px;">${cont.name}</div>
+                            <div style="font-size:11px; color:var(--text-sub);">Выигрыш: Суперкары, Номера, Cash</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-gold" style="width:auto; padding:8px 12px; font-size:11px;" onclick="openContainer('${cont.id}')">
+                        Открыть (${cont.price.toLocaleString()} ${cont.currency === 'cash' ? '₽' : '⭐'})
+                    </button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function openContainer(id) {
+            const cont = CONTAINER_TYPES.find(c => c.id === id);
+            if (cont.currency === 'cash' && gameState.cash < cont.price) {
+                showToast('Недостаточно денег!');
+                return;
+            }
+            if (cont.currency === 'stars' && gameState.stars < cont.price) {
+                showToast('Недостаточно Stars!');
+                return;
+            }
+
+            if (cont.currency === 'cash') gameState.cash -= cont.price;
+            else gameState.stars -= cont.price;
+
+            showToast('Распаковка контейнера...');
+            setTimeout(() => {
+                const winCash = Math.floor(cont.price * (0.8 + Math.random() * 0.8));
+                gameState.cash += winCash;
+                updateUI();
+                showToast(`Из контейнера выпало: ${winCash.toLocaleString()} ₽!`);
+            }, 1200);
+        }
+
+        function renderPlates() {
+            const container = document.getElementById('platesList');
+            container.innerHTML = '';
+
+            gameState.plates.forEach((plate, i) => {
+                const card = document.createElement('div');
+                card.className = 'glass-panel';
+                card.style.padding = '12px';
+                card.style.marginBottom = '8px';
+                card.style.display = 'flex';
+                card.style.justifyContent = 'space-between';
+                card.style.alignItems = 'center';
+
+                card.innerHTML = `
+                    <div class="car-plate" style="position:static;">${plate}</div>
+                    <button class="btn btn-secondary" style="width:auto; padding:6px 12px; font-size:11px;" onclick="sellPlate(${i})">Продать (50,000 ₽)</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function sellPlate(index) {
+            gameState.plates.splice(index, 1);
+            gameState.cash += 50000;
+            updateUI();
+            renderPlates();
+            showToast('Номер продан на аукционе!');
+        }
+
+        function drawWheel() {
+            const canvas = document.getElementById('wheelCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const numSectors = WHEELSPIN_ITEMS.length;
+            const arc = (2 * Math.PI) / numSectors;
+
+            for (let i = 0; i < numSectors; i++) {
+                const angle = i * arc;
+                ctx.beginPath();
+                ctx.fillStyle = WHEELSPIN_ITEMS[i].color;
+                ctx.moveTo(140, 140);
+                ctx.arc(140, 140, 136, angle, angle + arc);
+                ctx.lineTo(140, 140);
+                ctx.fill();
+
+                ctx.save();
+                ctx.translate(140, 140);
+                ctx.rotate(angle + arc / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px Plus Jakarta Sans';
+                ctx.fillText(WHEELSPIN_ITEMS[i].name, 120, 4);
+                ctx.restore();
+            }
+        }
+
+        function spinWheel(type) {
+            if (type === 'stars' && gameState.stars < 15) {
+                showToast('Недостаточно Stars!');
+                return;
+            }
+            if (type === 'stars') gameState.stars -= 15;
+
+            const randomPrize = WHEELSPIN_ITEMS[Math.floor(Math.random() * WHEELSPIN_ITEMS.length)];
+            showToast('Колесо вращается...');
+
+            setTimeout(() => {
+                if (randomPrize.type === 'cash') gameState.cash += randomPrize.val;
+                if (randomPrize.type === 'stars') gameState.stars += randomPrize.val;
+                if (randomPrize.type === 'connections') gameState.connections += randomPrize.val;
+                if (randomPrize.type === 'plate') gameState.plates.push(randomPrize.val);
+
+                updateUI();
+                showToast(`Выигран приз: ${randomPrize.name}!`);
+            }, 1500);
+        }
+
+        function searchBarn() {
+            if (gameState.cash < 10000) {
+                showToast('Нужно 10,000 ₽ для поиска!');
+                return;
+            }
+            gameState.cash -= 10000;
+            updateUI();
+            showToast('Поиск в заброшенных гаражах...');
+
+            setTimeout(() => {
+                const found = Math.random() > 0.5;
+                if (found) {
+                    gameState.garage.push({
+                        id: 'barn_' + Date.now(),
+                        name: 'ГАЗ-24 Волга [Раритет]',
+                        price: 350000,
+                        year: 1979,
+                        power: '95 л.с.',
+                        mileage: '45,000 км',
+                        plate: 'М777ММ 77',
+                        owners: 1,
+                        defect: 'Требуется реставрация кузова',
+                        legalStatus: 'CLEAN',
+                        img: 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=600&q=80'
+                    });
+                    showToast('НАХОДКА! В гараже найден редкий ГАЗ-24 Волга!');
+                } else {
+                    showToast('В этот раз гараж оказался пуст.');
+                }
+            }, 1500);
+        }
+
+        function watchRewardAd() {
+            showToast('Просмотр видео Adsgram...');
+            setTimeout(() => {
+                gameState.cash += 15000;
+                updateUI();
+                showToast('Награда зачислена: +15,000 ₽!');
+            }, 1500);
+        }
+
+        function buyStarsPack(stars, cash) {
+            if (gameState.stars < stars) { showToast('Недостаточно Stars!'); return; }
+            gameState.stars -= stars;
+            gameState.cash += cash;
+            updateUI();
+            showToast(`Успешно получено +${cash.toLocaleString()} ₽!`);
+        }
+
+        function buyConnectionsPack(stars, conn) {
+            if (gameState.stars < stars) { showToast('Недостаточно Stars!'); return; }
+            gameState.stars -= stars;
+            gameState.connections += conn;
+            updateUI();
+            showToast(`Получено +${conn} Связей 🤝!`);
+        }
+    </script>
+</body>
+</html>
