@@ -153,17 +153,17 @@ const CAR_DATABASE = {
 };
 
 const HOUSING_LIST = [
-    { id: 'trailer', name: 'Бытовка на стройплощадке', rent: 800, buyPrice: 0, slots: 0, moodBonus: -5, img: 'assets/houses/trailer.jpg' },
-    { id: 'room', name: 'Комната в общежитии', rent: 2500, buyPrice: 1800000, slots: 1, moodBonus: 5, img: 'assets/houses/room.jpg' },
-    { id: 'khrusch', name: 'Убитая "Хрущевка"', rent: 15000, buyPrice: 4500000, slots: 1, moodBonus: 10, img: 'assets/houses/khrusch.jpg' },
-    { id: 'garage', name: 'Кирпичный гараж с ямой', rent: 18000, buyPrice: 3000000, slots: 3, moodBonus: 12, img: 'assets/houses/garage.jpg' },
-    { id: 'dvushka', name: 'Двушка в спальном районе', rent: 25000, buyPrice: 8500000, slots: 2, moodBonus: 15, img: 'assets/houses/dvushka.jpg' },
-    { id: 'euro_treshka', name: 'Евро-трешка (Новостройка)', rent: 45000, buyPrice: 15000000, slots: 3, moodBonus: 25, img: 'assets/houses/treshka.jpg' },
-    { id: 'cottage', name: 'Коттедж за городом', rent: 65000, buyPrice: 22000000, slots: 6, moodBonus: 30, img: 'assets/houses/cottage.jpg' },
-    { id: 'loft', name: 'Дизайнерский Лофт в центре', rent: 80000, buyPrice: 35000000, slots: 4, moodBonus: 35, img: 'assets/houses/loft.jpg' },
-    { id: 'penthouse', name: 'Пентхаус в Москва-Сити', rent: 250000, buyPrice: 140000000, slots: 6, moodBonus: 50, img: 'assets/houses/penthouse.jpg' },
-    { id: 'villa', name: 'Особняк на Рублёвке', rent: 600000, buyPrice: 450000000, slots: 15, moodBonus: 80, img: 'assets/houses/villa.jpg' },
-    { id: 'island', name: 'Частный остров с виллой', rent: 2000000, buyPrice: 1500000000, slots: 30, moodBonus: 100, img: 'assets/houses/island.jpg' }
+    { id: 'trailer', name: 'Бытовка на стройплощадке', rent: 800, buyPrice: 0, slots: 0, moodBonus: -5, minLevel: 1, img: 'assets/houses/trailer.jpg' },
+    { id: 'room', name: 'Комната в общежитии', rent: 2500, buyPrice: 1800000, slots: 1, moodBonus: 5, minLevel: 2, img: 'assets/houses/room.jpg' },
+    { id: 'khrusch', name: 'Убитая "Хрущевка"', rent: 15000, buyPrice: 4500000, slots: 1, moodBonus: 10, minLevel: 6, img: 'assets/houses/khrusch.jpg' },
+    { id: 'garage', name: 'Кирпичный гараж с ямой', rent: 18000, buyPrice: 3000000, slots: 3, moodBonus: 12, minLevel: 10, img: 'assets/houses/garage.jpg' },
+    { id: 'dvushka', name: 'Двушка в спальном районе', rent: 25000, buyPrice: 8500000, slots: 2, moodBonus: 15, minLevel: 15, img: 'assets/houses/dvushka.jpg' },
+    { id: 'euro_treshka', name: 'Евро-трешка (Новостройка)', rent: 45000, buyPrice: 15000000, slots: 3, moodBonus: 25, minLevel: 22, img: 'assets/houses/treshka.jpg' },
+    { id: 'cottage', name: 'Коттедж за городом', rent: 65000, buyPrice: 22000000, slots: 6, moodBonus: 30, minLevel: 30, img: 'assets/houses/cottage.jpg' },
+    { id: 'loft', name: 'Дизайнерский Лофт в центре', rent: 80000, buyPrice: 35000000, slots: 4, moodBonus: 35, minLevel: 45, img: 'assets/houses/loft.jpg' },
+    { id: 'penthouse', name: 'Пентхаус в Москва-Сити', rent: 250000, buyPrice: 140000000, slots: 6, moodBonus: 50, minLevel: 65, img: 'assets/houses/penthouse.jpg' },
+    { id: 'villa', name: 'Особняк на Рублёвке', rent: 600000, buyPrice: 450000000, slots: 15, moodBonus: 80, minLevel: 85, img: 'assets/houses/villa.jpg' },
+    { id: 'island', name: 'Частный остров с виллой', rent: 2000000, buyPrice: 1500000000, slots: 30, moodBonus: 100, minLevel: 100, img: 'assets/houses/island.jpg' }
 ];
 
 const STREET_CHAT_LOG = [
@@ -196,7 +196,11 @@ const STREET_CHAT_LOG = [
     { author: "Auto_Podbor", text: "Сегодня смотрел 5 машин. Все скручены, две в тотале. Рынок мертв.", warning: false, effect: { target: "all", modifier: 0.90, duration: 60 } },
     { author: "Major_Vova", text: "Продул 500к в подпольном клубе... где тут ближайший ломбард?", warning: false },
     { author: "DriftKing", text: "Завтра ночная сходка на парковке Ашана. ДПС не звать!", warning: false },
-    { author: "Crypto_Bro", text: "Словил ликвидацию на Bybit, продаю свой Гольф стейдж 2. Срочно.", warning: false }
+    { author: "Crypto_Bro", text: "Словил ликвидацию на Bybit, продаю свой Гольф стейдж 2. Срочно.", warning: false },
+    // Новые сообщения:
+    { author: "SysAdmin", text: "Кто шарит, как AmneziaWG нормально настроить, чтобы MTU не резало на мобиле? Накипело...", warning: false },
+    { author: "CNC_Master", text: "Могу вырезать любые проставки на стенс и фланцы лазером или на координатно-пробивном. Качество завод. Пишите в личку.", warning: false, effect: { target: "economy", modifier: 1.05, duration: 40 } },
+    { author: "Beam_Mapper", text: "Народ, кто-то умеет JBeam файлы ковырять? Физика отваливается после переноса.", warning: false }
 ];
 
 const CONTAINER_ITEMS = [
@@ -357,7 +361,8 @@ const DAILY_REWARDS_CONFIG = [
     { day: 6, title: "+350k ₽ & Бак", reward: { cash: 350000, fuel: 100 } },
     { day: 7, title: "+600k ₽ & 25 ⭐", reward: { cash: 600000, stars: 25, specialPlate: "Х777ХХ 77" } }
 ];
-// --- НОВАЯ БАЗА ДЛЯ ГАРАЖНЫХ НАХОДОК ---
+
+// --- БАЗА ДЛЯ ГАРАЖНЫХ НАХОДОК ---
 const BARN_FINDS = [
     { name: "ВАЗ-2101 «Копейка» (Дрифт-Спек)", power: 160, type: 'economy', basePrice: 850000, marketValue: 1250000, img: "assets/cars/barn/vaz2101_drift.jpg" },
     { name: "BMW E30 Coupe", power: 170, type: 'comfort', basePrice: 650000, marketValue: 1300000, img: "assets/cars/barn/e30.jpg" },
