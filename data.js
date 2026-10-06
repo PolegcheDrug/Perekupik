@@ -4,7 +4,7 @@
 // Инструкция: создайте папку "assets" рядом с index.html, в ней папку "cars", и закиньте картинки с нужными названиями.
 const CAR_DATABASE = {
     economy: [
-        { name: "ВАЗ-2101 «Копейка»", power: 64, basePrice: 65000, type: "economy", img: "assets/cars/economy/vaz-2101.jpg" },
+        { name: "ВАЗ-2101 «Копейка»", power: 64, basePrice: 65000, type: "economy", img: "assets/cars/economy/vaz-2101.jpeg" },
         { name: "ВАЗ-2107 «Семёрка»", power: 74, basePrice: 95000, type: "economy", img: "assets/cars/economy/vaz-2107.jpg" },
         { name: "ВАЗ-2114 «Четырка»", power: 81, basePrice: 140000, type: "economy", img: "assets/cars/economy/vaz-2114.jpg" },
         { name: "Lada Priora", power: 98, basePrice: 280000, type: "economy", img: "assets/cars/economy/priora.jpg" },
@@ -38,11 +38,11 @@ const CAR_DATABASE = {
     ],
     premium: [
         { name: "BMW 3-Series G20", power: 184, basePrice: 3800000, type: "premium", img: "assets/cars/premium/g20.jpg" },
-        { name: "Mercedes E-Class W213", power: 197, basePrice: 4200000, type: "premium", img: "assets/cars/premium/w213.jpg" },
-        { name: "BMW 5-Series G30", power: 249, basePrice: 4800000, type: "premium", img: "assets/cars/premium/g30.jpg" },
+        { name: "Mercedes C63s AMG", power: 197, basePrice: 4200000, type: "premium", img: "assets/cars/premium/mercedes_c_с63_w205_sedan.jpeg" },
+        { name: "BMW M340i", power: 249, basePrice: 4800000, type: "premium", img: "assets/cars/premium/bmw_m_340i.jpeg" },
         { name: "Lexus RX 350", power: 300, basePrice: 5500000, type: "premium", img: "assets/cars/premium/rx350.jpg" },
         { name: "Porsche Macan S", power: 354, basePrice: 6500000, type: "premium", img: "assets/cars/premium/macan.jpg" },
-        { name: "Mercedes G63 AMG", power: 585, basePrice: 14500000, type: "premium", img: "assets/cars/premium/g63.jpg" }
+        { name: "Mercedes G63 AMG", power: 585, basePrice: 14500000, type: "premium", img: "assets/cars/premium/mercedes_g63amg.jpg" }
     ],
     hyper: [
         { name: "Nissan GT-R R35", power: 570, basePrice: 12000000, type: "hyper", img: "assets/cars/hyper/gtr.jpg" },
