@@ -1108,7 +1108,7 @@
     function renderDiets() { const container = document.getElementById('dietList'); if (!container) return; container.innerHTML = DIETS.map(d => { const isCurrent = state.player.diet === d.id; return `<div class="glass-card mb-2 flex-between p-2" style="${isCurrent ? 'border-color:var(--green);' : ''}"><div><div class="font-bold text-xs">${d.name} ${isCurrent ? '✅' : ''}</div><div class="sub-label">${d.desc}</div><div class="text-xs color-amber mt-1">Расход: ${d.cost.toLocaleString()} ₽/день</div></div><button onclick="setDiet('${d.id}')" class="btn btn-auto btn-sm ${isCurrent ? 'btn-green' : 'btn-dark'}">${isCurrent ? 'Выбрано' : 'Выбрать'}</button></div>`; }).join(''); }
     function doActivity(type, cost, moodGain, connGain = 0) { if (state.player.cash < cost) return showToast("Недостаточно денег на отдых!"); tgHaptic('success'); state.player.cash -= cost; state.player.mood = Math.min(100, state.player.mood + moodGain); if (connGain) state.player.connections += connGain; saveState(); showToast(`Отдых удался! +${moodGain} к настроению 😄`); }
 
-    function renderHousing() {
+     function renderHousing() {
         const list = document.getElementById('housingMarketList'); if (!list) return;
         list.innerHTML = HOUSING_LIST.map(h => {
             const isCurrent = state.player.housingId === h.id; 
