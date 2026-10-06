@@ -165,7 +165,7 @@
         </div>
       </section>
 
-      <!-- 5. ЖИЗНЬ И ЧАТ (НОВАЯ ВКЛАДКА ВМЕСТО КАЗИНО ВНИЗУ) -->
+      <!-- 5. ЖИЗНЬ И ЧАТ -->
       <section id="tabLife" class="tab-screen">
         <div class="glass-card flex-between mb-3">
           <div><h3 class="font-bold color-amber"><i class="fa-solid fa-calendar-day"></i> Смена игрового дня</h3><p class="sub-label">Расходы, еда и аренда</p></div>
@@ -337,13 +337,12 @@
       </section>
     </main>
 
-    <!-- НИЖНЕЕ МЕНЮ (ОБНОВЛЕННОЕ) -->
+    <!-- НИЖНЕЕ МЕНЮ НАВИГАЦИИ -->
     <nav class="bottom-nav">
       <div class="b-nav-item active" onclick="switchTab('tabMarket')" id="bnav-tabMarket"><i class="fa-solid fa-store"></i><span>Рынок</span></div>
       <div class="b-nav-item" onclick="switchTab('tabGarage')" id="bnav-tabGarage"><i class="fa-solid fa-warehouse"></i><span>Гараж</span></div>
       <div class="b-nav-item" onclick="switchTab('tabSalesLot')" id="bnav-tabSalesLot"><i class="fa-solid fa-car-on"></i><span>Площадка</span></div>
-      <!-- Жизнь заменила Казино в нижнем баре -->
-      <div class="b-nav-item" onclick="switchTab('tabLife')" id="bnav-tabLife"><i class="fa-solid fa-mug-hot color-amber"></i><span>Жизнь</span></div>
+      <div class="b-nav-item" onclick="switchTab('tabLife')" id="bnav-tabLife"><i class="fa-solid fa-mug-hot"></i><span>Жизнь</span></div>
       <div class="b-nav-item" onclick="switchTab('tabStreet')" id="bnav-tabStreet"><i class="fa-solid fa-flag-checkered"></i><span>Стрит</span></div>
     </nav>
   </div>
@@ -699,7 +698,6 @@
         updateTuningRiskUI(car); saveState(); renderGarage(); showToast("Тюнинг установлен!");
     }
 
-    function resolveLegal(idx) { if (state.player.connections < 1) return showToast("Нужны Связи (🤝)!"); state.player.connections -= 1; state.garage[idx].legalIssue = 'clean'; saveState(); renderGarage(); showToast("Арест успешно снят!"); }
     function unimpoundCar(idx) {
         const sto = state.businesses.find(b => b.id === 'sto'); if (sto && sto.level > 0 && Math.random() < 0.5) { state.garage[idx].impounded = false; saveState(); renderGarage(); return showToast("🔧 Дядя Ваня с СТО договорился на штрафстоянке! Авто спасено бесплатно."); }
         if (state.player.connections >= 1) { state.player.connections -= 1; state.garage[idx].impounded = false; showToast("Авто вызволено через связи 🤝!"); } 
@@ -765,16 +763,62 @@
     }
     function hitCasino() { if (casinoState !== 'playing') return; pHand.push(deck.pop()); playSound('tick'); tgHaptic('light'); updateCasinoTable(false); if (get21Score(pHand) >= 21) { document.getElementById('casinoPlayingArea').style.display = 'none'; setTimeout(standCasino, 500); } }
     function standCasino() { if (casinoState !== 'playing') return; document.getElementById('casinoPlayingArea').style.display = 'none'; playSound('tick'); tgHaptic('medium'); endCasinoGame(); }
+    
+    // ИСПРАВЛЕННАЯ ФУНКЦИЯ КАЗИНО 21 С ВЫПЛАТАМИ
     function endCasinoGame() {
-        casinoState = 'done'; let pScore = isTwoAces(pHand) ? 21 : get21Score(pHand);
-        if (pScore <= 21) { let dScore = isTwoAces(dHand) ? 21 : get21Score(dHand); while (dScore < 17 && deck.length > 0) { dHand.push(deck.pop()); dScore = isTwoAces(dHand) ? 21 : get21Score(dHand); } }
-        updateCasinoTable(true); let dScore = isTwoAces(dHand) ? 21 : get21Score(dHand); const resBox = document.getElementById('casinoResultArea'); resBox.style.display = 'block';
-        if (pScore > 21) { resBox.innerHTML = `<span class="color-red">ПЕРЕБОР (${pScore})! Чистый убыток: -${casinoBet.toLocaleString()} ₽</span>`; tgHaptic('error'); } 
-        else if (dScore > 21) { const winTotal = casinoBet * 2; state.player.cash += winTotal; resBox.innerHTML = `<span class="color-green">У КРУПЬЕ ПЕРЕБОР (${dScore})! Выигрыш: +${casinoBet.toLocaleString()} ₽</span>`; playSound('win'); tgHaptic('success'); spawnFloatingReward(`+${casinoBet.toLocaleString()} ₽`); } 
-        else if (pScore > dScore) { const bonus = (pScore === 21 || isTwoAces(pHand)) ? 1.5 : 1.0; const netProfit = Math.round(casinoBet * bonus); const totalPayout = casinoBet + netProfit; state.player.cash += totalPayout; const title = isTwoAces(pHand) ? "ЗОЛОТОЕ ОЧКО (2 ТУЗА)!" : (pScore === 21 ? "РОVНО 21 ОЧКО!" : "ВЫ ПОБЕДИЛИ!"); resBox.innerHTML = `<span class="color-green">${title} Выигрыш: +${netProfit.toLocaleString()} ₽</span>`; playSound('win'); tgHaptic('success'); spawnFloatingReward(`+${netProfit.toLocaleString()} ₽`); } 
-        else if (pScore === dScore) { state.player.cash += casinoBet; resBox.innerHTML = `<span class="color-amber">НИЧЬЯ (${pScore} : ${dScore}). Ставка ${casinoBet.toLocaleString()} ₽ возвращена.</span>`; tgHaptic('medium'); } 
-        else { resBox.innerHTML = `<span class="color-red">КРУПЬЕ ЗАБРАЛ БАНК (${dScore} против ${pScore})! Убыток: -${casinoBet.toLocaleString()} ₽</span>`; tgHaptic('error'); }
-        resBox.innerHTML += `<br><button onclick="resetCasinoUI()" class="btn btn-dark btn-sm mt-2">Сыграть еще раз</button>`; saveState();
+        casinoState = 'done';
+        let pScore = isTwoAces(pHand) ? 21 : get21Score(pHand);
+        
+        if (pScore <= 21) {
+            let dScore = isTwoAces(dHand) ? 21 : get21Score(dHand);
+            while (dScore < 17 && deck.length > 0) {
+                dHand.push(deck.pop());
+                dScore = isTwoAces(dHand) ? 21 : get21Score(dHand);
+            }
+        }
+
+        updateCasinoTable(true);
+        let dScore = isTwoAces(dHand) ? 21 : get21Score(dHand);
+        const resBox = document.getElementById('casinoResultArea');
+        resBox.style.display = 'block';
+
+        let finalPayout = 0;
+        let netProfit = 0;
+
+        if (pScore > 21) {
+            resBox.innerHTML = `<span class="color-red">ПЕРЕБОР (${pScore})! Чистый убыток: -${casinoBet.toLocaleString()} ₽</span>`;
+            tgHaptic('error');
+        } else if (dScore > 21) {
+            netProfit = casinoBet;
+            finalPayout = casinoBet + netProfit;
+            resBox.innerHTML = `<span class="color-green">У КРУПЬЕ ПЕРЕБОР (${dScore})! Выигрыш: +${netProfit.toLocaleString()} ₽</span>`;
+            playSound('win'); tgHaptic('success'); spawnFloatingReward(`+${netProfit.toLocaleString()} ₽`);
+        } else if (pScore > dScore) {
+            const isGolden = (pScore === 21 || isTwoAces(pHand));
+            const multiplier = isGolden ? 1.5 : 1.0;
+            netProfit = Math.round(casinoBet * multiplier);
+            finalPayout = casinoBet + netProfit;
+
+            const title = isTwoAces(pHand) ? "ЗОЛОТОЕ ОЧКО (2 ТУЗА)!" : (pScore === 21 ? "РОВНО 21 ОЧКО!" : "ВЫ ПОБЕДИЛИ!");
+            resBox.innerHTML = `<span class="color-green">${title}<br>Чистый выигрыш: +${netProfit.toLocaleString()} ₽</span>`;
+            playSound('win'); tgHaptic('success'); spawnFloatingReward(`+${netProfit.toLocaleString()} ₽`);
+        } else if (pScore === dScore) {
+            finalPayout = casinoBet;
+            resBox.innerHTML = `<span class="color-amber">НИЧЬЯ (${pScore} : ${dScore}). Возврат ставки: ${casinoBet.toLocaleString()} ₽</span>`;
+            tgHaptic('medium');
+        } else {
+            resBox.innerHTML = `<span class="color-red">КРУПЬЕ ЗАБРАЛ БАНК (${dScore} против ${pScore})! Убыток: -${casinoBet.toLocaleString()} ₽</span>`;
+            tgHaptic('error');
+        }
+
+        if (finalPayout > 0) {
+            state.player.cash += finalPayout;
+        }
+
+        resBox.innerHTML += `<br><button onclick="resetCasinoUI()" class="btn btn-dark btn-sm mt-2">Сыграть еще раз</button>`;
+        
+        saveState();
+        updateHeaderUI();
     }
 
     let activeLifeChatMessages = [];
@@ -857,7 +901,6 @@
     function advanceBarn() { if (state.player.cash < 75000) return showToast("Нужно 75,000 ₽"); state.player.cash -= 75000; state.barnProgress.step += 1; saveState(); renderBarnFind(); showToast("Этап реставрации завершен!"); }
     function claimBarn() { const maxSlots = getTotalGarageSlots(); if (state.garage.length >= maxSlots) return showToast("Гараж полон!"); const p = generateCoolPlate(); const totalCost = 50000 + (75000 * 4); state.garage.push({ id: Date.now(), name: state.barnProgress.car.name, power: 155, type: 'economy', basePrice: 850000, price: 850000, purchaseCost: totalCost, baseMarketValue: 1200000, marketValue: 1200000 + evaluatePlate(p), img: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80", condition: 100, wear: { engine: 100, transmission: 100 }, mileage: 12000, customPlate: p, tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 } }); state.barnProgress = { car: null, step: 0 }; saveState(); renderBarnFind(); renderGarage(); openVerdictModal("Раритет восстановлен!", "Автомобиль теперь в вашем гараже!", true); switchTab('tabGarage'); }
 
-    // ===================== АНИМИРОВАННЫЙ ВИЛСПИН =====================
     const WHEEL_SECTORS = [ { label: '100k ₽', color: '#00f2fe', type: 'cash', val: 100000 }, { label: '25 ⭐', color: '#ffb300', type: 'stars', val: 25 }, { label: '1 🤝', color: '#00e676', type: 'conn', val: 1 }, { label: '250k ₽', color: '#0284c7', type: 'cash', val: 250000 }, { label: 'СУПЕРКАР', color: '#ff3366', type: 'car' }, { label: '35k ₽', color: '#a855f7', type: 'cash', val: 35000 } ];
     let wheelAngle = 0; let isWheelSpinning = false;
     function drawWheel(angle = 0) {
