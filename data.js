@@ -5,7 +5,7 @@ const CAR_DATABASE = {
         { name: "Ока (ВАЗ-1111)", power: 33, basePrice: 40000, type: "economy", img: "assets/cars/economy/oka.jpg" },
         { name: "ЗАЗ-968М «Запорожец»", power: 40, basePrice: 35000, type: "economy", img: "assets/cars/economy/zaz.jpg" },
         { name: "Москвич-412", power: 75, basePrice: 50000, type: "economy", img: "assets/cars/economy/moskvich.jpg" },
-        { name: "ИЖ-2126 «Ода»", power: 73, basePrice: 55000, type: "economy", img: "assets/cars/economy/izh.jpg" },
+        { name: "ИЖ-2126 «Ода»", power: 73, basePrice: 55000, type: "economy", img: "assets/cars/economy/uvicorn main:app --reload.jpg" },
         { name: "ВАЗ-2101 «Копейка»", power: 64, basePrice: 65000, type: "economy", img: "assets/cars/economy/vaz-2101.jpg" },
         { name: "ВАЗ-2106 «Шестерка»", power: 75, basePrice: 75000, type: "economy", img: "assets/cars/economy/vaz-2106.jpg" },
         { name: "ВАЗ-2107 «Семёрка»", power: 74, basePrice: 95000, type: "economy", img: "assets/cars/economy/vaz-2107.jpg" },

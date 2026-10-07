@@ -534,118 +534,127 @@
                                                                                     </section>
                                                                                     <!-- TAB: СЕРВИСЫ -->
                                                                                     <section id="tabServices" class="tab-screen">
-                                                                                      <div class="glass-card mb-3">
-                                                                                        <h3 class="mb-1">
-                                                                                          <i class="fa-solid fa-user-secret color-purple">
-                                                                                          </i> Теневые связи (Решала)</h3>
-                                                                                          <p class="sub-label mb-2">Связи (🤝) спасают от 12.5.1 и проблем с перебитыми VIN при продаже. Иметь их очень полезно!</p>
-                                                                                          <button onclick="buyConnection()" class="btn btn-dark w-full" style="color: #a855f7; border-color: #a855f7;">Купить 1 Связь (150,000 ₽)</button>
+                                                                                        <div class="glass-card mb-3">
+                                                                                            <div class="flex-between mb-2">
+                                                                                                <h3><i class="fa-solid fa-user-group color-cyan"></i> Мои Друзья</h3>
+                                                                                                <button onclick="addFriendPrompt()" class="btn btn-cyan btn-auto btn-sm">+ Добавить</button>
+                                                                                            </div>
+                                                                                            <div id="friendsListContainer">
+                                                                                                <div class="sub-label text-center">Загрузка списка друзей...</div>
+                                                                                            </div>
                                                                                         </div>
-                                                                                        <div class="glass-card text-center mb-3">
-                                                                                          <h3 class="mb-2">
-                                                                                            <i class="fa-solid fa-dharmachakra color-amber">
-                                                                                            </i> Колесо Фортуны</h3>
-                                                                                            <div class="wheel-container">
-                                                                                              <canvas id="wheelCanvas" width="260" height="260">
-                                                                                              </canvas>
-                                                                                              <div class="wheel-pointer">▼</div>
-                                                                                            </div>
-                                                                                            <div class="grid-2 mb-2">
-                                                                                              <button id="btnWheelFree" onclick="spinWheel(true)" class="btn btn-green btn-sm">🎁 Бесплатный Спин</button>
-                                                                                              <button id="btnWheelPaid" onclick="spinWheel(false)" class="btn btn-amber btn-sm">⭐ Крутить (25 Stars)</button>
-                                                                                            </div>
-                                                                                            <div class="sub-label">Бесплатная прокрутка доступна 1 раз в 24 часа.</div>
+                                                                                        <div class="glass-card mb-3">
+                                                                                          <h3 class="mb-1">
+                                                                                            <i class="fa-solid fa-user-secret color-purple">
+                                                                                            </i> Теневые связи (Решала)</h3>
+                                                                                            <p class="sub-label mb-2">Связи (🤝) спасают от 12.5.1 и проблем с перебитыми VIN при продаже. Иметь их очень полезно!</p>
+                                                                                            <button onclick="buyConnection()" class="btn btn-dark w-full" style="color: #a855f7; border-color: #a855f7;">Купить 1 Связь (150,000 ₽)</button>
                                                                                           </div>
-                                                                                          <div class="glass-card mb-3">
-                                                                                            <h3 class="mb-1">
-                                                                                              <i class="fa-solid fa-gas-pump color-cyan">
-                                                                                              </i> Городская АЗС</h3>
-                                                                                              <div class="grid-2">
-                                                                                                <button onclick="refuelAction('cash')" class="btn btn-dark">Залить бак 100 ⛽ (5,000 ₽)</button>
-                                                                                                <button onclick="refuelAction('free')" class="btn btn-cyan">Бесплатно за рекламу</button>
+                                                                                          <div class="glass-card text-center mb-3">
+                                                                                            <h3 class="mb-2">
+                                                                                              <i class="fa-solid fa-dharmachakra color-amber">
+                                                                                              </i> Колесо Фортуны</h3>
+                                                                                              <div class="wheel-container">
+                                                                                                <canvas id="wheelCanvas" width="260" height="260">
+                                                                                                </canvas>
+                                                                                                <div class="wheel-pointer">▼</div>
                                                                                               </div>
+                                                                                              <div class="grid-2 mb-2">
+                                                                                                <button id="btnWheelFree" onclick="spinWheel(true)" class="btn btn-green btn-sm">🎁 Бесплатный Спин</button>
+                                                                                                <button id="btnWheelPaid" onclick="spinWheel(false)" class="btn btn-amber btn-sm">⭐ Крутить (25 Stars)</button>
+                                                                                              </div>
+                                                                                              <div class="sub-label">Бесплатная прокрутка доступна 1 раз в 24 часа.</div>
                                                                                             </div>
                                                                                             <div class="glass-card mb-3">
                                                                                               <h3 class="mb-1">
-                                                                                                <i class="fa-solid fa-rectangle-ad color-cyan">
-                                                                                                </i> Реклама (Adsgram)</h3>
-                                                                                                <button id="btnWatchAd" onclick="watchAdsgram()" class="btn btn-cyan w-full">📺 Смотреть видео (+25,000 ₽ & +1 🤝)</button>
+                                                                                                <i class="fa-solid fa-gas-pump color-cyan">
+                                                                                                </i> Городская АЗС</h3>
+                                                                                                <div class="grid-2">
+                                                                                                  <button onclick="refuelAction('cash')" class="btn btn-dark">Залить бак 100 ⛽ (5,000 ₽)</button>
+                                                                                                  <button onclick="refuelAction('free')" class="btn btn-cyan">Бесплатно за рекламу</button>
+                                                                                                </div>
                                                                                               </div>
-                                                                                              <div class="glass-card text-left">
-                                                                                                <h4 class="font-bold color-amber mb-2">
-                                                                                                  <i class="fa-solid fa-crown mr-1">
-                                                                                                  </i> Магазин Telegram Stars</h4>
-                                                                                                  <div class="grid-2 mb-2">
-                                                                                                    <button onclick="buyPackWithStars(50, 500000)" class="btn btn-dark">500,000 ₽ (50 ⭐)</button>
-                                                                                                    <button onclick="buyPackWithStars(150, 2000000)" class="btn btn-dark">2,000,000 ₽ (150 ⭐)</button>
-                                                                                                  </div>
-                                                                                                  <button onclick="buyVipProPass()" class="btn btn-amber w-full">⭐ VIP PRO за 199 Stars (или 1.5M ₽)</button>
+                                                                                              <div class="glass-card mb-3">
+                                                                                                <h3 class="mb-1">
+                                                                                                  <i class="fa-solid fa-rectangle-ad color-cyan">
+                                                                                                  </i> Реклама (Adsgram)</h3>
+                                                                                                  <button id="btnWatchAd" onclick="watchAdsgram()" class="btn btn-cyan w-full">📺 Смотреть видео (+25,000 ₽ & +1 🤝)</button>
                                                                                                 </div>
-                                                                                              </section>
-                                                                                              <!-- TAB: НОМЕРА -->
-                                                                                              <section id="tabPlates" class="tab-screen">
-                                                                                                <div class="glass-card mb-2">
-                                                                                                  <h3>
-                                                                                                    <i class="fa-solid fa-id-card color-amber">
-                                                                                                    </i> Моя коллекция номеров:</h3>
-                                                                                                    <div class="sub-label mb-2 mt-1">Госпошлина за установку и снятие: <b>2,000 ₽</b>
-                                                                                                  </div>
-                                                                                                  <div id="ownedPlatesListDetailed" class="space-y-2">
-                                                                                                  </div>
-                                                                                                </div>
-                                                                                                <h4 class="font-bold mb-2 px-1">Госномера в продаже:</h4>
-                                                                                                <div id="plateMarketList">
-                                                                                                </div>
-                                                                                              </section>
-                                                                                              <!-- TAB: ПРОФИЛЬ -->
-                                                                                              <section id="tabProfile" class="tab-screen">
-                                                                                                <div class="glass-card text-center">
-                                                                                                  <div class="avatar" style="width:62px; height:62px; margin:0 auto; font-size:26px;">
-                                                                                                    <i class="fa-solid fa-user-tie">
-                                                                                                    </i>
-                                                                                                  </div>
-                                                                                                  <h3 class="mt-2" id="profileTgUsername">Перекуп #777</h3>
-                                                                                                  <p class="sub-label mb-3" id="profPlayerRank">Статус: Гаражный Делец</p>
-                                                                                                  <div class="grid-2 mb-2">
-                                                                                                    <div class="stat-box">
-                                                                                                      <div class="sub-label">Прибыльных продаж:</div>
-                                                                                                      <div id="statProfitable" class="stat-value color-green">0</div>
+                                                                                                <div class="glass-card text-left">
+                                                                                                  <h4 class="font-bold color-amber mb-2">
+                                                                                                    <i class="fa-solid fa-crown mr-1">
+                                                                                                    </i> Магазин Telegram Stars</h4>
+                                                                                                    <div class="grid-2 mb-2">
+                                                                                                      <button onclick="buyPackWithStars(50, 500000)" class="btn btn-dark">500,000 ₽ (50 ⭐)</button>
+                                                                                                      <button onclick="buyPackWithStars(150, 2000000)" class="btn btn-dark">2,000,000 ₽ (150 ⭐)</button>
                                                                                                     </div>
-                                                                                                    <div class="stat-box">
-                                                                                                      <div class="sub-label">Убыточных продаж:</div>
-                                                                                                      <div id="statLoss" class="stat-value color-red">0</div>
+                                                                                                    <button onclick="buyVipProPass()" class="btn btn-amber w-full">⭐ VIP PRO за 199 Stars (или 1.5M ₽)</button>
+                                                                                                  </div>
+                                                                                                </section>
+                                                                                                <!-- TAB: НОМЕРА -->
+                                                                                                <section id="tabPlates" class="tab-screen">
+                                                                                                  <div class="glass-card mb-2">
+                                                                                                    <h3>
+                                                                                                      <i class="fa-solid fa-id-card color-amber">
+                                                                                                      </i> Моя коллекция номеров:</h3>
+                                                                                                      <div class="sub-label mb-2 mt-1">Госпошлина за установку и снятие: <b>2,000 ₽</b>
+                                                                                                    </div>
+                                                                                                    <div id="ownedPlatesListDetailed" class="space-y-2">
                                                                                                     </div>
                                                                                                   </div>
-                                                                                                  <div class="grid-2 mb-3">
-                                                                                                    <div class="stat-box">
-                                                                                                      <div class="sub-label">Итоговый профит:</div>
-                                                                                                      <div id="statTotalNetProfit" class="stat-value color-cyan">0 ₽</div>
-                                                                                                    </div>
-                                                                                                    <div class="stat-box">
-                                                                                                      <div class="sub-label">Винрейт сделок:</div>
-                                                                                                      <div id="statWinrate" class="stat-value color-amber">0%</div>
-                                                                                                    </div>
+                                                                                                  <h4 class="font-bold mb-2 px-1">Госномера в продаже:</h4>
+                                                                                                  <div id="plateMarketList">
                                                                                                   </div>
-                                                                                                  <div class="level-gate-box mb-3 text-left">
-                                                                                                    <div class="sub-label font-bold color-cyan mb-1">⚡ Быстрый тестер:</div>
-                                                                                                    <div class="grid-3 mb-1">
-                                                                                                      <button onclick="setCheatLevel(1)" class="btn btn-dark btn-sm">1 ур</button>
-                                                                                                      <button onclick="setCheatLevel(5)" class="btn btn-dark btn-sm">5 ур (Империя)</button>
-                                                                                                      <button onclick="setCheatLevel(12)" class="btn btn-dark btn-sm">12 ур (21)</button>
+                                                                                                </section>
+                                                                                                <!-- TAB: ПРОФИЛЬ -->
+                                                                                                <section id="tabProfile" class="tab-screen">
+                                                                                                  <div class="glass-card text-center">
+                                                                                                    <div class="avatar" style="width:62px; height:62px; margin:0 auto; font-size:26px;">
+                                                                                                      <i class="fa-solid fa-user-tie">
+                                                                                                      </i>
                                                                                                     </div>
-                                                                                                    <div class="grid-3 mb-1">
-                                                                                                      <button onclick="setCheatLevel(30)" class="btn btn-dark btn-sm">30 ур</button>
-                                                                                                      <button onclick="setCheatLevel(50)" class="btn btn-dark btn-sm">50 ур</button>
-                                                                                                      <button onclick="cheatAddMoney()" class="btn btn-green btn-sm">+10M ₽</button>
+                                                                                                    <h3 class="mt-2" id="profileTgUsername">Перекуп #777</h3>
+                                                                                                    <p class="sub-label mb-3" id="profPlayerRank">Статус: Гаражный Делец</p>
+                                                                                                    <div class="grid-2 mb-2">
+                                                                                                      <div class="stat-box">
+                                                                                                        <div class="sub-label">Прибыльных продаж:</div>
+                                                                                                        <div id="statProfitable" class="stat-value color-green">0</div>
+                                                                                                      </div>
+                                                                                                      <div class="stat-box">
+                                                                                                        <div class="sub-label">Убыточных продаж:</div>
+                                                                                                        <div id="statLoss" class="stat-value color-red">0</div>
+                                                                                                      </div>
                                                                                                     </div>
-                                                                                                    <div class="grid-2">
-                                                                                                      <button onclick="cheatAddStats()" class="btn btn-cyan btn-sm">100% Сил</button>
-                                                                                                      <button onclick="resetGameData()" class="btn btn-danger btn-sm">Сброс</button>
+                                                                                                    <div class="grid-2 mb-3">
+                                                                                                      <div class="stat-box">
+                                                                                                        <div class="sub-label">Итоговый профит:</div>
+                                                                                                        <div id="statTotalNetProfit" class="stat-value color-cyan">0 ₽</div>
+                                                                                                      </div>
+                                                                                                      <div class="stat-box">
+                                                                                                        <div class="sub-label">Винрейт сделок:</div>
+                                                                                                        <div id="statWinrate" class="stat-value color-amber">0%</div>
+                                                                                                      </div>
                                                                                                     </div>
+                                                                                                    <div class="level-gate-box mb-3 text-left">
+                                                                                                      <div class="sub-label font-bold color-cyan mb-1">⚡ Быстрый тестер:</div>
+                                                                                                      <div class="grid-3 mb-1">
+                                                                                                        <button onclick="setCheatLevel(1)" class="btn btn-dark btn-sm">1 ур</button>
+                                                                                                        <button onclick="setCheatLevel(5)" class="btn btn-dark btn-sm">5 ур (Империя)</button>
+                                                                                                        <button onclick="setCheatLevel(12)" class="btn btn-dark btn-sm">12 ур (21)</button>
+                                                                                                      </div>
+                                                                                                      <div class="grid-3 mb-1">
+                                                                                                        <button onclick="setCheatLevel(30)" class="btn btn-dark btn-sm">30 ур</button>
+                                                                                                        <button onclick="setCheatLevel(50)" class="btn btn-dark btn-sm">50 ур</button>
+                                                                                                        <button onclick="cheatAddMoney()" class="btn btn-green btn-sm">+10M ₽</button>
+                                                                                                      </div>
+                                                                                                      <div class="grid-2">
+                                                                                                        <button onclick="cheatAddStats()" class="btn btn-cyan btn-sm">100% Сил</button>
+                                                                                                        <button onclick="resetGameData()" class="btn btn-danger btn-sm">Сброс</button>
+                                                                                                      </div>
+                                                                                                    </div>
+                                                                                                    <button onclick="switchTab('tabMarket')" class="btn btn-dark">Вернуться к игре</button>
                                                                                                   </div>
-                                                                                                  <button onclick="switchTab('tabMarket')" class="btn btn-dark">Вернуться к игре</button>
-                                                                                                </div>
-                                                                                              </section>
+                                                                                                </section>
                                                                                             </main>
                                                                                             <nav class="bottom-nav">
                                                                                               <div class="b-nav-item active" onclick="switchTab('tabMarket')" id="bnav-tabMarket">
@@ -960,6 +969,200 @@
                                                                                                                 </div>
                                                                                                                 <div id="toastNotification" class="toast">Уведомление</div>
                                                                                                                 <script>
+    // --- ПОДКЛЮЧЕНИЕ К ВАШЕМУ СЕРВЕРУ НА RAILWAY ---
+    const API_BASE_URL = 'https://perekupik-production.up.railway.app/api';
+
+    async function apiRequest(endpoint, method = 'GET', body = null) {
+        const initData = window.Telegram?.WebApp?.initData || "";
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-Telegram-Init-Data': initData
+        };
+        const options = { method, headers };
+        if (body) options.body = JSON.stringify(body);
+
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(errText);
+        }
+        return await response.json();
+    }
+
+    async function syncProfileWithServer() {
+        try {
+            await apiRequest('/profile/sync', 'POST', {
+                cash: state.player.cash,
+                stars: state.player.stars,
+                level: state.player.level,
+                garage: state.garage
+            });
+        } catch (e) {
+            console.error("Ошибка синхронизации профиля:", e);
+        }
+    }
+
+    async function loadProfileFromServer() {
+        try {
+            const data = await apiRequest('/profile');
+            state.player.cash = data.cash;
+            state.player.stars = data.stars;
+            state.player.level = data.level;
+            state.player.name = data.username;
+            if (data.avatar_url) state.player.avatarUrl = data.avatar_url;
+            if (data.garage && data.garage.length > 0) {
+                state.garage = data.garage;
+            }
+            updateHeaderUI();
+            renderGarage();
+        } catch (e) {
+            console.error("Не удалось загрузить профиль с сервера, используем локальный кэш", e);
+        }
+    }
+
+    async function loadRealP2PListings() {
+        try {
+            const data = await apiRequest('/p2p/listings');
+            state.p2pCars = data.cars.map(lot => ({
+                ...lot.car_data,
+                id: lot.lot_id,
+                seller: lot.seller_username,
+                seller_id: lot.seller_id,
+                price: lot.price
+            }));
+            if (state.p2pMode === 'cars') renderP2P();
+        } catch (e) {
+            console.error("Ошибка загрузки P2P рынка:", e);
+        }
+    }
+
+    async function confirmPutOnLot() {
+        if (carToLotIndex === null) return; 
+        const car = state.garage[carToLotIndex]; 
+        const input = document.getElementById('lotAskingPriceInput'); 
+        let askingPrice = parseInt(input.value); 
+        if (isNaN(askingPrice) || askingPrice <= 0) return showToast("Введите корректную сумму!");
+
+        try {
+            await apiRequest('/p2p/sell', 'POST', {
+                car: car,
+                price: askingPrice
+            });
+
+            closeModal('modalPutOnLot'); 
+            state.garage.splice(carToLotIndex, 1); 
+            saveState(); 
+            syncProfileWithServer();
+            renderGarage(); 
+            showToast(`🚗 ${car.name} выставлен на реальную P2P биржу!`); 
+            setTimeout(() => switchTab('tabP2P'), 300); 
+        } catch (e) {
+            showToast("Ошибка при выставлении лота на сервер");
+        }
+    }
+
+    async function buyRealP2PCar(lotId, price) {
+        if (state.player.cash < price) {
+            return showToast("Недостаточно наличных средств!");
+        }
+
+        try {
+            const data = await apiRequest('/p2p/buy', 'POST', { lot_id: lotId });
+            
+            state.player.cash = data.new_cash;
+            state.garage.push(data.car);
+            saveState();
+            syncProfileWithServer();
+            loadRealP2PListings();
+            renderGarage();
+            playSound('win');
+            tgHaptic('success');
+            showToast("✅ Машина успешно выкуплена у игрока!");
+        } catch (e) {
+            showToast("Лот уже продан или недоступен");
+            loadRealP2PListings();
+        }
+    }
+
+    function renderP2P() {
+        const c = document.getElementById('p2pItemsList'); 
+        if (!c) return; 
+
+        loadRealP2PListings();
+
+        if (state.p2pMode === 'cars') {
+            if (!state.p2pCars || state.p2pCars.length === 0) {
+                c.innerHTML = `<div class="glass-card text-center sub-label py-8"><i class="fa-solid fa-handshake color-green mb-2" style="font-size:32px;"></i><div>На бирже пока нет лотов от других игроков. Выставьте свой автомобиль!</div></div>`;
+                return;
+            }
+
+            c.innerHTML = state.p2pCars.map((car, idx) => `
+                <div class="glass-card mb-2">
+                    <div class="flex-between mb-1">
+                        <h4 class="font-bold">${car.name}</h4>
+                        <span class="tag-badge bg-tag-cyan">@${car.seller || 'Игрок'}</span>
+                    </div>
+                    <div class="sub-label mb-2">${car.power || 100} л.с. | Пробег: ${(car.mileage || 50000).toLocaleString()} км</div>
+                    <div class="flex-between mb-2">
+                        <div class="license-plate">${car.customPlate || car.plate || 'А777АА 777'}</div>
+                        <div class="price-val">${car.price.toLocaleString()} ₽</div>
+                    </div>
+                    <button onclick="window.Telegram?.WebApp?.openTelegramLink('https://t.me/${car.seller}')" class="btn btn-dark w-full mb-1">
+                        💬 Написать продавцу (Торг)
+                    </button>
+                    <button onclick="buyRealP2PCar('${car.id}', ${car.price})" class="btn btn-green w-full">
+                        Выкупить лот
+                    </button>
+                </div>
+            `).join('');
+        } else {
+            c.innerHTML = `<div class="sub-label text-center">Раздел номеров на P2P в разработке</div>`;
+        }
+    }
+
+    async function loadFriendsList() {
+        try {
+            const data = await apiRequest('/friends');
+            const container = document.getElementById('friendsListContainer');
+            if (!container) return;
+
+            if (!data.friends || data.friends.length === 0) {
+                container.innerHTML = `<div class="sub-label text-center">У вас пока нет добавленных друзей.</div>`;
+                return;
+            }
+
+            container.innerHTML = data.friends.map(f => `
+                <div class="glass-card flex-between p-2 mb-2">
+                    <div>
+                        <div class="font-bold color-cyan">@${f.friend_username}</div>
+                        <div class="sub-label">Уровень: ${f.level} | Капитал: ${f.cash.toLocaleString()} ₽</div>
+                    </div>
+                    <span class="tag-badge bg-tag-green">В сети</span>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error("Ошибка загрузки друзей:", e);
+        }
+    }
+
+    async function addFriendPrompt() {
+        const friendIdStr = prompt("Введите Telegram ID игрока для добавления в друзья:");
+        if (!friendIdStr) return;
+        const friendId = parseInt(friendIdStr);
+        const friendUsername = prompt("Введите юзернейм игрока (без @):") || "Игрок";
+
+        try {
+            await apiRequest('/friends/add', 'POST', {
+                friend_id: friendId,
+                friend_username: friendUsername
+            });
+            showToast("Друг успешно добавлен!");
+            loadFriendsList();
+        } catch (e) {
+            showToast("Ошибка при добавлении в друзья");
+        }
+    }
+
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
 
@@ -1094,7 +1297,6 @@
         
         if (!state.businesses || state.businesses.length === 0) state.businesses = (typeof BUSINESS_DATA !== 'undefined' ? BUSINESS_DATA : []);
         if (!Array.isArray(state.plateCatalog) || state.plateCatalog.length === 0) refreshPlateCatalog();
-        if (!Array.isArray(state.p2pCars) || state.p2pCars.length === 0) generateRandomP2PCars();
         if (!Array.isArray(state.contracts) || state.contracts.length === 0) generateContracts();
         
         if (typeof BUSINESS_DATA !== 'undefined') {
@@ -1129,7 +1331,11 @@
         if(loanEl) loanEl.innerText = `Долг: ${state.player.loanDebt.toLocaleString()} ₽`;
     }
 
-    function saveState() { try { localStorage.setItem('perekoop_sim_save_v29', JSON.stringify(state)); } catch(e) {} updateHeaderUI(); }
+    function saveState() { 
+        try { localStorage.setItem('perekoop_sim_save_v29', JSON.stringify(state)); } catch(e) {} 
+        updateHeaderUI(); 
+        syncProfileWithServer();
+    }
 
     function getMarketRefreshCost() { return 150 + (state.player.level * 350); }
 
@@ -1167,7 +1373,7 @@
         if (tabId === 'tabBarn') renderBarnFind();
         if (tabId === 'tabLife') { renderDiets(); initLiveChat(); initCasino(); }
         if (tabId === 'tabHousing') renderHousing();
-        if (tabId === 'tabServices') setTimeout(drawWheelStatic, 50);
+        if (tabId === 'tabServices') { setTimeout(drawWheelStatic, 50); loadFriendsList(); }
         if (tabId === 'tabP2P') renderP2P();
         if (tabId === 'tabStreet') { initStreetView(); }
         if (tabId === 'tabProfile') renderProfileAnalytics();
@@ -1400,7 +1606,7 @@
         
         if (!car.preSaleVisited) {
             if (state.player.preSalesCount >= 10) {
-                state.player.preSaleCooldownUntil = now + 3600000; // 1 час
+                state.player.preSaleCooldownUntil = now + 3600000;
                 state.player.preSalesCount = 0;
                 saveState();
                 return showToast(`Лимит (10 машин) исчерпан! Студия закрыта на 1 час.`);
@@ -1461,7 +1667,7 @@
         
         saveState(); 
         renderGarage(); 
-        openPreSaleModal(activePreSaleCarIndex); // Обновляем UI кнопок
+        openPreSaleModal(activePreSaleCarIndex);
     }
 
     function repairCarDefect(idx) {
@@ -1532,17 +1738,6 @@
 
     let activeHaggleSlotIdx = null;
     function openPutOnLotModal(idx) { carToLotIndex = idx; const car = state.garage[idx]; const cost = car.purchaseCost || car.basePrice || 100000; setTxt('lotPutCarTitle', `${car.name} (Оценка: ${(car.marketValue || car.price).toLocaleString()} ₽)`); setTxt('lotCostInfo', `Начальная себестоимость: ${cost.toLocaleString()} ₽`); setTxt('lotRecPriceText', `Рекомендуемая рыночная: ~${(car.marketValue || car.price).toLocaleString()} ₽`); const input = document.getElementById('lotAskingPriceInput'); if (input) input.value = car.marketValue || car.price; document.getElementById('modalPutOnLot')?.classList.add('active'); }
-    
-    function confirmPutOnLot() { 
-        if (carToLotIndex === null) return; const car = state.garage[carToLotIndex]; const input = document.getElementById('lotAskingPriceInput'); 
-        let askingPrice = parseInt(input.value); 
-        if (isNaN(askingPrice) || askingPrice <= 0) return showToast("Введите корректную сумму для продажи!");
-        if (askingPrice > 999999999) askingPrice = 999999999; 
-        closeModal('modalPutOnLot'); 
-        state.garage.splice(carToLotIndex, 1); 
-        state.salesLot.push({ id: 'lot_' + Date.now(), car: car, askingPrice: askingPrice, timer: 25, currentBuyer: null }); 
-        saveState(); renderGarage(); renderSalesLot(); tgHaptic('success'); showToast(`🚗 ${car.name} выставлен на площадку!`); setTimeout(() => switchTab('tabSalesLot'), 300); 
-    }
 
     function renderSalesLot() {
         const list = document.getElementById('salesLotList'); if (!list) return; 
@@ -1812,7 +2007,7 @@
 
         state.player.fuel = 100;
         state.marketFeed.forEach(car => { car.cooldownUntil = 0; car.unavailable = false; car.haggled = false; });
-        populateMarketFeed(); generateRandomP2PCars(); refreshPlateCatalog(); saveState(); renderDiets(); renderHousing(); renderP2P(); checkBusinessAccess(); renderPlatesPage(); 
+        populateMarketFeed(); refreshPlateCatalog(); saveState(); renderDiets(); renderHousing(); checkBusinessAccess(); renderPlatesPage(); 
         triggerMorningEvent(luxuryTax, loanInfoText + connectionLossText + businessPayoutText);
     }
 
@@ -1880,15 +2075,7 @@
     function createClubPrompt() { const cName = prompt("Введите название автоклуба:"); if (cName) joinClub(cName); }
 
     function filterP2P(type) { state.p2pMode = type; document.getElementById('p2pFilter-cars')?.classList.toggle('btn-cyan', type === 'cars'); document.getElementById('p2pFilter-cars')?.classList.toggle('btn-dark', type !== 'cars'); document.getElementById('p2pFilter-plates')?.classList.toggle('btn-cyan', type === 'plates'); document.getElementById('p2pFilter-plates')?.classList.toggle('btn-dark', type !== 'plates'); renderP2P(); }
-    function generateRandomP2PCars() { 
-        if (typeof CAR_DATABASE === 'undefined') return;
-        const sellers = ['Smotra_King', 'Vaz_Tuning77', 'Majorka_Style', 'Garage_Customs', 'Baza_Perecup']; 
-        const names = [{ name: 'ВАЗ-2114 Super-Auto', power: 125, price: 230000, type: 'economy', img: 'assets/cars/economy/vaz-2114.jpg' }, { name: 'VW Golf VI GTI Stage 2', power: 260, price: 1450000, type: 'comfort', img: 'assets/cars/comfort/golf6.jpg' }]; 
-        while (state.p2pCars.length < 4) { const item = names[Math.floor(Math.random() * names.length)]; const seller = sellers[Math.floor(Math.random() * sellers.length)]; const p = generateCoolPlate(); const bPrice = Math.round(item.price * 1.15); state.p2pCars.push({ id: 'p2p_' + Date.now() + '_' + Math.random(), name: item.name, power: item.power, price: Math.round(item.price * (0.95 + Math.random() * 0.15)) + evaluatePlate(p), basePrice: item.price, baseMarketValue: bPrice, marketValue: bPrice + evaluatePlate(p), seller: seller, plate: p, type: item.type, mileage: Math.floor(Math.random() * 70000) + 40000, condition: 85, tuning: { chip: 1, exhaust: true, stance: false, bodykit: false, risk1251: 20 }, wear: { engine: 85, transmission: 85 }, img: item.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80", legalIssue: 'clean' }); } 
-    }
-    function renderP2P() { const c = document.getElementById('p2pItemsList'); if (!c) return; if (state.p2pMode === 'cars') { c.innerHTML = state.p2pCars.map((car, idx) => `<div class="glass-card mb-2"><div class="flex-between mb-1"><h4 class="font-bold">${car.name}</h4><span class="tag-badge bg-tag-cyan">${car.seller}</span></div><div class="sub-label mb-2">${car.power} л.с. | Пробег: ${(car.mileage || 65000).toLocaleString()} км</div><div class="flex-between mb-2"><div class="license-plate">${car.plate}</div><div class="price-val">${car.price.toLocaleString()} ₽</div></div><button onclick="buyP2PCar(${idx})" class="btn btn-green w-full">Выкупить лот</button></div>`).join(''); } else { c.innerHTML = state.p2pPlates.map((item, idx) => `<div class="glass-card flex-between mb-2"><div class="license-plate">${item.plate}</div><button onclick="buyP2PPlate(${idx})" class="btn btn-amber btn-auto">Купить (${item.price.toLocaleString()} ₽)</button></div>`).join(''); } }
-    function buyP2PCar(idx) { const car = state.p2pCars[idx]; if (!car) return; const maxSlots = getTotalGarageSlots(); if (state.garage.length >= maxSlots) return showToast(`Гараж полон!`); if (state.player.cash < car.price) return showToast("Не хватает денег!"); state.player.cash -= car.price; state.player.stats.bought += 1; const newCar = { ...car, id: 'g_p2p_' + Date.now() + '_' + Math.random(), purchaseCost: car.price, baseMarketValue: car.baseMarketValue || Math.round((car.basePrice || car.price) * 1.15), marketValue: car.marketValue, basePrice: car.basePrice || car.price, condition: car.condition || 85, mileage: car.mileage || Math.floor(Math.random() * 80000 + 35000), customPlate: car.plate, tuning: car.tuning || { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 }, wear: car.wear || { engine: 90, transmission: 90 }, bodyThickness: { hood: 110, roof: 100, doors: 110, wings: 110 }, hiddenDefect: null, hasAdditive: false, isRepainted: false, isPolished: false }; state.garage.push(newCar); state.p2pCars.splice(idx, 1); if (state.p2pCars.length < 3) generateRandomP2PCars(); addXp(30); saveState(); renderP2P(); renderGarage(); playSound('win'); tgHaptic('success'); showToast(`✅ ${newCar.name} выкуплен!`); setTimeout(() => switchTab('tabGarage'), 300); }
-    function buyP2PPlate(idx) { const item = state.p2pPlates[idx]; if (state.player.cash < item.price) return showToast("Не хватает денег!"); state.player.cash -= item.price; state.ownedPlates.push(item.plate); state.p2pPlates.splice(idx, 1); saveState(); renderP2P(); showToast(`Номер ${item.plate} выкуплен!`); }
+    
     function renderPlatesPage() { const detailed = document.getElementById('ownedPlatesListDetailed'); if (detailed) { if (state.ownedPlates.length === 0) detailed.innerHTML = `<div class="sub-label">У вас нет свободных номеров.</div>`; else detailed.innerHTML = state.ownedPlates.map((p, i) => `<div class="glass-card flex-between p-2 mb-2"><div class="license-plate">${p} <div class="license-flag">RUS</div></div><div class="flex-gap"><span class="sub-label color-green font-bold">+${Math.round(evaluatePlate(p) * 0.75).toLocaleString()} ₽</span><button onclick="sellOwnedPlate(${i})" class="btn btn-amber btn-auto btn-sm">Продать</button></div></div>`).join(''); } const pm = document.getElementById('plateMarketList'); if (pm) { const available = state.plateCatalog.filter(item => !state.ownedPlates.includes(item.plate)); if (available.length === 0) pm.innerHTML = `<div class="sub-label">Все номера раскуплены! Обновится завтра.</div>`; else pm.innerHTML = available.map(p => `<div class="glass-card flex-between mb-2"><div class="license-plate">${p.plate} <div class="license-flag">RUS</div></div><button onclick="buyPlateFromShop('${p.plate}', ${p.price})" class="btn btn-amber btn-auto">Купить (${p.price.toLocaleString()} ₽)</button></div>`).join(''); } }
     function sellOwnedPlate(idx) { const plate = state.ownedPlates[idx]; const payout = Math.round(evaluatePlate(plate) * 0.75); state.player.cash += payout; state.ownedPlates.splice(idx, 1); state.plateCatalog.push({ plate: plate, price: Math.round(payout / 0.75 * 1.15) }); saveState(); renderPlatesPage(); playSound('win'); tgHaptic('success'); spawnFloatingReward(`+${payout.toLocaleString()} ₽`); showToast(`Продан за ${payout.toLocaleString()} ₽!`); }
     function buyPlateFromShop(plate, price) { if (state.player.cash < price) return showToast("Недостаточно денег!"); if (state.ownedPlates.includes(plate)) return showToast("Номер уже в коллекции!"); state.player.cash -= price; state.ownedPlates.push(plate); saveState(); renderPlatesPage(); playSound('win'); tgHaptic('success'); showToast(`Номер ${plate} добавлен в коллекцию!`); }
@@ -1957,8 +2144,6 @@
     function cheatAddMoney() { state.player.cash += 10000000; updateHeaderUI(); saveState(); showToast("+10,000,000 ₽!"); }
     function cheatAddStats() { state.player.hunger = 100; state.player.mood = 100; state.player.reputation = 100; updateHeaderUI(); saveState(); showToast("Сытость и кураж 100%!"); }
 
-    // === ФУНКЦИИ ИНТЕРФЕЙСА (ОБНОВЛЕННЫЕ) ===
-
     function updateLevelGatesUI() {
         const locks = [
             { id: 'catBtn-moto', lock: 'lock-moto', lvl: 16 },
@@ -2008,7 +2193,6 @@
         showToast('Рацион питания изменен!');
     }
 
-    // === ЗАКАЗЫ ===
     function generateContracts() {
         state.contracts = [
             { id: 'cnt_1', title: 'Подобрать Солярис/Рио', reward: 75000, req: 'economy' },
@@ -2069,7 +2253,6 @@
         showToast('Заказы обновлены');
     }
 
-    // === САРАИ ===
     function renderBarnFind() {
         const b = document.getElementById('barnFindContent');
         if (!b || typeof BARN_FINDS === 'undefined') return;
@@ -2131,7 +2314,6 @@
         openVerdictModal("НАХОДКА! 🏚️", `Вы откопали ${template.name}! Машина добавлена в гараж, но требует капитального ремонта.`, true);
     }
 
-    // === ИМПЕРИЯ ===
     function checkBusinessAccess() {
         const c = document.getElementById('businessList');
         const lock = document.getElementById('businessLockCover');
@@ -2225,168 +2407,20 @@
         closeModal('modalDailyBonus');
     }
 
-    function renderProfileAnalytics() {
-        setTxt('profileTgUsername', state.player.name);
-        setTxt('profPlayerRank', `Уровень: ${state.player.level}`);
-        setTxt('statProfitable', state.player.stats.profitableSales);
-        setTxt('statLoss', state.player.stats.lossSales);
-        setTxt('statTotalNetProfit', state.player.stats.totalNetProfit.toLocaleString() + ' ₽');
-        const total = state.player.stats.sold || 1;
-        const winrate = state.player.stats.sold > 0 ? Math.round((state.player.stats.profitableSales / total) * 100) : 0;
-        setTxt('statWinrate', winrate + '%');
+    function renderAchievements() {
+        const list = document.getElementById('achievementsList');
+        if (!list || typeof ACHIEVEMENTS_CONFIG === 'undefined') return;
+        list.innerHTML = ACHIEVEMENTS_CONFIG.map(a => {
+            const isUnlocked = state.player.achievements.includes(a.id);
+            return `
+                <div class="glass-card mb-2 ${isUnlocked ? 'unlocked' : ''}">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs">${a.title}</b>
+                        <span class="tag-badge bg-tag-${isUnlocked ? 'green' : 'dark'}">${isUnlocked ? 'Разблокировано' : 'Закрыто'}</span>
+                    </div>
+                    <p class="sub-label mb-1">${a.desc}</p>
+                    ${isUnlocked ? `<div class="color-green text-xs font-bold">Награда: ${a.reward.cash ? a.reward.cash.toLocaleString() + ' ₽' : ''}${a.reward.stars ? ', ' + a.reward.stars + ' ⭐' : ''}</div>` : ''}
+                </div>
+            `;
+        }).join('');
     }
-
-    function drawWheelStatic() {
-        const c = document.getElementById('wheelCanvas');
-        if(!c) return;
-        const ctx = c.getContext('2d');
-        ctx.clearRect(0,0,260,260);
-        ctx.fillStyle = '#090e18'; 
-        ctx.beginPath(); 
-        ctx.arc(130,130,120,0,Math.PI*2); 
-        ctx.fill();
-        ctx.fillStyle = '#00f2fe'; 
-        ctx.font = '16px -apple-system, sans-serif'; 
-        ctx.textAlign = 'center';
-        ctx.fillText('Сектора колеса', 130, 130);
-    }
-
-    function spinWheel(isFree) {
-        if(isFree) {
-            const now = Date.now();
-            if (now - state.player.lastFreeSpin < 86400000) {
-                const hours = Math.ceil((86400000 - (now - state.player.lastFreeSpin)) / 3600000);
-                return showToast(`Бесплатный спин через ${hours} ч.`);
-            }
-            state.player.lastFreeSpin = now;
-        } else {
-            if (state.player.stars < 25) return showToast('Не хватает 25 ⭐!');
-            state.player.stars -= 25;
-        }
-        
-        tgHaptic('medium');
-        showToast('Крутим колесо...');
-        
-        setTimeout(() => {
-            const prizes = [10000, 25000, 50000, 100000, 'star', 'connection'];
-            const won = prizes[Math.floor(Math.random() * prizes.length)];
-            
-            if (won === 'star') {
-                state.player.stars += 5;
-                openVerdictModal("🎉 Колесо Фортуны", "Вы выиграли 5 ⭐!", true);
-            } else if (won === 'connection') {
-                state.player.connections += 1;
-                openVerdictModal("🎉 Колесо Фортуны", "Вы выиграли 1 🤝 (Связь)!", true);
-            } else {
-                state.player.cash += won;
-                openVerdictModal("🎉 Колесо Фортуны", `Вы выиграли ${won.toLocaleString()} ₽!`, true);
-            }
-            saveState();
-        }, 1500);
-    }
-
-    function doActivity(type, cost, mood, connections = 0) {
-        if (state.player.cash < cost) return showToast('Не хватает денег!');
-        state.player.cash -= cost;
-        state.player.mood = Math.min(100, state.player.mood + mood);
-        if (connections > 0) state.player.connections += connections;
-        saveState();
-        tgHaptic('success');
-        showToast(`Вы отлично отдохнули! Настроение +${mood}`);
-    }
-
-    function watchAdsgram() {
-        const now = Date.now();
-        if (now - state.player.lastAdTimestamp < 300000) {
-            const mins = Math.ceil((300000 - (now - state.player.lastAdTimestamp)) / 60000);
-            return showToast(`Реклама будет доступна через ${mins} мин.`);
-        }
-        state.player.lastAdTimestamp = now;
-        state.player.cash += 25000;
-        state.player.connections += 1;
-        saveState();
-        tgHaptic('success');
-        showToast('Просмотрено! +25,000 ₽ и +1 🤝');
-    }
-
-    function buyPackWithStars(stars, cash) {
-        if (state.player.stars < stars) return showToast(`Не хватает ${stars} ⭐!`);
-        state.player.stars -= stars;
-        state.player.cash += cash;
-        saveState();
-        tgHaptic('success');
-        showToast(`Успешно куплено ${cash.toLocaleString()} ₽`);
-    }
-
-    function buyVipProPass() {
-        if (state.player.vipPro) return showToast('У вас уже есть VIP PRO!');
-        if (state.player.stars >= 199) { 
-            state.player.stars -= 199; 
-        } else if (state.player.cash >= 1500000) { 
-            state.player.cash -= 1500000; 
-        } else {
-            return showToast('Не хватает 199 ⭐ или 1,500,000 ₽!');
-        }
-        state.player.vipPro = true;
-        saveState();
-        tgHaptic('success');
-        openVerdictModal("🌟 VIP PRO АКТИВИРОВАН", "Вам доступны новые привилегии и автотека!", true);
-    }
-
-    function refuelAction(type) {
-        if (state.player.fuel >= 100) return showToast('Бак и так полон!');
-        if (type === 'cash') {
-            if (state.player.cash < 5000) return showToast('Не хватает 5,000 ₽');
-            state.player.cash -= 5000;
-        } else if (type === 'free') {
-            const now = Date.now();
-            if (now - state.player.lastAdTimestamp < 300000) return showToast('Бесплатная заправка пока недоступна (КД 5 мин)');
-            state.player.lastAdTimestamp = now;
-        }
-        state.player.fuel = 100;
-        saveState();
-        tgHaptic('success');
-        showToast('Бак заправлен на 100 ⛽!');
-    }
-
-    function resetGameData() {
-        if (confirm('ВНИМАНИЕ! Вы уверены, что хотите полностью сбросить весь прогресс? Это действие необратимо!')) {
-            localStorage.removeItem('perekoop_sim_save_v29');
-            location.reload();
-        }
-    }
-
-    // === ИНИЦИАЛИЗАЦИЯ ===
-    function initApp() {
-        sanitizeState(); 
-        syncTelegramProfile(); 
-        updateHeaderUI();
-        updateLevelGatesUI(); 
-        
-        if (state.marketFeed.length === 0) populateMarketFeed();
-        
-        renderGarage(); 
-        renderSalesLot();
-        renderDiets(); 
-        renderHousing(); 
-        renderContracts(); 
-        renderContainersList(); 
-        renderPlatesPage();
-        renderBarnFind();
-        initLiveChat();
-        
-        switchTab('tabMarket');
-        if (state.player.lastClaimedDay < state.player.day) setTimeout(openDailyBonusModal, 800);
-    }
-    
-    setInterval(() => {
-        let lotChanged = false; state.salesLot.forEach(slot => { if (slot.timer > 0) { slot.timer -= 1; lotChanged = true; if (slot.timer === 0 && !slot.currentBuyer) generateBuyerForSlot(slot); } }); 
-        if (lotChanged && document.getElementById('tabSalesLot')?.classList.contains('active')) renderSalesLot();
-        if (state.player.fuel < 100) state.player.fuel = Math.min(100, state.player.fuel + 1);
-        if (document.getElementById('tabMarket')?.classList.contains('active')) updateMarketTimers();
-    }, 1000);
-
-    document.addEventListener('DOMContentLoaded', initApp);
-    </script>
-                                                                                                              </body>
-                                                                                                            </html>
