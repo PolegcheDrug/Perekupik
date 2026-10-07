@@ -58,7 +58,7 @@ overflow: hidden;
 .glass-card.card-danger { border-color: rgba(255, 51, 102, 0.4); background: linear-gradient(145deg, rgba(45, 15, 24, 0.95), rgba(20, 10, 15, 0.95)); }
 /* --- СПЕЦИАЛЬНЫЕ КАРТОЧКИ НАХОДОК (САРАИ) --- */
 .barn-tier-card {
-width: 100% !important;
+width: 100%;
 box-sizing: border-box;
 background: radial-gradient(circle at 100% 0%, rgba(0, 242, 254, 0.08) 0%, transparent 60%), #0d131f;
 border: 1px solid var(--border-glass);
@@ -74,16 +74,6 @@ text-align: left;
 }
 .barn-tier-card.tier-2 { border-left-color: var(--green); background: radial-gradient(circle at 100% 0%, rgba(0, 230, 118, 0.08) 0%, transparent 60%), #0d131f; }
 .barn-tier-card.tier-3 { border-left-color: var(--amber); background: radial-gradient(circle at 100% 0%, rgba(255, 179, 0, 0.08) 0%, transparent 60%), #0d131f; }
-.section-title {
-font-size: 14px;
-font-weight: 900;
-color: var(--cyan);
-margin: 20px 0 10px 0;
-text-transform: uppercase;
-letter-spacing: 1px;
-border-bottom: 1px solid var(--border-glass);
-padding-bottom: 6px;
-}
 /* --- ОБНОВЛЕННЫЕ СТИЛИ ЗАТЕМНЕНИЯ (BUSY) --- */
 .glass-card.busy { border-color: rgba(255, 255, 255, 0.05); }
 .glass-card.busy > *:not(.cooldown-timer):not(.viewed-badge) { filter: blur(3px) grayscale(0.8); opacity: 0.4; pointer-events: none; }
@@ -156,7 +146,21 @@ text-transform: uppercase; letter-spacing: 0.5px;
 .tachometer-wrap { position: relative; width: 100%; height: 38px; background: #131b2a; border-radius: 8px; overflow: hidden; margin-bottom: 12px; border: 1px solid var(--border-glass); }
 .tachometer-zone { position: absolute; left: 65%; width: 20%; height: 100%; background: rgba(0, 230, 118, 0.35); border-left: 2px solid var(--green); border-right: 2px solid var(--green); }
 .tachometer-needle { position: absolute; top: 0; bottom: 0; left: 0%; width: 4px; background: var(--red); border-radius: 2px; box-shadow: 0 0 8px var(--red); }
-.chat-feed-box { max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; background: #090e18; border: 1px solid var(--border-glass); border-radius: var(--radius-md); padding: 10px; margin-bottom: 8px; scrollbar-width: thin; scrollbar-color: var(--cyan) #090e18; }
+/* --- ОБНОВЛЕННЫЙ ЧАТ --- */
+.chat-feed-box {
+max-height: 250px;
+overflow-y: auto;
+display: flex;
+flex-direction: column;
+gap: 8px;
+background: #090e18;
+border: 1px solid var(--border-glass);
+border-radius: var(--radius-md);
+padding: 10px;
+margin-bottom: 8px;
+scrollbar-width: thin;
+scrollbar-color: var(--cyan) #090e18;
+}
 .chat-msg { background: #121a28; padding: 10px 14px; border-radius: 8px; font-size: 11px; border-left: 3px solid var(--cyan); box-shadow: 0 2px 5px rgba(0,0,0,0.3); animation: slideIn 0.3s ease-out; }
 .chat-msg.warning { border-left-color: var(--red); background: rgba(255, 51, 102, 0.12); }
 .chat-author { font-weight: 800; color: var(--cyan); margin-bottom: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
