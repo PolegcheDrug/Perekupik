@@ -277,7 +277,7 @@
                                                           <div id="lifeChatFeed" class="chat-feed-box" style="height: 190px;">
                                                           </div>
                                                         </div>
-                                                        <!-- Обновленный Ломбард -->
+                                                        <!-- Ломбард -->
                                                         <div class="glass-card mb-3">
                                                           <div class="flex-between mb-1">
                                                             <h3 class="color-red">
@@ -296,634 +296,645 @@
                                                               <button onclick="repayLoan(100)" class="btn btn-green btn-sm">Погасить всё</button>
                                                             </div>
                                                           </div>
+                                                          <!-- Благотворительность (Повышение репутации) -->
                                                           <div class="glass-card mb-3">
-                                                            <h3 class="mb-1">
-                                                              <i class="fa-solid fa-utensils color-green">
-                                                              </i> Рацион питания</h3>
-                                                              <div class="space-y-2" id="dietList">
+                                                            <div class="flex-between mb-1">
+                                                              <h3 class="color-green">
+                                                                <i class="fa-solid fa-hand-holding-heart">
+                                                                </i> Благотворительность</h3>
                                                               </div>
+                                                              <div class="sub-label mb-2">Пожертвуйте деньги в детдом или приют, чтобы очистить карму перед элитными покупателями.</div>
+                                                              <button onclick="donateForKarma()" class="btn btn-dark w-full">Пожертвовать 50,000 ₽ (+10 Карма 😇)</button>
                                                             </div>
-                                                            <div class="glass-card">
+                                                            <div class="glass-card mb-3">
                                                               <h3 class="mb-1">
-                                                                <i class="fa-solid fa-champagne-glasses color-cyan">
-                                                                </i> Развлечения</h3>
-                                                                <div class="grid-2 mb-2">
-                                                                  <button onclick="doActivity('banya', 15000, 30)" class="btn btn-dark">🧖 Сауна<br>
-                                                                    <span class="color-green text-xs">+30 😄 (15k ₽)</span>
-                                                                  </button>
-                                                                  <button onclick="doActivity('club', 45000, 60)" class="btn btn-dark">🍸 Клуб<br>
-                                                                    <span class="color-green text-xs">+60 😄 (45k ₽)</span>
-                                                                  </button>
+                                                                <i class="fa-solid fa-utensils color-green">
+                                                                </i> Рацион питания</h3>
+                                                                <div class="space-y-2" id="dietList">
                                                                 </div>
-                                                                <button onclick="doActivity('dubai', 450000, 100, 3)" class="btn btn-cyan">✈ Отпуск в Дубае: +100 😄 и +3 🤝 (450k ₽)</button>
                                                               </div>
-                                                            </section>
-                                                            <section id="tabBusiness" class="tab-screen">
-                                                              <div id="businessActiveBox">
-                                                                <div class="glass-card flex-between mb-2">
-                                                                  <div>
-                                                                    <h3>
-                                                                      <i class="fa-solid fa-building color-cyan">
-                                                                      </i> Автобизнесы & Империя</h3>
-                                                                    </div>
-                                                                    <button onclick="collectBusinessIncome()" class="btn btn-cyan btn-auto">Собрать кассу</button>
+                                                              <div class="glass-card">
+                                                                <h3 class="mb-1">
+                                                                  <i class="fa-solid fa-champagne-glasses color-cyan">
+                                                                  </i> Развлечения</h3>
+                                                                  <div class="grid-2 mb-2">
+                                                                    <button onclick="doActivity('banya', 15000, 30)" class="btn btn-dark">🧖 Сауна<br>
+                                                                      <span class="color-green text-xs">+30 😄 (15k ₽)</span>
+                                                                    </button>
+                                                                    <button onclick="doActivity('club', 45000, 60)" class="btn btn-dark">🍸 Клуб<br>
+                                                                      <span class="color-green text-xs">+60 😄 (45k ₽)</span>
+                                                                    </button>
                                                                   </div>
-                                                                  <div class="glass-card mb-2">
-                                                                    <div class="flex-between mb-1">
-                                                                      <div>
-                                                                        <div class="sub-label">Ваш РП Статус:</div>
-                                                                        <h4 class="font-bold color-amber" id="rpRankTitle">Гаражный Делец</h4>
-                                                                      </div>
-                                                                      <div class="text-right">
-                                                                        <div class="sub-label">Капитал Империи:</div>
-                                                                        <div class="color-green font-bold" id="netWorthText">0 ₽</div>
-                                                                      </div>
-                                                                    </div>
-                                                                  </div>
-                                                                  <div id="businessList">
-                                                                  </div>
-                                                                </div>
-                                                                <div id="businessLockCover" class="level-lock-cover glass-card" style="display:none;">
-                                                                  <i class="fa-solid fa-lock color-cyan" style="font-size:38px; margin-bottom:10px;">
-                                                                  </i>
-                                                                  <h3 class="font-bold">Империя пока недоступна</h3>
-                                                                  <p class="sub-label mt-1">Для открытия легальных автобизнесов вам нужен минимум <b>5 уровень авторитета</b>!</p>
+                                                                  <button onclick="doActivity('dubai', 450000, 100, 3)" class="btn btn-cyan">✈ Отпуск в Дубае: +100 😄 и +3 🤝 (450k ₽)</button>
                                                                 </div>
                                                               </section>
-                                                              <section id="tabStreet" class="tab-screen">
-                                                                <div class="glass-card">
-                                                                  <div class="card-header-row mb-2">
-                                                                    <h3>
-                                                                      <i class="fa-solid fa-flag-checkered color-red">
-                                                                      </i> Стрит Арена & Волна</h3>
-                                                                      <div class="toggle-mode-box">
-                                                                        <button onclick="toggleStreetSub('race')" id="streetSub-race" class="mode-btn active">Драг</button>
-                                                                        <button onclick="toggleStreetSub('show')" id="streetSub-show" class="mode-btn">Автошоу</button>
-                                                                        <button onclick="toggleStreetSub('clubs')" id="streetSub-clubs" class="mode-btn">Клубы</button>
+                                                              <section id="tabBusiness" class="tab-screen">
+                                                                <div id="businessActiveBox">
+                                                                  <div class="glass-card flex-between mb-2">
+                                                                    <div>
+                                                                      <h3>
+                                                                        <i class="fa-solid fa-building color-cyan">
+                                                                        </i> Автобизнесы & Империя</h3>
                                                                       </div>
+                                                                      <button onclick="collectBusinessIncome()" class="btn btn-cyan btn-auto">Собрать кассу</button>
                                                                     </div>
-                                                                    <div class="glass-card mb-2 p-2" style="background:#090e18; border-color:var(--border-glow);">
+                                                                    <div class="glass-card mb-2">
                                                                       <div class="flex-between mb-1">
-                                                                        <span class="sub-label font-bold color-cyan">🚗 Боевая машина:</span>
-                                                                        <span id="streetSelectedCarPower" class="text-xs font-bold color-green">0 л.с.</span>
-                                                                      </div>
-                                                                      <select id="streetCarSelector" onchange="selectCarForStreet(this.value)" style="width:100%; background:#101726; border:1px solid var(--border-glass); border-radius:6px; color:#fff; padding:7px; font-size:11px; font-weight:bold; outline:none; margin-bottom:6px;">
-                                                                      </select>
-                                                                      <div id="streetSelectedCarStats" class="sub-label text-xs">Загрузка авто...</div>
-                                                                    </div>
-                                                                    <div id="streetRaceBox">
-                                                                      <div class="warning-banner mb-2" style="background: rgba(255, 179, 0, 0.1); padding: 8px; border-radius: 6px; border: 1px solid var(--amber);">
-                                                                        <i class="fa-solid fa-triangle-exclamation color-amber">
-                                                                        </i>
-                                                                        <span class="text-xs">Мощность решает базовую скорость. Переключай передачи вовремя в зеленой зоне!</span>
-                                                                      </div>
-                                                                      <div class="grid-3 mb-2">
-                                                                        <button onclick="setRaceDifficulty('easy')" id="raceDiff-easy" class="btn btn-cyan btn-sm">Светофор</button>
-                                                                        <button onclick="setRaceDifficulty('medium')" id="raceDiff-medium" class="btn btn-dark btn-sm">Драг 402м</button>
-                                                                        <button onclick="setRaceDifficulty('boss')" id="raceDiff-boss" class="btn btn-dark btn-sm">Босс Района</button>
-                                                                      </div>
-                                                                      <div class="race-panel">
-                                                                        <div id="raceStatusText" class="race-status">Светофорная дуэль (Ставка: 25,000 ₽ | 15 ⛽)</div>
-                                                                        <div class="race-track-box">
-                                                                          <div class="race-lane">
-                                                                            <span style="font-size:9px; color:var(--cyan); margin-left:4px; font-weight:bold;">ВЫ:</span>
-                                                                            <div id="raceTrackPlayer" class="race-car-runner" style="left: 0%;">🏎️</div>
-                                                                          </div>
-                                                                          <div class="race-lane">
-                                                                            <span style="font-size:9px; color:var(--red); margin-left:4px; font-weight:bold;" id="raceOpponentName">СОЛЯРИС:</span>
-                                                                            <div id="raceTrackOpponent" class="race-car-runner" style="left: 0%;">🚘</div>
-                                                                          </div>
-                                                                        </div>
-                                                                        <div class="tachometer-wrap">
-                                                                          <div class="tachometer-zone">
-                                                                          </div>
-                                                                          <div id="raceNeedle" class="tachometer-needle">
-                                                                          </div>
-                                                                        </div>
-                                                                        <div class="grid-2">
-                                                                          <button id="raceStartBtn" onclick="startDragRace()" class="btn btn-amber">СТАРТ (15 ⛽)</button>
-                                                                          <button id="raceShiftBtn" onclick="shiftGear()" disabled class="btn btn-dark opacity-50">ПЕРЕКЛЮЧИТЬ!</button>
-                                                                        </div>
-                                                                      </div>
-                                                                    </div>
-                                                                    <div id="streetShowBox" style="display:none;">
-                                                                      <p class="sub-label mb-2">Легальный фестиваль стиля. Проходит 1 раз в игровой день (взнос 15 ⛽).</p>
-                                                                      <div class="glass-card text-center mb-2">
-                                                                        <div style="font-size:36px; margin-bottom:4px;">🏆</div>
-                                                                        <h4 id="showCarSelectName" class="font-bold mb-1">Автомобиль не выбран</h4>
-                                                                        <div id="showCarPoints" class="color-cyan text-xs font-bold mb-2">Рейтинг стиля: 0 баллов</div>
-                                                                        <div id="showStatusText" class="sub-label color-amber mb-2">Статус: Доступно сегодня (-15 ⛽)</div>
-                                                                        <button id="btnEnterShow" onclick="enterAutoShow()" class="btn btn-cyan">Участвовать в Автошоу (-15 ⛽)</button>
-                                                                      </div>
-                                                                    </div>
-                                                                    <div id="streetClubsBox" style="display:none;">
-                                                                      <div class="glass-card flex-between mb-2 p-2">
                                                                         <div>
-                                                                          <div class="sub-label">Ваш автоклуб:</div>
-                                                                          <div id="myClubName" class="font-bold">Без автоклуба</div>
+                                                                          <div class="sub-label">Ваш РП Статус:</div>
+                                                                          <h4 class="font-bold color-amber" id="rpRankTitle">Гаражный Делец</h4>
                                                                         </div>
-                                                                        <button onclick="createClubPrompt()" class="btn btn-amber btn-auto btn-sm">Создать Клуб</button>
-                                                                      </div>
-                                                                      <div class="space-y-2">
-                                                                        <div class="glass-card flex-between p-2 mb-1">
-                                                                          <div>
-                                                                            <div class="font-bold">DRIFT SYNDICATE</div>
-                                                                            <div class="sub-label">+15% к награде за драг</div>
-                                                                          </div>
-                                                                          <button onclick="joinClub('DRIFT SYNDICATE')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
-                                                                        </div>
-                                                                        <div class="glass-card flex-between p-2 mb-1">
-                                                                          <div>
-                                                                            <div class="font-bold">STANCE & SHINE</div>
-                                                                            <div class="sub-label">+25% баллов на Автошоу</div>
-                                                                          </div>
-                                                                          <button onclick="joinClub('STANCE & SHINE')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
-                                                                        </div>
-                                                                        <div class="glass-card flex-between p-2">
-                                                                          <div>
-                                                                            <div class="font-bold">NIGHT RUNNERS</div>
-                                                                            <div class="sub-label">-30% к шансу облавы ДПС</div>
-                                                                          </div>
-                                                                          <button onclick="joinClub('NIGHT RUNNERS')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
+                                                                        <div class="text-right">
+                                                                          <div class="sub-label">Капитал Империи:</div>
+                                                                          <div class="color-green font-bold" id="netWorthText">0 ₽</div>
                                                                         </div>
                                                                       </div>
+                                                                    </div>
+                                                                    <div id="businessList">
                                                                     </div>
                                                                   </div>
+                                                                  <div id="businessLockCover" class="level-lock-cover glass-card" style="display:none;">
+                                                                    <i class="fa-solid fa-lock color-cyan" style="font-size:38px; margin-bottom:10px;">
+                                                                    </i>
+                                                                    <h3 class="font-bold">Империя пока недоступна</h3>
+                                                                    <p class="sub-label mt-1">Для открытия легальных автобизнесов вам нужен минимум <b>5 уровень авторитета</b>!</p>
+                                                                  </div>
                                                                 </section>
-                                                                <section id="tabContainers" class="tab-screen">
-                                                                  <div class="glass-card" id="containersCardContainer">
-                                                                    <h3>
-                                                                      <i class="fa-solid fa-box-open color-purple">
-                                                                      </i> Портовые Контейнеры</h3>
-                                                                      <div id="containersListRender">
+                                                                <section id="tabStreet" class="tab-screen">
+                                                                  <div class="glass-card">
+                                                                    <div class="card-header-row mb-2">
+                                                                      <h3>
+                                                                        <i class="fa-solid fa-flag-checkered color-red">
+                                                                        </i> Стрит Арена & Волна</h3>
+                                                                        <div class="toggle-mode-box">
+                                                                          <button onclick="toggleStreetSub('race')" id="streetSub-race" class="mode-btn active">Драг</button>
+                                                                          <button onclick="toggleStreetSub('show')" id="streetSub-show" class="mode-btn">Автошоу</button>
+                                                                          <button onclick="toggleStreetSub('clubs')" id="streetSub-clubs" class="mode-btn">Клубы</button>
+                                                                        </div>
                                                                       </div>
-                                                                      <div id="containersLockCover" class="level-lock-cover" style="display:none;">
-                                                                        <i class="fa-solid fa-lock color-purple" style="font-size:32px; margin-bottom:10px;">
-                                                                        </i>
-                                                                        <h4 class="font-bold">Таможня закрыта</h4>
-                                                                        <p class="sub-label">Только с <b>20 уровня</b>!</p>
+                                                                      <div class="glass-card mb-2 p-2" style="background:#090e18; border-color:var(--border-glow);">
+                                                                        <div class="flex-between mb-1">
+                                                                          <span class="sub-label font-bold color-cyan">🚗 Боевая машина:</span>
+                                                                          <span id="streetSelectedCarPower" class="text-xs font-bold color-green">0 л.с.</span>
+                                                                        </div>
+                                                                        <select id="streetCarSelector" onchange="selectCarForStreet(this.value)" style="width:100%; background:#101726; border:1px solid var(--border-glass); border-radius:6px; color:#fff; padding:7px; font-size:11px; font-weight:bold; outline:none; margin-bottom:6px;">
+                                                                        </select>
+                                                                        <div id="streetSelectedCarStats" class="sub-label text-xs">Загрузка авто...</div>
+                                                                      </div>
+                                                                      <div id="streetRaceBox">
+                                                                        <div class="warning-banner mb-2" style="background: rgba(255, 179, 0, 0.1); padding: 8px; border-radius: 6px; border: 1px solid var(--amber);">
+                                                                          <i class="fa-solid fa-triangle-exclamation color-amber">
+                                                                          </i>
+                                                                          <span class="text-xs">Мощность решает базовую скорость. Переключай передачи вовремя в зеленой зоне!</span>
+                                                                        </div>
+                                                                        <div class="grid-3 mb-2">
+                                                                          <button onclick="setRaceDifficulty('easy')" id="raceDiff-easy" class="btn btn-cyan btn-sm">Светофор</button>
+                                                                          <button onclick="setRaceDifficulty('medium')" id="raceDiff-medium" class="btn btn-dark btn-sm">Драг 402м</button>
+                                                                          <button onclick="setRaceDifficulty('boss')" id="raceDiff-boss" class="btn btn-dark btn-sm">Босс Района</button>
+                                                                        </div>
+                                                                        <div class="race-panel">
+                                                                          <div id="raceStatusText" class="race-status">Светофорная дуэль (Ставка: 25,000 ₽ | 15 ⛽)</div>
+                                                                          <div class="race-track-box">
+                                                                            <div class="race-lane">
+                                                                              <span style="font-size:9px; color:var(--cyan); margin-left:4px; font-weight:bold;">ВЫ:</span>
+                                                                              <div id="raceTrackPlayer" class="race-car-runner" style="left: 0%;">🏎️</div>
+                                                                            </div>
+                                                                            <div class="race-lane">
+                                                                              <span style="font-size:9px; color:var(--red); margin-left:4px; font-weight:bold;" id="raceOpponentName">СОЛЯРИС:</span>
+                                                                              <div id="raceTrackOpponent" class="race-car-runner" style="left: 0%;">🚘</div>
+                                                                            </div>
+                                                                          </div>
+                                                                          <div class="tachometer-wrap">
+                                                                            <div class="tachometer-zone">
+                                                                            </div>
+                                                                            <div id="raceNeedle" class="tachometer-needle">
+                                                                            </div>
+                                                                          </div>
+                                                                          <div class="grid-2">
+                                                                            <button id="raceStartBtn" onclick="startDragRace()" class="btn btn-amber">СТАРТ (15 ⛽)</button>
+                                                                            <button id="raceShiftBtn" onclick="shiftGear()" disabled class="btn btn-dark opacity-50">ПЕРЕКЛЮЧИТЬ!</button>
+                                                                          </div>
+                                                                        </div>
+                                                                      </div>
+                                                                      <div id="streetShowBox" style="display:none;">
+                                                                        <p class="sub-label mb-2">Легальный фестиваль стиля. Проходит 1 раз в игровой день (взнос 15 ⛽).</p>
+                                                                        <div class="glass-card text-center mb-2">
+                                                                          <div style="font-size:36px; margin-bottom:4px;">🏆</div>
+                                                                          <h4 id="showCarSelectName" class="font-bold mb-1">Автомобиль не выбран</h4>
+                                                                          <div id="showCarPoints" class="color-cyan text-xs font-bold mb-2">Рейтинг стиля: 0 баллов</div>
+                                                                          <div id="showStatusText" class="sub-label color-amber mb-2">Статус: Доступно сегодня (-15 ⛽)</div>
+                                                                          <button id="btnEnterShow" onclick="enterAutoShow()" class="btn btn-cyan">Участвовать в Автошоу (-15 ⛽)</button>
+                                                                        </div>
+                                                                      </div>
+                                                                      <div id="streetClubsBox" style="display:none;">
+                                                                        <div class="glass-card flex-between mb-2 p-2">
+                                                                          <div>
+                                                                            <div class="sub-label">Ваш автоклуб:</div>
+                                                                            <div id="myClubName" class="font-bold">Без автоклуба</div>
+                                                                          </div>
+                                                                          <button onclick="createClubPrompt()" class="btn btn-amber btn-auto btn-sm">Создать Клуб</button>
+                                                                        </div>
+                                                                        <div class="space-y-2">
+                                                                          <div class="glass-card flex-between p-2 mb-1">
+                                                                            <div>
+                                                                              <div class="font-bold">DRIFT SYNDICATE</div>
+                                                                              <div class="sub-label">+15% к награде за драг</div>
+                                                                            </div>
+                                                                            <button onclick="joinClub('DRIFT SYNDICATE')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
+                                                                          </div>
+                                                                          <div class="glass-card flex-between p-2 mb-1">
+                                                                            <div>
+                                                                              <div class="font-bold">STANCE & SHINE</div>
+                                                                              <div class="sub-label">+25% баллов на Автошоу</div>
+                                                                            </div>
+                                                                            <button onclick="joinClub('STANCE & SHINE')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
+                                                                          </div>
+                                                                          <div class="glass-card flex-between p-2">
+                                                                            <div>
+                                                                              <div class="font-bold">NIGHT RUNNERS</div>
+                                                                              <div class="sub-label">-30% к шансу облавы ДПС</div>
+                                                                            </div>
+                                                                            <button onclick="joinClub('NIGHT RUNNERS')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
+                                                                          </div>
+                                                                        </div>
                                                                       </div>
                                                                     </div>
                                                                   </section>
-                                                                  <section id="tabPlates" class="tab-screen">
-                                                                    <div class="glass-card mb-2">
+                                                                  <section id="tabContainers" class="tab-screen">
+                                                                    <div class="glass-card" id="containersCardContainer">
                                                                       <h3>
-                                                                        <i class="fa-solid fa-id-card color-amber">
-                                                                        </i> Моя коллекция:</h3>
-                                                                        <div id="ownedPlatesListDetailed" class="space-y-2">
+                                                                        <i class="fa-solid fa-box-open color-purple">
+                                                                        </i> Портовые Контейнеры</h3>
+                                                                        <div id="containersListRender">
                                                                         </div>
-                                                                      </div>
-                                                                      <h4 class="font-bold mb-2 px-1">Госномера в продаже:</h4>
-                                                                      <div id="plateMarketList">
+                                                                        <div id="containersLockCover" class="level-lock-cover" style="display:none;">
+                                                                          <i class="fa-solid fa-lock color-purple" style="font-size:32px; margin-bottom:10px;">
+                                                                          </i>
+                                                                          <h4 class="font-bold">Таможня закрыта</h4>
+                                                                          <p class="sub-label">Только с <b>20 уровня</b>!</p>
+                                                                        </div>
                                                                       </div>
                                                                     </section>
-                                                                    <section id="tabContracts" class="tab-screen">
-                                                                      <div class="glass-card" id="contractsCardContainer">
-                                                                        <div class="flex-between mb-1">
-                                                                          <h3>
-                                                                            <i class="fa-solid fa-file-contract color-cyan">
-                                                                            </i> VIP-Заказы Синдиката</h3>
-                                                                            <button onclick="refreshContractsManual()" class="btn btn-dark btn-auto btn-sm" id="btnRefreshContracts">Обновить</button>
-                                                                          </div>
-                                                                          <div id="contractsList">
-                                                                          </div>
-                                                                          <div id="contractsLockCover" class="level-lock-cover" style="display:none;">
-                                                                            <i class="fa-solid fa-lock color-cyan" style="font-size:32px; margin-bottom:10px;">
-                                                                            </i>
-                                                                            <h4 class="font-bold">Синдикат недоступен</h4>
-                                                                            <p class="sub-label">Доступно с <b>15 уровня</b>!</p>
+                                                                    <section id="tabPlates" class="tab-screen">
+                                                                      <div class="glass-card mb-2">
+                                                                        <h3>
+                                                                          <i class="fa-solid fa-id-card color-amber">
+                                                                          </i> Моя коллекция:</h3>
+                                                                          <div id="ownedPlatesListDetailed" class="space-y-2">
                                                                           </div>
                                                                         </div>
+                                                                        <h4 class="font-bold mb-2 px-1">Госномера в продаже:</h4>
+                                                                        <div id="plateMarketList">
+                                                                        </div>
                                                                       </section>
-                                                                      <section id="tabHousing" class="tab-screen">
-                                                                        <div class="glass-card">
+                                                                      <section id="tabContracts" class="tab-screen">
+                                                                        <div class="glass-card" id="contractsCardContainer">
                                                                           <div class="flex-between mb-1">
                                                                             <h3>
-                                                                              <i class="fa-solid fa-house color-cyan">
-                                                                              </i> Рынок Недвижимости</h3>
-                                                                              <span class="tag-badge bg-tag-cyan" id="currentHomeText">Текущее: Комната</span>
+                                                                              <i class="fa-solid fa-file-contract color-cyan">
+                                                                              </i> VIP-Заказы Синдиката</h3>
+                                                                              <button onclick="refreshContractsManual()" class="btn btn-dark btn-auto btn-sm" id="btnRefreshContracts">Обновить</button>
                                                                             </div>
-                                                                          </div>
-                                                                          <div id="housingMarketList">
+                                                                            <div id="contractsList">
+                                                                            </div>
+                                                                            <div id="contractsLockCover" class="level-lock-cover" style="display:none;">
+                                                                              <i class="fa-solid fa-lock color-cyan" style="font-size:32px; margin-bottom:10px;">
+                                                                              </i>
+                                                                              <h4 class="font-bold">Синдикат недоступен</h4>
+                                                                              <p class="sub-label">Доступно с <b>15 уровня</b>!</p>
+                                                                            </div>
                                                                           </div>
                                                                         </section>
-                                                                        <section id="tabWheel" class="tab-screen text-center">
-                                                                          <div class="glass-card flex-between mb-3" style="flex-direction:column; align-items:center;">
-                                                                            <div class="wheel-container">
-                                                                              <canvas id="wheelCanvas" width="260" height="260">
-                                                                              </canvas>
-                                                                              <div class="wheel-pointer">▼</div>
+                                                                        <section id="tabHousing" class="tab-screen">
+                                                                          <div class="glass-card">
+                                                                            <div class="flex-between mb-1">
+                                                                              <h3>
+                                                                                <i class="fa-solid fa-house color-cyan">
+                                                                                </i> Рынок Недвижимости</h3>
+                                                                                <span class="tag-badge bg-tag-cyan" id="currentHomeText">Текущее: Комната</span>
+                                                                              </div>
                                                                             </div>
-                                                                            <button id="btnWheelFree" onclick="spinWheel(true)" class="btn btn-green mb-2">🎁 Бесплатный Спин (Раз в 24ч)</button>
-                                                                            <button id="btnWheelPaid" onclick="spinWheel(false)" class="btn btn-amber">⭐ Крутить за 25 Stars</button>
-                                                                          </div>
-                                                                          <div class="glass-card text-left">
-                                                                            <h4 class="font-bold color-amber mb-1">
-                                                                              <i class="fa-solid fa-crown mr-1">
-                                                                              </i> VIP Подписка «Перекуп PRO»</h4>
-                                                                              <button onclick="buyVipProPass()" class="btn btn-amber">⭐ Активировать за 199 Stars (или 1.5M ₽)</button>
+                                                                            <div id="housingMarketList">
                                                                             </div>
                                                                           </section>
-                                                                          <section id="tabP2P" class="tab-screen">
-                                                                            <div class="glass-card">
-                                                                              <div class="flex-between mb-1">
-                                                                                <h3>
-                                                                                  <i class="fa-solid fa-handshake color-green">
-                                                                                  </i> P2P Биржа Игроков</h3>
-                                                                                </div>
+                                                                          <section id="tabWheel" class="tab-screen text-center">
+                                                                            <div class="glass-card flex-between mb-3" style="flex-direction:column; align-items:center;">
+                                                                              <div class="wheel-container">
+                                                                                <canvas id="wheelCanvas" width="260" height="260">
+                                                                                </canvas>
+                                                                                <div class="wheel-pointer">▼</div>
                                                                               </div>
-                                                                              <div class="grid-2 mb-3">
-                                                                                <button onclick="filterP2P('cars')" id="p2pFilter-cars" class="btn btn-cyan btn-sm">🚗 Техника</button>
-                                                                                <button onclick="filterP2P('plates')" id="p2pFilter-plates" class="btn btn-dark btn-sm">🏷 Госномера</button>
-                                                                              </div>
-                                                                              <div id="p2pItemsList">
+                                                                              <button id="btnWheelFree" onclick="spinWheel(true)" class="btn btn-green mb-2">🎁 Бесплатный Спин (Раз в 24ч)</button>
+                                                                              <button id="btnWheelPaid" onclick="spinWheel(false)" class="btn btn-amber">⭐ Крутить за 25 Stars</button>
+                                                                            </div>
+                                                                            <div class="glass-card text-left">
+                                                                              <h4 class="font-bold color-amber mb-1">
+                                                                                <i class="fa-solid fa-crown mr-1">
+                                                                                </i> VIP Подписка «Перекуп PRO»</h4>
+                                                                                <button onclick="buyVipProPass()" class="btn btn-amber">⭐ Активировать за 199 Stars (или 1.5M ₽)</button>
                                                                               </div>
                                                                             </section>
-                                                                            <section id="tabBarn" class="tab-screen">
+                                                                            <section id="tabP2P" class="tab-screen">
                                                                               <div class="glass-card">
-                                                                                <h3>
-                                                                                  <i class="fa-solid fa-screwdriver-wrench color-amber">
-                                                                                  </i> Гаражная Находка</h3>
+                                                                                <div class="flex-between mb-1">
+                                                                                  <h3>
+                                                                                    <i class="fa-solid fa-handshake color-green">
+                                                                                    </i> P2P Биржа Игроков</h3>
+                                                                                  </div>
                                                                                 </div>
-                                                                                <div id="barnFindContent" class="glass-card text-center">
+                                                                                <div class="grid-2 mb-3">
+                                                                                  <button onclick="filterP2P('cars')" id="p2pFilter-cars" class="btn btn-cyan btn-sm">🚗 Техника</button>
+                                                                                  <button onclick="filterP2P('plates')" id="p2pFilter-plates" class="btn btn-dark btn-sm">🏷 Госномера</button>
+                                                                                </div>
+                                                                                <div id="p2pItemsList">
                                                                                 </div>
                                                                               </section>
-                                                                              <section id="tabDonate" class="tab-screen">
-                                                                                <div class="glass-card mb-2">
-                                                                                  <h3 class="mb-1">
-                                                                                    <i class="fa-solid fa-gas-pump color-cyan">
-                                                                                    </i> Городская АЗС</h3>
-                                                                                    <div class="grid-2">
-                                                                                      <button onclick="refuelAction('cash')" class="btn btn-dark">Залить бак 100 ⛽ (5,000 ₽)</button>
-                                                                                      <button onclick="refuelAction('free')" class="btn btn-cyan">Бесплатно за рекламу</button>
-                                                                                    </div>
+                                                                              <section id="tabBarn" class="tab-screen">
+                                                                                <div class="glass-card">
+                                                                                  <h3>
+                                                                                    <i class="fa-solid fa-screwdriver-wrench color-amber">
+                                                                                    </i> Гаражная Находка</h3>
                                                                                   </div>
+                                                                                  <div id="barnFindContent" class="glass-card text-center">
+                                                                                  </div>
+                                                                                </section>
+                                                                                <section id="tabDonate" class="tab-screen">
                                                                                   <div class="glass-card mb-2">
                                                                                     <h3 class="mb-1">
-                                                                                      <i class="fa-solid fa-rectangle-ad color-cyan">
-                                                                                      </i> Реклама (Adsgram)</h3>
-                                                                                      <button id="btnWatchAd" onclick="watchAdsgram()" class="btn btn-cyan">📺 Смотреть видео (+25,000 ₽ & +1 🤝)</button>
-                                                                                      <div id="adCooldownText" class="sub-label text-center color-amber mt-1" style="display:none;">
+                                                                                      <i class="fa-solid fa-gas-pump color-cyan">
+                                                                                      </i> Городская АЗС</h3>
+                                                                                      <div class="grid-2">
+                                                                                        <button onclick="refuelAction('cash')" class="btn btn-dark">Залить бак 100 ⛽ (5,000 ₽)</button>
+                                                                                        <button onclick="refuelAction('free')" class="btn btn-cyan">Бесплатно за рекламу</button>
                                                                                       </div>
                                                                                     </div>
-                                                                                    <div class="glass-card">
-                                                                                      <h3 class="mb-2">
-                                                                                        <i class="fa-solid fa-star color-amber">
-                                                                                        </i> Магазин Telegram Stars</h3>
-                                                                                        <div class="grid-2 mb-2">
-                                                                                          <button onclick="buyPackWithStars(50, 500000)" class="btn btn-dark">500,000 ₽ (50 ⭐)</button>
-                                                                                          <button onclick="buyPackWithStars(150, 2000000)" class="btn btn-dark">2,000,000 ₽ (150 ⭐)</button>
+                                                                                    <div class="glass-card mb-2">
+                                                                                      <h3 class="mb-1">
+                                                                                        <i class="fa-solid fa-rectangle-ad color-cyan">
+                                                                                        </i> Реклама (Adsgram)</h3>
+                                                                                        <button id="btnWatchAd" onclick="watchAdsgram()" class="btn btn-cyan">📺 Смотреть видео (+25,000 ₽ & +1 🤝)</button>
+                                                                                        <div id="adCooldownText" class="sub-label text-center color-amber mt-1" style="display:none;">
                                                                                         </div>
                                                                                       </div>
-                                                                                    </section>
-                                                                                    <section id="tabProfile" class="tab-screen">
-                                                                                      <div class="glass-card text-center">
-                                                                                        <div class="avatar" style="width:62px; height:62px; margin:0 auto; font-size:26px;">
-                                                                                          <i class="fa-solid fa-user-tie">
-                                                                                          </i>
-                                                                                        </div>
-                                                                                        <h3 class="mt-2" id="profileTgUsername">Перекуп #777</h3>
-                                                                                        <p class="sub-label mb-3" id="profPlayerRank">Статус: Гаражный Делец</p>
-                                                                                        <div class="grid-2 mb-2">
-                                                                                          <div class="stat-box">
-                                                                                            <div class="sub-label">Прибыльных продаж:</div>
-                                                                                            <div id="statProfitable" class="stat-value color-green">0</div>
-                                                                                          </div>
-                                                                                          <div class="stat-box">
-                                                                                            <div class="sub-label">Убыточных продаж:</div>
-                                                                                            <div id="statLoss" class="stat-value color-red">0</div>
+                                                                                      <div class="glass-card">
+                                                                                        <h3 class="mb-2">
+                                                                                          <i class="fa-solid fa-star color-amber">
+                                                                                          </i> Магазин Telegram Stars</h3>
+                                                                                          <div class="grid-2 mb-2">
+                                                                                            <button onclick="buyPackWithStars(50, 500000)" class="btn btn-dark">500,000 ₽ (50 ⭐)</button>
+                                                                                            <button onclick="buyPackWithStars(150, 2000000)" class="btn btn-dark">2,000,000 ₽ (150 ⭐)</button>
                                                                                           </div>
                                                                                         </div>
-                                                                                        <div class="grid-2 mb-3">
-                                                                                          <div class="stat-box">
-                                                                                            <div class="sub-label">Итоговый профит:</div>
-                                                                                            <div id="statTotalNetProfit" class="stat-value color-cyan">0 ₽</div>
+                                                                                      </section>
+                                                                                      <section id="tabProfile" class="tab-screen">
+                                                                                        <div class="glass-card text-center">
+                                                                                          <div class="avatar" style="width:62px; height:62px; margin:0 auto; font-size:26px;">
+                                                                                            <i class="fa-solid fa-user-tie">
+                                                                                            </i>
                                                                                           </div>
-                                                                                          <div class="stat-box">
-                                                                                            <div class="sub-label">Винрейт сделок:</div>
-                                                                                            <div id="statWinrate" class="stat-value color-amber">0%</div>
+                                                                                          <h3 class="mt-2" id="profileTgUsername">Перекуп #777</h3>
+                                                                                          <p class="sub-label mb-3" id="profPlayerRank">Статус: Гаражный Делец</p>
+                                                                                          <div class="grid-2 mb-2">
+                                                                                            <div class="stat-box">
+                                                                                              <div class="sub-label">Прибыльных продаж:</div>
+                                                                                              <div id="statProfitable" class="stat-value color-green">0</div>
+                                                                                            </div>
+                                                                                            <div class="stat-box">
+                                                                                              <div class="sub-label">Убыточных продаж:</div>
+                                                                                              <div id="statLoss" class="stat-value color-red">0</div>
+                                                                                            </div>
                                                                                           </div>
+                                                                                          <div class="grid-2 mb-3">
+                                                                                            <div class="stat-box">
+                                                                                              <div class="sub-label">Итоговый профит:</div>
+                                                                                              <div id="statTotalNetProfit" class="stat-value color-cyan">0 ₽</div>
+                                                                                            </div>
+                                                                                            <div class="stat-box">
+                                                                                              <div class="sub-label">Винрейт сделок:</div>
+                                                                                              <div id="statWinrate" class="stat-value color-amber">0%</div>
+                                                                                            </div>
+                                                                                          </div>
+                                                                                          <div class="level-gate-box mb-3 text-left">
+                                                                                            <div class="sub-label font-bold color-cyan mb-1">⚡ Быстрый тестер:</div>
+                                                                                            <div class="grid-3 mb-1">
+                                                                                              <button onclick="setCheatLevel(1)" class="btn btn-dark btn-sm">1 ур</button>
+                                                                                              <button onclick="setCheatLevel(5)" class="btn btn-dark btn-sm">5 ур (Империя)</button>
+                                                                                              <button onclick="setCheatLevel(12)" class="btn btn-dark btn-sm">12 ур (21)</button>
+                                                                                            </div>
+                                                                                            <div class="grid-3 mb-1">
+                                                                                              <button onclick="setCheatLevel(30)" class="btn btn-dark btn-sm">30 ур</button>
+                                                                                              <button onclick="setCheatLevel(50)" class="btn btn-dark btn-sm">50 ур</button>
+                                                                                              <button onclick="cheatAddMoney()" class="btn btn-green btn-sm">+10M ₽</button>
+                                                                                            </div>
+                                                                                            <div class="grid-2">
+                                                                                              <button onclick="cheatAddStats()" class="btn btn-cyan btn-sm">100% Сил</button>
+                                                                                              <button onclick="resetGameData()" class="btn btn-danger btn-sm">Сброс</button>
+                                                                                            </div>
+                                                                                          </div>
+                                                                                          <button onclick="switchTab('tabMarket')" class="btn btn-dark">Вернуться к игре</button>
                                                                                         </div>
-                                                                                        <div class="level-gate-box mb-3 text-left">
-                                                                                          <div class="sub-label font-bold color-cyan mb-1">⚡ Быстрый тестер:</div>
-                                                                                          <div class="grid-3 mb-1">
-                                                                                            <button onclick="setCheatLevel(1)" class="btn btn-dark btn-sm">1 ур</button>
-                                                                                            <button onclick="setCheatLevel(5)" class="btn btn-dark btn-sm">5 ур (Империя)</button>
-                                                                                            <button onclick="setCheatLevel(12)" class="btn btn-dark btn-sm">12 ур (21)</button>
-                                                                                          </div>
-                                                                                          <div class="grid-3 mb-1">
-                                                                                            <button onclick="setCheatLevel(30)" class="btn btn-dark btn-sm">30 ур</button>
-                                                                                            <button onclick="setCheatLevel(50)" class="btn btn-dark btn-sm">50 ур</button>
-                                                                                            <button onclick="cheatAddMoney()" class="btn btn-green btn-sm">+10M ₽</button>
+                                                                                      </section>
+                                                                                    </main>
+                                                                                    <nav class="bottom-nav">
+                                                                                      <div class="b-nav-item active" onclick="switchTab('tabMarket')" id="bnav-tabMarket">
+                                                                                        <i class="fa-solid fa-store">
+                                                                                        </i>
+                                                                                        <span>Рынок</span>
+                                                                                      </div>
+                                                                                      <div class="b-nav-item" onclick="switchTab('tabGarage')" id="bnav-tabGarage">
+                                                                                        <i class="fa-solid fa-warehouse">
+                                                                                        </i>
+                                                                                        <span>Гараж</span>
+                                                                                      </div>
+                                                                                      <div class="b-nav-item" onclick="switchTab('tabSalesLot')" id="bnav-tabSalesLot">
+                                                                                        <i class="fa-solid fa-car-on">
+                                                                                        </i>
+                                                                                        <span>Площадка</span>
+                                                                                      </div>
+                                                                                      <div class="b-nav-item" onclick="switchTab('tabLife')" id="bnav-tabLife">
+                                                                                        <i class="fa-solid fa-mug-hot">
+                                                                                        </i>
+                                                                                        <span>Жизнь</span>
+                                                                                      </div>
+                                                                                      <div class="b-nav-item" onclick="switchTab('tabStreet')" id="bnav-tabStreet">
+                                                                                        <i class="fa-solid fa-flag-checkered">
+                                                                                        </i>
+                                                                                        <span>Стрит</span>
+                                                                                      </div>
+                                                                                    </nav>
+                                                                                  </div>
+                                                                                  <!-- МОДАЛЬНЫЕ ОКНА -->
+                                                                                  <div id="modalDailyBonus" class="modal-overlay">
+                                                                                    <div class="modal-box text-center">
+                                                                                      <div style="font-size:38px; margin-bottom:6px;">🎁</div>
+                                                                                      <h3 class="font-bold mb-1">Ежедневный подарок</h3>
+                                                                                      <div class="daily-streak-grid" id="dailyBonusGrid">
+                                                                                      </div>
+                                                                                      <button id="btnClaimDaily" onclick="claimDailyReward()" class="btn btn-green mb-2">Забрать награду</button>
+                                                                                      <button onclick="closeModal('modalDailyBonus')" class="btn btn-dark w-full">Закрыть</button>
+                                                                                    </div>
+                                                                                  </div>
+                                                                                  <div id="modalBuyCall" class="modal-overlay">
+                                                                                    <div class="modal-box text-center">
+                                                                                      <div style="font-size:38px; margin-bottom:6px;" id="buyCallEmoji">📞</div>
+                                                                                      <h3 class="font-bold mb-1" id="buyCallTitle">Звонок продавцу...</h3>
+                                                                                      <p class="sub-label mb-3" id="buyCallDesc">Гудки в трубке...</p>
+                                                                                      <div id="buyCallActionBtnBox">
+                                                                                      </div>
+                                                                                    </div>
+                                                                                  </div>
+                                                                                  <div id="modalDealVerdict" class="modal-overlay">
+                                                                                    <div class="modal-box text-center">
+                                                                                      <div style="font-size:42px; margin-bottom:8px;" id="verdictEmoji">🤝</div>
+                                                                                      <h3 class="font-bold mb-1" id="verdictTitle">Сделка закрыта</h3>
+                                                                                      <p class="sub-label mb-2" id="verdictText">Покупатель согласен!</p>
+                                                                                      <div class="price-val mb-1" id="verdictAmount">+0 ₽</div>
+                                                                                      <div id="verdictProfitBadge" class="text-xs font-bold mb-3" style="display:none;">
+                                                                                      </div>
+                                                                                      <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Понятно 👍</button>
+                                                                                    </div>
+                                                                                  </div>
+                                                                                  <div id="modalHaggle" class="modal-overlay">
+                                                                                    <div class="modal-box text-center">
+                                                                                      <h3 class="font-bold mb-1">Торг с продавцом</h3>
+                                                                                      <div id="haggleCarTitle" class="text-xs color-cyan font-bold mb-2">Авто</div>
+                                                                                      <div id="haggleBubble" class="sub-label mb-3 color-amber" style="font-style: italic;">«Много не скину, машина в идеале!»</div>
+                                                                                      <div class="grid-3 mb-3">
+                                                                                        <button onclick="attemptMarketHaggle(3)" class="btn btn-dark btn-sm">Скинуть 3%<br>
+                                                                                          <span class="color-green text-xs">Легко</span>
+                                                                                        </button>
+                                                                                        <button onclick="attemptMarketHaggle(7)" class="btn btn-dark btn-sm">Скинуть 7%<br>
+                                                                                          <span class="color-amber text-xs">Риск</span>
+                                                                                        </button>
+                                                                                        <button onclick="attemptMarketHaggle(12)" class="btn btn-dark btn-sm">Скинуть 12%<br>
+                                                                                          <span class="color-red text-xs">Нагло</span>
+                                                                                        </button>
+                                                                                      </div>
+                                                                                      <button onclick="closeModal('modalHaggle')" class="btn btn-dark w-full">Закрыть</button>
+                                                                                    </div>
+                                                                                  </div>
+                                                                                  <div id="modalHaggleSale" class="modal-overlay" style="z-index: 2250;">
+                                                                                  </div>
+                                                                                  <div id="modalOBD2" class="modal-overlay" style="z-index: 2200;">
+                                                                                    <div class="modal-box">
+                                                                                      <h4 class="text-center mb-1">
+                                                                                        <i class="fa-solid fa-laptop-code color-cyan">
+                                                                                        </i> OBD2 Сканер</h4>
+                                                                                        <div id="obd2CarTitle" class="text-xs color-cyan text-center font-bold mb-3">Подключение к ЭБУ...</div>
+                                                                                        <div id="obd2ResultBox" class="mb-3" style="background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; font-family: monospace; font-size: 11px;">Инициализация протокола KWP2000...<br>Чтение блоков управления...</div>
+                                                                                        <div id="obd2ActionBox">
+                                                                                        </div>
+                                                                                        <button onclick="closeOBD2Modal()" class="btn btn-dark w-full mt-2">Закрыть сканер</button>
+                                                                                      </div>
+                                                                                    </div>
+                                                                                    <div id="modalPutOnLot" class="modal-overlay">
+                                                                                      <div class="modal-box">
+                                                                                        <h4 class="text-center mb-1">🏪 Выставить на продажу</h4>
+                                                                                        <div id="lotPutCarTitle" class="text-xs color-cyan text-center font-bold mb-1">Автомобиль</div>
+                                                                                        <div id="lotCostInfo" class="text-xs color-amber text-center mb-3">Себестоимость: 0 ₽</div>
+                                                                                        <div class="mb-3">
+                                                                                          <label class="sub-label mb-1 block">Желаемая цена (₽):</label>
+                                                                                          <input type="number" id="lotAskingPriceInput" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:16px; font-weight:bold; outline:none;">
+                                                                                            <div class="sub-label mt-1" id="lotRecPriceText">Рекомендуемая: ~100,000 ₽</div>
                                                                                           </div>
                                                                                           <div class="grid-2">
-                                                                                            <button onclick="cheatAddStats()" class="btn btn-cyan btn-sm">100% Сил</button>
-                                                                                            <button onclick="resetGameData()" class="btn btn-danger btn-sm">Сброс</button>
+                                                                                            <button onclick="confirmPutOnLot()" class="btn btn-green">Выставить</button>
+                                                                                            <button onclick="closeModal('modalPutOnLot')" class="btn btn-dark">Отмена</button>
                                                                                           </div>
                                                                                         </div>
-                                                                                        <button onclick="switchTab('tabMarket')" class="btn btn-dark">Вернуться к игре</button>
                                                                                       </div>
-                                                                                    </section>
-                                                                                  </main>
-                                                                                  <nav class="bottom-nav">
-                                                                                    <div class="b-nav-item active" onclick="switchTab('tabMarket')" id="bnav-tabMarket">
-                                                                                      <i class="fa-solid fa-store">
-                                                                                      </i>
-                                                                                      <span>Рынок</span>
-                                                                                    </div>
-                                                                                    <div class="b-nav-item" onclick="switchTab('tabGarage')" id="bnav-tabGarage">
-                                                                                      <i class="fa-solid fa-warehouse">
-                                                                                      </i>
-                                                                                      <span>Гараж</span>
-                                                                                    </div>
-                                                                                    <div class="b-nav-item" onclick="switchTab('tabSalesLot')" id="bnav-tabSalesLot">
-                                                                                      <i class="fa-solid fa-car-on">
-                                                                                      </i>
-                                                                                      <span>Площадка</span>
-                                                                                    </div>
-                                                                                    <div class="b-nav-item" onclick="switchTab('tabLife')" id="bnav-tabLife">
-                                                                                      <i class="fa-solid fa-mug-hot">
-                                                                                      </i>
-                                                                                      <span>Жизнь</span>
-                                                                                    </div>
-                                                                                    <div class="b-nav-item" onclick="switchTab('tabStreet')" id="bnav-tabStreet">
-                                                                                      <i class="fa-solid fa-flag-checkered">
-                                                                                      </i>
-                                                                                      <span>Стрит</span>
-                                                                                    </div>
-                                                                                  </nav>
-                                                                                </div>
-                                                                                <div id="modalDailyBonus" class="modal-overlay">
-                                                                                  <div class="modal-box text-center">
-                                                                                    <div style="font-size:38px; margin-bottom:6px;">🎁</div>
-                                                                                    <h3 class="font-bold mb-1">Ежедневный подарок</h3>
-                                                                                    <div class="daily-streak-grid" id="dailyBonusGrid">
-                                                                                    </div>
-                                                                                    <button id="btnClaimDaily" onclick="claimDailyReward()" class="btn btn-green mb-2">Забрать награду</button>
-                                                                                    <button onclick="closeModal('modalDailyBonus')" class="btn btn-dark w-full">Закрыть</button>
-                                                                                  </div>
-                                                                                </div>
-                                                                                <div id="modalBuyCall" class="modal-overlay">
-                                                                                  <div class="modal-box text-center">
-                                                                                    <div style="font-size:38px; margin-bottom:6px;" id="buyCallEmoji">📞</div>
-                                                                                    <h3 class="font-bold mb-1" id="buyCallTitle">Звонок продавцу...</h3>
-                                                                                    <p class="sub-label mb-3" id="buyCallDesc">Гудки в трубке...</p>
-                                                                                    <div id="buyCallActionBtnBox">
-                                                                                    </div>
-                                                                                  </div>
-                                                                                </div>
-                                                                                <div id="modalDealVerdict" class="modal-overlay">
-                                                                                  <div class="modal-box text-center">
-                                                                                    <div style="font-size:42px; margin-bottom:8px;" id="verdictEmoji">🤝</div>
-                                                                                    <h3 class="font-bold mb-1" id="verdictTitle">Сделка закрыта</h3>
-                                                                                    <p class="sub-label mb-2" id="verdictText">Покупатель согласен!</p>
-                                                                                    <div class="price-val mb-1" id="verdictAmount">+0 ₽</div>
-                                                                                    <div id="verdictProfitBadge" class="text-xs font-bold mb-3" style="display:none;">
-                                                                                    </div>
-                                                                                    <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Понятно 👍</button>
-                                                                                  </div>
-                                                                                </div>
-                                                                                <div id="modalHaggle" class="modal-overlay">
-                                                                                  <div class="modal-box text-center">
-                                                                                    <h3 class="font-bold mb-1">Торг с продавцом</h3>
-                                                                                    <div id="haggleCarTitle" class="text-xs color-cyan font-bold mb-2">Авто</div>
-                                                                                    <div id="haggleBubble" class="sub-label mb-3 color-amber" style="font-style: italic;">«Много не скину, машина в идеале!»</div>
-                                                                                    <div class="grid-3 mb-3">
-                                                                                      <button onclick="attemptMarketHaggle(3)" class="btn btn-dark btn-sm">Скинуть 3%<br>
-                                                                                        <span class="color-green text-xs">Легко</span>
-                                                                                      </button>
-                                                                                      <button onclick="attemptMarketHaggle(7)" class="btn btn-dark btn-sm">Скинуть 7%<br>
-                                                                                        <span class="color-amber text-xs">Риск</span>
-                                                                                      </button>
-                                                                                      <button onclick="attemptMarketHaggle(12)" class="btn btn-dark btn-sm">Скинуть 12%<br>
-                                                                                        <span class="color-red text-xs">Нагло</span>
-                                                                                      </button>
-                                                                                    </div>
-                                                                                    <button onclick="closeModal('modalHaggle')" class="btn btn-dark w-full">Закрыть</button>
-                                                                                  </div>
-                                                                                </div>
-                                                                                <div id="modalHaggleSale" class="modal-overlay" style="z-index: 2250;">
-                                                                                </div>
-                                                                                <div id="modalOBD2" class="modal-overlay" style="z-index: 2200;">
-                                                                                  <div class="modal-box">
-                                                                                    <h4 class="text-center mb-1">
-                                                                                      <i class="fa-solid fa-laptop-code color-cyan">
-                                                                                      </i> OBD2 Сканер</h4>
-                                                                                      <div id="obd2CarTitle" class="text-xs color-cyan text-center font-bold mb-3">Подключение к ЭБУ...</div>
-                                                                                      <div id="obd2ResultBox" class="mb-3" style="background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; font-family: monospace; font-size: 11px;">Инициализация протокола KWP2000...<br>Чтение блоков управления...</div>
-                                                                                      <div id="obd2ActionBox">
-                                                                                      </div>
-                                                                                      <button onclick="closeOBD2Modal()" class="btn btn-dark w-full mt-2">Закрыть сканер</button>
-                                                                                    </div>
-                                                                                  </div>
-                                                                                  <div id="modalPutOnLot" class="modal-overlay">
-                                                                                    <div class="modal-box">
-                                                                                      <h4 class="text-center mb-1">🏪 Выставить на продажу</h4>
-                                                                                      <div id="lotPutCarTitle" class="text-xs color-cyan text-center font-bold mb-1">Автомобиль</div>
-                                                                                      <div id="lotCostInfo" class="text-xs color-amber text-center mb-3">Себестоимость: 0 ₽</div>
-                                                                                      <div class="mb-3">
-                                                                                        <label class="sub-label mb-1 block">Желаемая цена (₽):</label>
-                                                                                        <input type="number" id="lotAskingPriceInput" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:16px; font-weight:bold; outline:none;">
-                                                                                          <div class="sub-label mt-1" id="lotRecPriceText">Рекомендуемая: ~100,000 ₽</div>
-                                                                                        </div>
-                                                                                        <div class="grid-2">
-                                                                                          <button onclick="confirmPutOnLot()" class="btn btn-green">Выставить</button>
-                                                                                          <button onclick="closeModal('modalPutOnLot')" class="btn btn-dark">Отмена</button>
+                                                                                      <div id="modalMorningEvent" class="modal-overlay">
+                                                                                        <div class="modal-box text-center">
+                                                                                          <div style="font-size:36px; margin-bottom:6px;" id="eventEmoji">🌅</div>
+                                                                                          <h4 class="font-bold mb-1" id="eventTitle">Городские новости</h4>
+                                                                                          <p class="sub-label mb-3" id="eventDesc">Описание утреннего события</p>
+                                                                                          <button onclick="closeModal('modalMorningEvent')" class="btn btn-amber w-full">Принять и продолжить</button>
                                                                                         </div>
                                                                                       </div>
-                                                                                    </div>
-                                                                                    <div id="modalMorningEvent" class="modal-overlay">
-                                                                                      <div class="modal-box text-center">
-                                                                                        <div style="font-size:36px; margin-bottom:6px;" id="eventEmoji">🌅</div>
-                                                                                        <h4 class="font-bold mb-1" id="eventTitle">Городские новости</h4>
-                                                                                        <p class="sub-label mb-3" id="eventDesc">Описание утреннего события</p>
-                                                                                        <button onclick="closeModal('modalMorningEvent')" class="btn btn-amber w-full">Принять и продолжить</button>
-                                                                                      </div>
-                                                                                    </div>
-                                                                                    <div id="modalPreview" class="modal-overlay">
-                                                                                      <div class="modal-box">
-                                                                                        <div class="car-img-wrap mb-2">
-                                                                                          <img id="prevImg" src="" class="car-img">
-                                                                                            <div id="prevTypeBadge" class="badge-tag" style="bottom: 8px; right: 8px;">АВТО</div>
-                                                                                            <div class="plate-corner">
-                                                                                              <div id="prevPlate" class="license-plate">Н000МЕ 77 <div class="license-flag">RUS</div>
+                                                                                      <div id="modalPreview" class="modal-overlay">
+                                                                                        <div class="modal-box">
+                                                                                          <div class="car-img-wrap mb-2">
+                                                                                            <img id="prevImg" src="" class="car-img">
+                                                                                              <div id="prevTypeBadge" class="badge-tag" style="bottom: 8px; right: 8px;">АВТО</div>
+                                                                                              <div class="plate-corner">
+                                                                                                <div id="prevPlate" class="license-plate">Н000МЕ 77 <div class="license-flag">RUS</div>
+                                                                                              </div>
                                                                                             </div>
                                                                                           </div>
-                                                                                        </div>
-                                                                                        <h3 id="prevTitle" class="font-bold mb-1">Название Авто</h3>
-                                                                                        <div id="prevSpecs" class="sub-label mb-1">240 л.с. | Разгон: 6.2с | Состояние: 100%</div>
-                                                                                        <div id="prevCostDetails" class="sub-label mb-2 color-amber">Себестоимость выкупа: 0 ₽</div>
-                                                                                        <div class="price-box mb-2">
-                                                                                          <div>
-                                                                                            <span class="text-xs color-green font-bold">ОЦЕНОЧНАЯ СТОИМОСТЬ:</span>
-                                                                                            <div id="prevPrice" class="price-val">1,200,000 ₽</div>
+                                                                                          <h3 id="prevTitle" class="font-bold mb-1">Название Авто</h3>
+                                                                                          <div id="prevSpecs" class="sub-label mb-1">240 л.с. | Разгон: 6.2с | Состояние: 100%</div>
+                                                                                          <div id="prevCostDetails" class="sub-label mb-2 color-amber">Себестоимость выкупа: 0 ₽</div>
+                                                                                          <div class="price-box mb-2">
+                                                                                            <div>
+                                                                                              <span class="text-xs color-green font-bold">ОЦЕНОЧНАЯ СТОИМОСТЬ:</span>
+                                                                                              <div id="prevPrice" class="price-val">1,200,000 ₽</div>
+                                                                                            </div>
                                                                                           </div>
-                                                                                        </div>
-                                                                                        <div class="grid-2 mb-2">
-                                                                                          <button onclick="playEngineSound()" class="btn btn-amber">
-                                                                                            <i class="fa-solid fa-volume-high">
-                                                                                            </i> Газануть</button>
-                                                                                            <button onclick="openChangePlateModal()" class="btn btn-dark">
-                                                                                              <i class="fa-solid fa-id-card">
-                                                                                              </i> Номера</button>
-                                                                                            </div>
-                                                                                            <div class="grid-2 mb-2">
-                                                                                              <button onclick="openTuningFromPreview()" class="btn btn-dark">
-                                                                                                <i class="fa-solid fa-screwdriver-wrench">
-                                                                                                </i> Тюнинг</button>
-                                                                                                <button onclick="openOBD2Modal()" class="btn btn-cyan">
-                                                                                                  <i class="fa-solid fa-laptop-code">
-                                                                                                  </i> OBD2 Скан</button>
-                                                                                                </div>
-                                                                                                <button onclick="closeModal('modalPreview')" class="btn btn-dark w-full">Закрыть</button>
+                                                                                          <div class="grid-2 mb-2">
+                                                                                            <button onclick="playEngineSound()" class="btn btn-amber">
+                                                                                              <i class="fa-solid fa-volume-high">
+                                                                                              </i> Газануть</button>
+                                                                                              <button onclick="openChangePlateModal()" class="btn btn-dark">
+                                                                                                <i class="fa-solid fa-id-card">
+                                                                                                </i> Номера</button>
                                                                                               </div>
-                                                                                            </div>
-                                                                                            <div id="modalChangePlate" class="modal-overlay">
-                                                                                              <div class="modal-box">
-                                                                                                <h4 class="text-center mb-1">🏷️ Переоформление авто</h4>
-                                                                                                <p class="sub-label text-center mb-3">Снятие номера вернет его в инвентарь.</p>
-                                                                                                <button onclick="removePlateFromCar()" class="btn btn-amber mb-3 w-full">Снять текущий номер (В инвентарь)</button>
-                                                                                                <div id="changePlateList" class="flex-gap mb-3" style="flex-direction:column;">
+                                                                                              <div class="grid-2 mb-2">
+                                                                                                <button onclick="openTuningFromPreview()" class="btn btn-dark">
+                                                                                                  <i class="fa-solid fa-screwdriver-wrench">
+                                                                                                  </i> Тюнинг</button>
+                                                                                                  <button onclick="openOBD2Modal()" class="btn btn-cyan">
+                                                                                                    <i class="fa-solid fa-laptop-code">
+                                                                                                    </i> OBD2 Скан</button>
+                                                                                                  </div>
+                                                                                                  <button onclick="closeModal('modalPreview')" class="btn btn-dark w-full">Закрыть</button>
                                                                                                 </div>
-                                                                                                <button onclick="closeModal('modalChangePlate')" class="btn btn-dark w-full">Отмена</button>
                                                                                               </div>
-                                                                                            </div>
-                                                                                            <div id="modalTuning" class="modal-overlay" style="z-index: 2150;">
-                                                                                              <div class="modal-box">
-                                                                                                <h4 class="text-center mb-1">🛠 Тюнинг-Ателье</h4>
-                                                                                                <div id="tuneCarTitle" class="text-xs color-cyan text-center font-bold mb-2">Автомобиль</div>
-                                                                                                <div class="tuning-risk-meter mb-3">
-                                                                                                  <div class="flex-between text-xs mb-1">
-                                                                                                    <span>Риск внимания ДПС (12.5.1):</span>
-                                                                                                    <b id="tuneRiskValue" class="color-amber">0%</b>
+                                                                                              <div id="modalChangePlate" class="modal-overlay">
+                                                                                                <div class="modal-box">
+                                                                                                  <h4 class="text-center mb-1">🏷️ Переоформление авто</h4>
+                                                                                                  <p class="sub-label text-center mb-3">Снятие номера вернет его в инвентарь.</p>
+                                                                                                  <button onclick="removePlateFromCar()" class="btn btn-amber mb-3 w-full">Снять текущий номер (В инвентарь)</button>
+                                                                                                  <div id="changePlateList" class="flex-gap mb-3" style="flex-direction:column;">
                                                                                                   </div>
-                                                                                                  <div class="risk-bar-wrap">
-                                                                                                    <div id="tuneRiskFill" class="risk-bar-fill">
-                                                                                                    </div>
-                                                                                                  </div>
+                                                                                                  <button onclick="closeModal('modalChangePlate')" class="btn btn-dark w-full">Отмена</button>
                                                                                                 </div>
-                                                                                                <div class="tuning-items-list mb-3">
-                                                                                                  <div class="tuning-row">
-                                                                                                    <div>
-                                                                                                      <div class="font-bold text-xs">Чип-Тюнинг Stage</div>
-                                                                                                      <div class="sub-label">+30 л.с. | +15% риск 12.5.1</div>
-                                                                                                    </div>
-                                                                                                    <button onclick="applyTuningMod('chip')" class="btn btn-dark btn-auto btn-sm">50,000 ₽</button>
-                                                                                                  </div>
-                                                                                                  <div class="tuning-row">
-                                                                                                    <div>
-                                                                                                      <div class="font-bold text-xs">Прямоточный Выхлоп</div>
-                                                                                                      <div class="sub-label">+25% риск 12.5.1</div>
-                                                                                                    </div>
-                                                                                                    <button onclick="applyTuningMod('exhaust')" class="btn btn-dark btn-auto btn-sm">35,000 ₽</button>
-                                                                                                  </div>
-                                                                                                  <div class="tuning-row">
-                                                                                                    <div>
-                                                                                                      <div class="font-bold text-xs">Пневмоподвеска (Стенс)</div>
-                                                                                                      <div class="sub-label">+40 баллов на Автошоу</div>
-                                                                                                    </div>
-                                                                                                    <button onclick="applyTuningMod('stance')" class="btn btn-dark btn-auto btn-sm">45,000 ₽</button>
-                                                                                                  </div>
-                                                                                                  <div class="tuning-row">
-                                                                                                    <div>
-                                                                                                      <div class="font-bold text-xs">Спортивный Обвес</div>
-                                                                                                      <div class="sub-label">+15% риск</div>
-                                                                                                    </div>
-                                                                                                    <button onclick="applyTuningMod('bodykit')" class="btn btn-dark btn-auto btn-sm">60,000 ₽</button>
-                                                                                                  </div>
-                                                                                                </div>
-                                                                                                <button onclick="closeModal('modalTuning')" class="btn btn-cyan w-full">Готово</button>
                                                                                               </div>
-                                                                                            </div>
-                                                                                            <div id="modalPolice" class="modal-overlay">
-                                                                                              <div class="modal-box" style="border-color:var(--red);">
-                                                                                                <div class="police-badge mb-1">🚨 ОБЛАВА ДПС 🚨</div>
-                                                                                                <h4 class="text-center color-red font-bold mb-1">Статья 12.5.1 КоАП РФ</h4>
-                                                                                                <p class="sub-label text-center mb-3">Инспектор зафиксировал изменения в конструкции!</p>
-                                                                                                <button onclick="policeAction('call')" class="btn btn-cyan mb-2 w-full">
-                                                                                                  <i class="fa-solid fa-phone mr-1">
-                                                                                                  </i> Звонок другу (1 🤝)</button>
-                                                                                                  <button onclick="policeAction('fine')" class="btn btn-amber mb-2 w-full">
-                                                                                                    <i class="fa-solid fa-receipt mr-1">
-                                                                                                    </i> Оплатить штраф (50,000 ₽)</button>
-                                                                                                    <button onclick="policeAction('impound')" class="btn btn-danger w-full">
-                                                                                                      <i class="fa-solid fa-truck-pickup mr-1">
-                                                                                                      </i> На штрафстоянку</button>
+                                                                                              <div id="modalTuning" class="modal-overlay" style="z-index: 2150;">
+                                                                                                <div class="modal-box">
+                                                                                                  <h4 class="text-center mb-1">🛠 Тюнинг-Ателье</h4>
+                                                                                                  <div id="tuneCarTitle" class="text-xs color-cyan text-center font-bold mb-2">Автомобиль</div>
+                                                                                                  <div class="tuning-risk-meter mb-3">
+                                                                                                    <div class="flex-between text-xs mb-1">
+                                                                                                      <span>Риск внимания ДПС (12.5.1):</span>
+                                                                                                      <b id="tuneRiskValue" class="color-amber">0%</b>
                                                                                                     </div>
-                                                                                                  </div>
-                                                                                                  <div id="modalGauge" class="modal-overlay">
-                                                                                                    <div class="modal-box">
-                                                                                                      <h4 class="text-center mb-2">Замер ЛКП (Завод: 90-140 мкм)</h4>
-                                                                                                      <div class="grid-2 mb-3">
-                                                                                                        <button onclick="checkBodyPart('hood')" class="btn btn-dark">
-                                                                                                          <span class="sub-label">Капот</span>
-                                                                                                          <span id="part-hood" class="font-bold">Замерить</span>
-                                                                                                        </button>
-                                                                                                        <button onclick="checkBodyPart('roof')" class="btn btn-dark">
-                                                                                                          <span class="sub-label">Крыша</span>
-                                                                                                          <span id="part-roof" class="font-bold">Замерить</span>
-                                                                                                        </button>
-                                                                                                        <button onclick="checkBodyPart('doors')" class="btn btn-dark">
-                                                                                                          <span class="sub-label">Двери</span>
-                                                                                                          <span id="part-doors" class="font-bold">Замерить</span>
-                                                                                                        </button>
-                                                                                                        <button onclick="checkBodyPart('wings')" class="btn btn-dark">
-                                                                                                          <span class="sub-label">Крылья</span>
-                                                                                                          <span id="part-wings" class="font-bold">Замерить</span>
-                                                                                                        </button>
+                                                                                                    <div class="risk-bar-wrap">
+                                                                                                      <div id="tuneRiskFill" class="risk-bar-fill">
                                                                                                       </div>
-                                                                                                      <button onclick="closeModal('modalGauge')" class="btn btn-cyan w-full">Готово</button>
                                                                                                     </div>
                                                                                                   </div>
-                                                                                                  <div id="modalAutoteka" class="modal-overlay">
-                                                                                                    <div class="modal-box">
-                                                                                                      <h4 class="text-center mb-2 color-green">Отчёт «Автотека»</h4>
-                                                                                                      <div id="autotekaReportContent" class="report-box mb-3" style="background:#080d16; padding:10px; border-radius:8px; font-size:12px;">
+                                                                                                  <div class="tuning-items-list mb-3">
+                                                                                                    <div class="tuning-row">
+                                                                                                      <div>
+                                                                                                        <div class="font-bold text-xs">Чип-Тюнинг Stage</div>
+                                                                                                        <div class="sub-label">+30 л.с. | +15% риск 12.5.1</div>
                                                                                                       </div>
-                                                                                                      <button onclick="closeModal('modalAutoteka')" class="btn btn-green w-full">Закрыть</button>
+                                                                                                      <button onclick="applyTuningMod('chip')" class="btn btn-dark btn-auto btn-sm">50,000 ₽</button>
+                                                                                                    </div>
+                                                                                                    <div class="tuning-row">
+                                                                                                      <div>
+                                                                                                        <div class="font-bold text-xs">Прямоточный Выхлоп</div>
+                                                                                                        <div class="sub-label">+25% риск 12.5.1</div>
+                                                                                                      </div>
+                                                                                                      <button onclick="applyTuningMod('exhaust')" class="btn btn-dark btn-auto btn-sm">35,000 ₽</button>
+                                                                                                    </div>
+                                                                                                    <div class="tuning-row">
+                                                                                                      <div>
+                                                                                                        <div class="font-bold text-xs">Пневмоподвеска (Стенс)</div>
+                                                                                                        <div class="sub-label">+40 баллов на Автошоу</div>
+                                                                                                      </div>
+                                                                                                      <button onclick="applyTuningMod('stance')" class="btn btn-dark btn-auto btn-sm">45,000 ₽</button>
+                                                                                                    </div>
+                                                                                                    <div class="tuning-row">
+                                                                                                      <div>
+                                                                                                        <div class="font-bold text-xs">Спортивный Обвес</div>
+                                                                                                        <div class="sub-label">+15% риск</div>
+                                                                                                      </div>
+                                                                                                      <button onclick="applyTuningMod('bodykit')" class="btn btn-dark btn-auto btn-sm">60,000 ₽</button>
                                                                                                     </div>
                                                                                                   </div>
-                                                                                                  <div id="modalPreSale" class="modal-overlay" style="z-index: 2150;">
-                                                                                                    <div class="modal-box">
-                                                                                                      <h4 class="text-center mb-1">
-                                                                                                        <i class="fa-solid fa-wand-magic-sparkles color-cyan">
-                                                                                                        </i> Предпродажная подготовка</h4>
-                                                                                                        <div id="preSaleCarTitle" class="text-xs color-cyan text-center font-bold mb-3">Автомобиль</div>
-                                                                                                        <div class="space-y-2 mb-3">
-                                                                                                          <div class="glass-card flex-between p-2 mb-2">
-                                                                                                            <div>
-                                                                                                              <div class="font-bold text-xs">✨ Полировка & Химчистка</div>
-                                                                                                              <div class="sub-label">+5% к рыночной стоимости</div>
-                                                                                                            </div>
-                                                                                                            <button onclick="applyPreSaleMod('clean')" class="btn btn-cyan btn-auto btn-sm" id="btnCleanPrice">4,000 ₽</button>
-                                                                                                          </div>
-                                                                                                          <div class="glass-card flex-between p-2 mb-2">
-                                                                                                            <div>
-                                                                                                              <div class="font-bold text-xs">🎨 Облив у дяди Вани</div>
-                                                                                                              <div class="sub-label">+20% состояния (бьется толщиномером)</div>
-                                                                                                            </div>
-                                                                                                            <button onclick="applyPreSaleMod('paint')" class="btn btn-dark btn-auto btn-sm" id="btnPaintPrice">12,000 ₽</button>
-                                                                                                          </div>
-                                                                                                          <div class="glass-card flex-between p-2 mb-2">
-                                                                                                            <div>
-                                                                                                              <div class="font-bold text-xs">🧪 Залить «медовую» присадку</div>
-                                                                                                              <div class="sub-label">Временно маскирует стук мотора</div>
-                                                                                                            </div>
-                                                                                                            <button onclick="applyPreSaleMod('additive')" class="btn btn-amber btn-auto btn-sm">6,000 ₽</button>
-                                                                                                          </div>
-                                                                                                          <div class="glass-card flex-between p-2 mb-2">
-                                                                                                            <div>
-                                                                                                              <div class="font-bold text-xs">⏳ Смотка одометра</div>
-                                                                                                              <div class="sub-label">-50% пробега | Риск спалиться подборщику!</div>
-                                                                                                            </div>
-                                                                                                            <button onclick="applyPreSaleMod('odometer')" class="btn btn-danger btn-auto btn-sm">8,000 ₽</button>
-                                                                                                          </div>
+                                                                                                  <button onclick="closeModal('modalTuning')" class="btn btn-cyan w-full">Готово</button>
+                                                                                                </div>
+                                                                                              </div>
+                                                                                              <div id="modalPolice" class="modal-overlay">
+                                                                                                <div class="modal-box" style="border-color:var(--red);">
+                                                                                                  <div class="police-badge mb-1">🚨 ОБЛАВА ДПС 🚨</div>
+                                                                                                  <h4 class="text-center color-red font-bold mb-1">Статья 12.5.1 КоАП РФ</h4>
+                                                                                                  <p class="sub-label text-center mb-3">Инспектор зафиксировал изменения в конструкции!</p>
+                                                                                                  <button onclick="policeAction('call')" class="btn btn-cyan mb-2 w-full">
+                                                                                                    <i class="fa-solid fa-phone mr-1">
+                                                                                                    </i> Звонок другу (1 🤝)</button>
+                                                                                                    <button onclick="policeAction('fine')" class="btn btn-amber mb-2 w-full">
+                                                                                                      <i class="fa-solid fa-receipt mr-1">
+                                                                                                      </i> Оплатить штраф (50,000 ₽)</button>
+                                                                                                      <button onclick="policeAction('impound')" class="btn btn-danger w-full">
+                                                                                                        <i class="fa-solid fa-truck-pickup mr-1">
+                                                                                                        </i> На штрафстоянку</button>
+                                                                                                      </div>
+                                                                                                    </div>
+                                                                                                    <div id="modalGauge" class="modal-overlay">
+                                                                                                      <div class="modal-box">
+                                                                                                        <h4 class="text-center mb-2">Замер ЛКП (Завод: 90-140 мкм)</h4>
+                                                                                                        <div class="grid-2 mb-3">
+                                                                                                          <button onclick="checkBodyPart('hood')" class="btn btn-dark">
+                                                                                                            <span class="sub-label">Капот</span>
+                                                                                                            <span id="part-hood" class="font-bold">Замерить</span>
+                                                                                                          </button>
+                                                                                                          <button onclick="checkBodyPart('roof')" class="btn btn-dark">
+                                                                                                            <span class="sub-label">Крыша</span>
+                                                                                                            <span id="part-roof" class="font-bold">Замерить</span>
+                                                                                                          </button>
+                                                                                                          <button onclick="checkBodyPart('doors')" class="btn btn-dark">
+                                                                                                            <span class="sub-label">Двери</span>
+                                                                                                            <span id="part-doors" class="font-bold">Замерить</span>
+                                                                                                          </button>
+                                                                                                          <button onclick="checkBodyPart('wings')" class="btn btn-dark">
+                                                                                                            <span class="sub-label">Крылья</span>
+                                                                                                            <span id="part-wings" class="font-bold">Замерить</span>
+                                                                                                          </button>
                                                                                                         </div>
-                                                                                                        <button onclick="closeModal('modalPreSale')" class="btn btn-dark w-full">Завершить подготовку</button>
+                                                                                                        <button onclick="closeModal('modalGauge')" class="btn btn-cyan w-full">Готово</button>
                                                                                                       </div>
                                                                                                     </div>
-                                                                                                    <div id="toastNotification" class="toast">Уведомление</div>
-                                                                                                    <script>
+                                                                                                    <div id="modalAutoteka" class="modal-overlay">
+                                                                                                      <div class="modal-box">
+                                                                                                        <h4 class="text-center mb-2 color-green">Отчёт «Автотека»</h4>
+                                                                                                        <div id="autotekaReportContent" class="report-box mb-3" style="background:#080d16; padding:10px; border-radius:8px; font-size:12px;">
+                                                                                                        </div>
+                                                                                                        <button onclick="closeModal('modalAutoteka')" class="btn btn-green w-full">Закрыть</button>
+                                                                                                      </div>
+                                                                                                    </div>
+                                                                                                    <div id="modalPreSale" class="modal-overlay" style="z-index: 2150;">
+                                                                                                      <div class="modal-box">
+                                                                                                        <h4 class="text-center mb-1">
+                                                                                                          <i class="fa-solid fa-wand-magic-sparkles color-cyan">
+                                                                                                          </i> Предпродажная подготовка</h4>
+                                                                                                          <div id="preSaleCarTitle" class="text-xs color-cyan text-center font-bold mb-3">Автомобиль</div>
+                                                                                                          <div class="space-y-2 mb-3">
+                                                                                                            <div class="glass-card flex-between p-2 mb-2">
+                                                                                                              <div>
+                                                                                                                <div class="font-bold text-xs">✨ Полировка & Химчистка</div>
+                                                                                                                <div class="sub-label">+5% к рыночной стоимости</div>
+                                                                                                              </div>
+                                                                                                              <button onclick="applyPreSaleMod('clean')" class="btn btn-cyan btn-auto btn-sm" id="btnCleanPrice">4,000 ₽</button>
+                                                                                                            </div>
+                                                                                                            <div class="glass-card flex-between p-2 mb-2">
+                                                                                                              <div>
+                                                                                                                <div class="font-bold text-xs">🎨 Облив у дяди Вани</div>
+                                                                                                                <div class="sub-label">+20% состояния (бьется толщиномером)</div>
+                                                                                                              </div>
+                                                                                                              <button onclick="applyPreSaleMod('paint')" class="btn btn-dark btn-auto btn-sm" id="btnPaintPrice">12,000 ₽</button>
+                                                                                                            </div>
+                                                                                                            <div class="glass-card flex-between p-2 mb-2">
+                                                                                                              <div>
+                                                                                                                <div class="font-bold text-xs">🧪 Залить «медовую» присадку</div>
+                                                                                                                <div class="sub-label">Временно маскирует стук мотора</div>
+                                                                                                              </div>
+                                                                                                              <button onclick="applyPreSaleMod('additive')" class="btn btn-amber btn-auto btn-sm">6,000 ₽</button>
+                                                                                                            </div>
+                                                                                                            <div class="glass-card flex-between p-2 mb-2">
+                                                                                                              <div>
+                                                                                                                <div class="font-bold text-xs">⏳ Смотка одометра</div>
+                                                                                                                <div class="sub-label">-50% пробега | Риск спалиться подборщику!</div>
+                                                                                                              </div>
+                                                                                                              <button onclick="applyPreSaleMod('odometer')" class="btn btn-danger btn-auto btn-sm">8,000 ₽</button>
+                                                                                                            </div>
+                                                                                                          </div>
+                                                                                                          <button onclick="closeModal('modalPreSale')" class="btn btn-dark w-full">Завершить подготовку</button>
+                                                                                                        </div>
+                                                                                                      </div>
+                                                                                                      <div id="toastNotification" class="toast">Уведомление</div>
+                                                                                                      <script>
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
 
@@ -1150,19 +1161,25 @@
                 isStolen: isStolen, autotekaChecked: false, cooldownUntil: 0, stoChecked: false,
                 hiddenDefect: hasHiddenDefect ? OBD_ERRORS[Math.floor(Math.random() * OBD_ERRORS.length)] : null,
                 sellerNote: SELLER_ADS_PHRASES[Math.floor(Math.random() * SELLER_ADS_PHRASES.length)], condition: hasHiddenDefect ? 55 : 85, tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 },
-                wear: { engine: 70 + Math.random()*25, transmission: 70 + Math.random()*25 }, bodyThickness: { hood: Math.random() > 0.6 ? 240 : 110, roof: 100, doors: Math.random() > 0.5 ? 240 : 110, wings: 105 }, rolledOdometer: false, hasAdditive: false, isRepainted: false, isPolished: false
+                wear: { engine: 70 + Math.random()*25, transmission: 70 + Math.random()*25 }, bodyThickness: { hood: Math.random() > 0.6 ? 240 : 110, roof: 100, doors: Math.random() > 0.5 ? 240 : 110, wings: 105 }, rolledOdometer: false, hasAdditive: false, isRepainted: false, isPolished: false, viewed: false
             });
         }
         renderMarketFeed();
     }
 
     function renderMarketFeed() {
-        const container = document.getElementById('marketCardContainer'); if (!container) return; setTxt('refreshCostText', getMarketRefreshCost().toLocaleString());
+        const container = document.getElementById('marketCardContainer'); if (!container) return; 
+        setTxt('refreshCostText', getMarketRefreshCost().toLocaleString());
+        
+        const mainContent = document.querySelector('.main-content');
+        const scrollPos = mainContent ? mainContent.scrollTop : 0;
+        
         const now = Date.now();
         container.innerHTML = state.marketFeed.map(car => {
             const isBusy = (car.cooldownUntil && car.cooldownUntil > now);
             const timeLeft = isBusy ? Math.ceil((car.cooldownUntil - now) / 1000) : 0;
-            return `<div class="glass-card mb-3 ${isBusy ? 'busy' : ''}" id="card_${car.id}">
+            return `<div class="glass-card mb-3 ${isBusy ? 'busy' : ''} ${car.viewed ? 'viewed-card' : ''}" id="card_${car.id}">
+                ${car.viewed ? '<div class="viewed-badge"><i class="fa-solid fa-eye"></i> Просмотрено</div>' : ''}
                 <div class="cooldown-timer">Занят (${timeLeft}с)</div>
                 <div class="car-img-wrap"><img src="${car.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'">
                 <div class="badge-tag" style="bottom: 8px; right: 8px;">${(car.type || 'car').toUpperCase()}</div><div class="plate-corner"><div class="license-plate">${car.plate} <div class="license-flag">RUS</div></div></div></div>
@@ -1172,15 +1189,19 @@
                 <div class="grid-2"><button onclick="openHaggleModal('${car.id}')" class="btn btn-dark">Торговаться</button><button onclick="initiateBuyMarketCar('${car.id}')" class="btn btn-green">Выкупить</button></div>
             </div>`;
         }).join('');
+
+        if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
     }
 
     function openHaggleModal(carId) { 
         activeHaggleCarId = carId; 
         const car = state.marketFeed.find(c => c.id === carId); 
         if (!car) return; 
+        car.viewed = true;
         setTxt('haggleCarTitle', `${car.name} (${car.price.toLocaleString()} ₽)`); 
         setTxt('haggleBubble', '«Много не скину, машина в идеале!»');
         document.getElementById('modalHaggle')?.classList.add('active'); 
+        renderMarketFeed();
     }
     
     function attemptMarketHaggle(percent) {
@@ -1217,22 +1238,37 @@
         }
     }
     
-    function openGaugeModal(carId) { activeInspectCarId = carId; if (state.player.cash < 3000) return showToast("Не хватает 3,000 ₽ на замер!"); state.player.cash -= 3000; saveState(); document.getElementById('modalGauge')?.classList.add('active'); }
+    function openGaugeModal(carId) { 
+        activeInspectCarId = carId; 
+        const car = state.marketFeed.find(c => c.id === carId); 
+        if (car) car.viewed = true;
+        if (state.player.cash < 3000) return showToast("Не хватает 3,000 ₽ на замер!"); 
+        state.player.cash -= 3000; 
+        saveState(); 
+        document.getElementById('modalGauge')?.classList.add('active'); 
+        renderMarketFeed();
+    }
+    
     function checkBodyPart(part) { if (!activeInspectCarId) return; const car = state.marketFeed.find(c => c.id === activeInspectCarId); if (!car) return; playSound('tick'); tgHaptic('light'); const val = car.bodyThickness[part]; const el = document.getElementById(`part-${part}`); if (el) el.innerHTML = val > 200 ? `<span class="color-red">${val} мкм (Окрас)</span>` : `<span class="color-green">${val} мкм (Завод)</span>`; }
     
     function openAutotekaModal(carId) {
         const car = state.marketFeed.find(c => c.id === carId); if (!car) return;
+        car.viewed = true;
         if (!car.autotekaChecked) {
             const cost = state.player.vipPro ? 0 : 5000; if (state.player.cash < cost && !state.player.vipPro) return showToast("Автотека стоит 5,000 ₽!");
-            state.player.cash -= cost; car.autotekaChecked = true; saveState(); renderMarketFeed();
+            state.player.cash -= cost; car.autotekaChecked = true; saveState();
         }
         const stat = car.isStolen ? "<b class='color-red'>В РОЗЫСКЕ (Перебиты VIN/Угон)</b>" : "<b class='color-green'>Юридически чист</b>";
         const rep = document.getElementById('autotekaReportContent'); if (rep) { rep.innerHTML = `<div class="mb-1 font-bold">${car.name} (${car.plate})</div><div>ДТП в базе: <b>${car.hiddenDefect ? '2' : '0'} шт.</b></div><div class="mt-1">Юридический статус: ${stat}</div>`; }
         document.getElementById('modalAutoteka')?.classList.add('active');
+        renderMarketFeed();
     }
 
     function initiateBuyMarketCar(carId) {
         const carIndex = state.marketFeed.findIndex(c => c.id === carId); if (carIndex === -1) return; const car = state.marketFeed[carIndex];
+        car.viewed = true;
+        renderMarketFeed();
+        
         const now = Date.now();
         if (car.cooldownUntil && car.cooldownUntil > now) return showToast("Абонент занят! Перезвоните позже.");
         if (Math.random() < 0.2) { car.cooldownUntil = now + 20000; renderMarketFeed(); return showToast("Продавец сбросил вызов."); }
@@ -1272,12 +1308,16 @@
     let selectedCarIndex = null; let activePreSaleCarIndex = null; let carToLotIndex = null;
 
     function renderGarage() {
-        const list = document.getElementById('garageList'); if (!list) return; const totalSlots = getTotalGarageSlots(); setTxt('garageDetailedSlots', `${state.garage.length} из ${totalSlots} боксов занято`);
+        const list = document.getElementById('garageList'); if (!list) return; 
+        const totalSlots = getTotalGarageSlots(); setTxt('garageDetailedSlots', `${state.garage.length} из ${totalSlots} боксов занято`);
+        const mainContent = document.querySelector('.main-content'); const scrollPos = mainContent ? mainContent.scrollTop : 0;
+        
         if (state.garage.length === 0) { list.innerHTML = `<div class="glass-card text-center sub-label py-8"><i class="fa-solid fa-warehouse color-cyan mb-2" style="font-size:32px;"></i><div>Гараж пуст. Выберите технику на авторынке или P2P!</div></div>`; return; }
         list.innerHTML = state.garage.map((car, idx) => {
             const cost = car.purchaseCost || car.basePrice || 100000;
             return `<div class="glass-card mb-3 ${car.hiddenDefect && !car.hasAdditive ? 'card-danger' : ''}"><div class="car-img-wrap" style="height: 140px;"><img src="${car.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'"><div class="badge-tag" style="bottom: 8px; right: 8px;">${(car.type || 'car').toUpperCase()}</div><div class="plate-corner"><div class="license-plate">${car.customPlate || car.plate} <div class="license-flag">RUS</div></div></div></div><div class="flex-between mb-2"><div><h4 class="font-bold">${car.name}</h4><div class="sub-label">${car.power || 100} л.с. | Пробег: ${(car.mileage || 85000).toLocaleString()} км | Сост: ${car.condition || 85}%</div><div class="text-xs color-amber mt-1">Куплена за: <b>${cost.toLocaleString()} ₽</b></div></div><div class="text-right"><div class="sub-label">Оценка:</div><div class="price-val">${(car.marketValue || car.price).toLocaleString()} ₽</div></div></div>${car.hiddenDefect ? `<div class="legal-warning mb-2"><span>⚠ <b>${car.hasAdditive ? 'Присадка залита' : car.hiddenDefect.text}</b></span><button onclick="repairCarDefect(${idx})" class="btn btn-amber btn-auto btn-sm">Капиталка (${car.hiddenDefect.cost.toLocaleString()} ₽)</button></div>` : ''}${car.impounded ? `<div class="legal-warning mb-2"><span>🚨 <b>НА ШТРАФСТОЯНКЕ</b></span><button onclick="unimpoundCar(${idx})" class="btn btn-cyan btn-auto btn-sm">Вызволить (1 🤝 или 100k ₽)</button></div>` : ''}<div class="grid-2 mb-2"><button onclick="openPreviewModal(${idx})" class="btn btn-dark">🔍 Осмотр & Звук</button><button onclick="openPreSaleModal(${idx})" class="btn btn-dark" ${car.impounded ? 'disabled' : ''}>🪄 Предпродажка</button></div><div class="grid-2 mb-2"><button onclick="openTuningModal(${idx})" class="btn btn-dark" ${car.impounded ? 'disabled' : ''}>🛠 Тюнинг</button><button onclick="openPutOnLotModal(${idx})" class="btn btn-green" ${car.impounded ? 'disabled' : ''}>🏪 На площадку</button></div><button onclick="scrapCar(${idx})" class="btn btn-dark btn-sm w-full">Сдать на разборку (-35% стоимости)</button></div>`;
         }).join('');
+        if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
     }
 
     function buyGarageSlot() { if (state.player.cash < 250000) return showToast("Нужно 250,000 ₽"); state.player.cash -= 250000; state.player.baseSlots += 1; saveState(); renderGarage(); showToast("Добавлен +1 бокс в гараж!"); }
@@ -1382,12 +1422,16 @@
     function confirmPutOnLot() { if (carToLotIndex === null) return; const car = state.garage[carToLotIndex]; const input = document.getElementById('lotAskingPriceInput'); const askingPrice = parseInt(input.value) || car.marketValue || car.price; closeModal('modalPutOnLot'); state.garage.splice(carToLotIndex, 1); state.salesLot.push({ id: 'lot_' + Date.now(), car: car, askingPrice: askingPrice, timer: 25, currentBuyer: null }); saveState(); renderGarage(); renderSalesLot(); tgHaptic('success'); showToast(`🚗 ${car.name} выставлен на площадку!`); setTimeout(() => switchTab('tabSalesLot'), 300); }
 
     function renderSalesLot() {
-        const list = document.getElementById('salesLotList'); if (!list) return; setTxt('lotCountBadge', `${state.salesLot.length} авто на продаже`);
+        const list = document.getElementById('salesLotList'); if (!list) return; 
+        setTxt('lotCountBadge', `${state.salesLot.length} авто на продаже`);
+        const mainContent = document.querySelector('.main-content'); const scrollPos = mainContent ? mainContent.scrollTop : 0;
+        
         if (state.salesLot.length === 0) { list.innerHTML = `<div class="glass-card text-center sub-label py-8"><i class="fa-solid fa-car-on color-green mb-2" style="font-size:32px;"></i><div>Площадка пуста. Выставьте авто из гаража.</div></div>`; return; }
         list.innerHTML = state.salesLot.map((slot, idx) => {
             const car = slot.car; const buyer = slot.currentBuyer; const cost = car.purchaseCost || car.basePrice || 100000;
             return `<div class="glass-card mb-3"><div class="car-img-wrap" style="height:130px;"><img src="${car.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'"><div class="plate-corner"><div class="license-plate">${car.customPlate || car.plate}</div></div></div><div class="flex-between mb-2"><div><h4 class="font-bold">${car.name}</h4><div class="sub-label">Выставлена за: <b class="color-green">${slot.askingPrice.toLocaleString()} ₽</b></div><div class="text-xs color-amber">Себестоимость: ${cost.toLocaleString()} ₽</div></div><div>${slot.timer > 0 ? `<span class="timer-badge">⏳ Покупатель через: ${slot.timer}с</span>` : `<span class="tag-badge bg-tag-green">Клиент на месте!</span>`}</div></div>${slot.timer > 0 ? `<div class="grid-2 mb-2"><button onclick="speedUpLotTimer(${idx}, 'ad')" class="btn btn-cyan btn-sm">⚡ Ускорить</button><button onclick="speedUpLotTimer(${idx}, 'cash')" class="btn btn-amber btn-sm">⏩ Пропустить (15k ₽)</button></div>` : ''}${buyer ? `<div class="glass-card p-3 mb-2" style="background:#090e18; border-color:var(--cyan);"><div class="flex-between mb-1"><div class="font-bold text-xs color-cyan">${buyer.avatar} ${buyer.name}</div><div class="price-val">${buyer.offerPrice.toLocaleString()} ₽</div></div><div class="sub-label mb-1 color-amber" style="font-style:italic;">🔍 Статус: «${buyer.preStatus}»</div><div class="text-xs mb-2 ${buyer.offerPrice >= cost ? 'color-green' : 'color-red'} font-bold">Прогноз: ${buyer.offerPrice >= cost ? '+' : ''}${(buyer.offerPrice - cost).toLocaleString()} ₽</div><div class="grid-3"><button onclick="acceptBuyerDeal(${idx})" class="btn btn-green btn-sm">Продать</button><button onclick="openHaggleSaleModal(${idx})" class="btn btn-amber btn-sm">Торг 🗣</button><button onclick="rejectBuyerDeal(${idx})" class="btn btn-dark btn-sm">Отказать</button></div></div>` : ''}<button onclick="withdrawFromLot(${idx})" class="btn btn-dark w-full mt-1 btn-sm">Забрать обратно в гараж</button></div>`;
         }).join('');
+        if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
     }
 
     function openHaggleSaleModal(idx) { 
@@ -1515,6 +1559,16 @@
         
         saveState(); 
         showToast(`Оплачено: ${amountToPay.toLocaleString()} ₽`); 
+    }
+
+    function donateForKarma() {
+        if (state.player.cash < 50000) return showToast("Не хватает 50,000 ₽ на благотворительность!");
+        if (state.player.karma >= 100) return showToast("Ваша карма и так идеальна (100)!");
+        state.player.cash -= 50000;
+        state.player.karma = Math.min(100, state.player.karma + 10);
+        saveState();
+        tgHaptic('success');
+        showToast("Доброе дело сделано! Карма +10 😇");
     }
     
     function checkBarterEvent() {
@@ -1762,17 +1816,15 @@
         if (state.player.lastClaimedDay < state.player.day) setTimeout(openDailyBonusModal, 800);
     }
     
-    // Глобальный таймер обновления площадки
     setInterval(() => {
         let lotChanged = false; state.salesLot.forEach(slot => { if (slot.timer > 0) { slot.timer -= 1; lotChanged = true; if (slot.timer === 0 && !slot.currentBuyer) generateBuyerForSlot(slot); } }); 
         if (lotChanged && document.getElementById('tabSalesLot')?.classList.contains('active')) renderSalesLot();
         
-        // Пассивный доход бизнеса
         state.businesses.forEach(b => { if (b.level > 0) { const cap = b.income * b.level * 60; b.stored = Math.min(cap, (b.stored || 0) + Math.round((b.income * b.level) / 4)); } }); 
         if (state.player.fuel < 100) state.player.fuel = Math.min(100, state.player.fuel + 1);
     }, 1000);
 
     document.addEventListener('DOMContentLoaded', initApp);
   </script>
-                                                                                                  </body>
-                                                                                                </html>
+                                                                                                    </body>
+                                                                                                  </html>
