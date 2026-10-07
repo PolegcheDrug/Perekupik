@@ -277,16 +277,23 @@
                                                           <div id="lifeChatFeed" class="chat-feed-box" style="height: 190px;">
                                                           </div>
                                                         </div>
+                                                        <!-- Обновленный Ломбард -->
                                                         <div class="glass-card mb-3">
-                                                          <div class="flex-between mb-2">
+                                                          <div class="flex-between mb-1">
                                                             <h3 class="color-red">
                                                               <i class="fa-solid fa-hand-holding-dollar">
-                                                              </i> Ломбард</h3>
+                                                              </i> Ломбард (Кредиты)</h3>
                                                               <span class="text-xs font-bold color-amber" id="loanDebtText">Долг: 0 ₽</span>
                                                             </div>
-                                                            <div class="grid-2">
+                                                            <div class="sub-label mb-2">Ставка: <b class="color-red">+15% в день</b>. Долг растёт при завершении дня!</div>
+                                                            <div class="grid-2 mb-2">
                                                               <button onclick="takeLoan(100000)" class="btn btn-dark btn-sm">Взять 100k ₽</button>
-                                                              <button onclick="repayLoan()" class="btn btn-green btn-sm">Погасить долг</button>
+                                                              <button onclick="takeLoan(500000)" class="btn btn-dark btn-sm">Взять 500k ₽</button>
+                                                            </div>
+                                                            <div class="grid-3">
+                                                              <button onclick="repayLoan(25)" class="btn btn-cyan btn-sm">Вернуть 25%</button>
+                                                              <button onclick="repayLoan(50)" class="btn btn-cyan btn-sm">Вернуть 50%</button>
+                                                              <button onclick="repayLoan(100)" class="btn btn-green btn-sm">Погасить всё</button>
                                                             </div>
                                                           </div>
                                                           <div class="glass-card mb-3">
@@ -646,7 +653,6 @@
                                                                                     </div>
                                                                                   </nav>
                                                                                 </div>
-                                                                                <!-- МОДАЛЬНЫЕ ОКНА -->
                                                                                 <div id="modalDailyBonus" class="modal-overlay">
                                                                                   <div class="modal-box text-center">
                                                                                     <div style="font-size:38px; margin-bottom:6px;">🎁</div>
@@ -1057,6 +1063,9 @@
         setTxt('moodText', state.player.mood); document.getElementById('moodFill').style.width = `${state.player.mood}%`;
         document.getElementById('vipBadge').style.display = state.player.vipPro ? 'block' : 'none';
         setTxt('garageHeaderSlots', `${state.garage.length}/${getTotalGarageSlots()}`);
+        
+        const loanEl = document.getElementById('loanDebtText');
+        if(loanEl) loanEl.innerText = `Долг: ${state.player.loanDebt.toLocaleString()} ₽`;
     }
 
     function saveState() { try { localStorage.setItem('perekoop_sim_save_v21', JSON.stringify(state)); } catch(e) {} updateHeaderUI(); }
@@ -1480,16 +1489,43 @@
     }
     function renderLifeChat() { const feed = document.getElementById('lifeChatFeed'); if (!feed) return; feed.innerHTML = activeLifeChatMessages.map(m => `<div class="chat-msg ${m.warning ? 'warning' : ''}"><div class="chat-author">${m.author}</div><div>${m.text}</div></div>`).join(''); feed.scrollTop = feed.scrollHeight; }
 
-    function takeLoan(amt) { tgHaptic('light'); state.player.cash += amt; state.player.loanDebt += Math.round(amt * 1.30); saveState(); showToast(`Займ получен под строгий процент!`); }
-    function repayLoan() { if (state.player.loanDebt <= 0) return showToast("У вас нет активных долгов!"); if (state.player.cash < state.player.loanDebt) return showToast("Недостаточно средств!"); tgHaptic('success'); state.player.cash -= state.player.loanDebt; state.player.loanDebt = 0; saveState(); showToast("Долг погашен!"); }
+    function takeLoan(amt) { 
+        if (state.player.loanDebt >= 1000000) return showToast("У вас уже слишком много долгов!");
+        tgHaptic('light'); 
+        state.player.cash += amt; 
+        state.player.loanDebt += amt; 
+        saveState(); 
+        showToast(`Одобрен кредит: ${amt.toLocaleString()} ₽!`); 
+    }
+    
+    function repayLoan(percent) { 
+        if (state.player.loanDebt <= 0) return showToast("У вас нет активных долгов!"); 
+        let amountToPay = Math.ceil(state.player.loanDebt * (percent / 100));
+        
+        if (percent === 100 && state.player.cash > 0 && state.player.cash < amountToPay) {
+            amountToPay = state.player.cash;
+        }
+        
+        if (state.player.cash < amountToPay) return showToast("Недостаточно средств для платежа!"); 
+        
+        tgHaptic('success'); 
+        state.player.cash -= amountToPay; 
+        state.player.loanDebt -= amountToPay; 
+        if (state.player.loanDebt < 0) state.player.loanDebt = 0;
+        
+        saveState(); 
+        showToast(`Оплачено: ${amountToPay.toLocaleString()} ₽`); 
+    }
     
     function checkBarterEvent() {
         if (state.garage.length > 0 && Math.random() < 0.1) {
-            const myCar = state.garage[Math.floor(Math.random() * state.garage.length)];
+            const myCarIdx = Math.floor(Math.random() * state.garage.length);
+            const myCar = state.garage[myCarIdx];
             const npcCar = CAR_DATABASE.comfort[Math.floor(Math.random() * CAR_DATABASE.comfort.length)];
             const surcharge = myCar.marketValue - npcCar.basePrice + (Math.random() * 50000 - 25000);
             if (confirm(`📞 Звонок от перекупа: Предлагает обмен! Свой ${npcCar.name} на ваш ${myCar.name} с доплатой ${Math.floor(surcharge).toLocaleString()} ₽.\nСогласны?`)) {
-                state.player.cash += surcharge; state.garage = state.garage.filter(c => c.id !== myCar.id);
+                state.player.cash += surcharge; 
+                state.garage.splice(myCarIdx, 1);
                 state.garage.push({ id: 'barter_' + Date.now(), name: npcCar.name, type: npcCar.type, basePrice: npcCar.basePrice, price: npcCar.basePrice, purchaseCost: npcCar.basePrice, marketValue: npcCar.basePrice, img: npcCar.img, plate: generateNormalPlate(), customPlate: generateNormalPlate(), wear: {engine: 90, transmission: 90}, condition: 85, tuning: {chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0} });
                 saveState(); renderGarage(); showToast("Обмен совершен!");
             }
@@ -1504,7 +1540,9 @@
         if (state.player.housingType === 'rent' && house && house.rent > 0) { if (state.player.cash >= house.rent) state.player.cash -= house.rent; else { state.player.housingId = 'room'; state.player.mood = Math.max(0, state.player.mood - 40); openVerdictModal("🚨 Долги!", "Вам не хватило на аренду, вы вернулись в комнату.", false); } }
         if (house) state.player.mood = Math.min(100, state.player.mood + house.moodBonus);
         let luxuryTax = 0; state.garage.forEach(c => { if(c.type === 'hyper') luxuryTax += 25000; }); if(luxuryTax > 0) state.player.cash -= luxuryTax;
+        
         if (state.player.loanDebt > 0) state.player.loanDebt = Math.round(state.player.loanDebt * 1.15);
+        
         let bTotal = 0; let bTaxes = 0; state.businesses.forEach(b => { if (b.level > 0) { const daily = (b.income * b.level * 3); bTotal += daily; bTaxes += Math.round(daily * 0.15); } });
         state.player.cash += (bTotal - bTaxes); state.player.fuel = 100;
         populateMarketFeed(); generateRandomP2PCars(); refreshPlateCatalog(); saveState(); renderDiets(); renderHousing(); renderP2P(); checkBusinessAccess(); renderPlatesPage(); triggerMorningEvent(luxuryTax);
@@ -1519,7 +1557,11 @@
     let isRacing = false; let racePos = 0; let raceInterval = null; let raceDuelInterval = null; let currentRaceDifficulty = 'easy'; let playerTrackPos = 0; let oppTrackPos = 0;
     function resetRaceState() { if (raceInterval) clearInterval(raceInterval); if (raceDuelInterval) clearInterval(raceDuelInterval); raceInterval = null; raceDuelInterval = null; isRacing = false; racePos = 0; playerTrackPos = 0; oppTrackPos = 0; const startBtn = document.getElementById('raceStartBtn'); const shiftBtn = document.getElementById('raceShiftBtn'); if (startBtn) startBtn.disabled = false; if (shiftBtn) { shiftBtn.disabled = true; shiftBtn.className = 'btn btn-dark opacity-50'; } const needle = document.getElementById('raceNeedle'); if (needle) needle.style.left = '0%'; const pRunner = document.getElementById('raceTrackPlayer'); const oRunner = document.getElementById('raceTrackOpponent'); if (pRunner) pRunner.style.left = '0%'; if (oRunner) oRunner.style.left = '0%'; }
     function initStreetView() { resetRaceState(); updateStreetCarSelector(); updateAutoShowUI(); }
-    function getEligibleStreetCars() { return state.garage.filter(c => ['economy', 'comfort', 'hyper'].includes(c.type)); }
+    
+    function getEligibleStreetCars() { 
+        return state.garage.filter(c => ['economy', 'comfort', 'premium', 'hyper', 'moto'].includes(c.type)); 
+    }
+    
     function updateStreetCarSelector() { const sel = document.getElementById('streetCarSelector'); if (!sel) return; const available = getEligibleStreetCars(); if (available.length === 0) { sel.innerHTML = `<option value="">Нет легковых авто в гараже</option>`; setTxt('streetSelectedCarPower', '0 л.с.'); setTxt('streetSelectedCarStats', 'Купите легковую машину (эконом, комфорт или гипер) для участия в уличных заездах!'); return; } sel.innerHTML = available.map((c, idx) => `<option value="${idx}" ${idx === state.player.selectedStreetCarIndex ? 'selected' : ''}>${c.name} (${c.power || 100} л.с.)</option>`).join(''); selectCarForStreet(state.player.selectedStreetCarIndex); }
     function selectCarForStreet(idx) { state.player.selectedStreetCarIndex = parseInt(idx) || 0; const available = getEligibleStreetCars(); const car = available[state.player.selectedStreetCarIndex] || available[0]; if (!car) return; if (!car.wear) car.wear = { engine: 100, transmission: 100 }; setTxt('streetSelectedCarPower', `${car.power || 100} л.с.`); setTxt('streetSelectedCarStats', `Мотор: ${Math.round(car.wear.engine)}% | КПП: ${Math.round(car.wear.transmission)}% | Риск 12.5.1: ${car.tuning?.risk1251 || 0}%`); setTxt('showCarSelectName', car.name); let pts = car.condition || 80; if (car.tuning?.stance) pts += 40; if (car.tuning?.bodykit) pts += 35; if (car.tuning?.exhaust) pts += 20; if (car.isPolished) pts += 15; setTxt('showCarPoints', `Рейтинг стиля: ${pts} баллов`); }
     function toggleStreetSub(mode) { resetRaceState(); ['race', 'show', 'clubs'].forEach(m => { document.getElementById(`streetSub-${m}`)?.classList.toggle('active', m === mode); }); document.getElementById('streetRaceBox').style.display = mode === 'race' ? 'block' : 'none'; document.getElementById('streetShowBox').style.display = mode === 'show' ? 'block' : 'none'; document.getElementById('streetClubsBox').style.display = mode === 'clubs' ? 'block' : 'none'; if (mode === 'show') updateAutoShowUI(); }
@@ -1623,7 +1665,7 @@
             const isLocked = state.player.level < h.minLevel;
             
             let btnClass = isOwned ? 'btn-green' : 'btn-amber';
-            let btnDisabled = (isOwned || isLocked) ? 'disabled' : '';
+            let btnDisabled = isOwned ? 'disabled' : (isLocked ? 'disabled' : '');
             let btnText = isOwned ? 'Выкуплено' : `Купить (${(h.buyPrice/1000000).toFixed(1)}M ₽)`;
             
             let rentBtn = '';
