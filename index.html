@@ -5,7 +5,6 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>Симулятор Перекупа — Telegram Mini App</title>
         <link rel="stylesheet" href="style.css">
-          <!-- Подключаем твой файл с базами данных -->
           <script src="data.js"></script>
           <script src="https://telegram.org/js/telegram-web-app.js"></script>
           <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -115,450 +114,432 @@
                                               <div class="glass-card mb-2" style="padding: 12px;">
                                                 <h3 class="mb-2" style="font-size: 13px;">
                                                   <i class="fa-solid fa-magnifying-glass-dollar color-cyan">
-                                                  </i> Классы техники
-                                                </h3>
-                                                <div class="market-categories-wrap">
-                                                  <button onclick="setCategory('economy')" id="catBtn-economy" class="cat-chip active">Эконом</button>
-                                                  <button onclick="setCategory('scooter')" id="catBtn-scooter" class="cat-chip">Скутеры</button>
-                                                  <button onclick="setCategory('moto')" id="catBtn-moto" class="cat-chip locked">
-                                                    <i class="fa-solid fa-lock" id="lock-moto">
-                                                    </i> Мото (16 ур)</button>
-                                                    <button onclick="setCategory('atv')" id="catBtn-atv" class="cat-chip locked">
-                                                      <i class="fa-solid fa-lock" id="lock-atv">
-                                                      </i> Квадро (16 ур)</button>
-                                                      <button onclick="setCategory('comfort')" id="catBtn-comfort" class="cat-chip locked">
-                                                        <i class="fa-solid fa-lock" id="lock-comfort">
-                                                        </i> Комфорт (30 ур)</button>
-                                                        <button onclick="setCategory('premium')" id="catBtn-premium" class="cat-chip locked">
-                                                          <i class="fa-solid fa-lock" id="lock-premium">
-                                                          </i> Премиум (30 ур)</button>
-                                                          <button onclick="setCategory('hyper')" id="catBtn-hyper" class="cat-chip locked">
-                                                            <i class="fa-solid fa-lock" id="lock-hyper">
-                                                            </i> Гиперкары (50 ур)</button>
-                                                            <button onclick="setCategory('truck')" id="catBtn-truck" class="cat-chip locked">
-                                                              <i class="fa-solid fa-lock" id="lock-truck">
-                                                              </i> Грузовики (50 ур)</button>
-                                                              <button onclick="setCategory('yacht')" id="catBtn-yacht" class="cat-chip locked">
-                                                                <i class="fa-solid fa-lock" id="lock-yacht">
-                                                                </i> Яхты (100 ур)</button>
-                                                              </div>
-                                                            </div>
-                                                            <button onclick="refreshMarketFeedManual()" class="btn btn-cyan mb-3">
-                                                              <i class="fa-solid fa-arrows-rotate">
-                                                              </i> Обновить ленту (<span id="refreshCostText">150</span> ₽ + 5 ⛽)
-                                                            </button>
-                                                            <div id="marketCardContainer">
-                                                            </div>
-                                                          </section>
-                                                          <!-- TAB: ГАРАЖ -->
-                                                          <section id="tabGarage" class="tab-screen">
-                                                            <div class="glass-card mb-2">
-                                                              <div class="flex-between mb-1">
-                                                                <div>
-                                                                  <h3>
-                                                                    <i class="fa-solid fa-warehouse color-green">
-                                                                    </i> Мой Автопарк</h3>
-                                                                    <p class="sub-label">Вместимость: <b class="color-cyan" id="garageDetailedSlots">1 из 2</b>
-                                                                  </p>
+                                                  </i> Классы техники</h3>
+                                                  <div class="market-categories-wrap">
+                                                    <button onclick="setCategory('economy')" id="catBtn-economy" class="cat-chip active">Эконом</button>
+                                                    <button onclick="setCategory('scooter')" id="catBtn-scooter" class="cat-chip">Скутеры</button>
+                                                    <button onclick="setCategory('moto')" id="catBtn-moto" class="cat-chip locked">
+                                                      <i class="fa-solid fa-lock" id="lock-moto">
+                                                      </i> Мото (16 ур)</button>
+                                                      <button onclick="setCategory('atv')" id="catBtn-atv" class="cat-chip locked">
+                                                        <i class="fa-solid fa-lock" id="lock-atv">
+                                                        </i> Квадро (16 ур)</button>
+                                                        <button onclick="setCategory('comfort')" id="catBtn-comfort" class="cat-chip locked">
+                                                          <i class="fa-solid fa-lock" id="lock-comfort">
+                                                          </i> Комфорт (30 ур)</button>
+                                                          <button onclick="setCategory('premium')" id="catBtn-premium" class="cat-chip locked">
+                                                            <i class="fa-solid fa-lock" id="lock-premium">
+                                                            </i> Премиум (30 ур)</button>
+                                                            <button onclick="setCategory('hyper')" id="catBtn-hyper" class="cat-chip locked">
+                                                              <i class="fa-solid fa-lock" id="lock-hyper">
+                                                              </i> Гиперкары (50 ур)</button>
+                                                              <button onclick="setCategory('truck')" id="catBtn-truck" class="cat-chip locked">
+                                                                <i class="fa-solid fa-lock" id="lock-truck">
+                                                                </i> Грузовики (50 ур)</button>
+                                                                <button onclick="setCategory('yacht')" id="catBtn-yacht" class="cat-chip locked">
+                                                                  <i class="fa-solid fa-lock" id="lock-yacht">
+                                                                  </i> Яхты (100 ур)</button>
                                                                 </div>
-                                                                <button onclick="buyGarageSlot()" class="btn btn-dark btn-auto border-green color-green">+1 Бокс (250k ₽)</button>
                                                               </div>
-                                                            </div>
-                                                            <div id="garageList">
-                                                            </div>
-                                                          </section>
-                                                          <!-- TAB: ПЛОЩАДКА -->
-                                                          <section id="tabSalesLot" class="tab-screen">
-                                                            <div class="glass-card">
-                                                              <div class="flex-between mb-1">
-                                                                <h3>
-                                                                  <i class="fa-solid fa-car-on color-green">
-                                                                  </i> Площадка продаж</h3>
-                                                                  <span class="tag-badge bg-tag-cyan" id="lotCountBadge">0 авто на продаже</span>
-                                                                </div>
-                                                                <p class="sub-label">Покупатели оценивают ваши машины по честной рыночной цене.</p>
-                                                              </div>
-                                                              <div id="salesLotList">
+                                                              <button onclick="refreshMarketFeedManual()" class="btn btn-cyan mb-3">
+                                                                <i class="fa-solid fa-arrows-rotate">
+                                                                </i> Обновить ленту (<span id="refreshCostText">150</span> ₽ + 5 ⛽)
+                                                              </button>
+                                                              <div id="marketCardContainer">
                                                               </div>
                                                             </section>
-                                                            <!-- TAB: ЖИЗНЬ -->
-                                                            <section id="tabLife" class="tab-screen">
-                                                              <div class="grid-3 mb-3">
-                                                                <button onclick="switchTab('tabContainers')" class="btn btn-dark" style="flex-direction:column; padding:12px 4px; border-color:var(--purple); color:var(--purple);">
-                                                                  <i class="fa-solid fa-box mb-1" style="font-size:18px;">
-                                                                  </i>Контейнеры
-                                                                </button>
-                                                                <button onclick="switchTab('tabContracts')" class="btn btn-dark" style="flex-direction:column; padding:12px 4px; border-color:var(--cyan); color:var(--cyan);">
-                                                                  <i class="fa-solid fa-file-contract mb-1" style="font-size:18px;">
-                                                                  </i>Заказы
-                                                                </button>
-                                                                <button onclick="switchTab('tabBarn')" class="btn btn-dark" style="flex-direction:column; padding:12px 4px; border-color:var(--amber); color:var(--amber);">
-                                                                  <i class="fa-solid fa-screwdriver-wrench mb-1" style="font-size:18px;">
-                                                                  </i>Сараи
-                                                                </button>
-                                                              </div>
-                                                              <div class="glass-card flex-between mb-3">
-                                                                <div>
-                                                                  <h3 class="font-bold color-amber">
-                                                                    <i class="fa-solid fa-calendar-day">
-                                                                    </i> Смена дня</h3>
-                                                                    <p class="sub-label">Списать расходы и 3 приема пищи</p>
-                                                                  </div>
-                                                                  <button onclick="nextDayAction()" class="btn btn-amber btn-auto">Завершить 🌙</button>
-                                                                </div>
-                                                                <!-- Подпольный Клуб «21» -->
-                                                                <div class="glass-card mb-3" id="casinoCardContainer">
-                                                                  <div class="flex-between mb-1">
-                                                                    <h3>
-                                                                      <i class="fa-solid fa-cards color-red">
-                                                                      </i> Подпольный Клуб «21»</h3>
-                                                                      <span class="tag-badge bg-tag-red">Колода 36 карт</span>
-                                                                    </div>
-                                                                    <p class="sub-label mb-2">Победа 1:1, ровно 21 очко или «Золотое (2 туза)» — выплата 1.5 к 1!</p>
-                                                                    <div id="casinoActiveBox">
-                                                                      <div class="glass-card p-2 mb-2" style="background:#090e18; border-color:var(--border-glass);">
-                                                                        <div class="flex-between mb-2">
-                                                                          <div class="font-bold text-xs color-red">Крупье: <span id="dealerScore">?</span>
-                                                                        </div>
-                                                                        <div id="dealerHandBox" class="flex-gap">
-                                                                        </div>
-                                                                      </div>
-                                                                      <div class="flex-between mb-1">
-                                                                        <div class="font-bold text-xs color-cyan">Вы: <span id="playerScore">0</span>
-                                                                      </div>
-                                                                      <div id="playerHandBox" class="flex-gap">
-                                                                      </div>
-                                                                    </div>
-                                                                  </div>
-                                                                  <div id="casinoBettingArea">
-                                                                    <div class="flex-between mb-2 font-bold text-xs">
-                                                                      <span>Ставка: <span class="color-amber" id="currentBetDisplay">0 ₽</span>
-                                                                    </span>
-                                                                    <span class="sub-label" id="casinoMaxBetText">Лимит: 500k ₽</span>
-                                                                  </div>
-                                                                  <div class="grid-4 mb-2">
-                                                                    <button onclick="addCasinoBet(10000)" class="btn btn-dark btn-sm">+10k</button>
-                                                                    <button onclick="addCasinoBet(50000)" class="btn btn-dark btn-sm">+50k</button>
-                                                                    <button onclick="addCasinoBet(100000)" class="btn btn-dark btn-sm">+100k</button>
-                                                                    <button onclick="setCasinoMaxBet()" class="btn btn-amber btn-sm">Макс</button>
-                                                                  </div>
-                                                                  <div class="grid-2 mb-2">
-                                                                    <button onclick="clearCasinoBet()" class="btn btn-danger btn-sm">Сброс</button>
-                                                                    <button id="btnStartCasinoGame" onclick="startCasinoGame()" class="btn btn-green">Начать раздачу</button>
-                                                                  </div>
-                                                                  <div id="casinoCooldownNotice" class="sub-label text-center color-amber mt-2" style="display:none;">
-                                                                  </div>
-                                                                </div>
-                                                                <div id="casinoPlayingArea" style="display:none;">
-                                                                  <div class="grid-2">
-                                                                    <button onclick="hitCasino()" class="btn btn-amber">ЕЩЁ КАРТУ</button>
-                                                                    <button onclick="standCasino()" class="btn btn-dark">СЕБЕ (ХВАТИТ)</button>
-                                                                  </div>
-                                                                </div>
-                                                                <div id="casinoResultArea" class="text-center mt-2 font-bold" style="display:none;">
-                                                                </div>
-                                                              </div>
-                                                              <div id="casinoLockCover" class="level-lock-cover" style="display:none;">
-                                                                <i class="fa-solid fa-lock color-red" style="font-size:32px; margin-bottom:10px;">
-                                                                </i>
-                                                                <h4 class="font-bold">Клуб закрыт</h4>
-                                                                <p class="sub-label">Вход открыт авторитетам только с <b>12 уровня</b>!</p>
-                                                              </div>
-                                                            </div>
-                                                            <!-- Городской Эфир -->
-                                                            <div class="glass-card mb-3" style="border-color: var(--cyan);">
-                                                              <h3 class="mb-2">
-                                                                <i class="fa-solid fa-satellite-dish color-cyan">
-                                                                </i> Городской Эфир (Live)</h3>
-                                                                <p class="sub-label mb-2">Перехват сообщений перекупов и сводки ДПС. Влияет на цены рынка!</p>
-                                                                <div id="lifeChatFeed" class="chat-feed-box" style="height: 190px;">
-                                                                </div>
-                                                              </div>
-                                                              <!-- Ломбард -->
-                                                              <div class="glass-card mb-3">
+                                                            <!-- TAB: ГАРАЖ -->
+                                                            <section id="tabGarage" class="tab-screen">
+                                                              <div class="glass-card mb-2">
                                                                 <div class="flex-between mb-1">
-                                                                  <h3 class="color-red">
-                                                                    <i class="fa-solid fa-hand-holding-dollar">
-                                                                    </i> Ломбард (Кредиты)</h3>
-                                                                    <span class="text-xs font-bold color-amber" id="loanDebtText">Долг: 0 ₽</span>
+                                                                  <div>
+                                                                    <h3>
+                                                                      <i class="fa-solid fa-warehouse color-green">
+                                                                      </i> Мой Автопарк</h3>
+                                                                      <p class="sub-label">Вместимость: <b class="color-cyan" id="garageDetailedSlots">1 из 2</b>
+                                                                    </p>
                                                                   </div>
-                                                                  <div class="sub-label mb-2">Комиссия за выдачу: <b class="color-red">5%</b>. Ставка: <b class="color-amber">15% в день</b>.<br>Автосписание платежа при завершении дня.</div>
-                                                                  <div class="grid-2 mb-2">
-                                                                    <button onclick="takeLoan(100000)" class="btn btn-dark btn-sm">Взять 100k ₽</button>
-                                                                    <button onclick="takeLoan(500000)" class="btn btn-dark btn-sm">Взять 500k ₽</button>
+                                                                  <button onclick="buyGarageSlot()" class="btn btn-dark btn-auto border-green color-green">+1 Бокс (250k ₽)</button>
+                                                                </div>
+                                                              </div>
+                                                              <div id="garageList">
+                                                              </div>
+                                                            </section>
+                                                            <!-- TAB: ПЛОЩАДКА -->
+                                                            <section id="tabSalesLot" class="tab-screen">
+                                                              <div class="glass-card">
+                                                                <div class="flex-between mb-1">
+                                                                  <h3>
+                                                                    <i class="fa-solid fa-car-on color-green">
+                                                                    </i> Площадка продаж</h3>
+                                                                    <span class="tag-badge bg-tag-cyan" id="lotCountBadge">0 авто на продаже</span>
                                                                   </div>
-                                                                  <div class="grid-3">
-                                                                    <button onclick="repayLoan(25)" class="btn btn-cyan btn-sm">Вернуть 25%</button>
-                                                                    <button onclick="repayLoan(50)" class="btn btn-cyan btn-sm">Вернуть 50%</button>
-                                                                    <button onclick="repayLoan(100)" class="btn btn-green btn-sm">Погасить всё</button>
+                                                                  <p class="sub-label">Покупатели оценивают ваши машины по честной рыночной цене.</p>
+                                                                </div>
+                                                                <div id="salesLotList">
+                                                                </div>
+                                                              </section>
+                                                              <!-- TAB: ЖИЗНЬ -->
+                                                              <section id="tabLife" class="tab-screen">
+                                                                <div class="grid-3 mb-3">
+                                                                  <button onclick="switchTab('tabContainers')" class="btn btn-dark" style="flex-direction:column; padding:12px 4px; border-color:var(--purple); color:var(--purple);">
+                                                                    <i class="fa-solid fa-box mb-1" style="font-size:18px;">
+                                                                    </i>Контейнеры
+                                                                  </button>
+                                                                  <button onclick="switchTab('tabContracts')" class="btn btn-dark" style="flex-direction:column; padding:12px 4px; border-color:var(--cyan); color:var(--cyan);">
+                                                                    <i class="fa-solid fa-file-contract mb-1" style="font-size:18px;">
+                                                                    </i>Заказы
+                                                                  </button>
+                                                                  <button onclick="switchTab('tabBarn')" class="btn btn-dark" style="flex-direction:column; padding:12px 4px; border-color:var(--amber); color:var(--amber);">
+                                                                    <i class="fa-solid fa-screwdriver-wrench mb-1" style="font-size:18px;">
+                                                                    </i>Сараи
+                                                                  </button>
+                                                                </div>
+                                                                <div class="glass-card flex-between mb-3">
+                                                                  <div>
+                                                                    <h3 class="font-bold color-amber">
+                                                                      <i class="fa-solid fa-calendar-day">
+                                                                      </i> Смена дня</h3>
+                                                                      <p class="sub-label">Списать расходы и 3 приема пищи</p>
+                                                                    </div>
+                                                                    <button onclick="nextDayAction()" class="btn btn-amber btn-auto">Завершить 🌙</button>
+                                                                  </div>
+                                                                  <div class="glass-card mb-3" id="casinoCardContainer">
+                                                                    <div class="flex-between mb-1">
+                                                                      <h3>
+                                                                        <i class="fa-solid fa-cards color-red">
+                                                                        </i> Подпольный Клуб «21»</h3>
+                                                                        <span class="tag-badge bg-tag-red">Колода 36 карт</span>
+                                                                      </div>
+                                                                      <p class="sub-label mb-2">Победа 1:1, ровно 21 очко или «Золотое (2 туза)» — выплата 1.5 к 1!</p>
+                                                                      <div id="casinoActiveBox">
+                                                                        <div class="glass-card p-2 mb-2" style="background:#090e18; border-color:var(--border-glass);">
+                                                                          <div class="flex-between mb-2">
+                                                                            <div class="font-bold text-xs color-red">Крупье: <span id="dealerScore">?</span>
+                                                                          </div>
+                                                                          <div id="dealerHandBox" class="flex-gap">
+                                                                          </div>
+                                                                        </div>
+                                                                        <div class="flex-between mb-1">
+                                                                          <div class="font-bold text-xs color-cyan">Вы: <span id="playerScore">0</span>
+                                                                        </div>
+                                                                        <div id="playerHandBox" class="flex-gap">
+                                                                        </div>
+                                                                      </div>
+                                                                    </div>
+                                                                    <div id="casinoBettingArea">
+                                                                      <div class="flex-between mb-2 font-bold text-xs">
+                                                                        <span>Ставка: <span class="color-amber" id="currentBetDisplay">0 ₽</span>
+                                                                      </span>
+                                                                      <span class="sub-label" id="casinoMaxBetText">Лимит: 500k ₽</span>
+                                                                    </div>
+                                                                    <div class="grid-4 mb-2">
+                                                                      <button onclick="addCasinoBet(10000)" class="btn btn-dark btn-sm">+10k</button>
+                                                                      <button onclick="addCasinoBet(50000)" class="btn btn-dark btn-sm">+50k</button>
+                                                                      <button onclick="addCasinoBet(100000)" class="btn btn-dark btn-sm">+100k</button>
+                                                                      <button onclick="setCasinoMaxBet()" class="btn btn-amber btn-sm">Макс</button>
+                                                                    </div>
+                                                                    <div class="grid-2 mb-2">
+                                                                      <button onclick="clearCasinoBet()" class="btn btn-danger btn-sm">Сброс</button>
+                                                                      <button id="btnStartCasinoGame" onclick="startCasinoGame()" class="btn btn-green">Начать раздачу</button>
+                                                                    </div>
+                                                                    <div id="casinoCooldownNotice" class="sub-label text-center color-amber mt-2" style="display:none;">
+                                                                    </div>
+                                                                  </div>
+                                                                  <div id="casinoPlayingArea" style="display:none;">
+                                                                    <div class="grid-2">
+                                                                      <button onclick="hitCasino()" class="btn btn-amber">ЕЩЁ КАРТУ</button>
+                                                                      <button onclick="standCasino()" class="btn btn-dark">СЕБЕ (ХВАТИТ)</button>
+                                                                    </div>
+                                                                  </div>
+                                                                  <div id="casinoResultArea" class="text-center mt-2 font-bold" style="display:none;">
+                                                                  </div>
+                                                                </div>
+                                                                <div id="casinoLockCover" class="level-lock-cover" style="display:none;">
+                                                                  <i class="fa-solid fa-lock color-red" style="font-size:32px; margin-bottom:10px;">
+                                                                  </i>
+                                                                  <h4 class="font-bold">Клуб закрыт</h4>
+                                                                  <p class="sub-label">Вход открыт авторитетам только с <b>12 уровня</b>!</p>
+                                                                </div>
+                                                              </div>
+                                                              <div class="glass-card mb-3" style="border-color: var(--cyan);">
+                                                                <h3 class="mb-2">
+                                                                  <i class="fa-solid fa-satellite-dish color-cyan">
+                                                                  </i> Городской Эфир (Live)</h3>
+                                                                  <p class="sub-label mb-2">Перехват сообщений перекупов и сводки ДПС. Влияет на цены рынка!</p>
+                                                                  <div id="lifeChatFeed" class="chat-feed-box" style="height: 190px;">
                                                                   </div>
                                                                 </div>
                                                                 <div class="glass-card mb-3">
                                                                   <div class="flex-between mb-1">
-                                                                    <h3 class="color-green">
-                                                                      <i class="fa-solid fa-hand-holding-heart">
-                                                                      </i> Благотворительность</h3>
+                                                                    <h3 class="color-red">
+                                                                      <i class="fa-solid fa-hand-holding-dollar">
+                                                                      </i> Ломбард (Кредиты)</h3>
+                                                                      <span class="text-xs font-bold color-amber" id="loanDebtText">Долг: 0 ₽</span>
                                                                     </div>
-                                                                    <div class="sub-label mb-2">Пожертвуйте деньги на добрые дела, чтобы очистить карму.</div>
-                                                                    <button onclick="donateForKarma()" class="btn btn-dark w-full">Пожертвовать 50,000 ₽ (+10 Карма 😇)</button>
+                                                                    <div class="sub-label mb-2">Комиссия за выдачу: <b class="color-red">5%</b>. Ставка: <b class="color-amber">15% в день</b>.<br>Автосписание платежа при завершении дня.</div>
+                                                                    <div class="grid-2 mb-2">
+                                                                      <button onclick="takeLoan(100000)" class="btn btn-dark btn-sm">Взять 100k ₽</button>
+                                                                      <button onclick="takeLoan(500000)" class="btn btn-dark btn-sm">Взять 500k ₽</button>
+                                                                    </div>
+                                                                    <div class="grid-3">
+                                                                      <button onclick="repayLoan(25)" class="btn btn-cyan btn-sm">Вернуть 25%</button>
+                                                                      <button onclick="repayLoan(50)" class="btn btn-cyan btn-sm">Вернуть 50%</button>
+                                                                      <button onclick="repayLoan(100)" class="btn btn-green btn-sm">Погасить всё</button>
+                                                                    </div>
                                                                   </div>
                                                                   <div class="glass-card mb-3">
-                                                                    <h3 class="mb-1">
-                                                                      <i class="fa-solid fa-utensils color-green">
-                                                                      </i> Рацион питания</h3>
-                                                                      <p class="sub-label mb-2">Списание за питание происходит <b class="color-amber">3 раза в день</b> при смене суток.</p>
-                                                                      <div class="space-y-2" id="dietList">
+                                                                    <div class="flex-between mb-1">
+                                                                      <h3 class="color-green">
+                                                                        <i class="fa-solid fa-hand-holding-heart">
+                                                                        </i> Благотворительность</h3>
                                                                       </div>
+                                                                      <div class="sub-label mb-2">Пожертвуйте деньги на добрые дела, чтобы очистить карму.</div>
+                                                                      <button onclick="donateForKarma()" class="btn btn-dark w-full">Пожертвовать 50,000 ₽ (+10 Карма 😇)</button>
                                                                     </div>
-                                                                    <div class="glass-card">
+                                                                    <div class="glass-card mb-3">
                                                                       <h3 class="mb-1">
-                                                                        <i class="fa-solid fa-champagne-glasses color-cyan">
-                                                                        </i> Развлечения</h3>
-                                                                        <div class="grid-2 mb-2">
-                                                                          <button onclick="doActivity('banya', 15000, 30)" class="btn btn-dark">🧖 Сауна<br>
-                                                                            <span class="color-green text-xs">+30 😄 (15k ₽)</span>
-                                                                          </button>
-                                                                          <button onclick="doActivity('club', 45000, 60)" class="btn btn-dark">🍸 Клуб<br>
-                                                                            <span class="color-green text-xs">+60 😄 (45k ₽)</span>
-                                                                          </button>
+                                                                        <i class="fa-solid fa-utensils color-green">
+                                                                        </i> Рацион питания</h3>
+                                                                        <p class="sub-label mb-2">Списание за питание происходит <b class="color-amber">3 раза в день</b> при смене суток.</p>
+                                                                        <div class="space-y-2" id="dietList">
                                                                         </div>
-                                                                        <button onclick="doActivity('dubai', 450000, 100, 3)" class="btn btn-cyan">✈ Отпуск в Дубае: +100 😄 и +3 🤝 (450k ₽)</button>
                                                                       </div>
-                                                                    </section>
-                                                                    <!-- TAB: ИМПЕРИЯ -->
-                                                                    <section id="tabBusiness" class="tab-screen">
-                                                                      <div id="businessActiveBox">
-                                                                        <div class="glass-card flex-between mb-2">
-                                                                          <div>
-                                                                            <h3>
-                                                                              <i class="fa-solid fa-building color-cyan">
-                                                                              </i> Автобизнесы & Империя</h3>
-                                                                              <p class="sub-label mt-1">Максимальный уровень: <b>10</b>. Выплата средств на баланс: <b class="color-green">15-го и 30-го числа</b> каждого месяца.</p>
-                                                                            </div>
+                                                                      <div class="glass-card">
+                                                                        <h3 class="mb-1">
+                                                                          <i class="fa-solid fa-champagne-glasses color-cyan">
+                                                                          </i> Развлечения</h3>
+                                                                          <div class="grid-2 mb-2">
+                                                                            <button onclick="doActivity('banya', 15000, 30)" class="btn btn-dark">🧖 Сауна<br>
+                                                                              <span class="color-green text-xs">+30 😄 (15k ₽)</span>
+                                                                            </button>
+                                                                            <button onclick="doActivity('club', 45000, 60)" class="btn btn-dark">🍸 Клуб<br>
+                                                                              <span class="color-green text-xs">+60 😄 (45k ₽)</span>
+                                                                            </button>
                                                                           </div>
-                                                                          <div class="glass-card mb-2">
-                                                                            <div class="flex-between mb-1">
-                                                                              <div>
-                                                                                <div class="sub-label">Ваш РП Статус:</div>
-                                                                                <h4 class="font-bold color-amber" id="rpRankTitle">Гаражный Делец</h4>
-                                                                              </div>
-                                                                              <div class="text-right">
-                                                                                <div class="sub-label">Капитал Империи:</div>
-                                                                                <div class="color-green font-bold" id="netWorthText">0 ₽</div>
-                                                                              </div>
-                                                                            </div>
-                                                                          </div>
-                                                                          <div id="businessList">
-                                                                          </div>
-                                                                        </div>
-                                                                        <div id="businessLockCover" class="level-lock-cover glass-card" style="display:none;">
-                                                                          <i class="fa-solid fa-lock color-cyan" style="font-size:38px; margin-bottom:10px;">
-                                                                          </i>
-                                                                          <h3 class="font-bold">Империя пока недоступна</h3>
-                                                                          <p class="sub-label mt-1">Для открытия легальных автобизнесов вам нужен минимум <b>5 уровень авторитета</b>!</p>
+                                                                          <button onclick="doActivity('dubai', 450000, 100, 3)" class="btn btn-cyan">✈ Отпуск в Дубае: +100 😄 и +3 🤝 (450k ₽)</button>
                                                                         </div>
                                                                       </section>
-                                                                      <!-- TAB: СТРИТ -->
-                                                                      <section id="tabStreet" class="tab-screen">
-                                                                        <div class="glass-card">
-                                                                          <div class="card-header-row mb-2">
-                                                                            <h3>
-                                                                              <i class="fa-solid fa-flag-checkered color-red">
-                                                                              </i> Стрит Арена & Волна</h3>
-                                                                              <div class="toggle-mode-box">
-                                                                                <button onclick="toggleStreetSub('race')" id="streetSub-race" class="mode-btn active">Драг</button>
-                                                                                <button onclick="toggleStreetSub('show')" id="streetSub-show" class="mode-btn">Автошоу</button>
-                                                                                <button onclick="toggleStreetSub('clubs')" id="streetSub-clubs" class="mode-btn">Клубы</button>
+                                                                      <!-- TAB: ИМПЕРИЯ -->
+                                                                      <section id="tabBusiness" class="tab-screen">
+                                                                        <div id="businessActiveBox">
+                                                                          <div class="glass-card flex-between mb-2">
+                                                                            <div>
+                                                                              <h3>
+                                                                                <i class="fa-solid fa-building color-cyan">
+                                                                                </i> Автобизнесы & Империя</h3>
+                                                                                <p class="sub-label mt-1">Максимальный уровень: <b>10</b>. Выплата средств на баланс: <b class="color-green">15-го и 30-го числа</b> каждого месяца.</p>
                                                                               </div>
                                                                             </div>
-                                                                            <div class="glass-card mb-2 p-2" style="background:#090e18; border-color:var(--border-glow);">
+                                                                            <div class="glass-card mb-2">
                                                                               <div class="flex-between mb-1">
-                                                                                <span class="sub-label font-bold color-cyan">🚗 Боевая машина:</span>
-                                                                                <span id="streetSelectedCarPower" class="text-xs font-bold color-green">0 л.с.</span>
-                                                                              </div>
-                                                                              <select id="streetCarSelector" onchange="selectCarForStreet(this.value)" style="width:100%; background:#101726; border:1px solid var(--border-glass); border-radius:6px; color:#fff; padding:7px; font-size:11px; font-weight:bold; outline:none; margin-bottom:6px;">
-                                                                              </select>
-                                                                              <div id="streetSelectedCarStats" class="sub-label text-xs">Загрузка авто...</div>
-                                                                            </div>
-                                                                            <div id="streetRaceBox">
-                                                                              <div class="warning-banner mb-2" style="background: rgba(255, 179, 0, 0.1); padding: 8px; border-radius: 6px; border: 1px solid var(--amber);">
-                                                                                <i class="fa-solid fa-triangle-exclamation color-amber">
-                                                                                </i>
-                                                                                <span class="text-xs">Переключай передачи вовремя в зеленой зоне!</span>
-                                                                              </div>
-                                                                              <div class="grid-3 mb-2">
-                                                                                <button onclick="setRaceDifficulty('easy')" id="raceDiff-easy" class="btn btn-cyan btn-sm">Светофор</button>
-                                                                                <button onclick="setRaceDifficulty('medium')" id="raceDiff-medium" class="btn btn-dark btn-sm">Драг 402м</button>
-                                                                                <button onclick="setRaceDifficulty('boss')" id="raceDiff-boss" class="btn btn-dark btn-sm">Босс Района</button>
-                                                                              </div>
-                                                                              <div class="race-panel">
-                                                                                <div id="raceStatusText" class="race-status">Светофорная дуэль (Ставка: 25,000 ₽ | 15 ⛽)</div>
-                                                                                <div class="race-track-box">
-                                                                                  <div class="race-lane">
-                                                                                    <span style="font-size:9px; color:var(--cyan); margin-left:4px; font-weight:bold;">ВЫ:</span>
-                                                                                    <div id="raceTrackPlayer" class="race-car-runner" style="left: 0%;">🏎️</div>
-                                                                                  </div>
-                                                                                  <div class="race-lane">
-                                                                                    <span style="font-size:9px; color:var(--red); margin-left:4px; font-weight:bold;" id="raceOpponentName">СОЛЯРИС:</span>
-                                                                                    <div id="raceTrackOpponent" class="race-car-runner" style="left: 0%;">🚘</div>
-                                                                                  </div>
-                                                                                </div>
-                                                                                <div class="tachometer-wrap">
-                                                                                  <div class="tachometer-zone">
-                                                                                  </div>
-                                                                                  <div id="raceNeedle" class="tachometer-needle">
-                                                                                  </div>
-                                                                                </div>
-                                                                                <div class="grid-2">
-                                                                                  <button id="raceStartBtn" onclick="startDragRace()" class="btn btn-amber">СТАРТ (15 ⛽)</button>
-                                                                                  <button id="raceShiftBtn" onclick="shiftGear()" disabled class="btn btn-dark opacity-50">ПЕРЕКЛЮЧИТЬ!</button>
-                                                                                </div>
-                                                                              </div>
-                                                                            </div>
-                                                                            <div id="streetShowBox" style="display:none;">
-                                                                              <p class="sub-label mb-2">Легальный фестиваль стиля. Проходит 1 раз в игровой день (взнос 15 ⛽).</p>
-                                                                              <div class="glass-card text-center mb-2">
-                                                                                <div style="font-size:36px; margin-bottom:4px;">🏆</div>
-                                                                                <h4 id="showCarSelectName" class="font-bold mb-1">Автомобиль не выбран</h4>
-                                                                                <div id="showCarPoints" class="color-cyan text-xs font-bold mb-2">Рейтинг стиля: 0 баллов</div>
-                                                                                <div id="showStatusText" class="sub-label color-amber mb-2">Статус: Доступно сегодня (-15 ⛽)</div>
-                                                                                <button id="btnEnterShow" onclick="enterAutoShow()" class="btn btn-cyan">Участвовать в Автошоу (-15 ⛽)</button>
-                                                                              </div>
-                                                                            </div>
-                                                                            <div id="streetClubsBox" style="display:none;">
-                                                                              <div class="glass-card flex-between mb-2 p-2">
                                                                                 <div>
-                                                                                  <div class="sub-label">Ваш автоклуб:</div>
-                                                                                  <div id="myClubName" class="font-bold">Без автоклуба</div>
+                                                                                  <div class="sub-label">Ваш РП Статус:</div>
+                                                                                  <h4 class="font-bold color-amber" id="rpRankTitle">Гаражный Делец</h4>
                                                                                 </div>
-                                                                                <button onclick="createClubPrompt()" class="btn btn-amber btn-auto btn-sm">Создать Клуб</button>
-                                                                              </div>
-                                                                              <div class="space-y-2">
-                                                                                <div class="glass-card flex-between p-2 mb-1">
-                                                                                  <div>
-                                                                                    <div class="font-bold">DRIFT SYNDICATE</div>
-                                                                                    <div class="sub-label">+15% к награде за драг</div>
-                                                                                  </div>
-                                                                                  <button onclick="joinClub('DRIFT SYNDICATE')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
-                                                                                </div>
-                                                                                <div class="glass-card flex-between p-2 mb-1">
-                                                                                  <div>
-                                                                                    <div class="font-bold">STANCE & SHINE</div>
-                                                                                    <div class="sub-label">+25% баллов на Автошоу</div>
-                                                                                  </div>
-                                                                                  <button onclick="joinClub('STANCE & SHINE')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
-                                                                                </div>
-                                                                                <div class="glass-card flex-between p-2">
-                                                                                  <div>
-                                                                                    <div class="font-bold">NIGHT RUNNERS</div>
-                                                                                    <div class="sub-label">-30% к шансу облавы ДПС</div>
-                                                                                  </div>
-                                                                                  <button onclick="joinClub('NIGHT RUNNERS')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
+                                                                                <div class="text-right">
+                                                                                  <div class="sub-label">Капитал Империи:</div>
+                                                                                  <div class="color-green font-bold" id="netWorthText">0 ₽</div>
                                                                                 </div>
                                                                               </div>
+                                                                            </div>
+                                                                            <div id="businessList">
                                                                             </div>
                                                                           </div>
+                                                                          <div id="businessLockCover" class="level-lock-cover glass-card" style="display:none;">
+                                                                            <i class="fa-solid fa-lock color-cyan" style="font-size:38px; margin-bottom:10px;">
+                                                                            </i>
+                                                                            <h3 class="font-bold">Империя пока недоступна</h3>
+                                                                            <p class="sub-label mt-1">Для открытия легальных автобизнесов вам нужен минимум <b>5 уровень авторитета</b>!</p>
+                                                                          </div>
                                                                         </section>
-                                                                        <!-- TAB: КОНТЕЙНЕРЫ -->
-                                                                        <section id="tabContainers" class="tab-screen">
-                                                                          <div class="glass-card" id="containersCardContainer">
-                                                                            <h3>
-                                                                              <i class="fa-solid fa-box-open color-purple">
-                                                                              </i> Портовые Контейнеры</h3>
-                                                                              <div id="containersListRender">
+                                                                        <!-- TAB: СТРИТ -->
+                                                                        <section id="tabStreet" class="tab-screen">
+                                                                          <div class="glass-card">
+                                                                            <div class="card-header-row mb-2">
+                                                                              <h3>
+                                                                                <i class="fa-solid fa-flag-checkered color-red">
+                                                                                </i> Стрит Арена & Волна</h3>
+                                                                                <div class="toggle-mode-box">
+                                                                                  <button onclick="toggleStreetSub('race')" id="streetSub-race" class="mode-btn active">Драг</button>
+                                                                                  <button onclick="toggleStreetSub('show')" id="streetSub-show" class="mode-btn">Автошоу</button>
+                                                                                  <button onclick="toggleStreetSub('clubs')" id="streetSub-clubs" class="mode-btn">Клубы</button>
+                                                                                </div>
                                                                               </div>
-                                                                              <div id="containersLockCover" class="level-lock-cover" style="display:none;">
-                                                                                <i class="fa-solid fa-lock color-purple" style="font-size:32px; margin-bottom:10px;">
-                                                                                </i>
-                                                                                <h4 class="font-bold">Таможня закрыта</h4>
-                                                                                <p class="sub-label">Только с <b>20 уровня</b>!</p>
+                                                                              <div class="glass-card mb-2 p-2" style="background:#090e18; border-color:var(--border-glow);">
+                                                                                <div class="flex-between mb-1">
+                                                                                  <span class="sub-label font-bold color-cyan">🚗 Боевая машина:</span>
+                                                                                  <span id="streetSelectedCarPower" class="text-xs font-bold color-green">0 л.с.</span>
+                                                                                </div>
+                                                                                <select id="streetCarSelector" onchange="selectCarForStreet(this.value)" style="width:100%; background:#101726; border:1px solid var(--border-glass); border-radius:6px; color:#fff; padding:7px; font-size:11px; font-weight:bold; outline:none; margin-bottom:6px;">
+                                                                                </select>
+                                                                                <div id="streetSelectedCarStats" class="sub-label text-xs">Загрузка авто...</div>
+                                                                              </div>
+                                                                              <div id="streetRaceBox">
+                                                                                <div class="warning-banner mb-2" style="background: rgba(255, 179, 0, 0.1); padding: 8px; border-radius: 6px; border: 1px solid var(--amber);">
+                                                                                  <i class="fa-solid fa-triangle-exclamation color-amber">
+                                                                                  </i>
+                                                                                  <span class="text-xs">Переключай передачи вовремя в зеленой зоне!</span>
+                                                                                </div>
+                                                                                <div class="grid-3 mb-2">
+                                                                                  <button onclick="setRaceDifficulty('easy')" id="raceDiff-easy" class="btn btn-cyan btn-sm">Светофор</button>
+                                                                                  <button onclick="setRaceDifficulty('medium')" id="raceDiff-medium" class="btn btn-dark btn-sm">Драг 402м</button>
+                                                                                  <button onclick="setRaceDifficulty('boss')" id="raceDiff-boss" class="btn btn-dark btn-sm">Босс Района</button>
+                                                                                </div>
+                                                                                <div class="race-panel">
+                                                                                  <div id="raceStatusText" class="race-status">Светофорная дуэль (Ставка: 25,000 ₽ | 15 ⛽)</div>
+                                                                                  <div class="race-track-box">
+                                                                                    <div class="race-lane">
+                                                                                      <span style="font-size:9px; color:var(--cyan); margin-left:4px; font-weight:bold;">ВЫ:</span>
+                                                                                      <div id="raceTrackPlayer" class="race-car-runner" style="left: 0%;">🏎️</div>
+                                                                                    </div>
+                                                                                    <div class="race-lane">
+                                                                                      <span style="font-size:9px; color:var(--red); margin-left:4px; font-weight:bold;" id="raceOpponentName">СОЛЯРИС:</span>
+                                                                                      <div id="raceTrackOpponent" class="race-car-runner" style="left: 0%;">🚘</div>
+                                                                                    </div>
+                                                                                  </div>
+                                                                                  <div class="tachometer-wrap">
+                                                                                    <div class="tachometer-zone">
+                                                                                    </div>
+                                                                                    <div id="raceNeedle" class="tachometer-needle">
+                                                                                    </div>
+                                                                                  </div>
+                                                                                  <div class="grid-2">
+                                                                                    <button id="raceStartBtn" onclick="startDragRace()" class="btn btn-amber">СТАРТ (15 ⛽)</button>
+                                                                                    <button id="raceShiftBtn" onclick="shiftGear()" disabled class="btn btn-dark opacity-50">ПЕРЕКЛЮЧИТЬ!</button>
+                                                                                  </div>
+                                                                                </div>
+                                                                              </div>
+                                                                              <div id="streetShowBox" style="display:none;">
+                                                                                <p class="sub-label mb-2">Легальный фестиваль стиля. Проходит 1 раз в игровой день (взнос 15 ⛽).</p>
+                                                                                <div class="glass-card text-center mb-2">
+                                                                                  <div style="font-size:36px; margin-bottom:4px;">🏆</div>
+                                                                                  <h4 id="showCarSelectName" class="font-bold mb-1">Автомобиль не выбран</h4>
+                                                                                  <div id="showCarPoints" class="color-cyan text-xs font-bold mb-2">Рейтинг стиля: 0 баллов</div>
+                                                                                  <div id="showStatusText" class="sub-label color-amber mb-2">Статус: Доступно сегодня (-15 ⛽)</div>
+                                                                                  <button id="btnEnterShow" onclick="enterAutoShow()" class="btn btn-cyan">Участвовать в Автошоу (-15 ⛽)</button>
+                                                                                </div>
+                                                                              </div>
+                                                                              <div id="streetClubsBox" style="display:none;">
+                                                                                <div class="glass-card flex-between mb-2 p-2">
+                                                                                  <div>
+                                                                                    <div class="sub-label">Ваш автоклуб:</div>
+                                                                                    <div id="myClubName" class="font-bold">Без автоклуба</div>
+                                                                                  </div>
+                                                                                  <button onclick="createClubPrompt()" class="btn btn-amber btn-auto btn-sm">Создать Клуб</button>
+                                                                                </div>
+                                                                                <div class="space-y-2">
+                                                                                  <div class="glass-card flex-between p-2 mb-1">
+                                                                                    <div>
+                                                                                      <div class="font-bold">DRIFT SYNDICATE</div>
+                                                                                      <div class="sub-label">+15% к награде за драг</div>
+                                                                                    </div>
+                                                                                    <button onclick="joinClub('DRIFT SYNDICATE')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
+                                                                                  </div>
+                                                                                  <div class="glass-card flex-between p-2 mb-1">
+                                                                                    <div>
+                                                                                      <div class="font-bold">STANCE & SHINE</div>
+                                                                                      <div class="sub-label">+25% баллов на Автошоу</div>
+                                                                                    </div>
+                                                                                    <button onclick="joinClub('STANCE & SHINE')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
+                                                                                  </div>
+                                                                                  <div class="glass-card flex-between p-2">
+                                                                                    <div>
+                                                                                      <div class="font-bold">NIGHT RUNNERS</div>
+                                                                                      <div class="sub-label">-30% к шансу облавы ДПС</div>
+                                                                                    </div>
+                                                                                    <button onclick="joinClub('NIGHT RUNNERS')" class="btn btn-dark btn-auto btn-sm">Вступить</button>
+                                                                                  </div>
+                                                                                </div>
                                                                               </div>
                                                                             </div>
                                                                           </section>
-                                                                          <!-- TAB: ЗАКАЗЫ -->
-                                                                          <section id="tabContracts" class="tab-screen">
-                                                                            <div class="glass-card" id="contractsCardContainer">
-                                                                              <div class="flex-between mb-1">
-                                                                                <h3>
-                                                                                  <i class="fa-solid fa-file-contract color-cyan">
-                                                                                  </i> Заказы Синдиката</h3>
-                                                                                  <button onclick="refreshContractsManual()" class="btn btn-dark btn-auto btn-sm" id="btnRefreshContracts">Обновить</button>
+                                                                          <!-- TAB: КОНТЕЙНЕРЫ -->
+                                                                          <section id="tabContainers" class="tab-screen">
+                                                                            <div class="glass-card" id="containersCardContainer">
+                                                                              <h3>
+                                                                                <i class="fa-solid fa-box-open color-purple">
+                                                                                </i> Портовые Контейнеры</h3>
+                                                                                <div id="containersListRender">
                                                                                 </div>
-                                                                                <div id="contractsList">
-                                                                                </div>
-                                                                                <div id="contractsLockCover" class="level-lock-cover" style="display:none;">
-                                                                                  <i class="fa-solid fa-lock color-cyan" style="font-size:32px; margin-bottom:10px;">
+                                                                                <div id="containersLockCover" class="level-lock-cover" style="display:none;">
+                                                                                  <i class="fa-solid fa-lock color-purple" style="font-size:32px; margin-bottom:10px;">
                                                                                   </i>
-                                                                                  <h4 class="font-bold">Синдикат недоступен</h4>
-                                                                                  <p class="sub-label">Доступно с <b>15 уровня</b>!</p>
+                                                                                  <h4 class="font-bold">Таможня закрыта</h4>
+                                                                                  <p class="sub-label">Только с <b>20 уровня</b>!</p>
                                                                                 </div>
                                                                               </div>
                                                                             </section>
-                                                                            <!-- TAB: САРАИ -->
-                                                                            <section id="tabBarn" class="tab-screen">
-                                                                              <div class="glass-card mb-3">
+                                                                            <!-- TAB: ЗАКАЗЫ -->
+                                                                            <section id="tabContracts" class="tab-screen">
+                                                                              <div class="glass-card" id="contractsCardContainer">
                                                                                 <div class="flex-between mb-1">
                                                                                   <h3>
-                                                                                    <i class="fa-solid fa-screwdriver-wrench color-amber">
-                                                                                    </i> Гаражные Находки</h3>
+                                                                                    <i class="fa-solid fa-file-contract color-cyan">
+                                                                                    </i> Заказы Синдиката</h3>
+                                                                                    <button onclick="refreshContractsManual()" class="btn btn-dark btn-auto btn-sm" id="btnRefreshContracts">Обновить</button>
                                                                                   </div>
-                                                                                  <p class="sub-label mb-2">Отыщите раритет под восстановление. Разведка доступна 1 раз в игровой день.</p>
-                                                                                  <div id="barnFindContent">
+                                                                                  <div id="contractsList">
+                                                                                  </div>
+                                                                                  <div id="contractsLockCover" class="level-lock-cover" style="display:none;">
+                                                                                    <i class="fa-solid fa-lock color-cyan" style="font-size:32px; margin-bottom:10px;">
+                                                                                    </i>
+                                                                                    <h4 class="font-bold">Синдикат недоступен</h4>
+                                                                                    <p class="sub-label">Доступно с <b>15 уровня</b>!</p>
                                                                                   </div>
                                                                                 </div>
                                                                               </section>
-                                                                              <!-- TAB: ЖИЛЬЁ -->
-                                                                              <section id="tabHousing" class="tab-screen">
-                                                                                <div class="glass-card mb-2">
+                                                                              <!-- TAB: САРАИ -->
+                                                                              <section id="tabBarn" class="tab-screen">
+                                                                                <div class="glass-card mb-3">
                                                                                   <div class="flex-between mb-1">
                                                                                     <h3>
-                                                                                      <i class="fa-solid fa-house color-cyan">
-                                                                                      </i> Рынок Недвижимости</h3>
-                                                                                      <span class="tag-badge bg-tag-cyan" id="currentHomeText">Текущее: Комната</span>
+                                                                                      <i class="fa-solid fa-screwdriver-wrench color-amber">
+                                                                                      </i> Гаражные Находки</h3>
                                                                                     </div>
-                                                                                    <p class="sub-label">Покупка или аренда расширяет гараж и повышает настроение.</p>
-                                                                                  </div>
-                                                                                  <div id="housingMarketList">
+                                                                                    <p class="sub-label mb-2">Отыщите раритет под восстановление. Разведка доступна 1 раз в игровой день.</p>
+                                                                                    <div id="barnFindContent">
+                                                                                    </div>
                                                                                   </div>
                                                                                 </section>
-                                                                                <!-- TAB: P2P БИРЖА -->
-                                                                                <section id="tabP2P" class="tab-screen">
-                                                                                  <div class="glass-card">
+                                                                                <!-- TAB: ЖИЛЬЁ -->
+                                                                                <section id="tabHousing" class="tab-screen">
+                                                                                  <div class="glass-card mb-2">
                                                                                     <div class="flex-between mb-1">
                                                                                       <h3>
-                                                                                        <i class="fa-solid fa-handshake color-green">
-                                                                                        </i> P2P Биржа Игроков</h3>
+                                                                                        <i class="fa-solid fa-house color-cyan">
+                                                                                        </i> Рынок Недвижимости</h3>
+                                                                                        <span class="tag-badge bg-tag-cyan" id="currentHomeText">Текущее: Комната</span>
                                                                                       </div>
+                                                                                      <p class="sub-label">Покупка или аренда расширяет гараж и повышает настроение.</p>
                                                                                     </div>
-                                                                                    <div class="grid-2 mb-3">
-                                                                                      <button onclick="filterP2P('cars')" id="p2pFilter-cars" class="btn btn-cyan btn-sm">🚗 Техника</button>
-                                                                                      <button onclick="filterP2P('plates')" id="p2pFilter-plates" class="btn btn-dark btn-sm">🏷 Госномера</button>
-                                                                                    </div>
-                                                                                    <div id="p2pItemsList">
+                                                                                    <div id="housingMarketList">
                                                                                     </div>
                                                                                   </section>
-                                                                                  <!-- TAB: СЕРВИСЫ -->
-                                                                                  <section id="tabServices" class="tab-screen">
-                                                                                    <div class="glass-card mb-3">
-                                                                                      <h3 class="mb-1">
-                                                                                        <i class="fa-solid fa-user-secret color-purple">
-                                                                                        </i> Теневые связи (Решала)</h3>
-                                                                                        <p class="sub-label mb-2">Связи (🤝) спасают от 12.5.1 и проблем с перебитыми VIN при продаже. Иметь их очень полезно!</p>
-                                                                                        <button onclick="buyConnection()" class="btn btn-dark w-full" style="color: #a855f7; border-color: #a855f7;">Купить 1 Связь (150,000 ₽)</button>
-                                                                                      </div>
-                                                                                      <!-- НОМЕРА ПЕРЕНЕСЕНЫ СЮДА -->
-                                                                                      <div class="glass-card mb-3">
+                                                                                  <!-- TAB: P2P БИРЖА -->
+                                                                                  <section id="tabP2P" class="tab-screen">
+                                                                                    <div class="glass-card">
+                                                                                      <div class="flex-between mb-1">
                                                                                         <h3>
-                                                                                          <i class="fa-solid fa-id-card color-amber">
-                                                                                          </i> Моя коллекция номеров:</h3>
-                                                                                          <div class="sub-label mb-2 mt-1">Госпошлина за установку и снятие: <b>2,000 ₽</b>
+                                                                                          <i class="fa-solid fa-handshake color-green">
+                                                                                          </i> P2P Биржа Игроков</h3>
                                                                                         </div>
-                                                                                        <div id="ownedPlatesListDetailed" class="space-y-2">
-                                                                                        </div>
-                                                                                        <hr style="border-color: rgba(255,255,255,0.05); margin: 12px 0;">
-                                                                                          <h4 class="font-bold mb-2">Госномера в продаже:</h4>
-                                                                                          <div id="plateMarketList">
-                                                                                          </div>
+                                                                                      </div>
+                                                                                      <div class="grid-2 mb-3">
+                                                                                        <button onclick="filterP2P('cars')" id="p2pFilter-cars" class="btn btn-cyan btn-sm">🚗 Техника</button>
+                                                                                        <button onclick="filterP2P('plates')" id="p2pFilter-plates" class="btn btn-dark btn-sm">🏷 Госномера</button>
+                                                                                      </div>
+                                                                                      <div id="p2pItemsList">
+                                                                                      </div>
+                                                                                    </section>
+                                                                                    <!-- TAB: СЕРВИСЫ (Теневые связи, Вилспин, АЗС) -->
+                                                                                    <section id="tabServices" class="tab-screen">
+                                                                                      <div class="glass-card mb-3">
+                                                                                        <h3 class="mb-1">
+                                                                                          <i class="fa-solid fa-user-secret color-purple">
+                                                                                          </i> Теневые связи (Решала)</h3>
+                                                                                          <p class="sub-label mb-2">Связи (🤝) спасают от 12.5.1 и проблем с перебитыми VIN при продаже. Иметь их очень полезно!</p>
+                                                                                          <button onclick="buyConnection()" class="btn btn-dark w-full" style="color: #a855f7; border-color: #a855f7;">Купить 1 Связь (150,000 ₽)</button>
                                                                                         </div>
                                                                                         <div class="glass-card text-center mb-3">
                                                                                           <h3 class="mb-2">
@@ -601,8 +582,20 @@
                                                                                                   <button onclick="buyVipProPass()" class="btn btn-amber w-full">⭐ VIP PRO за 199 Stars (или 1.5M ₽)</button>
                                                                                                 </div>
                                                                                               </section>
-                                                                                              <!-- TAB: НОМЕРА ПУСТАЯ, Т.К. ПЕРЕНЕСЕНЫ В СЕРВИСЫ -->
+                                                                                              <!-- TAB: НОМЕРА (ОТДЕЛЬНАЯ ВКЛАДКА) -->
                                                                                               <section id="tabPlates" class="tab-screen">
+                                                                                                <div class="glass-card mb-2">
+                                                                                                  <h3>
+                                                                                                    <i class="fa-solid fa-id-card color-amber">
+                                                                                                    </i> Моя коллекция номеров:</h3>
+                                                                                                    <div class="sub-label mb-2 mt-1">Госпошлина за установку и снятие: <b>2,000 ₽</b>
+                                                                                                  </div>
+                                                                                                  <div id="ownedPlatesListDetailed" class="space-y-2">
+                                                                                                  </div>
+                                                                                                </div>
+                                                                                                <h4 class="font-bold mb-2 px-1">Госномера в продаже:</h4>
+                                                                                                <div id="plateMarketList">
+                                                                                                </div>
                                                                                               </section>
                                                                                               <!-- TAB: ПРОФИЛЬ -->
                                                                                               <section id="tabProfile" class="tab-screen">
@@ -1017,7 +1010,7 @@
                 profitEl.style.display = 'block';
                 if (profit > 0) { profitEl.className = 'text-xs font-bold mb-3 color-green'; profitEl.innerText = `Чистая прибыль: +${profit.toLocaleString()} ₽ 📈`; } 
                 else if (profit < 0) { profitEl.className = 'text-xs font-bold mb-3 color-red'; profitEl.innerText = `Убыток: ${profit.toLocaleString()} ₽ 📉`; } 
-                else { profitEl.className = 'text-xs font-bold mb-3 color-amber'; profitEl.innerText = `Сделка закрыта в ноль (0 ₽)`; }
+                else { profitEl.className = 'text-xs font-bold mb-3 color-amber'; profitinnerText = `Сделка закрыта в ноль (0 ₽)`; }
             } else { profitEl.style.display = 'none'; }
         }
         document.getElementById('modalDealVerdict')?.classList.add('active');
@@ -1158,7 +1151,6 @@
         else if (tabId === 'tabLife' || tabId === 'tabHousing' || tabId === 'tabServices') document.getElementById('bnav-tabLife')?.classList.add('active');
         else if (tabId === 'tabStreet' || tabId === 'tabContracts' || tabId === 'tabBarn' || tabId === 'tabPlates') document.getElementById('bnav-tabStreet')?.classList.add('active');
 
-        if (tabId === 'tabMarket' && state.marketFeed.length === 0) populateMarketFeed();
         if (tabId === 'tabGarage') { renderGarage(); checkBarterEvent(); }
         if (tabId === 'tabSalesLot') renderSalesLot();
         if (tabId === 'tabBusiness') checkBusinessAccess();
@@ -1908,7 +1900,6 @@
         updateLevelGatesUI(); 
         
         if (state.marketFeed.length === 0) populateMarketFeed();
-        else renderMarketFeed();
         
         renderGarage(); 
         renderSalesLot();
@@ -1919,6 +1910,9 @@
         renderPlatesPage();
         renderBarnFind();
         initLiveChat();
+        
+        // Принудительно вызываем вкладку Рынок, чтобы запустить все стили и отрисовку ленты
+        switchTab('tabMarket');
         
         if (state.player.lastClaimedDay < state.player.day) setTimeout(openDailyBonusModal, 800);
     }

@@ -60,11 +60,11 @@ overflow: hidden;
 .barn-tier-card {
 width: 100% !important;
 box-sizing: border-box;
-background: radial-gradient(circle at 100% 0%, rgba(0, 242, 254, 0.08) 0%, transparent 60%), #0d131f;
+background: radial-gradient(circle at 100% 0%, rgba(0, 242, 254, 0.1) 0%, transparent 70%), #0d131f;
 border: 1px solid var(--border-glass);
-border-left: 3px solid var(--cyan);
+border-left: 4px solid var(--cyan);
 border-radius: var(--radius-lg);
-padding: 14px;
+padding: 16px;
 margin-bottom: 12px;
 box-shadow: 0 6px 20px rgba(0,0,0,0.4);
 display: flex;
@@ -74,8 +74,8 @@ text-align: left;
 transition: all 0.2s ease;
 }
 .barn-tier-card:active { transform: scale(0.98); box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
-.barn-tier-card.tier-2 { border-left-color: var(--green); background: radial-gradient(circle at 100% 0%, rgba(0, 230, 118, 0.08) 0%, transparent 60%), #0d131f; }
-.barn-tier-card.tier-3 { border-left-color: var(--amber); background: radial-gradient(circle at 100% 0%, rgba(255, 179, 0, 0.08) 0%, transparent 60%), #0d131f; }
+.barn-tier-card.tier-2 { border-left-color: var(--green); background: radial-gradient(circle at 100% 0%, rgba(0, 230, 118, 0.1) 0%, transparent 70%), #0d131f; }
+.barn-tier-card.tier-3 { border-left-color: var(--amber); background: radial-gradient(circle at 100% 0%, rgba(255, 179, 0, 0.1) 0%, transparent 70%), #0d131f; }
 .section-title {
 font-size: 14px;
 font-weight: 900;
@@ -134,7 +134,9 @@ text-transform: uppercase; letter-spacing: 0.5px;
 .btn-amber { background: linear-gradient(135deg, #ffd700, var(--amber)); color: #000; box-shadow: 0 4px 15px rgba(255,179,0,0.3), inset 0 2px 0 rgba(255,255,255,0.3); }
 .btn-dark { background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid var(--border-glass); }
 .btn-danger { background: #dc2626; color: #fff; box-shadow: 0 4px 15px rgba(220,38,38,0.3); }
-.btn-sm { font-size: 10px; padding: 8px 0; } .btn-auto { width: auto; padding: 8px 14px; font-size: 11px; }
+.btn-sm { font-size: 10px; padding: 8px 0; }
+/* Защита кнопок от сжатия (для Облива и т.д.) */
+.btn-auto { width: auto; padding: 8px 14px; font-size: 11px; white-space: nowrap; flex-shrink: 0; min-width: max-content; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; } .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; } .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; } .flex-gap { display: flex; gap: 6px; }
 .car-img-wrap { position: relative; width: 100%; height: 160px; border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 12px; background: #0c111c; border: 1px solid rgba(255,255,255,0.05); }
