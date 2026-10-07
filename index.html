@@ -532,7 +532,7 @@
                                                                                       <div id="p2pItemsList">
                                                                                       </div>
                                                                                     </section>
-                                                                                    <!-- TAB: СЕРВИСЫ (Теневые связи, Вилспин, АЗС) -->
+                                                                                    <!-- TAB: СЕРВИСЫ -->
                                                                                     <section id="tabServices" class="tab-screen">
                                                                                       <div class="glass-card mb-3">
                                                                                         <h3 class="mb-1">
@@ -582,7 +582,7 @@
                                                                                                   <button onclick="buyVipProPass()" class="btn btn-amber w-full">⭐ VIP PRO за 199 Stars (или 1.5M ₽)</button>
                                                                                                 </div>
                                                                                               </section>
-                                                                                              <!-- TAB: НОМЕРА (ОТДЕЛЬНАЯ ВКЛАДКА) -->
+                                                                                              <!-- TAB: НОМЕРА -->
                                                                                               <section id="tabPlates" class="tab-screen">
                                                                                                 <div class="glass-card mb-2">
                                                                                                   <h3>
@@ -746,9 +746,7 @@
                                                                                                   <i class="fa-solid fa-laptop-code color-cyan">
                                                                                                   </i> OBD2 Сканер</h4>
                                                                                                   <div id="obd2CarTitle" class="text-xs color-cyan text-center font-bold mb-3">Подключение к ЭБУ...</div>
-                                                                                                  <div id="obd2ResultBox" class="mb-3" style="background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; font-family: monospace; font-size: 11px;">
-                                                                                                    Инициализация протокола KWP2000...<br>Чтение блоков управления...
-                                                                                                  </div>
+                                                                                                  <div id="obd2ResultBox" class="mb-3" style="background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; font-family: monospace; font-size: 11px;">Инициализация протокола KWP2000...<br>Чтение блоков управления...</div>
                                                                                                   <div id="obd2ActionBox">
                                                                                                   </div>
                                                                                                   <button onclick="closeOBD2Modal()" class="btn btn-dark w-full mt-2">Закрыть сканер</button>
@@ -1010,7 +1008,7 @@
                 profitEl.style.display = 'block';
                 if (profit > 0) { profitEl.className = 'text-xs font-bold mb-3 color-green'; profitEl.innerText = `Чистая прибыль: +${profit.toLocaleString()} ₽ 📈`; } 
                 else if (profit < 0) { profitEl.className = 'text-xs font-bold mb-3 color-red'; profitEl.innerText = `Убыток: ${profit.toLocaleString()} ₽ 📉`; } 
-                else { profitEl.className = 'text-xs font-bold mb-3 color-amber'; profitinnerText = `Сделка закрыта в ноль (0 ₽)`; }
+                else { profitEl.className = 'text-xs font-bold mb-3 color-amber'; profitEl.innerText = `Сделка закрыта в ноль (0 ₽)`; }
             } else { profitEl.style.display = 'none'; }
         }
         document.getElementById('modalDealVerdict')?.classList.add('active');
@@ -1893,6 +1891,333 @@
     function cheatAddMoney() { state.player.cash += 10000000; updateHeaderUI(); saveState(); showToast("+10,000,000 ₽!"); }
     function cheatAddStats() { state.player.hunger = 100; state.player.mood = 100; state.player.reputation = 100; updateHeaderUI(); saveState(); showToast("Сытость и кураж 100%!"); }
 
+    // === ДОБАВЛЕННЫЕ НЕДОСТАЮЩИЕ ФУНКЦИИ ===
+
+    function updateLevelGatesUI() {
+        const locks = [
+            { id: 'catBtn-moto', lock: 'lock-moto', lvl: 16 },
+            { id: 'catBtn-atv', lock: 'lock-atv', lvl: 16 },
+            { id: 'catBtn-comfort', lock: 'lock-comfort', lvl: 30 },
+            { id: 'catBtn-premium', lock: 'lock-premium', lvl: 30 },
+            { id: 'catBtn-hyper', lock: 'lock-hyper', lvl: 50 },
+            { id: 'catBtn-truck', lock: 'lock-truck', lvl: 50 },
+            { id: 'catBtn-yacht', lock: 'lock-yacht', lvl: 100 }
+        ];
+        locks.forEach(l => {
+            const btn = document.getElementById(l.id);
+            const icon = document.getElementById(l.lock);
+            if (btn && icon) {
+                if (state.player.level >= l.lvl) {
+                    btn.classList.remove('locked');
+                    icon.style.display = 'none';
+                } else {
+                    btn.classList.add('locked');
+                    icon.style.display = 'inline-block';
+                }
+            }
+        });
+    }
+
+    function renderDiets() {
+        const dietList = document.getElementById('dietList');
+        if (!dietList || typeof DIETS === 'undefined') return;
+        dietList.innerHTML = DIETS.map(d => `
+            <div class="glass-card flex-between p-2 mb-2">
+                <div>
+                    <div class="font-bold text-xs">${d.name}</div>
+                    <div class="sub-label">${d.desc}</div>
+                    <div class="text-xs color-green">+${d.hunger} сытости | ${d.mood > 0 ? '+' : ''}${d.mood} куража</div>
+                </div>
+                <button onclick="selectDiet('${d.id}')" class="btn ${state.player.diet === d.id ? 'btn-green' : 'btn-dark'} btn-sm btn-auto" style="min-width: 80px;">
+                    ${state.player.diet === d.id ? 'Выбрано' : d.cost.toLocaleString() + ' ₽'}
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function selectDiet(id) { 
+        state.player.diet = id; 
+        saveState(); 
+        renderDiets(); 
+        showToast('Рацион питания изменен!');
+    }
+
+    function generateContracts() {
+        state.contracts = [
+            { id: 'cnt_1', title: 'Угнать Солярис', reward: 45000, req: 'economy' },
+            { id: 'cnt_2', title: 'Достать Камри XV50', reward: 120000, req: 'comfort' },
+            { id: 'cnt_3', title: 'Гелик для шефа', reward: 850000, req: 'premium' }
+        ];
+    }
+
+    function renderContracts() {
+        const c = document.getElementById('contractsList');
+        const lock = document.getElementById('contractsLockCover');
+        if (state.player.level < 15) {
+            if(c) c.style.display = 'none';
+            if(lock) lock.style.display = 'block';
+            return;
+        }
+        if(lock) lock.style.display = 'none';
+        if(c) {
+            c.style.display = 'block';
+            c.innerHTML = state.contracts.map(cnt => `
+                <div class="glass-card mb-2">
+                    <div class="flex-between mb-1">
+                        <b class="color-cyan">${cnt.title}</b>
+                        <span class="tag-badge bg-tag-amber">${cnt.reward.toLocaleString()} ₽</span>
+                    </div>
+                    <p class="sub-label mb-2">Требуемый класс: ${cnt.req.toUpperCase()}</p>
+                    <button class="btn btn-dark btn-sm w-full">Взять заказ</button>
+                </div>
+            `).join('');
+        }
+    }
+
+    function refreshContractsManual() {
+        generateContracts(); 
+        renderContracts(); 
+        showToast('Заказы обновлены');
+    }
+
+    function renderBarnFind() {
+        const b = document.getElementById('barnFindContent');
+        if (!b) return;
+        if (typeof BARN_FINDS === 'undefined') return;
+        b.innerHTML = BARN_FINDS.map(barn => `
+            <div class="barn-tier-card">
+                <div class="flex-between">
+                    <b class="color-amber">${barn.name}</b>
+                </div>
+                <div class="car-img-wrap" style="height: 100px; opacity: 0.8; filter: grayscale(0.5);">
+                    <img src="${barn.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'">
+                </div>
+                <button class="btn btn-dark w-full btn-sm">Разведать сарай (50,000 ₽)</button>
+            </div>
+        `).join('');
+    }
+
+    function checkBusinessAccess() {
+        const c = document.getElementById('businessList');
+        const lock = document.getElementById('businessLockCover');
+        const activeBox = document.getElementById('businessActiveBox');
+        if (state.player.level < 5) {
+            if(activeBox) activeBox.style.display = 'none';
+            if(lock) lock.style.display = 'block';
+            return;
+        }
+        if(lock) lock.style.display = 'none';
+        if(activeBox) activeBox.style.display = 'block';
+        if (c) {
+            let totalNet = 0;
+            c.innerHTML = state.businesses.map((b, i) => {
+                const cost = b.level === 0 ? b.cost : b.cost * (b.level + 1);
+                totalNet += b.level * cost;
+                return `
+                <div class="glass-card mb-2">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs">${b.name}</b> 
+                        <span class="tag-badge bg-tag-cyan">Ур. ${b.level}</span>
+                    </div>
+                    <div class="sub-label mb-1">Доход: ${(b.income * b.level).toLocaleString()} ₽ / смена</div>
+                    ${b.level > 0 ? `<div class="color-green text-xs font-bold mb-2">Накоплено: ${(b.stored || 0).toLocaleString()} ₽</div>` : ''}
+                    <button onclick="upgradeBusiness(${i})" class="btn btn-cyan btn-sm">
+                        ${b.level === 0 ? 'Купить ('+cost.toLocaleString()+' ₽)' : 'Улучшить ('+cost.toLocaleString()+' ₽)'}
+                    </button>
+                </div>
+                `;
+            }).join('');
+            setTxt('netWorthText', totalNet.toLocaleString() + ' ₽');
+        }
+    }
+
+    function upgradeBusiness(idx) {
+        const b = state.businesses[idx];
+        const cost = b.level === 0 ? b.cost : b.cost * (b.level + 1);
+        if (state.player.cash < cost) return showToast('Не хватает денег!');
+        state.player.cash -= cost;
+        b.level += 1;
+        saveState();
+        checkBusinessAccess();
+        showToast('Бизнес улучшен!');
+    }
+
+    function updateMarketTimers() {
+        const now = Date.now();
+        let needsRender = false;
+        state.marketFeed.forEach(car => {
+            if (car.cooldownUntil && car.cooldownUntil > now) {
+                const left = Math.ceil((car.cooldownUntil - now) / 1000);
+                const t = document.getElementById('timer_num_' + car.id);
+                if (t) t.innerText = left + 'с';
+            } else if (car.cooldownUntil && car.cooldownUntil <= now) {
+                car.cooldownUntil = 0;
+                needsRender = true;
+            }
+        });
+        if (needsRender) renderMarketFeed();
+    }
+
+    function openDailyBonusModal() {
+        const grid = document.getElementById('dailyBonusGrid');
+        if(grid && typeof DAILY_REWARDS_CONFIG !== 'undefined') {
+            grid.innerHTML = DAILY_REWARDS_CONFIG.map(r => `
+                <div class="daily-card ${state.player.streakDay === r.day ? 'active' : ''} ${state.player.lastClaimedDay >= r.day ? 'claimed' : ''}">
+                    День ${r.day}<br><span class="text-xs color-green font-bold mt-1 block">${r.title}</span>
+                </div>
+            `).join('');
+        }
+        document.getElementById('modalDailyBonus')?.classList.add('active');
+    }
+
+    function claimDailyReward() {
+        if (state.player.lastClaimedDay >= state.player.day) return showToast('Награда за этот день уже получена!');
+        state.player.lastClaimedDay = state.player.day;
+        const reward = DAILY_REWARDS_CONFIG.find(r => r.day === state.player.streakDay);
+        if (reward) {
+            if (reward.reward.cash) state.player.cash += reward.reward.cash;
+            if (reward.reward.stars) state.player.stars += reward.reward.stars;
+            if (reward.reward.fuel) state.player.fuel += reward.reward.fuel;
+            if (reward.reward.connections) state.player.connections += reward.reward.connections;
+            showToast('Награда успешно получена!');
+        }
+        state.player.streakDay = state.player.streakDay >= 7 ? 1 : state.player.streakDay + 1;
+        saveState();
+        closeModal('modalDailyBonus');
+    }
+
+    function renderProfileAnalytics() {
+        setTxt('profileTgUsername', state.player.name);
+        setTxt('profPlayerRank', `Уровень: ${state.player.level}`);
+        setTxt('statProfitable', state.player.stats.profitableSales);
+        setTxt('statLoss', state.player.stats.lossSales);
+        setTxt('statTotalNetProfit', state.player.stats.totalNetProfit.toLocaleString() + ' ₽');
+        const total = state.player.stats.sold || 1;
+        const winrate = state.player.stats.sold > 0 ? Math.round((state.player.stats.profitableSales / total) * 100) : 0;
+        setTxt('statWinrate', winrate + '%');
+    }
+
+    function drawWheelStatic() {
+        const c = document.getElementById('wheelCanvas');
+        if(!c) return;
+        const ctx = c.getContext('2d');
+        ctx.clearRect(0,0,260,260);
+        ctx.fillStyle = '#090e18'; 
+        ctx.beginPath(); 
+        ctx.arc(130,130,120,0,Math.PI*2); 
+        ctx.fill();
+        ctx.fillStyle = '#00f2fe'; 
+        ctx.font = '16px -apple-system, sans-serif'; 
+        ctx.textAlign = 'center';
+        ctx.fillText('Сектора колеса', 130, 130);
+    }
+
+    function spinWheel(isFree) {
+        if(isFree) {
+            const now = Date.now();
+            if (now - state.player.lastFreeSpin < 86400000) {
+                const hours = Math.ceil((86400000 - (now - state.player.lastFreeSpin)) / 3600000);
+                return showToast(`Бесплатный спин через ${hours} ч.`);
+            }
+            state.player.lastFreeSpin = now;
+        } else {
+            if (state.player.stars < 25) return showToast('Не хватает 25 ⭐!');
+            state.player.stars -= 25;
+        }
+        
+        tgHaptic('medium');
+        showToast('Крутим колесо...');
+        
+        setTimeout(() => {
+            const prizes = [10000, 25000, 50000, 100000, 'star', 'connection'];
+            const won = prizes[Math.floor(Math.random() * prizes.length)];
+            
+            if (won === 'star') {
+                state.player.stars += 5;
+                openVerdictModal("🎉 Колесо Фортуны", "Вы выиграли 5 ⭐!", true);
+            } else if (won === 'connection') {
+                state.player.connections += 1;
+                openVerdictModal("🎉 Колесо Фортуны", "Вы выиграли 1 🤝 (Связь)!", true);
+            } else {
+                state.player.cash += won;
+                openVerdictModal("🎉 Колесо Фортуны", `Вы выиграли ${won.toLocaleString()} ₽!`, true);
+            }
+            saveState();
+        }, 1500);
+    }
+
+    function doActivity(type, cost, mood, connections = 0) {
+        if (state.player.cash < cost) return showToast('Не хватает денег!');
+        state.player.cash -= cost;
+        state.player.mood = Math.min(100, state.player.mood + mood);
+        if (connections > 0) state.player.connections += connections;
+        saveState();
+        tgHaptic('success');
+        showToast(`Вы отлично отдохнули! Настроение +${mood}`);
+    }
+
+    function watchAdsgram() {
+        const now = Date.now();
+        if (now - state.player.lastAdTimestamp < 300000) {
+            const mins = Math.ceil((300000 - (now - state.player.lastAdTimestamp)) / 60000);
+            return showToast(`Реклама будет доступна через ${mins} мин.`);
+        }
+        state.player.lastAdTimestamp = now;
+        state.player.cash += 25000;
+        state.player.connections += 1;
+        saveState();
+        tgHaptic('success');
+        showToast('Просмотрено! +25,000 ₽ и +1 🤝');
+    }
+
+    function buyPackWithStars(stars, cash) {
+        if (state.player.stars < stars) return showToast(`Не хватает ${stars} ⭐!`);
+        state.player.stars -= stars;
+        state.player.cash += cash;
+        saveState();
+        tgHaptic('success');
+        showToast(`Успешно куплено ${cash.toLocaleString()} ₽`);
+    }
+
+    function buyVipProPass() {
+        if (state.player.vipPro) return showToast('У вас уже есть VIP PRO!');
+        if (state.player.stars >= 199) { 
+            state.player.stars -= 199; 
+        } else if (state.player.cash >= 1500000) { 
+            state.player.cash -= 1500000; 
+        } else {
+            return showToast('Не хватает 199 ⭐ или 1,500,000 ₽!');
+        }
+        state.player.vipPro = true;
+        saveState();
+        tgHaptic('success');
+        openVerdictModal("🌟 VIP PRO АКТИВИРОВАН", "Вам доступны новые привилегии и автотека!", true);
+    }
+
+    function refuelAction(type) {
+        if (state.player.fuel >= 100) return showToast('Бак и так полон!');
+        if (type === 'cash') {
+            if (state.player.cash < 5000) return showToast('Не хватает 5,000 ₽');
+            state.player.cash -= 5000;
+        } else if (type === 'free') {
+            const now = Date.now();
+            if (now - state.player.lastAdTimestamp < 300000) return showToast('Бесплатная заправка пока недоступна (КД 5 мин)');
+            state.player.lastAdTimestamp = now;
+        }
+        state.player.fuel = 100;
+        saveState();
+        tgHaptic('success');
+        showToast('Бак заправлен на 100 ⛽!');
+    }
+
+    function resetGameData() {
+        if (confirm('ВНИМАНИЕ! Вы уверены, что хотите полностью сбросить весь прогресс? Это действие необратимо!')) {
+            localStorage.removeItem('perekoop_sim_save_v29');
+            location.reload();
+        }
+    }
+
+    // === ИНИЦИАЛИЗАЦИЯ ===
     function initApp() {
         sanitizeState(); 
         syncTelegramProfile(); 
