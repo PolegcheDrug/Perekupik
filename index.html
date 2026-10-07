@@ -945,17 +945,17 @@
                                                                                                                           <div class="font-bold text-xs">🧪 Залить «медовую» присадку</div>
                                                                                                                           <div class="sub-label">Временно маскирует стук</div>
                                                                                                                         </div>
-                                                                                                                        <button onclick="applyPreSaleMod('additive')" class="btn btn-amber btn-sm" style="white-space: nowrap; min-width: 75px;">6,000 ₽</button>
+                                                                                                                        <button onclick="applyPreSaleMod('additive')" class="btn btn-amber btn-sm" id="btnAdditivePrice" style="white-space: nowrap; min-width: 75px;">6,000 ₽</button>
                                                                                                                       </div>
                                                                                                                       <div class="glass-card flex-between p-2 mb-2">
                                                                                                                         <div>
                                                                                                                           <div class="font-bold text-xs">⏳ Смотка одометра</div>
                                                                                                                           <div class="sub-label">-50% пробега | Риск спалиться!</div>
                                                                                                                         </div>
-                                                                                                                        <button onclick="applyPreSaleMod('odometer')" class="btn btn-danger btn-sm" style="white-space: nowrap; min-width: 75px;">8,000 ₽</button>
+                                                                                                                        <button onclick="applyPreSaleMod('odometer')" class="btn btn-danger btn-sm" id="btnOdometerPrice" style="white-space: nowrap; min-width: 75px;">8,000 ₽</button>
                                                                                                                       </div>
                                                                                                                     </div>
-                                                                                                                    <button onclick="closeModal('modalPreSale')" class="btn btn-dark w-full">Завершить подготовку</button>
+                                                                                                                    <button onclick="closeModal('modalPreSale')" class="btn btn-dark w-full">Закрыть</button>
                                                                                                                   </div>
                                                                                                                 </div>
                                                                                                                 <div id="toastNotification" class="toast">Уведомление</div>
@@ -1046,7 +1046,14 @@
     }
 
     const DEFAULT_STATE = {
-        player: { name: "Перекуп #777", avatarUrl: null, cash: 150000, stars: 15, connections: 1, fuel: 100, level: 1, xp: 0, maxXp: 120, baseSlots: 1, vip: false, vipPro: false, lastFreeSpin: 0, club: null, karma: 50, stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 }, hunger: 80, mood: 85, reputation: 30, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0, lastAutoShowDay: 0, lastAutoShowTimestamp: 0, lastDragRaceTimestamp: 0, lastAdTimestamp: 0, lastContractsRefreshTimestamp: 0, diet: 'shaurma', housingId: 'room', housingType: 'rent', ownedHouses: [], selectedStreetCarIndex: 0, lastBarnDay: 0 },
+        player: { 
+            name: "Перекуп #777", avatarUrl: null, cash: 150000, stars: 15, connections: 1, fuel: 100, level: 1, xp: 0, maxXp: 120, baseSlots: 1, 
+            vip: false, vipPro: false, lastFreeSpin: 0, club: null, karma: 50, stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 }, 
+            hunger: 80, mood: 85, reputation: 30, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0, lastAutoShowDay: 0, lastAutoShowTimestamp: 0, 
+            lastDragRaceTimestamp: 0, lastAdTimestamp: 0, lastContractsRefreshTimestamp: 0, diet: 'shaurma', housingId: 'room', housingType: 'rent', 
+            ownedHouses: [], selectedStreetCarIndex: 0, lastBarnDay: 0,
+            preSalesCount: 0, preSaleCooldownUntil: 0 
+        },
         garage: [], salesLot: [], contracts: [], plateCatalog: [], ownedPlates: ["В777ВВ 777"], activeCategory: 'economy', marketFeed: [], p2pMode: 'cars', p2pCars: [], p2pPlates: [], businesses: [], barnProgress: { car: null, step: 0, tier: 1, plate: '' }, marketModifiers: { economy: 1, comfort: 1, premium: 1, all: 1 }
     };
 
@@ -1082,6 +1089,8 @@
         if (!state.player.ownedHouses || !Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
         if (isNaN(state.player.cash) || state.player.cash < 0) state.player.cash = 150000;
         if (isNaN(state.player.loanDebt) || state.player.loanDebt < 0) state.player.loanDebt = 0;
+        if (typeof state.player.preSalesCount === 'undefined') state.player.preSalesCount = 0;
+        if (typeof state.player.preSaleCooldownUntil === 'undefined') state.player.preSaleCooldownUntil = 0;
         
         if (!state.businesses || state.businesses.length === 0) state.businesses = (typeof BUSINESS_DATA !== 'undefined' ? BUSINESS_DATA : []);
         if (!Array.isArray(state.plateCatalog) || state.plateCatalog.length === 0) refreshPlateCatalog();
@@ -1315,7 +1324,7 @@
         if (state.player.cash < car.price) return showToast("Недостаточно денег на выкуп!");
         closeModal('modalMarketDeal');
         state.player.cash -= car.price; state.player.stats.bought += 1;
-        state.garage.push({ ...car, customPlate: car.plate, impounded: false, purchaseCost: car.price, wear: car.wear || { engine: 90, transmission: 90 } });
+        state.garage.push({ ...car, customPlate: car.plate, impounded: false, purchaseCost: car.price, wear: car.wear || { engine: 90, transmission: 90 }, preSaleVisited: false });
         state.marketFeed.splice(carIndex, 1); pendingMarketCar = null; addXp(40);
         if (!car.stoChecked && car.hiddenDefect) {
             setTimeout(() => { openVerdictModal("⚠️ КОТ В МЕШКЕ!", `Вы поставили машину в гараж и присмотрелись... Вылез дефект: ${car.hiddenDefect.text}!`, false); }, 1000);
@@ -1380,22 +1389,79 @@
     function openTuningFromPreview() { if (selectedCarIndex === null) return; closeModal('modalPreview'); openTuningModal(selectedCarIndex); }
 
     function openPreSaleModal(idx) {
-        activePreSaleCarIndex = idx; const car = state.garage[idx]; 
-        setTxt('preSaleCarTitle', `${car.name} (Оценка: ${car.marketValue.toLocaleString()} ₽)`);
-        const wash = state.businesses.find(b => b.id === 'wash'); const sto = state.businesses.find(b => b.id === 'sto');
-        const cleanCost = (wash && wash.level >= 3) ? 0 : (wash && wash.level > 0 ? 2000 : 4000); const paintCost = (sto && sto.level > 0) ? 6000 : 12000;
-        setTxt('btnCleanPrice', `${cleanCost.toLocaleString()} ₽`); setTxt('btnPaintPrice', `${paintCost.toLocaleString()} ₽`); document.getElementById('modalPreSale')?.classList.add('active');
+        const now = Date.now();
+        if (state.player.preSaleCooldownUntil && state.player.preSaleCooldownUntil > now) {
+            const mins = Math.ceil((state.player.preSaleCooldownUntil - now) / 60000);
+            return showToast(`Мастера на перерыве! Предпродажка недоступна еще ${mins} мин.`);
+        }
+        
+        activePreSaleCarIndex = idx; 
+        const car = state.garage[idx]; 
+        
+        if (!car.preSaleVisited) {
+            if (state.player.preSalesCount >= 10) {
+                state.player.preSaleCooldownUntil = now + 3600000; // 1 час
+                state.player.preSalesCount = 0;
+                saveState();
+                return showToast(`Лимит (10 машин) исчерпан! Студия закрыта на 1 час.`);
+            }
+            car.preSaleVisited = true;
+            state.player.preSalesCount = (state.player.preSalesCount || 0) + 1;
+            saveState();
+        }
+
+        setTxt('preSaleCarTitle', `${car.name} (Оценка: ${car.marketValue.toLocaleString()} ₽) | ${10 - state.player.preSalesCount} авто до паузы`);
+        
+        const wash = state.businesses.find(b => b.id === 'wash'); 
+        const sto = state.businesses.find(b => b.id === 'sto');
+        const cleanCost = (wash && wash.level >= 3) ? 0 : (wash && wash.level > 0 ? 2000 : 4000); 
+        const paintCost = (sto && sto.level > 0) ? 6000 : 12000;
+        
+        const btnClean = document.getElementById('btnCleanPrice');
+        const btnPaint = document.getElementById('btnPaintPrice');
+        const btnAdditive = document.getElementById('btnAdditivePrice');
+        const btnOdometer = document.getElementById('btnOdometerPrice');
+
+        if(btnClean) { btnClean.innerText = car.isPolished ? 'Сделано' : `${cleanCost.toLocaleString()} ₽`; btnClean.disabled = car.isPolished; btnClean.className = car.isPolished ? 'btn btn-dark btn-sm opacity-50' : 'btn btn-cyan btn-sm'; }
+        if(btnPaint) { btnPaint.innerText = car.isRepainted ? 'Сделано' : `${paintCost.toLocaleString()} ₽`; btnPaint.disabled = car.isRepainted; btnPaint.className = car.isRepainted ? 'btn btn-dark btn-sm opacity-50' : 'btn btn-dark btn-sm'; }
+        if(btnAdditive) { btnAdditive.innerText = car.hasAdditive ? 'Сделано' : `6,000 ₽`; btnAdditive.disabled = car.hasAdditive; btnAdditive.className = car.hasAdditive ? 'btn btn-dark btn-sm opacity-50' : 'btn btn-amber btn-sm'; }
+        if(btnOdometer) { btnOdometer.innerText = car.rolledOdometer ? 'Сделано' : `8,000 ₽`; btnOdometer.disabled = car.rolledOdometer; btnOdometer.className = car.rolledOdometer ? 'btn btn-dark btn-sm opacity-50' : 'btn btn-danger btn-sm'; }
+
+        document.getElementById('modalPreSale')?.classList.add('active');
     }
 
     function applyPreSaleMod(type) {
-        if (activePreSaleCarIndex === null) return; const car = state.garage[activePreSaleCarIndex];
-        const wash = state.businesses.find(b => b.id === 'wash'); const sto = state.businesses.find(b => b.id === 'sto');
-        const cleanCost = (wash && wash.level >= 3) ? 0 : (wash && wash.level > 0 ? 2000 : 4000); const paintCost = (sto && sto.level > 0) ? 6000 : 12000;
-        if (type === 'clean') { if (state.player.cash < cleanCost) return showToast("Не хватает денег!"); state.player.cash -= cleanCost; car.isPolished = true; car.baseMarketValue = Math.round(car.baseMarketValue * 1.05); car.marketValue = car.baseMarketValue + evaluatePlate(car.customPlate); showToast("✨ Фары отполированы, салон чист! +5% к цене."); } 
-        else if (type === 'paint') { if (state.player.cash < paintCost) return showToast("Не хватает денег!"); state.player.cash -= paintCost; car.condition = Math.min(100, car.condition + 20); car.isRepainted = true; car.bodyThickness.doors = 280; showToast("🎨 Детали окрашены у дяди Вани! Толщиномер покажет слой."); } 
-        else if (type === 'additive') { if (state.player.cash < 6000) return showToast("Не хватает 6,000 ₽!"); state.player.cash -= 6000; car.hasAdditive = true; showToast("🧪 Присадка залита! Стук временно скрыт."); } 
-        else if (type === 'odometer') { if (car.rolledOdometer) return showToast("Пробег уже скручивался!"); if (state.player.cash < 8000) return showToast("Не хватает 8,000 ₽!"); state.player.cash -= 8000; car.mileage = Math.round((car.mileage || 85000) / 2); car.baseMarketValue = Math.round(car.baseMarketValue * 1.15); car.marketValue = car.baseMarketValue + evaluatePlate(car.customPlate); car.rolledOdometer = true; showToast("⏳ Пробег скручен вдвое! Машина помолодела."); }
-        saveState(); renderGarage(); setTxt('preSaleCarTitle', `${car.name} (Оценка: ${car.marketValue.toLocaleString()} ₽)`);
+        if (activePreSaleCarIndex === null) return; 
+        const car = state.garage[activePreSaleCarIndex];
+        const wash = state.businesses.find(b => b.id === 'wash'); 
+        const sto = state.businesses.find(b => b.id === 'sto');
+        const cleanCost = (wash && wash.level >= 3) ? 0 : (wash && wash.level > 0 ? 2000 : 4000); 
+        const paintCost = (sto && sto.level > 0) ? 6000 : 12000;
+        
+        if (type === 'clean') { 
+            if (car.isPolished) return showToast("Уже отполировано!");
+            if (state.player.cash < cleanCost) return showToast("Не хватает денег!"); 
+            state.player.cash -= cleanCost; car.isPolished = true; car.baseMarketValue = Math.round(car.baseMarketValue * 1.05); car.marketValue = car.baseMarketValue + evaluatePlate(car.customPlate); showToast("✨ Фары отполированы, салон чист! +5% к цене."); 
+        } 
+        else if (type === 'paint') { 
+            if (car.isRepainted) return showToast("Уже окрашено!");
+            if (state.player.cash < paintCost) return showToast("Не хватает денег!"); 
+            state.player.cash -= paintCost; car.condition = Math.min(100, car.condition + 20); car.isRepainted = true; car.bodyThickness.doors = 280; showToast("🎨 Детали окрашены у дяди Вани! Толщиномер покажет слой."); 
+        } 
+        else if (type === 'additive') { 
+            if (car.hasAdditive) return showToast("Присадка уже залита!");
+            if (state.player.cash < 6000) return showToast("Не хватает 6,000 ₽!"); 
+            state.player.cash -= 6000; car.hasAdditive = true; showToast("🧪 Присадка залита! Стук временно скрыт."); 
+        } 
+        else if (type === 'odometer') { 
+            if (car.rolledOdometer) return showToast("Пробег уже скручивался!"); 
+            if (state.player.cash < 8000) return showToast("Не хватает 8,000 ₽!"); 
+            state.player.cash -= 8000; car.mileage = Math.round((car.mileage || 85000) / 2); car.baseMarketValue = Math.round(car.baseMarketValue * 1.15); car.marketValue = car.baseMarketValue + evaluatePlate(car.customPlate); car.rolledOdometer = true; showToast("⏳ Пробег скручен вдвое! Машина помолодела."); 
+        }
+        
+        saveState(); 
+        renderGarage(); 
+        openPreSaleModal(activePreSaleCarIndex); // Обновляем UI кнопок
     }
 
     function repairCarDefect(idx) {
@@ -1891,7 +1957,7 @@
     function cheatAddMoney() { state.player.cash += 10000000; updateHeaderUI(); saveState(); showToast("+10,000,000 ₽!"); }
     function cheatAddStats() { state.player.hunger = 100; state.player.mood = 100; state.player.reputation = 100; updateHeaderUI(); saveState(); showToast("Сытость и кураж 100%!"); }
 
-    // === ДОБАВЛЕННЫЕ НЕДОСТАЮЩИЕ ФУНКЦИИ ===
+    // === ФУНКЦИИ ИНТЕРФЕЙСА (ОБНОВЛЕННЫЕ) ===
 
     function updateLevelGatesUI() {
         const locks = [
@@ -1942,11 +2008,12 @@
         showToast('Рацион питания изменен!');
     }
 
+    // === ЗАКАЗЫ ===
     function generateContracts() {
         state.contracts = [
-            { id: 'cnt_1', title: 'Угнать Солярис', reward: 45000, req: 'economy' },
-            { id: 'cnt_2', title: 'Достать Камри XV50', reward: 120000, req: 'comfort' },
-            { id: 'cnt_3', title: 'Гелик для шефа', reward: 850000, req: 'premium' }
+            { id: 'cnt_1', title: 'Подобрать Солярис/Рио', reward: 75000, req: 'economy' },
+            { id: 'cnt_2', title: 'Найти живую Камри', reward: 180000, req: 'comfort' },
+            { id: 'cnt_3', title: 'Подбор Гелика для шефа', reward: 950000, req: 'premium' }
         ];
     }
 
@@ -1961,17 +2028,39 @@
         if(lock) lock.style.display = 'none';
         if(c) {
             c.style.display = 'block';
-            c.innerHTML = state.contracts.map(cnt => `
-                <div class="glass-card mb-2">
+            if (state.contracts.length === 0) {
+                c.innerHTML = `<div class="sub-label text-center py-4">Нет доступных заказов. Нажмите "Обновить".</div>`;
+                return;
+            }
+            c.innerHTML = state.contracts.map((cnt, i) => `
+                <div class="glass-card mb-2" style="border-left: 3px solid var(--cyan);">
                     <div class="flex-between mb-1">
-                        <b class="color-cyan">${cnt.title}</b>
+                        <b class="color-cyan"><i class="fa-solid fa-user-tie"></i> ${cnt.title}</b>
                         <span class="tag-badge bg-tag-amber">${cnt.reward.toLocaleString()} ₽</span>
                     </div>
-                    <p class="sub-label mb-2">Требуемый класс: ${cnt.req.toUpperCase()}</p>
-                    <button class="btn btn-dark btn-sm w-full">Взять заказ</button>
+                    <p class="sub-label mb-2">Требуемый класс: <b>${cnt.req.toUpperCase()}</b></p>
+                    <button onclick="completeContract(${i})" class="btn btn-dark btn-sm w-full">
+                        <i class="fa-solid fa-car-side"></i> Отдать подходящее авто из гаража
+                    </button>
                 </div>
             `).join('');
         }
+    }
+
+    function completeContract(idx) {
+        const cnt = state.contracts[idx];
+        const carIdx = state.garage.findIndex(c => c.type === cnt.req && !c.impounded);
+        if (carIdx === -1) {
+            return showToast(`В гараже нет свободного авто класса ${cnt.req.toUpperCase()}!`);
+        }
+        const car = state.garage[carIdx];
+        state.garage.splice(carIdx, 1);
+        state.player.cash += cnt.reward;
+        state.contracts.splice(idx, 1);
+        saveState();
+        renderGarage();
+        renderContracts();
+        openVerdictModal("ЗАКАЗ ВЫПОЛНЕН! 🎉", `Вы подобрали и передали ${car.name}. Оплата ${cnt.reward.toLocaleString()} ₽.`, true, cnt.reward);
     }
 
     function refreshContractsManual() {
@@ -1980,23 +2069,69 @@
         showToast('Заказы обновлены');
     }
 
+    // === САРАИ ===
     function renderBarnFind() {
         const b = document.getElementById('barnFindContent');
-        if (!b) return;
-        if (typeof BARN_FINDS === 'undefined') return;
-        b.innerHTML = BARN_FINDS.map(barn => `
+        if (!b || typeof BARN_FINDS === 'undefined') return;
+        
+        const canExplore = state.player.lastBarnDay < state.player.day;
+        b.innerHTML = BARN_FINDS.map((barn, i) => `
             <div class="barn-tier-card">
                 <div class="flex-between">
                     <b class="color-amber">${barn.name}</b>
+                    <span class="tag-badge bg-tag-amber">Потенциал: ~${barn.marketValue.toLocaleString()} ₽</span>
                 </div>
                 <div class="car-img-wrap" style="height: 100px; opacity: 0.8; filter: grayscale(0.5);">
                     <img src="${barn.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'">
                 </div>
-                <button class="btn btn-dark w-full btn-sm">Разведать сарай (50,000 ₽)</button>
+                <button onclick="exploreBarn(${i})" class="btn btn-dark w-full btn-sm" ${!canExplore ? 'disabled' : ''}>
+                    ${canExplore ? 'Разведать сарай (50,000 ₽)' : 'Разведка будет доступна завтра'}
+                </button>
             </div>
         `).join('');
     }
 
+    function exploreBarn(idx) {
+        if (state.player.lastBarnDay >= state.player.day) return showToast('Разведка доступна только 1 раз в день!');
+        if (state.player.cash < 50000) return showToast('Не хватает 50,000 ₽ на экспедицию!');
+        const maxSlots = getTotalGarageSlots(); 
+        if (state.garage.length >= maxSlots) return showToast('В гараже нет места для находки!');
+        
+        state.player.cash -= 50000;
+        state.player.lastBarnDay = state.player.day;
+        
+        const template = BARN_FINDS[idx];
+        const foundCar = {
+            id: 'barn_' + Date.now(),
+            name: template.name,
+            power: template.power,
+            type: template.type,
+            basePrice: template.basePrice,
+            price: template.basePrice,
+            purchaseCost: 50000,
+            baseMarketValue: template.marketValue,
+            marketValue: Math.round(template.marketValue * 0.25),
+            img: template.img,
+            plate: generateNormalPlate(),
+            customPlate: generateNormalPlate(),
+            isStolen: false,
+            condition: 15,
+            wear: { engine: 15, transmission: 20 },
+            tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 },
+            bodyThickness: { hood: 800, roof: 150, doors: 600, wings: 900 },
+            hiddenDefect: { text: "Машина долго стояла. Двигатель троит, подвеска сыпется.", cost: Math.round(template.basePrice * 0.4), severity: "Критическая" },
+            isRepainted: false,
+            isPolished: false
+        };
+        
+        state.garage.push(foundCar);
+        saveState();
+        renderBarnFind();
+        renderGarage();
+        openVerdictModal("НАХОДКА! 🏚️", `Вы откопали ${template.name}! Машина добавлена в гараж, но требует капитального ремонта.`, true);
+    }
+
+    // === ИМПЕРИЯ ===
     function checkBusinessAccess() {
         const c = document.getElementById('businessList');
         const lock = document.getElementById('businessLockCover');
@@ -2011,18 +2146,20 @@
         if (c) {
             let totalNet = 0;
             c.innerHTML = state.businesses.map((b, i) => {
+                const isMax = b.level >= 10;
                 const cost = b.level === 0 ? b.cost : b.cost * (b.level + 1);
                 totalNet += b.level * cost;
+                
                 return `
                 <div class="glass-card mb-2">
                     <div class="flex-between mb-1">
                         <b class="text-xs">${b.name}</b> 
-                        <span class="tag-badge bg-tag-cyan">Ур. ${b.level}</span>
+                        <span class="tag-badge bg-tag-cyan">${isMax ? 'MAX УРОВЕНЬ' : 'Ур. ' + b.level}</span>
                     </div>
                     <div class="sub-label mb-1">Доход: ${(b.income * b.level).toLocaleString()} ₽ / смена</div>
                     ${b.level > 0 ? `<div class="color-green text-xs font-bold mb-2">Накоплено: ${(b.stored || 0).toLocaleString()} ₽</div>` : ''}
-                    <button onclick="upgradeBusiness(${i})" class="btn btn-cyan btn-sm">
-                        ${b.level === 0 ? 'Купить ('+cost.toLocaleString()+' ₽)' : 'Улучшить ('+cost.toLocaleString()+' ₽)'}
+                    <button onclick="upgradeBusiness(${i})" class="btn ${isMax ? 'btn-dark' : 'btn-cyan'} btn-sm" ${isMax ? 'disabled' : ''}>
+                        ${isMax ? 'Улучшено до максимума' : (b.level === 0 ? 'Купить ('+cost.toLocaleString()+' ₽)' : 'Улучшить ('+cost.toLocaleString()+' ₽)')}
                     </button>
                 </div>
                 `;
@@ -2033,13 +2170,15 @@
 
     function upgradeBusiness(idx) {
         const b = state.businesses[idx];
+        if (b.level >= 10) return showToast('Бизнес уже достиг максимального 10 уровня!');
         const cost = b.level === 0 ? b.cost : b.cost * (b.level + 1);
-        if (state.player.cash < cost) return showToast('Не хватает денег!');
+        if (state.player.cash < cost) return showToast('Не хватает денег на улучшение!');
+        
         state.player.cash -= cost;
         b.level += 1;
         saveState();
         checkBusinessAccess();
-        showToast('Бизнес улучшен!');
+        showToast(`Бизнес "${b.name}" улучшен до ${b.level} уровня!`);
     }
 
     function updateMarketTimers() {
@@ -2236,9 +2375,7 @@
         renderBarnFind();
         initLiveChat();
         
-        // Принудительно вызываем вкладку Рынок, чтобы запустить все стили и отрисовку ленты
         switchTab('tabMarket');
-        
         if (state.player.lastClaimedDay < state.player.day) setTimeout(openDailyBonusModal, 800);
     }
     
