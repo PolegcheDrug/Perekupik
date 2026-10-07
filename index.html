@@ -115,7 +115,6 @@
                                                 </i> АЗС</button>
                                               </div>
                                               <main class="main-content">
-                                                <!-- 1. РЫНОК -->
                                                 <section id="tabMarket" class="tab-screen active">
                                                   <div class="glass-card">
                                                     <div class="card-header-row mb-2">
@@ -171,7 +170,6 @@
                                                       <div id="marketCardContainer">
                                                       </div>
                                                     </section>
-                                                    <!-- 2. ГАРАЖ -->
                                                     <section id="tabGarage" class="tab-screen">
                                                       <div class="glass-card mb-2">
                                                         <div class="flex-between mb-1">
@@ -188,7 +186,6 @@
                                                       <div id="garageList">
                                                       </div>
                                                     </section>
-                                                    <!-- 3. ПЛОЩАДКА -->
                                                     <section id="tabSalesLot" class="tab-screen">
                                                       <div class="glass-card">
                                                         <div class="flex-between mb-1">
@@ -202,7 +199,6 @@
                                                         <div id="salesLotList">
                                                         </div>
                                                       </section>
-                                                      <!-- 4. КАЗИНО 21 -->
                                                       <section id="tabCasino" class="tab-screen">
                                                         <div class="glass-card" id="casinoCardContainer">
                                                           <div class="flex-between mb-1">
@@ -263,7 +259,6 @@
                                                       </div>
                                                     </div>
                                                   </section>
-                                                  <!-- 5. ЖИЗНЬ И ЧАТ -->
                                                   <section id="tabLife" class="tab-screen">
                                                     <div class="glass-card flex-between mb-3">
                                                       <div>
@@ -316,7 +311,6 @@
                                                                 <button onclick="doActivity('dubai', 450000, 100, 3)" class="btn btn-cyan">✈ Отпуск в Дубае: +100 😄 и +3 🤝 (450k ₽)</button>
                                                               </div>
                                                             </section>
-                                                            <!-- 6. БИЗНЕС -->
                                                             <section id="tabBusiness" class="tab-screen">
                                                               <div id="businessActiveBox">
                                                                 <div class="glass-card flex-between mb-2">
@@ -349,7 +343,6 @@
                                                                   <p class="sub-label mt-1">Для открытия легальных автобизнесов вам нужен минимум <b>5 уровень авторитета</b>!</p>
                                                                 </div>
                                                               </section>
-                                                              <!-- 7. СТРИТ -->
                                                               <section id="tabStreet" class="tab-screen">
                                                                 <div class="glass-card">
                                                                   <div class="card-header-row mb-2">
@@ -450,7 +443,6 @@
                                                                     </div>
                                                                   </div>
                                                                 </section>
-                                                                <!-- ОСТАЛЬНЫЕ ВКЛАДКИ -->
                                                                 <section id="tabContainers" class="tab-screen">
                                                                   <div class="glass-card" id="containersCardContainer">
                                                                     <h3>
@@ -626,7 +618,6 @@
                                                                                       </div>
                                                                                     </section>
                                                                                   </main>
-                                                                                  <!-- НИЖНЕЕ МЕНЮ НАВИГАЦИИ -->
                                                                                   <nav class="bottom-nav">
                                                                                     <div class="b-nav-item active" onclick="switchTab('tabMarket')" id="bnav-tabMarket">
                                                                                       <i class="fa-solid fa-store">
@@ -886,7 +877,6 @@
                                                                                                       <button onclick="closeModal('modalAutoteka')" class="btn btn-green w-full">Закрыть</button>
                                                                                                     </div>
                                                                                                   </div>
-                                                                                                  <!-- 8. ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (МОДАЛКА) -->
                                                                                                   <div id="modalPreSale" class="modal-overlay" style="z-index: 2150;">
                                                                                                     <div class="modal-box">
                                                                                                       <h4 class="text-center mb-1">
@@ -927,7 +917,6 @@
                                                                                                       </div>
                                                                                                     </div>
                                                                                                     <div id="toastNotification" class="toast">Уведомление</div>
-                                                                                                    <!-- ДВИЖОК ИГРЫ -->
                                                                                                     <script>
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
@@ -1028,12 +1017,26 @@
 
     function sanitizeState() {
         try { const saved = localStorage.getItem('perekoop_sim_save_v20'); if (saved) state = { ...state, ...JSON.parse(saved) }; } catch(e) {}
+        try { const saved21 = localStorage.getItem('perekoop_sim_save_v21'); if (saved21) state = { ...state, ...JSON.parse(saved21) }; } catch(e) {}
+        
         if (state.crypto) delete state.crypto;
         if (!state.businesses || state.businesses.length === 0) state.businesses = BUSINESS_DATA;
-        if (!Array.isArray(state.plateCatalog) || state.plateCatalog.length === 0) refreshPlateCatalog();
-        if (!Array.isArray(state.p2pCars) || state.p2pCars.length === 0) generateRandomP2PCars();
-        if (!Array.isArray(state.contracts) || state.contracts.length === 0) generateContracts();
+        
+        if (!Array.isArray(state.plateCatalog)) state.plateCatalog = [];
+        if (state.plateCatalog.length === 0) refreshPlateCatalog();
+        
+        if (!Array.isArray(state.p2pCars)) state.p2pCars = [];
+        if (state.p2pCars.length === 0) generateRandomP2PCars();
+        
+        if (!Array.isArray(state.contracts)) state.contracts = [];
+        if (state.contracts.length === 0) generateContracts();
+        
         if (!state.player.stats) state.player.stats = { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
+        if (!Array.isArray(state.garage)) state.garage = [];
+        if (!Array.isArray(state.salesLot)) state.salesLot = [];
+        if (!Array.isArray(state.ownedPlates)) state.ownedPlates = ["В777ВВ 777"];
+        if (!Array.isArray(state.marketFeed)) state.marketFeed = [];
+        
         state.businesses.forEach((b, idx) => { if (!b.minLevel && BUSINESS_DATA[idx]) b.minLevel = BUSINESS_DATA[idx].minLevel; });
         state.garage.forEach((car, index) => {
             if (!car.id) car.id = 'g_' + index + '_' + Date.now();
@@ -1056,7 +1059,7 @@
         setTxt('garageHeaderSlots', `${state.garage.length}/${getTotalGarageSlots()}`);
     }
 
-    function saveState() { try { localStorage.setItem('perekoop_sim_save_v20', JSON.stringify(state)); } catch(e) {} updateHeaderUI(); }
+    function saveState() { try { localStorage.setItem('perekoop_sim_save_v21', JSON.stringify(state)); } catch(e) {} updateHeaderUI(); }
 
     function getMarketRefreshCost() { return 150 + (state.player.level * 350); }
 
@@ -1618,6 +1621,23 @@
             const isCurrent = state.player.housingId === h.id; 
             const isOwned = state.player.ownedHouses.includes(h.id);
             const isLocked = state.player.level < h.minLevel;
+            
+            let btnClass = isOwned ? 'btn-green' : 'btn-amber';
+            let btnDisabled = (isOwned || isLocked) ? 'disabled' : '';
+            let btnText = isOwned ? 'Выкуплено' : `Купить (${(h.buyPrice/1000000).toFixed(1)}M ₽)`;
+            
+            let rentBtn = '';
+            if (h.rent > 0 && !isOwned) {
+                let rClass = (isCurrent && state.player.housingType === 'rent') ? 'btn-cyan' : 'btn-dark';
+                let rDis = isLocked ? 'disabled' : '';
+                rentBtn = `<button onclick="rentHouse('${h.id}')" class="btn ${rClass} btn-sm" ${rDis}>Аренда (${h.rent.toLocaleString()} ₽/д)</button>`;
+            }
+            
+            let buyBtn = '';
+            if (h.buyPrice > 0) {
+                buyBtn = `<button onclick="buyHouse('${h.id}')" class="btn ${btnClass} btn-sm" ${btnDisabled}>${btnText}</button>`;
+            }
+
             return `<div class="glass-card mb-3" style="${isCurrent ? 'border-color:var(--cyan);' : ''}">
                 <div class="car-img-wrap" style="height:120px; ${isLocked ? 'filter: grayscale(1); opacity: 0.7;' : ''}">
                     <img src="${h.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1513828583688-c52646db42da?auto=format&fit=crop&w=400&q=80'">
@@ -1627,8 +1647,8 @@
                 <div class="flex-between mb-1"><h4 class="font-bold">${h.name} ${isCurrent ? '🏠 (Вы здесь)' : ''}</h4></div>
                 <div class="sub-label mb-2">+${h.slots} боксов гаража | +${h.moodBonus}% к настроению</div>
                 <div class="grid-2">
-                    ${h.rent > 0 && !isOwned ? `<button onclick="rentHouse('${h.id}')" class="btn ${isCurrent && state.player.housingType === 'rent' ? 'btn-cyan' : 'btn-dark'} btn-sm" ${isLocked ? 'disabled' : ''}>Аренда (${h.rent.toLocaleString()} ₽/д)</button>` : ''}
-                    ${h.buyPrice > 0 ? `<button onclick="buyHouse('${h.id}')" class="btn ${isOwned ? 'btn-green' : 'btn-amber'} btn-sm" ${isOwned \vert{}\vert{} isLocked ? 'disabled' : ''}>${isOwned ? 'Выкуплено' : `Купить (${(h.buyPrice/1000000).toFixed(1)}M ₽)`}</button>` : ''}
+                    ${rentBtn}
+                    ${buyBtn}
                 </div>
             </div>`; 
         }).join('');
