@@ -69,7 +69,7 @@
                     </span>
                   </div>
                 </div>
-                <!-- ВЕРХНЯЯ НАВИГАЦИЯ -->
+                <!-- ВЕРХНИЙ ГОРИЗОНТАЛЬНЫЙ СУБ-НАВ -->
                 <div class="sub-nav">
                   <button onclick="switchTab('tabMarket')" id="topBtn-tabMarket" class="sub-nav-btn active">
                     <i class="fa-solid fa-store">
@@ -508,11 +508,15 @@
                                                                                                   <div class="sub-label mb-2">Очистите карму добрыми делами.</div>
                                                                                                   <button onclick="donateForKarma()" class="btn btn-dark w-full">Пожертвовать 50,000 ₽ (+10 Карма 😇)</button>
                                                                                                 </div>
+                                                                                                <!-- РАЦИОН ПИТАНИЯ (ВОССТАНОВЛЕН ПОЛНОСТЬЮ С ДЕТАЛЯМИ ИЗ DATA.JS) -->
                                                                                                 <div class="glass-card mb-3">
-                                                                                                  <h3 class="mb-1">
-                                                                                                    <i class="fa-solid fa-utensils color-green">
-                                                                                                    </i> Рацион питания</h3>
-                                                                                                    <p class="sub-label mb-2">Списание за питание происходит 3 раза в день при смене суток.</p>
+                                                                                                  <div class="flex-between mb-1">
+                                                                                                    <h3 class="color-green">
+                                                                                                      <i class="fa-solid fa-utensils">
+                                                                                                      </i> Рацион питания</h3>
+                                                                                                      <span class="tag-badge bg-tag-green">3 раза в день</span>
+                                                                                                    </div>
+                                                                                                    <p class="sub-label mb-2">Качественное питание даёт кураж в торгах и восстанавливает сытость.</p>
                                                                                                     <div class="space-y-2" id="dietList">
                                                                                                     </div>
                                                                                                   </div>
@@ -600,7 +604,7 @@
                                                                                                           </div>
                                                                                                         </div>
                                                                                                       </section>
-                                                                                                      <!-- TAB: ИМПЕРИЯ -->
+                                                                                                      <!-- TAB: ИМПЕРИЯ (ВОССТАНОВЛЕНА С БИЗНЕСАМИ И ПЕРКАМИ ИЗ DATA.JS) -->
                                                                                                       <section id="tabBusiness" class="tab-screen">
                                                                                                         <div id="businessActiveBox">
                                                                                                           <div class="glass-card flex-between mb-2">
@@ -608,7 +612,7 @@
                                                                                                               <h3>
                                                                                                                 <i class="fa-solid fa-building color-cyan">
                                                                                                                 </i> Автобизнесы & Империя</h3>
-                                                                                                                <p class="sub-label mt-1">Максимальный уровень: <b>10</b>. Выплата средств: <b>15-го и 30-го числа</b>.</p>
+                                                                                                                <p class="sub-label mt-1">Максимальный уровень: <b>10</b>. Выплата средств: <b>15-го и 30-го числа</b> каждого месяца.</p>
                                                                                                               </div>
                                                                                                             </div>
                                                                                                             <div class="glass-card mb-2">
@@ -633,12 +637,16 @@
                                                                                                             <p class="sub-label mt-1">Требуется минимум <b>5 уровень авторитета</b>!</p>
                                                                                                           </div>
                                                                                                         </section>
-                                                                                                        <!-- TAB: КОНТЕЙНЕРЫ -->
+                                                                                                        <!-- TAB: КОНТЕЙНЕРЫ (ВОССТАНОВЛЕНЫ С КАРТИНКАМИ И БЕЙДЖАМИ ИЗ DATA.JS) -->
                                                                                                         <section id="tabContainers" class="tab-screen">
                                                                                                           <div class="glass-card" id="containersCardContainer">
-                                                                                                            <h3>
-                                                                                                              <i class="fa-solid fa-box-open color-purple">
-                                                                                                              </i> Портовые Контейнеры</h3>
+                                                                                                            <div class="flex-between mb-2">
+                                                                                                              <h3>
+                                                                                                                <i class="fa-solid fa-box-open color-purple">
+                                                                                                                </i> Портовые Контейнеры</h3>
+                                                                                                                <span class="tag-badge bg-tag-purple">Таможня</span>
+                                                                                                              </div>
+                                                                                                              <p class="sub-label mb-3">Прямые поставки аукционной техники со всего мира.</p>
                                                                                                               <div id="containersListRender">
                                                                                                               </div>
                                                                                                               <div id="containersLockCover" class="level-lock-cover" style="display:none;">
@@ -649,15 +657,16 @@
                                                                                                               </div>
                                                                                                             </div>
                                                                                                           </section>
-                                                                                                          <!-- TAB: ЗАКАЗЫ -->
+                                                                                                          <!-- TAB: ЗАКАЗЫ (ВОССТАНОВЛЕНЫ ПОЛНОСТЬЮ) -->
                                                                                                           <section id="tabContracts" class="tab-screen">
                                                                                                             <div class="glass-card" id="contractsCardContainer">
                                                                                                               <div class="flex-between mb-1">
                                                                                                                 <h3>
                                                                                                                   <i class="fa-solid fa-file-contract color-cyan">
                                                                                                                   </i> Заказы Синдиката</h3>
-                                                                                                                  <button onclick="refreshContractsManual()" class="btn btn-dark btn-auto btn-sm">Обновить</button>
+                                                                                                                  <button onclick="refreshContractsManual()" class="btn btn-dark btn-auto btn-sm" id="btnRefreshContracts">Обновить</button>
                                                                                                                 </div>
+                                                                                                                <p class="sub-label mb-3">Подбирайте авто нужного класса под запросы клиентов за солидную комиссию.</p>
                                                                                                                 <div id="contractsList">
                                                                                                                 </div>
                                                                                                                 <div id="contractsLockCover" class="level-lock-cover" style="display:none;">
@@ -668,18 +677,21 @@
                                                                                                                 </div>
                                                                                                               </div>
                                                                                                             </section>
-                                                                                                            <!-- TAB: САРАИ -->
+                                                                                                            <!-- TAB: САРАИ (ВОССТАНОВЛЕНЫ С КАРТИНКАМИ И ТАЙМИНГАМИ ИЗ DATA.JS) -->
                                                                                                             <section id="tabBarn" class="tab-screen">
                                                                                                               <div class="glass-card mb-3">
-                                                                                                                <h3>
-                                                                                                                  <i class="fa-solid fa-screwdriver-wrench color-amber">
-                                                                                                                  </i> Гаражные Находки</h3>
-                                                                                                                  <p class="sub-label mb-2">Отыщите раритет под восстановление. Разведка доступна 1 раз в день.</p>
+                                                                                                                <div class="flex-between mb-1">
+                                                                                                                  <h3>
+                                                                                                                    <i class="fa-solid fa-screwdriver-wrench color-amber">
+                                                                                                                    </i> Гаражные Находки</h3>
+                                                                                                                    <span class="tag-badge bg-tag-amber">1 раз в день</span>
+                                                                                                                  </div>
+                                                                                                                  <p class="sub-label mb-3">Отыщите брошенный раритет под восстановление. Разведка стоит 50,000 ₽.</p>
                                                                                                                   <div id="barnFindContent">
                                                                                                                   </div>
                                                                                                                 </div>
                                                                                                               </section>
-                                                                                                              <!-- TAB: ЖИЛЬЁ -->
+                                                                                                              <!-- TAB: ЖИЛЬЁ (ВОССТАНОВЛЕНО ПОЛНОСТЬЮ С ФОТО И БОНУСАМИ ИЗ DATA.JS) -->
                                                                                                               <section id="tabHousing" class="tab-screen">
                                                                                                                 <div class="glass-card mb-2">
                                                                                                                   <div class="flex-between mb-1">
@@ -688,6 +700,7 @@
                                                                                                                       </i> Рынок Недвижимости</h3>
                                                                                                                       <span class="tag-badge bg-tag-cyan" id="currentHomeText">Текущее: Комната</span>
                                                                                                                     </div>
+                                                                                                                    <p class="sub-label">Покупка или аренда расширяет гараж и повышает настроение каждый день.</p>
                                                                                                                   </div>
                                                                                                                   <div id="housingMarketList">
                                                                                                                   </div>
@@ -1119,7 +1132,7 @@
                                                                                                                                             </div>
                                                                                                                                           </div>
                                                                                                                                           <div id="toastNotification" class="toast">Уведомление</div>
-                                                                                                                                          <!-- JS КОД ИГРЫ И ВСЕ МЕХАНИКИ -->
+                                                                                                                                          <!-- JS КОД И ВСЕ МЕХАНИКИ -->
                                                                                                                                           <script>
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     let audioCtx = null;
@@ -1233,7 +1246,7 @@
 
     function sanitizeState() {
         try { 
-            const saved = localStorage.getItem('perekoop_sim_save_v33'); 
+            const saved = localStorage.getItem('perekoop_sim_save_v34'); 
             if (saved) {
                 const parsed = JSON.parse(saved);
                 state.player = { ...DEFAULT_STATE.player, ...(parsed.player || {}) };
@@ -1294,7 +1307,7 @@
         if(loanEl) loanEl.innerText = `Долг: ${state.player.loanDebt.toLocaleString()} ₽`;
     }
 
-    function saveState() { try { localStorage.setItem('perekoop_sim_save_v33', JSON.stringify(state)); } catch(e) {} updateHeaderUI(); }
+    function saveState() { try { localStorage.setItem('perekoop_sim_save_v34', JSON.stringify(state)); } catch(e) {} updateHeaderUI(); }
 
     function getMarketRefreshCost() { return 150 + (state.player.level * 350); }
 
@@ -1320,7 +1333,7 @@
         if (tabId === 'tabMarket') document.getElementById('bnav-tabMarket')?.classList.add('active');
         else if (tabId === 'tabGarage') document.getElementById('bnav-tabGarage')?.classList.add('active');
         else if (tabId === 'tabSalesLot') document.getElementById('bnav-tabSalesLot')?.classList.add('active');
-        else if (tabId === 'tabLife' || tabId === 'tabHousing' || tabId === 'tabContainers' || tabId === 'tabContracts' || tabId === 'tabBarn' || tabId === 'tabPlates' || tabId === 'tabReshala') document.getElementById('bnav-tabLife')?.classList.add('active');
+        else if (tabId === 'tabLife' || tabId === 'tabHousing' || tabId === 'tabContainers' || tabId === 'tabContracts' || tabId === 'tabBarn' || tabId === 'tabPlates' || tabId === 'tabReshala' || tabId === 'tabServices') document.getElementById('bnav-tabLife')?.classList.add('active');
         else if (tabId === 'tabSyndicate') document.getElementById('bnav-tabSyndicate')?.classList.add('active');
 
         if (tabId === 'tabGarage') { renderGarage(); checkBarterEvent(); }
@@ -1515,7 +1528,7 @@
         if (state.garage.length === 0) { list.innerHTML = `<div class="glass-card text-center sub-label py-8"><i class="fa-solid fa-warehouse color-cyan mb-2" style="font-size:32px;"></i><div>Гараж пуст. Выберите технику на авторынке или P2P!</div></div>`; return; }
         list.innerHTML = state.garage.map((car, idx) => {
             const cost = car.purchaseCost || car.basePrice || 100000;
-            return `<div class="glass-card mb-3 ${car.hiddenDefect && !car.hasAdditive ? 'card-danger' : ''}"><div class="car-img-wrap" style="height: 140px;"><img src="${car.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'"><div class="badge-tag" style="bottom: 8px; right: 8px;">${(car.type || 'car').toUpperCase()}</div><div class="plate-corner"><div class="license-plate">${car.customPlate || car.plate} <div class="license-flag">RUS</div></div></div></div><div class="flex-between mb-2"><div><h4 class="font-bold">${car.name}</h4><div class="sub-label">${car.power || 100} л.с. | Пробег: ${(car.mileage || 85000).toLocaleString()} км | Сост: ${car.condition || 85}%</div><div class="text-xs color-amber mt-1">Куплена за: <b>${cost.toLocaleString()} ₽</b></div></div><div class="text-right"><div class="sub-label">Оценка:</div><div class="price-val">${(car.marketValue || car.price).toLocaleString()} ₽</div></div></div>${car.hiddenDefect ? `<div class="legal-warning mb-2"><span>⚠ <b>${car.hasAdditive ? 'Присадка залита' : car.hiddenDefect.text}</b></span><button onclick="repairCarDefect(${idx})" class="btn btn-amber btn-auto btn-sm">Капиталка (${car.hiddenDefect.cost.toLocaleString()} ₽)</button></div>` : ''}${car.impounded ? `<div class="legal-warning mb-2"><span>🚨 <b>НА ШТРАФСТОЯНКЕ</b></span><button onclick="unimpoundCar(${idx})" class="btn btn-cyan btn-auto btn-sm">Вызволить (1 🤝 или 100k ₽)</button></div>` : ''}<div class="grid-2 mb-2"><button onclick="openPreviewModal(${idx})" class="btn btn-dark">🔍 Осмотр & Звук</button><button onclick="openPreSaleModal(${idx})" class="btn btn-dark" ${car.impounded ? 'disabled' : ''}>🪄 Предпродажка</button></div><div class="grid-2 mb-2"><button onclick="openTuningModal(${idx})" class="btn btn-dark" ${car.impounded ? 'disabled' : ''}>🛠 Тюнинг</button><button onclick="openPutOnLotModal(${idx})" class="btn btn-green" ${car.impounded ? 'disabled' : ''}>🏪 На площадку</button></div><button onclick="scrapCar(${idx})" class="btn btn-dark btn-sm w-full">Сдать на разборку (-35% стоимости)</button></div>`;
+            return `<div class="glass-card mb-3 ${car.hiddenDefect && !car.hasAdditive ? 'card-danger' : ''}"><div class="car-img-wrap" style="height: 140px;"><img src="${car.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'"><div class="badge-tag" style="bottom: 8px; right: 8px;">${(car.type || 'car').toUpperCase()}</div><div class="plate-corner"><div class="license-plate">${car.customPlate || car.plate} <div class="license-flag">RUS</div></div></div></div><div class="flex-between mb-2"><div><h4 class="font-bold">${car.name}</h4><div class="sub-label">${car.power || 100} л.с. | Пробег: ${(car.mileage || 85000).toLocaleString()} км | Сост: ${car.condition || 85}%</div><div class="text-xs color-amber mt-1">Куплена за: <b>${cost.toLocaleString()} ₽</b></div></div><div class="text-right"><div class="price-val">${(car.marketValue || car.price).toLocaleString()} ₽</div></div></div>${car.hiddenDefect ? `<div class="legal-warning mb-2"><span>⚠ <b>${car.hasAdditive ? 'Присадка залита' : car.hiddenDefect.text}</b></span><button onclick="repairCarDefect(${idx})" class="btn btn-amber btn-auto btn-sm">Капиталка (${car.hiddenDefect.cost.toLocaleString()} ₽)</button></div>` : ''}${car.impounded ? `<div class="legal-warning mb-2"><span>🚨 <b>НА ШТРАФСТОЯНКЕ</b></span><button onclick="unimpoundCar(${idx})" class="btn btn-cyan btn-auto btn-sm">Вызволить (1 🤝 или 100k ₽)</button></div>` : ''}<div class="grid-2 mb-2"><button onclick="openPreviewModal(${idx})" class="btn btn-dark">🔍 Осмотр & Звук</button><button onclick="openPreSaleModal(${idx})" class="btn btn-dark" ${car.impounded ? 'disabled' : ''}>🪄 Предпродажка</button></div><div class="grid-2 mb-2"><button onclick="openTuningModal(${idx})" class="btn btn-dark" ${car.impounded ? 'disabled' : ''}>🛠 Тюнинг</button><button onclick="openPutOnLotModal(${idx})" class="btn btn-green" ${car.impounded ? 'disabled' : ''}>🏪 На площадку</button></div><button onclick="scrapCar(${idx})" class="btn btn-dark btn-sm w-full">Сдать на разборку (-35% стоимости)</button></div>`;
         }).join('');
         if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
     }
@@ -1619,7 +1632,7 @@
         saveState(); renderGarage(); renderSalesLot(); switchTab('tabSalesLot');
     }
 
-    // ===================== НОВАЯ ЛОГИКА УСКОРЕНИЯ ПЛОЩАДКИ ПРОДАЖ =====================
+    // ===================== УСКОРЕНИЕ ПЛОЩАДКИ ПРОДАЖ =====================
     function renderSalesLot() {
         const list = document.getElementById('salesLotList'); if (!list) return; 
         setTxt('lotCountBadge', `${state.salesLot.length} авто на продаже`);
@@ -1694,7 +1707,7 @@
         saveState(); renderSalesLot();
         openVerdictModal("СДЕЛКА ЗАКРЫТА! 🎉", `${buyer.name} купил автомобиль!`, true, buyer.offerPrice, netProfit);
     }
-    function rejectBuyerDeal(idx) { state.salesLot[idx].currentBuyer = null; state.salesLot[idx].timer = 25; saveState(); renderSalesLot(); showToast("Ждем следующего покупателя..."); }
+    function rejectBuyerDeal(idx) { const slot = state.salesLot[idx]; slot.currentBuyer = null; slot.timer = 25; saveState(); renderSalesLot(); showToast("Ждем следующего покупателя..."); }
     function withdrawFromLot(idx) { const slot = state.salesLot.splice(idx, 1)[0]; state.garage.push(slot.car); saveState(); renderGarage(); renderSalesLot(); showToast("Автомобиль возвращен в бокс."); }
 
     // ===================== ТЕНЕВЫЕ СВЯЗИ (РЕШАЛА АРТУР) =====================
@@ -2331,7 +2344,7 @@
     }
 
     // СТРИТ АРЕНА
-    let isRacing = false; let racePos = 0; let raceInterval = null; let raceDuelInterval = null; let currentRaceDifficulty = 'easy'; let playerTrackPos = 0; let oppTrackPos = 0;
+    let isRacing = false; let racePos = 0; let raceInterval = null; let raceDuelInterval = null; let currentRaceDifficulty = 'easy'; let playerTrackPos = 0; oppTrackPos = 0;
     function resetRaceState() { if (raceInterval) clearInterval(raceInterval); if (raceDuelInterval) clearInterval(raceDuelInterval); isRacing = false; racePos = 0; playerTrackPos = 0; oppTrackPos = 0; }
     function initStreetView() { resetRaceState(); updateStreetCarSelector(); }
     function updateStreetCarSelector() {
@@ -2387,47 +2400,330 @@
     }
     function buyPlateFromShop(plate, price) { if (state.player.cash < price) return showToast("Не хватает денег!"); state.player.cash -= price; state.ownedPlates.push(plate); saveState(); renderPlatesPage(); showToast("Номер куплен!"); }
 
-    function renderContainersList() {
-        const r = document.getElementById('containersListRender'); if (!r || typeof CONTAINER_ITEMS === 'undefined') return;
-        r.innerHTML = CONTAINER_ITEMS.map(item => `<div class="glass-card mb-2"><div class="flex-between"><b>${item.name}</b><span class="color-green font-bold">${item.cost.toLocaleString()} ₽</span></div><p class="sub-label mb-2">${item.desc}</p><button onclick="openContainer('${item.id}', ${item.cost})" class="btn btn-cyan btn-sm">Открыть</button></div>`).join('');
-    }
-    function openContainer(type, price) { if (state.player.cash < price) return showToast("Не хватает денег!"); state.player.cash -= price; state.garage.push({ id: 'c_' + Date.now(), name: "Lexus RX 350", power: 300, type: "premium", basePrice: price, price: price, marketValue: price * 1.2, img: "assets/cars/premium/rx350.jpg", plate: generateCoolPlate(), customPlate: generateCoolPlate(), condition: 100 }); saveState(); renderGarage(); openVerdictModal("КОНТЕЙНЕР", "Выпал Lexus RX 350!", true); }
+    // ========================================================
+    // ВОССТАНОВЛЕНИЕ: ПОЛНЫЙ КРАСИВЫЙ РЕНДЕР С КАРТИНКАМИ (DATA.JS)
+    // ========================================================
 
-    function renderHousing() {
-        const l = document.getElementById('housingMarketList'); if (!l || typeof HOUSING_LIST === 'undefined') return;
-        l.innerHTML = HOUSING_LIST.map(h => `<div class="glass-card mb-2"><div class="flex-between"><b>${h.name}</b><span>+${h.slots} боксов</span></div><button onclick="rentHouse('${h.id}')" class="btn btn-dark btn-sm mt-2">Аренда (${h.rent.toLocaleString()} ₽/д)</button></div>`).join('');
+    // 1. РЕНДЕР КОНТЕЙНЕРОВ
+    function renderContainersList() {
+        const r = document.getElementById('containersListRender');
+        const lock = document.getElementById('containersLockCover');
+        if (state.player.level < 20) {
+            if (r) r.style.display = 'none';
+            if (lock) lock.style.display = 'block';
+            return;
+        }
+        if (lock) lock.style.display = 'none';
+        if (!r || typeof CONTAINER_ITEMS === 'undefined') return;
+        r.style.display = 'block';
+
+        r.innerHTML = CONTAINER_ITEMS.map(item => `
+            <div class="glass-card mb-3">
+                <div class="car-img-wrap" style="height: 140px;">
+                    <img src="${item.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80'">
+                    <div class="badge-tag">${item.badge}</div>
+                </div>
+                <div class="flex-between mb-1">
+                    <h4 class="font-bold">${item.name}</h4>
+                    <div class="price-val">${item.cost.toLocaleString()} ₽</div>
+                </div>
+                <p class="sub-label mb-3">${item.desc}</p>
+                <button onclick="openContainer('${item.id}', ${item.cost})" class="btn btn-cyan w-full">
+                    Открыть контейнер (Таймер ${item.timer}с)
+                </button>
+            </div>
+        `).join('');
     }
-    function rentHouse(id) { state.player.housingId = id; saveState(); renderHousing(); renderGarage(); showToast("Вы переехали!"); }
+
+    function openContainer(type, price) {
+        if (state.player.cash < price) return showToast("Не хватает денег!");
+        if (state.garage.length >= getTotalGarageSlots()) return showToast("Гараж полон!");
+        state.player.cash -= price;
+        showToast("🚢 Контейнер вскрывается...");
+        setTimeout(() => {
+            let won = {
+                id: 'c_' + Date.now(),
+                name: "Lexus RX 350",
+                power: 300,
+                type: "premium",
+                basePrice: price,
+                price: price,
+                marketValue: Math.round(price * 1.25),
+                img: "assets/cars/premium/rx350.jpg",
+                plate: generateCoolPlate(),
+                customPlate: generateCoolPlate(),
+                condition: 100,
+                wear: { engine: 100, transmission: 100 },
+                tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 }
+            };
+            if (type === 'dubai') {
+                won.name = "Porsche 911 GT3 RS";
+                won.power = 525;
+                won.type = "hyper";
+                won.img = "assets/cars/hyper/911.jpg";
+            }
+            state.garage.push(won);
+            saveState(); renderGarage();
+            openVerdictModal("КОНТЕЙНЕР ВСКРЫТ! 🎁", `В контейнере: «${won.name}»!`, true);
+        }, 1500);
+    }
+
+    // 2. РЕНДЕР ЗАКАЗОВ
+    function generateContracts() {
+        state.contracts = [
+            { id: 'cnt_1', title: 'Подобрать Солярис/Рио', reward: 75000, req: 'economy' },
+            { id: 'cnt_2', title: 'Найти живую Октавию/Камри', reward: 180000, req: 'comfort' },
+            { id: 'cnt_3', title: 'Гелик/БМВ для авторитета', reward: 950000, req: 'premium' }
+        ];
+    }
+
+    function renderContracts() {
+        const c = document.getElementById('contractsList');
+        const lock = document.getElementById('contractsLockCover');
+        if (state.player.level < 15) {
+            if (c) c.style.display = 'none';
+            if (lock) lock.style.display = 'block';
+            return;
+        }
+        if (lock) lock.style.display = 'none';
+        if (!c) return;
+        c.style.display = 'block';
+
+        if (state.contracts.length === 0) {
+            c.innerHTML = `<div class="sub-label text-center py-4">Все заказы выполнены! Нажмите «Обновить».</div>`;
+            return;
+        }
+
+        c.innerHTML = state.contracts.map((cnt, i) => `
+            <div class="glass-card mb-2" style="border-left: 3px solid var(--cyan);">
+                <div class="flex-between mb-1">
+                    <b class="color-cyan"><i class="fa-solid fa-user-tie"></i> ${cnt.title}</b>
+                    <span class="tag-badge bg-tag-amber">+${cnt.reward.toLocaleString()} ₽</span>
+                </div>
+                <p class="sub-label mb-2">Требуемый класс авто: <b>${cnt.req.toUpperCase()}</b></p>
+                <button onclick="completeContract(${i})" class="btn btn-dark btn-sm w-full">
+                    <i class="fa-solid fa-car-side"></i> Отдать подходящее авто из гаража
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function completeContract(idx) {
+        const cnt = state.contracts[idx];
+        const carIdx = state.garage.findIndex(c => c.type === cnt.req && !c.impounded);
+        if (carIdx === -1) return showToast(`В гараже нет свободного авто класса ${cnt.req.toUpperCase()}!`);
+        const car = state.garage[carIdx];
+        state.garage.splice(carIdx, 1);
+        state.player.cash += cnt.reward;
+        state.contracts.splice(idx, 1);
+        saveState(); renderGarage(); renderContracts();
+        openVerdictModal("ЗАКАЗ ВЫПОЛНЕН! 🎉", `Вы подобрали и передали ${car.name}. Оплата +${cnt.reward.toLocaleString()} ₽.`, true, cnt.reward);
+    }
+
+    function refreshContractsManual() {
+        generateContracts();
+        renderContracts();
+        showToast("Заказы обновлены!");
+    }
+
+    // 3. РЕНДЕР САРАЕВ (ГАРАЖНЫХ НАХОДОК)
+    function renderBarnFind() {
+        const b = document.getElementById('barnFindContent');
+        if (!b || typeof BARN_FINDS === 'undefined') return;
+
+        const canExplore = (state.player.lastBarnDay || 0) < state.player.day;
+
+        b.innerHTML = BARN_FINDS.map((barn, i) => `
+            <div class="barn-tier-card">
+                <div class="flex-between mb-1">
+                    <b class="color-amber">${barn.name}</b>
+                    <span class="tag-badge bg-tag-amber">Оценка: ~${barn.marketValue.toLocaleString()} ₽</span>
+                </div>
+                <div class="car-img-wrap" style="height: 110px; opacity: 0.85; filter: grayscale(0.4);">
+                    <img src="${barn.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'">
+                </div>
+                <button onclick="exploreBarn(${i})" class="btn btn-dark w-full btn-sm" ${!canExplore ? 'disabled' : ''}>
+                    ${canExplore ? 'Разведать сарай (50,000 ₽)' : 'Разведка будет доступна завтра'}
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function exploreBarn(idx) {
+        if ((state.player.lastBarnDay || 0) >= state.player.day) return showToast("Разведка сараев доступна только 1 раз в игровой день!");
+        if (state.player.cash < 50000) return showToast("Не хватает 50,000 ₽ на разведку!");
+        if (state.garage.length >= getTotalGarageSlots()) return showToast("В гараже нет свободного места!");
+
+        state.player.cash -= 50000;
+        state.player.lastBarnDay = state.player.day;
+
+        const template = BARN_FINDS[idx];
+        const foundCar = {
+            id: 'barn_' + Date.now(),
+            name: template.name,
+            power: template.power,
+            type: template.type,
+            basePrice: template.basePrice,
+            price: template.basePrice,
+            purchaseCost: 50000,
+            baseMarketValue: template.marketValue,
+            marketValue: Math.round(template.marketValue * 0.25),
+            img: template.img,
+            plate: generateNormalPlate(),
+            customPlate: generateNormalPlate(),
+            isStolen: false,
+            condition: 20,
+            wear: { engine: 20, transmission: 20 },
+            tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 },
+            bodyThickness: { hood: 800, roof: 140, doors: 600, wings: 900 },
+            hiddenDefect: { text: "Машина долго стояла. Мотор троит, подвеска сыпется.", cost: Math.round(template.basePrice * 0.4), severity: "Критическая" },
+            isRepainted: false,
+            isPolished: false
+        };
+
+        state.garage.push(foundCar);
+        saveState(); renderBarnFind(); renderGarage();
+        openVerdictModal("НАХОДКА! 🏚️", `Вы откопали ${template.name}! Автомобиль доставлен в гараж, но требует полного ремонта.`, true);
+    }
+
+    // 4. РЕНДЕР ЖИЛЬЯ
+    function renderHousing() {
+        const list = document.getElementById('housingMarketList');
+        if (!list || typeof HOUSING_LIST === 'undefined') return;
+
+        list.innerHTML = HOUSING_LIST.map(h => {
+            const isCurrent = state.player.housingId === h.id;
+            const isOwned = state.player.ownedHouses && state.player.ownedHouses.includes(h.id);
+            const isLocked = state.player.level < h.minLevel;
+
+            let rentBtn = '';
+            if (h.rent > 0 && !isOwned) {
+                let rClass = (isCurrent && state.player.housingType === 'rent') ? 'btn-cyan' : 'btn-dark';
+                rentBtn = `<button onclick="rentHouse('${h.id}')" class="btn ${rClass} btn-sm" ${isLocked ? 'disabled' : ''}>Аренда (${h.rent.toLocaleString()} ₽/д)</button>`;
+            }
+
+            let buyBtn = '';
+            if (h.buyPrice > 0) {
+                let bClass = isOwned ? 'btn-green' : 'btn-amber';
+                let bText = isOwned ? 'Выкуплено' : `Купить (${(h.buyPrice / 1000000).toFixed(1)}M ₽)`;
+                buyBtn = `<button onclick="buyHouse('${h.id}')" class="btn ${bClass} btn-sm" ${isOwned || isLocked ? 'disabled' : ''}>${bText}</button>`;
+            }
+
+            return `
+            <div class="glass-card mb-3" style="${isCurrent ? 'border-color:var(--cyan);' : ''}">
+                <div class="car-img-wrap" style="height: 125px; ${isLocked ? 'filter: grayscale(1); opacity: 0.7;' : ''}">
+                    <img src="${h.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1513828583688-c52646db42da?auto=format&fit=crop&w=400&q=80'">
+                    <div class="badge-tag">${isOwned ? 'В СОБСТВЕННОСТИ' : 'АРЕНДА'}</div>
+                    ${isLocked ? `<div class="cooldown-timer" style="display:flex; font-size:14px; opacity:1;"><i class="fa-solid fa-lock mr-2"></i>С ${h.minLevel} УР</div>` : ''}
+                </div>
+                <div class="flex-between mb-1">
+                    <h4 class="font-bold">${h.name} ${isCurrent ? '🏠 (Вы здесь)' : ''}</h4>
+                </div>
+                <div class="sub-label mb-2">+${h.slots} боксов гаража | +${h.moodBonus}% к настроению в день</div>
+                <div class="grid-2">
+                    ${rentBtn}
+                    ${buyBtn}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function rentHouse(id) {
+        state.player.housingId = id;
+        state.player.housingType = 'rent';
+        saveState(); renderHousing(); renderGarage();
+        showToast("Вы переехали! Вместимость гаража пересчитана.");
+    }
+
+    function buyHouse(id) {
+        const house = HOUSING_LIST.find(h => h.id === id);
+        if (!house) return;
+        if (state.player.cash < house.buyPrice) return showToast("Не хватает денег на покупку!");
+        state.player.cash -= house.buyPrice;
+        state.player.ownedHouses.push(id);
+        state.player.housingId = id;
+        state.player.housingType = 'owned';
+        saveState(); renderHousing(); renderGarage();
+        openVerdictModal("🎉 НЕДВИЖИМОСТЬ КУПЛЕНА!", `Вы стали собственником «${house.name}»! Боксы закреплены навсегда.`, true);
+    }
+
+    // 5. РЕНДЕР РАЦИОНА ПИТАНИЯ
+    function renderDiets() {
+        const dietList = document.getElementById('dietList');
+        if (!dietList || typeof DIETS === 'undefined') return;
+
+        dietList.innerHTML = DIETS.map(d => `
+            <div class="glass-card flex-between p-2 mb-2">
+                <div>
+                    <div class="font-bold text-xs">${d.name}</div>
+                    <div class="sub-label mb-1">${d.desc}</div>
+                    <div class="text-xs color-green">+${d.hunger} сытости | ${d.mood > 0 ? '+' : ''}${d.mood} куража</div>
+                </div>
+                <button onclick="selectDiet('${d.id}')" class="btn ${state.player.diet === d.id ? 'btn-green' : 'btn-dark'} btn-sm btn-auto" style="min-width: 85px;">
+                    ${state.player.diet === d.id ? 'Выбрано' : (d.cost === 0 ? 'Бесплатно' : d.cost.toLocaleString() + ' ₽')}
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function selectDiet(id) {
+        state.player.diet = id;
+        saveState(); renderDiets();
+        showToast("Рацион питания успешно изменен!");
+    }
+
+    // 6. РЕНДЕР ИМПЕРИИ
+    function checkBusinessAccess() {
+        const c = document.getElementById('businessList');
+        const lock = document.getElementById('businessLockCover');
+        const activeBox = document.getElementById('businessActiveBox');
+        if (state.player.level < 5) {
+            if (activeBox) activeBox.style.display = 'none';
+            if (lock) lock.style.display = 'block';
+            return;
+        }
+        if (lock) lock.style.display = 'none';
+        if (activeBox) activeBox.style.display = 'block';
+        if (!c || typeof BUSINESS_DATA === 'undefined') return;
+
+        let totalNet = 0;
+        c.innerHTML = state.businesses.map((b, i) => {
+            const isMax = b.level >= 10;
+            const cost = b.level === 0 ? b.cost : b.cost * (b.level + 1);
+            totalNet += b.level * cost;
+
+            return `
+            <div class="glass-card mb-2">
+                <div class="flex-between mb-1">
+                    <b class="text-xs">${b.name}</b> 
+                    <span class="tag-badge bg-tag-cyan">${isMax ? 'MAX УРОВЕНЬ' : 'Ур. ' + b.level}</span>
+                </div>
+                <div class="sub-label mb-1">Доход: ${(b.income * b.level).toLocaleString()} ₽ / смена</div>
+                <div class="sub-label color-amber mb-2" style="font-style:italic;">⭐ Перк: ${b.perk || 'Пассивный доход'}</div>
+                ${b.level > 0 ? `<div class="color-green text-xs font-bold mb-2">Накоплено в кассе: ${(b.stored || 0).toLocaleString()} ₽</div>` : ''}
+                <button onclick="upgradeBusiness(${i})" class="btn ${isMax ? 'btn-dark' : 'btn-cyan'} btn-sm" ${isMax ? 'disabled' : ''}>
+                    ${isMax ? 'Улучшено до максимума' : (b.level === 0 ? 'Купить ('+cost.toLocaleString()+' ₽)' : 'Улучшить ('+cost.toLocaleString()+' ₽)')}
+                </button>
+            </div>`;
+        }).join('');
+        setTxt('netWorthText', totalNet.toLocaleString() + ' ₽');
+    }
+
+    function upgradeBusiness(idx) {
+        const b = state.businesses[idx];
+        if (b.level >= 10) return showToast("Бизнес достиг максимума!");
+        const cost = b.level === 0 ? b.cost : b.cost * (b.level + 1);
+        if (state.player.cash < cost) return showToast("Не хватает денег!");
+        state.player.cash -= cost;
+        b.level += 1;
+        saveState(); checkBusinessAccess();
+        showToast(`Бизнес «${b.name}» прокачан до ${b.level} уровня!`);
+    }
 
     function setCheatLevel(lvl) { state.player.level = lvl; updateLevelGatesUI(); updateHeaderUI(); saveState(); showToast(`Уровень ${lvl}`); }
     function cheatAddMoney() { state.player.cash += 10000000; updateHeaderUI(); saveState(); showToast("+10M ₽"); }
-    function cheatAddStats() { state.player.hunger = 100; state.player.mood = 100; updateHeaderUI(); saveState(); showToast("100%!"); }
+    function cheatAddStats() { state.player.hunger = 100; state.player.mood = 100; state.player.reputation = 100; updateHeaderUI(); saveState(); showToast("100%!"); }
     function updateLevelGatesUI() {}
-
-    function renderDiets() {
-        const l = document.getElementById('dietList'); if (!l || typeof DIETS === 'undefined') return;
-        l.innerHTML = DIETS.map(d => `<div class="glass-card flex-between p-2 mb-1"><span>${d.name}</span><button onclick="selectDiet('${d.id}')" class="btn btn-dark btn-auto btn-sm">${d.cost.toLocaleString()} ₽</button></div>`).join('');
-    }
-    function selectDiet(id) { state.player.diet = id; saveState(); showToast("Рацион изменен!"); }
-
-    function generateContracts() {
-        state.contracts = [{ id: 'cnt_1', title: 'Подобрать Солярис', reward: 75000, req: 'economy' }];
-    }
-    function renderContracts() {
-        const c = document.getElementById('contractsList'); if (!c) return;
-        c.innerHTML = state.contracts.map(cnt => `<div class="glass-card mb-2"><div class="flex-between"><b>${cnt.title}</b><span class="color-green font-bold">+${cnt.reward.toLocaleString()} ₽</span></div></div>`).join('');
-    }
-    function refreshContractsManual() { generateContracts(); renderContracts(); }
-
-    function renderBarnFind() {
-        const b = document.getElementById('barnFindContent'); if (!b || typeof BARN_FINDS === 'undefined') return;
-        b.innerHTML = BARN_FINDS.map(barn => `<div class="glass-card mb-2"><div class="flex-between"><b>${barn.name}</b><span>~${barn.marketValue.toLocaleString()} ₽</span></div></div>`).join('');
-    }
-
-    function checkBusinessAccess() {
-        const c = document.getElementById('businessList'); if (!c) return;
-        c.innerHTML = state.businesses.map(b => `<div class="glass-card mb-2"><div class="flex-between"><b>${b.name}</b><span>Ур. ${b.level}</span></div></div>`).join('');
-    }
 
     function openDailyBonusModal() { document.getElementById('modalDailyBonus')?.classList.add('active'); }
     function claimDailyReward() { state.player.cash += 50000; saveState(); closeModal('modalDailyBonus'); showToast("+50,000 ₽ бонус!"); }
@@ -2439,11 +2735,12 @@
         setTxt('statTotalNetProfit', state.player.stats.totalNetProfit.toLocaleString() + ' ₽');
     }
 
+    function doActivity(type, cost, mood, connections = 0) { if (state.player.cash < cost) return showToast("Не хватает денег!"); state.player.cash -= cost; state.player.mood = Math.min(100, state.player.mood + mood); if (connections) state.player.connections += connections; saveState(); showToast("Отдохнули!"); }
     function watchAdsgram() { state.player.cash += 25000; state.player.connections += 1; saveState(); showToast("+25k ₽ и +1 🤝"); }
     function buyPackWithStars(stars, cash) { state.player.cash += cash; saveState(); showToast(`+${cash.toLocaleString()} ₽`); }
     function buyVipProPass() { state.player.vipPro = true; saveState(); showToast("VIP активирован!"); }
     function refuelAction(type) { state.player.fuel = 100; saveState(); showToast("Бак 100 ⛽!"); }
-    function resetGameData() { localStorage.removeItem('perekoop_sim_save_v33'); location.reload(); }
+    function resetGameData() { localStorage.removeItem('perekoop_sim_save_v34'); location.reload(); }
 
     function initApp() {
         sanitizeState(); 
