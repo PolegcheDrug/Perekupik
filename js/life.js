@@ -93,7 +93,7 @@ saveState();
 renderGarage();
 openVerdictModal("VIN ОТМЫТ! 🔏", "Автомобиль теперь юридически чист во всех базах!", true);
 }
-// ===================== 2. ТЕНЕВОЙ КОНФИСКАТ (ФССП/ШТРАФСТОЯНКА) =====================
+// ===================== 2. ТЕНЕВОЙ КОНФИСКАТ =====================
 function generateConfiscatedCarLot() {
 if (typeof CAR_DATABASE === 'undefined') return;
 const isExclusive = Math.random() < 0.15;
@@ -112,12 +112,11 @@ const pool = CAR_DATABASE[chosenCat] || CAR_DATABASE.economy;
 template = pool[Math.floor(Math.random() * pool.length)];
 category = chosenCat;
 }
-const dynPrice = typeof getDynamicPrice === 'function' ? getDynamicPrice(template.basePrice, template.type) : template.basePrice;
+const dynPrice = template.basePrice || 350000;
 const discount = isExclusive ? 0.50 : 0.45;
 const buyPrice = Math.round(dynPrice * (1 - discount));
 const marketVal = Math.round(dynPrice * 1.15);
-const plate = isExclusive ? generateCoolPlate() : generateNormalPlate();
-const plateVal = typeof calculatePlateValue === 'function' ? calculatePlateValue(plate) : 0;
+const plate = isExclusive ? 'Е777КХ 77' : 'А123МР 77';
 state.confiscatedLot = {
 id: 'confiscated_' + Date.now(),
 name: template.name,
@@ -126,8 +125,8 @@ type: template.type || 'comfort',
 basePrice: template.basePrice,
 price: buyPrice,
 baseMarketValue: marketVal,
-marketValue: marketVal + plateVal,
-img: template.img,
+marketValue: marketVal + 250000,
+img: template.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
 plate: plate,
 customPlate: plate,
 isExclusive: isExclusive,
@@ -617,24 +616,31 @@ b.innerHTML = BARN_FINDS.map((barn, i) => `
   `).join('');
   }
   function exploreBarn(idx) {
-  if ((state.player.lastBarnDay || 0) >= state.player.day) return showToast("Разведка доступна 1 раз в игровой день!");
-  if (state.player.cash < 50000) return showToast("Не хватает 50,000 ₽ на разведку!");
-  if (state.garage.length >= getTotalGarageSlots()) return showToast("В гараже нет свободного места!");
+  if ((state.player.lastBarnDay || 0) >= state.player.day) {
+  return showToast("Разведка доступна только 1 раз в день!");
+  }
+  if (state.player.cash < 50000) {
+  return showToast("Не хватает 50,000 ₽ на разведку!");
+  }
+  const maxSlots = getTotalGarageSlots();
+  if (state.garage.length >= maxSlots) {
+  return showToast(`В гараже нет свободного места! Вместимость: ${maxSlots} мест.`);
+  }
   state.player.cash -= 50000;
   state.player.lastBarnDay = state.player.day;
   const template = BARN_FINDS[idx];
-  const plate = generateNormalPlate();
+  const plate = 'С777ВВ 77';
   const foundCar = {
   id: 'barn_' + Date.now(),
   name: template.name,
-  power: template.power,
-  type: template.type,
-  basePrice: template.basePrice,
-  price: template.basePrice,
+  power: template.power || 120,
+  type: template.type || 'economy',
+  basePrice: template.basePrice || 400000,
+  price: template.basePrice || 400000,
   purchaseCost: 50000,
-  baseMarketValue: template.marketValue,
-  marketValue: Math.round(template.marketValue * 0.35),
-  img: template.img,
+  baseMarketValue: template.marketValue || 800000,
+  marketValue: Math.round((template.marketValue || 800000) * 0.35),
+  img: template.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
   plate: plate,
   customPlate: plate,
   isStolen: false,
@@ -642,7 +648,7 @@ b.innerHTML = BARN_FINDS.map((barn, i) => `
   wear: { engine: 20, transmission: 20 },
   tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 },
   bodyThickness: { hood: 800, roof: 140, doors: 600, wings: 900 },
-  hiddenDefect: { text: "Долгий простой. Мотор троит, компрессия слабая.", cost: Math.round(template.basePrice * 0.35), severity: "Критическая" },
+  hiddenDefect: { text: "Долгий простой. Мотор троит, компрессия слабая.", cost: Math.round((template.basePrice || 400000) * 0.35), severity: "Критическая" },
   isRepainted: false,
   isPolished: false
   };
@@ -754,10 +760,10 @@ b.innerHTML = BARN_FINDS.map((barn, i) => `
     won.type = "hyper";
     won.img = "assets/cars/hyper/gtr.jpg";
     }
-    const plate = generateCoolPlate();
+    const plate = 'А777АА 777';
     won.plate = plate;
     won.customPlate = plate;
-    const plateVal = typeof calculatePlateValue === 'function' ? calculatePlateValue(plate) : 0;
+    const plateVal = typeof calculatePlateValue === 'function' ? calculatePlateValue(plate) : 250000;
     won.marketValue = (won.baseMarketValue || won.price) + plateVal;
     state.garage.push(won);
     saveState();

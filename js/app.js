@@ -1,7 +1,6 @@
 // ===================== ЯДРО ИГРЫ И СОСТОЯНИЕ (js/app.js) =====================
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
-// --- УТИЛИТЫ (Звук, Вибрация, Уведомления) ---
 function tgHaptic(type = 'light') {
 try {
 if (window.Telegram?.WebApp?.HapticFeedback) {
@@ -116,7 +115,7 @@ profitEl.style.display = 'none';
 document.getElementById('modalDealVerdict')?.classList.add('active');
 }
 // --- СОСТОЯНИЕ (STATE) ---
-const SAVE_KEY = 'perekoop_sim_save_v45_release';
+const SAVE_KEY = 'perekoop_sim_save_v48_stable';
 const DEFAULT_STATE = {
 player: {
 name: "Перекуп #777",
@@ -130,7 +129,7 @@ fuel: 100,
 level: 1,
 xp: 0,
 maxXp: 120,
-baseSlots: 1,
+baseSlots: 2,
 vip: false,
 vipPro: false,
 lastFreeSpin: 0,
@@ -180,18 +179,17 @@ barnProgress: { car: null, step: 0, tier: 1, plate: '' },
 marketModifiers: { economy: 1, comfort: 1, premium: 1, all: 1 }
 };
 let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
-// --- ПРОГРЕССИВНАЯ СТОИМОСТЬ БОКСОВ И БИЛЕТОВ ---
 function getGarageSlotCost() {
-const extraSlots = (state.player.baseSlots || 1) - 1;
+const extraSlots = Math.max(0, (state.player.baseSlots || 2) - 2);
 return Math.round(250000 * Math.pow(1.65, extraSlots));
 }
 function getExpressTicketUpgradeCost() {
-const steps = Math.floor(((state.player.maxExpressTickets || 25) - 25) / 25);
+const steps = Math.floor(Math.max(0, (state.player.maxExpressTickets || 25) - 25) / 25);
 return Math.round(50000 * Math.pow(1.5, steps));
 }
 function getTotalGarageSlots() {
-let slots = (state.player.baseSlots || 1);
-if (typeof HOUSING_LIST !== 'undefined') {
+let slots = (state.player.baseSlots || 2);
+if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
 const house = HOUSING_LIST.find(h => h.id === state.player.housingId);
 if (house) slots += house.slots;
 if (state.player.ownedHouses && Array.isArray(state.player.ownedHouses)) {
@@ -223,30 +221,18 @@ state.confiscatedLot = parsed.confiscatedLot || null;
 state.marketFeed = Array.isArray(parsed.marketFeed) ? parsed.marketFeed : [];
 }
 } catch(e) {}
+if (typeof state.player.baseSlots === 'undefined' || state.player.baseSlots < 2) state.player.baseSlots = 2;
 if (typeof state.player.maxExpressTickets === 'undefined') state.player.maxExpressTickets = 25;
 if (typeof state.player.expressTickets === 'undefined') state.player.expressTickets = state.player.maxExpressTickets;
 if (typeof state.player.policeImmunityDays === 'undefined') state.player.policeImmunityDays = 0;
 if (!state.player.ownedHouses || !Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
 if (isNaN(state.player.cash) || state.player.cash < 0) state.player.cash = 150000;
 if (isNaN(state.player.loanDebt) || state.player.loanDebt < 0) state.player.loanDebt = 0;
-if (typeof state.player.preSalesCount === 'undefined') state.player.preSalesCount = 0;
-if (typeof state.player.preSaleCooldownUntil === 'undefined') state.player.preSaleCooldownUntil = 0;
 if (!state.player.tools) state.player.tools = { gauge: false, obd: false, endoscope: false, compressor: false };
 if (!state.player.supplies) state.player.supplies = { energyDrinks: 0, coffee: 0 };
 if (!state.businesses || state.businesses.length === 0) {
 state.businesses = (typeof BUSINESS_DATA !== 'undefined' ? BUSINESS_DATA : []);
 }
-state.garage.forEach((car, index) => {
-if (!car.id) car.id = 'g_' + index + '_' + Date.now();
-if (!car.tuning) car.tuning = { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 };
-if (!car.wear) car.wear = { engine: 100, transmission: 100 };
-if (isNaN(car.purchaseCost) || car.purchaseCost <= 0) car.purchaseCost = car.basePrice || car.price || 100000;
-if (isNaN(car.marketValue) || car.marketValue <= 0) car.marketValue = car.price || 150000;
-if (isNaN(car.power)) car.power = 100;
-});
-state.salesLot.forEach(slot => {
-if (isNaN(slot.askingPrice) || slot.askingPrice <= 0) slot.askingPrice = slot.car.marketValue || 100000;
-});
 }
 function updateHeaderUI() {
 setTxt('cashAmount', (state.player.cash || 0).toLocaleString());
@@ -284,7 +270,6 @@ if (btnSlot) btnSlot.innerText = `+1 Бокс (${(slotCost / 1000).toFixed(0)}k 
 const loanEl = document.getElementById('loanDebtText');
 if (loanEl) loanEl.innerText = `Долг: ${(state.player.loanDebt || 0).toLocaleString()} ₽`;
 }
-// --- АВТОМАТИЧЕСКАЯ РАЗБЛОКИРОВКА КАТЕГОРИЙ ПО УРОВНЯМ ---
 function updateLevelGatesUI() {
 const lvl = state.player.level || 1;
 const gates = [
@@ -298,7 +283,6 @@ const gates = [
 ];
 gates.forEach(g => {
 const btn = document.getElementById(`catBtn-${g.id}`);
-const lockIcon = document.getElementById(g.lockId);
 if (btn) {
 if (lvl >= g.minLvl) {
 btn.classList.remove('locked');
@@ -505,7 +489,6 @@ playEngineSound();
 const car = state.garage[state.player.selectedStreetCarIndex] || state.garage[0];
 const playerHp = car.power || 100;
 const rivalHp = Math.round(playerHp * (0.85 + Math.random() * 0.35));
-// Проверка попадания стрелки в идеальную зеленую зону (5500-6500 RPM)
 const isPerfectLaunch = tachoRpm >= 5500 && tachoRpm <= 6500;
 const launchBonus = isPerfectLaunch ? 35 : (tachoRpm > 7200 ? -20 : 0);
 setTxt('raceStatusText', isPerfectLaunch ? '🔥 ИДЕАЛЬНЫЙ ЛАНЧ-СТАРТ!' : '🚦 Заезд начался!');
@@ -563,7 +546,6 @@ else if (state.player.level >= 10) rank = "Гаражный Профи";
 else if (state.player.level >= 5) rank = "Бодрый Перекуп";
 setTxt('profPlayerRank', `Статус: ${rank}`);
 }
-// --- ТЕСТОВЫЕ КНОПКИ ---
 function setCheatLevel(lvl) {
 state.player.level = lvl;
 updateLevelGatesUI();
@@ -585,14 +567,17 @@ localStorage.removeItem(SAVE_KEY);
 location.reload();
 }
 }
-// --- ИНИЦИАЛИЗАЦИЯ ИГРЫ ---
+// --- ИНИЦИАЛИЗАЦИЯ ИГРЫ (ПРЯМОЙ БЕЗОПАСНЫЙ СТАРТ) ---
 function initApp() {
 sanitizeState();
 syncTelegramProfile();
 updateHeaderUI();
 updateLevelGatesUI();
+// Принудительно генерируем и рендерим ленту рынка
 if (!state.marketFeed || state.marketFeed.length === 0) {
-if (typeof populateMarketFeed === 'function') populateMarketFeed();
+if (typeof populateMarketFeed === 'function') {
+populateMarketFeed();
+}
 }
 if (!Array.isArray(state.plateCatalog) || state.plateCatalog.length === 0) {
 if (typeof refreshPlateCatalog === 'function') refreshPlateCatalog();
@@ -610,7 +595,9 @@ if (typeof renderContainersList === 'function') renderContainersList();
 if (typeof renderBarnFind === 'function') renderBarnFind();
 if (typeof renderLifeChat === 'function') renderLifeChat();
 switchTab('tabMarket');
-if (typeof renderMarketFeed === 'function') renderMarketFeed();
+if (typeof renderMarketFeed === 'function') {
+renderMarketFeed();
+}
 }
 // --- ГЛОБАЛЬНЫЙ ТАЙМЕР ---
 setInterval(() => {
@@ -642,6 +629,9 @@ if (document.getElementById('tabMarket')?.classList.contains('active') && typeof
 updateMarketTimers();
 }
 }, 1000);
-window.addEventListener('load', () => {
+// Запуск без задержек
+if (document.readyState === 'loading') {
+document.addEventListener('DOMContentLoaded', initApp);
+} else {
 initApp();
-});
+}
