@@ -1,4 +1,3 @@
-// ===================== Вкладка: РЫНОК (js/market.js) =====================
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
 const REGIONS = ['77', '99', '97', '177', '199', '777', '799', '50', '90', '150', '190', '750'];
 function generateNormalPlate() {
@@ -7,7 +6,7 @@ const l2 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
 const l3 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
 let num = String(Math.floor(Math.random() * 899) + 100);
 const reg = REGIONS[Math.floor(Math.random() * REGIONS.length)];
-return `${l1}${num}${l2}${l3} ${reg}`;
+return `${l1}${num}${l2}${l3}${reg}`;
 }
 function generateCoolPlate() {
 const letters = Math.random() > 0.5
@@ -16,7 +15,7 @@ const letters = Math.random() > 0.5
 const coolNums = ['001', '007', '111', '222', '333', '444', '555', '666', '777', '888', '999'];
 const num = coolNums[Math.floor(Math.random() * coolNums.length)];
 const reg = ['77', '99', '97', '777'][Math.floor(Math.random() * 4)];
-return `${letters.charAt(0)}${num}${letters.substring(1)} ${reg}`;
+return `${letters.charAt(0)}${num}${letters.substring(1)}${reg}`;
 }
 function evaluatePlate(plateStr) {
 if (typeof calculatePlateValue === 'function') {
@@ -46,25 +45,26 @@ return 150 + ((state.player?.level || 1) * 350);
 }
 function setCategory(cat) {
 const lvl = state.player?.level || 1;
-if (['moto', 'atv'].includes(cat) && lvl < 16) return showToast("🔒 Нужен 16 ур!");
-if (['comfort', 'premium'].includes(cat) && lvl < 30) return showToast("🔒 Нужен 30 ур!");
-if (['hyper', 'truck'].includes(cat) && lvl < 50) return showToast("🔒 Нужен 50 ур!");
-if (['yacht'].includes(cat) && lvl < 100) return showToast("🔒 Нужен 100 ур!");
+if (['moto', 'atv'].includes(cat) && lvl < 16) return showToast(`🔒 Нужен 16 ур!`);
+if (['comfort', 'premium'].includes(cat) && lvl < 30) return showToast(`🔒 Нужен 30 ур!`);
+if (['hyper', 'truck'].includes(cat) && lvl < 50) return showToast(`🔒 Нужен 50 ур!`);
+if (['yacht'].includes(cat) && lvl < 100) return showToast(`🔒 Нужен 100 ур!`);
 state.activeCategory = cat;
 document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
-document.getElementById(`catBtn-${cat}`)?.classList.add('active');
+const btn = document.getElementById(`catBtn-${cat}`);
+if (btn) btn.classList.add('active');
 populateMarketFeed();
 }
 function refreshMarketFeedManual() {
 const cost = getMarketRefreshCost();
 if ((state.player?.cash || 0) < cost) return showToast(`Не хватает ${cost.toLocaleString()} ₽!`);
-if ((state.player?.fuel || 0) < 5) return showToast("Закончился бензин ⛽!");
+if ((state.player?.fuel || 0) < 5) return showToast(`Закончился бензин ⛽!`);
 state.player.cash -= cost;
 state.player.fuel -= 5;
 saveState();
 populateMarketFeed();
 renderMarketFeed();
-showToast("Лента обновлена (-5 ⛽)!");
+showToast(`Лента обновлена (-5 ⛽)!`);
 }
 function populateMarketFeed() {
 if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
@@ -80,7 +80,7 @@ const defectChance = lvl <= 5 ? 0.35 : (lvl >= 20 ? 0.60 : 0.45);
 const stolenChance = lvl <= 5 ? 0.12 : (lvl >= 20 ? 0.28 : 0.20);
 const hasHiddenDefect = (typeof OBD_ERRORS !== 'undefined' && OBD_ERRORS.length > 0) ? (Math.random() < defectChance) : false;
 const isStolen = Math.random() < stolenChance;
-const carId = 'm_' + Date.now() + '_' + i;
+const carId = `m_${Date.now()}_${i}`;
 const isCool = Math.random() < 0.20;
 const genPlate = isCool ? generateCoolPlate() : generateNormalPlate();
 const baseP = template.basePrice || 100000;
@@ -91,21 +91,22 @@ const priceMultiplier = lvl <= 10
 const sellerPrice = Math.round(dynPrice * priceMultiplier);
 const baseVal = Math.round(dynPrice * 1.15);
 const defectObj = (hasHiddenDefect && typeof OBD_ERRORS !== 'undefined') ? OBD_ERRORS[Math.floor(Math.random() * OBD_ERRORS.length)] : null;
-const sNote = (typeof SELLER_ADS_PHRASES !== 'undefined' && SELLER_ADS_PHRASES.length > 0)
-? SELLER_ADS_PHRASES[Math.floor(Math.random() * SELLER_ADS_PHRASES.length)]
-: "Хорошая машина, сел и поехал.";
+let sNote = `Хорошая машина, сел и поехал.`;
+if (typeof SELLER_ADS_PHRASES !== 'undefined' && SELLER_ADS_PHRASES.length > 0) {
+sNote = SELLER_ADS_PHRASES[Math.floor(Math.random() * SELLER_ADS_PHRASES.length)];
+}
 const plateVal = evaluatePlate(genPlate);
 state.marketFeed.push({
 id: carId,
-name: template.name || "Автомобиль",
+name: template.name || `Автомобиль`,
 power: template.power || 100,
-type: template.type || 'economy',
+type: template.type || `economy`,
 basePrice: baseP,
 mileage: Math.floor(Math.random() * 120000) + 18000,
 price: sellerPrice,
 baseMarketValue: baseVal,
 marketValue: baseVal + plateVal,
-img: template.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
+img: template.img || `https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80`,
 plate: genPlate,
 isStolen: isStolen,
 autotekaChecked: false,
@@ -140,27 +141,37 @@ if (!state.marketFeed || state.marketFeed.length === 0) {
 container.innerHTML = `<div class="glass-card text-center py-6 sub-label">Нет предложений на рынке. Нажмите «Обновить ленту»!</div>`;
 return;
 }
-container.innerHTML = state.marketFeed.map(car => {
-if (!car || car.unavailable) return '';
+let htmlContent = ``;
+state.marketFeed.forEach(car => {
+if (!car || car.unavailable) return;
 const isBusy = (car.cooldownUntil && car.cooldownUntil > now);
 const timeLeft = isBusy ? Math.ceil((car.cooldownUntil - now) / 1000) : 0;
 const hasScanner = !!(state.player?.tools && state.player.tools.obd);
-const carMileage = (car.mileage || 0).toLocaleString();
-const carPrice = (car.price || 0).toLocaleString();
-const carMarketVal = (car.marketValue || car.price || 0).toLocaleString();
-return `
-<div class="glass-card mb-3 ${isBusy ? 'busy' : ''} ${car.viewed ? 'viewed-card' : ''}" id="card_${car.id}">
-  ${car.viewed ? '<div class="viewed-badge">
-  <i class="fa-solid fa-eye">
-  </i> Просмотрено</div>' : ''}
+const carMileage = car.mileage ? car.mileage.toLocaleString() : `85 000`;
+const carPrice = car.price ? car.price.toLocaleString() : `100 000`;
+const carMarketVal = car.marketValue ? car.marketValue.toLocaleString() : `150 000`;
+const carType = car.type ? car.type.toUpperCase() : `CAR`;
+const carImg = car.img || `https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80`;
+const viewedBadge = car.viewed ? `<div class="viewed-badge">
+<i class="fa-solid fa-eye">
+</i> Просмотрено</div>` : ``;
+const busyClass = isBusy ? `busy` : ``;
+const viewedClass = car.viewed ? `viewed-card` : ``;
+const sellerNoteBlock = car.sellerNote ? `<div class="seller-note-card">${car.sellerNote}</div>` : ``;
+const toolIcon = state.player?.tools?.gauge ? `✓` : `(3k)`;
+const obdIcon = hasScanner ? `OBD2 ✓` : `OBD2 (5k)`;
+const autoIcon = car.autotekaChecked ? `0` : `5k`;
+htmlContent += `
+<div class="glass-card mb-3 ${busyClass} ${viewedClass}" id="card_${car.id}">
+  ${viewedBadge}
   <div class="cooldown-timer">
     <div class="timer-clock" id="timer_num_${car.id}">${timeLeft}с</div>
     <div class="timer-text">Абонент занят</div>
     <button onclick="paidCallMarketCar('${car.id}')" class="btn btn-amber" style="width: 80%;">Платный дозвон (1000 ₽)</button>
   </div>
   <div class="car-img-wrap">
-    <img src="${car.img}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'">
-      <div class="badge-tag" style="bottom: 8px; right: 8px;">${(car.type || 'car').toUpperCase()}</div>
+    <img src="${carImg}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'">
+      <div class="badge-tag" style="bottom: 8px; right: 8px;">${carType}</div>
       <div class="plate-corner">
         <div class="license-plate">${car.plate || 'ТРАНЗИТ'} <div class="license-flag">RUS</div>
       </div>
@@ -168,8 +179,8 @@ return `
   </div>
   <div class="mb-2">
     <h4 class="font-bold">${car.name}</h4>
-    <div class="sub-label mb-2">${car.power || 100} л.с. | Пробег: ${carMileage} км</div>
-    ${car.sellerNote ? `<div class="seller-note-card">${car.sellerNote}</div>` : ''}
+    <div class="sub-label mb-2">${car.power \vert{}\vert{} 100} л.с. \vert{} Пробег: ${carMileage} км</div>
+    ${sellerNoteBlock}
   </div>
   <div class="price-box">
     <div>
@@ -179,16 +190,17 @@ return `
     <div class="sub-label">Рыночная: ~${carMarketVal} ₽</div>
   </div>
   <div class="grid-3 mb-2">
-    <button onclick="openGaugeModal('${car.id}')" class="btn btn-dark btn-sm">Толщиномер ${state.player?.tools?.gauge ? '✓' : '(3k)'}</button>
-    <button onclick="quickOBDScanMarketCar('${car.id}')" class="btn btn-dark btn-sm">${hasScanner ? 'OBD2 ✓' : 'OBD2 (5k)'}</button>
-    <button onclick="openAutotekaModal('${car.id}')" class="btn btn-dark btn-sm">Автотека (${car.autotekaChecked ? '0' : '5k'})</button>
+    <button onclick="openGaugeModal('${car.id}')" class="btn btn-dark btn-sm">Толщиномер ${toolIcon}</button>
+    <button onclick="quickOBDScanMarketCar('${car.id}')" class="btn btn-dark btn-sm">${obdIcon}</button>
+    <button onclick="openAutotekaModal('${car.id}')" class="btn btn-dark btn-sm">Автотека (${autoIcon})</button>
   </div>
   <button onclick="initiateBuyMarketCar('${car.id}')" class="btn btn-cyan w-full">
     <i class="fa-solid fa-phone">
     </i> Позвонить продавцу
   </button>
 </div>`;
-}).join('');
+});
+container.innerHTML = htmlContent;
 if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
 }
 function quickOBDScanMarketCar(carId) {
@@ -197,19 +209,19 @@ if (!car) return;
 car.viewed = true;
 const hasScanner = !!(state.player?.tools && state.player.tools.obd);
 if (!hasScanner) {
-if ((state.player?.cash || 0) < 5000) return showToast("Нужно 5,000 ₽ на выездного диагноста или сканер из Маркета!");
+if ((state.player?.cash || 0) < 5000) return showToast(`Нужно 5,000 ₽ на выездного диагноста или сканер из Маркета!`);
 state.player.cash -= 5000;
-showToast("Выездной мастер подключил сканер (-5,000 ₽)");
+showToast(`Выездной мастер подключил сканер (-5,000 ₽)`);
 } else {
-showToast("Подключен ваш собственный OBD2-сканер ✓");
+showToast(`Подключен ваш собственный OBD2-сканер ✓`);
 }
 car.stoChecked = true;
 saveState();
 renderMarketFeed();
 if (car.hiddenDefect) {
-openVerdictModal("ОШИБКИ В ЭБУ! ⚠️", `Сканер считал неисправность: ${car.hiddenDefect.text}. Затраты на ремонт: ~${(car.hiddenDefect.cost || 10000).toLocaleString()} ₽.`, false);
+openVerdictModal(`ОШИБКИ В ЭБУ! ⚠️`, `Сканер считал неисправность: ${car.hiddenDefect.text}. Затраты на ремонт: ~${(car.hiddenDefect.cost || 10000).toLocaleString()} ₽.`, false);
 } else {
-openVerdictModal("ОШИБОК НЕТ ✓", `ЭБУ чист. Ресурс двигателя: ${Math.round(car.wear?.engine || 90)}%, трансмиссии: ${Math.round(car.wear?.transmission || 90)}%.`, true);
+openVerdictModal(`ОШИБОК НЕТ ✓`, `ЭБУ чист. Ресурс двигателя: ${Math.round(car.wear?.engine \vert{}\vert{} 90)}\%, трансмиссии: ${Math.round(car.wear?.transmission || 90)}%.`, true);
 }
 }
 function initiateBuyMarketCar(carId) {
@@ -220,34 +232,34 @@ car.viewed = true;
 renderMarketFeed();
 const now = Date.now();
 if (car.cooldownUntil && car.cooldownUntil > now) {
-return showToast("Абонент всё ещё занят! Подождите.");
+return showToast(`Абонент всё ещё занят! Подождите.`);
 }
-setTxt('buyCallEmoji', '📞');
-setTxt('buyCallTitle', `Звонок продавцу...`);
-setTxt('buyCallDesc', 'Соединение с абонентом... Идут гудки...');
-const btnBox = document.getElementById('buyCallActionBtnBox');
+setTxt(`buyCallEmoji`, `📞`);
+setTxt(`buyCallTitle`, `Звонок продавцу...`);
+setTxt(`buyCallDesc`, `Соединение с абонентом... Идут гудки...`);
+const btnBox = document.getElementById(`buyCallActionBtnBox`);
 if (btnBox) btnBox.innerHTML = `<button class="btn btn-dark w-full" disabled>Гудки в трубке...</button>`;
-document.getElementById('modalBuyCall')?.classList.add('active');
-tgHaptic('light');
+document.getElementById(`modalBuyCall`)?.classList.add(`active`);
+tgHaptic(`light`);
 setTimeout(() => {
 let callSuccessChance = 55 + ((state.player?.karma || 50) > 60 ? 10 : 0) - (car.type === 'premium' ? 10 : 0);
 const roll = Math.random() * 100;
 if (roll < callSuccessChance) {
-closeModal('modalBuyCall');
+closeModal(`modalBuyCall`);
 openMarketDeal(carId);
 } else if (roll < 85) {
 const waitSec = Math.floor(20 + Math.random() * 25);
 car.cooldownUntil = Date.now() + (waitSec * 1000);
-setTxt('buyCallEmoji', '📵');
-setTxt('buyCallTitle', 'Абонент сбросил');
-setTxt('buyCallDesc', `«Не могу говорить, перезвоните через ${waitSec} сек!»`);
+setTxt(`buyCallEmoji`, `📵`);
+setTxt(`buyCallTitle`, `Абонент сбросил`);
+setTxt(`buyCallDesc`, `«Не могу говорить, перезвоните через ${waitSec} сек!»`);
 btnBox.innerHTML = `<button onclick="closeModal('modalBuyCall')" class="btn btn-dark w-full">Понятно</button>`;
 saveState();
 renderMarketFeed();
 } else {
-setTxt('buyCallEmoji', '❌');
-setTxt('buyCallTitle', 'Объявление снято');
-setTxt('buyCallDesc', '«Только что внесли задаток, машина ушла!»');
+setTxt(`buyCallEmoji`, `❌`);
+setTxt(`buyCallTitle`, `Объявление снято`);
+setTxt(`buyCallDesc`, `«Только что внесли задаток, машина ушла!»`);
 car.unavailable = true;
 saveState();
 renderMarketFeed();
@@ -256,7 +268,7 @@ btnBox.innerHTML = `<button onclick="closeModal('modalBuyCall')" class="btn btn-
 }, 1200);
 }
 function paidCallMarketCar(carId) {
-if ((state.player?.cash || 0) < 1000) return showToast("Не хватает 1000 ₽ на платный дозвон!");
+if ((state.player?.cash || 0) < 1000) return showToast(`Не хватает 1000 ₽ на платный дозвон!`);
 state.player.cash -= 1000;
 const carIndex = state.marketFeed.findIndex(c => c.id === carId);
 if (carIndex === -1) return;
@@ -267,24 +279,24 @@ renderMarketFeed();
 openMarketDeal(carId);
 }
 function updateMarketRiskPreview(pct) {
-const text = document.getElementById('marketHaggleRiskText');
-const fill = document.getElementById('marketHaggleRiskFill');
+const text = document.getElementById(`marketHaggleRiskText`);
+const fill = document.getElementById(`marketHaggleRiskFill`);
 if (!text || !fill) return;
 if (pct === 3) {
-text.innerText = "Низкий (~15%)";
-text.className = "color-green";
-fill.className = "risk-fill risk-low";
-fill.style.width = "20%";
+text.innerText = `Низкий (~15%)`;
+text.className = `color-green`;
+fill.className = `risk-fill risk-low`;
+fill.style.width = `20%`;
 } else if (pct === 7) {
-text.innerText = "Умеренный (~50%)";
-text.className = "color-amber";
-fill.className = "risk-fill risk-mid";
-fill.style.width = "55%";
+text.innerText = `Умеренный (~50%)`;
+text.className = `color-amber`;
+fill.className = `risk-fill risk-mid`;
+fill.style.width = `55%`;
 } else {
-text.innerText = "Критический (~85%)";
-text.className = "color-red";
-fill.className = "risk-fill risk-high";
-fill.style.width = "90%";
+text.innerText = `Критический (~85%)`;
+text.className = `color-red`;
+fill.className = `risk-fill risk-high`;
+fill.style.width = `90%`;
 }
 }
 function openMarketDeal(carId) {
@@ -292,26 +304,24 @@ const carIndex = state.marketFeed.findIndex(c => c.id === carId);
 if (carIndex === -1) return;
 const car = state.marketFeed[carIndex];
 pendingMarketCar = { car, carIndex };
-document.getElementById('dealCarImg').src = car.img;
-setTxt('dealCarTitle', car.name);
-setTxt('dealCarMileageInfo', `Пробег: ${(car.mileage || 0).toLocaleString()} км | Госномер: ${car.plate}`);
-setTxt('dealCarPrice', `${(car.price || 0).toLocaleString()} ₽`);
-const avatars = ['👨‍💼', '🧔', '😎', '👨‍🔧', '🧑‍💻'];
-const names = ['Сергей', 'Алексей', 'Дмитрий', 'Артем', 'Михаил'];
+document.getElementById(`dealCarImg`).src = car.img;
+setTxt(`dealCarTitle`, car.name);
+setTxt(`dealCarMileageInfo`, `Пробег: ${(car.mileage \vert{}\vert{} 0).toLocaleString()} км \vert{} Госномер: ${car.plate}`);
+setTxt(`dealCarPrice`, `${(car.price || 0).toLocaleString()} ₽`);
+const avatars = [`👨‍💼`, `🧔`, `😎`, `👨‍🔧`, `🧑‍💻`];
+const names = [`Сергей`, `Алексей`, `Дмитрий`, `Артем`, `Михаил`];
 const randIdx = Math.abs(String(carId).split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)) % avatars.length;
-setTxt('dealSellerAvatar', avatars[randIdx]);
-setTxt('dealSellerName', `${names[randIdx]} (Продавец)`);
-const thread = document.getElementById('dealChatThread');
+setTxt(`dealSellerAvatar`, avatars[randIdx]);
+setTxt(`dealSellerName`, `${names[randIdx]} (Продавец)`);
+const thread = document.getElementById(`dealChatThread`);
 if (thread) {
-thread.innerHTML = `
-<div class="chat-msg msg-seller">«Алло, да, продаю. Машина в порядке, сел и поехал. Что интересует?»</div>
-`;
+thread.innerHTML = `<div class="chat-msg msg-seller">«Алло, да, продаю. Машина в порядке, сел и поехал. Что интересует?»</div>`;
 }
-const haggleArea = document.getElementById('dealHaggleArea');
+const haggleArea = document.getElementById(`dealHaggleArea`);
 if (car.haggled) {
-haggleArea.style.display = 'none';
+haggleArea.style.display = `none`;
 } else {
-haggleArea.style.display = 'block';
+haggleArea.style.display = `block`;
 haggleArea.innerHTML = `
 <div class="risk-meter-box mb-2">
   <div class="flex-between text-xs">
@@ -339,22 +349,22 @@ haggleArea.innerHTML = `
 </div>
 `;
 }
-document.getElementById('modalMarketDeal')?.classList.add('active');
-playSound('tick');
+document.getElementById(`modalMarketDeal`)?.classList.add(`active`);
+playSound(`tick`);
 }
 function attemptMarketHaggle(percent) {
 if (!pendingMarketCar) return;
 const car = pendingMarketCar.car;
-if (car.haggled) return showToast("Продавец больше не пойдет на уступки!");
+if (car.haggled) return showToast(`Продавец больше не пойдет на уступки!`);
 let successChance = percent === 3 ? 80 : (percent === 7 ? 45 : 15);
 successChance += ((state.player?.level || 1) * 0.5) + ((state.player?.karma || 50) > 60 ? 10 : 0);
 car.haggled = true;
-document.getElementById('dealHaggleArea').style.display = 'none';
-const thread = document.getElementById('dealChatThread');
+document.getElementById(`dealHaggleArea`).style.display = `none`;
+const thread = document.getElementById(`dealChatThread`);
 if (Math.random() * 100 <= successChance) {
 const disc = Math.round((car.price || 100000) * (percent / 100));
 car.price = Math.max(10000, (car.price || 100000) - disc);
-setTxt('dealCarPrice', `${car.price.toLocaleString()} ₽`);
+setTxt(`dealCarPrice`, `${car.price.toLocaleString()} ₽`);
 if (thread) {
 thread.innerHTML += `
 <div class="chat-msg msg-player">«Скинь ${percent}%, забираю прямо сейчас за наличку без лишних вопросов.»</div>
@@ -362,8 +372,8 @@ thread.innerHTML += `
 `;
 thread.scrollTop = thread.scrollHeight;
 }
-playSound('win');
-tgHaptic('success');
+playSound(`win`);
+tgHaptic(`success`);
 } else {
 if (thread) {
 thread.innerHTML += `
@@ -372,7 +382,7 @@ thread.innerHTML += `
 `;
 thread.scrollTop = thread.scrollHeight;
 }
-tgHaptic('error');
+tgHaptic(`error`);
 }
 saveState();
 }
@@ -381,10 +391,11 @@ if (!pendingMarketCar) return;
 const { car, carIndex } = pendingMarketCar;
 const maxSlots = getTotalGarageSlots();
 if ((state.garage?.length || 0) >= maxSlots) return showToast(`Гараж полон! Вместимость: ${maxSlots} мест.`);
-if ((state.player?.cash || 0) < car.price) return showToast("Недостаточно денег на выкуп!");
-closeModal('modalMarketDeal');
+if ((state.player?.cash || 0) < car.price) return showToast(`Недостаточно денег на выкуп!`);
+closeModal(`modalMarketDeal`);
 state.player.cash -= car.price;
 state.player.stats.bought = (state.player.stats.bought || 0) + 1;
+if (!state.garage) state.garage = [];
 state.garage.push({
 ...car,
 customPlate: car.plate,
@@ -397,32 +408,32 @@ state.marketFeed.splice(carIndex, 1);
 pendingMarketCar = null;
 addXp(40);
 showToast(`✅ ${car.name} куплен за ${car.price.toLocaleString()} ₽!`);
-playSound('win');
-tgHaptic('success');
+playSound(`win`);
+tgHaptic(`success`);
 spawnFloatingReward(`-${car.price.toLocaleString()} ₽`);
 saveState();
 renderMarketFeed();
 renderGarage();
-setTimeout(() => switchTab('tabGarage'), 350);
+setTimeout(() => switchTab(`tabGarage`), 350);
 }
 function openGaugeModal(carId) {
 activeInspectCarId = carId;
 const car = state.marketFeed.find(c => c.id === carId);
 if (car) car.viewed = true;
 if (!state.player?.tools?.gauge) {
-if ((state.player?.cash || 0) < 3000) return showToast("Купите толщиномер в Маркете или отдайте 3,000 ₽ за замер!");
+if ((state.player?.cash || 0) < 3000) return showToast(`Купите толщиномер в Маркете или отдайте 3,000 ₽ за замер!`);
 state.player.cash -= 3000;
 }
 saveState();
-document.getElementById('modalGauge')?.classList.add('active');
+document.getElementById(`modalGauge`)?.classList.add(`active`);
 renderMarketFeed();
 }
 function checkBodyPart(part) {
 if (!activeInspectCarId) return;
 const car = state.marketFeed.find(c => c.id === activeInspectCarId);
 if (!car || !car.bodyThickness) return;
-playSound('tick');
-tgHaptic('light');
+playSound(`tick`);
+tgHaptic(`light`);
 const val = car.bodyThickness[part] || 100;
 const el = document.getElementById(`part-${part}`);
 if (el) el.innerHTML = val > 200 ? `<span class="color-red">${val} мкм (Шпакля)</span>` : `<span class="color-green">${val} мкм (Завод)</span>`;
@@ -433,20 +444,20 @@ if (!car) return;
 car.viewed = true;
 if (!car.autotekaChecked) {
 const cost = state.player?.vipPro ? 0 : 5000;
-if ((state.player?.cash || 0) < cost && !state.player?.vipPro) return showToast("Автотека стоит 5,000 ₽!");
+if ((state.player?.cash || 0) < cost && !state.player?.vipPro) return showToast(`Автотека стоит 5,000 ₽!`);
 state.player.cash -= cost;
 car.autotekaChecked = true;
 saveState();
 }
-const stat = car.isStolen ? "<b class='color-red'>В РОЗЫСКЕ (Перебиты номера кузова)</b>" : "<b class='color-green'>Юридически чист</b>";
-const rep = document.getElementById('autotekaReportContent');
+const stat = car.isStolen ? `<b class='color-red'>В РОЗЫСКЕ (Перебиты номера кузова)</b>` : `<b class='color-green'>Юридически чист</b>`;
+const rep = document.getElementById(`autotekaReportContent`);
 if (rep) {
-rep.innerHTML = `<div class="mb-1 font-bold">${car.name} (${car.plate || ''})</div>
+rep.innerHTML = `<div class="mb-1 font-bold">${car.name} (${car.plate \vert{}\vert{} ''})</div>
 <div>ДТП в базе: <b>${car.hiddenDefect ? '2' : '0'} шт.</b>
 </div>
 <div class="mt-1">Юридический статус: ${stat}</div>`;
 }
-document.getElementById('modalAutoteka')?.classList.add('active');
+document.getElementById(`modalAutoteka`)?.classList.add(`active`);
 renderMarketFeed();
 }
 function updateMarketTimers() {

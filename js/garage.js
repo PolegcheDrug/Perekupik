@@ -45,33 +45,34 @@ function renderGarage() {
 const list = document.getElementById('garageList');
 if (!list) return;
 const totalSlots = getTotalGarageSlots();
-setTxt('garageDetailedSlots', `${state.garage?.length || 0} из ${totalSlots} боксов занято`);
+setTxt('garageDetailedSlots', `${state.garage?.length \vert{}\vert{} 0} из ${totalSlots} боксов занято`);
 const mainContent = document.querySelector('.main-content');
 const scrollPos = mainContent ? mainContent.scrollTop : 0;
 if (!state.garage || state.garage.length === 0) {
-list.innerHTML = '<div class="glass-card text-center sub-label py-8">
+list.innerHTML = `<div class="glass-card text-center sub-label py-8">
 <i class="fa-solid fa-warehouse color-cyan mb-2" style="font-size:32px;">
 </i>
 <div>Гараж пуст. Подберите технику на авторынке или P2P!</div>
-</div>';
+</div>`;
 return;
 }
-list.innerHTML = state.garage.map((car, idx) => {
-if (!car) return '';
+let htmlContent = ``;
+state.garage.forEach((car, idx) => {
+if (!car) return;
 const cost = car.purchaseCost || car.basePrice || car.price || 100000;
-const carImg = car.img || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80';
+const carImg = car.img || `https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80`;
 const carType = (car.type || 'economy').toUpperCase();
 const carPlate = car.customPlate || car.plate || 'ТРАНЗИТ';
 const carPower = car.power || 100;
-const carMileage = (car.mileage !== undefined ? car.mileage : 85000).toLocaleString();
+const carMileage = car.mileage ? car.mileage.toLocaleString() : `85 000`;
 const carCondition = car.condition !== undefined ? car.condition : 85;
 const plateVal = calculatePlateValue(carPlate);
 const baseVal = car.baseMarketValue || car.price || 150000;
 const marketVal = baseVal + plateVal;
 car.marketValue = marketVal;
-let defectBlock = '';
+let defectBlock = ``;
 if (car.hiddenDefect) {
-const defectText = car.hasAdditive ? 'Присадка залита (Стук заглушен)' : (car.hiddenDefect.text || 'Неисправность узлов');
+const defectText = car.hasAdditive ? `Присадка залита (Стук заглушен)` : (car.hiddenDefect.text || `Неисправность узлов`);
 const defectCost = (car.hiddenDefect.cost || 10000).toLocaleString();
 defectBlock = `
 <div class="legal-warning mb-2">
@@ -80,7 +81,7 @@ defectBlock = `
 <button onclick="repairCarDefect(${idx})" class="btn btn-amber btn-auto btn-sm">Капиталка (${defectCost} ₽)</button>
 </div>`;
 }
-let impoundedBlock = '';
+let impoundedBlock = ``;
 if (car.impounded) {
 const daysAtLot = car.impoundedDays || 1;
 const baseDailyRate = car.type === 'premium' ? 12000 : (car.type === 'comfort' ? 6000 : 3500);
@@ -96,10 +97,12 @@ impoundedBlock = `
 <button onclick="unimpoundCar(${idx})" class="btn btn-cyan btn-auto btn-sm">Вызволить</button>
 </div>`;
 }
-const preSaleDisabled = car.impounded ? 'disabled' : '';
-const lotDisabled = car.impounded ? 'disabled' : '';
-return `
-<div class="glass-card mb-3 ${car.hiddenDefect && !car.hasAdditive ? 'card-danger' : ''}">
+const preSaleDisabled = car.impounded ? `disabled` : ``;
+const lotDisabled = car.impounded ? `disabled` : ``;
+const dangerClass = (car.hiddenDefect && !car.hasAdditive) ? `card-danger` : ``;
+const bonusPlateBlock = plateVal > 5000 ? `<div class="text-xs color-cyan font-bold">+${plateVal.toLocaleString()} ₽ за номер</div>` : ``;
+htmlContent += `
+<div class="glass-card mb-3 ${dangerClass}">
   <div class="car-img-wrap" style="height: 140px;">
     <img src="${carImg}" class="car-img" onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'">
       <div class="badge-tag" style="bottom: 8px; right: 8px;">${carType}</div>
@@ -111,18 +114,16 @@ return `
   <div class="flex-between mb-2">
     <div>
       <h4 class="font-bold">${car.name || 'Автомобиль'}</h4>
-      <div class="sub-label">${carPower} л.с. | Пробег: ${carMileage} км | Сост: ${carCondition}%</div>
+      <div class="sub-label">${carPower} л.с. | Пробег: ${carMileage} км \vert{} Сост: ${carCondition}%</div>
       <div class="text-xs color-amber mt-1">Куплена за: <b>${cost.toLocaleString()} ₽</b>
     </div>
   </div>
   <div class="text-right">
     <div class="sub-label">Оценка:</div>
-    <div class="price-val">${marketVal.toLocaleString()} ₽</div>
-    ${plateVal > 5000 ? `<div class="text-xs color-cyan font-bold">+${plateVal.toLocaleString()} ₽ за номер</div>` : ''}
+    <div class="price-val">${marketVal.toLocaleString()} ₽</div>${bonusPlateBlock}
   </div>
 </div>
-${defectBlock}
-${impoundedBlock}
+${defectBlock}${impoundedBlock}
 <div class="grid-2 mb-2">
   <button onclick="openPreviewModal(${idx})" class="btn btn-dark">🔍 Осмотр & Звук</button>
   <button onclick="openPreSaleModal(${idx})" class="btn btn-dark" ${preSaleDisabled}>🪄 Предпродажка</button>
@@ -133,7 +134,8 @@ ${impoundedBlock}
 </div>
 <button onclick="scrapCar(${idx})" class="btn btn-dark btn-sm w-full">Сдать на разборку (-35% стоимости)</button>
 </div>`;
-}).join('');
+});
+list.innerHTML = htmlContent;
 if (mainContent) {
 requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
 }
@@ -165,24 +167,24 @@ const car = state.garage[idx];
 if (!car) return;
 const plateVal = calculatePlateValue(car.customPlate || car.plate);
 const totalVal = (car.baseMarketValue || car.price || 150000) + plateVal;
-document.getElementById('prevImg').src = car.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
-setTxt('prevTypeBadge', (car.type || 'car').toUpperCase());
-document.getElementById('prevPlate').innerHTML = `${car.customPlate || car.plate || 'ТРАНЗИТ'} <div class="license-flag">RUS</div>`;
-setTxt('prevTitle', car.name || 'Автомобиль');
-setTxt('prevSpecs', `${car.power || 100} л.с. | Разгон: ~6.2с | Состояние: ${car.condition || 85}%`);
-setTxt('prevCostDetails', `Себестоимость выкупа: ${(car.purchaseCost || car.basePrice || 0).toLocaleString()} ₽`);
-setTxt('prevPrice', `${totalVal.toLocaleString()} ₽`);
-const obdBtn = document.getElementById('btnPreviewObdScan');
+document.getElementById(`prevImg`).src = car.img || `https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80`;
+setTxt(`prevTypeBadge`, (car.type || `car`).toUpperCase());
+document.getElementById(`prevPlate`).innerHTML = `${car.customPlate || car.plate || `ТРАНЗИТ`} <div class="license-flag">RUS</div>`;
+setTxt(`prevTitle`, car.name || `Автомобиль`);
+setTxt(`prevSpecs`, `${car.power \vert{}\vert{} 100} л.с. \vert{} Разгон: ~6.2с \vert{} Состояние: ${car.condition || 85}%`);
+setTxt(`prevCostDetails`, `Себестоимость выкупа: ${(car.purchaseCost || car.basePrice || 0).toLocaleString()} ₽`);
+setTxt(`prevPrice`, `${totalVal.toLocaleString()} ₽`);
+const obdBtn = document.getElementById(`btnPreviewObdScan`);
 if (obdBtn) {
 const hasScanner = !!(state.player?.tools && state.player.tools.obd);
-obdBtn.innerText = hasScanner ? "OBD2 Сканер" : "🔒 Нужен OBD2";
-obdBtn.className = hasScanner ? "btn btn-cyan" : "btn btn-dark opacity-50";
+obdBtn.innerText = hasScanner ? `OBD2 Сканер` : `🔒 Нужен OBD2`;
+obdBtn.className = hasScanner ? `btn btn-cyan` : `btn btn-dark opacity-50`;
 }
-document.getElementById('modalPreview')?.classList.add('active');
+document.getElementById(`modalPreview`)?.classList.add(`active`);
 }
 function openTuningFromPreview() {
 if (selectedCarIndex === null) return;
-closeModal('modalPreview');
+closeModal(`modalPreview`);
 openTuningModal(selectedCarIndex);
 }
 function openPreSaleModal(idx) {
@@ -194,36 +196,36 @@ return showToast(`Мастера на перерыве! Предпродажка
 activePreSaleCarIndex = idx;
 const car = state.garage[idx];
 if (!car) return;
-setTxt('preSaleCarTitle', `${car.name} (Оценка: ${(car.marketValue || 0).toLocaleString()} ₽)`);
+setTxt(`preSaleCarTitle`, `${car.name} (Оценка: ${(car.marketValue || 0).toLocaleString()} ₽)`);
 const wash = state.businesses ? state.businesses.find(b => b.id === 'wash') : null;
 const sto = state.businesses ? state.businesses.find(b => b.id === 'sto') : null;
 const cleanCost = (wash && wash.level >= 3) ? 0 : (wash && wash.level > 0 ? 2000 : 4000);
 const paintCost = (sto && sto.level > 0) ? 6000 : 12000;
-const btnClean = document.getElementById('btnCleanPrice');
-const btnPaint = document.getElementById('btnPaintPrice');
-const btnAdditive = document.getElementById('btnAdditivePrice');
-const btnOdometer = document.getElementById('btnOdometerPrice');
+const btnClean = document.getElementById(`btnCleanPrice`);
+const btnPaint = document.getElementById(`btnPaintPrice`);
+const btnAdditive = document.getElementById(`btnAdditivePrice`);
+const btnOdometer = document.getElementById(`btnOdometerPrice`);
 if (btnClean) {
-btnClean.innerText = car.isPolished ? 'Готово ✓' : `${cleanCost.toLocaleString()} ₽`;
+btnClean.innerText = car.isPolished ? `Готово ✓` : `${cleanCost.toLocaleString()} ₽`;
 btnClean.disabled = !!car.isPolished;
-btnClean.className = car.isPolished ? 'btn btn-dark btn-sm opacity-50' : 'btn btn-cyan btn-sm';
+btnClean.className = car.isPolished ? `btn btn-dark btn-sm opacity-50` : `btn btn-cyan btn-sm`;
 }
 if (btnPaint) {
-btnPaint.innerText = car.isRepainted ? 'Готово ✓' : `${paintCost.toLocaleString()} ₽`;
+btnPaint.innerText = car.isRepainted ? `Готово ✓` : `${paintCost.toLocaleString()} ₽`;
 btnPaint.disabled = !!car.isRepainted;
-btnPaint.className = car.isRepainted ? 'btn btn-dark btn-sm opacity-50' : 'btn btn-dark btn-sm';
+btnPaint.className = car.isRepainted ? `btn btn-dark btn-sm opacity-50` : `btn btn-dark btn-sm`;
 }
 if (btnAdditive) {
-btnAdditive.innerText = car.hasAdditive ? 'Готово ✓' : '6,000 ₽';
+btnAdditive.innerText = car.hasAdditive ? `Готово ✓` : `6,000 ₽`;
 btnAdditive.disabled = !!car.hasAdditive;
-btnAdditive.className = car.hasAdditive ? 'btn btn-dark btn-sm opacity-50' : 'btn btn-amber btn-sm';
+btnAdditive.className = car.hasAdditive ? `btn btn-dark btn-sm opacity-50` : `btn btn-amber btn-sm`;
 }
 if (btnOdometer) {
-btnOdometer.innerText = car.rolledOdometer ? 'Скручен ✓' : '8,000 ₽';
+btnOdometer.innerText = car.rolledOdometer ? `Скручен ✓` : `8,000 ₽`;
 btnOdometer.disabled = !!car.rolledOdometer;
-btnOdometer.className = car.rolledOdometer ? 'btn btn-dark btn-sm opacity-50' : 'btn btn-danger btn-sm';
+btnOdometer.className = car.rolledOdometer ? `btn btn-dark btn-sm opacity-50` : `btn btn-danger btn-sm`;
 }
-document.getElementById('modalPreSale')?.classList.add('active');
+document.getElementById(`modalPreSale`)?.classList.add(`active`);
 }
 function applyPreSaleMod(type) {
 if (activePreSaleCarIndex === null) return;
@@ -234,40 +236,40 @@ const sto = state.businesses ? state.businesses.find(b => b.id === 'sto') : null
 const cleanCost = (wash && wash.level >= 3) ? 0 : (wash && wash.level > 0 ? 2000 : 4000);
 const paintCost = (sto && sto.level > 0) ? 6000 : 12000;
 if (type === 'clean') {
-if (car.isPolished) return showToast("Уже отполировано!");
-if ((state.player?.cash || 0) < cleanCost) return showToast("Не хватает денег!");
+if (car.isPolished) return showToast(`Уже отполировано!`);
+if ((state.player?.cash || 0) < cleanCost) return showToast(`Не хватает денег!`);
 state.player.cash -= cleanCost;
 car.isPolished = true;
 car.baseMarketValue = Math.round((car.baseMarketValue || car.price || 100000) * 1.05);
 car.marketValue = car.baseMarketValue + calculatePlateValue(car.customPlate || car.plate);
-showToast("✨ Фары сияют, салон как новый! +5% к цене.");
+showToast(`✨ Фары сияют, салон как новый! +5% к цене.`);
 }
 else if (type === 'paint') {
-if (car.isRepainted) return showToast("Уже окрашено!");
-if ((state.player?.cash || 0) < paintCost) return showToast("Не хватает денег!");
+if (car.isRepainted) return showToast(`Уже окрашено!`);
+if ((state.player?.cash || 0) < paintCost) return showToast(`Не хватает денег!`);
 state.player.cash -= paintCost;
 car.condition = Math.min(100, (car.condition || 85) + 20);
 car.isRepainted = true;
 if (!car.bodyThickness) car.bodyThickness = { hood: 110, roof: 100, doors: 110, wings: 105 };
 car.bodyThickness.doors = 280;
-showToast("🎨 Детали облиты! Слой краски увеличился.");
+showToast(`🎨 Детали облиты! Слой краски увеличился.`);
 }
 else if (type === 'additive') {
-if (car.hasAdditive) return showToast("Присадка уже залита!");
-if ((state.player?.cash || 0) < 6000) return showToast("Не хватает 6,000 ₽!");
+if (car.hasAdditive) return showToast(`Присадка уже залита!`);
+if ((state.player?.cash || 0) < 6000) return showToast(`Не хватает 6,000 ₽!`);
 state.player.cash -= 6000;
 car.hasAdditive = true;
-showToast("🧪 «Медовая» присадка залита! Стук гидрокомпенсаторов скрыт.");
+showToast(`🧪 «Медовая» присадка залита! Стук гидрокомпенсаторов скрыт.`);
 }
 else if (type === 'odometer') {
-if (car.rolledOdometer) return showToast("Пробег уже скручивался!");
-if ((state.player?.cash || 0) < 8000) return showToast("Не хватает 8,000 ₽!");
+if (car.rolledOdometer) return showToast(`Пробег уже скручивался!`);
+if ((state.player?.cash || 0) < 8000) return showToast(`Не хватает 8,000 ₽!`);
 state.player.cash -= 8000;
 car.mileage = Math.round((car.mileage || 85000) / 2);
 car.baseMarketValue = Math.round((car.baseMarketValue || car.price || 100000) * 1.15);
 car.marketValue = car.baseMarketValue + calculatePlateValue(car.customPlate || car.plate);
 car.rolledOdometer = true;
-showToast("⏳ Пробег скручен вдвое! Машина помолодела.");
+showToast(`⏳ Пробег скручен вдвое! Машина помолодела.`);
 }
 saveState();
 renderGarage();
@@ -279,36 +281,36 @@ if (!car) return;
 const sto = state.businesses ? state.businesses.find(b => b.id === 'sto') : null;
 let cost = car.hiddenDefect ? (car.hiddenDefect.cost || 10000) : 10000;
 if (sto && sto.level > 0) cost = Math.round(cost * 0.6);
-if ((state.player?.cash || 0) < cost) return showToast("Не хватает денег на капремонт!");
+if ((state.player?.cash || 0) < cost) return showToast(`Не хватает денег на капремонт!`);
 state.player.cash -= cost;
 car.hiddenDefect = null;
 car.hasAdditive = false;
 car.condition = 95;
 saveState();
 renderGarage();
-showToast("Дефект устранён!");
+showToast(`Дефект устранён!`);
 }
 function openOBD2Modal() {
 if (selectedCarIndex === null) return;
 if (!state.player?.tools?.obd) {
-return showToast("🔒 Требуется OBD2-сканер! Купите его в Маркете Перекупа.");
+return showToast(`🔒 Требуется OBD2-сканер! Купите его в Маркете Перекупа.`);
 }
 obdActiveCarIdx = selectedCarIndex;
 const car = state.garage[selectedCarIndex];
 if (!car) return;
-closeModal('modalPreview');
+closeModal(`modalPreview`);
 car.stoChecked = true;
-setTxt('obd2CarTitle', `Диагностика: ${car.name}`);
-const resBox = document.getElementById('obd2ResultBox');
-const actBox = document.getElementById('obd2ActionBox');
-resBox.innerHTML = "Подключение по протоколу CAN / ISO 14230...<br>";
-actBox.innerHTML = "";
-document.getElementById('modalOBD2')?.classList.add('active');
+setTxt(`obd2CarTitle`, `Диагностика: ${car.name}`);
+const resBox = document.getElementById(`obd2ResultBox`);
+const actBox = document.getElementById(`obd2ActionBox`);
+resBox.innerHTML = `Подключение по протоколу CAN / ISO 14230...<br>`;
+actBox.innerHTML = ``;
+document.getElementById(`modalOBD2`)?.classList.add(`active`);
 setTimeout(() => {
 const engWear = car.wear ? Math.round(car.wear.engine) : 100;
 const transWear = car.wear ? Math.round(car.wear.transmission) : 100;
 let issuesHtml = `<b>Отчет об узлах:</b>
-<br>Двигатель: ${engWear}% ресурса<br>Трансмиссия: ${transWear}% ресурса<br>`;
+<br>Двигатель: ${engWear}\% ресурса<br>Трансмиссия: ${transWear}% ресурса<br>`;
   if (car.hiddenDefect) {
   issuesHtml += `<br>
   <span class="color-red">ОШИБКИ В ЭБУ:</span>
@@ -322,7 +324,7 @@ let issuesHtml = `<b>Отчет об узлах:</b>
     }, 800);
     }
     function closeOBD2Modal() {
-    closeModal('modalOBD2');
+    closeModal(`modalOBD2`);
     if (obdActiveCarIdx !== null) openPreviewModal(obdActiveCarIdx);
     }
     function repairOBDErrorFromScanner() {
@@ -330,7 +332,7 @@ let issuesHtml = `<b>Отчет об узлах:</b>
     const car = state.garage[obdActiveCarIdx];
     if (!car || !car.hiddenDefect) return;
     const cost = car.hiddenDefect.cost || 10000;
-    if ((state.player?.cash || 0) < cost) return showToast("Недостаточно денег на ремонт!");
+    if ((state.player?.cash || 0) < cost) return showToast(`Недостаточно денег на ремонт!`);
     state.player.cash -= cost;
     car.hiddenDefect = null;
     if (!car.wear) car.wear = { engine: 90, transmission: 90 };
@@ -341,37 +343,38 @@ let issuesHtml = `<b>Отчет об узлах:</b>
     saveState();
     closeOBD2Modal();
     renderGarage();
-    showToast("Ремонт узлов выполнен успешно!");
+    showToast(`Ремонт узлов выполнен успешно!`);
     }
     function openChangePlateModal() {
     if (selectedCarIndex === null) return;
-    const list = document.getElementById('changePlateList');
+    const list = document.getElementById(`changePlateList`);
     if (!list) return;
     if (!state.ownedPlates || state.ownedPlates.length === 0) {
-    list.innerHTML = '<div class="sub-label py-2">У вас нет номеров в коллекции! Купите в Маркете.</div>';
+    list.innerHTML = `<div class="sub-label py-2">У вас нет номеров в коллекции! Купите в Маркете.</div>`;
     } else {
     list.innerHTML = state.ownedPlates.map((p, i) => {
     const pVal = calculatePlateValue(p);
+    const extraClass = pVal > 5000 ? `<div class="text-xs color-green mt-1">+${pVal.toLocaleString()} ₽ к цене</div>` : ``;
     return `
     <div class="glass-card flex-between w-full mb-1 p-2">
       <div>
         <div class="license-plate">${p} <div class="license-flag">RUS</div>
       </div>
-      ${pVal > 5000 ? `<div class="text-xs color-green mt-1">+${pVal.toLocaleString()} ₽ к цене</div>` : ''}
+      ${extraClass}
     </div>
-    <button onclick="installPlateOnCar('${p}', ${i})" class="btn btn-cyan btn-auto btn-sm">Установить</button>
+    <button onclick="installPlateOnCar('${p}',${i})" class="btn btn-cyan btn-auto btn-sm">Установить</button>
   </div>`;
   }).join('');
   }
-  document.getElementById('modalChangePlate')?.classList.add('active');
+  document.getElementById(`modalChangePlate`)?.classList.add(`active`);
   }
   function removePlateFromCar() {
   if (selectedCarIndex === null) return;
   const car = state.garage[selectedCarIndex];
   if (!car) return;
   const oldPlate = car.customPlate || car.plate;
-  if (oldPlate && String(oldPlate).startsWith('ТРАНЗИТ')) return showToast("На машине уже установлены транзиты!");
-  if ((state.player?.cash || 0) < 2000) return showToast("Нужно 2,000 ₽ на снятие!");
+  if (oldPlate && String(oldPlate).startsWith('ТРАНЗИТ')) return showToast(`На машине уже установлены транзиты!`);
+  if ((state.player?.cash || 0) < 2000) return showToast(`Нужно 2,000 ₽ на снятие!`);
   state.player.cash -= 2000;
   if (oldPlate) {
   if (!state.ownedPlates) state.ownedPlates = [];
@@ -381,31 +384,31 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   car.customPlate = `ТРАНЗИТ ${transitNum}`;
   car.marketValue = car.baseMarketValue || car.price || 100000;
   saveState();
-  closeModal('modalChangePlate');
+  closeModal(`modalChangePlate`);
   openPreviewModal(selectedCarIndex);
   renderGarage();
-  showToast("Номер снят в инвентарь (-2,000 ₽). Выданы транзиты!");
+  showToast(`Номер снят в инвентарь (-2,000 ₽). Выданы транзиты!`);
   }
   function installPlateOnCar(plate, plateIdx) {
   if (selectedCarIndex === null) return;
   const car = state.garage[selectedCarIndex];
   if (!car) return;
-  if ((state.player?.cash || 0) < 2000) return showToast("Нужно 2,000 ₽ на установку!");
+  if ((state.player?.cash || 0) < 2000) return showToast(`Нужно 2,000 ₽ на установку!`);
   state.player.cash -= 2000;
   car.customPlate = plate;
   state.ownedPlates.splice(plateIdx, 1);
   const plateVal = calculatePlateValue(plate);
   car.marketValue = (car.baseMarketValue || car.price || 100000) + plateVal;
   saveState();
-  closeModal('modalChangePlate');
+  closeModal(`modalChangePlate`);
   openPreviewModal(selectedCarIndex);
   renderGarage();
   showToast(`Госномер ${plate} установлен! (+${plateVal.toLocaleString()} ₽ к оценке авто)`);
   }
   function updateTuningRiskUI(car) {
   const risk = car?.tuning?.risk1251 || 0;
-  setTxt('tuneRiskValue', `${risk}%`);
-  const fill = document.getElementById('tuneRiskFill');
+  setTxt(`tuneRiskValue`, `${risk}%`);
+  const fill = document.getElementById(`tuneRiskFill`);
   if (fill) fill.style.width = `${Math.min(100, risk)}%`;
   }
   function openTuningModal(idx) {
@@ -413,49 +416,46 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   const car = state.garage[idx];
   if (!car) return;
   if (!car.tuning) car.tuning = { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 };
-  setTxt('tuneCarTitle', `${car.name} (${car.power || 100} л.с.)`);
+  setTxt(`tuneCarTitle`, `${car.name} (${car.power || 100} л.с.)`);
   updateTuningRiskUI(car);
-  const c = document.getElementById('tuningItemsContainer');
+  const c = document.getElementById(`tuningItemsContainer`);
   if (c) {
+  const lvl = state.player?.level || 1;
+  const btn1 = lvl < 5 ? `С 5 УР` : `50,000 ₽`;
+  const btn2 = lvl < 10 ? `С 10 УР` : `35,000 ₽`;
+  const btn3 = lvl < 15 ? `С 15 УР` : `45,000 ₽`;
+  const btn4 = lvl < 20 ? `С 20 УР` : `60,000 ₽`;
   c.innerHTML = `
   <div class="glass-card flex-between p-2 mb-2">
     <div>
       <div class="font-bold text-xs">Чип-Тюнинг Stage</div>
       <div class="sub-label">+30 л.с. | Лимит: Stage 3</div>
     </div>
-    <button onclick="applyTuningMod('chip')" class="btn btn-dark btn-auto btn-sm" ${(state.player?.level || 1) < 5 ? 'disabled' : ''}>
-      ${(state.player?.level || 1) < 5 ? 'С 5 УР' : '50,000 ₽'}
-    </button>
+    <button onclick="applyTuningMod('chip')" class="btn btn-dark btn-auto btn-sm" ${lvl < 5 ? 'disabled' : ''}>${btn1}</button>
   </div>
   <div class="glass-card flex-between p-2 mb-2">
     <div>
       <div class="font-bold text-xs">Прямоточный Выхлоп</div>
       <div class="sub-label">+25% риск 12.5.1</div>
     </div>
-    <button onclick="applyTuningMod('exhaust')" class="btn btn-dark btn-auto btn-sm" ${(state.player?.level || 1) < 10 ? 'disabled' : ''}>
-      ${(state.player?.level || 1) < 10 ? 'С 10 УР' : '35,000 ₽'}
-    </button>
+    <button onclick="applyTuningMod('exhaust')" class="btn btn-dark btn-auto btn-sm" ${lvl < 10 ? 'disabled' : ''}>${btn2}</button>
   </div>
   <div class="glass-card flex-between p-2 mb-2">
     <div>
       <div class="font-bold text-xs">Пневмоподвеска (Стенс)</div>
       <div class="sub-label">+40 баллов на шоу</div>
     </div>
-    <button onclick="applyTuningMod('stance')" class="btn btn-dark btn-auto btn-sm" ${(state.player?.level || 1) < 15 ? 'disabled' : ''}>
-      ${(state.player?.level || 1) < 15 ? 'С 15 УР' : '45,000 ₽'}
-    </button>
+    <button onclick="applyTuningMod('stance')" class="btn btn-dark btn-auto btn-sm" ${lvl < 15 ? 'disabled' : ''}>${btn3}</button>
   </div>
   <div class="glass-card flex-between p-2 mb-2">
     <div>
       <div class="font-bold text-xs">Спортивный Обвес</div>
       <div class="sub-label">+15% риск 12.5.1</div>
     </div>
-    <button onclick="applyTuningMod('bodykit')" class="btn btn-dark btn-auto btn-sm" ${(state.player?.level || 1) < 20 ? 'disabled' : ''}>
-      ${(state.player?.level || 1) < 20 ? 'С 20 УР' : '60,000 ₽'}
-    </button>
+    <button onclick="applyTuningMod('bodykit')" class="btn btn-dark btn-auto btn-sm" ${lvl < 20 ? 'disabled' : ''}>${btn4}</button>
   </div>`;
   }
-  document.getElementById('modalTuning')?.classList.add('active');
+  document.getElementById(`modalTuning`)?.classList.add(`active`);
   }
   function applyTuningMod(type) {
   if (selectedCarIndex === null) return;
@@ -464,34 +464,34 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   if (!car.tuning) car.tuning = { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 };
   const lvl = state.player?.level || 1;
   if (type === 'chip') {
-  if (lvl < 5) return showToast("Требуется 5 уровень!");
-  if (car.tuning.chip >= 3) return showToast("Уже установлен Stage 3!");
-  if ((state.player?.cash || 0) < 50000) return showToast("Не хватает 50,000 ₽!");
+  if (lvl < 5) return showToast(`Требуется 5 уровень!`);
+  if (car.tuning.chip >= 3) return showToast(`Уже установлен Stage 3!`);
+  if ((state.player?.cash || 0) < 50000) return showToast(`Не хватает 50,000 ₽!`);
   state.player.cash -= 50000;
   car.tuning.chip += 1;
   car.power = (car.power || 100) + 30;
   car.tuning.risk1251 += 15;
   }
   else if (type === 'exhaust') {
-  if (lvl < 10) return showToast("Требуется 10 уровень!");
-  if (car.tuning.exhaust) return showToast("Прямоток уже стоит!");
-  if ((state.player?.cash || 0) < 35000) return showToast("Не хватает 35,000 ₽!");
+  if (lvl < 10) return showToast(`Требуется 10 уровень!`);
+  if (car.tuning.exhaust) return showToast(`Прямоток уже стоит!`);
+  if ((state.player?.cash || 0) < 35000) return showToast(`Не хватает 35,000 ₽!`);
   state.player.cash -= 35000;
   car.tuning.exhaust = true;
   car.tuning.risk1251 += 25;
   }
   else if (type === 'stance') {
-  if (lvl < 15) return showToast("Требуется 15 уровень!");
-  if (car.tuning.stance) return showToast("Пневма уже настроена!");
-  if ((state.player?.cash || 0) < 45000) return showToast("Не хватает 45,000 ₽!");
+  if (lvl < 15) return showToast(`Требуется 15 уровень!`);
+  if (car.tuning.stance) return showToast(`Пневма уже настроена!`);
+  if ((state.player?.cash || 0) < 45000) return showToast(`Не хватает 45,000 ₽!`);
   state.player.cash -= 45000;
   car.tuning.stance = true;
   car.tuning.risk1251 += 20;
   }
   else if (type === 'bodykit') {
-  if (lvl < 20) return showToast("Требуется 20 уровень!");
-  if (car.tuning.bodykit) return showToast("Обвес уже установлен!");
-  if ((state.player?.cash || 0) < 60000) return showToast("Не хватает 60,000 ₽!");
+  if (lvl < 20) return showToast(`Требуется 20 уровень!`);
+  if (car.tuning.bodykit) return showToast(`Обвес уже установлен!`);
+  if ((state.player?.cash || 0) < 60000) return showToast(`Не хватает 60,000 ₽!`);
   state.player.cash -= 60000;
   car.tuning.bodykit = true;
   car.tuning.risk1251 += 15;
@@ -499,7 +499,7 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   updateTuningRiskUI(car);
   saveState();
   renderGarage();
-  showToast("Тюнинг установлен!");
+  showToast(`Тюнинг установлен!`);
   }
   function unimpoundCar(idx) {
   const car = state.garage[idx];
@@ -513,7 +513,7 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   car.impoundedDays = 0;
   saveState();
   renderGarage();
-  return showToast("🔧 Дядя Ваня с СТО вытащил машину со стоянки бесплатно!");
+  return showToast(`🔧 Дядя Ваня с СТО вытащил машину со стоянки бесплатно!`);
   }
   if ((state.player?.connections || 0) >= 2) {
   state.player.connections -= 2;
@@ -521,7 +521,7 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   car.impoundedDays = 0;
   saveState();
   renderGarage();
-  return showToast("🤝 Машина забрана со штрафстоянки за 2 Связи!");
+  return showToast(`🤝 Машина забрана со штрафстоянки за 2 Связи!`);
   }
   if ((state.player?.cash || 0) < totalParkingDebt) {
   return showToast(`Не хватает денег! Долг за стоянку: ${totalParkingDebt.toLocaleString()} ₽`);
@@ -538,24 +538,24 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   const car = state.garage[idx];
   if (!car) return;
   const cost = car.purchaseCost || car.basePrice || car.price || 100000;
-  setTxt('lotPutCarTitle', `${car.name} (Оценка: ${(car.marketValue || car.price).toLocaleString()} ₽)`);
-  setTxt('lotCostInfo', `Начальная себестоимость: ${cost.toLocaleString()} ₽`);
-  const input = document.getElementById('lotAskingPriceInput');
+  setTxt(`lotPutCarTitle`, `${car.name} (Оценка: ${(car.marketValue || car.price).toLocaleString()} ₽)`);
+  setTxt(`lotCostInfo`, `Начальная себестоимость: ${cost.toLocaleString()} ₽`);
+  const input = document.getElementById(`lotAskingPriceInput`);
   if (input) input.value = car.marketValue || car.price || 100000;
-  document.getElementById('modalPutOnLot')?.classList.add('active');
+  document.getElementById(`modalPutOnLot`)?.classList.add(`active`);
   }
   function confirmPutOnLot() {
   if (carToLotIndex === null) return;
   const car = state.garage[carToLotIndex];
   if (!car) return;
-  const input = document.getElementById('lotAskingPriceInput');
+  const input = document.getElementById(`lotAskingPriceInput`);
   let askingPrice = parseInt(input?.value);
-  if (isNaN(askingPrice) || askingPrice <= 0) return showToast("Введите корректную сумму продажи!");
-  closeModal('modalPutOnLot');
+  if (isNaN(askingPrice) || askingPrice <= 0) return showToast(`Введите корректную сумму продажи!`);
+  closeModal(`modalPutOnLot`);
   state.garage.splice(carToLotIndex, 1);
   if (!state.salesLot) state.salesLot = [];
   state.salesLot.push({
-  id: 'lot_' + Date.now(),
+  id: `lot_${Date.now()}`,
   car: car,
   askingPrice: askingPrice,
   timer: 30,
@@ -564,9 +564,9 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   saveState();
   renderGarage();
   renderSalesLot();
-  tgHaptic('success');
+  tgHaptic(`success`);
   showToast(`🚗 ${car.name} выставлен на площадку!`);
-  setTimeout(() => switchTab('tabSalesLot'), 300);
+  setTimeout(() => switchTab(`tabSalesLot`), 300);
   }
   function checkBarterEvent() {
   if (typeof CAR_DATABASE === 'undefined' || !state.garage || state.garage.length === 0) return;
@@ -585,27 +585,27 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   myCarIdx: myCarIdx,
   myCar: myCar,
   npcCar: {
-  id: 'barter_' + Date.now(),
-  name: npcTemplate.name || "Автомобиль",
-  type: npcTemplate.type || 'economy',
+  id: `barter_${Date.now()}`,
+  name: npcTemplate.name || `Автомобиль`,
+  type: npcTemplate.type || `economy`,
   power: npcTemplate.power || 100,
   basePrice: npcTemplate.basePrice || 100000,
   price: npcTemplate.basePrice || 100000,
   baseMarketValue: npcTemplate.basePrice || 100000,
   marketValue: npcTemplate.basePrice || 100000,
-  img: npcTemplate.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
-  plate: typeof generateNormalPlate === 'function' ? generateNormalPlate() : 'В777ВВ 77',
-  customPlate: typeof generateNormalPlate === 'function' ? generateNormalPlate() : 'В777ВВ 77',
+  img: npcTemplate.img || `https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80`,
+  plate: typeof generateNormalPlate === 'function' ? generateNormalPlate() : `В777ВВ 77`,
+  customPlate: typeof generateNormalPlate === 'function' ? generateNormalPlate() : `В777ВВ 77`,
   condition: 85,
   wear: { engine: 85, transmission: 85 },
   tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 }
   }
   };
-  setTxt('barterMyCarName', myCar.name);
-  setTxt('barterMyCarVal', `${(myCar.marketValue || myCar.price || 0).toLocaleString()} ₽`);
-  setTxt('barterNpcCarName', pendingBarterCar.npcCar.name);
-  setTxt('barterNpcCarVal', `${(pendingBarterCar.npcCar.marketValue || 0).toLocaleString()} ₽`);
-  document.getElementById('modalBarterDeal')?.classList.add('active');
+  setTxt(`barterMyCarName`, myCar.name);
+  setTxt(`barterMyCarVal`, `${(myCar.marketValue || myCar.price || 0).toLocaleString()} ₽`);
+  setTxt(`barterNpcCarName`, pendingBarterCar.npcCar.name);
+  setTxt(`barterNpcCarVal`, `${(pendingBarterCar.npcCar.marketValue || 0).toLocaleString()} ₽`);
+  document.getElementById(`modalBarterDeal`)?.classList.add(`active`);
   }
   function confirmBarterExchange() {
   if (!pendingBarterCar) return;
@@ -613,10 +613,10 @@ let issuesHtml = `<b>Отчет об узлах:</b>
   state.garage.splice(myCarIdx, 1);
   state.garage.push(npcCar);
   pendingBarterCar = null;
-  closeModal('modalBarterDeal');
+  closeModal(`modalBarterDeal`);
   saveState();
   renderGarage();
-  tgHaptic('success');
-  playSound('win');
+  tgHaptic(`success`);
+  playSound(`win`);
   showToast(`Ключ в ключ! Вы обменяли авто на «${npcCar.name}»!`);
   }
