@@ -910,7 +910,7 @@
           <div class="glass-card flex-between p-2 mb-2">
             <div>
               <div class="font-bold text-xs">🧪 Залить «медовую» присадку</div>
-              <div class="sub-label">Временно маскирует стук</div>
+              <div class="sub-label Временно маскирует стук">Временно маскирует стук</div>
             </div>
             <button onclick="applyPreSaleMod('additive')" class="btn btn-amber btn-sm" id="btnAdditivePrice" style="white-space: nowrap; min-width: 75px;">6,000 ₽</button>
           </div>
@@ -928,14 +928,13 @@
     
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- ПОРЯДОК СКРИПТОВ КРИТИЧЕН: -->
-    <script src="data.js"></script>
-    <script src="firebase-bridge.js"></script>
+    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ (СТРОГИЙ ПОРЯДОК: СНАЧАЛА ВСЕ МОДУЛИ, ЗАТЕМ ЯДРО APP.JS) -->
     <script src="js/market.js"></script>
     <script src="js/garage.js"></script>
     <script src="js/salesLot.js"></script>
     <script src="js/life.js"></script>
     <script src="js/syndicate.js"></script>
     <script src="js/app.js"></script>
+
   </body>
 </html>
