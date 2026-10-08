@@ -197,7 +197,6 @@ const STREET_CHAT_LOG = [
     { author: "Major_Vova", text: "Продул 500к в подпольном клубе... где тут ближайший ломбард?", warning: false },
     { author: "DriftKing", text: "Завтра ночная сходка на парковке Ашана. ДПС не звать!", warning: false },
     { author: "Crypto_Bro", text: "Словил ликвидацию на Bybit, продаю свой Гольф стейдж 2. Срочно.", warning: false },
-    // Новые сообщения:
     { author: "SysAdmin", text: "Кто шарит, как AmneziaWG нормально настроить, чтобы MTU не резало на мобиле? Накипело...", warning: false },
     { author: "CNC_Master", text: "Могу вырезать любые проставки на стенс и фланцы лазером или на координатно-пробивном. Качество завод. Пишите в личку.", warning: false, effect: { target: "economy", modifier: 1.05, duration: 40 } },
     { author: "Beam_Mapper", text: "Народ, кто-то умеет JBeam файлы ковырять? Физика отваливается после переноса.", warning: false }
@@ -252,7 +251,7 @@ const EXPANDED_BUYERS_POOL = [
     { name: "Максим, подборщик", avatar: "🔍", type: "inspector", rate: 0.90, minKarma: 30, preStatus: "Лезет эндоскопом...", rejectSay: "Сделки не будет! Машина - хлам." },
     { name: "Иван Сергеевич", avatar: "👨‍🌾", type: "regular", rate: 0.85, minKarma: 20, preStatus: "Ищет повод сбить цену...", rejectSay: "Мне на дачу ездить не пойдет." },
     { name: "Артём, студент", avatar: "🧢", type: "student", rate: 0.78, minKarma: 0, preStatus: "Слушает выхлоп...", rejectSay: "Блин, стипы не хватает." },
-    { name: "Елена, бухгалтер", avatar: "👩‍‍💼", type: "regular", rate: 0.95, minKarma: 50, preStatus: "Смотрит только на салон...", rejectSay: "Вы мне кажетесь подозрительным. Отказ." },
+    { name: "Елена, бухгалтер", avatar: "👩‍💼", type: "regular", rate: 0.95, minKarma: 50, preStatus: "Смотрит только на салон...", rejectSay: "Вы мне кажетесь подозрительным. Отказ." },
     { name: "Илья, инженер-ЧПУ", avatar: "🛠️", type: "inspector", rate: 0.82, minKarma: 20, preStatus: "Замеряет зазоры...", rejectSay: "Отклонение на 2 микрона, геометрия нарушена!" },
     { name: "Кирилл, криптотрейдер", avatar: "📱", type: "dealer", rate: 0.92, minKarma: 10, preStatus: "Смотрит графики битка...", rejectSay: "Маржин-колл, братан, денег нет." },
     { name: "Мага, суетолог", avatar: "🏎️", type: "student", rate: 0.88, minKarma: 10, preStatus: "Проверяет тонировку...", rejectSay: "Не едет она на свои деньги, брат." },
@@ -362,7 +361,6 @@ const DAILY_REWARDS_CONFIG = [
     { day: 7, title: "+600k ₽ & 25 ⭐", reward: { cash: 600000, stars: 25, specialPlate: "Х777ХХ 77" } }
 ];
 
-// --- БАЗА ДЛЯ ГАРАЖНЫХ НАХОДОК ---
 const BARN_FINDS = [
     { name: "ВАЗ-2101 «Копейка» (Дрифт-Спек)", power: 160, type: 'economy', basePrice: 850000, marketValue: 1250000, img: "assets/cars/barn/vaz2101_drift.jpg" },
     { name: "BMW E30 Coupe", power: 170, type: 'comfort', basePrice: 650000, marketValue: 1300000, img: "assets/cars/barn/e30.jpg" },
