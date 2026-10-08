@@ -67,17 +67,18 @@ let activeInspectCarId = null;
 let pendingMarketCar = null;
 
 function getDynamicPrice(basePrice, type) { 
+    if (!state.marketModifiers) state.marketModifiers = { economy: 1, comfort: 1, premium: 1, all: 1 };
     const mod = state.marketModifiers[type] || 1; 
     const globalMod = state.marketModifiers.all || 1; 
     return Math.floor(basePrice * mod * globalMod); 
 }
 
 function getMarketRefreshCost() { 
-    return 150 + (state.player.level * 350); 
+    return 150 + ((state.player?.level || 1) * 350); 
 }
 
 function setCategory(cat) {
-    const lvl = state.player.level;
+    const lvl = state.player.level || 1;
     if (['moto', 'atv'].includes(cat) && lvl < 16) return showToast("🔒 Нужен 16 ур!");
     if (['comfort', 'premium'].includes(cat) && lvl < 30) return showToast("🔒 Нужен 30 ур!");
     if (['hyper', 'truck'].includes(cat) && lvl < 50) return showToast("🔒 Нужен 50 ур!");
@@ -98,21 +99,27 @@ function refreshMarketFeedManual() {
     state.player.fuel -= 5; 
     saveState(); 
     populateMarketFeed(); 
+    renderMarketFeed();
     showToast("Лента обновлена (-5 ⛽)!");
 }
 
 function populateMarketFeed() {
-    if (typeof CAR_DATABASE === 'undefined') return showToast("Ошибка загрузки базы автомобилей!");
-    const pool = CAR_DATABASE[state.activeCategory] || CAR_DATABASE.economy; 
+    if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) {
+        return;
+    }
+    const cat = state.activeCategory || 'economy';
+    const pool = CAR_DATABASE[cat] || CAR_DATABASE.economy || []; 
+    if (pool.length === 0) return;
+
     state.marketFeed = [];
-    const lvl = state.player.level || 1;
+    const lvl = state.player?.level || 1;
     
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 8; i++) {
         const template = pool[i % pool.length]; 
         const defectChance = lvl <= 10 ? 0.25 : (lvl >= 20 ? 0.60 : 0.40);
         const stolenChance = lvl <= 10 ? 0.05 : (lvl >= 20 ? 0.25 : 0.15);
 
-        const hasHiddenDefect = typeof OBD_ERRORS !== 'undefined' ? (Math.random() < defectChance) : false;
+        const hasHiddenDefect = (typeof OBD_ERRORS !== 'undefined' && OBD_ERRORS.length > 0) ? (Math.random() < defectChance) : false;
         const isStolen = Math.random() < stolenChance;
         const carId = 'm_' + Date.now() + '_' + i; 
         const genPlate = generateNormalPlate();
@@ -124,16 +131,16 @@ function populateMarketFeed() {
 
         const sellerPrice = Math.round(dynPrice * priceMultiplier);
         const baseVal = Math.round(dynPrice * 1.15);
-        const defectObj = hasHiddenDefect ? OBD_ERRORS[Math.floor(Math.random() * OBD_ERRORS.length)] : null;
-        const sNote = typeof SELLER_ADS_PHRASES !== 'undefined' 
+        const defectObj = (hasHiddenDefect && typeof OBD_ERRORS !== 'undefined') ? OBD_ERRORS[Math.floor(Math.random() * OBD_ERRORS.length)] : null;
+        const sNote = (typeof SELLER_ADS_PHRASES !== 'undefined' && SELLER_ADS_PHRASES.length > 0) 
             ? SELLER_ADS_PHRASES[Math.floor(Math.random() * SELLER_ADS_PHRASES.length)] 
             : "Хорошая машина, сел поехал.";
 
         state.marketFeed.push({
             id: carId, 
             name: template.name, 
-            power: template.power, 
-            type: template.type, 
+            power: template.power || 100, 
+            type: template.type || 'economy', 
             basePrice: template.basePrice, 
             mileage: Math.floor(Math.random() * 110000) + 14000,
             price: sellerPrice, 
@@ -160,6 +167,7 @@ function populateMarketFeed() {
             viewed: false
         });
     }
+    saveState();
     renderMarketFeed();
 }
 
@@ -170,6 +178,11 @@ function renderMarketFeed() {
     const mainContent = document.querySelector('.main-content');
     const scrollPos = mainContent ? mainContent.scrollTop : 0;
     const now = Date.now();
+
+    if (!state.marketFeed || state.marketFeed.length === 0) {
+        container.innerHTML = `<div class="glass-card text-center py-6 sub-label">Нет предложений на рынке. Нажмите «Обновить ленту»!</div>`;
+        return;
+    }
     
     container.innerHTML = state.marketFeed.map(car => {
         if (car.unavailable) return '';
