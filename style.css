@@ -426,7 +426,7 @@ margin-bottom: 12px;
 position: relative;
 }
 .seller-note-card::before {
-content: '\f10d';
+content: '\f10d'; /* Иконка кавычки FontAwesome */
 font-family: 'Font Awesome 6 Free';
 font-weight: 900;
 position: absolute;
@@ -473,7 +473,7 @@ box-shadow: 0 0 8px rgba(0, 230, 118, 0.6);
 transition: width 1s linear;
 }
 /* ========================================================
-ИМПЕРИЯ (БИЗНЕСЫ С ПРЕВЬЮ И ВКЛАДКАМИ)
+ИМПЕРИЯ: КАРТОЧКИ БИЗНЕСОВ С ПРЕВЬЮ
 ======================================================== */
 .empire-sub-nav {
 display: flex !important;
