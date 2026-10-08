@@ -126,6 +126,8 @@ function openVerdictModal(title, text, isSuccess, amount = null, profit = null) 
 }
 
 // --- СОСТОЯНИЕ (STATE) ---
+const SAVE_KEY = 'perekoop_sim_save_v42_fresh';
+
 const DEFAULT_STATE = {
     player: { 
         name: "Перекуп #777", 
@@ -213,7 +215,7 @@ function getTotalGarageSlots() {
 
 function sanitizeState() {
     try { 
-        const saved = localStorage.getItem('perekoop_sim_save_v40'); 
+        const saved = localStorage.getItem(SAVE_KEY); 
         if (saved) {
             const parsed = JSON.parse(saved);
             state.player = { ...DEFAULT_STATE.player, ...(parsed.player || {}) };
@@ -310,7 +312,7 @@ function updateHeaderUI() {
 
 function saveState() { 
     try { 
-        localStorage.setItem('perekoop_sim_save_v40', JSON.stringify(state)); 
+        localStorage.setItem(SAVE_KEY, JSON.stringify(state)); 
     } catch(e) {} 
     updateHeaderUI(); 
 }
@@ -394,7 +396,7 @@ function claimDailyReward() {
     openVerdictModal("БОНУС ПОЛУЧЕН! 🎁", `Вам начислено: ${currentReward.title}`, true);
 }
 
-// --- НАВИГАЦИЯ ---
+// --- НАВИГАЦИЯ И КАРУСЕЛЬНОЕ СМЕЩЕНИЕ ---
 function switchTab(tabId) {
     playSound('tick'); 
     tgHaptic('light'); 
@@ -404,7 +406,12 @@ function switchTab(tabId) {
     document.getElementById(tabId)?.classList.add('active');
     
     document.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active')); 
-    document.querySelector(`.sub-nav-btn.nav-${tabId}`)?.classList.add('active');
+    const targetNavBtn = document.querySelector(`.sub-nav-btn.nav-${tabId}`);
+    if (targetNavBtn) {
+        targetNavBtn.classList.add('active');
+        // Плавная прокрутка активной кнопки в центр вращающейся ленты
+        targetNavBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
     
     document.querySelectorAll('.b-nav-item').forEach(b => b.classList.remove('active'));
     
@@ -463,6 +470,33 @@ function renderProfileAnalytics() {
     setTxt('profPlayerRank', `Статус: ${rank}`);
 }
 
+// --- БЕСКОНЕЧНАЯ КАРУСЕЛЬ ВЕРХНЕГО МЕНЮ ---
+function initInfiniteCarouselNav() {
+    const wrapper = document.querySelector('.sub-nav-wrapper');
+    const track = document.getElementById('infiniteNavTrack');
+    if (!wrapper || !track) return;
+
+    // Дублируем набор кнопок для бесконечного эффекта при прокрутке вбок
+    if (!track.dataset.cloned) {
+        const originalButtons = Array.from(track.children);
+        originalButtons.forEach(btn => {
+            const clone = btn.cloneNode(true);
+            clone.classList.add('nav-clone');
+            track.appendChild(clone);
+        });
+        track.dataset.cloned = "true";
+    }
+
+    wrapper.addEventListener('scroll', () => {
+        const halfWidth = track.scrollWidth / 2;
+        if (wrapper.scrollLeft >= halfWidth) {
+            wrapper.scrollLeft -= halfWidth;
+        } else if (wrapper.scrollLeft <= 0) {
+            wrapper.scrollLeft += halfWidth;
+        }
+    });
+}
+
 // --- ТЕСТОВЫЕ КНОПКИ ---
 function setCheatLevel(lvl) { 
     state.player.level = lvl; 
@@ -490,7 +524,7 @@ function cheatAddStats() {
 
 function resetGameData() { 
     if (confirm("Точно сбросить весь прогресс?")) {
-        localStorage.removeItem('perekoop_sim_save_v40'); 
+        localStorage.removeItem(SAVE_KEY); 
         location.reload(); 
     }
 }
@@ -500,8 +534,9 @@ function initApp() {
     sanitizeState(); 
     syncTelegramProfile(); 
     updateHeaderUI();
+    initInfiniteCarouselNav();
     
-    // Если лента рынка пуста - генерируем
+    // Если лента пустая — немедленно заполняем машинами
     if (!state.marketFeed || state.marketFeed.length === 0) {
         if (typeof populateMarketFeed === 'function') {
             populateMarketFeed();
