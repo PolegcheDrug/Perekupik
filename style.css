@@ -335,7 +335,7 @@ letter-spacing: 0.5px; transition: all 0.2s ease;
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .flex-gap { display: flex; gap: 6px; }
 /* ========================================================
-ОТОБРАЖЕНИЕ АВТО, ПРЕВЬЮ И НОМЕРОВ
+ОТОБРАЖЕНИЕ АВТО И НОМЕРОВ
 ======================================================== */
 .car-img-wrap {
 position: relative;
@@ -411,7 +411,7 @@ color: var(--green);
 text-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
 }
 /* ========================================================
-ОБНОВЛЕННАЯ ЦИТАТА ПРОДАВЦА (КРАСИВАЯ КАРТОЧКА)
+ОБНОВЛЕННАЯ ЦИТАТА ПРОДАВЦА
 ======================================================== */
 .seller-note-card {
 background: linear-gradient(90deg, rgba(0, 242, 254, 0.1) 0%, rgba(0, 242, 254, 0.02) 100%);
@@ -436,6 +436,23 @@ color: var(--cyan);
 opacity: 0.5;
 font-size: 12px;
 }
+.seller-dialog-box {
+background: #090e18;
+border: 1px solid var(--border-glass);
+border-radius: var(--radius-lg);
+padding: 12px;
+margin-bottom: 12px;
+}
+.seller-bubble {
+position: relative;
+background: #121a28;
+border-left: 3px solid var(--cyan);
+padding: 12px;
+border-radius: 0 8px 8px 8px;
+font-size: 12px;
+font-style: italic;
+color: #e2e8f0;
+}
 /* ========================================================
 ПОЛОСКА ПРОГРЕССА ТАЙМЕРА (ПЛОЩАДКА)
 ======================================================== */
@@ -453,10 +470,10 @@ height: 100%;
 width: 100%;
 background: linear-gradient(90deg, var(--cyan), var(--green));
 box-shadow: 0 0 8px rgba(0, 230, 118, 0.6);
-transition: width 1s linear; /* Плавное убывание 1 сек */
+transition: width 1s linear;
 }
 /* ========================================================
-ИМПЕРИЯ: КАРТОЧКИ БИЗНЕСОВ С ПРЕВЬЮ И ВКЛАДКИ
+ИМПЕРИЯ: КАРТОЧКИ БИЗНЕСОВ С ПРЕВЬЮ
 ======================================================== */
 .empire-sub-nav {
 display: flex !important;
