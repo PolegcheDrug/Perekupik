@@ -410,47 +410,38 @@ font-weight: 900;
 color: var(--green);
 text-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
 }
-.seller-dialog-box {
-background: #090e18;
-border: 1px solid var(--border-glass);
-border-radius: var(--radius-lg);
-padding: 12px;
-margin-bottom: 12px;
-}
-.seller-bubble {
-position: relative;
-background: #121a28;
+/* ========================================================
+ОБНОВЛЕННАЯ ЦИТАТА ПРОДАВЦА (КРАСИВАЯ КАРТОЧКА)
+======================================================== */
+.seller-note-card {
+background: linear-gradient(90deg, rgba(0, 242, 254, 0.1) 0%, rgba(0, 242, 254, 0.02) 100%);
 border-left: 3px solid var(--cyan);
-padding: 12px;
-border-radius: 0 8px 8px 8px;
-font-size: 12px;
+border-radius: 4px 8px 8px 4px;
+padding: 12px 14px 12px 32px;
 font-style: italic;
+font-size: 11px;
+line-height: 1.5;
 color: #e2e8f0;
 margin-bottom: 12px;
-box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+position: relative;
 }
-.seller-bubble::before {
-content: '';
+.seller-note-card::before {
+content: '\f10d'; /* Иконка кавычки FontAwesome */
+font-family: 'Font Awesome 6 Free';
+font-weight: 900;
 position: absolute;
-top: -10px;
-left: -3px;
-border-width: 0 0 10px 10px;
-border-style: solid;
-border-color: transparent transparent #121a28 transparent;
-}
-.level-gate-box {
-background: rgba(0, 0, 0, 0.3);
-border: 1px dashed rgba(255, 179, 0, 0.35);
-border-radius: var(--radius-md);
-padding: 8px;
-margin-top: 8px;
+left: 10px;
+top: 10px;
+color: var(--cyan);
+opacity: 0.5;
+font-size: 12px;
 }
 /* ========================================================
-НОВАЯ ПОЛОСКА ОЖИДАНИЯ ПОКУПАТЕЛЯ (30 СЕКУНД)
+ПОЛОСКА ПРОГРЕССА ТАЙМЕРА (ПЛОЩАДКА)
 ======================================================== */
 .lot-progress-wrap {
 width: 100%;
-height: 8px;
+height: 6px;
 background: rgba(255, 255, 255, 0.08);
 border-radius: 6px;
 overflow: hidden;
@@ -459,14 +450,49 @@ border: 1px solid rgba(255, 255, 255, 0.05);
 }
 .lot-progress-bar {
 height: 100%;
-width: 0%;
+width: 100%;
 background: linear-gradient(90deg, var(--cyan), var(--green));
 box-shadow: 0 0 8px rgba(0, 230, 118, 0.6);
-transition: width 1s linear;
+transition: width 1s linear; /* Плавное убывание 1 сек */
 }
 /* ========================================================
-ИМПЕРИЯ: КАРТОЧКИ БИЗНЕСОВ С ПРЕВЬЮ
+ИМПЕРИЯ: КАРТОЧКИ БИЗНЕСОВ С ПРЕВЬЮ И ВКЛАДКИ
 ======================================================== */
+.empire-sub-nav {
+display: flex !important;
+background: #090e18 !important;
+border: 1px solid rgba(255, 255, 255, 0.1) !important;
+border-radius: 12px !important;
+padding: 4px !important;
+gap: 4px !important;
+margin-bottom: 14px !important;
+width: 100% !important;
+box-sizing: border-box !important;
+}
+.empire-sub-btn {
+flex: 1 1 0 !important;
+background: transparent !important;
+border: none !important;
+color: var(--text-sub) !important;
+font-size: 10px !important;
+font-weight: 800 !important;
+padding: 9px 4px !important;
+border-radius: 8px !important;
+cursor: pointer !important;
+display: flex !important;
+align-items: center !important;
+justify-content: center !important;
+gap: 5px !important;
+white-space: nowrap !important;
+transition: all 0.2s ease !important;
+text-transform: uppercase !important;
+}
+.empire-sub-btn.active {
+background: linear-gradient(135deg, rgba(0, 242, 254, 0.25), rgba(2, 132, 199, 0.35)) !important;
+color: #fff !important;
+border: 1px solid rgba(0, 242, 254, 0.4) !important;
+box-shadow: 0 0 12px rgba(0, 242, 254, 0.25) !important;
+}
 .business-card {
 background: #090e18;
 border: 1px solid var(--border-glass);
@@ -889,7 +915,7 @@ background: linear-gradient(135deg, var(--cyan), #0284c7); border: none;
 color: #000; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 /* ========================================================
-НИЖНИЙ БАР
+НИЖНИЙ БАР (НЕОНОВЫЕ ЦВЕТА)
 ======================================================== */
 .bottom-nav {
 flex-shrink: 0;
