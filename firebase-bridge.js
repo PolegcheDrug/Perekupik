@@ -96,7 +96,6 @@ mockLiveFeed: [
 // Генерация динамической реферальной ссылки для Telegram
 getReferralLink() {
 const tgId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || "777";
-// Замените ВАШ_БОТ на актуальный username вашего бота (без @)
 return `https://t.me/share/url?url=https://t.me/ВАШ_БОТ?startapp=ref_${tgId}&text=Залетай%20в%20Симулятор%20Перекупа!%20Дают%20+50,000%20₽%20и%20связи%20на%20старте!`;
 }
 };
