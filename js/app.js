@@ -228,6 +228,7 @@ function sanitizeState() {
             state.barnProgress = parsed.barnProgress || DEFAULT_STATE.barnProgress;
             state.myP2PListings = Array.isArray(parsed.myP2PListings) ? parsed.myP2PListings : [];
             state.confiscatedLot = parsed.confiscatedLot || null;
+            state.marketFeed = Array.isArray(parsed.marketFeed) ? parsed.marketFeed : [];
         } 
     } catch(e) {}
     
@@ -415,6 +416,7 @@ function switchTab(tabId) {
     }
     else if (tabId === 'tabSyndicate') document.getElementById('bnav-tabSyndicate')?.classList.add('active');
 
+    if (tabId === 'tabMarket' && typeof renderMarketFeed === 'function') renderMarketFeed();
     if (tabId === 'tabGarage' && typeof renderGarage === 'function') { 
         renderGarage(); 
         if (typeof checkBarterEvent === 'function') checkBarterEvent(); 
@@ -499,11 +501,11 @@ function initApp() {
     syncTelegramProfile(); 
     updateHeaderUI();
     
-    // Гарантируем, что лента рынка создана и отрисована
+    // Если лента рынка пуста - генерируем
     if (!state.marketFeed || state.marketFeed.length === 0) {
-        if (typeof populateMarketFeed === 'function') populateMarketFeed();
-    } else {
-        if (typeof renderMarketFeed === 'function') renderMarketFeed();
+        if (typeof populateMarketFeed === 'function') {
+            populateMarketFeed();
+        }
     }
 
     if (!Array.isArray(state.plateCatalog) || state.plateCatalog.length === 0) {
@@ -513,10 +515,7 @@ function initApp() {
         if (typeof generateContracts === 'function') generateContracts();
     }
 
-    // Принудительно открываем и показываем активный экран
-    switchTab('tabMarket');
-}
-
+    if (typeof checkReshalaAccess === 'function') checkReshalaAccess();
     if (typeof renderGarage === 'function') renderGarage(); 
     if (typeof renderSalesLot === 'function') renderSalesLot();
     if (typeof renderDiets === 'function') renderDiets(); 
@@ -527,6 +526,9 @@ function initApp() {
     if (typeof renderLifeChat === 'function') renderLifeChat();
     
     switchTab('tabMarket');
+    if (typeof renderMarketFeed === 'function') {
+        renderMarketFeed();
+    }
 }
 
 // --- ГЛОБАЛЬНЫЙ ТАЙМЕР ---
@@ -564,8 +566,7 @@ setInterval(() => {
     }
 }, 1000);
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
-} else {
+// Запуск приложения строго после полной загрузки всех файлов и DOM
+window.addEventListener('load', () => {
     initApp();
-}
+});
