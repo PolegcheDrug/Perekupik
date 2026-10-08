@@ -499,14 +499,23 @@ function initApp() {
     syncTelegramProfile(); 
     updateHeaderUI();
     
-    if (typeof checkReshalaAccess === 'function') checkReshalaAccess();
-    if (state.marketFeed.length === 0 && typeof populateMarketFeed === 'function') populateMarketFeed();
+    // Гарантируем, что лента рынка создана и отрисована
+    if (!state.marketFeed || state.marketFeed.length === 0) {
+        if (typeof populateMarketFeed === 'function') populateMarketFeed();
+    } else {
+        if (typeof renderMarketFeed === 'function') renderMarketFeed();
+    }
+
     if (!Array.isArray(state.plateCatalog) || state.plateCatalog.length === 0) {
         if (typeof refreshPlateCatalog === 'function') refreshPlateCatalog();
     }
     if (!Array.isArray(state.contracts) || state.contracts.length === 0) {
         if (typeof generateContracts === 'function') generateContracts();
     }
+
+    // Принудительно открываем и показываем активный экран
+    switchTab('tabMarket');
+}
 
     if (typeof renderGarage === 'function') renderGarage(); 
     if (typeof renderSalesLot === 'function') renderSalesLot();
