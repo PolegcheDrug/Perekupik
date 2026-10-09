@@ -1,22 +1,23 @@
 // ========================================================
-// js/app.js — ЯДРО ИГРЫ, СОСТОЯНИЕ, ГОНКИ И СОБЫТИЯ (v0.3.3.5)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СЕЙВЫ (v0.3.3.6)
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.3.3.5";
+const CURRENT_GAME_VERSION = "v0.3.3.6";
 
 let ACtx = window.AudioContext;
 if (!ACtx) ACtx = window.webkitAudioContext;
 let audioCtx = null;
 
+let tgUserId = "guest_777";
+let SAVE_KEY = "perekup_save_guest_777";
+let cloudSaveDebounceTimer = null;
+let isCloudStorageAvailable = false;
+
 function tgHaptic(type) {
     let t = type ? type : 'light';
     try { 
         if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) { 
-            let isNotif = false;
-            if (t === 'success') isNotif = true;
-            if (t === 'warning') isNotif = true;
-            if (t === 'error') isNotif = true;
-
+            let isNotif = (t === 'success' || t === 'warning' || t === 'error');
             if (isNotif) {
                 window.Telegram.WebApp.HapticFeedback.notificationOccurred(t); 
             } else {
@@ -156,8 +157,6 @@ function dismissPatchNotesModal() {
     } catch(e) {}
 }
 
-const SAVE_KEY = 'perekoop_sim_save_v105_release';
-
 const DEFAULT_STATE = {
     player: { 
         name: "Перекуп #777", avatarUrl: null, cash: 150000, stars: 15, connections: 1, 
@@ -183,16 +182,14 @@ let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 function getGarageSlotCost() {
     let bs = 2;
     if (state.player && state.player.baseSlots) bs = state.player.baseSlots;
-    let extraSlots = bs - 2;
-    if (extraSlots < 0) extraSlots = 0;
+    let extraSlots = Math.max(0, bs - 2);
     return Math.round(250000 * Math.pow(1.65, extraSlots));
 }
 
 function getExpressTicketUpgradeCost() {
     let m = 25;
     if (state.player && state.player.maxExpressTickets) m = state.player.maxExpressTickets;
-    let extra = m - 25;
-    if (extra < 0) extra = 0;
+    let extra = Math.max(0, m - 25);
     const steps = Math.floor(extra / 25);
     return Math.round(50000 * Math.pow(1.5, steps));
 }
@@ -215,31 +212,95 @@ function getTotalGarageSlots() {
     return slots;
 }
 
-function sanitizeState() {
-    try { 
-        const saved = localStorage.getItem(SAVE_KEY); 
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed.player) {
-                state.player = Object.assign({}, DEFAULT_STATE.player, parsed.player);
-                if (parsed.player.stats) state.player.stats = Object.assign({}, DEFAULT_STATE.player.stats, parsed.player.stats);
-                if (parsed.player.tools) state.player.tools = Object.assign({}, DEFAULT_STATE.player.tools, parsed.player.tools);
-                if (parsed.player.furniture) state.player.furniture = parsed.player.furniture;
+// ========================================================
+// TELEGRAM АВТОРИЗАЦИЯ, СЕЙВЫ И CLOUD STORAGE
+// ========================================================
+function initTelegramAuthAndStorage(callback) {
+    try {
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            tg.ready();
+            tg.expand();
+
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                const u = tg.initDataUnsafe.user;
+                tgUserId = String(u.id);
+                SAVE_KEY = "perekup_save_" + tgUserId;
+
+                let names = [];
+                if (u.first_name) names.push(u.first_name);
+                if (u.last_name) names.push(u.last_name);
+                const fullName = names.join(' ');
+
+                if (fullName) state.player.name = fullName;
+                else if (u.username) state.player.name = "@" + u.username;
+                if (u.photo_url) state.player.avatarUrl = u.photo_url;
             }
-            if (Array.isArray(parsed.garage)) state.garage = parsed.garage;
-            if (Array.isArray(parsed.salesLot)) state.salesLot = parsed.salesLot;
-            if (Array.isArray(parsed.ownedPlates)) state.ownedPlates = parsed.ownedPlates;
-            if (Array.isArray(parsed.businesses)) state.businesses = parsed.businesses;
-            if (parsed.marketModifiers) state.marketModifiers = parsed.marketModifiers;
-            if (parsed.barnProgress) state.barnProgress = parsed.barnProgress;
-            if (Array.isArray(parsed.myP2PListings)) state.myP2PListings = parsed.myP2PListings;
-            if (parsed.confiscatedLot) state.confiscatedLot = parsed.confiscatedLot;
-            if (Array.isArray(parsed.marketFeed)) state.marketFeed = parsed.marketFeed;
-        } 
+
+            if (tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function') {
+                isCloudStorageAvailable = true;
+                const statusEl = document.getElementById('cloudStorageStatus');
+                if (statusEl) {
+                    statusEl.innerText = "TG Cloud: Синхронно";
+                    statusEl.className = "tag-badge bg-tag-green";
+                }
+
+                // Читаем сейв из CloudStorage
+                tg.CloudStorage.getItem(SAVE_KEY, (err, val) => {
+                    if (!err && val) {
+                        try {
+                            applyLoadedState(JSON.parse(val));
+                            if (callback) callback();
+                            return;
+                        } catch(e) {}
+                    }
+                    // Если в облаке пусто — читаем локально
+                    loadFromLocalStorage();
+                    if (callback) callback();
+                });
+                return;
+            }
+        }
     } catch(e) {}
-    
-    if (!state.player.baseSlots) state.player.baseSlots = 2;
-    if (state.player.baseSlots < 2) state.player.baseSlots = 2;
+
+    // Fallback без Telegram WebApp
+    loadFromLocalStorage();
+    if (callback) callback();
+}
+
+function loadFromLocalStorage() {
+    try {
+        let saved = localStorage.getItem(SAVE_KEY);
+        if (!saved) saved = localStorage.getItem('perekoop_sim_save_v105_release');
+        if (saved) {
+            applyLoadedState(JSON.parse(saved));
+        }
+    } catch(e) {}
+}
+
+function applyLoadedState(parsed) {
+    if (!parsed) return;
+    if (parsed.player) {
+        state.player = Object.assign({}, DEFAULT_STATE.player, parsed.player);
+        if (parsed.player.stats) state.player.stats = Object.assign({}, DEFAULT_STATE.player.stats, parsed.player.stats);
+        if (parsed.player.tools) state.player.tools = Object.assign({}, DEFAULT_STATE.player.tools, parsed.player.tools);
+        if (parsed.player.furniture) state.player.furniture = parsed.player.furniture;
+    }
+    if (Array.isArray(parsed.garage)) state.garage = parsed.garage;
+    if (Array.isArray(parsed.salesLot)) state.salesLot = parsed.salesLot;
+    if (Array.isArray(parsed.ownedPlates)) state.ownedPlates = parsed.ownedPlates;
+    if (Array.isArray(parsed.businesses)) state.businesses = parsed.businesses;
+    if (parsed.marketModifiers) state.marketModifiers = parsed.marketModifiers;
+    if (parsed.barnProgress) state.barnProgress = parsed.barnProgress;
+    if (Array.isArray(parsed.myP2PListings)) state.myP2PListings = parsed.myP2PListings;
+    if (parsed.confiscatedLot) state.confiscatedLot = parsed.confiscatedLot;
+    if (Array.isArray(parsed.marketFeed)) state.marketFeed = parsed.marketFeed;
+
+    sanitizeState();
+}
+
+function sanitizeState() {
+    if (!state.player.baseSlots || state.player.baseSlots < 2) state.player.baseSlots = 2;
     if (!state.player.maxExpressTickets) state.player.maxExpressTickets = 25;
     if (typeof state.player.expressTickets !== 'number') state.player.expressTickets = state.player.maxExpressTickets;
     if (typeof state.player.policeImmunityDays !== 'number') state.player.policeImmunityDays = 0;
@@ -247,10 +308,8 @@ function sanitizeState() {
     if (typeof state.player.maxRacesBeforeRaid !== 'number') state.player.maxRacesBeforeRaid = Math.floor(10 + Math.random() * 5);
     if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
     if (!Array.isArray(state.player.furniture)) state.player.furniture = [];
-    if (typeof state.player.cash !== 'number') state.player.cash = 150000;
-    if (state.player.cash < 0) state.player.cash = 150000;
-    if (typeof state.player.loanDebt !== 'number') state.player.loanDebt = 0;
-    if (state.player.loanDebt < 0) state.player.loanDebt = 0;
+    if (typeof state.player.cash !== 'number' || state.player.cash < 0) state.player.cash = 150000;
+    if (typeof state.player.loanDebt !== 'number' || state.player.loanDebt < 0) state.player.loanDebt = 0;
     if (!state.player.tools) state.player.tools = { gauge: false, obd: false, endoscope: false, compressor: false };
     
     if (!state.businesses || state.businesses.length === 0) {
@@ -259,6 +318,114 @@ function sanitizeState() {
         } else {
             state.businesses = [];
         }
+    }
+}
+
+function saveState() { 
+    try { 
+        const jsonStr = JSON.stringify(state);
+        localStorage.setItem(SAVE_KEY, jsonStr);
+
+        // Debounce сохранение в Telegram CloudStorage
+        if (isCloudStorageAvailable && window.Telegram?.WebApp?.CloudStorage) {
+            if (cloudSaveDebounceTimer) clearTimeout(cloudSaveDebounceTimer);
+            cloudSaveDebounceTimer = setTimeout(() => {
+                window.Telegram.WebApp.CloudStorage.setItem(SAVE_KEY, jsonStr, (err, success) => {
+                    const statusEl = document.getElementById('cloudStorageStatus');
+                    if (statusEl) {
+                        if (success) {
+                            statusEl.innerText = "TG Cloud: Синхронно";
+                            statusEl.className = "tag-badge bg-tag-green";
+                        } else {
+                            statusEl.innerText = "TG Cloud: Ошибка";
+                            statusEl.className = "tag-badge bg-tag-red";
+                        }
+                    }
+                });
+            }, 1800);
+        }
+    } catch(e) {} 
+    updateHeaderUI(); 
+}
+
+function syncCloudStorageManual() {
+    if (!isCloudStorageAvailable || !window.Telegram?.WebApp?.CloudStorage) {
+        return showToast("Telegram Cloud Storage недоступен в обычном браузере!");
+    }
+    const jsonStr = JSON.stringify(state);
+    window.Telegram.WebApp.CloudStorage.setItem(SAVE_KEY, jsonStr, (err, success) => {
+        if (success) {
+            playSound('win');
+            tgHaptic('success');
+            showToast("Облако Telegram успешно синхронизировано!");
+        } else {
+            tgHaptic('error');
+            showToast("Не удалось сохранить в облако Telegram.");
+        }
+    });
+}
+
+// РЕЗЕРВНЫЙ ЭКСПОРТ И ИМПОРТ СЕЙВОВ
+function openSaveManagerModal() {
+    const area = document.getElementById('saveExportArea');
+    if (area) {
+        try {
+            area.value = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+        } catch(e) {
+            area.value = JSON.stringify(state);
+        }
+    }
+    const modal = document.getElementById('modalSaveManager');
+    if (modal) modal.classList.add('active');
+    playSound('tick');
+}
+
+function exportSaveCodeAction() {
+    const area = document.getElementById('saveExportArea');
+    if (!area || !area.value) return;
+
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(area.value).then(() => {
+            showToast("Код сейва скопирован в буфер обмена!");
+            tgHaptic('success');
+            playSound('win');
+        }).catch(() => {
+            area.select();
+            document.executeCommand('copy');
+            showToast("Код скопирован!");
+        });
+    } else {
+        area.select();
+        document.executeCommand('copy');
+        showToast("Код скопирован!");
+    }
+}
+
+function importSaveCodeAction() {
+    const area = document.getElementById('saveExportArea');
+    if (!area || !area.value.trim()) return showToast("Вставьте код сохранения в поле!");
+
+    try {
+        let rawStr = area.value.trim();
+        let jsonStr = "";
+        try {
+            jsonStr = decodeURIComponent(escape(atob(rawStr)));
+        } catch(e) {
+            jsonStr = rawStr;
+        }
+
+        const parsed = JSON.parse(jsonStr);
+        if (!parsed.player || typeof parsed.player.cash !== 'number') {
+            throw new Error("Неверный формат данных");
+        }
+
+        applyLoadedState(parsed);
+        saveState();
+        closeModal('modalSaveManager');
+        location.reload();
+    } catch(err) {
+        tgHaptic('error');
+        showToast("Ошибка импорта! Некорректный код сейва.");
     }
 }
 
@@ -297,8 +464,7 @@ function updateHeaderUI() {
     if (fill) {
         let xp = (state.player && state.player.xp) ? state.player.xp : 0;
         let maxXp = (state.player && state.player.maxXp) ? state.player.maxXp : 120;
-        let pct = (xp / maxXp) * 100;
-        if (pct > 100) pct = 100;
+        let pct = Math.min(100, (xp / maxXp) * 100);
         fill.style.width = pct + "%";
     }
     
@@ -373,33 +539,6 @@ function updateLevelGatesUI() {
             }
         }
     });
-}
-
-function saveState() { 
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch(e) {} 
-    updateHeaderUI(); 
-}
-
-function syncTelegramProfile() {
-    try {
-        if (window.Telegram && window.Telegram.WebApp) { 
-            const tg = window.Telegram.WebApp;
-            tg.ready(); 
-            tg.expand(); 
-            if (tg.initDataUnsafe && tg.initDataUnsafe.user) { 
-                const u = tg.initDataUnsafe.user; 
-                let arr = [];
-                if (u.first_name) arr.push(u.first_name);
-                if (u.last_name) arr.push(u.last_name);
-                const fullName = arr.join(' ');
-                
-                if (fullName) state.player.name = fullName;
-                else if (u.username) state.player.name = "@" + u.username;
-                
-                if (u.photo_url) state.player.avatarUrl = u.photo_url; 
-            } 
-        }
-    } catch(e) {}
 }
 
 function addXp(amount) {
@@ -563,7 +702,6 @@ function switchTab(tabId) {
 }
 
 // ===================== ДРАГ-РЕЙСИНГ (РАВНАЯ МОЩНОСТЬ, ОБЛАВЫ, КУЛДАУН) =====================
-
 let currentRaceBet = 25000;
 let tachoRpm = 1000;
 let isGasPressed = false;
@@ -652,9 +790,7 @@ function releaseGasPedal() {
 function updateTachometerUI() {
     const needle = document.getElementById('tachoNeedle');
     if (!needle) return;
-    let pct = ((tachoRpm - 1000) / 7000) * 100;
-    if (pct < 0) pct = 0;
-    if (pct > 100) pct = 100;
+    let pct = Math.min(100, Math.max(0, ((tachoRpm - 1000) / 7000) * 100));
     needle.style.left = pct + "%";
 }
 
@@ -802,7 +938,6 @@ function startMotorCooldown(seconds) {
 }
 
 // ===================== СТРИТ-МЕРОПРИЯТИЯ ПО РЕГЛАМЕНТАМ =====================
-
 const STREET_EVENTS_LIST = [
     {
         id: "meet",
@@ -971,7 +1106,6 @@ function participateInStreetEvent(eventId) {
 }
 
 // ===================== ПРОФИЛЬ И АНАЛИТИКА =====================
-
 function renderProfileAnalytics() {
     let pName = (state.player && state.player.name) ? state.player.name : "Перекуп";
     setTxt('profileTgUsername', pName);
@@ -1001,6 +1135,9 @@ function resetGameData() {
     if (confirm("Точно сбросить весь прогресс?")) {
         localStorage.removeItem(SAVE_KEY); 
         localStorage.removeItem('perekup_last_seen_version');
+        if (isCloudStorageAvailable && window.Telegram?.WebApp?.CloudStorage) {
+            window.Telegram.WebApp.CloudStorage.removeItem(SAVE_KEY);
+        }
         location.reload(); 
     }
 }
@@ -1017,35 +1154,35 @@ function checkAutoShowPatchNotes() {
 }
 
 function initApp() {
-    sanitizeState(); 
-    syncTelegramProfile(); 
-    updateHeaderUI();
-    updateLevelGatesUI();
-    
-    if (!state.marketFeed || state.marketFeed.length === 0) {
-        if (typeof populateMarketFeed === 'function') populateMarketFeed();
-    }
-    if (!state.plateCatalog || state.plateCatalog.length === 0) {
-        if (typeof refreshPlateCatalog === 'function') refreshPlateCatalog();
-    }
-    if (!state.contracts || state.contracts.length === 0) {
-        if (typeof generateContracts === 'function') generateContracts();
-    }
+    initTelegramAuthAndStorage(() => {
+        updateHeaderUI();
+        updateLevelGatesUI();
+        
+        if (!state.marketFeed || state.marketFeed.length === 0) {
+            if (typeof populateMarketFeed === 'function') populateMarketFeed();
+        }
+        if (!state.plateCatalog || state.plateCatalog.length === 0) {
+            if (typeof refreshPlateCatalog === 'function') refreshPlateCatalog();
+        }
+        if (!state.contracts || state.contracts.length === 0) {
+            if (typeof generateContracts === 'function') generateContracts();
+        }
 
-    if (typeof checkReshalaAccess === 'function') checkReshalaAccess();
-    if (typeof renderGarage === 'function') renderGarage(); 
-    if (typeof renderSalesLot === 'function') renderSalesLot();
-    if (typeof renderDiets === 'function') renderDiets(); 
-    if (typeof renderHousing === 'function') renderHousing(); 
-    if (typeof renderContracts === 'function') renderContracts(); 
-    if (typeof renderContainersList === 'function') renderContainersList(); 
-    if (typeof renderBarnFind === 'function') renderBarnFind();
-    if (typeof checkBusinessAccess === 'function') checkBusinessAccess();
-    
-    switchTab('tabMarket');
-    if (typeof renderMarketFeed === 'function') renderMarketFeed();
+        if (typeof checkReshalaAccess === 'function') checkReshalaAccess();
+        if (typeof renderGarage === 'function') renderGarage(); 
+        if (typeof renderSalesLot === 'function') renderSalesLot();
+        if (typeof renderDiets === 'function') renderDiets(); 
+        if (typeof renderHousing === 'function') renderHousing(); 
+        if (typeof renderContracts === 'function') renderContracts(); 
+        if (typeof renderContainersList === 'function') renderContainersList(); 
+        if (typeof renderBarnFind === 'function') renderBarnFind();
+        if (typeof checkBusinessAccess === 'function') checkBusinessAccess();
+        
+        switchTab('tabMarket');
+        if (typeof renderMarketFeed === 'function') renderMarketFeed();
 
-    checkAutoShowPatchNotes();
+        checkAutoShowPatchNotes();
+    });
 }
 
 setInterval(() => {
