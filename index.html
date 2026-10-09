@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Симулятор Перекупа — Telegram Mini App</title>
-    <link rel="stylesheet" href="style.css?v=40">
+    <link rel="stylesheet" href="style.css?v=50">
     
     <!-- Подключение баз данных и системных библиотек -->
-    <script src="data.js?v=40"></script>
-    <script src="firebase-bridge.js?v=40"></script>
+    <script src="data.js?v=50"></script>
+    <script src="firebase-bridge.js?v=50"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
@@ -434,7 +434,7 @@
           </div>
         </section>
 
-        <!-- 8. TAB: СТРИТ И ДРАГ-РЕЙСИНГ -->
+        <!-- 8. TAB: СТРИТ И ДРАГ-РЕЙСИНГ + МЕРОПРИЯТИЯ -->
         <section id="tabStreet" class="tab-screen">
           <div class="glass-card mb-3">
             <div class="flex-between mb-2">
@@ -484,6 +484,16 @@
                 🚦 СТАРТ НА 402М
               </button>
             </div>
+          </div>
+
+          <!-- НОВЫЙ БЛОК: СТРИТ-МЕРОПРИЯТИЯ (СХОДКИ, АВТОШОУ, НЕЛЕГАЛЬНЫЙ ДРИФТ) -->
+          <div class="glass-card mb-3">
+            <div class="flex-between mb-2">
+              <h3 class="color-amber font-bold"><i class="fa-solid fa-masks-theater"></i> Стрит-Мероприятия</h3>
+              <span class="tag-badge bg-tag-amber">Ивенты</span>
+            </div>
+            <p class="sub-label mb-2">Участвуйте в городских авто-событиях с риском облав ДПС и проверкой 12.5.1!</p>
+            <div id="streetEventsContainer" class="space-y-2"></div>
           </div>
         </section>
 
@@ -601,7 +611,12 @@
         <section id="tabProfile" class="tab-screen">
           <div class="glass-card text-center mb-3">
             <h3 id="profileTgUsername">Перекуп #777</h3>
-            <p class="sub-label mb-3" id="profPlayerRank">Статус: Гаражный Делец</p>
+            <p class="sub-label mb-2" id="profPlayerRank">Статус: Гаражный Делец</p>
+            
+            <!-- КНОПКА ОТКРЫТИЯ СПИСКА ИЗМЕНЕНИЙ И ТИТРОВ -->
+            <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
+              <i class="fa-solid fa-sparkles"></i> Список изменений v2.5 & Команда
+            </button>
             
             <div class="grid-2 mb-2">
               <div class="stat-box">
@@ -712,6 +727,54 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА -->
+    <!-- СПИСОК ИЗМЕНЕНИЙ И КОМАНДА РАЗРАБОТЧИКОВ -->
+    <div id="modalPatchNotes" class="modal-overlay">
+      <div class="modal-box">
+        <div class="flex-between mb-2">
+          <h4 class="color-purple font-bold"><i class="fa-solid fa-code-commit"></i> Список изменений v2.5</h4>
+          <button onclick="closeModal('modalPatchNotes')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+
+        <div class="p-2 mb-2" style="background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+          <div class="flex-between text-xs mb-1">
+            <span>Прогресс готовности обновления:</span>
+            <b class="color-green">100% (Релиз)</b>
+          </div>
+          <div class="biz-progress-track"><div class="biz-progress-fill fill-biz-lvl" style="width:100%;"></div></div>
+        </div>
+
+        <div class="space-y-2 text-xs mb-3" style="line-height:1.4;">
+          <div class="patch-item">
+            <b class="color-cyan">✓ Стрит-Мероприятия:</b> сходки, автошоу и нелегальный дрифт с риском изъятия авто и аннулирования учёта.
+          </div>
+          <div class="patch-item">
+            <b class="color-amber">✓ Интерактивный Бизнес:</b> шкалы уровня и сырья (0-100%), закупка расходников в Маркете.
+          </div>
+          <div class="patch-item">
+            <b class="color-green">✓ Торг-Мессенджер у капота:</b> согласование цены при продаже в стиле чата.
+          </div>
+          <div class="patch-item">
+            <b class="color-purple">✓ Фортуна и Развлечения:</b> вилспин, напёрстки x2 и подпольный клуб 21.
+          </div>
+          <div class="patch-item">
+            <b class="color-cyan">✓ Обновлённая Автотека:</b> визуальные шкалы состояния узлов и проверка пробега.
+          </div>
+        </div>
+
+        <div class="p-2 mb-3" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+          <div class="sub-label mb-2 color-amber font-bold">🛠 КОМАНДА РАЗРАБОТЧИКОВ:</div>
+          <div class="credits-grid">
+            <div class="credit-pill">👑 <b>Илюха DXF</b> — Lead Architect / Dev</div>
+            <div class="credit-pill">⚡ <b>Святой Максиман</b> — Gameplay & Balance</div>
+            <div class="credit-pill">🔧 <b>Серёга Техно</b> — Core Physics & Backend</div>
+            <div class="credit-pill">🤖 <b>Жиминка Пендосовская</b> — AI Co-Pilot & Logic</div>
+          </div>
+        </div>
+
+        <button onclick="closeModal('modalPatchNotes')" class="btn btn-purple w-full">Круто, погнали! 🚀</button>
+      </div>
+    </div>
+
     <!-- 1. ЗВОНОК И ТОРГ ПРИ ПОКУПКЕ -->
     <div id="modalMarketDeal" class="modal-overlay">
       <div class="modal-box chat-deal-box">
@@ -744,7 +807,7 @@
       </div>
     </div>
 
-    <!-- 2. ИНТЕРАКТИВНЫЙ ТОРГ ПРИ ПРОДАЖЕ (В СТИЛЕ МЕССЕНДЖЕРА У КАПОТА) -->
+    <!-- 2. ИНТЕРАКТИВНЫЙ ТОРГ ПРИ ПРОДАЖЕ -->
     <div id="modalHaggleSale" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -1004,12 +1067,12 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ (СТРОГИЙ ПОРЯДОК: СНАЧАЛА МОДУЛИ, В КОНЦЕ APP.JS) -->
-    <script src="js/market.js?v=40"></script>
-    <script src="js/garage.js?v=40"></script>
-    <script src="js/salesLot.js?v=40"></script>
-    <script src="js/life.js?v=40"></script>
-    <script src="js/syndicate.js?v=40"></script>
-    <script src="js/app.js?v=40"></script>
+    <script src="js/market.js?v=50"></script>
+    <script src="js/garage.js?v=50"></script>
+    <script src="js/salesLot.js?v=50"></script>
+    <script src="js/life.js?v=50"></script>
+    <script src="js/syndicate.js?v=50"></script>
+    <script src="js/app.js?v=50"></script>
 
   </body>
 </html>
