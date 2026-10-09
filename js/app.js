@@ -1,5 +1,7 @@
 // ===================== ЯДРО ИГРЫ И СОСТОЯНИЕ (js/app.js) =====================
 
+const CURRENT_GAME_VERSION = "v0.3.3.4";
+
 let ACtx = window.AudioContext;
 if (!ACtx) ACtx = window.webkitAudioContext;
 let audioCtx = null;
@@ -145,7 +147,14 @@ function openPatchNotesModal() {
     playSound('tick');
 }
 
-const SAVE_KEY = 'perekoop_sim_save_v70_clean';
+function dismissPatchNotesModal() {
+    closeModal('modalPatchNotes');
+    try {
+        localStorage.setItem('perekup_last_seen_version', CURRENT_GAME_VERSION);
+    } catch(e) {}
+}
+
+const SAVE_KEY = 'perekoop_sim_save_v75_clean';
 
 const DEFAULT_STATE = {
     player: { 
@@ -156,6 +165,7 @@ const DEFAULT_STATE = {
         hunger: 80, mood: 85, reputation: 30, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0, 
         diet: 'shaurma', housingId: 'room', housingType: 'rent', ownedHouses: [], selectedStreetCarIndex: 0, 
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
+        consecutiveRaces: 0, maxRacesBeforeRaid: 12,
         tools: { gauge: false, obd: false, endoscope: false, compressor: false },
         supplies: { energyDrinks: 0, coffee: 0 }
     },
@@ -231,6 +241,8 @@ function sanitizeState() {
     if (!state.player.maxExpressTickets) state.player.maxExpressTickets = 25;
     if (typeof state.player.expressTickets !== 'number') state.player.expressTickets = state.player.maxExpressTickets;
     if (typeof state.player.policeImmunityDays !== 'number') state.player.policeImmunityDays = 0;
+    if (typeof state.player.consecutiveRaces !== 'number') state.player.consecutiveRaces = 0;
+    if (typeof state.player.maxRacesBeforeRaid !== 'number') state.player.maxRacesBeforeRaid = Math.floor(10 + Math.random() * 5);
     if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
     if (typeof state.player.cash !== 'number') state.player.cash = 150000;
     if (state.player.cash < 0) state.player.cash = 150000;
@@ -313,13 +325,31 @@ function updateHeaderUI() {
     let debt = 0; if (state.player && state.player.loanDebt) debt = state.player.loanDebt;
     const loanEl = document.getElementById('loanDebtText');
     if (loanEl) loanEl.innerText = "Долг: " + debt.toLocaleString() + " ₽";
+
+    updateRaceHeatBadge();
 }
 
+function updateRaceHeatBadge() {
+    const heatBadge = document.getElementById('raceHeatBadge');
+    if (!heatBadge) return;
+    const curRaces = state.player?.consecutiveRaces || 0;
+    const maxRaces = state.player?.maxRacesBeforeRaid || 12;
+    heatBadge.innerText = "Внимание ДПС: " + curRaces + "/" + maxRaces;
+    if (curRaces >= maxRaces - 2) {
+        heatBadge.className = "tag-badge bg-tag-red";
+    } else if (curRaces >= Math.floor(maxRaces / 2)) {
+        heatBadge.className = "tag-badge bg-tag-amber";
+    } else {
+        heatBadge.className = "tag-badge bg-tag-green";
+    }
+}
+
+// Новые пороги уровней: Мото с 5 ур., Квадро с 8 ур.
 function updateLevelGatesUI() {
-    let lvl = 1; if (state.player && state.player.level) lvl = state.player.level;
+    let lvl = state.player?.level || 1;
     const gates = [
-        { id: 'moto', lockId: 'lock-moto', minLvl: 16, title: 'Мото' },
-        { id: 'atv', lockId: 'lock-atv', minLvl: 16, title: 'Квадро' },
+        { id: 'moto', lockId: 'lock-moto', minLvl: 5, title: 'Мото' },
+        { id: 'atv', lockId: 'lock-atv', minLvl: 8, title: 'Квадро' },
         { id: 'comfort', lockId: 'lock-comfort', minLvl: 30, title: 'Комфорт' },
         { id: 'premium', lockId: 'lock-premium', minLvl: 30, title: 'Премиум' },
         { id: 'hyper', lockId: 'lock-hyper', minLvl: 50, title: 'Гиперкары' },
@@ -329,13 +359,16 @@ function updateLevelGatesUI() {
 
     gates.forEach(g => {
         const btn = document.getElementById("catBtn-" + g.id);
-        if (btn) {
+        const sub = document.getElementById(g.lockId);
+        if (btn && sub) {
             if (lvl >= g.minLvl) {
                 btn.classList.remove('locked');
-                btn.innerHTML = g.title;
+                sub.innerHTML = "Доступен";
+                sub.style.color = "var(--green)";
             } else {
                 btn.classList.add('locked');
-                btn.innerHTML = "<i class='fa-solid fa-lock' id='" + g.lockId + "'></i> " + g.title + " (" + g.minLvl + " ур)";
+                sub.innerHTML = "<i class='fa-solid fa-lock'></i> " + g.minLvl + " ур";
+                sub.style.color = "#f87171";
             }
         }
     });
@@ -535,13 +568,15 @@ function switchTab(tabId) {
     if (tabId === 'tabProfile' && typeof renderProfileAnalytics === 'function') renderProfileAnalytics();
 }
 
-// ===================== СТРИТ И ДРАГ-РЕЙСИНГ =====================
+// ===================== СТРИТ И ДРАГ-РЕЙСИНГ С КУЛДАУНОМ И ОБЛАВАМИ =====================
 
 let currentRaceBet = 25000;
 let tachoRpm = 1000;
 let isGasPressed = false;
 let gasInterval = null;
 let isRaceRunning = false;
+let isMotorCoolingDown = false;
+let motorCooldownTimer = 0;
 
 function renderStreetScreen() {
     const box = document.getElementById('streetCarPickerBox');
@@ -595,7 +630,7 @@ function setRaceBet(amt) {
 }
 
 function holdGasPedal() {
-    if (isRaceRunning) return;
+    if (isRaceRunning || isMotorCoolingDown) return;
     isGasPressed = true;
     if (gasInterval) clearInterval(gasInterval);
     gasInterval = setInterval(() => {
@@ -631,6 +666,9 @@ function updateTachometerUI() {
 
 function launchDragRace() {
     if (isRaceRunning) return;
+    if (isMotorCoolingDown) {
+        return showToast("⚠️ Мотор перегрет! Остывание: " + motorCooldownTimer + " сек.");
+    }
     if (!state.garage || state.garage.length === 0) return showToast("Нет авто для заезда!");
     
     let selIdx = state.player?.selectedStreetCarIndex || 0;
@@ -648,6 +686,37 @@ function launchDragRace() {
     
     let fuel = state.player?.fuel || 0;
     if (fuel < 10) return showToast("Нужно 10 ⛽ бензина для заезда!");
+
+    // --- ПРОВЕРКА ЛИМИТА ЗАЕЗДОВ И ПОЛИЦЕЙСКОЙ ОБЛАВЫ ---
+    let hasImmunity = (state.player?.policeImmunityDays || 0) > 0;
+    state.player.consecutiveRaces = (state.player.consecutiveRaces || 0) + 1;
+    let maxRaces = state.player?.maxRacesBeforeRaid || 12;
+
+    if (!hasImmunity && state.player.consecutiveRaces >= maxRaces) {
+        // ОБЛАВА ДПС
+        state.player.consecutiveRaces = 0;
+        state.player.maxRacesBeforeRaid = Math.floor(10 + Math.random() * 5);
+        car.impounded = true;
+        car.impoundedDays = 1;
+        car.impoundFine = 40000;
+
+        let hasIllegalTune = car.tuning?.exhaust || car.tuning?.stance || (car.tuning?.chip && car.tuning.chip >= 2);
+        if (hasIllegalTune) {
+            car.unregistered = true;
+        }
+
+        saveState();
+        renderGarage();
+        updateRaceHeatBadge();
+        tgHaptic('error');
+
+        let msg = "ДПС и ОМОН оцепили район гонок! За серию нелегальных заездов «" + car.name + "» конфискован на штрафстоянку.";
+        if (hasIllegalTune) {
+            msg += " Технадзор также АННУЛИРОВАЛ регистрацию за нелегальный тюнинг!";
+        }
+        openVerdictModal("ОБЛАВА НА ГОНКАХ! 🚨", msg, false);
+        return;
+    }
 
     state.player.cash -= currentRaceBet;
     state.player.fuel -= 10;
@@ -703,18 +772,47 @@ function launchDragRace() {
                 openVerdictModal("ПОРАЖЕНИЕ 💨", "Соперник оказался быстрее на финише. Банк утерян: -" + currentRaceBet.toLocaleString() + " ₽.", false);
             }
 
+            // Запуск таймера остывания мотора (кулдаун 10 сек)
+            startMotorCooldown(10);
+
             setTimeout(() => {
                 if (pRunner) pRunner.style.left = '0%';
                 if (rRunner) rRunner.style.left = '0%';
                 tachoRpm = 1000;
                 updateTachometerUI();
-                setTxt('raceStatusText', 'Заезд завершен. Выберите ставку для новой гонки!');
             }, 1200);
         }
     }, 120);
 }
 
-// ===================== НОВАЯ МЕХАНИКА: СТРИТ-МЕРОПРИЯТИЯ =====================
+function startMotorCooldown(seconds) {
+    isMotorCoolingDown = true;
+    motorCooldownTimer = seconds;
+    const btnLaunch = document.getElementById('btnStartRaceLaunch');
+
+    const cdInterval = setInterval(() => {
+        motorCooldownTimer -= 1;
+        if (btnLaunch) {
+            btnLaunch.innerText = "⏳ ОСТЫВАНИЕ (" + motorCooldownTimer + "с)";
+            btnLaunch.classList.remove('btn-green');
+            btnLaunch.classList.add('btn-dark');
+        }
+        setTxt('raceStatusText', "❄️ Мотор остывает: " + motorCooldownTimer + " сек.");
+
+        if (motorCooldownTimer <= 0) {
+            clearInterval(cdInterval);
+            isMotorCoolingDown = false;
+            if (btnLaunch) {
+                btnLaunch.innerText = "🚦 СТАРТ НА 402М";
+                btnLaunch.classList.remove('btn-dark');
+                btnLaunch.classList.add('btn-green');
+            }
+            setTxt('raceStatusText', "Мотор остыл и готов к новому заезду!");
+        }
+    }, 1000);
+}
+
+// ===================== СТРИТ-МЕРОПРИЯТИЯ =====================
 
 const STREET_EVENTS_LIST = [
     {
@@ -866,9 +964,6 @@ function participateInStreetEvent(eventId) {
     } 
     else if (eventId === 'drift') {
         playEngineSound();
-        let driftSkillRoll = Math.random();
-
-        // Риск облавы на нелегальном дрифте
         let raidRoll = Math.random();
         let isBusted = (!hasImmunity && raidRoll < 0.45);
 
@@ -877,7 +972,6 @@ function participateInStreetEvent(eventId) {
             let severeBust = Math.random() < 0.50;
 
             if (severeBust && (car.tuning?.exhaust || car.tuning?.stance || car.tuning?.chip)) {
-                // АННУЛИРОВАНИЕ УЧЁТА (СНЯТИЕ С РЕГИСТРАЦИИ)
                 car.unregistered = true;
                 car.impounded = true;
                 car.impoundedDays = 1;
@@ -890,7 +984,6 @@ function participateInStreetEvent(eventId) {
                     false
                 );
             } else {
-                // ОБЫЧНАЯ ШТРАФСТОЯНКА
                 car.impounded = true;
                 car.impoundedDays = 1;
                 car.impoundFine = 30000;
@@ -942,14 +1035,26 @@ function renderProfileAnalytics() {
     else if (lvl >= 10) rank = "Гаражный Профи";
     else if (lvl >= 5) rank = "Бодрый Перекуп";
     
-    setTxt('profPlayerRank', "Статус: " + rank);
+    setTxt('profPlayerRank', "Статус: " + rank + " (" + CURRENT_GAME_VERSION + ")");
 }
 
 function resetGameData() { 
     if (confirm("Точно сбросить весь прогресс?")) {
         localStorage.removeItem(SAVE_KEY); 
+        localStorage.removeItem('perekup_last_seen_version');
         location.reload(); 
     }
+}
+
+function checkAutoShowPatchNotes() {
+    try {
+        const lastSeen = localStorage.getItem('perekup_last_seen_version');
+        if (lastSeen !== CURRENT_GAME_VERSION) {
+            setTimeout(() => {
+                openPatchNotesModal();
+            }, 800);
+        }
+    } catch(e) {}
 }
 
 function initApp() {
@@ -980,6 +1085,9 @@ function initApp() {
     
     switchTab('tabMarket');
     if (typeof renderMarketFeed === 'function') renderMarketFeed();
+
+    // Автоматическая проверка и показ патчноута при первом запуске версии v0.3.3.4
+    checkAutoShowPatchNotes();
 }
 
 setInterval(() => {
