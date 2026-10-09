@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Симулятор Перекупа v0.3.3.5</title>
-    <link rel="stylesheet" href="style.css?v=100">
+    <link rel="stylesheet" href="style.css?v=110">
     
-    <!-- Подключение баз данных и системных библиотек -->
-    <script src="data.js?v=100"></script>
-    <script src="firebase-bridge.js?v=100"></script>
+    <!-- Базы данных и библиотеки -->
+    <script src="data.js?v=110"></script>
+    <script src="firebase-bridge.js?v=110"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
@@ -18,7 +18,6 @@
       <!-- ЕДИНЫЙ ИГРОВОЙ HUD -->
       <header class="hud-header">
         <div class="hud-top-row">
-          <!-- Профиль игрока -->
           <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль">
             <div class="avatar-ring">
               <div class="avatar" id="playerAvatarBox">
@@ -42,7 +41,6 @@
             </div>
           </div>
 
-          <!-- Баланс и ресурсы -->
           <div class="wallet-dashboard">
             <div class="wallet-main">
               <div class="cash-val"><span id="cashAmount">150,000</span> ₽</div>
@@ -72,7 +70,7 @@
         </div>
       </header>
 
-      <!-- ВЕРХНЯЯ НАВИГАЦИОННАЯ ЛЕНТА -->
+      <!-- НАВИГАЦИОННАЯ ЛЕНТА -->
       <div class="sub-nav-wrapper">
         <div class="sub-nav-track" id="infiniteNavTrack">
           <button onclick="switchTab('tabMarket')" class="sub-nav-btn nav-tabMarket active"><i class="fa-solid fa-store"></i> Рынок</button>
@@ -92,11 +90,10 @@
         </div>
       </div>
       
-      <!-- ОСНОВНОЙ КОНТЕЙНЕР ДЛЯ ЭКРАНОВ -->
+      <!-- ОСНОВНОЙ КОНТЕЙНЕР -->
       <main class="main-content">
         <!-- 1. TAB: РЫНОК -->
         <section id="tabMarket" class="tab-screen active">
-          <!-- СЕТКА КЛАССОВ ТЕХНИКИ 3х3 -->
           <div class="glass-card market-filter-card mb-3">
             <div class="flex-between mb-2">
               <div style="display:flex; align-items:center; gap:8px;">
@@ -109,6 +106,7 @@
               <span class="tag-badge bg-tag-cyan" id="currentCatBadge">ЭКОНОМ</span>
             </div>
 
+            <!-- ИСПРАВЛЕННАЯ СЕТКА КЛАССОВ С ИКОНКОЙ СКУТЕРА -->
             <div class="market-categories-grid" id="marketCatListContainer">
               <button onclick="setCategory('economy')" id="catBtn-economy" class="cat-tile active">
                 <div class="cat-tile-icon"><i class="fa-solid fa-car"></i></div>
@@ -117,7 +115,7 @@
               </button>
 
               <button onclick="setCategory('scooter')" id="catBtn-scooter" class="cat-tile">
-                <div class="cat-tile-icon"><i class="fa-solid fa-moped"></i></div>
+                <div class="cat-tile-icon"><i class="fa-solid fa-motorcycle" style="transform: scaleX(-1);"></i></div>
                 <div class="cat-tile-name">Скутеры</div>
                 <div class="cat-tile-sub">Доступен</div>
               </button>
@@ -334,7 +332,7 @@
           <div class="glass-card mb-3 flex-between">
             <div>
               <h3 class="font-bold color-amber"><i class="fa-solid fa-cart-shopping"></i> Магазин Перекупа</h3>
-              <p class="sub-label">Госномера, сканеры, толщиномеры, запчасти, мебель и приставки.</p>
+              <p class="sub-label">Оборудование, сырьё, спортивные детали, консоли и мебель.</p>
             </div>
             <button onclick="switchTab('tabShop')" class="btn btn-amber btn-auto">Войти 🛒</button>
           </div>
@@ -396,19 +394,24 @@
           </div>
         </section>
 
-        <!-- 7. TAB: ФОРТУНА -->
+        <!-- 7. TAB: ФОРТУНА (НОВОЕ НЕОНОВОЕ КОЛЕСО + НАПЁРСТКИ + 21) -->
         <section id="tabServices" class="tab-screen">
-          <div class="glass-card text-center mb-3">
+          <div class="glass-card text-center mb-3 fortune-wheel-card">
             <div class="flex-between mb-2">
-              <h3 class="font-bold color-amber"><i class="fa-solid fa-dharmachakra"></i> Колесо Фортуны</h3>
+              <h3 class="font-bold color-amber"><i class="fa-solid fa-dharmachakra"></i> VIP Колесо Фортуны</h3>
               <span class="tag-badge bg-tag-amber" id="wheelStatusBadge">Готово</span>
             </div>
-            <div style="margin: 10px auto; width: 270px; height: 270px; position:relative;">
-              <canvas id="wheelCanvas" width="540" height="540" style="width:100%; height:100%; border-radius:50%;"></canvas>
-              <div id="wheelPointerArrow" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); width:0; height:0; border-left:12px solid transparent; border-right:12px solid transparent; border-top:20px solid #ff3366;"></div>
+            
+            <div class="wheel-stage-container">
+              <div class="wheel-outer-ring">
+                <canvas id="wheelCanvas" width="560" height="560" class="neon-wheel-canvas"></canvas>
+                <div class="wheel-center-hub">⭐</div>
+              </div>
+              <div class="wheel-arrow-ticker">▼</div>
             </div>
-            <div class="grid-2 mb-2">
-              <button id="btnWheelFree" onclick="spinWheelAction(true)" class="btn btn-green">🎁 Бесплатно</button>
+
+            <div class="grid-2 mt-3 mb-2">
+              <button id="btnWheelFree" onclick="spinWheelAction(true)" class="btn btn-green">🎁 Бесплатный спин</button>
               <button id="btnWheelPaid" onclick="spinWheelAction(false)" class="btn btn-amber">⭐ 25 Stars</button>
             </div>
           </div>
@@ -580,7 +583,7 @@
           </div>
         </section>
 
-        <!-- 10. TAB: МАГАЗИН ПЕРЕКУПА -->
+        <!-- 10. TAB: МАГАЗИН ПЕРЕКУПА (ПОЛНОСТЬЮ РАСШИРЕННЫЙ) -->
         <section id="tabShop" class="tab-screen">
           <div class="grid-4 mb-3">
             <button onclick="switchShopSection('tools')" id="shopTab-tools" class="btn btn-cyan btn-sm">Приборы</button>
@@ -592,8 +595,8 @@
           <div id="shopSec-tools">
             <div class="glass-card mb-2">
               <div class="flex-between">
-                <h4 class="color-cyan">Приборы подборщика</h4>
-                <span class="tag-badge bg-tag-cyan" id="syndicateEquipStatus">Заказы: Закрыто</span>
+                <h4 class="color-cyan">Приборы & Диагностическое Оборудование</h4>
+                <span class="tag-badge bg-tag-cyan" id="syndicateEquipStatus">Арсенал</span>
               </div>
             </div>
             <div id="shopToolsList" class="space-y-2 mb-3"></div>
@@ -601,21 +604,21 @@
 
           <div id="shopSec-consumables" style="display:none;">
             <div class="glass-card mb-2">
-              <h4 class="color-amber">Сырьё для бизнеса</h4>
+              <h4 class="color-amber">Сырьё, Автохимия & Расходники</h4>
             </div>
             <div id="shopConsumablesList" class="space-y-2 mb-3"></div>
           </div>
 
           <div id="shopSec-tuningParts" style="display:none;">
             <div class="glass-card mb-2">
-              <h4 class="color-red">Спортивные запчасти & Лицензии</h4>
+              <h4 class="color-red">Спортивные Компоненты & Лицензии</h4>
             </div>
             <div id="shopTuningPartsList" class="space-y-2 mb-3"></div>
           </div>
 
           <div id="shopSec-homeItems" style="display:none;">
             <div class="glass-card mb-2">
-              <h4 class="color-green">Мебель, приставки и уют для дома</h4>
+              <h4 class="color-green">Мебель, Техника & Престиж для Дома</h4>
             </div>
             <div id="shopHomeItemsList" class="space-y-2 mb-3"></div>
           </div>
@@ -628,7 +631,7 @@
             <div id="containersListRender"></div>
             <div id="containersLockCover" class="level-lock-cover" style="display:none;">
               <h4 class="font-bold">Таможня закрыта</h4>
-              <p class="sub-label">С 20 уровня!</p>
+              <p class="sub-label">С 12 уровня!</p>
             </div>
           </div>
         </section>
@@ -678,7 +681,7 @@
             <p class="sub-label mb-2" id="profPlayerRank">Статус: Гаражный Делец</p>
             
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-sparkles"></i> Список изменений v0.3.3.4 & Команда
+              <i class="fa-solid fa-sparkles"></i> Список изменений v0.3.3.5 & Команда
             </button>
             
             <div class="grid-2 mb-2">
@@ -792,33 +795,33 @@
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <h4 class="color-purple font-bold"><i class="fa-solid fa-code-commit"></i> Список изменений v0.3.3.4</h4>
+          <h4 class="color-purple font-bold"><i class="fa-solid fa-code-commit"></i> Список изменений v0.3.3.5</h4>
           <button onclick="closeModal('modalPatchNotes')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
 
         <div class="p-2 mb-2" style="background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
           <div class="flex-between text-xs mb-1">
-            <span>Статус готовности сборки:</span>
-            <b class="color-green">100% (Релиз v0.3.3.4)</b>
+            <span>Статус сборки:</span>
+            <b class="color-green">100% (Релиз v0.3.3.5)</b>
           </div>
           <div class="biz-progress-track"><div class="biz-progress-fill fill-biz-lvl" style="width:100%;"></div></div>
         </div>
 
         <div class="space-y-2 text-xs mb-3" style="line-height:1.4;">
           <div class="patch-item">
-            <b class="color-cyan">✓ Интерактивный Тюнинг:</b> регламенты для Дрифта (выворот, заварка, гидроручник) и Драга (каркас, слики, лицензия РАФ).
+            <b class="color-cyan">✓ Огромный Ассортимент Маркета:</b> более 70 товаров (приборы, автохимия, спортивный тюнинг и техника для дома).
           </div>
           <div class="patch-item">
-            <b class="color-amber">✓ Обустройство Жилья:</b> покупка PlayStation 5, мебели и декора в собственное жилье для буста настроения!
+            <b class="color-amber">✓ Неоновый VIP Вилспин:</b> металлический обод, реалистичный ход, подсветка и обновлённые ценные сектора.
           </div>
           <div class="patch-item">
-            <b class="color-green">✓ Баланс Драг-рейсинга:</b> равная мощность соперников, кулдаун остывания мотора и облавы ДПС при частых заездах.
+            <b class="color-green">✓ Иконка Скутера:</b> восстановлено красивое отображение мопеда в сетке техники.
           </div>
           <div class="patch-item">
-            <b class="color-purple">✓ 4 Грейда Сараев:</b> от деревенских находок до элитных ангаров с капсулами времени.
+            <b class="color-purple">✓ Спортивный Тюнинг:</b> доработки под регламенты Драга (каркас, слики), Дрифта (выворот, заварка) и Шоу.
           </div>
           <div class="patch-item">
-            <b class="color-red">✓ Честные продавцы номеров:</b> авто с блатными номерами продаются по рыночной цене с шансом 3% на находку!
+            <b class="color-red">✓ Честная Экономика Номеров:</b> продавцы учитывают стоимость «блатных» номеров в цене авто (с шансом 3% на джекпот).
           </div>
         </div>
 
@@ -1153,13 +1156,13 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- СТРОГИЙ ПОРЯДОК ПОДКЛЮЧЕНИЯ СКРИПТОВ: МОДУЛИ ПЕРВЫМИ, ЯДРО В КОНЦЕ -->
-    <script src="js/market.js?v=100"></script>
-    <script src="js/garage.js?v=100"></script>
-    <script src="js/salesLot.js?v=100"></script>
-    <script src="js/life.js?v=100"></script>
-    <script src="js/syndicate.js?v=100"></script>
-    <script src="js/app.js?v=100"></script>
+    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ: МОДУЛИ ПЕРВЫМИ, ЯДРО В КОНЦЕ -->
+    <script src="js/market.js?v=110"></script>
+    <script src="js/garage.js?v=110"></script>
+    <script src="js/salesLot.js?v=110"></script>
+    <script src="js/life.js?v=110"></script>
+    <script src="js/syndicate.js?v=110"></script>
+    <script src="js/app.js?v=110"></script>
 
   </body>
 </html>
