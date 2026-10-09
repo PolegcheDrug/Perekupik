@@ -106,6 +106,7 @@ function openVerdictModal(title, text, isSuccess, amount, profit) {
     setTxt('verdictEmoji', isSuccess ? '🎉' : '❌'); 
     setTxt('verdictTitle', title); 
     setTxt('verdictText', text);
+    
     const amtEl = document.getElementById('verdictAmount'); 
     if (amtEl) { 
         if (amount) {
@@ -115,6 +116,7 @@ function openVerdictModal(title, text, isSuccess, amount, profit) {
             amtEl.style.display = 'none';
         }
     }
+    
     const profitEl = document.getElementById('verdictProfitBadge');
     if (profitEl) {
         if (profit !== undefined && profit !== null) {
@@ -137,7 +139,7 @@ function openVerdictModal(title, text, isSuccess, amount, profit) {
     if (mod) mod.classList.add('active');
 }
 
-const SAVE_KEY = 'perekoop_sim_save_v50_clean';
+const SAVE_KEY = 'perekoop_sim_save_v60_clean';
 
 const DEFAULT_STATE = {
     player: { 
@@ -292,8 +294,7 @@ function updateHeaderUI() {
 
     const vipBadge = document.getElementById('vipBadge');
     if (vipBadge) {
-        if (state.player && state.player.vipPro) vipBadge.style.display = 'block';
-        else vipBadge.style.display = 'none';
+        vipBadge.style.display = (state.player && state.player.vipPro) ? 'block' : 'none';
     }
 
     let gLen = 0; if (state.garage) gLen = state.garage.length;
@@ -374,25 +375,56 @@ function addXp(amount) {
     saveState();
 }
 
+// --- ПУЛЬТ РЕГУЛИРОВКИ РЕСУРСОВ (+ / -) ---
+function adjustResource(type, delta) {
+    if (!state.player) return;
+    
+    if (type === 'cash') {
+        let cur = state.player.cash || 0;
+        state.player.cash = Math.max(0, cur + delta);
+        showToast((delta > 0 ? "+" : "") + delta.toLocaleString() + " ₽");
+    } else if (type === 'level') {
+        let cur = state.player.level || 1;
+        state.player.level = Math.max(1, Math.min(100, cur + delta));
+        updateLevelGatesUI();
+        if (typeof checkReshalaAccess === 'function') checkReshalaAccess();
+        showToast((delta > 0 ? "+" : "") + delta + " Ур");
+    } else if (type === 'stars') {
+        let cur = state.player.stars || 0;
+        state.player.stars = Math.max(0, cur + delta);
+        showToast((delta > 0 ? "+" : "") + delta + " Stars ⭐");
+    } else if (type === 'tickets') {
+        let cur = state.player.expressTickets || 0;
+        let max = state.player.maxExpressTickets || 25;
+        state.player.expressTickets = Math.max(0, Math.min(max, cur + delta));
+        showToast((delta > 0 ? "+" : "") + delta + " Талонов 🎟️");
+    } else if (type === 'connections') {
+        let cur = state.player.connections || 0;
+        state.player.connections = Math.max(0, cur + delta);
+        showToast((delta > 0 ? "+" : "") + delta + " Связей 🤝");
+    }
+    
+    saveState();
+    updateHeaderUI();
+    renderProfileAnalytics();
+}
+
 function openDailyBonusModal() {
     const grid = document.getElementById('dailyBonusGrid');
-    if (!grid) return;
-    if (typeof DAILY_REWARDS_CONFIG === 'undefined') return;
+    if (!grid || typeof DAILY_REWARDS_CONFIG === 'undefined') return;
 
-    let sDay = 1; if (state.player && state.player.streakDay) sDay = state.player.streakDay;
+    let sDay = state.player?.streakDay || 1;
 
     let html = "";
     DAILY_REWARDS_CONFIG.forEach(r => {
-        let isClaimed = false; if (sDay > r.day) isClaimed = true;
-        let isCurrent = false; if (sDay === r.day) isCurrent = true;
+        let isClaimed = sDay > r.day;
+        let isCurrent = sDay === r.day;
         
         let cName = "daily-streak-day";
         if (isClaimed) cName += " claimed";
         if (isCurrent) cName += " current";
 
-        let sym = "🔒";
-        if (isClaimed) sym = "✓";
-        else if (isCurrent) sym = "★";
+        let sym = isClaimed ? "✓" : (isCurrent ? "★" : "🔒");
 
         html += 
         "<div class='" + cName + "'>" +
@@ -405,15 +437,12 @@ function openDailyBonusModal() {
 
     const claimBtn = document.getElementById('btnClaimDaily');
     if (claimBtn) {
-        let last = 0; if (state.player && state.player.lastClaimedDay) last = state.player.lastClaimedDay;
-        let pDay = 1; if (state.player && state.player.day) pDay = state.player.day;
-        
-        let canClaim = false;
-        if (last < pDay) canClaim = true;
+        let last = state.player?.lastClaimedDay || 0;
+        let pDay = state.player?.day || 1;
+        let canClaim = last < pDay;
         
         claimBtn.disabled = !canClaim;
-        if (canClaim) claimBtn.innerText = "Забрать награду";
-        else claimBtn.innerText = "Уже получено сегодня";
+        claimBtn.innerText = canClaim ? "Забрать награду" : "Уже получено сегодня";
     }
 
     const mod = document.getElementById('modalDailyBonus');
@@ -421,11 +450,11 @@ function openDailyBonusModal() {
 }
 
 function claimDailyReward() {
-    let last = 0; if (state.player && state.player.lastClaimedDay) last = state.player.lastClaimedDay;
-    let pDay = 1; if (state.player && state.player.day) pDay = state.player.day;
+    let last = state.player?.lastClaimedDay || 0;
+    let pDay = state.player?.day || 1;
     if (last >= pDay) return showToast("Награда за сегодня уже забрана!");
 
-    let sDay = 1; if (state.player && state.player.streakDay) sDay = state.player.streakDay;
+    let sDay = state.player?.streakDay || 1;
     let currentReward = DAILY_REWARDS_CONFIG.find(r => r.day === sDay);
     if (!currentReward) currentReward = DAILY_REWARDS_CONFIG[0];
     
@@ -479,13 +508,15 @@ function switchTab(tabId) {
     if (tabId === 'tabContainers' && typeof renderContainersList === 'function') renderContainersList();
     if (tabId === 'tabContracts' && typeof renderContracts === 'function') renderContracts();
     if (tabId === 'tabBarn' && typeof renderBarnFind === 'function') renderBarnFind();
-    if (tabId === 'tabLife') { 
-        if (typeof renderDiets === 'function') renderDiets(); 
-        if (typeof renderLifeChat === 'function') renderLifeChat(); 
+    if (tabId === 'tabLife' && typeof renderDiets === 'function') renderDiets(); 
+    
+    // Переход на экран Фортуны: Вилспин, Напёрстки и Казино 21
+    if (tabId === 'tabServices') { 
+        if (typeof initWheelModule === 'function') initWheelModule(); 
         if (typeof initCasino === 'function') initCasino(); 
     }
+    
     if (tabId === 'tabHousing' && typeof renderHousing === 'function') renderHousing();
-    if (tabId === 'tabServices' && typeof initWheelModule === 'function') initWheelModule();
     if (tabId === 'tabSyndicate' && typeof renderSyndicateHub === 'function') renderSyndicateHub();
     if (tabId === 'tabProfile' && typeof renderProfileAnalytics === 'function') renderProfileAnalytics();
 }
@@ -506,20 +537,19 @@ function renderStreetScreen() {
         return;
     }
 
-    let selIdx = 0; if (state.player && state.player.selectedStreetCarIndex) selIdx = state.player.selectedStreetCarIndex;
-    let selCar = state.garage[selIdx];
-    if (!selCar) selCar = state.garage[0];
+    let selIdx = state.player?.selectedStreetCarIndex || 0;
+    let selCar = state.garage[selIdx] || state.garage[0];
     
-    let cPower = 100; if (selCar.power) cPower = selCar.power;
+    let cPower = selCar.power || 100;
     setTxt('streetSelectedCarHp', cPower + " л.с.");
 
-    let cName = "Авто"; if (selCar.name) cName = selCar.name;
-    let cChip = 0; if (selCar.tuning && selCar.tuning.chip) cChip = selCar.tuning.chip;
+    let cName = selCar.name || "Авто";
+    let cChip = selCar.tuning?.chip || 0;
 
     let opts = "";
     state.garage.forEach((c, i) => {
-        let isSel = ""; if (i === selIdx) isSel = "selected";
-        let optName = "Авто"; if (c && c.name) optName = c.name;
+        let isSel = (i === selIdx) ? "selected" : "";
+        let optName = c?.name || "Авто";
         opts += "<option value='" + i + "' " + isSel + ">" + optName + "</option>";
     });
 
@@ -586,10 +616,10 @@ function launchDragRace() {
     if (isRaceRunning) return;
     if (!state.garage || state.garage.length === 0) return showToast("Нет авто для заезда!");
     
-    let cash = 0; if (state.player && state.player.cash) cash = state.player.cash;
+    let cash = state.player?.cash || 0;
     if (cash < currentRaceBet) return showToast("Не хватает денег на ставку!");
     
-    let fuel = 0; if (state.player && state.player.fuel) fuel = state.player.fuel;
+    let fuel = state.player?.fuel || 0;
     if (fuel < 10) return showToast("Нужно 10 ⛽ бензина для заезда!");
 
     state.player.cash -= currentRaceBet;
@@ -600,24 +630,16 @@ function launchDragRace() {
     isRaceRunning = true;
     playEngineSound();
 
-    let selIdx = 0; if (state.player && state.player.selectedStreetCarIndex) selIdx = state.player.selectedStreetCarIndex;
-    let car = state.garage[selIdx];
-    if (!car) car = state.garage[0];
+    let selIdx = state.player?.selectedStreetCarIndex || 0;
+    let car = state.garage[selIdx] || state.garage[0];
     
-    let playerHp = 100; if (car.power) playerHp = car.power;
+    let playerHp = car.power || 100;
     const rivalHp = Math.round(playerHp * (0.85 + Math.random() * 0.35));
 
-    let isPerfectLaunch = false;
-    if (tachoRpm >= 5500) {
-        if (tachoRpm <= 6500) isPerfectLaunch = true;
-    }
-    
-    let launchBonus = 0;
-    if (isPerfectLaunch) launchBonus = 35;
-    else if (tachoRpm > 7200) launchBonus = -20;
+    let isPerfectLaunch = (tachoRpm >= 5500 && tachoRpm <= 6500);
+    let launchBonus = isPerfectLaunch ? 35 : (tachoRpm > 7200 ? -20 : 0);
 
-    if (isPerfectLaunch) setTxt('raceStatusText', '🔥 ИДЕАЛЬНЫЙ ЛАНЧ-СТАРТ!');
-    else setTxt('raceStatusText', '🚦 Заезд начался!');
+    setTxt('raceStatusText', isPerfectLaunch ? '🔥 ИДЕАЛЬНЫЙ ЛАНЧ-СТАРТ!' : '🚦 Заезд начался!');
 
     const pRunner = document.getElementById('playerRaceCarRunner');
     const rRunner = document.getElementById('rivalRaceCarRunner');
@@ -629,34 +651,28 @@ function launchDragRace() {
         pProgress += (playerHp / 30) + (launchBonus / 10) + Math.random() * 4;
         rProgress += (rivalHp / 30) + Math.random() * 4;
 
-        let pPct = pProgress; if (pPct > 92) pPct = 92;
-        let rPct = rProgress; if (rPct > 92) rPct = 92;
+        let pPct = Math.min(92, pProgress);
+        let rPct = Math.min(92, rProgress);
 
         if (pRunner) pRunner.style.left = pPct + "%";
         if (rRunner) rRunner.style.left = rPct + "%";
 
-        let raceDone = false;
-        if (pProgress >= 92) raceDone = true;
-        if (rProgress >= 92) raceDone = true;
-
-        if (raceDone) {
+        if (pProgress >= 92 || rProgress >= 92) {
             clearInterval(raceTimer);
             isRaceRunning = false;
 
-            let isWin = false;
-            if (pProgress >= rProgress) isWin = true;
-            
+            let isWin = (pProgress >= rProgress);
             if (isWin) {
                 const prize = currentRaceBet * 2;
                 state.player.cash += prize;
-                let mood = 80; if (state.player && state.player.mood) mood = state.player.mood;
+                let mood = state.player?.mood || 80;
                 state.player.mood = Math.min(100, mood + 15);
                 addXp(30);
                 saveState();
                 updateHeaderUI();
                 openVerdictModal("ПОБЕДА НА 402М! 🏁", "Вы обогнали соперника и забрали банк: +" + prize.toLocaleString() + " ₽!", true, prize);
             } else {
-                let mood = 80; if (state.player && state.player.mood) mood = state.player.mood;
+                let mood = state.player?.mood || 80;
                 state.player.mood = Math.max(0, mood - 15);
                 saveState();
                 updateHeaderUI();
@@ -675,23 +691,20 @@ function launchDragRace() {
 }
 
 function renderProfileAnalytics() {
-    let pName = "Перекуп"; if (state.player && state.player.name) pName = state.player.name;
+    let pName = state.player?.name || "Перекуп";
     setTxt('profileTgUsername', pName);
     
-    let pStats = { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
-    if (state.player && state.player.stats) pStats = state.player.stats;
-    
+    let pStats = state.player?.stats || { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
     setTxt('statProfitable', pStats.profitableSales);
     setTxt('statLoss', pStats.lossSales);
-    setTxt('statTotalNetProfit', pStats.totalNetProfit.toLocaleString() + " ₽");
+    setTxt('statTotalNetProfit', (pStats.totalNetProfit || 0).toLocaleString() + " ₽");
     
-    const totalSales = pStats.profitableSales + pStats.lossSales;
-    let winrate = 0;
-    if (totalSales > 0) winrate = Math.round((pStats.profitableSales / totalSales) * 100);
+    const totalSales = (pStats.profitableSales || 0) + (pStats.lossSales || 0);
+    let winrate = (totalSales > 0) ? Math.round((pStats.profitableSales / totalSales) * 100) : 0;
     setTxt('statWinrate', winrate + "%");
 
     let rank = "Новичок с района";
-    let lvl = 1; if (state.player && state.player.level) lvl = state.player.level;
+    let lvl = state.player?.level || 1;
     
     if (lvl >= 50) rank = "Автомобильный Олигарх";
     else if (lvl >= 30) rank = "Хозяин Авторынка";
@@ -700,23 +713,6 @@ function renderProfileAnalytics() {
     else if (lvl >= 5) rank = "Бодрый Перекуп";
     
     setTxt('profPlayerRank', "Статус: " + rank);
-}
-
-function setCheatLevel(lvl) { 
-    state.player.level = lvl; 
-    updateLevelGatesUI();
-    if (typeof checkReshalaAccess === 'function') checkReshalaAccess(); 
-    updateHeaderUI(); 
-    saveState(); 
-    showToast("Уровень изменён на " + lvl); 
-    renderProfileAnalytics(); 
-}
-
-function cheatAddMoney() { 
-    state.player.cash += 10000000; 
-    updateHeaderUI(); 
-    saveState(); 
-    showToast("+10,000,000 ₽"); 
 }
 
 function resetGameData() { 
@@ -732,25 +728,13 @@ function initApp() {
     updateHeaderUI();
     updateLevelGatesUI();
     
-    let noFeed = false;
-    if (!state.marketFeed) noFeed = true;
-    else if (state.marketFeed.length === 0) noFeed = true;
-
-    if (noFeed) {
+    if (!state.marketFeed || state.marketFeed.length === 0) {
         if (typeof populateMarketFeed === 'function') populateMarketFeed();
     }
-
-    let noPlates = false;
-    if (!state.plateCatalog) noPlates = true;
-    else if (state.plateCatalog.length === 0) noPlates = true;
-    if (noPlates) {
+    if (!state.plateCatalog || state.plateCatalog.length === 0) {
         if (typeof refreshPlateCatalog === 'function') refreshPlateCatalog();
     }
-
-    let noContr = false;
-    if (!state.contracts) noContr = true;
-    else if (state.contracts.length === 0) noContr = true;
-    if (noContr) {
+    if (!state.contracts || state.contracts.length === 0) {
         if (typeof generateContracts === 'function') generateContracts();
     }
 
@@ -762,7 +746,7 @@ function initApp() {
     if (typeof renderContracts === 'function') renderContracts(); 
     if (typeof renderContainersList === 'function') renderContainersList(); 
     if (typeof renderBarnFind === 'function') renderBarnFind();
-    if (typeof renderLifeChat === 'function') renderLifeChat();
+    if (typeof checkBusinessAccess === 'function') checkBusinessAccess();
     
     switchTab('tabMarket');
     if (typeof renderMarketFeed === 'function') renderMarketFeed();
@@ -778,18 +762,12 @@ setInterval(() => {
                 const timerText = document.getElementById("lot_timer_text_" + idx);
                 
                 if (progressBar) {
-                    let pct = ((30 - slot.timer) / 30) * 100;
-                    if (pct < 0) pct = 0;
-                    if (pct > 100) pct = 100;
+                    let pct = Math.max(0, Math.min(100, ((30 - slot.timer) / 30) * 100));
                     progressBar.style.width = pct + "%";
                 }
                 if (timerText) timerText.innerText = "Ожидание клиента: " + slot.timer + "с";
 
-                let doGen = false;
-                if (slot.timer === 0) {
-                    if (!slot.currentBuyer) doGen = true;
-                }
-                if (doGen) { 
+                if (slot.timer === 0 && !slot.currentBuyer) { 
                     if (typeof generateBuyerForSlot === 'function') generateBuyerForSlot(slot); 
                     lotChanged = true; 
                 } 
@@ -798,27 +776,18 @@ setInterval(() => {
     }
     
     const sTab = document.getElementById('tabSalesLot');
-    let isSalesActive = false;
-    if (sTab && sTab.classList.contains('active')) isSalesActive = true;
-
-    if (lotChanged && isSalesActive && typeof renderSalesLot === 'function') {
+    if (lotChanged && sTab && sTab.classList.contains('active') && typeof renderSalesLot === 'function') {
         renderSalesLot();
     }
     
-    let pFuel = 100;
-    if (state.player && state.player.fuel !== undefined) pFuel = state.player.fuel;
-    
+    let pFuel = (state.player && state.player.fuel !== undefined) ? state.player.fuel : 100;
     if (pFuel < 100) {
-        state.player.fuel = pFuel + 1;
-        if (state.player.fuel > 100) state.player.fuel = 100;
+        state.player.fuel = Math.min(100, pFuel + 1);
         setTxt('fuelAmount', state.player.fuel);
     }
     
     const mTab = document.getElementById('tabMarket');
-    let isMarketActive = false;
-    if (mTab && mTab.classList.contains('active')) isMarketActive = true;
-
-    if (isMarketActive && typeof updateMarketTimers === 'function') {
+    if (mTab && mTab.classList.contains('active') && typeof updateMarketTimers === 'function') {
         updateMarketTimers();
     }
 }, 1000);
