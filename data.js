@@ -152,18 +152,27 @@ const CAR_DATABASE = {
     ]
 };
 
+// ПОЛНЫЙ СПИСОК НЕДВИЖИМОСТИ (АРЕНДА И ВЫКУП В СОБСТВЕННОСТЬ)
 const HOUSING_LIST = [
-    { id: 'trailer', name: 'Бытовка на стройплощадке', rent: 800, buyPrice: 0, slots: 0, moodBonus: -5, minLevel: 1, img: 'assets/houses/trailer.jpg' },
-    { id: 'room', name: 'Комната в общежитии', rent: 2500, buyPrice: 1800000, slots: 1, moodBonus: 5, minLevel: 2, img: 'assets/houses/room.jpg' },
-    { id: 'khrusch', name: 'Убитая "Хрущевка"', rent: 15000, buyPrice: 4500000, slots: 1, moodBonus: 10, minLevel: 6, img: 'assets/houses/khrusch.jpg' },
-    { id: 'garage', name: 'Кирпичный гараж с ямой', rent: 18000, buyPrice: 3000000, slots: 3, moodBonus: 12, minLevel: 10, img: 'assets/houses/garage.jpg' },
-    { id: 'dvushka', name: 'Двушка в спальном районе', rent: 25000, buyPrice: 8500000, slots: 2, moodBonus: 15, minLevel: 15, img: 'assets/houses/dvushka.jpg' },
-    { id: 'euro_treshka', name: 'Евро-трешка (Новостройка)', rent: 45000, buyPrice: 15000000, slots: 3, moodBonus: 25, minLevel: 22, img: 'assets/houses/treshka.jpg' },
-    { id: 'cottage', name: 'Коттедж за городом', rent: 65000, buyPrice: 22000000, slots: 6, moodBonus: 30, minLevel: 30, img: 'assets/houses/cottage.jpg' },
-    { id: 'loft', name: 'Дизайнерский Лофт в центре', rent: 80000, buyPrice: 35000000, slots: 4, moodBonus: 35, minLevel: 45, img: 'assets/houses/loft.jpg' },
-    { id: 'penthouse', name: 'Пентхаус в Москва-Сити', rent: 250000, buyPrice: 140000000, slots: 6, moodBonus: 50, minLevel: 65, img: 'assets/houses/penthouse.jpg' },
-    { id: 'villa', name: 'Особняк на Рублёвке', rent: 600000, buyPrice: 450000000, slots: 15, moodBonus: 80, minLevel: 85, img: 'assets/houses/villa.jpg' },
-    { id: 'island', name: 'Частный остров с виллой', rent: 2000000, buyPrice: 1500000000, slots: 30, moodBonus: 100, minLevel: 100, img: 'assets/houses/island.jpg' }
+    { id: 'trailer', name: 'Бытовка на стройплощадке', rent: 800, buyPrice: 450000, slots: 0, moodBonus: -5, minLevel: 1, desc: 'Временный вагончик. Сквозняки, запах мазута, но крыша над головой.', img: 'assets/houses/trailer.jpg' },
+    { id: 'room', name: 'Комната в общежитии', rent: 2500, buyPrice: 1800000, slots: 1, moodBonus: 5, minLevel: 2, desc: 'Угол в спальном районе. Одно парковочное место под окном во дворе.', img: 'assets/houses/room.jpg' },
+    { id: 'khrusch', name: 'Убитая "Хрущевка"', rent: 15000, buyPrice: 4500000, slots: 1, moodBonus: 10, minLevel: 6, desc: 'Бабушкин ремонт, старый паркет, зато своя кухня.', img: 'assets/houses/khrusch.jpg' },
+    { id: 'garage', name: 'Кирпичный гараж с ямой', rent: 18000, buyPrice: 3000000, slots: 3, moodBonus: 12, minLevel: 10, desc: 'Капитальный бокс с верстаком, печкой и смотровой ямой.', img: 'assets/houses/garage.jpg' },
+    { id: 'dvushka', name: 'Двушка в спальном районе', rent: 25000, buyPrice: 8500000, slots: 2, moodBonus: 15, minLevel: 15, desc: 'Хороший кирпичный дом, стеклопакеты и парковка во дворе.', img: 'assets/houses/dvushka.jpg' },
+    { id: 'euro_treshka', name: 'Евро-трешка (Новостройка)', rent: 45000, buyPrice: 15000000, slots: 3, moodBonus: 25, minLevel: 22, desc: 'Свежий ремонт, закрытый двор без машин и консьерж.', img: 'assets/houses/treshka.jpg' },
+    { id: 'cottage', name: 'Коттедж за городом', rent: 65000, buyPrice: 22000000, slots: 6, moodBonus: 30, minLevel: 30, desc: 'Собственный участок, просторный гараж и мангальная зона.', img: 'assets/houses/cottage.jpg' },
+    { id: 'loft', name: 'Дизайнерский Лофт в центре', rent: 80000, buyPrice: 35000000, slots: 4, moodBonus: 35, minLevel: 45, desc: 'Красный кирпич, панорамные окна и вид на набережную.', img: 'assets/houses/loft.jpg' },
+    { id: 'penthouse', name: 'Пентхаус в Москва-Сити', rent: 250000, buyPrice: 140000000, slots: 6, moodBonus: 50, minLevel: 65, desc: 'Панорамный вид с 65 этажа и доступ в подземный VIP-паркинг.', img: 'assets/houses/penthouse.jpg' },
+    { id: 'villa', name: 'Особняк на Рублёвке', rent: 600000, buyPrice: 450000000, slots: 15, moodBonus: 80, minLevel: 85, desc: 'Гектар сосен, вертолетная площадка и гаражный комплекс.', img: 'assets/houses/villa.jpg' },
+    { id: 'island', name: 'Частный остров с виллой', rent: 2000000, buyPrice: 1500000000, slots: 30, moodBonus: 100, minLevel: 100, desc: 'Абсолютная автономия, личный пирс для яхт и ангар для спорткаров.', img: 'assets/houses/island.jpg' }
+];
+
+// КАТАЛОГ ОБУСТРОЙСТВА И МЕБЕЛИ ДЛЯ КУПЛЕННОГО ДОМА
+const HOUSING_INTERIOR_CATALOG = [
+    { id: "ps5", name: "🎮 Игровая консоль PlayStation 5", cost: 75000, perk: "+25% настроения и куража каждый день" },
+    { id: "sofa", name: "🛋️ Кожаный итальянский диван", cost: 120000, perk: "+15% к восстановлению сил и сытости" },
+    { id: "hometheater", name: "🍿 Домашний кинотеатр 4K", cost: 250000, perk: "+35% настроения и статус перед гостями" },
+    { id: "safe", name: "🔒 Огнеупорный сейф перекупа", cost: 180000, perk: "Защита заначки от проверок и облав" }
 ];
 
 const STREET_CHAT_LOG = [
@@ -203,12 +212,12 @@ const STREET_CHAT_LOG = [
 ];
 
 const CONTAINER_ITEMS = [
-    { id: 'japan', name: 'Японский Контейнер', cost: 150000, timer: 30, badge: 'JDM & Мото', desc: 'Прямые поставки из порта Кобе.', img: 'assets/containers/japan.jpg' },
-    { id: 'europe', name: 'Европейский Автовоз', cost: 450000, timer: 35, badge: 'Комфорт & Премиум', desc: 'Автомобили из Германии без пробега по РФ.', img: 'assets/containers/europe.jpg' },
-    { id: 'usa_auction', name: 'Американский Аукцион', cost: 750000, timer: 40, badge: 'Битые & Маслкары', desc: 'Контейнер с Copart. Кот в мешке.', img: 'assets/containers/usa.jpg' },
-    { id: 'china_ship', name: 'Китайский Сухогруз', cost: 950000, timer: 38, badge: 'Электрички & Новые', desc: 'Свежие Lixiang и Zeekr прямиком из Гуанчжоу.', img: 'assets/containers/china.jpg' },
-    { id: 'dubai', name: 'Эмиратский Контейнер', cost: 1200000, timer: 45, badge: 'Катера & Суперкары', desc: 'Аукционная роскошь шейхов.', img: 'assets/containers/dubai.jpg' },
-    { id: 'hangar', name: 'Заброшенный Ангар', cost: 5000000, timer: 60, badge: 'Тягачи & Гиперкары', desc: 'Списанное имущество логистического хаба!', img: 'assets/containers/hangar.jpg' }
+    { id: 'japan', name: 'Японский Контейнер', cost: 150000, timer: 30, minLevel: 12, badge: 'JDM & Мото', desc: 'Прямые поставки из порта Кобе.', img: 'assets/containers/japan.jpg' },
+    { id: 'europe', name: 'Европейский Автовоз', cost: 450000, timer: 35, minLevel: 15, badge: 'Комфорт & Премиум', desc: 'Автомобили из Германии без пробега по РФ.', img: 'assets/containers/europe.jpg' },
+    { id: 'usa_auction', name: 'Американский Аукцион', cost: 750000, timer: 40, minLevel: 18, badge: 'Битые & Маслкары', desc: 'Контейнер с Copart. Кот в мешке.', img: 'assets/containers/usa.jpg' },
+    { id: 'china_ship', name: 'Китайский Сухогруз', cost: 950000, timer: 38, minLevel: 22, badge: 'Электрички & Новые', desc: 'Свежие Lixiang и Zeekr прямиком из Гуанчжоу.', img: 'assets/containers/china.jpg' },
+    { id: 'dubai', name: 'Эмиратский Контейнер', cost: 1200000, timer: 45, minLevel: 25, badge: 'Катера & Суперкары', desc: 'Аукционная роскошь шейхов.', img: 'assets/containers/dubai.jpg' },
+    { id: 'hangar', name: 'Заброшенный Ангар', cost: 5000000, timer: 60, minLevel: 30, badge: 'Тягачи & Гиперкары', desc: 'Списанное имущество логистического хаба!', img: 'assets/containers/hangar.jpg' }
 ];
 
 const SELLER_ADS_PHRASES = [
@@ -295,27 +304,27 @@ const DIETS = [
 ];
 
 const BUSINESS_DATA = [
-    { id: 'wash', name: 'Автомойка 24/7', minLevel: 5, income: 900, level: 0, cost: 90000, stored: 0, perk: 'Скидка 50% на полировку и химчистку' },
-    { id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 8, income: 1500, level: 0, cost: 150000, stored: 0, perk: '+10% к стоимости авто на правильных дисках' },
-    { id: 'sto', name: 'СТО дяди Вани', minLevel: 12, income: 2200, level: 0, cost: 300000, stored: 0, perk: 'Скидка 40% на ремонт мотора' },
-    { id: 'shaurma', name: 'Точка Шаурмы у трассы', minLevel: 15, income: 3000, level: 0, cost: 450000, stored: 0, perk: 'Бесплатное питание раз в день (ХП на макс)' },
-    { id: 'detailing', name: 'Детейлинг Студия', minLevel: 20, income: 6500, level: 0, cost: 950000, stored: 0, perk: '+35% к баллам на Автошоу' },
-    { id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 8000, level: 0, cost: 1200000, stored: 0, perk: 'Детали на ремонт обходятся дешевле на 30%' },
-    { id: 'evacuator', name: 'Служба Эвакуации 24/7', minLevel: 25, income: 9500, level: 0, cost: 1500000, stored: 0, perk: 'Шанс 50% бесплатно спасти авто со штрафстоянки' },
-    { id: 'katalizator', name: 'Скупка катализаторов', minLevel: 28, income: 12000, level: 0, cost: 1900000, stored: 0, perk: 'Дополнительный доход при вырезке ката (P0420)' },
-    { id: 'perekup_office', name: 'Офис перекупов «Рога и Авто»', minLevel: 30, income: 15000, level: 0, cost: 2500000, stored: 0, perk: '+15% шанс впарить хлам лоху' },
-    { id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, stored: 0, perk: 'Пассивный доход и +1 🤝 связь каждый день' },
-    { id: 'rental', name: 'Прокат авто «Драйв»', minLevel: 35, income: 21000, level: 0, cost: 4500000, stored: 0, perk: 'Машины в аренде не требуют налога' },
-    { id: 'tonirovka', name: 'Студия Тонировки «Бункер»', minLevel: 38, income: 24000, level: 0, cost: 5200000, stored: 0, perk: 'Менты реже останавливают за 12.5.1' },
-    { id: 'zvuk', name: 'Студия Автозвука', minLevel: 40, income: 27000, level: 0, cost: 6000000, stored: 0, perk: '+20% настроения от поездок на своем авто' },
-    { id: 'chip_tuning', name: 'Чип-Тюнинг «Stage 100»', minLevel: 42, income: 30000, level: 0, cost: 7500000, stored: 0, perk: 'Бесплатный Stage 1 для своих тачек' },
-    { id: 'lombard', name: 'Автоломбард', minLevel: 45, income: 35000, level: 0, cost: 9500000, stored: 0, perk: 'Шанс выкупить тачку за 50% от рынка' },
-    { id: 'parking_bityo', name: 'Стоянка тотальных авто', minLevel: 48, income: 40000, level: 0, cost: 12000000, stored: 0, perk: 'Можно хранить неограниченно битых тачек' },
-    { id: 'dealer', name: 'Автосалон Premium', minLevel: 50, income: 45000, level: 0, cost: 15000000, stored: 0, perk: '+15% к шансу быстрой продажи авто на площадке' },
-    { id: 'customs', name: 'Таможенный брокер', minLevel: 55, income: 60000, level: 0, cost: 22000000, stored: 0, perk: 'Скидка 20% на растаможку контейнеров' },
-    { id: 'azs', name: 'Сеть АЗС «Бодяга-Ойл»', minLevel: 60, income: 80000, level: 0, cost: 35000000, stored: 0, perk: 'Бензин для ваших машин бесплатен' },
-    { id: 'elite_parking', name: 'Подземный VIP-Паркинг', minLevel: 65, income: 120000, level: 0, cost: 55000000, stored: 0, perk: '+10 мест в гараже, 0% угона' },
-    { id: 'insurance', name: 'Страховая «Надежный кидок»', minLevel: 70, income: 200000, level: 0, cost: 100000000, stored: 0, perk: 'Полный возврат при тотале вашей машины' }
+    { id: 'wash', name: 'Автомойка 24/7', minLevel: 5, income: 900, level: 0, cost: 90000, stored: 0, stock: 100, perk: 'Скидка 50% на полировку и химчистку' },
+    { id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 8, income: 1500, level: 0, cost: 150000, stored: 0, stock: 100, perk: '+10% к стоимости авто на правильных дисках' },
+    { id: 'sto', name: 'СТО дяди Вани', minLevel: 12, income: 2200, level: 0, cost: 300000, stored: 0, stock: 100, perk: 'Скидка 40% на ремонт мотора' },
+    { id: 'shaurma', name: 'Точка Шаурмы у трассы', minLevel: 15, income: 3000, level: 0, cost: 450000, stored: 0, stock: 100, perk: 'Бесплатное питание раз в день (ХП на макс)' },
+    { id: 'detailing', name: 'Детейлинг Студия', minLevel: 20, income: 6500, level: 0, cost: 950000, stored: 0, stock: 100, perk: '+35% к баллам на Автошоу' },
+    { id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 8000, level: 0, cost: 1200000, stored: 0, stock: 100, perk: 'Детали на ремонт обходятся дешевле на 30%' },
+    { id: 'evacuator', name: 'Служба Эвакуации 24/7', minLevel: 25, income: 9500, level: 0, cost: 1500000, stored: 0, stock: 100, perk: 'Шанс 50% бесплатно спасти авто со штрафстоянки' },
+    { id: 'katalizator', name: 'Скупка катализаторов', minLevel: 28, income: 12000, level: 0, cost: 1900000, stored: 0, stock: 100, perk: 'Дополнительный доход при вырезке ката (P0420)' },
+    { id: 'perekup_office', name: 'Офис перекупов «Рога и Авто»', minLevel: 30, income: 15000, level: 0, cost: 2500000, stored: 0, stock: 100, perk: '+15% шанс впарить хлам лоху' },
+    { id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, stored: 0, stock: 100, perk: 'Пассивный доход и +1 🤝 связь каждый день' },
+    { id: 'rental', name: 'Прокат авто «Драйв»', minLevel: 35, income: 21000, level: 0, cost: 4500000, stored: 0, stock: 100, perk: 'Машины в аренде не требуют налога' },
+    { id: 'tonirovka', name: 'Студия Тонировки «Бункер»', minLevel: 38, income: 24000, level: 0, cost: 5200000, stored: 0, stock: 100, perk: 'Менты реже останавливают за 12.5.1' },
+    { id: 'zvuk', name: 'Студия Автозвука', minLevel: 40, income: 27000, level: 0, cost: 6000000, stored: 0, stock: 100, perk: '+20% настроения от поездок на своем авто' },
+    { id: 'chip_tuning', name: 'Чип-Тюнинг «Stage 100»', minLevel: 42, income: 30000, level: 0, cost: 7500000, stored: 0, stock: 100, perk: 'Бесплатный Stage 1 для своих тачек' },
+    { id: 'lombard', name: 'Автоломбард', minLevel: 45, income: 35000, level: 0, cost: 9500000, stored: 0, stock: 100, perk: 'Шанс выкупить тачку за 50% от рынка' },
+    { id: 'parking_bityo', name: 'Стоянка тотальных авто', minLevel: 48, income: 40000, level: 0, cost: 1200000, stored: 0, stock: 100, perk: 'Можно хранить неограниченно битых тачек' },
+    { id: 'dealer', name: 'Автосалон Premium', minLevel: 50, income: 45000, level: 0, cost: 15000000, stored: 0, stock: 100, perk: '+15% к шансу быстрой продажи авто на площадке' },
+    { id: 'customs', name: 'Таможенный брокер', minLevel: 55, income: 60000, level: 0, cost: 22000000, stored: 0, stock: 100, perk: 'Скидка 20% на растаможку контейнеров' },
+    { id: 'azs', name: 'Сеть АЗС «Бодяга-Ойл»', minLevel: 60, income: 80000, level: 0, cost: 35000000, stored: 0, stock: 100, perk: 'Бензин для ваших машин бесплатен' },
+    { id: 'elite_parking', name: 'Подземный VIP-Паркинг', minLevel: 65, income: 120000, level: 0, cost: 55000000, stored: 0, stock: 100, perk: '+10 мест в гараже, 0% угона' },
+    { id: 'insurance', name: 'Страховая «Надежный кидок»', minLevel: 70, income: 200000, level: 0, cost: 100000000, stored: 0, stock: 100, perk: 'Полный возврат при тотале вашей машины' }
 ];
 
 const OBD_ERRORS = [
