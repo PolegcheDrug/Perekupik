@@ -1,7 +1,4 @@
-// ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.4.0)
-// Полная и расширенная версия контента
-// ========================================================
+// ===================== ФАЙЛ БАЗЫ ДАННЫХ (data.js) =====================
 
 const CAR_DATABASE = {
     economy: [
@@ -27,8 +24,6 @@ const CAR_DATABASE = {
         { name: "Ford Focus I", power: 100, basePrice: 300000, type: "economy", img: "assets/cars/economy/focus1.jpg" },
         { name: "Hyundai Solaris I", power: 123, basePrice: 620000, type: "economy", img: "assets/cars/economy/solaris.jpg" },
         { name: "Kia Rio 3", power: 123, basePrice: 650000, type: "economy", img: "assets/cars/economy/rio.jpg" },
-        { name: "Toyota Mark II (JZX90 Самурай)", power: 180, basePrice: 450000, type: "economy", img: "assets/cars/economy/mark2.jpg" },
-        { name: "Mitsubishi Lancer IX", power: 98, basePrice: 380000, type: "economy", img: "assets/cars/economy/lancer9.jpg" },
         { name: "BMW E34 520i (Гнилая)", power: 150, basePrice: 250000, type: "economy", img: "assets/cars/economy/e34.jpg" },
         { name: "Mercedes W210 (Лупатый)", power: 136, basePrice: 300000, type: "economy", img: "assets/cars/economy/w210.jpg" },
         { name: "BMW E38 740i (Требует вложений)", power: 286, basePrice: 450000, type: "economy", img: "assets/cars/economy/e38.jpg" },
@@ -117,9 +112,7 @@ const CAR_DATABASE = {
         { name: "Maserati Levante", power: 350, basePrice: 9000000, type: "premium", img: "assets/cars/premium/levante.jpg" },
         { name: "Mercedes S-Class (W223)", power: 367, basePrice: 16000000, type: "premium", img: "assets/cars/premium/w223.jpg" },
         { name: "BMW 7 Series (G70)", power: 381, basePrice: 15500000, type: "premium", img: "assets/cars/premium/g70.jpg" },
-        { name: "Mercedes G63 AMG", power: 585, basePrice: 14500000, type: "premium", img: "assets/cars/premium/mercedes_g63amg.jpg" },
-        { name: "Porsche Panamera Turbo S", power: 630, basePrice: 13500000, type: "premium", img: "assets/cars/premium/panamera.jpg" },
-        { name: "Audi RS6 Avant", power: 600, basePrice: 12800000, type: "premium", img: "assets/cars/premium/rs6.jpg" }
+        { name: "Mercedes G63 AMG", power: 585, basePrice: 14500000, type: "premium", img: "assets/cars/premium/mercedes_g63amg.jpg" }
     ],
     hyper: [
         { name: "Nissan GT-R R35", power: 570, basePrice: 12000000, type: "hyper", img: "assets/cars/hyper/gtr.jpg" },
@@ -159,6 +152,7 @@ const CAR_DATABASE = {
     ]
 };
 
+// ПОЛНЫЙ СПИСОК НЕДВИЖИМОСТИ (АРЕНДА И ВЫКУП В СОБСТВЕННОСТЬ)
 const HOUSING_LIST = [
     { id: 'trailer', name: 'Бытовка на стройплощадке', rent: 800, buyPrice: 450000, slots: 0, moodBonus: -5, minLevel: 1, desc: 'Временный вагончик. Сквозняки, запах мазута, но крыша над головой.', img: 'assets/houses/trailer.jpg' },
     { id: 'room', name: 'Комната в общежитии', rent: 2500, buyPrice: 1800000, slots: 1, moodBonus: 5, minLevel: 2, desc: 'Угол в спальном районе. Одно парковочное место под окном во дворе.', img: 'assets/houses/room.jpg' },
@@ -173,24 +167,48 @@ const HOUSING_LIST = [
     { id: 'island', name: 'Частный остров с виллой', rent: 2000000, buyPrice: 1500000000, slots: 30, moodBonus: 100, minLevel: 100, desc: 'Абсолютная автономия, личный пирс для яхт и ангар для спорткаров.', img: 'assets/houses/island.jpg' }
 ];
 
+// КАТАЛОГ ОБУСТРОЙСТВА И МЕБЕЛИ ДЛЯ КУПЛЕННОГО ДОМА
 const HOUSING_INTERIOR_CATALOG = [
-    { id: "home_ps5", name: "🎮 Игровая консоль PlayStation 5", cost: 75000, perk: "+25% настроения и куража каждый день" },
-    { id: "home_leather_sofa", name: "🛋️ Кожаный итальянский диван", cost: 120000, perk: "+15% к восстановлению сил и сытости" },
-    { id: "home_cinema_audio", name: "🍿 Домашний кинотеатр 4K", cost: 250000, perk: "+35% настроения и статус перед гостями" },
-    { id: "home_safe_valberg", name: "🔒 Огнеупорный сейф перекупа", cost: 180000, perk: "Защита заначки от проверок и облав" }
+    { id: "ps5", name: "🎮 Игровая консоль PlayStation 5", cost: 75000, perk: "+25% настроения и куража каждый день" },
+    { id: "sofa", name: "🛋️ Кожаный итальянский диван", cost: 120000, perk: "+15% к восстановлению сил и сытости" },
+    { id: "hometheater", name: "🍿 Домашний кинотеатр 4K", cost: 250000, perk: "+35% настроения и статус перед гостями" },
+    { id: "safe", name: "🔒 Огнеупорный сейф перекупа", cost: 180000, perk: "Защита заначки от проверок и облав" }
 ];
 
 const STREET_CHAT_LOG = [
-    { author: "🚨 ДПС_Инфо", text: "Внимание! На ул. Ленина рейд по 12.5.1, прячьте прямотоки!", warning: true },
-    { author: "🚨 ДПС_Инфо", text: "Экипаж с люстрой стоит у ТЦ Галерея, тормозят всех тонированных.", warning: true },
-    { author: "Vazovod_77", text: "Куплю кузов под корч ВАЗ 2107 или 2101, срочно в лс!", warning: false },
+    { author: "🚨 ДПС_Инфо", text: "Внимание! На ул. Ленина рейд по 12.5.1, прячьте прямотоки!", warning: true, effect: { target: "comfort", modifier: 0.85, duration: 120 } },
+    { author: "🚨 ДПС_Инфо", text: "Экипаж с люстрой стоит у ТЦ Галерея, тормозят всех тонированных.", warning: true, effect: { target: "premium", modifier: 0.90, duration: 120 } },
+    { author: "🚨 ДПС_Инфо", text: "Скрытый патруль на объездной. Снимайте каркасы шторки!", warning: true },
+    { author: "🚨 ДПС_Инфо", text: "Облава на парковке Ашана. Выписывают за выхлоп.", warning: true, effect: { target: "all", modifier: 0.95, duration: 90 } },
+    { author: "🚨 ДПС_Инфо", text: "Камеры на МКАДе перенастроили на ремни и телефон.", warning: true },
+    { author: "Vazovod_77", text: "Куплю кузов под корч ВАЗ 2107 или 2101, срочно в лс!", warning: false, effect: { target: "economy", modifier: 1.15, duration: 90 } },
     { author: "Major_Vova", text: "Завтра сходка на парковке, вход только для немцев.", warning: false },
     { author: "JDM_King", text: "Кто может заварить редуктор по-братски за пиво?", warning: false },
     { author: "Perecup_Pro", text: "Продам Солярис, не бит не крашен (крашена только крыша).", warning: false },
     { author: "Sanya_Garage", text: "Делаю капиталку за 3 дня, гарантия до ворот. Цены в лс.", warning: false },
     { author: "Mark_2_Top", text: "Ищу столб... тьфу, задний бампер на марк 2.", warning: false },
+    { author: "BMW_Boy", text: "Куплю масло 10w40 бочку, желательно оптом.", warning: false },
+    { author: "Podbor_Max", text: "Осматривал Камри на Лесной. Пробег кручен на 300к. Не берите!", warning: false },
+    { author: "Patsan_Taz", text: "Где сейчас можно нормально угла дать, чтобы без мигалок?", warning: false },
+    { author: "Auto_Lombard", text: "Выдаем займы под ПТС. Быстро, без вопросов.", warning: false },
     { author: "Maga_M5", text: "Встану на 402 метра с любым. Ставка 500к.", warning: false },
-    { author: "Kislota_Drift", text: "Пацаны, у кого есть съёмник пружин? Срочно надо дропнуть тачку.", warning: false }
+    { author: "GTI_Stage3", text: "У кого есть шнурок Вася Диагност? Надо чек скинуть перед продажей.", warning: false },
+    { author: "Plenka_Center", text: "Акция! Закатай бункер в круг со скидкой 20%.", warning: false },
+    { author: "Ilya_Resale", text: "Заберу ваш авто в любом состоянии за 60% от рынка. Деньги сразу.", warning: false },
+    { author: "Serega_Taxi", text: "Сдам в аренду Логан под такси. 1500р/сутки.", warning: false },
+    { author: "Detaling_Pro", text: "Химчистка после картошки и рассады. Вернем запах новой машины.", warning: false },
+    { author: "Peredelka_Msk", text: "Переварю пороги, днище, стаканы. Недорого. Писать в личку.", warning: false },
+    { author: "Secret_Buyer", text: "Ищу премиум от 300 л.с., бюджет не ограничен. Писать в ЛС.", warning: false, effect: { target: "premium", modifier: 1.2, duration: 120 } },
+    { author: "Lada_Fan", text: "Пацаны, как снять стук клапанов на Приоре перед продажей? Срочно!", warning: false },
+    { author: "Ivan_Perekup", text: "Скинул перекупу машину перекупа. Круговорот хлама в природе.", warning: false },
+    { author: "Hustler99", text: "Кто знает, где достать номера 777 дешевле рынка?", warning: false },
+    { author: "Auto_Podbor", text: "Сегодня смотрел 5 машин. Все скручены, две в тотале. Рынок мертв.", warning: false, effect: { target: "all", modifier: 0.90, duration: 60 } },
+    { author: "Major_Vova", text: "Продул 500к в подпольном клубе... где тут ближайший ломбард?", warning: false },
+    { author: "DriftKing", text: "Завтра ночная сходка на парковке Ашана. ДПС не звать!", warning: false },
+    { author: "Crypto_Bro", text: "Словил ликвидацию на Bybit, продаю свой Гольф стейдж 2. Срочно.", warning: false },
+    { author: "SysAdmin", text: "Кто шарит, как AmneziaWG нормально настроить, чтобы MTU не резало на мобиле? Накипело...", warning: false },
+    { author: "CNC_Master", text: "Могу вырезать любые проставки на стенс и фланцы лазером или на координатно-пробивном. Качество завод. Пишите в личку.", warning: false, effect: { target: "economy", modifier: 1.05, duration: 40 } },
+    { author: "Beam_Mapper", text: "Народ, кто-то умеет JBeam файлы ковырять? Физика отваливается после переноса.", warning: false }
 ];
 
 const CONTAINER_ITEMS = [
@@ -213,10 +231,61 @@ const SELLER_ADS_PHRASES = [
     "«Красилась только одна дверь (косметика).»",
     "«Ездила девушка, маршрут дом-работа-сад.»",
     "«Пробег родной 100%, можете проверять по базам.»",
-    "«Не бита, не крашена, мамой клянусь!»",
-    "«В салоне не курили, матом не ругались.»",
-    "«Перекупы мимо, отдаю только в хорошие руки.»",
-    "«Двигатель работает как швейцарские часы.»"
+    "«Масло не ест ни грамма, от замены до замены!»",
+    "«Коробка не пинает, листает незаметно.»",
+    "«В гонках не участвовала, чисто городской цикл.»",
+    "«Салон пахнет новьем, никто никогда не курил.»",
+    "«Третья машина в семье, стояла в теплом паркинге.»",
+    "«Продаю в связи с покупкой жилья/пополнением в семье.»",
+    "«Обслуживалась только у официалов, чеки на руках.»",
+    "«Кузов оцинкован, ни одного рыжика!»",
+    "«Юридически чистая, без штрафов и запретов.»",
+    "«Двигатель контрактный, вписан в ПТС.»",
+    "«По ходовке мячик, нигде ничего не стучит.»",
+    "«Отдам с зимней резиной на штампах.»",
+    "«Торг только у капота с деньгами в руках.»",
+    "«Обмен не предлагать (разве что на квартиру в центре).»",
+    "«Свои цены не предлагайте, рынок знаю.»",
+    "«В салоне возили только воздух.»",
+    "«Музыка на 200К, сабвуфер на полбагажника!»",
+    "«Вложено много сил и средств, делал для себя.»",
+    "«Комплектация максимальная, есть всё кроме люка.»",
+    "«Передвигаюсь каждый день, на стоянку не поставлю.»",
+    "«Состояние - музей! Капсула времени.»",
+    "«От сердца отрываю, надежный как автомат Калашникова.»"
+];
+
+const EXPANDED_BUYERS_POOL = [
+    { name: "Ашот, перекуп", avatar: "😎", type: "dealer", rate: 0.72, minKarma: 0, preStatus: "Жестко сбивает цену...", rejectSay: "За эти деньги я две таких возьму!" },
+    { name: "Максим, подборщик", avatar: "🔍", type: "inspector", rate: 0.90, minKarma: 30, preStatus: "Лезет эндоскопом...", rejectSay: "Сделки не будет! Машина - хлам." },
+    { name: "Иван Сергеевич", avatar: "👨‍🌾", type: "regular", rate: 0.85, minKarma: 20, preStatus: "Ищет повод сбить цену...", rejectSay: "Мне на дачу ездить не пойдет." },
+    { name: "Артём, студент", avatar: "🧢", type: "student", rate: 0.78, minKarma: 0, preStatus: "Слушает выхлоп...", rejectSay: "Блин, стипы не хватает." },
+    { name: "Елена, бухгалтер", avatar: "👩‍💼", type: "regular", rate: 0.95, minKarma: 50, preStatus: "Смотрит только на салон...", rejectSay: "Вы мне кажетесь подозрительным. Отказ." },
+    { name: "Илья, инженер-ЧПУ", avatar: "🛠️", type: "inspector", rate: 0.82, minKarma: 20, preStatus: "Замеряет зазоры...", rejectSay: "Отклонение на 2 микрона, геометрия нарушена!" },
+    { name: "Кирилл, криптотрейдер", avatar: "📱", type: "dealer", rate: 0.92, minKarma: 10, preStatus: "Смотрит графики битка...", rejectSay: "Маржин-колл, братан, денег нет." },
+    { name: "Мага, суетолог", avatar: "🏎️", type: "student", rate: 0.88, minKarma: 10, preStatus: "Проверяет тонировку...", rejectSay: "Не едет она на свои деньги, брат." },
+    { name: "Дядя Толя, таксист", avatar: "🚕", type: "regular", rate: 0.80, minKarma: 15, preStatus: "Считает расход топлива...", rejectSay: "Жрет много, в такси нерентабельно." },
+    { name: "Саня, гонщик", avatar: "🏁", type: "student", rate: 0.85, minKarma: 0, preStatus: "Смотрит на резину...", rejectSay: "Резина лысая, угла не дать, пас." },
+    { name: "Виктория, инста-дива", avatar: "💅", type: "regular", rate: 0.98, minKarma: 60, preStatus: "Делает селфи на фоне...", rejectSay: "Она не сочетается с моей сумочкой." },
+    { name: "Вася, механик", avatar: "🔧", type: "inspector", rate: 0.75, minKarma: 10, preStatus: "Нюхает щуп...", rejectSay: "Масло пахнет гарью, мотор труп." },
+    { name: "Дед Макар", avatar: "👴", type: "regular", rate: 0.88, minKarma: 30, preStatus: "Стучит клюкой по порогам...", rejectSay: "В мое время металл был толще. Гнилушка." },
+    { name: "Тимур, мажор", avatar: "🤑", type: "dealer", rate: 0.95, minKarma: 10, preStatus: "Лениво пинает колесо...", rejectSay: "Слишком скучная, пацаны засмеют." },
+    { name: "Ольга Петровна", avatar: "👵", type: "regular", rate: 0.90, minKarma: 40, preStatus: "Ищет крепления изофикс...", rejectSay: "Куда я тут внуков посажу? Тесно!" },
+    { name: "Гриша, рыбак", avatar: "🎣", type: "regular", rate: 0.82, minKarma: 20, preStatus: "Проверяет объем багажника...", rejectSay: "Сюда лодка не влезет, отказ." },
+    { name: "Руслан, автосалон", avatar: "🏢", type: "dealer", rate: 0.65, minKarma: 25, preStatus: "Обещает золотые горы...", rejectSay: "Ну не хотите по низу рынка — до свидания." },
+    { name: "Светик, жена", avatar: "👱‍♀️", type: "regular", rate: 0.92, minKarma: 50, preStatus: "Звонит мужу посоветоваться...", rejectSay: "Муж сказал не брать эту ерунду." },
+    { name: "Колян, с района", avatar: "🦧", type: "student", rate: 0.70, minKarma: 0, preStatus: "Включает магнитолу на всю...", rejectSay: "Басов не хватает, вообще не качает." },
+    { name: "Альберт, коллекционер", avatar: "🧐", type: "inspector", rate: 0.98, minKarma: 80, preStatus: "Ищет оригинальные болты...", rejectSay: "С вашей репутацией я дела не веду." },
+    { name: "Даша, студентка", avatar: "📚", type: "student", rate: 0.80, minKarma: 40, preStatus: "Смотрит, есть ли парктроники...", rejectSay: "Без камеры заднего вида я ее разобью." },
+    { name: "Егор, перегонщик", avatar: "🛣️", type: "dealer", rate: 0.75, minKarma: 20, preStatus: "Пробивает толщиномером...", rejectSay: "Вся в шпакле, на перепродажу не пойдет." },
+    { name: "Михалыч, сосед", avatar: "🍺", type: "regular", rate: 0.85, minKarma: 10, preStatus: "Дышит перегаром в салон...", rejectSay: "Не, лучше свою Волгу починю." },
+    { name: "Алиса, стартапер", avatar: "💻", type: "regular", rate: 0.90, minKarma: 50, preStatus: "Ищет Bluetooth и розетки...", rejectSay: "Она недостаточно экологичная." },
+    { name: "Женя, дрифтер", avatar: "🔄", type: "student", rate: 0.78, minKarma: 0, preStatus: "Проверяет заварку дифференциала...", rejectSay: "Кузов повело, боком не поедет." },
+    { name: "Слепой Пью", avatar: "🦯", type: "inspector", rate: 0.99, minKarma: 50, preStatus: "Щупает машину руками...", rejectSay: "Я не вижу в ней потенциала." },
+    { name: "Влад, юрист", avatar: "⚖️", type: "inspector", rate: 0.85, minKarma: 60, preStatus: "Пробивает по базам ФССП...", rejectSay: "У вас плохая история сделок, рисковать не буду." },
+    { name: "Марат, строитель", avatar: "🧱", type: "regular", rate: 0.80, minKarma: 20, preStatus: "Проверяет рессоры...", rejectSay: "Тонну цемента не увезет, слабая." },
+    { name: "Гоша, геймер", avatar: "🎮", type: "student", rate: 0.88, minKarma: 10, preStatus: "Ищет подсветку салона...", rejectSay: "В Форзе она выглядит круче." },
+    { name: "Петр, чиновник", avatar: "💼", type: "dealer", rate: 0.95, minKarma: 70, preStatus: "Смотрит, глухая ли тонировка...", rejectSay: "Недостаточно статусная для моих задач." }
 ];
 
 const DIETS = [
@@ -224,31 +293,71 @@ const DIETS = [
     { id: 'doshik', name: 'Бич-пакет и сухари', cost: 150, hunger: 20, mood: -15, desc: 'Желудок ноет, депрессия, тяжело торговаться' },
     { id: 'home_sandwich', name: 'Бутерброд из дома', cost: 250, hunger: 30, mood: -5, desc: 'Майонез, колбаса "Красная цена", терпимо' },
     { id: 'pelmeni', name: 'Пельмени по акции', cost: 400, hunger: 45, mood: 0, desc: 'Дешево и сердито, главное сварить' },
+    { id: 'energy_dog', name: 'Энергетик и сосиска', cost: 550, hunger: 35, mood: 5, desc: 'Мотор колотится, но жить можно' },
     { id: 'shaurma', name: 'Шаурма на вокзале', cost: 800, hunger: 50, mood: -5, desc: 'Сытно, но жирно и тоскливо' },
     { id: 'fastfood', name: 'Фастфуд комбо', cost: 1200, hunger: 60, mood: 10, desc: 'Бургер, картошка, кола. Классика.' },
     { id: 'stolovka', name: 'Обед в столовой', cost: 2200, hunger: 70, mood: 15, desc: 'Нормальное первое, второе и компот' },
-    { id: 'cafe', name: 'Бизнес-ланч в ресторане', cost: 6500, hunger: 90, mood: 25, desc: 'Свежий стейк, кофе и уверенность в себе' }
+    { id: 'pizza_delivery', name: 'Доставка пиццы', cost: 3500, hunger: 85, mood: 20, desc: 'Большая пепперони с сырным бортом' },
+    { id: 'cafe', name: 'Бизнес-ланч в ресторане', cost: 6500, hunger: 90, mood: 25, desc: 'Свежий стейк, кофе и уверенность в себе' },
+    { id: 'craft_burger', name: 'Крафтовый бургер с ИПА', cost: 8000, hunger: 95, mood: 35, desc: 'Хипстерский шик, настроение на высоте' },
+    { id: 'elite', name: 'Шеф-повар & Мишлен', cost: 25000, hunger: 100, mood: 45, desc: 'Максимальный кураж: меньше уступок в торгах!' }
 ];
 
 const BUSINESS_DATA = [
     { id: 'wash', name: 'Автомойка 24/7', minLevel: 5, income: 900, level: 0, cost: 90000, stored: 0, stock: 100, perk: 'Скидка 50% на полировку и химчистку' },
     { id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 8, income: 1500, level: 0, cost: 150000, stored: 0, stock: 100, perk: '+10% к стоимости авто на правильных дисках' },
     { id: 'sto', name: 'СТО дяди Вани', minLevel: 12, income: 2200, level: 0, cost: 300000, stored: 0, stock: 100, perk: 'Скидка 40% на ремонт мотора' },
+    { id: 'shaurma', name: 'Точка Шаурмы у трассы', minLevel: 15, income: 3000, level: 0, cost: 450000, stored: 0, stock: 100, perk: 'Бесплатное питание раз в день (ХП на макс)' },
     { id: 'detailing', name: 'Детейлинг Студия', minLevel: 20, income: 6500, level: 0, cost: 950000, stored: 0, stock: 100, perk: '+35% к баллам на Автошоу' },
     { id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 8000, level: 0, cost: 1200000, stored: 0, stock: 100, perk: 'Детали на ремонт обходятся дешевле на 30%' },
-    { id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, stored: 0, stock: 100, perk: 'Пассивный доход и +1 🤝 связь каждый день' }
+    { id: 'evacuator', name: 'Служба Эвакуации 24/7', minLevel: 25, income: 9500, level: 0, cost: 1500000, stored: 0, stock: 100, perk: 'Шанс 50% бесплатно спасти авто со штрафстоянки' },
+    { id: 'katalizator', name: 'Скупка катализаторов', minLevel: 28, income: 12000, level: 0, cost: 1900000, stored: 0, stock: 100, perk: 'Дополнительный доход при вырезке ката (P0420)' },
+    { id: 'perekup_office', name: 'Офис перекупов «Рога и Авто»', minLevel: 30, income: 15000, level: 0, cost: 2500000, stored: 0, stock: 100, perk: '+15% шанс впарить хлам лоху' },
+    { id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, stored: 0, stock: 100, perk: 'Пассивный доход и +1 🤝 связь каждый день' },
+    { id: 'rental', name: 'Прокат авто «Драйв»', minLevel: 35, income: 21000, level: 0, cost: 4500000, stored: 0, stock: 100, perk: 'Машины в аренде не требуют налога' },
+    { id: 'tonirovka', name: 'Студия Тонировки «Бункер»', minLevel: 38, income: 24000, level: 0, cost: 5200000, stored: 0, stock: 100, perk: 'Менты реже останавливают за 12.5.1' },
+    { id: 'zvuk', name: 'Студия Автозвука', minLevel: 40, income: 27000, level: 0, cost: 6000000, stored: 0, stock: 100, perk: '+20% настроения от поездок на своем авто' },
+    { id: 'chip_tuning', name: 'Чип-Тюнинг «Stage 100»', minLevel: 42, income: 30000, level: 0, cost: 7500000, stored: 0, stock: 100, perk: 'Бесплатный Stage 1 для своих тачек' },
+    { id: 'lombard', name: 'Автоломбард', minLevel: 45, income: 35000, level: 0, cost: 9500000, stored: 0, stock: 100, perk: 'Шанс выкупить тачку за 50% от рынка' },
+    { id: 'parking_bityo', name: 'Стоянка тотальных авто', minLevel: 48, income: 40000, level: 0, cost: 1200000, stored: 0, stock: 100, perk: 'Можно хранить неограниченно битых тачек' },
+    { id: 'dealer', name: 'Автосалон Premium', minLevel: 50, income: 45000, level: 0, cost: 15000000, stored: 0, stock: 100, perk: '+15% к шансу быстрой продажи авто на площадке' },
+    { id: 'customs', name: 'Таможенный брокер', minLevel: 55, income: 60000, level: 0, cost: 22000000, stored: 0, stock: 100, perk: 'Скидка 20% на растаможку контейнеров' },
+    { id: 'azs', name: 'Сеть АЗС «Бодяга-Ойл»', minLevel: 60, income: 80000, level: 0, cost: 35000000, stored: 0, stock: 100, perk: 'Бензин для ваших машин бесплатен' },
+    { id: 'elite_parking', name: 'Подземный VIP-Паркинг', minLevel: 65, income: 120000, level: 0, cost: 55000000, stored: 0, stock: 100, perk: '+10 мест в гараже, 0% угона' },
+    { id: 'insurance', name: 'Страховая «Надежный кидок»', minLevel: 70, income: 200000, level: 0, cost: 100000000, stored: 0, stock: 100, perk: 'Полный возврат при тотале вашей машины' }
 ];
 
 const OBD_ERRORS = [
     { text: "P0101: Выход сигнала ДМРВ из допустимого диапазона", cost: 5000, severity: "Низкая" },
+    { text: "P0113: Высокий уровень сигнала датчика температуры впуска", cost: 2500, severity: "Низкая" },
+    { text: "P0133: Медленный отклик кислородного датчика (Лямбда)", cost: 8000, severity: "Средняя" },
     { text: "P0171: Слишком бедная смесь (Подсос воздуха)", cost: 4000, severity: "Средняя" },
+    { text: "P0172: Слишком богатая смесь (Льют форсунки)", cost: 12000, severity: "Средняя" },
+    { text: "P0234: Передув турбины (Неисправен клапан N75)", cost: 16000, severity: "Высокая" },
     { text: "P0299: Недодув турбины (Утечка или хана улитке)", cost: 45000, severity: "Критическая" },
     { text: "P0300: Множественные пропуски зажигания", cost: 11000, severity: "Средняя" },
+    { text: "P0301: Пропуски зажигания в 1 цилиндре (Свеча/Катушка)", cost: 3500, severity: "Низкая" },
+    { text: "P0325: Неисправность цепи датчика детонации", cost: 4500, severity: "Низкая" },
+    { text: "P0335: Ошибка датчика положения коленвала (Глохнет)", cost: 6000, severity: "Высокая" },
+    { text: "P0340: Ошибка датчика распредвала", cost: 5500, severity: "Высокая" },
+    { text: "P0401: Слишком низкий расход в системе EGR", cost: 15000, severity: "Средняя" },
     { text: "P0420: Эффективность катализатора ниже порога", cost: 25000, severity: "Средняя" },
+    { text: "P0442: Небольшая утечка в системе EVAP", cost: 1500, severity: "Низкая" },
+    { text: "P0500: Нет сигнала от датчика скорости", cost: 3000, severity: "Низкая" },
     { text: "P0700: Неисправность системы управления АКПП", cost: 8000, severity: "Высокая" },
+    { text: "P0720: Ошибка датчика частоты вращения вала АКПП", cost: 12000, severity: "Высокая" },
+    { text: "P0730: Некорректное передаточное отношение (Букс АКПП)", cost: 85000, severity: "Критическая" },
+    { text: "P0741: Блокировка гидротрансформатора не работает", cost: 40000, severity: "Критическая" },
+    { text: "P2711: Недостоверные данные о передаче (Мехатроник DSG)", cost: 65000, severity: "Критическая" },
+    { text: "P0011: Положение распредвала - избыточное опережение (Vanos)", cost: 35000, severity: "Критическая" },
     { text: "P0016: Рассинхронизация распредвала и коленвала", cost: 85000, severity: "Критическая (Цепь ГРМ)" },
-    { text: "P0404: Неисправность клапана EGR (Засорен)", cost: 12000, severity: "Средняя" },
-    { text: "P0340: Ошибка датчика положения распредвала", cost: 6500, severity: "Низкая" }
+    { text: "U0100: Потеря связи с ЭБУ двигателя (Проводка)", cost: 20000, severity: "Высокая" },
+    { text: "C1201: Сбой системы курсовой устойчивости (ABS/ESP)", cost: 18000, severity: "Высокая" },
+    { text: "B1000: Внутренняя ошибка блока SRS (Стреляные подушки)", cost: 30000, severity: "Критическая" },
+    { text: "P1296: Ошибка системы охлаждения (Термостат)", cost: 8000, severity: "Средняя" },
+    { text: "P2261: Механическая неисправность байпасного клапана", cost: 9000, severity: "Средняя" },
+    { text: "P2101: Неисправность привода дроссельной заслонки", cost: 14000, severity: "Высокая" },
+    { text: "P0087: Слишком низкое давление в топливной рампе (ТНВД)", cost: 55000, severity: "Критическая" }
 ];
 
 const DAILY_REWARDS_CONFIG = [
@@ -266,7 +375,5 @@ const BARN_FINDS = [
     { name: "BMW E30 Coupe", power: 170, type: 'comfort', basePrice: 650000, marketValue: 1300000, img: "assets/cars/barn/e30.jpg" },
     { name: "Nissan Silvia S13", power: 200, type: 'comfort', basePrice: 900000, marketValue: 1800000, img: "assets/cars/barn/silvia.jpg" },
     { name: "VW Golf VI GTI (Stage 2 Project)", power: 280, type: 'comfort', basePrice: 1100000, marketValue: 1900000, img: "assets/cars/barn/golf6.jpg" },
-    { name: "ГАЗ-24 «Волга» V8", power: 220, type: 'economy', basePrice: 700000, marketValue: 1500000, img: "assets/cars/barn/volga24.jpg" },
-    { name: "Nissan Skyline GT-R R34 (В пыли)", power: 280, type: 'premium', basePrice: 4500000, marketValue: 9500000, img: "assets/cars/barn/r34.jpg" },
-    { name: "Toyota Supra A80 (Без мотора)", power: 0, type: 'premium', basePrice: 3200000, marketValue: 7000000, img: "assets/cars/barn/supra.jpg" }
+    { name: "ГАЗ-24 «Волга» V8", power: 220, type: 'economy', basePrice: 700000, marketValue: 1500000, img: "assets/cars/barn/volga24.jpg" }
 ];

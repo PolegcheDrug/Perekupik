@@ -1,5 +1,5 @@
 // ========================================================
-// js/syndicate.js — P2P БИРЖА, ТЕНЕВОЙ РЫНОК НОМЕРОВ, КЛУБЫ, ТОП (v0.4.0)
+// js/syndicate.js — P2P БИРЖА, АВТОКЛУБЫ, РЕФЕРАЛЫ И ТОП
 // ========================================================
 
 let p2pActiveFilter = 'cars';
@@ -12,7 +12,7 @@ function renderSyndicateHub() {
 
 function switchSyndicateTab(sub) {
     state.syndicateSubTab = sub;
-    ['p2p', 'blackmarket', 'clubs', 'leaderboard', 'friends'].forEach(s => {
+    ['p2p', 'clubs', 'friends', 'leaderboard'].forEach(s => {
         const scr = document.getElementById('synScreen-' + s);
         const btn = document.getElementById('synTabBtn-' + s);
         if (scr) scr.style.display = (s === sub) ? 'block' : 'none';
@@ -30,10 +30,9 @@ function switchSyndicateTab(sub) {
     });
 
     if (sub === 'p2p') renderP2PListings();
-    if (sub === 'blackmarket') renderBlackMarketPlates();
     if (sub === 'clubs') renderClubsList();
+    if (sub === 'friends') renderFriendsList();
     if (sub === 'leaderboard') renderLeaderboard();
-    if (sub === 'friends') renderFriendsList(); // На случай если вкладка друзей вернется
 }
 
 // ----------------------------------------------------
@@ -45,11 +44,11 @@ function filterP2P(type) {
     const btnPlates = document.getElementById('p2pFilter-plates');
 
     if (type === 'cars') {
-        if (btnCars) btnCars.className = 'btn btn-cyan btn-sm';
-        if (btnPlates) btnPlates.className = 'btn btn-dark btn-sm';
+        if (btnCars) { btnCars.className = 'btn btn-cyan btn-sm'; }
+        if (btnPlates) { btnPlates.className = 'btn btn-dark btn-sm'; }
     } else {
-        if (btnCars) btnCars.className = 'btn btn-dark btn-sm';
-        if (btnPlates) btnPlates.className = 'btn btn-cyan btn-sm';
+        if (btnCars) { btnCars.className = 'btn btn-dark btn-sm'; }
+        if (btnPlates) { btnPlates.className = 'btn btn-cyan btn-sm'; }
     }
     renderP2PListings();
 }
@@ -58,25 +57,52 @@ function renderP2PListings() {
     const list = document.getElementById('p2pItemsList');
     if (!list) return;
 
-    // Генерация базовых лотов от "игроков", если биржа пуста
     if (!state.p2pMarketListings || state.p2pMarketListings.length === 0) {
+        // Дефолтные предложения игроков биржи
         state.p2pMarketListings = [
-            { 
-                id: "p2p_1", seller: "Maga_GTI", type: "car", name: "VW Golf VI GTI (Stage 2)", 
-                price: 1850000, plate: "О777ОО 77", power: 260, img: "assets/cars/comfort/golf6.jpg",
-                originalCarObj: { condition: 85, wear: {engine: 80, transmission: 75}, tuning: {chip: 2, exhaust: true, stance: false, bodykit: false} }
+            {
+                id: "p2p_1",
+                seller: "Maga_GTI",
+                type: "car",
+                name: "VW Golf VI GTI (Stage 2)",
+                price: 1350000,
+                plate: "О777ОО 77",
+                power: 260,
+                img: "assets/cars/comfort/golf6.jpg"
             },
-            { id: "p2p_2", seller: "Major_Vova", type: "plate", name: "Госномер А777АА 77", price: 1500000, plate: "А777АА 77" },
-            { 
-                id: "p2p_3", seller: "Serega_Drift", type: "car", name: "ВАЗ-2107 (Корч)", 
-                price: 250000, plate: "В123ВВ 77", power: 85, img: "assets/cars/economy/vaz-2107.jpg",
-                originalCarObj: { condition: 60, wear: {engine: 50, transmission: 40}, tuning: {chip: 0, exhaust: true, stance: false, bodykit: false, weldedDiff: true, steeringAngle: true, hydroHandbrake: true} }
+            {
+                id: "p2p_2",
+                seller: "Major_Vova",
+                type: "plate",
+                name: "Госномер А777АА 77",
+                price: 950000,
+                plate: "А777АА 77"
             },
-            { id: "p2p_4", seller: "Bumer_Boy", type: "plate", name: "Госномер В001ОР 777", price: 950000, plate: "В001ОР 777" }
+            {
+                id: "p2p_3",
+                seller: "Serega_Drift",
+                type: "car",
+                name: "ВАЗ-2107 (Выворот + Заварка)",
+                price: 180000,
+                plate: "В123ВВ 77",
+                power: 85,
+                img: "assets/cars/economy/vaz-2107.jpg"
+            },
+            {
+                id: "p2p_4",
+                seller: "Bumer_Boy",
+                type: "plate",
+                name: "Госномер В001ОР 777",
+                price: 650000,
+                plate: "В001ОР 777"
+            }
         ];
     }
 
-    let filtered = state.p2pMarketListings.filter(item => item.type === p2pActiveFilter);
+    let filtered = state.p2pMarketListings.filter(item => {
+        if (p2pActiveFilter === 'cars') return item.type === 'car';
+        return item.type === 'plate';
+    });
 
     if (filtered.length === 0) {
         list.innerHTML = "<div class='glass-card text-center sub-label py-6'>В этой категории биржи пока нет активных лотов.</div>";
@@ -92,16 +118,6 @@ function renderP2PListings() {
 
         if (item.type === 'car') {
             let carImg = item.img ? item.img : "assets/cars/economy/vaz-2107.jpg";
-            
-            // Собираем значки тюнинга
-            let tuneBadges = "";
-            let t = item.originalCarObj?.tuning;
-            if (t) {
-                if (t.chip > 0) tuneBadges += "<span class='tag-badge bg-tag-purple mx-1'>STG " + t.chip + "</span>";
-                if (t.stance) tuneBadges += "<span class='tag-badge bg-tag-amber mx-1'>ПНЕВМА</span>";
-                if (t.weldedDiff) tuneBadges += "<span class='tag-badge bg-tag-red mx-1'>ДРИФТ</span>";
-            }
-
             html += 
             "<div class='glass-card mb-2'>" +
                 "<div class='flex-between mb-2'>" +
@@ -115,15 +131,12 @@ function renderP2PListings() {
                     "<img src='" + carImg + "' class='deal-car-thumb' onerror=\"this.src='assets/cars/economy/vaz-2107.jpg'\">" +
                     "<div style='flex:1;'>" +
                         "<div class='font-bold text-xs'>" + item.name + "</div>" +
-                        "<div class='license-plate text-xs' style='padding:1px 4px; margin:4px 0;'>" + item.plate + "</div>" +
+                        "<div class='license-plate text-xs' style='padding:1px 4px; margin:2px 0;'>" + item.plate + "</div>" +
                         "<div class='price-val text-xs color-green'>" + item.price.toLocaleString() + " ₽</div>" +
                     "</div>" +
                 "</div>" +
                 "<div class='flex-between'>" +
-                    "<div>" +
-                        "<div class='sub-label text-xs'>Мощность: " + (item.power || 100) + " л.с.</div>" +
-                        "<div class='mt-1'>" + tuneBadges + "</div>" +
-                    "</div>" +
+                    "<span class='sub-label text-xs'>Мощность: " + (item.power || 100) + " л.с.</span>" +
                     btnAction +
                 "</div>" +
             "</div>";
@@ -131,7 +144,7 @@ function renderP2PListings() {
             html += 
             "<div class='glass-card p-2 flex-between mb-2'>" +
                 "<div>" +
-                    "<div class='license-plate mb-1' style='font-size:14px;'>" + item.plate + " <div class='license-flag'>RUS</div></div>" +
+                    "<div class='license-plate mb-1'>" + item.plate + " <div class='license-flag'>RUS</div></div>" +
                     "<div class='sub-label text-xs'>Продавец: <b class='color-cyan'>" + item.seller + "</b></div>" +
                 "</div>" +
                 "<div class='text-right'>" +
@@ -159,24 +172,24 @@ function selectP2PListingType(type) {
     const select = document.getElementById('p2pItemSelect');
 
     if (type === 'car') {
-        if (btnCar) btnCar.className = 'btn btn-cyan btn-sm';
-        if (btnPlate) btnPlate.className = 'btn btn-dark btn-sm';
+        if (btnCar) { btnCar.className = 'btn btn-cyan btn-sm'; }
+        if (btnPlate) { btnPlate.className = 'btn btn-dark btn-sm'; }
         
         let opts = "";
         if (state.garage && state.garage.length > 0) {
             state.garage.forEach((c, i) => {
-                let isBlocked = c.impounded || c.unregistered || c.isStolen;
+                let isBlocked = c.impounded || c.unregistered;
                 let cPlate = c.customPlate || c.plate || "ТРАНЗИТ";
                 if (!isBlocked) {
                     opts += "<option value='car_" + i + "'>" + c.name + " (" + cPlate + ")</option>";
                 }
             });
         }
-        if (!opts) opts = "<option value=''>Нет чистых авто в гараже</option>";
+        if (!opts) opts = "<option value=''>Нет доступных авто в гараже</option>";
         if (select) select.innerHTML = opts;
     } else {
-        if (btnCar) btnCar.className = 'btn btn-dark btn-sm';
-        if (btnPlate) btnPlate.className = 'btn btn-cyan btn-sm';
+        if (btnCar) { btnCar.className = 'btn btn-dark btn-sm'; }
+        if (btnPlate) { btnPlate.className = 'btn btn-cyan btn-sm'; }
 
         let opts = "";
         if (state.ownedPlates && state.ownedPlates.length > 0) {
@@ -237,7 +250,7 @@ function confirmCreateP2PListing() {
             plate: car.customPlate || car.plate || "ТРАНЗИТ",
             power: car.power || 100,
             img: car.img,
-            originalCarObj: car // Полностью сохраняем весь тюнинг и состояние
+            originalCarObj: car
         });
 
         if (!state.myP2PListings) state.myP2PListings = [];
@@ -288,14 +301,15 @@ function buyP2PListing(listingId) {
         if (curSlots >= maxSlots) return showToast("В гараже нет свободного места!");
 
         state.player.cash -= lot.price;
-        
-        // Восстанавливаем оригинальный объект машины, если он есть
-        let carObj = lot.originalCarObj ? Object.assign({}, lot.originalCarObj) : {
+        let carObj = lot.originalCarObj ? lot.originalCarObj : {
             id: "car_p2p_" + Date.now(),
             name: lot.name,
             power: lot.power || 100,
             type: "comfort",
             price: lot.price,
+            purchaseCost: lot.price,
+            baseMarketValue: lot.price,
+            marketValue: lot.price,
             img: lot.img,
             plate: lot.plate,
             customPlate: lot.plate,
@@ -303,8 +317,6 @@ function buyP2PListing(listingId) {
             wear: { engine: 90, transmission: 90 },
             tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 }
         };
-        
-        carObj.purchaseCost = lot.price; // Обновляем стоимость выкупа для расчета маржи в будущем
 
         if (!state.garage) state.garage = [];
         state.garage.push(carObj);
@@ -335,7 +347,7 @@ function cancelP2PListing(listingId) {
         let curSlots = (state.garage && state.garage.length) ? state.garage.length : 0;
         if (curSlots >= maxSlots) return showToast("В гараже нет свободного места под возврат авто!");
 
-        let carObj = lot.originalCarObj ? Object.assign({}, lot.originalCarObj) : {
+        let carObj = lot.originalCarObj ? lot.originalCarObj : {
             id: "car_p2p_" + Date.now(),
             name: lot.name,
             power: lot.power || 100,
@@ -343,9 +355,7 @@ function cancelP2PListing(listingId) {
             price: lot.price,
             img: lot.img,
             plate: lot.plate,
-            customPlate: lot.plate,
-            condition: 85,
-            tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 }
+            customPlate: lot.plate
         };
 
         if (!state.garage) state.garage = [];
@@ -367,125 +377,7 @@ function cancelP2PListing(listingId) {
 }
 
 // ----------------------------------------------------
-// 2. ТЕНЕВОЙ РЫНОК НОМЕРОВ (BLACK MARKET)
-// ----------------------------------------------------
-function generateBlackMarketPlates() {
-    const rareRegions = ['77', '99', '97', '777', '199', '177'];
-    const rareLetters = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
-    
-    let generated = [];
-    
-    for (let i = 0; i < 4; i++) {
-        let l1 = rareLetters[Math.floor(Math.random() * rareLetters.length)];
-        let l2 = rareLetters[Math.floor(Math.random() * rareLetters.length)];
-        let l3 = rareLetters[Math.floor(Math.random() * rareLetters.length)];
-        let reg = rareRegions[Math.floor(Math.random() * rareRegions.length)];
-        
-        let plateType = Math.random();
-        let plateStr = "";
-        let baseValue = 0;
-
-        if (plateType < 0.25) {
-            // Три одинаковых буквы
-            plateStr = l1 + l1 + l1 + " " + (Math.floor(Math.random()*899)+100) + " " + reg;
-            baseValue = 450000 + Math.random() * 200000;
-        } else if (plateType < 0.5) {
-            // Три одинаковых цифры
-            const nums = ['111', '222', '333', '444', '555', '666', '888', '999'];
-            let n = nums[Math.floor(Math.random() * nums.length)];
-            plateStr = l1 + n + l2 + l3 + " " + reg;
-            baseValue = 380000 + Math.random() * 150000;
-        } else if (plateType < 0.75) {
-            // Элитные 777 / 001 / 007
-            const eliteNums = ['777', '001', '007'];
-            let n = eliteNums[Math.floor(Math.random() * eliteNums.length)];
-            plateStr = l1 + n + l1 + l1 + " " + reg;
-            baseValue = 1200000 + Math.random() * 500000;
-        } else {
-            // Спецсерии (АМР, ЕКХ)
-            const specList = ["АМР", "ЕКХ", "СКР"];
-            let spec = specList[Math.floor(Math.random() * specList.length)];
-            plateStr = spec[0] + (Math.floor(Math.random()*899)+100) + spec[1] + spec[2] + " " + reg;
-            baseValue = 1800000 + Math.random() * 1000000;
-        }
-
-        generated.push({
-            id: "bm_plate_" + Date.now() + "_" + i,
-            plate: plateStr,
-            price: Math.round(baseValue)
-        });
-    }
-
-    state.blackMarketPlates = generated;
-}
-
-function refreshBlackMarketPlates() {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 25000) return showToast("Нужно 25,000 ₽ за услуги связи с барыгой!");
-    
-    state.player.cash -= 25000;
-    generateBlackMarketPlates();
-    saveState();
-    updateHeaderUI();
-    renderBlackMarketPlates();
-    playSound('tick');
-    tgHaptic('success');
-    showToast("Список теневых госзнаков обновлен!");
-}
-
-function renderBlackMarketPlates() {
-    const list = document.getElementById('blackMarketPlatesList');
-    if (!list) return;
-
-    if (!state.blackMarketPlates || state.blackMarketPlates.length === 0) {
-        generateBlackMarketPlates();
-        saveState();
-    }
-
-    let html = "";
-    state.blackMarketPlates.forEach((item, idx) => {
-        let isSuperRare = item.price > 1000000;
-        let borderGlow = isSuperRare ? "border: 1px solid var(--purple); box-shadow: 0 0 15px rgba(192, 132, 252, 0.25);" : "";
-        let rarityText = isSuperRare ? "<span class='color-purple text-xs font-bold'>ЭКСКЛЮЗИВ</span>" : "<span class='color-amber text-xs'>БЛАТНОЙ</span>";
-
-        html += 
-        "<div class='glass-card flex-between p-2 mb-2' style='" + borderGlow + "'>" +
-            "<div>" +
-                "<div class='license-plate mb-1' style='font-size:15px; padding:4px 8px;'>" + item.plate + " <div class='license-flag'>RUS</div></div>" +
-                rarityText +
-            "</div>" +
-            "<div class='text-right'>" +
-                "<div class='price-val text-xs color-green mb-1'>" + item.price.toLocaleString() + " ₽</div>" +
-                "<button onclick=\"buyBlackMarketPlate(" + idx + ")\" class='btn " + (isSuperRare ? "btn-purple" : "btn-amber") + " btn-sm btn-auto'>Выкупить</button>" +
-            "</div>" +
-        "</div>";
-    });
-
-    list.innerHTML = html;
-}
-
-function buyBlackMarketPlate(idx) {
-    const lot = state.blackMarketPlates[idx];
-    if (!lot) return;
-
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < lot.price) return showToast("Не хватает денег на покупку номера!");
-
-    state.player.cash -= lot.price;
-    if (!state.ownedPlates) state.ownedPlates = [];
-    state.ownedPlates.push(lot.plate);
-
-    state.blackMarketPlates.splice(idx, 1);
-    saveState();
-    updateHeaderUI();
-    renderBlackMarketPlates();
-    playSound('win');
-    tgHaptic('success');
-    openVerdictModal("НОМЕР ПРИОБРЕТЕН! 🏷️", "Госзнак «" + lot.plate + "» добавлен в ваш инвентарь. Можете установить его в Гараже.", true);
-}
-
-// ----------------------------------------------------
-// 3. АВТОКЛУБЫ СИНДИКАТА
+// 2. АВТОКЛУБЫ СИНДИКАТА
 // ----------------------------------------------------
 function renderClubsList() {
     const container = document.getElementById('synClubsContainer');
@@ -564,49 +456,7 @@ function createClubPrompt() {
 }
 
 // ----------------------------------------------------
-// 4. ТОП ПЕРЕКУПОВ (ЛИДЕРБОРД)
-// ----------------------------------------------------
-function renderLeaderboard() {
-    const container = document.getElementById('leaderboardListContainer');
-    if (!container) return;
-
-    const leaders = [
-        { rank: 1, name: "Илюха DXF", profit: 142500000, lvl: 85, badge: "👑 ОЛИГАРХ" },
-        { rank: 2, name: "Святой Максиман", profit: 98400000, lvl: 64, badge: "⚡ ХОЗЯИН РЫНКА" },
-        { rank: 3, name: "Серёга Техно", profit: 76100000, lvl: 52, badge: "🔧 ТОП ДЕЛЕЦ" },
-        { rank: 4, name: "Жиминка Пендосовская", profit: 54000000, lvl: 41, badge: "🤖 AI ПЕРЕКУП" },
-        { 
-            rank: 5, 
-            name: (state.player && state.player.name) ? state.player.name : "Вы", 
-            profit: (state.player && state.player.stats && state.player.stats.totalNetProfit) ? state.player.stats.totalNetProfit : 0, 
-            lvl: (state.player && state.player.level) ? state.player.level : 1, 
-            badge: "🎯 ВЫ" 
-        }
-    ];
-
-    let html = "";
-    leaders.forEach(lead => {
-        let isMe = lead.rank === 5;
-        let rankColor = lead.rank === 1 ? "color-amber" : (lead.rank === 2 ? "color-cyan" : (lead.rank === 3 ? "color-purple" : ""));
-
-        html += 
-        "<div class='glass-card p-2 flex-between mb-2 " + (isMe ? "border-cyan" : "") + "'>" +
-            "<div class='flex-gap' style='align-items:center;'>" +
-                "<b class='font-bold " + rankColor + "' style='font-size:14px; min-width:20px;'>#" + lead.rank + "</b>" +
-                "<div>" +
-                    "<b class='text-xs'>" + lead.name + "</b>" +
-                    "<div class='sub-label' style='font-size:10px;'>Ур. " + lead.lvl + " | Чистая прибыль: <span class='color-green font-bold'>" + lead.profit.toLocaleString() + " ₽</span></div>" +
-                "</div>" +
-            "</div>" +
-            "<span class='tag-badge " + (isMe ? "bg-tag-cyan" : "bg-tag-amber") + "'>" + lead.badge + "</span>" +
-        "</div>";
-    });
-
-    container.innerHTML = html;
-}
-
-// ----------------------------------------------------
-// 5. РЕФЕРАЛЬНАЯ СЕТЬ (ДРУЗЬЯ В TELEGRAM)
+// 3. РЕФЕРАЛЬНАЯ СЕТЬ (ДРУЗЬЯ В TELEGRAM)
 // ----------------------------------------------------
 function getReferralLink() {
     let userId = "777";
@@ -684,6 +534,42 @@ function renderFriendsList() {
                 "<div class='sub-label' style='font-size:10px;'>Уровень: " + f.lvl + " | Приглашён: " + f.date + "</div>" +
             "</div>" +
             "<span class='tag-badge bg-tag-green'>+50,000 ₽ получено</span>" +
+        "</div>";
+    });
+
+    container.innerHTML = html;
+}
+
+// ----------------------------------------------------
+// 4. ТОП ПЕРЕКУПОВ (ЛИДЕРБОРД)
+// ----------------------------------------------------
+function renderLeaderboard() {
+    const container = document.getElementById('leaderboardListContainer');
+    if (!container) return;
+
+    const leaders = [
+        { rank: 1, name: "Илюха DXF", profit: 142500000, lvl: 85, badge: "👑 ОЛИГАРХ" },
+        { rank: 2, name: "Святой Максиман", profit: 98400000, lvl: 64, badge: "⚡ ХОЗЯИН РЫНКА" },
+        { rank: 3, name: "Серёга Техно", profit: 76100000, lvl: 52, badge: "🔧 ТОП ДЕЛЕЦ" },
+        { rank: 4, name: "Жиминка Пендосовская", profit: 54000000, lvl: 41, badge: "🤖 AI ПЕРЕКУП" },
+        { rank: 5, name: (state.player && state.player.name) ? state.player.name : "Вы", profit: (state.player && state.player.stats && state.player.stats.totalNetProfit) ? state.player.stats.totalNetProfit : 0, lvl: (state.player && state.player.level) ? state.player.level : 1, badge: "🎯 ВЫ" }
+    ];
+
+    let html = "";
+    leaders.forEach(lead => {
+        let isMe = lead.rank === 5;
+        let rankColor = lead.rank === 1 ? "color-amber" : (lead.rank === 2 ? "color-cyan" : (lead.rank === 3 ? "color-purple" : ""));
+
+        html += 
+        "<div class='glass-card p-2 flex-between mb-2 " + (isMe ? "border-cyan" : "") + "'>" +
+            "<div class='flex-gap' style='align-items:center;'>" +
+                "<b class='font-bold " + rankColor + "' style='font-size:14px; min-width:20px;'>#" + lead.rank + "</b>" +
+                "<div>" +
+                    "<b class='text-xs'>" + lead.name + "</b>" +
+                    "<div class='sub-label' style='font-size:10px;'>Ур. " + lead.lvl + " | Чистая прибыль: <span class='color-green font-bold'>" + lead.profit.toLocaleString() + " ₽</span></div>" +
+                "</div>" +
+            "</div>" +
+            "<span class='tag-badge " + (isMe ? "bg-tag-cyan" : "bg-tag-amber") + "'>" + lead.badge + "</span>" +
         "</div>";
     });
 

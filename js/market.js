@@ -1,5 +1,5 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ОБЪЯВЛЕНИЯ, ТОЛЩИНОМЕР И АВТОТЕКА (v0.4.0)
+// js/market.js — АВТОРЫНОК, ОБЪЯВЛЕНИЯ, ТОЛЩИНОМЕР И АВТОТЕКА (v0.3.3.6)
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -119,19 +119,10 @@ function refreshMarketFeedManual() {
     
     state.player.cash -= cost;
     state.player.fuel -= 5;
-    
-    // Авто-сворачивание сетки классов при обновлении ленты для экономии места
-    const grid = document.getElementById('marketCatListContainer');
-    const btnIcon = document.querySelector('#btnToggleMarketGrid i');
-    if (grid && !grid.classList.contains('collapsed')) {
-        grid.classList.add('collapsed');
-        if (btnIcon) btnIcon.className = "fa-solid fa-chevron-down";
-    }
-
     saveState();
     populateMarketFeed();
     renderMarketFeed();
-    showToast("Лента предложений обновлена (-5 ⛽)!");
+    showToast("Лента обновлена (-5 ⛽)!");
 }
 
 function populateMarketFeed() {
@@ -153,9 +144,6 @@ function populateMarketFeed() {
         let defectChance = 0.45;
         if (lvl <= 5) defectChance = 0.35;
         else if (lvl >= 20) defectChance = 0.60;
-        
-        // Премиум и гиперкары реже имеют скрытые дефекты на рынке, чем эконом
-        if (cat === 'premium' || cat === 'hyper') defectChance -= 0.15;
 
         let stolenChance = 0.20;
         if (lvl <= 5) stolenChance = 0.12;
@@ -189,7 +177,7 @@ function populateMarketFeed() {
         let isLuckyFind = false;
 
         if (plateVal > 5000) {
-            if (Math.random() < 0.04) {
+            if (Math.random() < 0.03) {
                 isLuckyFind = true;
                 sellerPrice = carOnlyPrice;
             } else {
@@ -204,15 +192,11 @@ function populateMarketFeed() {
             defectObj = { text: errItem.text, cost: errItem.cost };
         }
 
-        // Динамические фразы продавцов
-        let sNote = "Машина в порядке, сел и поехал.";
+        let sNote = "Хорошая машина, сел и поехал.";
         if (isLuckyFind) {
-            sNote = "«Отдаю дедовский аппарат как есть, в ценах на номера не разбираюсь.» (🔥 Продавец не знает цену номеров!)";
+            sNote = "«Дедушка ездил только в сад. Про номера ничего не знаю, отдаю как есть.» (🔥 Продавец не знает цену номеров!)";
         } else if (plateVal > 5000) {
-            sNote = "«Продаю только вместе с красивым госномером " + genPlate + ", торга нет!»";
-        } else if (hasHiddenDefect) {
-            const riskyPhrases = ["«Есть мелкие недочеты, на езду не влияет.»", "«Продаю срочно, перекупам не звонить.»", "«Двигатель работает ровно, но чек горит (датчик кислорода).»"];
-            sNote = riskyPhrases[Math.floor(Math.random() * riskyPhrases.length)];
+            sNote = "«Отдаю вместе с красивым госномером " + genPlate + ", цена окончательная с учётом номеров.»";
         } else if (typeof SELLER_ADS_PHRASES !== 'undefined' && SELLER_ADS_PHRASES.length > 0) {
             sNote = SELLER_ADS_PHRASES[Math.floor(Math.random() * SELLER_ADS_PHRASES.length)];
         }
@@ -221,15 +205,9 @@ function populateMarketFeed() {
         let cPower = template.power ? template.power : 100;
         let cImg = template.img ? template.img : "assets/cars/economy/vaz-2107.jpg";
 
-        // Состояние зависит от скрытых дефектов и класса авто
-        let cCond = hasHiddenDefect ? Math.floor(45 + Math.random() * 25) : Math.floor(75 + Math.random() * 20);
-        if (cat === 'premium' || cat === 'hyper') cCond = Math.max(65, cCond);
-
-        let isThick1 = (Math.random() > 0.6) ? Math.floor(200 + Math.random() * 300) : 115;
-        let isThick2 = (Math.random() > 0.5) ? Math.floor(250 + Math.random() * 400) : 110;
-        
-        let engWear = hasHiddenDefect ? (40 + Math.random() * 30) : (75 + Math.random() * 20);
-        let transWear = hasHiddenDefect ? (45 + Math.random() * 25) : (80 + Math.random() * 15);
+        let cCond = hasHiddenDefect ? 55 : 85;
+        let isThick1 = (Math.random() > 0.6) ? 250 : 115;
+        let isThick2 = (Math.random() > 0.5) ? 260 : 110;
 
         state.marketFeed.push({
             id: carId,
@@ -237,7 +215,7 @@ function populateMarketFeed() {
             power: cPower,
             type: tType,
             basePrice: baseP,
-            mileage: Math.floor(Math.random() * (tType === 'premium' ? 80000 : 180000)) + 15000,
+            mileage: Math.floor(Math.random() * 120000) + 18000,
             price: sellerPrice,
             baseMarketValue: baseVal,
             marketValue: baseVal + plateVal,
@@ -258,7 +236,7 @@ function populateMarketFeed() {
                 weldedDiff: false, steeringAngle: false, bucketSeats: false, 
                 customWheels: false, risk1251: 0 
             },
-            wear: { engine: engWear, transmission: transWear },
+            wear: { engine: 65 + Math.random() * 30, transmission: 65 + Math.random() * 30 },
             bodyThickness: { hood: isThick1, roof: 100, doors: isThick2, wings: 110 },
             rolledOdometer: false,
             hasAdditive: false,
@@ -283,7 +261,7 @@ function renderMarketFeed() {
     const now = Date.now();
 
     if (!state.marketFeed || state.marketFeed.length === 0) {
-        container.innerHTML = "<div class='glass-card text-center py-6 sub-label'>Нет предложений на рынке. Выберите класс и нажмите «Обновить ленту»!</div>";
+        container.innerHTML = "<div class='glass-card text-center py-6 sub-label'>Нет предложений на рынке. Нажмите «Обновить ленту»!</div>";
         return;
     }
     
@@ -411,7 +389,7 @@ function initiateBuyMarketCar(carId) {
         let karma = (state.player && state.player.karma) ? state.player.karma : 50;
         let callSuccessChance = 55;
         if (karma > 60) callSuccessChance += 10;
-        if (car.type === 'premium' || car.type === 'hyper') callSuccessChance -= 15;
+        if (car.type === 'premium') callSuccessChance -= 10;
         
         const roll = Math.random() * 100;
 
@@ -515,8 +493,8 @@ function openMarketDeal(carId) {
     let priceStr = car.price ? car.price.toLocaleString() : "0";
     setTxt("dealCarPrice", priceStr + " ₽");
     
-    const avatars = ["👨‍💼", "🧔", "😎", "👨‍🔧", "🧑‍💻", "🕵️‍♂️"];
-    const names = ["Сергей", "Алексей", "Дмитрий", "Артем", "Михаил", "Игорь"];
+    const avatars = ["👨‍💼", "🧔", "😎", "👨‍🔧", "🧑‍💻"];
+    const names = ["Сергей", "Алексей", "Дмитрий", "Артем", "Михаил"];
     let numSum = 0;
     for (let k = 0; k < carId.length; k++) {
         numSum += carId.charCodeAt(k);
@@ -571,15 +549,14 @@ function attemptMarketHaggle(percent) {
     if (car.haggled) return showToast("Продавец больше не пойдет на уступки!");
     
     let successChance = 15;
-    if (percent === 3) successChance = 85;
-    else if (percent === 7) successChance = 50;
+    if (percent === 3) successChance = 80;
+    else if (percent === 7) successChance = 45;
 
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
     let karma = (state.player && state.player.karma) ? state.player.karma : 50;
     
     successChance += (lvl * 0.5);
     if (karma > 60) successChance += 10;
-    if (car.type === 'premium' || car.type === 'hyper') successChance -= 15; // Сложно торговаться с владельцами дорогих авто
 
     car.haggled = true; 
     const hArea = document.getElementById("dealHaggleArea");

@@ -1,11 +1,11 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.0)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СЕЙВЫ (v0.3.3.6)
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.4.0";
+const CURRENT_GAME_VERSION = "v0.3.3.6";
 
-// Инициализация AudioContext для звуков
-let ACtx = window.AudioContext || window.webkitAudioContext;
+let ACtx = window.AudioContext;
+if (!ACtx) ACtx = window.webkitAudioContext;
 let audioCtx = null;
 
 let tgUserId = "guest_777";
@@ -13,36 +13,23 @@ let SAVE_KEY = "perekup_save_guest_777";
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
 
-// ========================================================
-// ГЛОБАЛЬНЫЕ УТИЛИТЫ И UI
-// ========================================================
-function tgHaptic(type = 'light') {
+function tgHaptic(type) {
+    let t = type ? type : 'light';
     try { 
-        if (window.Telegram?.WebApp?.HapticFeedback) { 
-            let isNotif = ['success', 'warning', 'error'].includes(type);
+        if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) { 
+            let isNotif = (t === 'success' || t === 'warning' || t === 'error');
             if (isNotif) {
-                window.Telegram.WebApp.HapticFeedback.notificationOccurred(type); 
+                window.Telegram.WebApp.HapticFeedback.notificationOccurred(t); 
             } else {
-                window.Telegram.WebApp.HapticFeedback.impactOccurred(type); 
+                window.Telegram.WebApp.HapticFeedback.impactOccurred(t); 
             }
         } 
-    } catch(e) {
-        console.warn("Haptic API недоступен:", e);
-    }
-}
-
-function initAudio() {
-    if (!audioCtx) {
-        audioCtx = new ACtx();
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+    } catch(e) {}
 }
 
 function playSound(type) {
     try {
-        initAudio();
+        if (!audioCtx) audioCtx = new ACtx();
         const now = audioCtx.currentTime;
         if (type === 'tick') {
             const osc = audioCtx.createOscillator(); 
@@ -65,25 +52,13 @@ function playSound(type) {
             g.gain.linearRampToValueAtTime(0, now + 0.25); 
             osc.start(now); 
             osc.stop(now + 0.25);
-        } else if (type === 'error') {
-            const osc = audioCtx.createOscillator(); 
-            const g = audioCtx.createGain(); 
-            osc.connect(g); 
-            g.connect(audioCtx.destination);
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(150, now); 
-            osc.frequency.exponentialRampToValueAtTime(50, now + 0.3); 
-            g.gain.setValueAtTime(0.15, now); 
-            g.gain.linearRampToValueAtTime(0, now + 0.3); 
-            osc.start(now); 
-            osc.stop(now + 0.3);
         }
     } catch(e) {}
 }
 
 function playEngineSound() {
     try {
-        initAudio(); 
+        if (!audioCtx) audioCtx = new ACtx(); 
         const now = audioCtx.currentTime;
         const osc = audioCtx.createOscillator(); 
         const g = audioCtx.createGain(); 
@@ -98,6 +73,7 @@ function playEngineSound() {
         osc.start(now); 
         osc.stop(now + 0.9); 
         tgHaptic('medium'); 
+        showToast("🔥 РЁВ ВЫХЛОПА: Газ в пол!");
     } catch(e) {}
 }
 
@@ -132,8 +108,6 @@ function closeModal(id) {
 function openVerdictModal(title, text, isSuccess, amount, profit) {
     tgHaptic(isSuccess ? 'success' : 'error'); 
     if (isSuccess) playSound('win');
-    else playSound('error');
-
     setTxt('verdictEmoji', isSuccess ? '🎉' : '❌'); 
     setTxt('verdictTitle', title); 
     setTxt('verdictText', text);
@@ -183,27 +157,24 @@ function dismissPatchNotesModal() {
     } catch(e) {}
 }
 
-// ========================================================
-// УПРАВЛЕНИЕ СОСТОЯНИЕМ (STATE)
-// ========================================================
 const DEFAULT_STATE = {
     player: { 
         name: "Перекуп #777", avatarUrl: null, cash: 150000, stars: 15, connections: 1, 
         expressTickets: 25, maxExpressTickets: 25, fuel: 100, level: 1, xp: 0, maxXp: 120, 
         baseSlots: 2, vip: false, vipPro: false, lastFreeSpinDay: 0, club: null, karma: 50, 
         stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 }, 
-        hunger: 80, mood: 85, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0, 
+        hunger: 80, mood: 85, reputation: 30, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0, 
         diet: 'shaurma', housingId: 'room', housingType: 'rent', ownedHouses: [], selectedStreetCarIndex: 0, 
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
         hasRacingLicense: false, consecutiveRaces: 0, maxRacesBeforeRaid: 12,
         tools: { gauge: false, obd: false, endoscope: false, compressor: false },
         furniture: []
     },
-    garage: [], salesLot: [], contracts: [], plateCatalog: [], ownedPlates: ["В777ВВ 77"], 
+    garage: [], salesLot: [], contracts: [], plateCatalog: [], ownedPlates: ["В777ВВ 777"], 
     activeCategory: 'economy', marketFeed: [], p2pMode: 'cars', syndicateSubTab: 'p2p', 
-    myP2PListings: [], businesses: [], confiscatedLot: null, blackMarketPlates: [],
-    marketModifiers: { economy: 1, comfort: 1, premium: 1, all: 1 },
-    lifeChatMessages: [], friendsList: []
+    myP2PListings: [], businesses: [], confiscatedLot: null,
+    barnProgress: { car: null, step: 0, tier: 1, plate: '' }, 
+    marketModifiers: { economy: 1, comfort: 1, premium: 1, all: 1 }
 };
 
 let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -242,16 +213,16 @@ function getTotalGarageSlots() {
 }
 
 // ========================================================
-// АВТОРИЗАЦИЯ, СОХРАНЕНИЕ И СЕТЬ
+// TELEGRAM АВТОРИЗАЦИЯ, СЕЙВЫ И CLOUD STORAGE
 // ========================================================
 function initTelegramAuthAndStorage(callback) {
     try {
-        if (window.Telegram?.WebApp) {
+        if (window.Telegram && window.Telegram.WebApp) {
             const tg = window.Telegram.WebApp;
             tg.ready();
             tg.expand();
 
-            if (tg.initDataUnsafe?.user) {
+            if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                 const u = tg.initDataUnsafe.user;
                 tgUserId = String(u.id);
                 SAVE_KEY = "perekup_save_" + tgUserId;
@@ -274,22 +245,25 @@ function initTelegramAuthAndStorage(callback) {
                     statusEl.className = "tag-badge bg-tag-green";
                 }
 
+                // Читаем сейв из CloudStorage
                 tg.CloudStorage.getItem(SAVE_KEY, (err, val) => {
                     if (!err && val) {
                         try {
                             applyLoadedState(JSON.parse(val));
                             if (callback) callback();
                             return;
-                        } catch(e) { console.error("Ошибка парсинга TG Cloud:", e); }
+                        } catch(e) {}
                     }
+                    // Если в облаке пусто — читаем локально
                     loadFromLocalStorage();
                     if (callback) callback();
                 });
                 return;
             }
         }
-    } catch(e) { console.error("Ошибка инициализации TG:", e); }
+    } catch(e) {}
 
+    // Fallback без Telegram WebApp
     loadFromLocalStorage();
     if (callback) callback();
 }
@@ -298,28 +272,29 @@ function loadFromLocalStorage() {
     try {
         let saved = localStorage.getItem(SAVE_KEY);
         if (!saved) saved = localStorage.getItem('perekoop_sim_save_v105_release');
-        if (saved) applyLoadedState(JSON.parse(saved));
-    } catch(e) { console.error("Ошибка загрузки LocalStorage:", e); }
+        if (saved) {
+            applyLoadedState(JSON.parse(saved));
+        }
+    } catch(e) {}
 }
 
 function applyLoadedState(parsed) {
     if (!parsed) return;
-    
     if (parsed.player) {
-        state.player = { ...DEFAULT_STATE.player, ...parsed.player };
-        if (parsed.player.stats) state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
-        if (parsed.player.tools) state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
+        state.player = Object.assign({}, DEFAULT_STATE.player, parsed.player);
+        if (parsed.player.stats) state.player.stats = Object.assign({}, DEFAULT_STATE.player.stats, parsed.player.stats);
+        if (parsed.player.tools) state.player.tools = Object.assign({}, DEFAULT_STATE.player.tools, parsed.player.tools);
+        if (parsed.player.furniture) state.player.furniture = parsed.player.furniture;
     }
-    
     if (Array.isArray(parsed.garage)) state.garage = parsed.garage;
     if (Array.isArray(parsed.salesLot)) state.salesLot = parsed.salesLot;
     if (Array.isArray(parsed.ownedPlates)) state.ownedPlates = parsed.ownedPlates;
     if (Array.isArray(parsed.businesses)) state.businesses = parsed.businesses;
     if (parsed.marketModifiers) state.marketModifiers = parsed.marketModifiers;
+    if (parsed.barnProgress) state.barnProgress = parsed.barnProgress;
     if (Array.isArray(parsed.myP2PListings)) state.myP2PListings = parsed.myP2PListings;
     if (parsed.confiscatedLot) state.confiscatedLot = parsed.confiscatedLot;
     if (Array.isArray(parsed.marketFeed)) state.marketFeed = parsed.marketFeed;
-    if (Array.isArray(parsed.blackMarketPlates)) state.blackMarketPlates = parsed.blackMarketPlates;
 
     sanitizeState();
 }
@@ -351,6 +326,7 @@ function saveState() {
         const jsonStr = JSON.stringify(state);
         localStorage.setItem(SAVE_KEY, jsonStr);
 
+        // Debounce сохранение в Telegram CloudStorage
         if (isCloudStorageAvailable && window.Telegram?.WebApp?.CloudStorage) {
             if (cloudSaveDebounceTimer) clearTimeout(cloudSaveDebounceTimer);
             cloudSaveDebounceTimer = setTimeout(() => {
@@ -368,15 +344,7 @@ function saveState() {
                 });
             }, 1800);
         }
-
-        if (window.FB_Bridge && typeof window.FB_Bridge.CloudSave?.pushSave === 'function') {
-            window.FB_Bridge.CloudSave.pushSave(tgUserId, state);
-            if (state.player.stats?.totalNetProfit > 0) {
-                window.FB_Bridge.Leaderboard.updateMyRank(tgUserId, state.player.name, state.player.stats.totalNetProfit, state.player.level);
-            }
-        }
-        
-    } catch(e) { console.error("Ошибка сохранения:", e); } 
+    } catch(e) {} 
     updateHeaderUI(); 
 }
 
@@ -397,6 +365,7 @@ function syncCloudStorageManual() {
     });
 }
 
+// РЕЗЕРВНЫЙ ЭКСПОРТ И ИМПОРТ СЕЙВОВ
 function openSaveManagerModal() {
     const area = document.getElementById('saveExportArea');
     if (area) {
@@ -422,12 +391,12 @@ function exportSaveCodeAction() {
             playSound('win');
         }).catch(() => {
             area.select();
-            document.execCommand('copy');
+            document.executeCommand('copy');
             showToast("Код скопирован!");
         });
     } else {
         area.select();
-        document.execCommand('copy');
+        document.executeCommand('copy');
         showToast("Код скопирован!");
     }
 }
@@ -460,9 +429,6 @@ function importSaveCodeAction() {
     }
 }
 
-// ========================================================
-// УПРАВЛЕНИЕ ИНТЕРФЕЙСОМ И НАВИГАЦИЕЙ
-// ========================================================
 function updateHeaderUI() {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
     let stars = (state.player && state.player.stars) ? state.player.stars : 0;
@@ -513,7 +479,9 @@ function updateHeaderUI() {
     if (mFill) mFill.style.width = md + "%";
 
     const vipBadge = document.getElementById('vipBadge');
-    if (vipBadge) vipBadge.style.display = (state.player && state.player.vipPro) ? 'block' : 'none';
+    if (vipBadge) {
+        vipBadge.style.display = (state.player && state.player.vipPro) ? 'block' : 'none';
+    }
 
     let gLen = state.garage ? state.garage.length : 0;
     setTxt('garageHeaderSlots', gLen + "/" + getTotalGarageSlots());
@@ -616,7 +584,7 @@ function adjustResource(type, delta) {
     
     saveState();
     updateHeaderUI();
-    if (typeof renderProfileAnalytics === 'function') renderProfileAnalytics();
+    renderProfileAnalytics();
 }
 
 function openDailyBonusModal() {
@@ -667,10 +635,7 @@ function claimDailyReward() {
     if (r.fuel) state.player.fuel = Math.min(100, state.player.fuel + r.fuel);
     if (r.connections) state.player.connections = (state.player.connections || 0) + r.connections;
     if (r.stars) state.player.stars += r.stars;
-    if (r.specialPlate) {
-        if (!state.ownedPlates) state.ownedPlates = [];
-        state.ownedPlates.push(r.specialPlate);
-    }
+    if (r.specialPlate) state.ownedPlates.push(r.specialPlate);
 
     state.player.lastClaimedDay = pDay;
     state.player.streakDay = (sDay % 7) + 1;
@@ -683,7 +648,6 @@ function claimDailyReward() {
 }
 
 function switchTab(tabId) {
-    initAudio(); 
     playSound('tick'); 
     tgHaptic('light'); 
     
@@ -706,16 +670,16 @@ function switchTab(tabId) {
     else if (tabId === 'tabSyndicate') { const el = document.getElementById('bnav-tabSyndicate'); if (el) el.classList.add('active'); }
     else { const el = document.getElementById('bnav-tabLife'); if (el) el.classList.add('active'); }
 
-    // Безопасный вызов рендеров из других модулей
     if (tabId === 'tabMarket' && typeof renderMarketFeed === 'function') renderMarketFeed();
     if (tabId === 'tabGarage' && typeof renderGarage === 'function') renderGarage(); 
     if (tabId === 'tabSalesLot' && typeof renderSalesLot === 'function') renderSalesLot();
     
-    if (tabId === 'tabStreet' && typeof renderStreetScreen === 'function' && typeof renderStreetEvents === 'function') {
+    if (tabId === 'tabStreet') {
         renderStreetScreen();
         renderStreetEvents();
     }
     
+    if (tabId === 'tabBusiness' && typeof checkBusinessAccess === 'function') checkBusinessAccess();
     if (tabId === 'tabShop' && typeof switchShopSection === 'function') switchShopSection('tools');
     if (tabId === 'tabReshala' && typeof checkReshalaAccess === 'function') checkReshalaAccess();
     if (tabId === 'tabContainers' && typeof renderContainersList === 'function') renderContainersList();
@@ -725,7 +689,6 @@ function switchTab(tabId) {
     if (tabId === 'tabLife') {
         if (typeof renderDiets === 'function') renderDiets(); 
         if (typeof renderLifeChat === 'function') renderLifeChat();
-        if (typeof checkBusinessAccess === 'function') checkBusinessAccess();
     }
     
     if (tabId === 'tabServices') { 
@@ -735,21 +698,461 @@ function switchTab(tabId) {
     
     if (tabId === 'tabHousing' && typeof renderHousing === 'function') renderHousing();
     if (tabId === 'tabSyndicate' && typeof renderSyndicateHub === 'function') renderSyndicateHub();
-    if (tabId === 'tabProfile' && typeof renderProfileAnalytics === 'function') renderProfileAnalytics();
+    if (tabId === 'tabProfile') renderProfileAnalytics();
+}
+
+// ===================== ДРАГ-РЕЙСИНГ (РАВНАЯ МОЩНОСТЬ, ОБЛАВЫ, КУЛДАУН) =====================
+let currentRaceBet = 25000;
+let tachoRpm = 1000;
+let isGasPressed = false;
+let gasInterval = null;
+let isRaceRunning = false;
+let isMotorCoolingDown = false;
+let motorCooldownTimer = 0;
+
+function renderStreetScreen() {
+    const box = document.getElementById('streetCarPickerBox');
+    if (!box) return;
+
+    if (!state.garage || state.garage.length === 0) {
+        box.innerHTML = "<div class='sub-label text-center py-2'>В гараже пусто! Купите авто для заездов.</div>";
+        setTxt('streetSelectedCarHp', '0 л.с.');
+        return;
+    }
+
+    let selIdx = (state.player && state.player.selectedStreetCarIndex) ? state.player.selectedStreetCarIndex : 0;
+    let selCar = state.garage[selIdx] ? state.garage[selIdx] : state.garage[0];
+    
+    let cPower = selCar.power ? selCar.power : 100;
+    setTxt('streetSelectedCarHp', cPower + " л.с.");
+
+    let cName = selCar.name ? selCar.name : "Авто";
+    let cChip = (selCar.tuning && selCar.tuning.chip) ? selCar.tuning.chip : 0;
+
+    let opts = "";
+    state.garage.forEach((c, i) => {
+        let isSel = (i === selIdx) ? "selected" : "";
+        let optName = c.name ? c.name : "Авто";
+        opts += "<option value='" + i + "' " + isSel + ">" + optName + "</option>";
+    });
+
+    box.innerHTML = 
+        "<div class='flex-between'>" +
+            "<div>" +
+                "<b class='text-xs color-cyan'>" + cName + "</b>" +
+                "<div class='sub-label'>" + cPower + " л.с. / Чип: Stage " + cChip + "</div>" +
+            "</div>" +
+            "<select onchange='onSelectStreetCar(this.value)' style='background:#131c2e; color:#fff; border:1px solid var(--border-glass); border-radius:6px; padding:6px; font-size:11px; outline:none;'>" +
+                opts +
+            "</select>" +
+        "</div>";
+}
+
+function onSelectStreetCar(idx) {
+    state.player.selectedStreetCarIndex = parseInt(idx);
+    saveState();
+    renderStreetScreen();
+    renderStreetEvents();
+}
+
+function setRaceBet(amt) {
+    currentRaceBet = amt;
+    setTxt('raceStatusText', "Ставка установлена: " + amt.toLocaleString() + " ₽. Прогрейте мотор!");
+    tgHaptic('light');
+}
+
+function holdGasPedal() {
+    if (isRaceRunning || isMotorCoolingDown) return;
+    isGasPressed = true;
+    if (gasInterval) clearInterval(gasInterval);
+    gasInterval = setInterval(() => {
+        tachoRpm += 400;
+        if (tachoRpm > 8000) tachoRpm = 8000;
+        updateTachometerUI();
+        if (Math.random() < 0.3) playSound('tick');
+    }, 60);
+}
+
+function releaseGasPedal() {
+    isGasPressed = false;
+    if (gasInterval) clearInterval(gasInterval);
+    gasInterval = setInterval(() => {
+        if (tachoRpm > 1000) {
+            tachoRpm -= 350;
+            if (tachoRpm < 1000) tachoRpm = 1000;
+            updateTachometerUI();
+        } else {
+            clearInterval(gasInterval);
+        }
+    }, 80);
+}
+
+function updateTachometerUI() {
+    const needle = document.getElementById('tachoNeedle');
+    if (!needle) return;
+    let pct = Math.min(100, Math.max(0, ((tachoRpm - 1000) / 7000) * 100));
+    needle.style.left = pct + "%";
+}
+
+function launchDragRace() {
+    if (isRaceRunning) return;
+    if (isMotorCoolingDown) {
+        return showToast("⚠️ Мотор перегрет! Остывание: " + motorCooldownTimer + " сек.");
+    }
+    if (!state.garage || state.garage.length === 0) return showToast("Нет авто для заезда!");
+    
+    let selIdx = (state.player && state.player.selectedStreetCarIndex) ? state.player.selectedStreetCarIndex : 0;
+    let car = state.garage[selIdx] ? state.garage[selIdx] : state.garage[0];
+
+    if (car.unregistered) return showToast("🚫 Авто снято с учёта! Поставьте на учёт в гараже.");
+    if (car.impounded) return showToast("🚨 Автомобиль на штрафстоянке! Сначала вызволите его.");
+
+    let carHp = car.power ? car.power : 100;
+    if (carHp > 220 && !state.player.hasRacingLicense) {
+        return showToast("🔒 Требуется лицензия пилота РАФ для машин свыше 220 л.с.! Оформите у Решалы.");
+    }
+
+    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
+    if (cash < currentRaceBet) return showToast("Не хватает денег на ставку!");
+    
+    let fuel = (state.player && state.player.fuel) ? state.player.fuel : 0;
+    if (fuel < 10) return showToast("Нужно 10 ⛽ бензина для заезда!");
+
+    let hasImmunity = (state.player && state.player.policeImmunityDays && state.player.policeImmunityDays > 0);
+    state.player.consecutiveRaces = (state.player.consecutiveRaces || 0) + 1;
+    let maxRaces = (state.player && state.player.maxRacesBeforeRaid) ? state.player.maxRacesBeforeRaid : 12;
+
+    if (!hasImmunity && state.player.consecutiveRaces >= maxRaces) {
+        state.player.consecutiveRaces = 0;
+        state.player.maxRacesBeforeRaid = Math.floor(10 + Math.random() * 5);
+        car.impounded = true;
+        car.impoundedDays = 1;
+        car.impoundFine = 40000;
+
+        let hasIllegalTune = (car.tuning && (car.tuning.exhaust || car.tuning.stance || (car.tuning.chip && car.tuning.chip >= 2)));
+        if (hasIllegalTune) car.unregistered = true;
+
+        saveState();
+        if (typeof renderGarage === 'function') renderGarage();
+        updateRaceHeatBadge();
+        tgHaptic('error');
+
+        let msg = "ДПС и ОМОН оцепили прямую! За серию ночных заездов «" + car.name + "» эвакуирован на штрафстоянку.";
+        if (hasIllegalTune) msg += " Технадзор также АННУЛИРОВАЛ регистрацию за нелегальный прямоток/тюнинг!";
+        openVerdictModal("ОБЛАВА НА ГОНКАХ! 🚨", msg, false);
+        return;
+    }
+
+    state.player.cash -= currentRaceBet;
+    state.player.fuel -= 10;
+    saveState();
+    updateHeaderUI();
+
+    isRaceRunning = true;
+    playEngineSound();
+
+    let playerHp = car.power ? car.power : 100;
+    const rivalHp = Math.round(playerHp * (0.96 + Math.random() * 0.08));
+
+    let isPerfectLaunch = (tachoRpm >= 5500 && tachoRpm <= 6500);
+    let launchBonus = isPerfectLaunch ? 18 : (tachoRpm > 7200 ? -15 : 0);
+    if (car.tuning && car.tuning.dragSlicks) launchBonus += 10;
+
+    setTxt('raceStatusText', isPerfectLaunch ? '🔥 ИДЕАЛЬНЫЙ ЛАНЧ-СТАРТ!' : '🚦 Заезд начался!');
+
+    const pRunner = document.getElementById('playerRaceCarRunner');
+    const rRunner = document.getElementById('rivalRaceCarRunner');
+
+    let pProgress = 0;
+    let rProgress = 0;
+
+    const raceTimer = setInterval(() => {
+        pProgress += (playerHp / 36) + (launchBonus / 12) + (Math.random() * 2.2);
+        rProgress += (rivalHp / 36) + (Math.random() * 2.2);
+
+        let pPct = Math.min(92, pProgress);
+        let rPct = Math.min(92, rProgress);
+
+        if (pRunner) pRunner.style.left = pPct + "%";
+        if (rRunner) rRunner.style.left = rPct + "%";
+
+        if (pProgress >= 92 || rProgress >= 92) {
+            clearInterval(raceTimer);
+            isRaceRunning = false;
+
+            let isWin = (pProgress >= rProgress);
+            if (isWin) {
+                const prize = currentRaceBet * 2;
+                state.player.cash += prize;
+                let mood = (state.player && state.player.mood) ? state.player.mood : 80;
+                state.player.mood = Math.min(100, mood + 15);
+                addXp(30);
+                saveState();
+                updateHeaderUI();
+                openVerdictModal("ПОБЕДА НА 402М! 🏁", "Вы обогнали соперника на финише: +" + prize.toLocaleString() + " ₽!", true, prize);
+            } else {
+                let mood = (state.player && state.player.mood) ? state.player.mood : 80;
+                state.player.mood = Math.max(0, mood - 15);
+                saveState();
+                updateHeaderUI();
+                openVerdictModal("ПОРАЖЕНИЕ 💨", "Соперник вырвал победу на полкорпуса. Банк утерян: -" + currentRaceBet.toLocaleString() + " ₽.", false);
+            }
+
+            startMotorCooldown(10);
+
+            setTimeout(() => {
+                if (pRunner) pRunner.style.left = '0%';
+                if (rRunner) rRunner.style.left = '0%';
+                tachoRpm = 1000;
+                updateTachometerUI();
+            }, 1200);
+        }
+    }, 120);
+}
+
+function startMotorCooldown(seconds) {
+    isMotorCoolingDown = true;
+    motorCooldownTimer = seconds;
+    const btnLaunch = document.getElementById('btnStartRaceLaunch');
+
+    const cdInterval = setInterval(() => {
+        motorCooldownTimer -= 1;
+        if (btnLaunch) {
+            btnLaunch.innerText = "⏳ ОСТЫВАНИЕ (" + motorCooldownTimer + "с)";
+            btnLaunch.classList.remove('btn-green');
+            btnLaunch.classList.add('btn-dark');
+        }
+        setTxt('raceStatusText', "❄️ Мотор остывает: " + motorCooldownTimer + " сек.");
+
+        if (motorCooldownTimer <= 0) {
+            clearInterval(cdInterval);
+            isMotorCoolingDown = false;
+            if (btnLaunch) {
+                btnLaunch.innerText = "🚦 СТАРТ НА 402М";
+                btnLaunch.classList.remove('btn-dark');
+                btnLaunch.classList.add('btn-green');
+            }
+            setTxt('raceStatusText', "Мотор остыл и готов к новому старту!");
+        }
+    }, 1000);
+}
+
+// ===================== СТРИТ-МЕРОПРИЯТИЯ ПО РЕГЛАМЕНТАМ =====================
+const STREET_EVENTS_LIST = [
+    {
+        id: "meet",
+        name: "🅿️ Парковочная авто-сходка",
+        reqLvl: 3,
+        fuelCost: 15,
+        desc: "Встреча у ТЦ. Показ машин, заведение связей. Доработки дают бонус!",
+        rewardText: "+20 Кармы, +15% Куража и шанс получить +1 🤝 Связь.",
+        riskText: "Безопасно (Облав нет)"
+    },
+    {
+        id: "autoshow",
+        name: "🏆 Городской Стенс & Автошоу",
+        reqLvl: 8,
+        fuelCost: 20,
+        desc: "Конкурс стиля: диски, обвес, пневма и полировка.",
+        rewardText: "Призовой фонд до 180,000 ₽ + кубок лучшего проекта.",
+        riskText: "Риск 12.5.1: ДПС дежурят на выезде!"
+    },
+    {
+        id: "drift",
+        name: "💨 Нелегальный ночной дрифт",
+        reqLvl: 12,
+        fuelCost: 25,
+        desc: "Парные заезды на кольце. ТРЕБУЕТСЯ: гидроручник, заварка и выворот!",
+        rewardText: "Банк до 450,000 ₽ и огромный авторитет.",
+        riskText: "ВЫСОКИЙ РИСК: Эвакуация на штрафстоянку и аннулирование учёта!"
+    }
+];
+
+function renderStreetEvents() {
+    const container = document.getElementById('streetEventsContainer');
+    if (!container) return;
+
+    const lvl = (state.player && state.player.level) ? state.player.level : 1;
+    let html = "";
+
+    STREET_EVENTS_LIST.forEach(ev => {
+        let isLocked = lvl < ev.reqLvl;
+        let cardClass = "street-event-card" + (ev.id === 'drift' ? " card-drift" : (ev.id === 'autoshow' ? " card-show" : ""));
+        let lockBadge = isLocked 
+            ? "<span class='tag-badge bg-tag-red'><i class='fa-solid fa-lock'></i> С " + ev.reqLvl + " УР</span>" 
+            : "<span class='tag-badge bg-tag-green'>Доступно</span>";
+
+        let btnText = isLocked ? "Закрыто (Нужен " + ev.reqLvl + " ур)" : "Участвовать (-" + ev.fuelCost + " ⛽)";
+
+        html += 
+        "<div class='" + cardClass + "'>" +
+            "<div class='flex-between mb-1'>" +
+                "<b class='text-xs color-cyan'>" + ev.name + "</b>" +
+                lockBadge +
+            "</div>" +
+            "<p class='sub-label mb-2'>" + ev.desc + "</p>" +
+            "<div class='text-xs mb-1 color-green'>🎁 Награда: " + ev.rewardText + "</div>" +
+            "<div class='text-xs mb-2 color-amber'>⚠️ Опасность: " + ev.riskText + "</div>" +
+            "<button onclick=\"participateInStreetEvent('" + ev.id + "')\" class='btn btn-dark btn-sm w-full' " + (isLocked ? "disabled" : "") + ">" +
+                btnText +
+            "</button>" +
+        "</div>";
+    });
+
+    container.innerHTML = html;
+}
+
+function participateInStreetEvent(eventId) {
+    if (!state.garage || state.garage.length === 0) return showToast("В гараже нет машин для участия!");
+
+    let selIdx = (state.player && state.player.selectedStreetCarIndex) ? state.player.selectedStreetCarIndex : 0;
+    let car = state.garage[selIdx] ? state.garage[selIdx] : state.garage[0];
+
+    if (car.unregistered) return showToast("🚫 Авто снято с учёта! Восстановите регистрацию.");
+    if (car.impounded) return showToast("🚨 Авто на штрафстоянке! Вызволите его перед выездом.");
+
+    if (eventId === 'drift') {
+        let t = car.tuning ? car.tuning : {};
+        if (!t.hydroHandbrake || !t.weldedDiff || !t.steeringAngle) {
+            return showToast("🚫 Не проходит регламент дрифта! Установите гидроручник, заварку и выворот в меню тюнинга.");
+        }
+    }
+
+    const ev = STREET_EVENTS_LIST.find(e => e.id === eventId);
+    if (!ev) return;
+
+    let fuel = (state.player && state.player.fuel) ? state.player.fuel : 0;
+    if (fuel < ev.fuelCost) return showToast("Не хватает " + ev.fuelCost + " ⛽ бензина!");
+
+    state.player.fuel -= ev.fuelCost;
+    saveState();
+    updateHeaderUI();
+
+    let hasImmunity = (state.player && state.player.policeImmunityDays && state.player.policeImmunityDays > 0);
+
+    if (eventId === 'meet') {
+        playEngineSound();
+        state.player.karma = Math.min(100, (state.player.karma || 50) + 15);
+        state.player.mood = Math.min(100, (state.player.mood || 80) + 15);
+        
+        let gotConnection = Math.random() < 0.40;
+        if (gotConnection) state.player.connections = (state.player.connections || 0) + 1;
+
+        addXp(35);
+        saveState();
+        updateHeaderUI();
+
+        let desc = "Вы отлично провели время со стритрейсерами. Кураж +15%, Карма +15.";
+        if (gotConnection) desc += " Удалось познакомиться с авторитетным перекупом (+1 🤝 Связь)!";
+        openVerdictModal("СХОДКА УДАЛАСЬ! 🅿️", desc, true);
+    } else if (eventId === 'autoshow') {
+        playEngineSound();
+        let showPoints = car.condition ? car.condition : 80;
+        if (car.isPolished) showPoints += 25;
+        if (car.tuning && car.tuning.stance) showPoints += 35;
+        if (car.tuning && car.tuning.bodykit) showPoints += 25;
+        if (car.tuning && car.tuning.customWheels) showPoints += 30;
+
+        let risk1251 = (car.tuning && car.tuning.risk1251) ? car.tuning.risk1251 : 0;
+        let isRaid = (!hasImmunity && Math.random() < (risk1251 / 160));
+
+        if (isRaid) {
+            let fine = 25000;
+            state.player.cash = Math.max(0, (state.player.cash || 0) - fine);
+            saveState();
+            updateHeaderUI();
+            openVerdictModal("ОБЛАВА ТЕХНАДЗОРА! 🚔", "На выезде экипаж ДПС выписал протокол по ст. 12.5.1 КоАП за изменение конструкции. Штраф: -" + fine.toLocaleString() + " ₽.", false);
+        } else {
+            let prize = Math.round(100000 + (showPoints * 600));
+            state.player.cash = (state.player.cash || 0) + prize;
+            addXp(50);
+            saveState();
+            updateHeaderUI();
+            openVerdictModal("ПРИЗЕР АВТОШОУ! 🏆", "Судьи оценили проект «" + car.name + "» (" + showPoints + " баллов)! Приз: +" + prize.toLocaleString() + " ₽.", true, prize);
+        }
+    } else if (eventId === 'drift') {
+        playEngineSound();
+        let isBusted = (!hasImmunity && Math.random() < 0.45);
+
+        if (isBusted) {
+            tgHaptic('error');
+            let severeBust = Math.random() < 0.50;
+
+            if (severeBust) {
+                car.unregistered = true;
+                car.impounded = true;
+                car.impoundedDays = 1;
+                car.impoundFine = 45000;
+                saveState();
+                if (typeof renderGarage === 'function') renderGarage();
+                openVerdictModal("УЧЁТ АННУЛИРОВАН! 🚨", "Облава спецбатальона! За нелегальный дрифт и агрессивный тюнинг регистрация «" + car.name + "» АННУЛИРОВАНА, а машина отправлена на штрафстоянку!", false);
+            } else {
+                car.impounded = true;
+                car.impoundedDays = 1;
+                car.impoundFine = 30000;
+                saveState();
+                if (typeof renderGarage === 'function') renderGarage();
+                openVerdictModal("ЭВАКУАЦИЯ НА ШТРАФСТОЯНКУ! 🚔", "ДПС перекрыли выезды с площадки! «" + car.name + "» эвакуирован на штрафстоянку за опасное вождение.", false);
+            }
+        } else {
+            let winBank = Math.round(200000 + Math.random() * 250000);
+            state.player.cash = (state.player.cash || 0) + winBank;
+            addXp(65);
+            saveState();
+            updateHeaderUI();
+            openVerdictModal("КОРОЛЬ УЛИЧНОГО ДРИФТА! 💨", "Вы раздали угла без ошибок и сорвали овации зрителей! Банк заезда: +" + winBank.toLocaleString() + " ₽!", true, winBank);
+        }
+    }
+}
+
+// ===================== ПРОФИЛЬ И АНАЛИТИКА =====================
+function renderProfileAnalytics() {
+    let pName = (state.player && state.player.name) ? state.player.name : "Перекуп";
+    setTxt('profileTgUsername', pName);
+    
+    let pStats = (state.player && state.player.stats) ? state.player.stats : { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
+    setTxt('statProfitable', pStats.profitableSales || 0);
+    setTxt('statLoss', pStats.lossSales || 0);
+    setTxt('statTotalNetProfit', (pStats.totalNetProfit || 0).toLocaleString() + " ₽");
+    
+    const totalSales = (pStats.profitableSales || 0) + (pStats.lossSales || 0);
+    let winrate = (totalSales > 0) ? Math.round((pStats.profitableSales / totalSales) * 100) : 0;
+    setTxt('statWinrate', winrate + "%");
+
+    let rank = "Новичок с района";
+    let lvl = (state.player && state.player.level) ? state.player.level : 1;
+    
+    if (lvl >= 50) rank = "Автомобильный Олигарх";
+    else if (lvl >= 30) rank = "Хозяин Авторынка";
+    else if (lvl >= 20) rank = "Крупный Перекуп";
+    else if (lvl >= 10) rank = "Гаражный Профи";
+    else if (lvl >= 5) rank = "Бодрый Перекуп";
+    
+    setTxt('profPlayerRank', "Статус: " + rank + " (" + CURRENT_GAME_VERSION + ")");
+}
+
+function resetGameData() { 
+    if (confirm("Точно сбросить весь прогресс?")) {
+        localStorage.removeItem(SAVE_KEY); 
+        localStorage.removeItem('perekup_last_seen_version');
+        if (isCloudStorageAvailable && window.Telegram?.WebApp?.CloudStorage) {
+            window.Telegram.WebApp.CloudStorage.removeItem(SAVE_KEY);
+        }
+        location.reload(); 
+    }
 }
 
 function checkAutoShowPatchNotes() {
     try {
         const lastSeen = localStorage.getItem('perekup_last_seen_version');
         if (lastSeen !== CURRENT_GAME_VERSION) {
-            setTimeout(() => { openPatchNotesModal(); }, 800);
+            setTimeout(() => {
+                openPatchNotesModal();
+            }, 800);
         }
     } catch(e) {}
 }
 
-// ========================================================
-// ИНИЦИАЛИЗАЦИЯ И НАДЕЖНЫЙ ИГРОВОЙ ЦИКЛ (TICK)
-// ========================================================
 function initApp() {
     initTelegramAuthAndStorage(() => {
         updateHeaderUI();
@@ -776,63 +1179,33 @@ function initApp() {
         if (typeof checkBusinessAccess === 'function') checkBusinessAccess();
         
         switchTab('tabMarket');
+        if (typeof renderMarketFeed === 'function') renderMarketFeed();
+
         checkAutoShowPatchNotes();
     });
 }
 
 setInterval(() => {
     let lotChanged = false; 
-    
-    // НАДЕЖНАЯ ЛОГИКА ТАЙМЕРОВ ПЛОЩАДКИ
     if (state.salesLot && state.salesLot.length > 0) {
-        // Проходим с конца, чтобы удаление (splice) не сбивало индексы цикла!
-        for (let i = state.salesLot.length - 1; i >= 0; i--) {
-            let slot = state.salesLot[i];
-            if (!slot) continue;
-
-            if (!slot.currentBuyer) {
-                // АВТО-РЕМОНТ: если загружен старый сейв или кривые таймеры
-                if (slot.timer === undefined || isNaN(slot.timer) || slot.maxTimer === undefined || isNaN(slot.maxTimer) || slot.timer > slot.maxTimer) {
-                    let t = Math.floor(60 + Math.random() * 180);
-                    slot.maxTimer = t;
-                    slot.timer = t;
-                }
-
-                if (slot.timer > 0) {
-                    slot.timer -= 1;
-                    const progressBar = document.getElementById("lot_progress_fill_" + i);
-                    const timerText = document.getElementById("lot_timer_text_" + i);
-                    
-                    if (progressBar) {
-                        let pct = Math.max(0, Math.min(100, ((slot.maxTimer - slot.timer) / slot.maxTimer) * 100));
-                        progressBar.style.width = pct + "%";
-                    }
-                    if (timerText) timerText.innerText = "Ожидание клиента: " + slot.timer + "с";
-                }
-
-                if (slot.timer <= 0) {
-                    if (typeof generateBuyerForSlot === 'function') generateBuyerForSlot(slot);
-                    lotChanged = true;
-                }
-            } else {
-                // Логика когда покупатель уже у капота (уходит через X секунд)
-                if (slot.buyerTimerLeft === undefined || isNaN(slot.buyerTimerLeft)) {
-                    slot.buyerTimerLeft = 120;
-                }
+        state.salesLot.forEach((slot, idx) => { 
+            if (slot && slot.timer > 0) { 
+                slot.timer -= 1; 
+                const progressBar = document.getElementById("lot_progress_fill_" + idx);
+                const timerText = document.getElementById("lot_timer_text_" + idx);
                 
-                if (slot.buyerTimerLeft > 0) {
-                    slot.buyerTimerLeft -= 1;
-                    const buyerTimeText = document.getElementById("lot_buyer_timer_" + i);
-                    if (buyerTimeText) buyerTimeText.innerText = "⏳ " + slot.buyerTimerLeft + "с";
+                if (progressBar) {
+                    let pct = Math.max(0, Math.min(100, ((30 - slot.timer) / 30) * 100));
+                    progressBar.style.width = pct + "%";
                 }
+                if (timerText) timerText.innerText = "Ожидание клиента: " + slot.timer + "с";
 
-                if (slot.buyerTimerLeft <= 0) {
-                    state.salesLot.splice(i, 1);
-                    lotChanged = true;
-                    showToast("🚶‍♂️ Покупатель не дождался вас и ушел к другому перекупу.");
-                }
-            }
-        }
+                if (slot.timer === 0 && !slot.currentBuyer) { 
+                    if (typeof generateBuyerForSlot === 'function') generateBuyerForSlot(slot); 
+                    lotChanged = true; 
+                } 
+            } 
+        }); 
     }
     
     const sTab = document.getElementById('tabSalesLot');
@@ -840,14 +1213,12 @@ setInterval(() => {
         renderSalesLot();
     }
     
-    // Восстановление бензина
     let pFuel = (state.player && state.player.fuel !== undefined) ? state.player.fuel : 100;
     if (pFuel < 100) {
         state.player.fuel = Math.min(100, pFuel + 1);
         setTxt('fuelAmount', state.player.fuel);
     }
     
-    // Обновление таймеров рынка (дозвон продавцу)
     const mTab = document.getElementById('tabMarket');
     if (mTab && mTab.classList.contains('active') && typeof updateMarketTimers === 'function') {
         updateMarketTimers();

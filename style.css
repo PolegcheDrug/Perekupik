@@ -448,18 +448,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-top: 6px;
-  transition: max-height 0.4s ease-out, opacity 0.3s ease-out, margin 0.3s ease-out;
-  max-height: 500px;
-  overflow: hidden;
-  opacity: 1;
-}
-
-.market-categories-grid.collapsed {
-  max-height: 0 !important;
-  opacity: 0;
-  margin-top: 0;
-  padding: 0;
-  border: none;
 }
 
 .cat-tile {
@@ -697,7 +685,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   КАРТОЧКА АВТОМОБИЛЯ И ОЦЕНКИ
+   КАРТОЧКА АВТОМОБИЛЯ
    ======================================================== */
 .car-img-wrap {
   position: relative;
@@ -865,31 +853,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   ШКАЛЫ РИСКА (12.5.1 И ТЕРПЕНИЕ)
-   ======================================================== */
-.risk-meter-box {
-  background: #090e18;
-  border: 1px solid var(--border-glass);
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-.risk-track {
-  width: 100%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 4px;
-}
-.risk-fill {
-  height: 100%;
-  transition: width 0.3s ease, background 0.3s ease;
-}
-.risk-low { background: var(--green); }
-.risk-mid { background: var(--amber); }
-.risk-high { background: var(--red); }
-
-/* ========================================================
    ПРЕДПРОДАЖКА
    ======================================================== */
 .presale-grid {
@@ -1029,8 +992,12 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   padding: 12px;
   margin-bottom: 8px;
 }
-.street-event-card.card-drift { border-left-color: var(--red); }
-.street-event-card.card-show { border-left-color: var(--amber); }
+.street-event-card.card-drift {
+  border-left-color: var(--red);
+}
+.street-event-card.card-show {
+  border-left-color: var(--amber);
+}
 
 /* ========================================================
    ШКАЛА КОНТЕЙНЕРОВ
@@ -1120,7 +1087,10 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   overflow: hidden;
   margin: 4px 0 8px 0;
 }
-.biz-progress-fill { height: 100%; transition: width 0.3s ease; }
+.biz-progress-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
 .fill-biz-lvl { background: linear-gradient(90deg, var(--cyan), var(--green)); }
 .fill-biz-stock { background: linear-gradient(90deg, var(--amber), #22c55e); }
 
@@ -1145,7 +1115,11 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border-left: 3px solid var(--cyan);
 }
 
-.credits-grid { display: flex; flex-direction: column; gap: 4px; }
+.credits-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
 .credit-pill {
   background: rgba(255, 255, 255, 0.03);
@@ -1296,7 +1270,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   УТИЛИТЫ И АНИМАЦИИ
+   УТИЛИТЫ
    ======================================================== */
 .toast {
   position: fixed;
