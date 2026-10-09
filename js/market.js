@@ -1,10 +1,11 @@
+// ===================== Вкладка: РЫНОК (js/market.js) =====================
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
 const REGIONS = ['77', '99', '97', '177', '199', '777', '799', '50', '90', '150', '190', '750'];
 function generateNormalPlate() {
 const l1 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
 const l2 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
 const l3 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
-let num = String(Math.floor(Math.random() * 899) + 100);
+const num = String(Math.floor(Math.random() * 899) + 100);
 const reg = REGIONS[Math.floor(Math.random() * REGIONS.length)];
 return l1 + num + l2 + l3 + " " + reg;
 }
@@ -35,17 +36,22 @@ function refreshPlateCatalog() {
 state.plateCatalog = [];
 for (let i = 0; i < 6; i++) {
 const isCool = Math.random() > 0.45;
-const p = isCool ? generateCoolPlate() : generateNormalPlate();
-state.plateCatalog.push({ plate: p, price: Math.round(evaluatePlate(p) * (1.1 + Math.random() * 0.25)) });
+let p = generateNormalPlate();
+if (isCool) p = generateCoolPlate();
+const cost = Math.round(evaluatePlate(p) * (1.1 + Math.random() * 0.25));
+state.plateCatalog.push({ plate: p, price: cost });
 }
 }
 let activeInspectCarId = null;
 let pendingMarketCar = null;
 function getDynamicPrice(basePrice, type) {
 if (!state.marketModifiers) state.marketModifiers = { economy: 1, comfort: 1, premium: 1, all: 1 };
-const mod = (state.marketModifiers && state.marketModifiers[type]) ? state.marketModifiers[type] : 1;
-const globalMod = (state.marketModifiers && state.marketModifiers.all) ? state.marketModifiers.all : 1;
-const price = basePrice ? basePrice : 100000;
+let mod = 1;
+if (state.marketModifiers && state.marketModifiers[type]) mod = state.marketModifiers[type];
+let globalMod = 1;
+if (state.marketModifiers && state.marketModifiers.all) globalMod = state.marketModifiers.all;
+let price = 100000;
+if (basePrice) price = basePrice;
 return Math.floor(price * mod * globalMod);
 }
 function getMarketRefreshCost() {
@@ -87,8 +93,10 @@ showToast("Лента обновлена (-5 ⛽)!");
 function populateMarketFeed() {
 if (typeof CAR_DATABASE === 'undefined') return;
 if (!CAR_DATABASE) return;
-const cat = state.activeCategory ? state.activeCategory : 'economy';
-const pool = CAR_DATABASE[cat] ? CAR_DATABASE[cat] : CAR_DATABASE.economy;
+let cat = 'economy';
+if (state.activeCategory) cat = state.activeCategory;
+let pool = CAR_DATABASE.economy;
+if (CAR_DATABASE[cat]) pool = CAR_DATABASE[cat];
 if (!pool) return;
 if (pool.length === 0) return;
 state.marketFeed = [];
@@ -103,13 +111,19 @@ else if (lvl >= 20) defectChance = 0.60;
 let stolenChance = 0.20;
 if (lvl <= 5) stolenChance = 0.12;
 else if (lvl >= 20) stolenChance = 0.28;
-const hasHiddenDefect = (typeof OBD_ERRORS !== 'undefined' && OBD_ERRORS.length > 0) ? (Math.random() < defectChance) : false;
-const isStolen = Math.random() < stolenChance;
+let hasHiddenDefect = false;
+if (typeof OBD_ERRORS !== 'undefined' && OBD_ERRORS.length > 0) {
+if (Math.random() < defectChance) hasHiddenDefect = true;
+}
+let isStolen = false;
+if (Math.random() < stolenChance) isStolen = true;
 const carId = "m_" + Date.now() + "_" + i;
-const isCool = Math.random() < 0.20;
-const genPlate = isCool ? generateCoolPlate() : generateNormalPlate();
-const baseP = template.basePrice ? template.basePrice : 100000;
-const tType = template.type ? template.type : 'economy';
+let genPlate = generateNormalPlate();
+if (Math.random() < 0.20) genPlate = generateCoolPlate();
+let baseP = 100000;
+if (template.basePrice) baseP = template.basePrice;
+let tType = 'economy';
+if (template.type) tType = template.type;
 const dynPrice = getDynamicPrice(baseP, tType);
 let priceMultiplier = 0.8;
 if (lvl <= 10) priceMultiplier = 0.75 + Math.random() * 0.20;
@@ -126,9 +140,16 @@ if (typeof SELLER_ADS_PHRASES !== 'undefined' && SELLER_ADS_PHRASES.length > 0) 
 sNote = SELLER_ADS_PHRASES[Math.floor(Math.random() * SELLER_ADS_PHRASES.length)];
 }
 const plateVal = evaluatePlate(genPlate);
-const cName = template.name ? template.name : "Автомобиль";
-const cPower = template.power ? template.power : 100;
-const cImg = template.img ? template.img : "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+let cName = "Автомобиль";
+if (template.name) cName = template.name;
+let cPower = 100;
+if (template.power) cPower = template.power;
+let cImg = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+if (template.img) cImg = template.img;
+let cCond = 85;
+if (hasHiddenDefect) cCond = 55;
+let isThick1 = 115; if (Math.random() > 0.6) isThick1 = 250;
+let isThick2 = 110; if (Math.random() > 0.5) isThick2 = 260;
 state.marketFeed.push({
 id: carId,
 name: cName,
@@ -149,10 +170,10 @@ haggled: false,
 unavailable: false,
 hiddenDefect: defectObj,
 sellerNote: sNote,
-condition: hasHiddenDefect ? 55 : 85,
+condition: cCond,
 tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 },
 wear: { engine: 65 + Math.random() * 30, transmission: 65 + Math.random() * 30 },
-bodyThickness: { hood: Math.random() > 0.6 ? 250 : 115, roof: 100, doors: Math.random() > 0.5 ? 260 : 110, wings: 110 },
+bodyThickness: { hood: isThick1, roof: 100, doors: isThick2, wings: 110 },
 rolledOdometer: false,
 hasAdditive: false,
 isRepainted: false,
@@ -171,15 +192,14 @@ if (refreshText) refreshText.innerText = getMarketRefreshCost().toLocaleString()
 const mainContent = document.querySelector('.main-content');
 const scrollPos = mainContent ? mainContent.scrollTop : 0;
 const now = Date.now();
-if (!state.marketFeed) {
-container.innerHTML = "<div class='glass-card text-center py-6 sub-label'>Нет предложений на рынке. Нажмите «Обновить ленту»!</div>";
+let noFeed = false;
+if (!state.marketFeed) noFeed = true;
+else if (state.marketFeed.length === 0) noFeed = true;
+if (noFeed) {
+container.innerHTML = `<div class='glass-card text-center py-6 sub-label'>Нет предложений на рынке. Нажмите «Обновить ленту»!</div>`;
 return;
 }
-if (state.marketFeed.length === 0) {
-container.innerHTML = "<div class='glass-card text-center py-6 sub-label'>Нет предложений на рынке. Нажмите «Обновить ленту»!</div>";
-return;
-}
-let htmlContent = "";
+let htmlContent = ``;
 state.marketFeed.forEach(car => {
 if (!car) return;
 if (car.unavailable) return;
@@ -187,76 +207,92 @@ let isBusy = false;
 if (car.cooldownUntil) {
 if (car.cooldownUntil > now) isBusy = true;
 }
-const timeLeft = isBusy ? Math.ceil((car.cooldownUntil - now) / 1000) : 0;
+let timeLeft = 0;
+if (isBusy) timeLeft = Math.ceil((car.cooldownUntil - now) / 1000);
 let hasScanner = false;
-if (state.player && state.player.tools && state.player.tools.obd) {
-hasScanner = true;
-}
-const carMileage = car.mileage ? car.mileage.toLocaleString() : "85 000";
-const carPrice = car.price ? car.price.toLocaleString() : "100 000";
+if (state.player && state.player.tools && state.player.tools.obd) hasScanner = true;
+let carMileage = "85 000";
+if (typeof car.mileage === 'number') carMileage = car.mileage.toLocaleString();
+let carPrice = "100 000";
+if (typeof car.price === 'number') carPrice = car.price.toLocaleString();
 let carMarketVal = "150 000";
-if (car.marketValue) carMarketVal = car.marketValue.toLocaleString();
-else if (car.price) carMarketVal = car.price.toLocaleString();
-const carType = car.type ? car.type.toUpperCase() : "CAR";
-const carImg = car.img ? car.img : "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
-const viewedBadge = car.viewed ? "<div class='viewed-badge'>
+if (typeof car.marketValue === 'number') {
+carMarketVal = car.marketValue.toLocaleString();
+} else if (typeof car.price === 'number') {
+carMarketVal = car.price.toLocaleString();
+}
+let carType = "CAR";
+if (car.type) carType = car.type.toUpperCase();
+let carImg = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+if (car.img) carImg = car.img;
+let viewedBadge = ``;
+if (car.viewed) viewedBadge = `<div class='viewed-badge'>
 <i class='fa-solid fa-eye'>
-</i> Просмотрено</div>" : "";
-const busyClass = isBusy ? "busy" : "";
-const viewedClass = car.viewed ? "viewed-card" : "";
-const sellerNoteBlock = car.sellerNote ? "<div class='seller-note-card'>" + car.sellerNote + "</div>" : "";
+</i> Просмотрено</div>`;
+let busyClass = ``;
+if (isBusy) busyClass = `busy`;
+let viewedClass = ``;
+if (car.viewed) viewedClass = `viewed-card`;
+let sellerNoteBlock = ``;
+if (car.sellerNote) sellerNoteBlock = `<div class='seller-note-card'>${car.sellerNote}</div>`;
 let toolIcon = "(3k)";
 if (state.player && state.player.tools && state.player.tools.gauge) {
 toolIcon = "✓";
 }
-const obdIcon = hasScanner ? "OBD2 ✓" : "OBD2 (5k)";
-const autoIcon = car.autotekaChecked ? "0" : "5k";
-const carName = car.name ? car.name : "Автомобиль";
-const carPower = car.power ? car.power : 100;
-const carPlate = car.plate ? car.plate : "ТРАНЗИТ";
-htmlContent += "<div class='glass-card mb-3 " + busyClass + " " + viewedClass + "' id='card_" + car.id + "'>" +
-viewedBadge +
-"<div class='cooldown-timer'>" +
-"<div class='timer-clock' id='timer_num_" + car.id + "'>" + timeLeft + "с</div>" +
-"<div class='timer-text'>Абонент занят</div>" +
-"<button onclick=\"paidCallMarketCar('" + car.id + "')\" class='btn btn-amber' style='width: 80%;'>Платный дозвон (1000 ₽)</button>" +
-"</div>" +
-"<div class='car-img-wrap'>" +
-"<img src='" + carImg + "' class='car-img' onerror=\"this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'\">" +
-"<div class='badge-tag' style='bottom: 8px; right: 8px;'>" + carType + "</div>" +
-"<div class='plate-corner'>
-<div class='license-plate'>" + carPlate + " <div class='license-flag'>RUS</div>
-</div>
-</div>" +
-"</div>" +
-"<div class='mb-2'>" +
-"<h4 class='font-bold'>" + carName + "</h4>" +
-"<div class='sub-label mb-2'>" + carPower + " л.с. / Пробег: " + carMileage + " км</div>" +
-sellerNoteBlock +
-"</div>" +
-"<div class='price-box'>" +
-"<div>" +
-"<span class='text-xs color-green font-bold'>ЦЕНА:</span>" +
-"<div class='price-val' id='price_txt_" + car.id + "'>" + carPrice + " ₽</div>" +
-"</div>" +
-"<div class='sub-label'>Рыночная: ~" + carMarketVal + " ₽</div>" +
-"</div>" +
-"<div class='grid-3 mb-2'>" +
-"<button onclick=\"openGaugeModal('" + car.id + "')\" class='btn btn-dark btn-sm'>Толщиномер " + toolIcon + "</button>" +
-"<button onclick=\"quickOBDScanMarketCar('" + car.id + "')\" class='btn btn-dark btn-sm'>" + obdIcon + "</button>" +
-"<button onclick=\"openAutotekaModal('" + car.id + "')\" class='btn btn-dark btn-sm'>Автотека (" + autoIcon + ")</button>" +
-"</div>" +
-"<button onclick=\"initiateBuyMarketCar('" + car.id + "')\" class='btn btn-cyan w-full'>" +
-"<i class='fa-solid fa-phone'>
-</i> Позвонить продавцу" +
-"</button>" +
-"</div>";
+let obdIcon = "OBD2 (5k)";
+if (hasScanner) obdIcon = "OBD2 ✓";
+let autoIcon = "5k";
+if (car.autotekaChecked) autoIcon = "0";
+let carName = "Автомобиль";
+if (car.name) carName = car.name;
+let carPower = 100;
+if (car.power) carPower = car.power;
+let carPlate = "ТРАНЗИТ";
+if (car.plate) carPlate = car.plate;
+htmlContent += `
+<div class='glass-card mb-3 ${busyClass} ${viewedClass}' id='card_${car.id}'>
+  ${viewedBadge}
+  <div class='cooldown-timer'>
+    <div class='timer-clock' id='timer_num_${car.id}'>${timeLeft}с</div>
+    <div class='timer-text'>Абонент занят</div>
+    <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>Платный дозвон (1000 ₽)</button>
+  </div>
+  <div class='car-img-wrap'>
+    <img src='${carImg}' class='car-img' onerror="this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'">
+      <div class='badge-tag' style='bottom: 8px; right: 8px;'>${carType}</div>
+      <div class='plate-corner'>
+        <div class='license-plate'>${carPlate} <div class='license-flag'>RUS</div>
+      </div>
+    </div>
+  </div>
+  <div class='mb-2'>
+    <h4 class='font-bold'>${carName}</h4>
+    <div class='sub-label mb-2'>${carPower} л.с. / Пробег: ${carMileage} км</div>
+    ${sellerNoteBlock}
+  </div>
+  <div class='price-box'>
+    <div>
+      <span class='text-xs color-green font-bold'>ЦЕНА:</span>
+      <div class='price-val' id='price_txt_${car.id}'>${carPrice} ₽</div>
+    </div>
+    <div class='sub-label'>Рыночная: ~${carMarketVal} ₽</div>
+  </div>
+  <div class='grid-3 mb-2'>
+    <button onclick="openGaugeModal('${car.id}')" class='btn btn-dark btn-sm'>Толщиномер ${toolIcon}</button>
+    <button onclick="quickOBDScanMarketCar('${car.id}')" class='btn btn-dark btn-sm'>${obdIcon}</button>
+    <button onclick="openAutotekaModal('${car.id}')" class='btn btn-dark btn-sm'>Автотека (${autoIcon})</button>
+  </div>
+  <button onclick="initiateBuyMarketCar('${car.id}')" class='btn btn-cyan w-full'>
+    <i class='fa-solid fa-phone'>
+    </i> Позвонить продавцу
+  </button>
+</div>`;
 });
 container.innerHTML = htmlContent;
 if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
 }
 function quickOBDScanMarketCar(carId) {
-const car = state.marketFeed.find(c => c.id === carId);
+const car = state.marketFeed.find(c => c && c.id === carId);
 if (!car) return;
 car.viewed = true;
 let hasScanner = false;
@@ -264,7 +300,8 @@ if (state.player && state.player.tools && state.player.tools.obd) {
 hasScanner = true;
 }
 if (!hasScanner) {
-const cash = state.player && state.player.cash ? state.player.cash : 0;
+let cash = 0;
+if (state.player && state.player.cash) cash = state.player.cash;
 if (cash < 5000) return showToast("Нужно 5,000 ₽ на выездного диагноста или сканер из Маркета!");
 state.player.cash -= 5000;
 showToast("Выездной мастер подключил сканер (-5,000 ₽)");
@@ -275,7 +312,8 @@ car.stoChecked = true;
 saveState();
 renderMarketFeed();
 if (car.hiddenDefect) {
-const costStr = car.hiddenDefect.cost ? car.hiddenDefect.cost.toLocaleString() : "10 000";
+let costStr = "10 000";
+if (car.hiddenDefect.cost) costStr = car.hiddenDefect.cost.toLocaleString();
 openVerdictModal("ОШИБКИ В ЭБУ! ⚠️", "Сканер считал неисправность: " + car.hiddenDefect.text + ". Затраты на ремонт: ~" + costStr + " ₽.", false);
 } else {
 let eng = 90;
@@ -286,7 +324,7 @@ openVerdictModal("ОШИБОК НЕТ ✓", "ЭБУ чист. Ресурс дв�
 }
 }
 function initiateBuyMarketCar(carId) {
-const carIndex = state.marketFeed.findIndex(c => c.id === carId);
+const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
 if (carIndex === -1) return;
 const car = state.marketFeed[carIndex];
 car.viewed = true;
@@ -299,7 +337,7 @@ setTxt("buyCallEmoji", "📞");
 setTxt("buyCallTitle", "Звонок продавцу...");
 setTxt("buyCallDesc", "Соединение с абонентом... Идут гудки...");
 const btnBox = document.getElementById("buyCallActionBtnBox");
-if (btnBox) btnBox.innerHTML = "<button class='btn btn-dark w-full' disabled>Гудки в трубке...</button>";
+if (btnBox) btnBox.innerHTML = `<button class='btn btn-dark w-full' disabled>Гудки в трубке...</button>`;
 const modal = document.getElementById("modalBuyCall");
 if (modal) modal.classList.add('active');
 tgHaptic('light');
@@ -319,7 +357,7 @@ car.cooldownUntil = Date.now() + (waitSec * 1000);
 setTxt("buyCallEmoji", "📵");
 setTxt("buyCallTitle", "Абонент сбросил");
 setTxt("buyCallDesc", "«Не могу говорить, перезвоните через " + waitSec + " сек!»");
-if (btnBox) btnBox.innerHTML = "<button onclick=\"closeModal('modalBuyCall')\" class='btn btn-dark w-full'>Понятно</button>";
+if (btnBox) btnBox.innerHTML = `<button onclick="closeModal('modalBuyCall')" class='btn btn-dark w-full'>Понятно</button>`;
 saveState();
 renderMarketFeed();
 } else {
@@ -329,15 +367,16 @@ setTxt("buyCallDesc", "«Только что внесли задаток, маш
 car.unavailable = true;
 saveState();
 renderMarketFeed();
-if (btnBox) btnBox.innerHTML = "<button onclick=\"closeModal('modalBuyCall')\" class='btn btn-dark w-full'>Закрыть</button>";
+if (btnBox) btnBox.innerHTML = `<button onclick="closeModal('modalBuyCall')" class='btn btn-dark w-full'>Закрыть</button>`;
 }
 }, 1200);
 }
 function paidCallMarketCar(carId) {
-const cash = state.player && state.player.cash ? state.player.cash : 0;
+let cash = 0;
+if (state.player && state.player.cash) cash = state.player.cash;
 if (cash < 1000) return showToast("Не хватает 1000 ₽ на платный дозвон!");
 state.player.cash -= 1000;
-const carIndex = state.marketFeed.findIndex(c => c.id === carId);
+const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
 if (carIndex === -1) return;
 const car = state.marketFeed[carIndex];
 car.cooldownUntil = 0;
@@ -348,8 +387,7 @@ openMarketDeal(carId);
 function updateMarketRiskPreview(pct) {
 const text = document.getElementById("marketHaggleRiskText");
 const fill = document.getElementById("marketHaggleRiskFill");
-if (!text) return;
-if (!fill) return;
+if (!text || !fill) return;
 if (pct === 3) {
 text.innerText = "Низкий (~15%)";
 text.className = "color-green";
@@ -368,17 +406,21 @@ fill.style.width = "90%";
 }
 }
 function openMarketDeal(carId) {
-const carIndex = state.marketFeed.findIndex(c => c.id === carId);
+const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
 if (carIndex === -1) return;
 const car = state.marketFeed[carIndex];
 pendingMarketCar = { car: car, carIndex: carIndex };
 const imgEl = document.getElementById("dealCarImg");
-if (imgEl) imgEl.src = car.img ? car.img : "";
-setTxt("dealCarTitle", car.name ? car.name : "Авто");
-const mileageStr = car.mileage ? car.mileage.toLocaleString() : "0";
-const plateStr = car.plate ? car.plate : "ТРАНЗИТ";
+if (imgEl) {
+if (car.img) imgEl.src = car.img;
+else imgEl.src = "";
+}
+let cName = "Авто"; if (car.name) cName = car.name;
+setTxt("dealCarTitle", cName);
+let mileageStr = "0"; if (car.mileage) mileageStr = car.mileage.toLocaleString();
+let plateStr = "ТРАНЗИТ"; if (car.plate) plateStr = car.plate;
 setTxt("dealCarMileageInfo", "Пробег: " + mileageStr + " км / Госномер: " + plateStr);
-const priceStr = car.price ? car.price.toLocaleString() : "0";
+let priceStr = "0"; if (car.price) priceStr = car.price.toLocaleString();
 setTxt("dealCarPrice", priceStr + " ₽");
 const avatars = ["👨‍💼", "🧔", "😎", "👨‍🔧", "🧑‍💻"];
 const names = ["Сергей", "Алексей", "Дмитрий", "Артем", "Михаил"];
@@ -391,7 +433,7 @@ setTxt("dealSellerAvatar", avatars[randIdx]);
 setTxt("dealSellerName", names[randIdx] + " (Продавец)");
 const thread = document.getElementById("dealChatThread");
 if (thread) {
-thread.innerHTML = "<div class='chat-msg msg-seller'>«Алло, да, продаю. Машина в порядке, сел и поехал. Что интересует?»</div>";
+thread.innerHTML = `<div class='chat-msg msg-seller'>«Алло, да, продаю. Машина в порядке, сел и поехал. Что интересует?»</div>`;
 }
 const haggleArea = document.getElementById("dealHaggleArea");
 if (haggleArea) {
@@ -399,31 +441,31 @@ if (car.haggled) {
 haggleArea.style.display = "none";
 } else {
 haggleArea.style.display = "block";
-haggleArea.innerHTML =
-"<div class='risk-meter-box mb-2'>" +
-"<div class='flex-between text-xs'>" +
-"<span>Риск срыва переговоров:</span>" +
-"<b id='marketHaggleRiskText' class='color-green'>Низкий (~15%)</b>" +
-"</div>" +
-"<div class='risk-track'>" +
-"<div id='marketHaggleRiskFill' class='risk-fill risk-low' style='width: 20%;'>
-</div>" +
-"</div>" +
-"</div>" +
-"<div class='grid-3'>" +
-"<button onmouseenter='updateMarketRiskPreview(3)' onclick='attemptMarketHaggle(3)' class='btn btn-dark btn-sm'>" +
-"-3%<br>
-<span class='color-green text-xs'>Мягко</span>" +
-"</button>" +
-"<button onmouseenter='updateMarketRiskPreview(7)' onclick='attemptMarketHaggle(7)' class='btn btn-dark btn-sm'>" +
-"-7%<br>
-<span class='color-amber text-xs'>Напор</span>" +
-"</button>" +
-"<button onmouseenter='updateMarketRiskPreview(12)' onclick='attemptMarketHaggle(12)' class='btn btn-dark btn-sm'>" +
-"-12%<br>
-<span class='color-red text-xs'>Нагло</span>" +
-"</button>" +
-"</div>";
+haggleArea.innerHTML = `
+<div class='risk-meter-box mb-2'>
+  <div class='flex-between text-xs'>
+    <span>Риск срыва переговоров:</span>
+    <b id='marketHaggleRiskText' class='color-green'>Низкий (~15%)</b>
+  </div>
+  <div class='risk-track'>
+    <div id='marketHaggleRiskFill' class='risk-fill risk-low' style='width: 20%;'>
+    </div>
+  </div>
+</div>
+<div class='grid-3'>
+  <button onmouseenter='updateMarketRiskPreview(3)' onclick='attemptMarketHaggle(3)' class='btn btn-dark btn-sm'>
+    -3%<br>
+    <span class='color-green text-xs'>Мягко</span>
+  </button>
+  <button onmouseenter='updateMarketRiskPreview(7)' onclick='attemptMarketHaggle(7)' class='btn btn-dark btn-sm'>
+    -7%<br>
+    <span class='color-amber text-xs'>Напор</span>
+  </button>
+  <button onmouseenter='updateMarketRiskPreview(12)' onclick='attemptMarketHaggle(12)' class='btn btn-dark btn-sm'>
+    -12%<br>
+    <span class='color-red text-xs'>Нагло</span>
+  </button>
+</div>`;
 }
 }
 const modal = document.getElementById("modalMarketDeal");
@@ -448,23 +490,24 @@ const hArea = document.getElementById("dealHaggleArea");
 if (hArea) hArea.style.display = "none";
 const thread = document.getElementById("dealChatThread");
 if (Math.random() * 100 <= successChance) {
-const carPriceNum = car.price ? car.price : 100000;
+let carPriceNum = 100000;
+if (car.price) carPriceNum = car.price;
 const disc = Math.round(carPriceNum * (percent / 100));
 car.price = Math.max(10000, carPriceNum - disc);
 setTxt("dealCarPrice", car.price.toLocaleString() + " ₽");
 if (thread) {
-thread.innerHTML +=
-"<div class='chat-msg msg-player'>«Скинь " + percent + "%, забираю прямо сейчас за наличку без лишних вопросов.»</div>" +
-"<div class='chat-msg msg-seller'>«Ладно, по рукам... Скину " + disc.toLocaleString() + " ₽. Оформляем ДКП!»</div>";
+thread.innerHTML += `
+<div class='chat-msg msg-player'>«Скинь ${percent}%, забираю прямо сейчас за наличку без лишних вопросов.»</div>
+<div class='chat-msg msg-seller'>«Ладно, по рукам... Скину ${disc.toLocaleString()} ₽. Оформляем ДКП!»</div>`;
 thread.scrollTop = thread.scrollHeight;
 }
 playSound('win');
 tgHaptic('success');
 } else {
 if (thread) {
-thread.innerHTML +=
-"<div class='chat-msg msg-player'>«Скидывай цену, на ней шпакли в два пальца!»</div>" +
-"<div class='chat-msg msg-seller'>«Слышь, не нравится — иди пешком ходи! Торга нет, цена окончательная.»</div>";
+thread.innerHTML += `
+<div class='chat-msg msg-player'>«Скидывай цену, на ней шпакли в два пальца!»</div>
+<div class='chat-msg msg-seller'>«Слышь, не нравится — иди пешком ходи! Торга нет, цена окончательная.»</div>`;
 thread.scrollTop = thread.scrollHeight;
 }
 tgHaptic('error');
@@ -502,7 +545,7 @@ state.marketFeed.splice(carIndex, 1);
 }
 pendingMarketCar = null;
 addXp(40);
-const carName = car.name ? car.name : "Авто";
+let carName = "Авто"; if (car.name) carName = car.name;
 showToast("✅ " + carName + " куплен за " + price.toLocaleString() + " ₽!");
 playSound('win');
 tgHaptic('success');
@@ -510,7 +553,7 @@ spawnFloatingReward("-" + price.toLocaleString() + " ₽");
 saveState();
 renderMarketFeed();
 renderGarage();
-setTimeout(() => switchTab("tabGarage"), 350);
+setTimeout(() => { switchTab("tabGarage"); }, 350);
 }
 function openGaugeModal(carId) {
 activeInspectCarId = carId;
@@ -545,9 +588,9 @@ if (car.bodyThickness[part]) val = car.bodyThickness[part];
 const el = document.getElementById("part-" + part);
 if (el) {
 if (val > 200) {
-el.innerHTML = "<span class='color-red'>" + val + " мкм (Шпакля)</span>";
+el.innerHTML = `<span class='color-red'>${val} мкм (Шпакля)</span>`;
 } else {
-el.innerHTML = "<span class='color-green'>" + val + " мкм (Завод)</span>";
+el.innerHTML = `<span class='color-green'>${val} мкм (Завод)</span>`;
 }
 }
 }
@@ -567,18 +610,18 @@ state.player.cash -= cost;
 car.autotekaChecked = true;
 saveState();
 }
-let stat = "<b class='color-green'>Юридически чист</b>";
-if (car.isStolen) stat = "<b class='color-red'>В РОЗЫСКЕ (Перебиты номера кузова)</b>";
+let stat = `<b class='color-green'>Юридически чист</b>`;
+if (car.isStolen) stat = `<b class='color-red'>В РОЗЫСКЕ (Перебиты номера кузова)</b>`;
 const rep = document.getElementById("autotekaReportContent");
 if (rep) {
-const cName = car.name ? car.name : "Авто";
-const cPlate = car.plate ? car.plate : "";
-const cDefects = car.hiddenDefect ? "2" : "0";
-rep.innerHTML =
-"<div class='mb-1 font-bold'>" + cName + " (" + cPlate + ")</div>" +
-"<div>ДТП в базе: <b>" + cDefects + " шт.</b>
-</div>" +
-"<div class='mt-1'>Юридический статус: " + stat + "</div>";
+let cName = "Авто"; if (car.name) cName = car.name;
+let cPlate = ""; if (car.plate) cPlate = car.plate;
+let cDefects = "0"; if (car.hiddenDefect) cDefects = "2";
+rep.innerHTML = `
+<div class='mb-1 font-bold'>${cName} (${cPlate})</div>
+<div>ДТП в базе: <b>${cDefects} шт.</b>
+</div>
+<div class='mt-1'>Юридический статус: ${stat}</div>`;
 }
 const modal = document.getElementById("modalAutoteka");
 if (modal) modal.classList.add('active');
