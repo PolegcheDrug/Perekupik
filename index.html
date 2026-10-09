@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Симулятор Перекупа — Telegram Mini App</title>
-    <link rel="stylesheet" href="style.css?v=30">
+    <link rel="stylesheet" href="style.css?v=40">
     
     <!-- Подключение баз данных и системных библиотек -->
-    <script src="data.js?v=30"></script>
-    <script src="firebase-bridge.js?v=30"></script>
+    <script src="data.js?v=40"></script>
+    <script src="firebase-bridge.js?v=40"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
@@ -252,6 +252,23 @@
 
         <!-- 6. TAB: ЖИЗНЬ -->
         <section id="tabLife" class="tab-screen">
+          <!-- Быстрые кнопки разделов -->
+          <div class="grid-4 mb-3">
+            <button onclick="switchTab('tabStreet')" class="btn btn-dark btn-sm"><i class="fa-solid fa-flag-checkered color-red"></i> Стрит</button>
+            <button onclick="switchTab('tabContainers')" class="btn btn-dark btn-sm"><i class="fa-solid fa-box color-purple"></i> Порт</button>
+            <button onclick="switchTab('tabContracts')" class="btn btn-dark btn-sm"><i class="fa-solid fa-file-contract color-cyan"></i> Заказы</button>
+            <button onclick="switchTab('tabBarn')" class="btn btn-dark btn-sm"><i class="fa-solid fa-screwdriver-wrench color-amber"></i> Сараи</button>
+          </div>
+
+          <!-- Маркет перекупа -->
+          <div class="glass-card mb-3 flex-between">
+            <div>
+              <h3 class="font-bold color-amber"><i class="fa-solid fa-cart-shopping"></i> Магазин Перекупа</h3>
+              <p class="sub-label">Госномера, сканеры, толщиномеры, сырьё и перекус.</p>
+            </div>
+            <button onclick="switchTab('tabShop')" class="btn btn-amber btn-auto">Войти 🛒</button>
+          </div>
+
           <!-- Репутация и связи -->
           <div class="glass-card mb-3">
             <div class="flex-between mb-2">
@@ -265,12 +282,29 @@
             <button onclick="bigCharityDonate()" class="btn btn-green w-full">🕊 Меценатство 100,000 ₽ (+25 Кармы)</button>
           </div>
 
+          <!-- Смена дня -->
           <div class="glass-card flex-between mb-3">
             <div>
               <h3 class="font-bold color-amber"><i class="fa-solid fa-calendar-day"></i> Смена дня</h3>
               <p class="sub-label">Списать расходы на жильё, выдать 25 талонов.</p>
             </div>
             <button onclick="nextDayAction()" class="btn btn-amber btn-auto">Завершить 🌙</button>
+          </div>
+
+          <!-- Городской Эфир (Live Chat) -->
+          <div class="live-chat-card mb-3">
+            <div class="flex-between mb-2">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <i class="fa-solid fa-satellite-dish color-cyan"></i>
+                <h4 class="font-bold">Городской Эфир</h4>
+              </div>
+              <span class="tag-badge bg-tag-cyan">Live</span>
+            </div>
+            <div id="lifeChatFeed" class="chat-messages-container"></div>
+            <div class="chat-compose-box">
+              <input type="text" id="feedMessageInput" class="chat-input" placeholder="Написать в эфир..." maxlength="100">
+              <button onclick="sendChatMessageFromInput()" class="chat-send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
           </div>
 
           <!-- Ломбард -->
@@ -315,7 +349,7 @@
             </div>
           </div>
 
-          <!-- 2. Фича от себя: Напёрстки перекупа (Угадай стаканчик x2) -->
+          <!-- 2. Вокзальные Напёрстки (Выигрыш x2) -->
           <div class="glass-card mb-3" id="thimblesGameCard">
             <div class="flex-between mb-2">
               <h3 class="color-amber font-bold"><i class="fa-solid fa-hat-wizard"></i> Вокзальные Напёрстки</h3>
@@ -472,7 +506,7 @@
           </div>
         </section>
 
-        <!-- 10. TAB: МАГАЗИН ПЕРЕКУПА (С разделом «Расходники») -->
+        <!-- 10. TAB: МАГАЗИН ПЕРЕКУПА -->
         <section id="tabShop" class="tab-screen">
           <div class="grid-4 mb-3">
             <button onclick="switchShopSection('tools')" id="shopTab-tools" class="btn btn-cyan btn-sm">Приборы</button>
@@ -481,7 +515,6 @@
             <button onclick="switchShopSection('supplies')" id="shopTab-supplies" class="btn btn-dark btn-sm">Еда</button>
           </div>
 
-          <!-- Приборы -->
           <div id="shopSec-tools">
             <div class="glass-card mb-2">
               <div class="flex-between">
@@ -492,7 +525,6 @@
             <div id="shopToolsList" class="space-y-2 mb-3"></div>
           </div>
 
-          <!-- Расходники / Сырьё для бизнеса -->
           <div id="shopSec-consumables" style="display:none;">
             <div class="glass-card mb-2">
               <h4 class="color-amber">Сырьё и расходники для предприятий</h4>
@@ -501,7 +533,6 @@
             <div id="shopConsumablesList" class="space-y-2 mb-3"></div>
           </div>
 
-          <!-- Номера -->
           <div id="shopSec-plates" style="display:none;">
             <div class="glass-card mb-2">
               <h4 class="color-amber">Витрина Госномеров</h4>
@@ -509,7 +540,6 @@
             <div id="plateMarketListDetailed" class="space-y-2 mb-3"></div>
           </div>
 
-          <!-- Перекус -->
           <div id="shopSec-supplies" style="display:none;">
             <div class="glass-card mb-2">
               <h4 class="color-green">Перекус в дорогу</h4>
@@ -567,7 +597,7 @@
           <div id="housingMarketList"></div>
         </section>
 
-        <!-- 15. TAB: ИНТЕРАКТИВНЫЙ ПРОФИЛЬ (С удобным чит-пультом) -->
+        <!-- 15. TAB: ИНТЕРАКТИВНЫЙ ПРОФИЛЬ -->
         <section id="tabProfile" class="tab-screen">
           <div class="glass-card text-center mb-3">
             <h3 id="profileTgUsername">Перекуп #777</h3>
@@ -603,7 +633,6 @@
               <span class="tag-badge bg-tag-amber">DEV / ЧИТЫ</span>
             </div>
             
-            <!-- Регулировка Денег -->
             <div class="cheat-adjust-row">
               <span class="text-xs">💰 Наличные:</span>
               <div class="flex-gap">
@@ -613,7 +642,6 @@
               </div>
             </div>
 
-            <!-- Регулировка Уровня -->
             <div class="cheat-adjust-row">
               <span class="text-xs">⭐ Уровень:</span>
               <div class="flex-gap">
@@ -623,7 +651,6 @@
               </div>
             </div>
 
-            <!-- Регулировка Звезд -->
             <div class="cheat-adjust-row">
               <span class="text-xs">⭐ Stars:</span>
               <div class="flex-gap">
@@ -633,7 +660,6 @@
               </div>
             </div>
 
-            <!-- Регулировка Талонов -->
             <div class="cheat-adjust-row">
               <span class="text-xs">🎟️ Талоны:</span>
               <div class="flex-gap">
@@ -643,7 +669,6 @@
               </div>
             </div>
 
-            <!-- Регулировка Связей -->
             <div class="cheat-adjust-row">
               <span class="text-xs">🤝 Связи:</span>
               <div class="flex-gap">
@@ -687,6 +712,7 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА -->
+    <!-- 1. ЗВОНОК И ТОРГ ПРИ ПОКУПКЕ -->
     <div id="modalMarketDeal" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -715,6 +741,71 @@
           <button onclick="closeModal('modalMarketDeal')" class="btn btn-dark">Отбой 📵</button>
           <button id="dealBuyBtn" onclick="confirmMarketPurchaseSuccess()" class="btn btn-green">Выкупить 🤝</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 2. ИНТЕРАКТИВНЫЙ ТОРГ ПРИ ПРОДАЖЕ (В СТИЛЕ МЕССЕНДЖЕРА У КАПОТА) -->
+    <div id="modalHaggleSale" class="modal-overlay">
+      <div class="modal-box chat-deal-box">
+        <div class="chat-header-bar flex-between mb-2">
+          <div class="flex-gap" style="align-items:center;">
+            <div class="chat-avatar-circle" id="saleBuyerAvatar">🧑‍💼</div>
+            <div>
+              <div class="font-bold text-xs" id="saleBuyerName">Покупатель</div>
+              <div class="text-xs color-green">● Осматривает ваш авто у капота</div>
+            </div>
+          </div>
+          <button onclick="closeModal('modalHaggleSale')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        
+        <div class="deal-car-preview-card mb-2">
+          <img id="saleCarImg" src="" class="deal-car-thumb">
+          <div style="flex:1;">
+            <div class="font-bold text-xs" id="saleCarTitle">Автомобиль</div>
+            <div class="text-xs sub-label">Текущее предложение:</div>
+            <div class="price-val text-xs color-green" id="saleBuyerOfferVal">0 ₽</div>
+          </div>
+        </div>
+
+        <div class="chat-thread-container mb-2" id="saleHaggleChatThread">
+          <div class="chat-msg msg-seller" id="saleBuyerGreetingMsg">«Машина интересная. Но цену надо обсудить...»</div>
+        </div>
+
+        <div class="risk-meter-box mb-2">
+          <div class="flex-between text-xs">
+            <span>Терпение покупателя:</span>
+            <b id="saleBuyerPatienceText" class="color-green">100%</b>
+          </div>
+          <div class="risk-track">
+            <div id="saleBuyerPatienceFill" class="risk-fill risk-low" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <div class="space-y-2 mb-3">
+          <button onclick="attemptHaggleSale('safe')" class="btn btn-dark w-full">
+            🛡 Обосновать по кузову (+2% | Риск 15%)
+          </button>
+          <button onclick="attemptHaggleSale('firm')" class="btn btn-dark w-full">
+            🔥 Давить на эксклюзив (+6% | Риск 45%)
+          </button>
+        </div>
+
+        <div class="grid-2">
+          <button onclick="confirmSaleFromHaggleModal()" class="btn btn-green">Продать по текущей 🤝</button>
+          <button onclick="closeModal('modalHaggleSale')" class="btn btn-dark">Назад к лоту</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. ИНТЕРАКТИВНЫЙ И КРАСИВЫЙ ОТЧЁТ «АВТОТЕКА» -->
+    <div id="modalAutoteka" class="modal-overlay">
+      <div class="modal-box">
+        <div class="flex-between mb-2">
+          <h4 class="color-green font-bold"><i class="fa-solid fa-shield-halved"></i> Полный отчёт «Автотека»</h4>
+          <button onclick="closeModal('modalAutoteka')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div id="autotekaReportContent" class="report-box p-3 mb-3" style="border-radius:12px;"></div>
+        <button onclick="closeModal('modalAutoteka')" class="btn btn-green w-full">Закрыть отчёт</button>
       </div>
     </div>
 
@@ -808,8 +899,6 @@
       </div>
     </div>
 
-    <div id="modalHaggleSale" class="modal-overlay"></div>
-
     <div id="modalOBD2" class="modal-overlay">
       <div class="modal-box">
         <h4 class="text-center mb-2 color-cyan"><i class="fa-solid fa-laptop-code"></i> OBD2 Сканер</h4>
@@ -888,14 +977,6 @@
       </div>
     </div>
 
-    <div id="modalAutoteka" class="modal-overlay">
-      <div class="modal-box">
-        <h4 class="text-center mb-2 color-green">Отчёт «Автотека»</h4>
-        <div id="autotekaReportContent" class="report-box p-2 mb-3" style="border-radius:8px;"></div>
-        <button onclick="closeModal('modalAutoteka')" class="btn btn-green w-full">Закрыть</button>
-      </div>
-    </div>
-
     <div id="modalLegalizeCar" class="modal-overlay">
       <div class="modal-box">
         <h4 class="text-center mb-2 color-purple">🔏 Легализация</h4>
@@ -923,12 +1004,12 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ (СТРОГИЙ ПОРЯДОК: СНАЧАЛА МОДУЛИ, В КОНЦЕ APP.JS) -->
-    <script src="js/market.js?v=30"></script>
-    <script src="js/garage.js?v=30"></script>
-    <script src="js/salesLot.js?v=30"></script>
-    <script src="js/life.js?v=30"></script>
-    <script src="js/syndicate.js?v=30"></script>
-    <script src="js/app.js?v=30"></script>
+    <script src="js/market.js?v=40"></script>
+    <script src="js/garage.js?v=40"></script>
+    <script src="js/salesLot.js?v=40"></script>
+    <script src="js/life.js?v=40"></script>
+    <script src="js/syndicate.js?v=40"></script>
+    <script src="js/app.js?v=40"></script>
 
   </body>
 </html>
