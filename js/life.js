@@ -567,10 +567,7 @@ function collectAllBusinessCash() {
     state.player.cash += totalCollected;
     saveState();
     checkBusinessAccess();
-    tgHaptic('success');
-    playSound('win');
-    spawnFloatingReward("+" 
-   tgHaptic('success');
+            tgHaptic('success');
         playSound('win');
         spawnFloatingReward("+" + totalCollected.toLocaleString() + " ₽");
     } // закрываем функцию
