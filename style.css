@@ -424,7 +424,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   opacity: 0.65;
 }
 
-/* СЕТКА 3x3 КЛАССОВ ТЕХНИКИ */
+/* СЕТКА КЛАССОВ ТЕХНИКИ 3х3 */
 .market-filter-card {
   padding: 12px;
   background: radial-gradient(circle at 50% 0%, #151f33 0%, #090e18 100%);
