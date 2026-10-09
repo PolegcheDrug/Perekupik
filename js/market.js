@@ -7,7 +7,7 @@ function generateNormalPlate() {
     const l1 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
     const l2 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
     const l3 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
-    let num = String(Math.floor(Math.random() * 899) + 100);
+    const num = String(Math.floor(Math.random() * 899) + 100);
     const reg = REGIONS[Math.floor(Math.random() * REGIONS.length)];
     return l1 + num + l2 + l3 + " " + reg;
 }
@@ -68,12 +68,24 @@ function getMarketRefreshCost() {
     return 150 + (lvl * 350);
 }
 
+const CATEGORY_META = {
+    economy: { name: "ЭКОНОМ", title: "Сегмент Эконом", capital: "от 50 000 ₽", desc: "Быстрый оборот, минимальные риски на старте и высокий спрос перекупов." },
+    scooter: { name: "СКУТЕРЫ", title: "Городские Скутеры", capital: "от 25 000 ₽", desc: "Дешёвый порог входа, моментальные сделки без заморочек с документами." },
+    moto: { name: "МОТО", title: "Спортбайки & Классика", capital: "от 120 000 ₽", desc: "Высокая сезонная маржа, проверка состояния вилки и геометрии рамы." },
+    atv: { name: "КВАДРО", title: "Квадроциклы 4x4", capital: "от 180 000 ₽", desc: "Техника для бездорожья. Частые скрытые дефекты ходовой и приводов." },
+    comfort: { name: "КОМФОРТ", title: "Сегмент Комфорт", capital: "от 450 000 ₽", desc: "Городские седаны и кроссоверы. Идеально под выкуп для таксопарков." },
+    premium: { name: "ПРЕМИУМ", title: "Премиум & Люкс", capital: "от 1 200 000 ₽", desc: "Высокая чистая прибыль с одной сделки, но капризные и дотошные клиенты." },
+    hyper: { name: "ГИПЕРКАРЫ", title: "Спорт & Экзотика", capital: "от 5 000 000 ₽", desc: "Огромная маржа, эксклюзивные клиенты и дорогие комплектующие." },
+    truck: { name: "ГРУЗОВИКИ", title: "Коммерческий транспорт", capital: "от 2 500 000 ₽", desc: "Тягачи и фургоны для крупных заказов Синдиката под ключ." },
+    yacht: { name: "ЯХТЫ", title: "Морской сегмент", capital: "от 15 000 000 ₽", desc: "Элитная морская техника для настоящих автомобильных олигархов." }
+};
+
 function setCategory(cat) {
-    let lvl = 1;
-    if (state.player && state.player.level) lvl = state.player.level;
+    let lvl = state.player?.level || 1;
     
-    if (cat === 'moto' && lvl < 16) return showToast("🔒 Нужен 16 ур!");
-    if (cat === 'atv' && lvl < 16) return showToast("🔒 Нужен 16 ур!");
+    // Новые уровни доступа
+    if (cat === 'moto' && lvl < 5) return showToast("🔒 Мотоциклы доступны с 5 уровня!");
+    if (cat === 'atv' && lvl < 8) return showToast("🔒 Квадроциклы доступны с 8 уровня!");
     if (cat === 'comfort' && lvl < 30) return showToast("🔒 Нужен 30 ур!");
     if (cat === 'premium' && lvl < 30) return showToast("🔒 Нужен 30 ур!");
     if (cat === 'hyper' && lvl < 50) return showToast("🔒 Нужен 50 ур!");
@@ -81,9 +93,20 @@ function setCategory(cat) {
     if (cat === 'yacht' && lvl < 100) return showToast("🔒 Нужен 100 ур!");
     
     state.activeCategory = cat;
-    document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+    
+    // Переключение плиток сетки 3x3
+    document.querySelectorAll('.cat-tile').forEach(c => c.classList.remove('active'));
     const btn = document.getElementById("catBtn-" + cat);
     if (btn) btn.classList.add('active');
+
+    // Обновление баннера описания сегмента
+    const meta = CATEGORY_META[cat] || CATEGORY_META.economy;
+    setTxt("currentCatBadge", meta.name);
+    setTxt("catInfoTitle", "<i class='fa-solid fa-chart-line'></i> " + meta.title + ":");
+    setTxt("catInfoPrice", "Капитал: " + meta.capital);
+    setTxt("catInfoDesc", meta.desc);
+
+    playSound('tick');
     populateMarketFeed();
 }
 
@@ -160,8 +183,26 @@ function populateMarketFeed() {
         else if (lvl >= 20) priceMultiplier = 0.85 + Math.random() * 0.30;
         else priceMultiplier = 0.80 + Math.random() * 0.25;
 
-        const sellerPrice = Math.round(dynPrice * priceMultiplier);
+        // Базовая оценка авто продавцом
+        let carOnlyPrice = Math.round(dynPrice * priceMultiplier);
         const baseVal = Math.round(dynPrice * 1.15);
+        const plateVal = evaluatePlate(genPlate);
+
+        // --- БАЛАНС ЦЕНЫ БЛАТНЫХ НОМЕРОВ У ПРОДАВЦОВ ---
+        let sellerPrice = carOnlyPrice;
+        let isLuckyFind = false;
+
+        if (plateVal > 5000) {
+            // Шанс 3%, что продавец не знает цену красивого номера (джекпот для перекупа)
+            if (Math.random() < 0.03) {
+                isLuckyFind = true;
+                sellerPrice = carOnlyPrice; // продает по обычной цене авто
+            } else {
+                // Продавец знает цену номеров и прибавляет 80-90% их рыночной стоимости
+                let plateMarkup = Math.round(plateVal * (0.80 + Math.random() * 0.10));
+                sellerPrice = carOnlyPrice + plateMarkup;
+            }
+        }
         
         let defectObj = null;
         if (hasHiddenDefect && typeof OBD_ERRORS !== 'undefined') {
@@ -169,20 +210,17 @@ function populateMarketFeed() {
         }
 
         let sNote = "Хорошая машина, сел и поехал.";
-        if (typeof SELLER_ADS_PHRASES !== 'undefined' && SELLER_ADS_PHRASES.length > 0) {
+        if (isLuckyFind) {
+            sNote = "«Дедушка ездил только в сад. Про номера ничего не знаю, продаю как есть.» (🔥 Продавец не знает цену номеров!)";
+        } else if (plateVal > 5000) {
+            sNote = "«Отдаю вместе с красивым госномером " + genPlate + ", цена окончательная с учётом номеров.»";
+        } else if (typeof SELLER_ADS_PHRASES !== 'undefined' && SELLER_ADS_PHRASES.length > 0) {
             sNote = SELLER_ADS_PHRASES[Math.floor(Math.random() * SELLER_ADS_PHRASES.length)];
         }
 
-        const plateVal = evaluatePlate(genPlate);
-        
-        let cName = "Автомобиль";
-        if (template.name) cName = template.name;
-        
-        let cPower = 100;
-        if (template.power) cPower = template.power;
-        
-        let cImg = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
-        if (template.img) cImg = template.img;
+        let cName = template.name ? template.name : "Автомобиль";
+        let cPower = template.power ? template.power : 100;
+        let cImg = template.img ? template.img : "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
 
         let cCond = 85;
         if (hasHiddenDefect) cCond = 55;
@@ -683,7 +721,7 @@ function checkBodyPart(part) {
     }
 }
 
-// --- НОВЫЙ ИНТЕРАКТИВНЫЙ ОТЧЁТ «АВТОТЕКА» ---
+// --- ИНТЕРАКТИВНЫЙ ОТЧЁТ «АВТОТЕКА» ---
 function openAutotekaModal(carId) {
     if (!state.marketFeed) return;
     const car = state.marketFeed.find(c => c && c.id === carId); 
