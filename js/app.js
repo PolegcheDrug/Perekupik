@@ -139,7 +139,13 @@ function openVerdictModal(title, text, isSuccess, amount, profit) {
     if (mod) mod.classList.add('active');
 }
 
-const SAVE_KEY = 'perekoop_sim_save_v60_clean';
+function openPatchNotesModal() {
+    const modal = document.getElementById('modalPatchNotes');
+    if (modal) modal.classList.add('active');
+    playSound('tick');
+}
+
+const SAVE_KEY = 'perekoop_sim_save_v70_clean';
 
 const DEFAULT_STATE = {
     player: { 
@@ -481,7 +487,7 @@ function switchTab(tabId) {
     
     document.querySelectorAll('.tab-screen').forEach(el => el.classList.remove('active')); 
     const tb = document.getElementById(tabId);
-    if (tb) tb.classList.add('active');
+    if (tb) tb.classList.add('active'); 
     
     document.querySelectorAll('.sub-nav-btn').forEach(b => b.classList.remove('active')); 
     const targetNavBtn = document.querySelector(".sub-nav-btn.nav-" + tabId);
@@ -501,16 +507,24 @@ function switchTab(tabId) {
     if (tabId === 'tabMarket' && typeof renderMarketFeed === 'function') renderMarketFeed();
     if (tabId === 'tabGarage' && typeof renderGarage === 'function') renderGarage(); 
     if (tabId === 'tabSalesLot' && typeof renderSalesLot === 'function') renderSalesLot();
-    if (tabId === 'tabStreet' && typeof renderStreetScreen === 'function') renderStreetScreen();
+    
+    if (tabId === 'tabStreet') {
+        if (typeof renderStreetScreen === 'function') renderStreetScreen();
+        if (typeof renderStreetEvents === 'function') renderStreetEvents();
+    }
+    
     if (tabId === 'tabBusiness' && typeof checkBusinessAccess === 'function') checkBusinessAccess();
     if (tabId === 'tabShop' && typeof renderShopTools === 'function') renderShopTools();
     if (tabId === 'tabReshala' && typeof renderConfiscatedCardUI === 'function') renderConfiscatedCardUI();
     if (tabId === 'tabContainers' && typeof renderContainersList === 'function') renderContainersList();
     if (tabId === 'tabContracts' && typeof renderContracts === 'function') renderContracts();
     if (tabId === 'tabBarn' && typeof renderBarnFind === 'function') renderBarnFind();
-    if (tabId === 'tabLife' && typeof renderDiets === 'function') renderDiets(); 
     
-    // Переход на экран Фортуны: Вилспин, Напёрстки и Казино 21
+    if (tabId === 'tabLife') {
+        if (typeof renderDiets === 'function') renderDiets(); 
+        if (typeof renderLifeChat === 'function') renderLifeChat();
+    }
+    
     if (tabId === 'tabServices') { 
         if (typeof initWheelModule === 'function') initWheelModule(); 
         if (typeof initCasino === 'function') initCasino(); 
@@ -520,6 +534,8 @@ function switchTab(tabId) {
     if (tabId === 'tabSyndicate' && typeof renderSyndicateHub === 'function') renderSyndicateHub();
     if (tabId === 'tabProfile' && typeof renderProfileAnalytics === 'function') renderProfileAnalytics();
 }
+
+// ===================== СТРИТ И ДРАГ-РЕЙСИНГ =====================
 
 let currentRaceBet = 25000;
 let tachoRpm = 1000;
@@ -569,6 +585,7 @@ function onSelectStreetCar(idx) {
     state.player.selectedStreetCarIndex = parseInt(idx);
     saveState();
     renderStreetScreen();
+    renderStreetEvents();
 }
 
 function setRaceBet(amt) {
@@ -616,6 +633,16 @@ function launchDragRace() {
     if (isRaceRunning) return;
     if (!state.garage || state.garage.length === 0) return showToast("Нет авто для заезда!");
     
+    let selIdx = state.player?.selectedStreetCarIndex || 0;
+    let car = state.garage[selIdx] || state.garage[0];
+
+    if (car.unregistered) {
+        return showToast("🚫 Авто снято с учёта! Поставьте на учёт в гараже.");
+    }
+    if (car.impounded) {
+        return showToast("🚨 Автомобиль на штрафстоянке! Сначала вызволите его.");
+    }
+
     let cash = state.player?.cash || 0;
     if (cash < currentRaceBet) return showToast("Не хватает денег на ставку!");
     
@@ -630,9 +657,6 @@ function launchDragRace() {
     isRaceRunning = true;
     playEngineSound();
 
-    let selIdx = state.player?.selectedStreetCarIndex || 0;
-    let car = state.garage[selIdx] || state.garage[0];
-    
     let playerHp = car.power || 100;
     const rivalHp = Math.round(playerHp * (0.85 + Math.random() * 0.35));
 
@@ -689,6 +713,212 @@ function launchDragRace() {
         }
     }, 120);
 }
+
+// ===================== НОВАЯ МЕХАНИКА: СТРИТ-МЕРОПРИЯТИЯ =====================
+
+const STREET_EVENTS_LIST = [
+    {
+        id: "meet",
+        name: "🅿️ Парковочная авто-сходка",
+        reqLvl: 3,
+        fuelCost: 15,
+        desc: "Ночная встреча у гипермаркета. Показ машин, общение с ребятами, обмен связями.",
+        rewardText: "+20 Кармы, +15% Куража и шанс получить +1 🤝 Связь.",
+        riskText: "Безопасно (Облав нет)"
+    },
+    {
+        id: "autoshow",
+        name: "🏆 Городской Стенс & Автошоу",
+        reqLvl: 8,
+        fuelCost: 20,
+        desc: "Конкурс внешнего вида: полировка, стенс, спортивный обвес и выхлоп.",
+        rewardText: "Призовой фонд до 180,000 ₽ + кубок лучшего проекта.",
+        riskText: "Риск 12.5.1: ДПС на выезде с выставки!"
+    },
+    {
+        id: "drift",
+        name: "💨 Нелегальный ночной дрифт",
+        reqLvl: 12,
+        fuelCost: 25,
+        desc: "Парный дрифт вокруг столбов и на кольце. Жесткий визг резины и адреналин.",
+        rewardText: "Банк до 450,000 ₽ и огромный авторитет перекупа.",
+        riskText: "ВЫСОКИЙ РИСК: Эвакуация на штрафстоянку и аннулирование учёта!"
+    }
+];
+
+function renderStreetEvents() {
+    const container = document.getElementById('streetEventsContainer');
+    if (!container) return;
+
+    const lvl = state.player?.level || 1;
+    let html = "";
+
+    STREET_EVENTS_LIST.forEach(ev => {
+        let isLocked = lvl < ev.reqLvl;
+        let cardClass = "street-event-card";
+        if (ev.id === 'drift') cardClass += " card-drift";
+        if (ev.id === 'autoshow') cardClass += " card-show";
+
+        let lockBadge = isLocked 
+            ? "<span class='tag-badge bg-tag-red'><i class='fa-solid fa-lock'></i> С " + ev.reqLvl + " УР</span>" 
+            : "<span class='tag-badge bg-tag-green'>Доступно</span>";
+
+        let btnText = isLocked ? "Закрыто (Нужен " + ev.reqLvl + " ур)" : "Участвовать (-" + ev.fuelCost + " ⛽)";
+
+        html += 
+        "<div class='" + cardClass + "'>" +
+            "<div class='flex-between mb-1'>" +
+                "<b class='text-xs color-cyan'>" + ev.name + "</b>" +
+                lockBadge +
+            "</div>" +
+            "<p class='sub-label mb-2'>" + ev.desc + "</p>" +
+            "<div class='text-xs mb-1 color-green'>🎁 Награда: " + ev.rewardText + "</div>" +
+            "<div class='text-xs mb-2 color-amber'>⚠️ Опасность: " + ev.riskText + "</div>" +
+            "<button onclick=\"participateInStreetEvent('" + ev.id + "')\" class='btn btn-dark btn-sm w-full' " + (isLocked ? "disabled" : "") + ">" +
+                btnText +
+            "</button>" +
+        "</div>";
+    });
+
+    container.innerHTML = html;
+}
+
+function participateInStreetEvent(eventId) {
+    if (!state.garage || state.garage.length === 0) {
+        return showToast("В гараже нет машин для участия!");
+    }
+
+    let selIdx = state.player?.selectedStreetCarIndex || 0;
+    let car = state.garage[selIdx] || state.garage[0];
+
+    if (car.unregistered) {
+        return showToast("🚫 Авто снято с учёта! Восстановите регистрацию в гараже.");
+    }
+    if (car.impounded) {
+        return showToast("🚨 Авто на штрафстоянке! Вызволите его перед выездом.");
+    }
+
+    const ev = STREET_EVENTS_LIST.find(e => e.id === eventId);
+    if (!ev) return;
+
+    let fuel = state.player?.fuel || 0;
+    if (fuel < ev.fuelCost) {
+        return showToast("Не хватает " + ev.fuelCost + " ⛽ бензина!");
+    }
+
+    state.player.fuel -= ev.fuelCost;
+    saveState();
+    updateHeaderUI();
+
+    let hasImmunity = (state.player?.policeImmunityDays || 0) > 0;
+
+    if (eventId === 'meet') {
+        playEngineSound();
+        state.player.karma = Math.min(100, (state.player.karma || 50) + 15);
+        state.player.mood = Math.min(100, (state.player.mood || 80) + 15);
+        
+        let gotConnection = Math.random() < 0.40;
+        if (gotConnection) {
+            state.player.connections = (state.player.connections || 0) + 1;
+        }
+
+        addXp(35);
+        saveState();
+        updateHeaderUI();
+
+        let desc = "Вы отлично провели время с местными перекупами и стритрейсерами. Кураж +15%, Карма +15.";
+        if (gotConnection) desc += " Удалось познакомиться с влиятельным человеком (+1 🤝 Связь)!";
+        openVerdictModal("СХОДКА УДАЛАСЬ! 🅿️", desc, true);
+    } 
+    else if (eventId === 'autoshow') {
+        playEngineSound();
+        let showPoints = (car.condition || 80);
+        if (car.isPolished) showPoints += 25;
+        if (car.tuning?.stance) showPoints += 35;
+        if (car.tuning?.bodykit) showPoints += 25;
+
+        let risk1251 = car.tuning?.risk1251 || 0;
+        let isRaid = (!hasImmunity && Math.random() < (risk1251 / 150));
+
+        if (isRaid) {
+            let fine = 25000;
+            state.player.cash = Math.max(0, (state.player.cash || 0) - fine);
+            saveState();
+            updateHeaderUI();
+            openVerdictModal(
+                "ОБЛАВА ТЕХНАДЗОРА! 🚔", 
+                "На выезде с автошоу экипаж ДПС выписал протокол по ст. 12.5.1 КоАП за изменение конструкции. Штраф: -" + fine.toLocaleString() + " ₽.", 
+                false
+            );
+        } else {
+            let prize = Math.round(100000 + (showPoints * 600));
+            state.player.cash = (state.player.cash || 0) + prize;
+            addXp(50);
+            saveState();
+            updateHeaderUI();
+            openVerdictModal(
+                "ПРИЗЕР АВТОШОУ! 🏆", 
+                "Судьи оценили стиль «" + car.name + "» (" + showPoints + " баллов)! Приз за участие: +" + prize.toLocaleString() + " ₽.", 
+                true, 
+                prize
+            );
+        }
+    } 
+    else if (eventId === 'drift') {
+        playEngineSound();
+        let driftSkillRoll = Math.random();
+
+        // Риск облавы на нелегальном дрифте
+        let raidRoll = Math.random();
+        let isBusted = (!hasImmunity && raidRoll < 0.45);
+
+        if (isBusted) {
+            tgHaptic('error');
+            let severeBust = Math.random() < 0.50;
+
+            if (severeBust && (car.tuning?.exhaust || car.tuning?.stance || car.tuning?.chip)) {
+                // АННУЛИРОВАНИЕ УЧЁТА (СНЯТИЕ С РЕГИСТРАЦИИ)
+                car.unregistered = true;
+                car.impounded = true;
+                car.impoundedDays = 1;
+                car.impoundFine = 45000;
+                saveState();
+                renderGarage();
+                openVerdictModal(
+                    "УЧЁТ АННУЛИРОВАН! 🚨", 
+                    "Облава спецбатальона! За агрессивный дрифт и незаконный тюнинг регистрация «" + car.name + "» АННУЛИРОВАНА, а машина отправлена на штрафстоянку! Придётся восстанавливать учёт.", 
+                    false
+                );
+            } else {
+                // ОБЫЧНАЯ ШТРАФСТОЯНКА
+                car.impounded = true;
+                car.impoundedDays = 1;
+                car.impoundFine = 30000;
+                saveState();
+                renderGarage();
+                openVerdictModal(
+                    "ЭВАКУАЦИЯ НА ШТРАФСТОЯНКУ! 🚔", 
+                    "ДПС перекрыли выезды с площадки! «" + car.name + "» эвакуирован на штрафстоянку за опасное вождение.", 
+                    false
+                );
+            }
+        } else {
+            let winBank = Math.round(200000 + Math.random() * 250000);
+            state.player.cash = (state.player.cash || 0) + winBank;
+            addXp(65);
+            saveState();
+            updateHeaderUI();
+            openVerdictModal(
+                "КОРОЛЬ УЛИЧНОГО ДРИФТА! 💨", 
+                "Вы раздали угла без ошибок, сорвали овации зрителей и забрали весь банк: +" + winBank.toLocaleString() + " ₽!", 
+                true, 
+                winBank
+            );
+        }
+    }
+}
+
+// ===================== ПРОФИЛЬ И АНАЛИТИКА =====================
 
 function renderProfileAnalytics() {
     let pName = state.player?.name || "Перекуп";
