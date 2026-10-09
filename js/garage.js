@@ -1,5 +1,5 @@
 // ========================================================
-// js/garage.js — ГАРАЖ, ОБСЛУЖИВАНИЕ, ОБД2, ТЮНИНГ, НОМЕРА
+// js/garage.js — ГАРАЖ, ИНДИВИДУАЛЬНЫЙ ТЮНИНГ ТАЧЕК, OBD2 (v0.4.0)
 // ========================================================
 
 let selectedCarIndex = null; 
@@ -43,6 +43,20 @@ function calculatePlateValue(plateStr) {
     return value;
 }
 
+function toggleMarketCategories() {
+    const grid = document.getElementById('marketCatListContainer');
+    const btnIcon = document.querySelector('#btnToggleMarketGrid i');
+    if (!grid) return;
+    grid.classList.toggle('collapsed');
+    if (btnIcon) {
+        if (grid.classList.contains('collapsed')) {
+            btnIcon.className = "fa-solid fa-chevron-down";
+        } else {
+            btnIcon.className = "fa-solid fa-chevron-up";
+        }
+    }
+}
+
 function renderGarage() {
     const list = document.getElementById('garageList'); 
     if (!list) return; 
@@ -78,7 +92,6 @@ function renderGarage() {
         const marketVal = baseVal + plateVal;
         car.marketValue = marketVal;
 
-        // Неисправности
         let defectBlock = "";
         if (car.hiddenDefect) {
             let defectText = car.hasAdditive ? "Присадка залита (Стук заглушен)" : (car.hiddenDefect.text ? car.hiddenDefect.text : "Неисправность узлов");
@@ -91,7 +104,6 @@ function renderGarage() {
             "</div>";
         }
 
-        // Штрафстоянка
         let impoundedBlock = "";
         if (car.impounded) {
             let daysAtLot = car.impoundedDays ? car.impoundedDays : 1;
@@ -109,7 +121,6 @@ function renderGarage() {
             "</div>";
         }
 
-        // Аннулированный учёт (12.5.1)
         let unregBlock = "";
         if (car.unregistered) {
             unregBlock = 
@@ -194,7 +205,7 @@ function registerCarAction(idx, method) {
         renderGarage();
         playSound('win');
         tgHaptic('success');
-        openVerdictModal("УЧЁТ ВОССТАНОВЛЕН! 📋", "Мастера СТО демонтировали прямоток/тюнинг и прошли техосмотр. Машина снова чиста перед ДПС!", true);
+        openVerdictModal("УЧЁТ ВОССТАНОВЛЕН! 📋", "Мастера СТО демонтировали тюнинг и прошли техосмотр. Машина снова чиста перед ДПС!", true);
     } else if (method === 'reshala') {
         let conn = (state.player && state.player.connections) ? state.player.connections : 0;
         if (conn < 2) return showToast("Нужно 2 Связи 🤝 для звонка Артуру!");
@@ -277,7 +288,7 @@ function openPreviewModal(idx) {
 
     const obdBtn = document.getElementById("btnPreviewObdScan");
     if (obdBtn) {
-        let hasScanner = !!(state.player && state.player.tools && state.player.tools.obd);
+        let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_elm || state.player.tools.obd_launch));
         if (hasScanner) {
             obdBtn.innerText = "OBD2 Сканер";
             obdBtn.className = "btn btn-cyan";
@@ -480,7 +491,7 @@ function repairCarDefect(idx) {
 // ----------------------------------------------------
 function openOBD2Modal() {
     if (selectedCarIndex === null) return; 
-    let hasScanner = !!(state.player && state.player.tools && state.player.tools.obd);
+    let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_elm || state.player.tools.obd_launch));
     if (!hasScanner) return showToast("🔒 Требуется OBD2-сканер! Купите его в Маркете.");
 
     obdActiveCarIdx = selectedCarIndex; 
@@ -637,7 +648,7 @@ function installPlateOnCar(plate, plateIdx) {
 }
 
 // ----------------------------------------------------
-// РАСШИРЕННЫЙ СПОРТИВНЫЙ ТЮНИНГ ПО ДИСЦИПЛИНАМ
+// СПОРТИВНЫЙ ТЮНИНГ (ПРИВЯЗКА К КАЖДОЙ МАШИНЕ ОТДЕЛЬНО)
 // ----------------------------------------------------
 function updateTuningRiskUI(car) { 
     let risk = (car && car.tuning && car.tuning.risk1251) ? car.tuning.risk1251 : 0;
@@ -851,7 +862,7 @@ function applyTuningMod(type) {
     renderGarage(); 
     renderTuningOptions();
     playSound('win');
-    showToast("Деталь установлена в боксе!");
+    showToast("Деталь установлена на автомобиль!");
 }
 
 // ----------------------------------------------------
@@ -940,7 +951,8 @@ function confirmPutOnLot() {
         id: "lot_" + Date.now(), 
         car: car, 
         askingPrice: askingPrice, 
-        timer: 30, 
+        maxTimer: Math.floor(60 + Math.random() * 240),
+        timer: Math.floor(60 + Math.random() * 240), 
         currentBuyer: null 
     }); 
     
