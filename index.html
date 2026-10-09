@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Симулятор Перекупа v0.3.3.5</title>
-    <link rel="stylesheet" href="style.css?v=110">
+    <title>Симулятор Перекупа v0.3.3.6</title>
+    <link rel="stylesheet" href="style.css?v=120">
     
     <!-- Базы данных и библиотеки -->
-    <script src="data.js?v=110"></script>
-    <script src="firebase-bridge.js?v=110"></script>
+    <script src="data.js?v=120"></script>
+    <script src="firebase-bridge.js?v=120"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
@@ -106,7 +106,7 @@
               <span class="tag-badge bg-tag-cyan" id="currentCatBadge">ЭКОНОМ</span>
             </div>
 
-            <!-- ИСПРАВЛЕННАЯ СЕТКА КЛАССОВ С ИКОНКОЙ СКУТЕРА -->
+            <!-- СЕТКА КЛАССОВ С ПРАВИЛЬНЫМИ ИКОНКАМИ -->
             <div class="market-categories-grid" id="marketCatListContainer">
               <button onclick="setCategory('economy')" id="catBtn-economy" class="cat-tile active">
                 <div class="cat-tile-icon"><i class="fa-solid fa-car"></i></div>
@@ -332,7 +332,7 @@
           <div class="glass-card mb-3 flex-between">
             <div>
               <h3 class="font-bold color-amber"><i class="fa-solid fa-cart-shopping"></i> Магазин Перекупа</h3>
-              <p class="sub-label">Оборудование, сырьё, спортивные детали, консоли и мебель.</p>
+              <p class="sub-label">Более 70 товаров: оборудование, химия, спорт-тюнинг и быт.</p>
             </div>
             <button onclick="switchTab('tabShop')" class="btn btn-amber btn-auto">Войти 🛒</button>
           </div>
@@ -394,7 +394,7 @@
           </div>
         </section>
 
-        <!-- 7. TAB: ФОРТУНА (НОВОЕ НЕОНОВОЕ КОЛЕСО + НАПЁРСТКИ + 21) -->
+        <!-- 7. TAB: ФОРТУНА (НЕОНОВЫЙ VIP ВИЛСПИН) -->
         <section id="tabServices" class="tab-screen">
           <div class="glass-card text-center mb-3 fortune-wheel-card">
             <div class="flex-between mb-2">
@@ -583,7 +583,7 @@
           </div>
         </section>
 
-        <!-- 10. TAB: МАГАЗИН ПЕРЕКУПА (ПОЛНОСТЬЮ РАСШИРЕННЫЙ) -->
+        <!-- 10. TAB: МАГАЗИН ПЕРЕКУПА (БОЛЕЕ 70 ТОВАРОВ) -->
         <section id="tabShop" class="tab-screen">
           <div class="grid-4 mb-3">
             <button onclick="switchShopSection('tools')" id="shopTab-tools" class="btn btn-cyan btn-sm">Приборы</button>
@@ -681,7 +681,7 @@
             <p class="sub-label mb-2" id="profPlayerRank">Статус: Гаражный Делец</p>
             
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-sparkles"></i> Список изменений v0.3.3.5 & Команда
+              <i class="fa-solid fa-sparkles"></i> Список изменений v0.3.3.6 & Команда
             </button>
             
             <div class="grid-2 mb-2">
@@ -703,6 +703,18 @@
               <div class="stat-box">
                 <div class="sub-label">Винрейт:</div>
                 <div id="statWinrate" class="stat-value color-amber">0%</div>
+              </div>
+            </div>
+
+            <!-- БЛОК ОБЛАЧНОГО СОХРАНЕНИЯ И ЭКСПОРТА -->
+            <div class="p-2 mb-2" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
+              <div class="flex-between mb-2">
+                <div class="text-xs font-bold color-cyan"><i class="fa-solid fa-cloud-arrow-up"></i> Облачное хранилище</div>
+                <span class="tag-badge bg-tag-green" id="cloudStorageStatus">TG Cloud: Активно</span>
+              </div>
+              <div class="grid-2">
+                <button onclick="syncCloudStorageManual()" class="btn btn-cyan btn-sm"><i class="fa-solid fa-rotate"></i> Синхронизация</button>
+                <button onclick="openSaveManagerModal()" class="btn btn-dark btn-sm"><i class="fa-solid fa-file-export"></i> Резерв / Код</button>
               </div>
             </div>
           </div>
@@ -792,36 +804,52 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА -->
+    <div id="modalSaveManager" class="modal-overlay">
+      <div class="modal-box">
+        <div class="flex-between mb-2">
+          <h4 class="color-cyan font-bold"><i class="fa-solid fa-cloud-arrow-up"></i> Резервные копии сейва</h4>
+          <button onclick="closeModal('modalSaveManager')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <p class="sub-label mb-2">Сейвы синхронизируются с серверами Telegram автоматически. Также вы можете скопировать или загрузить код сохранения вручную:</p>
+        <textarea id="saveExportArea" style="width:100%; height:90px; background:#090e18; border:1px solid var(--border-glass); border-radius:8px; color:#fff; font-size:10px; font-family:monospace; padding:8px; outline:none; resize:none; margin-bottom:10px;" placeholder="Код сохранения..."></textarea>
+        <div class="grid-2 mb-2">
+          <button onclick="exportSaveCodeAction()" class="btn btn-cyan btn-sm"><i class="fa-solid fa-copy"></i> Экспорт кода</button>
+          <button onclick="importSaveCodeAction()" class="btn btn-amber btn-sm"><i class="fa-solid fa-file-import"></i> Импорт кода</button>
+        </div>
+        <button onclick="closeModal('modalSaveManager')" class="btn btn-dark w-full">Закрыть</button>
+      </div>
+    </div>
+
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <h4 class="color-purple font-bold"><i class="fa-solid fa-code-commit"></i> Список изменений v0.3.3.5</h4>
+          <h4 class="color-purple font-bold"><i class="fa-solid fa-code-commit"></i> Список изменений v0.3.3.6</h4>
           <button onclick="closeModal('modalPatchNotes')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
 
         <div class="p-2 mb-2" style="background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
           <div class="flex-between text-xs mb-1">
             <span>Статус сборки:</span>
-            <b class="color-green">100% (Релиз v0.3.3.5)</b>
+            <b class="color-green">100% (Релиз v0.3.3.6)</b>
           </div>
           <div class="biz-progress-track"><div class="biz-progress-fill fill-biz-lvl" style="width:100%;"></div></div>
         </div>
 
         <div class="space-y-2 text-xs mb-3" style="line-height:1.4;">
           <div class="patch-item">
-            <b class="color-cyan">✓ Огромный Ассортимент Маркета:</b> более 70 товаров (приборы, автохимия, спортивный тюнинг и техника для дома).
+            <b class="color-cyan">✓ Бесшовная Авторизация & CloudStorage:</b> привязка к вашему Telegram ID и сохранение прогресса в облаке Telegram без серверов и баз данных!
           </div>
           <div class="patch-item">
-            <b class="color-amber">✓ Неоновый VIP Вилспин:</b> металлический обод, реалистичный ход, подсветка и обновлённые ценные сектора.
+            <b class="color-amber">✓ Экспорт & Импорт Сейвов:</b> возможность скопировать текстовый ключ сохранения и перенести прогресс на любое устройство.
           </div>
           <div class="patch-item">
-            <b class="color-green">✓ Иконка Скутера:</b> восстановлено красивое отображение мопеда в сетке техники.
+            <b class="color-green">✓ Неоновый VIP Вилспин:</b> металлический обод, физика замедления, плавная стрелка и ценные призы.
           </div>
           <div class="patch-item">
-            <b class="color-purple">✓ Спортивный Тюнинг:</b> доработки под регламенты Драга (каркас, слики), Дрифта (выворот, заварка) и Шоу.
+            <b class="color-purple">✓ Расширение Маркета:</b> более 70 позиций техники, приборов, профессиональной химии и уюта.
           </div>
           <div class="patch-item">
-            <b class="color-red">✓ Честная Экономика Номеров:</b> продавцы учитывают стоимость «блатных» номеров в цене авто (с шансом 3% на джекпот).
+            <b class="color-red">✓ Исправлена иконка скутера:</b> правильное отображение в сетке 3х3.
           </div>
         </div>
 
@@ -1157,12 +1185,12 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ: МОДУЛИ ПЕРВЫМИ, ЯДРО В КОНЦЕ -->
-    <script src="js/market.js?v=110"></script>
-    <script src="js/garage.js?v=110"></script>
-    <script src="js/salesLot.js?v=110"></script>
-    <script src="js/life.js?v=110"></script>
-    <script src="js/syndicate.js?v=110"></script>
-    <script src="js/app.js?v=110"></script>
+    <script src="js/market.js?v=120"></script>
+    <script src="js/garage.js?v=120"></script>
+    <script src="js/salesLot.js?v=120"></script>
+    <script src="js/life.js?v=120"></script>
+    <script src="js/syndicate.js?v=120"></script>
+    <script src="js/app.js?v=120"></script>
 
   </body>
 </html>
