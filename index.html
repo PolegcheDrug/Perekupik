@@ -3,20 +3,22 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Симулятор Перекупа v0.3.3.5</title>
-    <link rel="stylesheet" href="style.css?v=70">
+    <title>Симулятор Перекупа v0.3.3.4</title>
+    <link rel="stylesheet" href="style.css?v=100">
     
-    <script src="data.js?v=70"></script>
-    <script src="firebase-bridge.js?v=70"></script>
+    <!-- Подключение баз данных и системных библиотек -->
+    <script src="data.js?v=100"></script>
+    <script src="firebase-bridge.js?v=100"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
   <body>
     <div class="app-shell">
       
-      <!-- HUD HEADER -->
+      <!-- ЕДИНЫЙ ИГРОВОЙ HUD -->
       <header class="hud-header">
         <div class="hud-top-row">
+          <!-- Профиль игрока -->
           <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль">
             <div class="avatar-ring">
               <div class="avatar" id="playerAvatarBox">
@@ -40,6 +42,7 @@
             </div>
           </div>
 
+          <!-- Баланс и ресурсы -->
           <div class="wallet-dashboard">
             <div class="wallet-main">
               <div class="cash-val"><span id="cashAmount">150,000</span> ₽</div>
@@ -69,7 +72,7 @@
         </div>
       </header>
 
-      <!-- НАВИГАЦИОННАЯ ЛЕНТА -->
+      <!-- ВЕРХНЯЯ НАВИГАЦИОННАЯ ЛЕНТА -->
       <div class="sub-nav-wrapper">
         <div class="sub-nav-track" id="infiniteNavTrack">
           <button onclick="switchTab('tabMarket')" class="sub-nav-btn nav-tabMarket active"><i class="fa-solid fa-store"></i> Рынок</button>
@@ -89,10 +92,11 @@
         </div>
       </div>
       
-      <!-- ОСНОВНОЙ КОНТЕЙНЕР -->
+      <!-- ОСНОВНОЙ КОНТЕЙНЕР ДЛЯ ЭКРАНОВ -->
       <main class="main-content">
         <!-- 1. TAB: РЫНОК -->
         <section id="tabMarket" class="tab-screen active">
+          <!-- СЕТКА КЛАССОВ ТЕХНИКИ 3х3 -->
           <div class="glass-card market-filter-card mb-3">
             <div class="flex-between mb-2">
               <div style="display:flex; align-items:center; gap:8px;">
@@ -298,7 +302,6 @@
             <button onclick="buyReshalaService('roof')" class="btn btn-amber btn-sm mt-1">Оформить (350k ₽ / 45 ⭐)</button>
           </div>
 
-          <!-- Новая услуга: Спортивная лицензия РАФ в обход проверок -->
           <div class="reshala-deal-card">
             <div class="flex-between">
               <b>🏎️ Гоночная Лицензия РАФ</b>
@@ -645,7 +648,7 @@
           </div>
         </section>
         
-        <!-- 13. TAB: САРАИ (ПЕРЕРАБОТАННЫЕ ГРЕЙДЫ) -->
+        <!-- 13. TAB: САРАИ -->
         <section id="tabBarn" class="tab-screen">
           <div class="glass-card mb-3">
             <div class="flex-between mb-2">
@@ -657,7 +660,7 @@
           </div>
         </section>
         
-        <!-- 14. TAB: ЖИЛЬЁ (С УЛУЧШЕНИЕМ СОБСТВЕННОГО ЖИЛЬЯ) -->
+        <!-- 14. TAB: ЖИЛЬЁ -->
         <section id="tabHousing" class="tab-screen">
           <div class="glass-card mb-2">
             <div class="flex-between">
@@ -786,7 +789,6 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА -->
-    <!-- ОКНО СПИСКА ИЗМЕНЕНИЙ И КОМАНДЫ РАЗРАБОТЧИКОВ -->
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -867,7 +869,6 @@
           </div>
         </div>
 
-        <!-- Табы категорий тюнинга -->
         <div class="grid-3 mb-2">
           <button onclick="switchTuneTab('drag')" id="tuneTab-drag" class="btn btn-cyan btn-sm">🏁 Драг</button>
           <button onclick="switchTuneTab('drift')" id="tuneTab-drift" class="btn btn-dark btn-sm">💨 Дрифт</button>
@@ -880,7 +881,7 @@
       </div>
     </div>
 
-    <!-- ДРУГИЕ МОДАЛКИ (БЕЗ ИЗМЕНЕНИЙ) -->
+    <!-- ДРУГИЕ МОДАЛЬНЫЕ ОКНА -->
     <div id="modalMarketDeal" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -1152,13 +1153,13 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ (СТРОГИЙ ПОРЯДОК: СНАЧАЛА МОДУЛИ, В КОНЦЕ APP.JS) -->
-    <script src="js/market.js?v=70"></script>
-    <script src="js/garage.js?v=70"></script>
-    <script src="js/salesLot.js?v=70"></script>
-    <script src="js/life.js?v=70"></script>
-    <script src="js/syndicate.js?v=70"></script>
-    <script src="js/app.js?v=70"></script>
+    <!-- СТРОГИЙ ПОРЯДОК ПОДКЛЮЧЕНИЯ СКРИПТОВ: МОДУЛИ ПЕРВЫМИ, ЯДРО В КОНЦЕ -->
+    <script src="js/market.js?v=100"></script>
+    <script src="js/garage.js?v=100"></script>
+    <script src="js/salesLot.js?v=100"></script>
+    <script src="js/life.js?v=100"></script>
+    <script src="js/syndicate.js?v=100"></script>
+    <script src="js/app.js?v=100"></script>
 
   </body>
 </html>
