@@ -1,4 +1,6 @@
-// ===================== ПОЛНАЯ ВЕРСИЯ: js/market.js =====================
+// ========================================================
+// js/market.js — АВТОРЫНОК, ОБЪЯВЛЕНИЯ, ТОЛЩИНОМЕР И АВТОТЕКА (v0.3.3.6)
+// ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
 const REGIONS = ['77', '99', '97', '177', '199', '777', '799', '50', '90', '150', '190', '750'];
@@ -83,7 +85,6 @@ const CATEGORY_META = {
 function setCategory(cat) {
     let lvl = state.player?.level ? state.player.level : 1;
     
-    // Новые уровни доступа
     if (cat === 'moto' && lvl < 5) return showToast("🔒 Мотоциклы доступны с 5 уровня!");
     if (cat === 'atv' && lvl < 8) return showToast("🔒 Квадроциклы доступны с 8 уровня!");
     if (cat === 'comfort' && lvl < 30) return showToast("🔒 Нужен 30 ур!");
@@ -94,12 +95,10 @@ function setCategory(cat) {
     
     state.activeCategory = cat;
     
-    // Переключение плиток в сетке 3х3
     document.querySelectorAll('.cat-tile').forEach(c => c.classList.remove('active'));
     const btn = document.getElementById("catBtn-" + cat);
     if (btn) btn.classList.add('active');
 
-    // Обновление баннера описания сегмента
     const meta = CATEGORY_META[cat] ? CATEGORY_META[cat] : CATEGORY_META.economy;
     setTxt("currentCatBadge", meta.name);
     setTxt("catInfoTitle", "<i class='fa-solid fa-chart-line'></i> " + meta.title + ":");
@@ -170,22 +169,18 @@ function populateMarketFeed() {
         else if (lvl >= 20) priceMultiplier = 0.85 + Math.random() * 0.30;
         else priceMultiplier = 0.80 + Math.random() * 0.25;
 
-        // Базовая оценка авто продавцом
         let carOnlyPrice = Math.round(dynPrice * priceMultiplier);
         const baseVal = Math.round(dynPrice * 1.15);
         const plateVal = evaluatePlate(genPlate);
 
-        // --- БАЛАНС ЦЕНЫ БЛАТНЫХ НОМЕРОВ У ПРОДАВЦОВ ---
         let sellerPrice = carOnlyPrice;
         let isLuckyFind = false;
 
         if (plateVal > 5000) {
-            // Шанс 3% на редкую ошибку продавца ("дедушка из деревни")
             if (Math.random() < 0.03) {
                 isLuckyFind = true;
                 sellerPrice = carOnlyPrice;
             } else {
-                // Продавец знает цену номеров и прибавляет 80-90% стоимости номера к цене машины
                 let plateMarkup = Math.round(plateVal * (0.80 + Math.random() * 0.10));
                 sellerPrice = carOnlyPrice + plateMarkup;
             }
@@ -193,7 +188,8 @@ function populateMarketFeed() {
         
         let defectObj = null;
         if (hasHiddenDefect && typeof OBD_ERRORS !== 'undefined') {
-            defectObj = OBD_ERRORS[Math.floor(Math.random() * OBD_ERRORS.length)];
+            const errItem = OBD_ERRORS[Math.floor(Math.random() * OBD_ERRORS.length)];
+            defectObj = { text: errItem.text, cost: errItem.cost };
         }
 
         let sNote = "Хорошая машина, сел и поехал.";
@@ -207,7 +203,7 @@ function populateMarketFeed() {
 
         let cName = template.name ? template.name : "Автомобиль";
         let cPower = template.power ? template.power : 100;
-        let cImg = template.img ? template.img : "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+        let cImg = template.img ? template.img : "assets/cars/economy/vaz-2107.jpg";
 
         let cCond = hasHiddenDefect ? 55 : 85;
         let isThick1 = (Math.random() > 0.6) ? 250 : 115;
@@ -276,20 +272,20 @@ function renderMarketFeed() {
         
         let isBusy = (car.cooldownUntil && car.cooldownUntil > now);
         let timeLeft = isBusy ? Math.ceil((car.cooldownUntil - now) / 1000) : 0;
-        let hasScanner = !!(state.player && state.player.tools && state.player.tools.obd);
+        let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_elm || state.player.tools.obd_launch));
         
         let carMileage = (typeof car.mileage === 'number') ? car.mileage.toLocaleString() : "85 000";
         let carPrice = (typeof car.price === 'number') ? car.price.toLocaleString() : "100 000";
         let carMarketVal = (typeof car.marketValue === 'number') ? car.marketValue.toLocaleString() : carPrice;
         let carType = car.type ? car.type.toUpperCase() : "CAR";
-        let carImg = car.img ? car.img : "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+        let carImg = car.img ? car.img : "assets/cars/economy/vaz-2107.jpg";
         
         let viewedBadge = car.viewed ? "<div class='viewed-badge'><i class='fa-solid fa-eye'></i> Просмотрено</div>" : "";
         let busyClass = isBusy ? "busy" : "";
         let viewedClass = car.viewed ? "viewed-card" : "";
         let sellerNoteBlock = car.sellerNote ? "<div class='seller-note-card'>" + car.sellerNote + "</div>" : "";
         
-        let toolIcon = (state.player && state.player.tools && state.player.tools.gauge) ? "✓" : "(3k)";
+        let toolIcon = (state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_basic || state.player.tools.gauge_pro)) ? "✓" : "(3k)";
         let obdIcon = hasScanner ? "OBD2 ✓" : "OBD2 (5k)";
         let autoIcon = car.autotekaChecked ? "0" : "5k";
 
@@ -306,7 +302,7 @@ function renderMarketFeed() {
                 "<button onclick=\"paidCallMarketCar('" + car.id + "')\" class='btn btn-amber' style='width: 80%;'>Платный дозвон (1000 ₽)</button>" +
             "</div>" +
             "<div class='car-img-wrap'>" +
-                "<img src='" + carImg + "' class='car-img' onerror=\"this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'\">" +
+                "<img src='" + carImg + "' class='car-img' onerror=\"this.src='assets/cars/economy/vaz-2107.jpg'\">" +
                 "<div class='badge-tag' style='bottom: 8px; right: 8px;'>" + carType + "</div>" +
                 "<div class='plate-corner'><div class='license-plate'>" + carPlate + " <div class='license-flag'>RUS</div></div></div>" +
             "</div>" +
@@ -342,7 +338,7 @@ function quickOBDScanMarketCar(carId) {
     if (!car) return;
     car.viewed = true;
 
-    let hasScanner = !!(state.player && state.player.tools && state.player.tools.obd);
+    let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_elm || state.player.tools.obd_launch));
 
     if (!hasScanner) {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -350,7 +346,7 @@ function quickOBDScanMarketCar(carId) {
         state.player.cash -= 5000;
         showToast("Выездной мастер подключил сканер (-5,000 ₽)");
     } else {
-        showToast("Подключен ваш собственный OBD2-сканер ✓");
+        showToast("Подключен ваш собственный диагностический сканер ✓");
     }
 
     car.stoChecked = true;
@@ -421,7 +417,6 @@ function initiateBuyMarketCar(carId) {
     }, 1200);
 }
 
-// ПЛАТНЫЙ ДОЗВОН С ШАНСОМ НЕУДАЧИ (70% УСПЕХА)
 function paidCallMarketCar(carId) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
     if (cash < 1000) return showToast("Не хватает 1000 ₽ на платный дозвон!");
@@ -446,7 +441,6 @@ function paidCallMarketCar(carId) {
         showToast("Успешный дозвон по приоритетной линии!");
         openMarketDeal(carId);
     } else {
-        // Неудача: таймер снижается, но дозвон не состоялся
         car.cooldownUntil = Date.now() + 8000;
         saveState();
         renderMarketFeed();
@@ -654,7 +648,7 @@ function openGaugeModal(carId) {
     const car = state.marketFeed.find(c => c && c.id === carId); 
     if (car) car.viewed = true;
 
-    let hasGauge = !!(state.player && state.player.tools && state.player.tools.gauge);
+    let hasGauge = !!(state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_basic || state.player.tools.gauge_pro));
 
     if (!hasGauge) {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
