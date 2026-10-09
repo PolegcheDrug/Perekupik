@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Симулятор Перекупа — Telegram Mini App</title>
-    <link rel="stylesheet" href="style.css?v=50">
+    <title>Симулятор Перекупа v0.3.3.4</title>
+    <link rel="stylesheet" href="style.css?v=60">
     
     <!-- Подключение баз данных и системных библиотек -->
-    <script src="data.js?v=50"></script>
-    <script src="firebase-bridge.js?v=50"></script>
+    <script src="data.js?v=60"></script>
+    <script src="firebase-bridge.js?v=60"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
@@ -96,22 +96,84 @@
       <main class="main-content">
         <!-- 1. TAB: РЫНОК -->
         <section id="tabMarket" class="tab-screen active">
-          <div class="glass-card mb-2" style="padding: 12px;">
-            <h3 class="mb-2" style="font-size: 13px;">
-              <i class="fa-solid fa-magnifying-glass-dollar color-cyan"></i> Классы техники
-            </h3>
-            <div class="market-categories-wrap" id="marketCatListContainer">
-              <button onclick="setCategory('economy')" id="catBtn-economy" class="cat-chip active">Эконом</button>
-              <button onclick="setCategory('scooter')" id="catBtn-scooter" class="cat-chip">Скутеры</button>
-              <button onclick="setCategory('moto')" id="catBtn-moto" class="cat-chip locked"><i class="fa-solid fa-lock" id="lock-moto"></i> Мото (16 ур)</button>
-              <button onclick="setCategory('atv')" id="catBtn-atv" class="cat-chip locked"><i class="fa-solid fa-lock" id="lock-atv"></i> Квадро (16 ур)</button>
-              <button onclick="setCategory('comfort')" id="catBtn-comfort" class="cat-chip locked"><i class="fa-solid fa-lock" id="lock-comfort"></i> Комфорт (30 ур)</button>
-              <button onclick="setCategory('premium')" id="catBtn-premium" class="cat-chip locked"><i class="fa-solid fa-lock" id="lock-premium"></i> Премиум (30 ур)</button>
-              <button onclick="setCategory('hyper')" id="catBtn-hyper" class="cat-chip locked"><i class="fa-solid fa-lock" id="lock-hyper"></i> Гиперкары (50 ур)</button>
-              <button onclick="setCategory('truck')" id="catBtn-truck" class="cat-chip locked"><i class="fa-solid fa-lock" id="lock-truck"></i> Грузовики (50 ур)</button>
-              <button onclick="setCategory('yacht')" id="catBtn-yacht" class="cat-chip locked"><i class="fa-solid fa-lock" id="lock-yacht"></i> Яхты (100 ур)</button>
+          <!-- ОБНОВЛЕННАЯ СЕТКА КЛАССОВ ТЕХНИКИ -->
+          <div class="glass-card market-filter-card mb-3">
+            <div class="flex-between mb-2">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div class="category-header-icon"><i class="fa-solid fa-car-side color-cyan"></i></div>
+                <div>
+                  <h3 style="font-size: 13px; font-weight:900;">Классы автотехники</h3>
+                  <p class="sub-label">Выберите категорию для поиска предложений</p>
+                </div>
+              </div>
+              <span class="tag-badge bg-tag-cyan" id="currentCatBadge">ЭКОНОМ</span>
+            </div>
+
+            <div class="market-categories-grid" id="marketCatListContainer">
+              <button onclick="setCategory('economy')" id="catBtn-economy" class="cat-tile active">
+                <div class="cat-tile-icon"><i class="fa-solid fa-car"></i></div>
+                <div class="cat-tile-name">Эконом</div>
+                <div class="cat-tile-sub">Доступен</div>
+              </button>
+
+              <button onclick="setCategory('scooter')" id="catBtn-scooter" class="cat-tile">
+                <div class="cat-tile-icon"><i class="fa-solid fa-moped"></i></div>
+                <div class="cat-tile-name">Скутеры</div>
+                <div class="cat-tile-sub">Доступен</div>
+              </button>
+
+              <button onclick="setCategory('moto')" id="catBtn-moto" class="cat-tile locked">
+                <div class="cat-tile-icon"><i class="fa-solid fa-motorcycle"></i></div>
+                <div class="cat-tile-name">Мото</div>
+                <div class="cat-tile-sub" id="lock-moto"><i class="fa-solid fa-lock"></i> 5 ур</div>
+              </button>
+
+              <button onclick="setCategory('atv')" id="catBtn-atv" class="cat-tile locked">
+                <div class="cat-tile-icon"><i class="fa-solid fa-truck-monster"></i></div>
+                <div class="cat-tile-name">Квадро</div>
+                <div class="cat-tile-sub" id="lock-atv"><i class="fa-solid fa-lock"></i> 8 ур</div>
+              </button>
+
+              <button onclick="setCategory('comfort')" id="catBtn-comfort" class="cat-tile locked">
+                <div class="cat-tile-icon"><i class="fa-solid fa-taxi"></i></div>
+                <div class="cat-tile-name">Комфорт</div>
+                <div class="cat-tile-sub" id="lock-comfort"><i class="fa-solid fa-lock"></i> 30 ур</div>
+              </button>
+
+              <button onclick="setCategory('premium')" id="catBtn-premium" class="cat-tile locked">
+                <div class="cat-tile-icon"><i class="fa-solid fa-gem"></i></div>
+                <div class="cat-tile-name">Премиум</div>
+                <div class="cat-tile-sub" id="lock-premium"><i class="fa-solid fa-lock"></i> 30 ур</div>
+              </button>
+
+              <button onclick="setCategory('hyper')" id="catBtn-hyper" class="cat-tile locked">
+                <div class="cat-tile-icon"><i class="fa-solid fa-bolt-lightning"></i></div>
+                <div class="cat-tile-name">Гиперкары</div>
+                <div class="cat-tile-sub" id="lock-hyper"><i class="fa-solid fa-lock"></i> 50 ур</div>
+              </button>
+
+              <button onclick="setCategory('truck')" id="catBtn-truck" class="cat-tile locked">
+                <div class="cat-tile-icon"><i class="fa-solid fa-truck-moving"></i></div>
+                <div class="cat-tile-name">Грузовики</div>
+                <div class="cat-tile-sub" id="lock-truck"><i class="fa-solid fa-lock"></i> 50 ур</div>
+              </button>
+
+              <button onclick="setCategory('yacht')" id="catBtn-yacht" class="cat-tile locked">
+                <div class="cat-tile-icon"><i class="fa-solid fa-ship"></i></div>
+                <div class="cat-tile-name">Яхты</div>
+                <div class="cat-tile-sub" id="lock-yacht"><i class="fa-solid fa-lock"></i> 100 ур</div>
+              </button>
+            </div>
+
+            <div class="cat-info-banner mt-2" id="catInfoBanner">
+              <div class="flex-between text-xs">
+                <span class="color-cyan font-bold" id="catInfoTitle"><i class="fa-solid fa-chart-line"></i> Сегмент Эконом:</span>
+                <span class="sub-label" id="catInfoPrice">Капитал: от 50 000 ₽</span>
+              </div>
+              <div class="sub-label mt-1" id="catInfoDesc">Высокий оборот, быстрый торг у капота и минимальные риски на старте.</div>
             </div>
           </div>
+
           <button onclick="refreshMarketFeedManual()" class="btn btn-cyan mb-3">
             <i class="fa-solid fa-arrows-rotate"></i> Обновить ленту (<span id="refreshCostText">150</span> ₽ + 5 ⛽)
           </button>
@@ -236,7 +298,7 @@
               <b>🚨 Крыша ГИБДД (3 дня)</b>
               <span class="tag-badge bg-tag-amber">Иммунитет</span>
             </div>
-            <p class="sub-label">Защита от проверок и штрафстоянки.</p>
+            <p class="sub-label">Защита от проверок, облав в дрифте и штрафстоянки.</p>
             <button onclick="buyReshalaService('roof')" class="btn btn-amber btn-sm mt-1">Оформить (350k ₽ / 45 ⭐)</button>
           </div>
           <div class="reshala-deal-card" id="reshala-legalize-card">
@@ -448,7 +510,10 @@
           </div>
 
           <div class="race-panel mb-3">
-            <div class="race-status" id="raceStatusText">Выберите ставку и прогрейте резину!</div>
+            <div class="flex-between mb-2">
+              <div class="race-status" id="raceStatusText" style="margin-bottom:0;">Выберите ставку и прогрейте резину!</div>
+              <span class="tag-badge bg-tag-amber" id="raceHeatBadge">Внимание ДПС: 0/12</span>
+            </div>
             
             <div class="race-track-box">
               <div class="race-lane">
@@ -486,7 +551,7 @@
             </div>
           </div>
 
-          <!-- НОВЫЙ БЛОК: СТРИТ-МЕРОПРИЯТИЯ (СХОДКИ, АВТОШОУ, НЕЛЕГАЛЬНЫЙ ДРИФТ) -->
+          <!-- СТРИТ-МЕРОПРИЯТИЯ -->
           <div class="glass-card mb-3">
             <div class="flex-between mb-2">
               <h3 class="color-amber font-bold"><i class="fa-solid fa-masks-theater"></i> Стрит-Мероприятия</h3>
@@ -615,7 +680,7 @@
             
             <!-- КНОПКА ОТКРЫТИЯ СПИСКА ИЗМЕНЕНИЙ И ТИТРОВ -->
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-sparkles"></i> Список изменений v2.5 & Команда
+              <i class="fa-solid fa-sparkles"></i> Список изменений v0.3.3.4 & Команда
             </button>
             
             <div class="grid-2 mb-2">
@@ -727,37 +792,40 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА -->
-    <!-- СПИСОК ИЗМЕНЕНИЙ И КОМАНДА РАЗРАБОТЧИКОВ -->
+    <!-- СПИСОК ИЗМЕНЕНИЙ v0.3.3.4 И КОМАНДА РАЗРАБОТЧИКОВ -->
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <h4 class="color-purple font-bold"><i class="fa-solid fa-code-commit"></i> Список изменений v2.5</h4>
+          <h4 class="color-purple font-bold"><i class="fa-solid fa-code-commit"></i> Список изменений v0.3.3.4</h4>
           <button onclick="closeModal('modalPatchNotes')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
 
         <div class="p-2 mb-2" style="background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
           <div class="flex-between text-xs mb-1">
-            <span>Прогресс готовности обновления:</span>
-            <b class="color-green">100% (Релиз)</b>
+            <span>Статус готовности сборки:</span>
+            <b class="color-green">100% (Релиз v0.3.3.4)</b>
           </div>
           <div class="biz-progress-track"><div class="biz-progress-fill fill-biz-lvl" style="width:100%;"></div></div>
         </div>
 
         <div class="space-y-2 text-xs mb-3" style="line-height:1.4;">
           <div class="patch-item">
-            <b class="color-cyan">✓ Стрит-Мероприятия:</b> сходки, автошоу и нелегальный дрифт с риском изъятия авто и аннулирования учёта.
+            <b class="color-cyan">✓ Интерактивная витрина классов:</b> сетка 3×3 с финансовой аналитикой и иконками техники.
           </div>
           <div class="patch-item">
-            <b class="color-amber">✓ Интерактивный Бизнес:</b> шкалы уровня и сырья (0-100%), закупка расходников в Маркете.
+            <b class="color-green">✓ Доступность мото и квадроциклов:</b> открытие Мото снижено до 5 ур., Квадро — до 8 ур.!
           </div>
           <div class="patch-item">
-            <b class="color-green">✓ Торг-Мессенджер у капота:</b> согласование цены при продаже в стиле чата.
+            <b class="color-amber">✓ Экономика блатных номеров:</b> продавцы теперь знают ценность «красивых» номеров и не продают их даром.
           </div>
           <div class="patch-item">
-            <b class="color-purple">✓ Фортуна и Развлечения:</b> вилспин, напёрстки x2 и подпольный клуб 21.
+            <b class="color-red">✓ Драг-рейсинг и облавы:</b> кулдаун остывания мотора и ограничение до 10-15 заездов перед облавой ДПС.
           </div>
           <div class="patch-item">
-            <b class="color-cyan">✓ Обновлённая Автотека:</b> визуальные шкалы состояния узлов и проверка пробега.
+            <b class="color-purple">✓ Стрит-Мероприятия:</b> сходки, автошоу и дрифт с риском аннулирования учёта по 12.5.1.
+          </div>
+          <div class="patch-item">
+            <b class="color-cyan">✓ Интерактивный Бизнес:</b> шкалы прокачки и закупка сырья/расходников.
           </div>
         </div>
 
@@ -771,7 +839,7 @@
           </div>
         </div>
 
-        <button onclick="closeModal('modalPatchNotes')" class="btn btn-purple w-full">Круто, погнали! 🚀</button>
+        <button onclick="dismissPatchNotesModal()" class="btn btn-purple w-full">Круто, погнали! 🚀</button>
       </div>
     </div>
 
@@ -1067,12 +1135,12 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ (СТРОГИЙ ПОРЯДОК: СНАЧАЛА МОДУЛИ, В КОНЦЕ APP.JS) -->
-    <script src="js/market.js?v=50"></script>
-    <script src="js/garage.js?v=50"></script>
-    <script src="js/salesLot.js?v=50"></script>
-    <script src="js/life.js?v=50"></script>
-    <script src="js/syndicate.js?v=50"></script>
-    <script src="js/app.js?v=50"></script>
+    <script src="js/market.js?v=60"></script>
+    <script src="js/garage.js?v=60"></script>
+    <script src="js/salesLot.js?v=60"></script>
+    <script src="js/life.js?v=60"></script>
+    <script src="js/syndicate.js?v=60"></script>
+    <script src="js/app.js?v=60"></script>
 
   </body>
 </html>
