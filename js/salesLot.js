@@ -56,59 +56,76 @@ function renderSalesLot() {
         let asking = lot.askingPrice ? lot.askingPrice : 100000;
 
         let statusBlock = "";
+        
         if (!lot.currentBuyer) {
             let maxTime = lot.maxTimer || 240;
             let currentTimer = lot.timer || 0;
+            // Считаем прогресс (от 0 до 100%)
             let progressPct = Math.max(0, Math.min(100, ((maxTime - currentTimer) / maxTime) * 100));
 
             statusBlock = 
-            "<div class='p-2' style='background:#090e18; border-radius:8px; border:1px solid var(--border-glass);'>" +
-                "<div class='flex-between text-xs mb-1'>" +
-                    "<span id='lot_timer_text_" + idx + "'>Ожидание клиента: " + currentTimer + "с</span>" +
-                    "<span class='color-cyan font-bold'>Поиск покупателя</span>" +
+            "<div class='mb-2'>" +
+                "<div class='text-center sub-label mb-2' style='font-size: 13px;' id='lot_timer_text_" + idx + "'>Ожидание клиента: " + currentTimer + "с</div>" +
+                
+                // Заполняющаяся шкала прогресса
+                "<div style='width: 100%; height: 8px; background: rgba(255,255,255,0.08); border-radius: 6px; overflow: hidden; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.03);'>" +
+                    "<div id='lot_progress_fill_" + idx + "' style='width: " + progressPct + "%; height: 100%; background: linear-gradient(90deg, #c084fc, #00f2fe); box-shadow: 0 0 10px rgba(0, 242, 254, 0.4); transition: width 1s linear;'></div>" +
                 "</div>" +
-                "<div class='container-progress-wrap'>" +
-                    "<div class='container-progress-bar' id='lot_progress_fill_" + idx + "' style='width:" + progressPct + "%;'></div>" +
+
+                "<div class='grid-2 mb-3'>" +
+                    "<button onclick='useExpressTicket(" + idx + ")' class='btn' style='background: #b062ff; color: #fff; border-radius: 12px; padding: 12px; font-weight: 900;'>" +
+                        "🎟 ПРОПУСК (" + curExpress + " ШТ)" +
+                    "</button>" +
+                    "<button onclick='skipWithStars(" + idx + ")' class='btn' style='background: #ffb300; color: #000; border-radius: 12px; padding: 12px; font-weight: 900;'>" +
+                        "⭐ 5 STARS" +
+                    "</button>" +
                 "</div>" +
-                "<button onclick='useExpressTicket(" + idx + ")' class='btn btn-purple btn-sm w-full mt-2'>" +
-                    "⚡ Ускорить поиск (1 Талон 🎟️)" +
-                "</button>" +
+                "<button onclick='cancelSalesLot(" + idx + ")' class='btn btn-dark w-full' style='border-radius: 12px; padding: 12px;'>ЗАБРАТЬ ОБРАТНО В ГАРАЖ</button>" +
             "</div>";
         } else {
             let buyer = lot.currentBuyer;
             let timeLeft = lot.buyerTimerLeft ? lot.buyerTimerLeft : 60;
+            let patiencePct = Math.max(0, Math.min(100, (timeLeft / 120) * 100)); // 120с базовое терпение
+            
             statusBlock = 
-            "<div class='p-2' style='background:rgba(0,230,118,0.1); border:1px solid var(--green); border-radius:8px;'>" +
-                "<div class='flex-between mb-1'>" +
+            "<div class='p-3 mb-3' style='background:rgba(0,230,118,0.1); border:1px solid var(--green); border-radius:12px;'>" +
+                "<div class='flex-between mb-2'>" +
                     "<div class='flex-gap' style='align-items:center;'>" +
-                        "<span style='font-size:20px;'>" + buyer.avatar + "</span>" +
-                        "<div><b class='text-xs color-green'>" + buyer.name + "</b><div class='sub-label' style='font-size:9px;'>Осматривает авто у капота</div></div>" +
+                        "<span style='font-size:24px;'>" + buyer.avatar + "</span>" +
+                        "<div>" +
+                            "<b class='text-xs color-green'>" + buyer.name + "</b>" +
+                            "<div class='sub-label' style='font-size:10px; font-weight: bold;'>КЛИЕНТ ОСМАТРИВАЕТ!</div>" +
+                        "</div>" +
                     "</div>" +
                     "<span class='tag-badge bg-tag-amber' id='lot_buyer_timer_" + idx + "'>⏳ " + timeLeft + "с</span>" +
                 "</div>" +
-                "<div class='flex-between mb-2'>" +
+                
+                // Шкала терпения клиента
+                "<div style='width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; margin-bottom: 12px;'>" +
+                    "<div id='lot_buyer_fill_" + idx + "' style='width: " + patiencePct + "%; height: 100%; background: var(--green); transition: width 1s linear;'></div>" +
+                "</div>" +
+
+                "<div class='flex-between mb-3'>" +
                     "<span class='sub-label'>Предложение:</span>" +
-                    "<span class='price-val text-xs'>" + buyer.offerPrice.toLocaleString() + " ₽</span>" +
+                    "<span class='price-val text-xs color-green'>" + buyer.offerPrice.toLocaleString() + " ₽</span>" +
                 "</div>" +
                 "<div class='grid-2'>" +
-                    "<button onclick=\"openSaleHaggleModal(" + idx + ")\" class='btn btn-cyan btn-sm'>💬 Торговаться</button>" +
-                    "<button onclick=\"acceptBuyerOffer(" + idx + ")\" class='btn btn-green btn-sm'>Продать 🤝</button>" +
+                    "<button onclick=\"openSaleHaggleModal(" + idx + ")\" class='btn btn-cyan' style='border-radius: 10px;'>💬 ТОРГ</button>" +
+                    "<button onclick=\"acceptBuyerOffer(" + idx + ")\" class='btn btn-green' style='border-radius: 10px;'>ПРОДАТЬ 🤝</button>" +
                 "</div>" +
-            "</div>";
+            "</div>" +
+            "<button onclick='cancelSalesLot(" + idx + ")' class='btn btn-dark w-full' style='border-radius: 12px; padding: 12px;'>ОТКАЗАТЬ И ЗАБРАТЬ В ГАРАЖ</button>";
         }
 
         html += 
-        "<div class='glass-card mb-3'>" +
-            "<div class='car-img-wrap' style='height: 130px;'>" +
+        "<div class='glass-card mb-3' style='border-radius: 16px; padding: 14px;'>" +
+            "<div class='car-img-wrap' style='height: 160px; border-radius: 12px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.1);'>" +
                 "<img src='" + cImg + "' class='car-img' onerror=\"this.src='assets/cars/economy/vaz-2107.jpg'\">" +
-                "<div class='plate-corner'><div class='license-plate'>" + cPlate + " <div class='license-flag'>RUS</div></div></div>" +
+                "<div class='plate-corner'><div class='license-plate' style='background:#fff; color:#000; padding:3px 8px; border-radius:4px; font-size:12px; font-weight:900; box-shadow: 0 2px 5px rgba(0,0,0,0.5);'>" + cPlate + "</div></div>" +
             "</div>" +
-            "<div class='flex-between mb-2'>" +
-                "<div>" +
-                    "<h4 class='font-bold'>" + cName + "</h4>" +
-                    "<div class='sub-label'>Цена в объявлении: <b class='color-cyan'>" + asking.toLocaleString() + " ₽</b></div>" +
-                "</div>" +
-                "<button onclick='cancelSalesLot(" + idx + ")' class='btn btn-dark btn-auto btn-sm'>Снять с продажи</button>" +
+            "<div class='mb-3'>" +
+                "<h3 style='font-weight: 900; font-size: 18px; margin-bottom: 4px;'>" + cName + "</h3>" +
+                "<div class='sub-label' style='font-size: 13px;'>Цена выставления: <b style='color: #00e676;'>" + asking.toLocaleString() + " ₽</b></div>" +
             "</div>" +
             statusBlock +
         "</div>";
@@ -122,15 +139,13 @@ function generateBuyerForSlot(slot) {
     const car = slot.car;
     let carCat = car.type ? car.type : 'economy';
     
-    // Если категория вдруг грузовик или яхта, используем пул премиума (для упрощения)
+    // Если категория вдруг грузовик или яхта, используем пул премиума
     if (!BUYERS_CATALOG[carCat]) carCat = 'premium';
     
     const pool = BUYERS_CATALOG[carCat];
     const template = pool[Math.floor(Math.random() * pool.length)];
     
     let asking = slot.askingPrice ? slot.askingPrice : car.marketValue;
-    
-    // Покупатель отталкивается от рыночной цены и своей наглости
     let baseVal = car.marketValue || 100000;
     
     // Если машина отполирована или с хорошим тюнингом, покупатель готов дать больше
@@ -145,23 +160,21 @@ function generateBuyerForSlot(slot) {
     
     let rate = template.rate + tuneBonus;
     
-    // Итоговое предложение: берем процент от рыночной цены, но с оглядкой на то, сколько просит игрок
     let offer = Math.round(baseVal * (rate + (Math.random() * 0.1 - 0.05)));
     
-    // Если покупатель очень богатый, он может сразу дать запрашиваемую цену (если она не космос)
+    // Защита от странных цен
     if (offer > asking * 1.1) offer = asking;
-    if (offer < asking * 0.5) offer = Math.round(asking * 0.55); // Защита от слишком смешных предложений
+    if (offer < asking * 0.5) offer = Math.round(asking * 0.55); 
 
     slot.currentBuyer = {
         name: template.name,
         avatar: template.avatar,
         type: template.type,
         offerPrice: offer,
-        maxOfferPrice: Math.round(offer * (1.05 + Math.random() * 0.15)), // Потолок торга
+        maxOfferPrice: Math.round(offer * (1.05 + Math.random() * 0.15)), 
         patience: 100
     };
     
-    // Таймер терпения найденного покупателя (от 2 до 5 минут)
     slot.buyerTimerLeft = Math.floor(120 + Math.random() * 180); 
 
     try {
@@ -171,6 +184,22 @@ function generateBuyerForSlot(slot) {
     
     showToast("🔔 На площадке появился клиент: " + template.name + " у капота!");
     renderSalesLot();
+}
+
+function skipWithStars(idx) {
+    let stars = (state.player && state.player.stars) ? state.player.stars : 0;
+    if (stars < 5) return showToast("Не хватает 5 ⭐ Stars!");
+
+    state.player.stars -= 5;
+    const slot = state.salesLot[idx];
+    if (slot) {
+        slot.timer = 0;
+        generateBuyerForSlot(slot);
+    }
+    saveState();
+    renderSalesLot();
+    updateHeaderUI();
+    showToast("⭐ Вы применили Stars! Покупатель найден.");
 }
 
 function upgradeExpressCapacity() {
@@ -300,7 +329,6 @@ function attemptHaggleSale(type) {
         }
 
         if (delta <= 0) {
-            // Потолок достигнут
             if (thread) {
                 thread.innerHTML += "<div class='chat-msg msg-player'>«Может накинешь еще немного?»</div>";
                 thread.innerHTML += "<div class='chat-msg msg-seller'>«Брат, это мой край. Больше ни копейки не дам, бюджет впритык!»</div>";
@@ -373,13 +401,9 @@ function acceptBuyerOffer(idx) {
     const car = slot.car;
     const finalPrice = buyer.offerPrice;
 
-    // Удаляем из лота
     state.salesLot.splice(idx, 1);
-    
-    // Зачисляем деньги
     state.player.cash = (state.player.cash || 0) + finalPrice;
 
-    // Аналитика
     let purchaseCost = car.purchaseCost ? car.purchaseCost : (car.basePrice ? car.basePrice : 100000);
     let netProfit = finalPrice - purchaseCost;
 
@@ -394,7 +418,6 @@ function acceptBuyerOffer(idx) {
         state.player.stats.lossSales = (state.player.stats.lossSales || 0) + 1;
     }
 
-    // Опыт и кураж
     addXp(50);
     state.player.mood = Math.min(100, (state.player.mood || 80) + 10);
 
