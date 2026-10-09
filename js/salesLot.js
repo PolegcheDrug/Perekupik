@@ -192,12 +192,14 @@ function speedUpLotWithStars(idx) {
     showToast("⭐ VIP-покупатель сразу у капота!");
 }
 
+// --- ОТКРЫТИЕ ОКНА ТОРГА У КАПОТА В СТИЛЕ МЕССЕНДЖЕРА ---
 function openHaggleSaleModal(idx) {
     activeHaggleSlotIdx = idx;
     const slot = state.salesLot[idx];
     if (!slot) return;
     if (!slot.currentBuyer) return;
     const buyer = slot.currentBuyer;
+    const car = slot.car;
     
     let karma = 50;
     if (state.player && state.player.karma) karma = state.player.karma;
@@ -209,42 +211,52 @@ function openHaggleSaleModal(idx) {
         return showToast("Ваша репутация слишком низкая для торга с этим покупателем!");
     }
     
-    let riskClass = "color-red";
-    let fillClass = "risk-high";
-    if (buyer.patience > 50) {
-        riskClass = "color-green";
-        fillClass = "risk-low";
-    }
-
     let bAva = "👤"; if (buyer.avatar) bAva = buyer.avatar;
     let bName = "Покупатель"; if (buyer.name) bName = buyer.name;
     let bPrice = 0; if (buyer.offerPrice) bPrice = buyer.offerPrice;
 
-    const html = 
-    "<div class='modal-box'>" +
-        "<h4 class='text-center mb-1'><i class='fa-solid fa-comments-dollar color-amber'></i> Торг у капота</h4>" +
-        "<div class='text-xs color-cyan text-center font-bold mb-1'>" + bAva + " " + bName + "</div>" +
-        "<div class='sub-label text-center mb-2 color-amber'>Предложение: <b>" + bPrice.toLocaleString() + " ₽</b></div>" +
-        "<div class='risk-meter-box mb-2'>" +
-            "<div class='flex-between text-xs'>" +
-                "<span>Терпение покупателя:</span>" +
-                "<b class='" + riskClass + "'>" + buyer.patience + "%</b>" +
-            "</div>" +
-            "<div class='risk-track'>" +
-                "<div class='risk-fill " + fillClass + "' style='width: " + buyer.patience + "%;'></div>" +
-            "</div>" +
-        "</div>" +
-        "<div class='space-y-2 mb-3'>" +
-            "<button onclick=\"attemptHaggleSale('safe')\" class='btn btn-dark w-full'>🛡 Обосновать по кузову (+2% / Риск 15%)</button>" +
-            "<button onclick=\"attemptHaggleSale('firm')\" class='btn btn-dark w-full'>🔥 Давить на эксклюзив (+6% / Риск 45%)</button>" +
-        "</div>" +
-        "<button onclick=\"closeModal('modalHaggleSale')\" class='btn btn-dark w-full'>Назад к предложению</button>" +
-    "</div>";
+    setTxt('saleBuyerAvatar', bAva);
+    setTxt('saleBuyerName', bName);
     
+    const imgEl = document.getElementById('saleCarImg');
+    if (imgEl) {
+        if (car && car.img) imgEl.src = car.img;
+        else imgEl.src = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+    }
+
+    let cName = "Автомобиль";
+    if (car && car.name) cName = car.name;
+    setTxt('saleCarTitle', cName);
+    setTxt('saleBuyerOfferVal', bPrice.toLocaleString() + " ₽");
+
+    const thread = document.getElementById('saleHaggleChatThread');
+    if (thread) {
+        let greetText = "«Машина хорошая, но цена кусается. Предлагаю " + bPrice.toLocaleString() + " ₽, по рукам?»";
+        if (buyer.preStatus) greetText = "«" + buyer.preStatus + " Предлагаю забрать за " + bPrice.toLocaleString() + " ₽.»";
+        thread.innerHTML = "<div class='chat-msg msg-seller'>" + greetText + "</div>";
+    }
+
+    updateSalePatienceUI(buyer.patience);
+
     const mod = document.getElementById('modalHaggleSale');
-    if (mod) {
-        mod.innerHTML = html;
-        mod.classList.add('active');
+    if (mod) mod.classList.add('active');
+    playSound('tick');
+}
+
+function updateSalePatienceUI(patience) {
+    let pVal = typeof patience === 'number' ? patience : 100;
+    setTxt('saleBuyerPatienceText', pVal + "%");
+    
+    const fill = document.getElementById('saleBuyerPatienceFill');
+    if (fill) {
+        fill.style.width = pVal + "%";
+        if (pVal > 50) {
+            fill.className = "risk-fill risk-low";
+        } else if (pVal > 25) {
+            fill.className = "risk-fill risk-mid";
+        } else {
+            fill.className = "risk-fill risk-high";
+        }
     }
 }
 
@@ -254,13 +266,12 @@ function attemptHaggleSale(strategy) {
     if (!slot) return;
     if (!slot.currentBuyer) return;
     const buyer = slot.currentBuyer;
-    
-    let lvl = 1;
-    if (state.player && state.player.level) lvl = state.player.level;
+    const lvl = state.player && state.player.level ? state.player.level : 1;
 
     let priceBoost = 0;
     let patienceHit = 0;
     let failChance = 0;
+    let playerQuote = "";
     
     let hardModifier = 1.0;
     if (lvl >= 20) hardModifier = 1.35;
@@ -270,31 +281,67 @@ function attemptHaggleSale(strategy) {
         priceBoost = 0.02;
         patienceHit = Math.round(15 * hardModifier);
         failChance = 0.15 * hardModifier;
+        playerQuote = "«Посмотри на кузов и салон, идеальное состояние без вложений!»";
     } else if (strategy === 'firm') {
         priceBoost = 0.06;
         patienceHit = Math.round(35 * hardModifier);
         failChance = 0.40 * hardModifier;
+        playerQuote = "«Таких машин на рынке единицы, за ней уже очередь стоит. Меньше не отдам!»";
     }
     
     let isFailed = false;
     if (Math.random() < failChance) isFailed = true;
     if (buyer.patience - patienceHit <= 0) isFailed = true;
 
+    const thread = document.getElementById('saleHaggleChatThread');
+
     if (isFailed) {
-        closeModal('modalHaggleSale');
-        rejectBuyerDeal(activeHaggleSlotIdx);
-        return showToast("😡 Покупатель развернулся и ушёл!");
+        let rejectSay = "За такие деньги я в салоне новую возьму! Сделки не будет.";
+        if (buyer.rejectSay) rejectSay = buyer.rejectSay;
+
+        if (thread) {
+            thread.innerHTML += 
+                "<div class='chat-msg msg-player'>" + playerQuote + "</div>" +
+                "<div class='chat-msg msg-seller color-red'>«" + rejectSay + "»</div>";
+            thread.scrollTop = thread.scrollHeight;
+        }
+
+        tgHaptic('error');
+        setTimeout(() => {
+            closeModal('modalHaggleSale');
+            rejectBuyerDeal(activeHaggleSlotIdx);
+            showToast("😡 Покупатель развернулся и ушёл!");
+        }, 1100);
     } else {
         const ask = slot.askingPrice ? slot.askingPrice : 100000;
         const bOff = buyer.offerPrice ? buyer.offerPrice : 100000;
         let newOffer = Math.round(bOff * (1 + priceBoost));
         if (newOffer > ask) newOffer = ask;
         
+        const addedAmount = newOffer - bOff;
         buyer.offerPrice = newOffer;
         buyer.patience -= patienceHit;
-        openHaggleSaleModal(activeHaggleSlotIdx);
-        showToast("Удалось накинуть цену, но терпение падает!");
+        
+        setTxt('saleBuyerOfferVal', newOffer.toLocaleString() + " ₽");
+        updateSalePatienceUI(buyer.patience);
+
+        if (thread) {
+            thread.innerHTML += 
+                "<div class='chat-msg msg-player'>" + playerQuote + "</div>" +
+                "<div class='chat-msg msg-seller'>«Ладно, убедил... Добавлю +" + addedAmount.toLocaleString() + " ₽, забираю за " + newOffer.toLocaleString() + " ₽!»</div>";
+            thread.scrollTop = thread.scrollHeight;
+        }
+
+        playSound('win');
+        tgHaptic('success');
+        showToast("Удалось накинуть +" + addedAmount.toLocaleString() + " ₽!");
     }
+}
+
+function confirmSaleFromHaggleModal() {
+    if (activeHaggleSlotIdx === null) return;
+    closeModal('modalHaggleSale');
+    acceptBuyerDeal(activeHaggleSlotIdx);
 }
 
 function generateBuyerForSlot(slot) {
