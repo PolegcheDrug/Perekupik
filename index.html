@@ -4,21 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Симулятор Перекупа v0.3.3.4</title>
-    <link rel="stylesheet" href="style.css?v=60">
+    <link rel="stylesheet" href="style.css?v=70">
     
-    <!-- Подключение баз данных и системных библиотек -->
-    <script src="data.js?v=60"></script>
-    <script src="firebase-bridge.js?v=60"></script>
+    <script src="data.js?v=70"></script>
+    <script src="firebase-bridge.js?v=70"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
   <body>
     <div class="app-shell">
       
-      <!-- ЕДИНЫЙ ИГРОВОЙ HUD -->
+      <!-- HUD HEADER -->
       <header class="hud-header">
         <div class="hud-top-row">
-          <!-- Профиль игрока -->
           <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль">
             <div class="avatar-ring">
               <div class="avatar" id="playerAvatarBox">
@@ -42,7 +40,6 @@
             </div>
           </div>
 
-          <!-- Баланс и ресурсы -->
           <div class="wallet-dashboard">
             <div class="wallet-main">
               <div class="cash-val"><span id="cashAmount">150,000</span> ₽</div>
@@ -72,7 +69,7 @@
         </div>
       </header>
 
-      <!-- ВЕРХНЯЯ НАВИГАЦИОННАЯ ЛЕНТА -->
+      <!-- НАВИГАЦИОННАЯ ЛЕНТА -->
       <div class="sub-nav-wrapper">
         <div class="sub-nav-track" id="infiniteNavTrack">
           <button onclick="switchTab('tabMarket')" class="sub-nav-btn nav-tabMarket active"><i class="fa-solid fa-store"></i> Рынок</button>
@@ -92,11 +89,10 @@
         </div>
       </div>
       
-      <!-- ОСНОВНОЙ КОНТЕЙНЕР ДЛЯ ЭКРАНОВ -->
+      <!-- ОСНОВНОЙ КОНТЕЙНЕР -->
       <main class="main-content">
         <!-- 1. TAB: РЫНОК -->
         <section id="tabMarket" class="tab-screen active">
-          <!-- ОБНОВЛЕННАЯ СЕТКА КЛАССОВ ТЕХНИКИ -->
           <div class="glass-card market-filter-card mb-3">
             <div class="flex-between mb-2">
               <div style="display:flex; align-items:center; gap:8px;">
@@ -281,7 +277,7 @@
               </div>
               <div style="font-size:32px;">🕵️‍♂️</div>
             </div>
-            <p class="sub-label">«Любой вопрос решается: отмены протоколов 12.5.1, конфискат приставов и отмыв VIN.»</p>
+            <p class="sub-label">«Любой вопрос решается: отмены протоколов 12.5.1, конфискат приставов, внесение тюнинга в ПТС и лицензии РАФ.»</p>
           </div>
           <div class="glass-card card-purple mb-3">
             <div class="flex-between mb-2">
@@ -301,6 +297,17 @@
             <p class="sub-label">Защита от проверок, облав в дрифте и штрафстоянки.</p>
             <button onclick="buyReshalaService('roof')" class="btn btn-amber btn-sm mt-1">Оформить (350k ₽ / 45 ⭐)</button>
           </div>
+
+          <!-- Новая услуга: Спортивная лицензия РАФ в обход проверок -->
+          <div class="reshala-deal-card">
+            <div class="flex-between">
+              <b>🏎️ Гоночная Лицензия РАФ</b>
+              <span class="tag-badge bg-tag-cyan">Драг-рейсинг</span>
+            </div>
+            <p class="sub-label">Официальный допуск пилота к ночным заездам 402м без проверок медсправок.</p>
+            <button onclick="buyReshalaService('license')" class="btn btn-cyan btn-sm mt-1" id="btnReshalaLicense">Оформить (85k ₽ / 1 🤝)</button>
+          </div>
+
           <div class="reshala-deal-card" id="reshala-legalize-card">
             <div class="flex-between">
               <b>🔏 Легализация криминала</b>
@@ -314,7 +321,6 @@
 
         <!-- 6. TAB: ЖИЗНЬ -->
         <section id="tabLife" class="tab-screen">
-          <!-- Быстрые кнопки разделов -->
           <div class="grid-4 mb-3">
             <button onclick="switchTab('tabStreet')" class="btn btn-dark btn-sm"><i class="fa-solid fa-flag-checkered color-red"></i> Стрит</button>
             <button onclick="switchTab('tabContainers')" class="btn btn-dark btn-sm"><i class="fa-solid fa-box color-purple"></i> Порт</button>
@@ -322,16 +328,14 @@
             <button onclick="switchTab('tabBarn')" class="btn btn-dark btn-sm"><i class="fa-solid fa-screwdriver-wrench color-amber"></i> Сараи</button>
           </div>
 
-          <!-- Маркет перекупа -->
           <div class="glass-card mb-3 flex-between">
             <div>
               <h3 class="font-bold color-amber"><i class="fa-solid fa-cart-shopping"></i> Магазин Перекупа</h3>
-              <p class="sub-label">Госномера, сканеры, толщиномеры, сырьё и перекус.</p>
+              <p class="sub-label">Госномера, сканеры, толщиномеры, запчасти, мебель и приставки.</p>
             </div>
             <button onclick="switchTab('tabShop')" class="btn btn-amber btn-auto">Войти 🛒</button>
           </div>
 
-          <!-- Репутация и связи -->
           <div class="glass-card mb-3">
             <div class="flex-between mb-2">
               <h3 class="color-green"><i class="fa-solid fa-handshake-angle"></i> Репутация</h3>
@@ -344,16 +348,14 @@
             <button onclick="bigCharityDonate()" class="btn btn-green w-full">🕊 Меценатство 100,000 ₽ (+25 Кармы)</button>
           </div>
 
-          <!-- Смена дня -->
           <div class="glass-card flex-between mb-3">
             <div>
               <h3 class="font-bold color-amber"><i class="fa-solid fa-calendar-day"></i> Смена дня</h3>
-              <p class="sub-label">Списать расходы на жильё, выдать 25 талонов.</p>
+              <p class="sub-label">Списать расходы, получить бонусы обустройства, сбросить внимание ДПС.</p>
             </div>
             <button onclick="nextDayAction()" class="btn btn-amber btn-auto">Завершить 🌙</button>
           </div>
 
-          <!-- Городской Эфир (Live Chat) -->
           <div class="live-chat-card mb-3">
             <div class="flex-between mb-2">
               <div style="display:flex; align-items:center; gap:6px;">
@@ -369,7 +371,6 @@
             </div>
           </div>
 
-          <!-- Ломбард -->
           <div class="glass-card mb-3">
             <div class="flex-between mb-1">
               <h3 class="color-red"><i class="fa-solid fa-hand-holding-dollar"></i> Ломбард</h3>
@@ -386,16 +387,14 @@
             </div>
           </div>
 
-          <!-- Рацион питания -->
           <div class="glass-card mb-3">
             <h3 class="color-green mb-1"><i class="fa-solid fa-utensils"></i> Рацион питания</h3>
             <div class="space-y-2" id="dietList"></div>
           </div>
         </section>
 
-        <!-- 7. TAB: ФОРТУНА (Колесо + Наперстки + Клуб 21) -->
+        <!-- 7. TAB: ФОРТУНА -->
         <section id="tabServices" class="tab-screen">
-          <!-- 1. Колесо Фортуны (Вилспин) -->
           <div class="glass-card text-center mb-3">
             <div class="flex-between mb-2">
               <h3 class="font-bold color-amber"><i class="fa-solid fa-dharmachakra"></i> Колесо Фортуны</h3>
@@ -411,7 +410,6 @@
             </div>
           </div>
 
-          <!-- 2. Вокзальные Напёрстки (Выигрыш x2) -->
           <div class="glass-card mb-3" id="thimblesGameCard">
             <div class="flex-between mb-2">
               <h3 class="color-amber font-bold"><i class="fa-solid fa-hat-wizard"></i> Вокзальные Напёрстки</h3>
@@ -443,7 +441,6 @@
             <div id="thimblesResultText" class="text-center text-xs font-bold color-cyan">Выберите любой напёрсток!</div>
           </div>
 
-          <!-- 3. Подпольный Клуб 21 (Перенесён под колесо) -->
           <div class="glass-card mb-3" id="casinoCardContainer">
             <div class="flex-between mb-1">
               <h3 class="color-red font-bold"><i class="fa-solid fa-cards"></i> Подпольный Клуб «21»</h3>
@@ -482,7 +479,6 @@
             </div>
           </div>
 
-          <!-- Городская АЗС и Adsgram -->
           <div class="glass-card mb-3">
             <h4 class="mb-2"><i class="fa-solid fa-gas-pump color-cyan"></i> Городская АЗС</h4>
             <div class="grid-2">
@@ -496,7 +492,7 @@
           </div>
         </section>
 
-        <!-- 8. TAB: СТРИТ И ДРАГ-РЕЙСИНГ + МЕРОПРИЯТИЯ -->
+        <!-- 8. TAB: СТРИТ И ДРАГ-РЕЙСИНГ -->
         <section id="tabStreet" class="tab-screen">
           <div class="glass-card mb-3">
             <div class="flex-between mb-2">
@@ -557,7 +553,7 @@
               <h3 class="color-amber font-bold"><i class="fa-solid fa-masks-theater"></i> Стрит-Мероприятия</h3>
               <span class="tag-badge bg-tag-amber">Ивенты</span>
             </div>
-            <p class="sub-label mb-2">Участвуйте в городских авто-событиях с риском облав ДПС и проверкой 12.5.1!</p>
+            <p class="sub-label mb-2">Участвуйте в городских событиях при соблюдении технического регламента!</p>
             <div id="streetEventsContainer" class="space-y-2"></div>
           </div>
         </section>
@@ -586,8 +582,8 @@
           <div class="grid-4 mb-3">
             <button onclick="switchShopSection('tools')" id="shopTab-tools" class="btn btn-cyan btn-sm">Приборы</button>
             <button onclick="switchShopSection('consumables')" id="shopTab-consumables" class="btn btn-dark btn-sm">Сырьё</button>
-            <button onclick="switchShopSection('plates')" id="shopTab-plates" class="btn btn-dark btn-sm">Номера</button>
-            <button onclick="switchShopSection('supplies')" id="shopTab-supplies" class="btn btn-dark btn-sm">Еда</button>
+            <button onclick="switchShopSection('tuningParts')" id="shopTab-tuningParts" class="btn btn-dark btn-sm">Тюнинг</button>
+            <button onclick="switchShopSection('homeItems')" id="shopTab-homeItems" class="btn btn-dark btn-sm">Дом/Уют</button>
           </div>
 
           <div id="shopSec-tools">
@@ -602,24 +598,23 @@
 
           <div id="shopSec-consumables" style="display:none;">
             <div class="glass-card mb-2">
-              <h4 class="color-amber">Сырьё и расходники для предприятий</h4>
-              <p class="sub-label">Без сырья ваши предприятия перестают генерировать выручку!</p>
+              <h4 class="color-amber">Сырьё для бизнеса</h4>
             </div>
             <div id="shopConsumablesList" class="space-y-2 mb-3"></div>
           </div>
 
-          <div id="shopSec-plates" style="display:none;">
+          <div id="shopSec-tuningParts" style="display:none;">
             <div class="glass-card mb-2">
-              <h4 class="color-amber">Витрина Госномеров</h4>
+              <h4 class="color-red">Спортивные запчасти & Лицензии</h4>
             </div>
-            <div id="plateMarketListDetailed" class="space-y-2 mb-3"></div>
+            <div id="shopTuningPartsList" class="space-y-2 mb-3"></div>
           </div>
 
-          <div id="shopSec-supplies" style="display:none;">
+          <div id="shopSec-homeItems" style="display:none;">
             <div class="glass-card mb-2">
-              <h4 class="color-green">Перекус в дорогу</h4>
+              <h4 class="color-green">Мебель, приставки и уют для дома</h4>
             </div>
-            <div id="shopSuppliesList" class="space-y-2 mb-3"></div>
+            <div id="shopHomeItemsList" class="space-y-2 mb-3"></div>
           </div>
         </section>
         
@@ -650,18 +645,19 @@
           </div>
         </section>
         
-        <!-- 13. TAB: САРАИ -->
+        <!-- 13. TAB: САРАИ (ПЕРЕРАБОТАННЫЕ ГРЕЙДЫ) -->
         <section id="tabBarn" class="tab-screen">
           <div class="glass-card mb-3">
             <div class="flex-between mb-2">
               <h3><i class="fa-solid fa-screwdriver-wrench color-amber"></i> Гаражные Находки</h3>
               <span class="tag-badge bg-tag-amber">1 раз в день</span>
             </div>
+            <p class="sub-label mb-2">Поиск забытых авто в сараях и ангарах. Шанс найти редкую классику и блатные номера!</p>
             <div id="barnFindContent"></div>
           </div>
         </section>
         
-        <!-- 14. TAB: ЖИЛЬЁ -->
+        <!-- 14. TAB: ЖИЛЬЁ (С УЛУЧШЕНИЕМ СОБСТВЕННОГО ЖИЛЬЯ) -->
         <section id="tabHousing" class="tab-screen">
           <div class="glass-card mb-2">
             <div class="flex-between">
@@ -678,7 +674,6 @@
             <h3 id="profileTgUsername">Перекуп #777</h3>
             <p class="sub-label mb-2" id="profPlayerRank">Статус: Гаражный Делец</p>
             
-            <!-- КНОПКА ОТКРЫТИЯ СПИСКА ИЗМЕНЕНИЙ И ТИТРОВ -->
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
               <i class="fa-solid fa-sparkles"></i> Список изменений v0.3.3.4 & Команда
             </button>
@@ -706,7 +701,6 @@
             </div>
           </div>
 
-          <!-- Пульт регулировки ресурсов (+/-) -->
           <div class="glass-card mb-3">
             <div class="flex-between mb-2">
               <h4 class="color-amber font-bold"><i class="fa-solid fa-sliders"></i> Управление балансом и параметрами</h4>
@@ -792,7 +786,7 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА -->
-    <!-- СПИСОК ИЗМЕНЕНИЙ v0.3.3.4 И КОМАНДА РАЗРАБОТЧИКОВ -->
+    <!-- ОКНО СПИСКА ИЗМЕНЕНИЙ И КОМАНДЫ РАЗРАБОТЧИКОВ -->
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -810,22 +804,19 @@
 
         <div class="space-y-2 text-xs mb-3" style="line-height:1.4;">
           <div class="patch-item">
-            <b class="color-cyan">✓ Интерактивная витрина классов:</b> сетка 3×3 с финансовой аналитикой и иконками техники.
+            <b class="color-cyan">✓ Интерактивный Тюнинг:</b> регламенты для Дрифта (выворот, заварка, гидроручник) и Драга (каркас, слики, лицензия РАФ).
           </div>
           <div class="patch-item">
-            <b class="color-green">✓ Доступность мото и квадроциклов:</b> открытие Мото снижено до 5 ур., Квадро — до 8 ур.!
+            <b class="color-amber">✓ Обустройство Жилья:</b> покупка PlayStation 5, мебели и декора в собственное жилье для буста настроения!
           </div>
           <div class="patch-item">
-            <b class="color-amber">✓ Экономика блатных номеров:</b> продавцы теперь знают ценность «красивых» номеров и не продают их даром.
+            <b class="color-green">✓ Баланс Драг-рейсинга:</b> равная мощность соперников, кулдаун остывания мотора и облавы ДПС при частых заездах.
           </div>
           <div class="patch-item">
-            <b class="color-red">✓ Драг-рейсинг и облавы:</b> кулдаун остывания мотора и ограничение до 10-15 заездов перед облавой ДПС.
+            <b class="color-purple">✓ 4 Грейда Сараев:</b> от деревенских находок до элитных ангаров с капсулами времени.
           </div>
           <div class="patch-item">
-            <b class="color-purple">✓ Стрит-Мероприятия:</b> сходки, автошоу и дрифт с риском аннулирования учёта по 12.5.1.
-          </div>
-          <div class="patch-item">
-            <b class="color-cyan">✓ Интерактивный Бизнес:</b> шкалы прокачки и закупка сырья/расходников.
+            <b class="color-red">✓ Честные продавцы номеров:</b> авто с блатными номерами продаются по рыночной цене с шансом 3% на находку!
           </div>
         </div>
 
@@ -843,7 +834,53 @@
       </div>
     </div>
 
-    <!-- 1. ЗВОНОК И ТОРГ ПРИ ПОКУПКЕ -->
+    <!-- МОДАЛЬНОЕ ОКНО: ОБУСТРОЙСТВО И УЛУЧШЕНИЕ ДОМА -->
+    <div id="modalHomeInterior" class="modal-overlay">
+      <div class="modal-box">
+        <div class="flex-between mb-2">
+          <h4 class="color-cyan font-bold"><i class="fa-solid fa-couch"></i> Обустройство дома</h4>
+          <button onclick="closeModal('modalHomeInterior')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div id="homeInteriorHeader" class="text-xs color-amber mb-2">Собственная недвижимость</div>
+        <div id="homeInteriorItemsList" class="space-y-2 mb-3"></div>
+        <button onclick="closeModal('modalHomeInterior')" class="btn btn-dark w-full">Закрыть</button>
+      </div>
+    </div>
+
+    <!-- МОДАЛЬНОЕ ОКНО: РАСШИРЕННЫЙ СПОРТИВНЫЙ ТЮНИНГ -->
+    <div id="modalTuning" class="modal-overlay">
+      <div class="modal-box" style="max-width: 420px;">
+        <div class="flex-between mb-2">
+          <h4 class="color-cyan font-bold"><i class="fa-solid fa-screwdriver-wrench"></i> Спортивный Тюнинг</h4>
+          <button onclick="closeModal('modalTuning')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        
+        <div id="tuneCarTitle" class="text-xs color-amber mb-2 font-bold">Автомобиль</div>
+        
+        <div class="risk-meter-box mb-2">
+          <div class="flex-between text-xs">
+            <span>Риск по ст. 12.5.1 КоАП:</span>
+            <b id="tuneRiskValue" class="color-amber">0%</b>
+          </div>
+          <div class="risk-track">
+            <div id="tuneRiskFill" class="risk-fill risk-low" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <!-- Табы категорий тюнинга -->
+        <div class="grid-3 mb-2">
+          <button onclick="switchTuneTab('drag')" id="tuneTab-drag" class="btn btn-cyan btn-sm">🏁 Драг</button>
+          <button onclick="switchTuneTab('drift')" id="tuneTab-drift" class="btn btn-dark btn-sm">💨 Дрифт</button>
+          <button onclick="switchTuneTab('style')" id="tuneTab-style" class="btn btn-dark btn-sm">✨ Стенс/Шоу</button>
+        </div>
+
+        <div id="tuningItemsContainer" class="space-y-2 mb-3" style="max-height: 240px; overflow-y: auto;"></div>
+        
+        <button onclick="closeModal('modalTuning')" class="btn btn-cyan w-full">Готово</button>
+      </div>
+    </div>
+
+    <!-- ДРУГИЕ МОДАЛКИ (БЕЗ ИЗМЕНЕНИЙ) -->
     <div id="modalMarketDeal" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -875,7 +912,6 @@
       </div>
     </div>
 
-    <!-- 2. ИНТЕРАКТИВНЫЙ ТОРГ ПРИ ПРОДАЖЕ -->
     <div id="modalHaggleSale" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -888,7 +924,6 @@
           </div>
           <button onclick="closeModal('modalHaggleSale')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
-        
         <div class="deal-car-preview-card mb-2">
           <img id="saleCarImg" src="" class="deal-car-thumb">
           <div style="flex:1;">
@@ -897,11 +932,9 @@
             <div class="price-val text-xs color-green" id="saleBuyerOfferVal">0 ₽</div>
           </div>
         </div>
-
         <div class="chat-thread-container mb-2" id="saleHaggleChatThread">
           <div class="chat-msg msg-seller" id="saleBuyerGreetingMsg">«Машина интересная. Но цену надо обсудить...»</div>
         </div>
-
         <div class="risk-meter-box mb-2">
           <div class="flex-between text-xs">
             <span>Терпение покупателя:</span>
@@ -911,16 +944,10 @@
             <div id="saleBuyerPatienceFill" class="risk-fill risk-low" style="width: 100%;"></div>
           </div>
         </div>
-
         <div class="space-y-2 mb-3">
-          <button onclick="attemptHaggleSale('safe')" class="btn btn-dark w-full">
-            🛡 Обосновать по кузову (+2% | Риск 15%)
-          </button>
-          <button onclick="attemptHaggleSale('firm')" class="btn btn-dark w-full">
-            🔥 Давить на эксклюзив (+6% | Риск 45%)
-          </button>
+          <button onclick="attemptHaggleSale('safe')" class="btn btn-dark w-full">🛡 Обосновать по кузову (+2% | Риск 15%)</button>
+          <button onclick="attemptHaggleSale('firm')" class="btn btn-dark w-full">🔥 Давить на эксклюзив (+6% | Риск 45%)</button>
         </div>
-
         <div class="grid-2">
           <button onclick="confirmSaleFromHaggleModal()" class="btn btn-green">Продать по текущей 🤝</button>
           <button onclick="closeModal('modalHaggleSale')" class="btn btn-dark">Назад к лоту</button>
@@ -928,7 +955,6 @@
       </div>
     </div>
 
-    <!-- 3. ИНТЕРАКТИВНЫЙ И КРАСИВЫЙ ОТЧЁТ «АВТОТЕКА» -->
     <div id="modalAutoteka" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -1087,14 +1113,6 @@
       </div>
     </div>
 
-    <div id="modalTuning" class="modal-overlay">
-      <div class="modal-box">
-        <h4 class="text-center mb-2">🛠 Тюнинг</h4>
-        <div id="tuningItemsContainer" class="space-y-2 mb-3"></div>
-        <button onclick="closeModal('modalTuning')" class="btn btn-cyan w-full">Готово</button>
-      </div>
-    </div>
-
     <div id="modalGauge" class="modal-overlay">
       <div class="modal-box">
         <h4 class="text-center mb-2">Замер ЛКП</h4>
@@ -1135,12 +1153,12 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ (СТРОГИЙ ПОРЯДОК: СНАЧАЛА МОДУЛИ, В КОНЦЕ APP.JS) -->
-    <script src="js/market.js?v=60"></script>
-    <script src="js/garage.js?v=60"></script>
-    <script src="js/salesLot.js?v=60"></script>
-    <script src="js/life.js?v=60"></script>
-    <script src="js/syndicate.js?v=60"></script>
-    <script src="js/app.js?v=60"></script>
+    <script src="js/market.js?v=70"></script>
+    <script src="js/garage.js?v=70"></script>
+    <script src="js/salesLot.js?v=70"></script>
+    <script src="js/life.js?v=70"></script>
+    <script src="js/syndicate.js?v=70"></script>
+    <script src="js/app.js?v=70"></script>
 
   </body>
 </html>
