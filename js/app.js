@@ -1,6 +1,8 @@
-// ===================== ЯДРО ИГРЫ И СОСТОЯНИЕ (js/app.js) =====================
+// ========================================================
+// js/app.js — ЯДРО ИГРЫ, СОСТОЯНИЕ, ГОНКИ И СОБЫТИЯ (v0.3.3.5)
+// ========================================================
 
-const CURRENT_GAME_VERSION = "v0.3.3.4";
+const CURRENT_GAME_VERSION = "v0.3.3.5";
 
 let ACtx = window.AudioContext;
 if (!ACtx) ACtx = window.webkitAudioContext;
@@ -154,7 +156,7 @@ function dismissPatchNotesModal() {
     } catch(e) {}
 }
 
-const SAVE_KEY = 'perekoop_sim_save_v90_clean';
+const SAVE_KEY = 'perekoop_sim_save_v105_release';
 
 const DEFAULT_STATE = {
     player: { 
@@ -201,12 +203,12 @@ function getTotalGarageSlots() {
     if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
         if (state.player && state.player.housingId) {
             const house = HOUSING_LIST.find(h => h.id === state.player.housingId); 
-            if (house) slots += house.slots;
+            if (house) slots += (house.slots || 0);
         }
         if (state.player && state.player.ownedHouses && Array.isArray(state.player.ownedHouses)) {
            state.player.ownedHouses.forEach(hId => { 
                const oh = HOUSING_LIST.find(h => h.id === hId); 
-               if (oh) slots += oh.slots; 
+               if (oh) slots += (oh.slots || 0); 
            }); 
         }
     }
@@ -539,7 +541,7 @@ function switchTab(tabId) {
     }
     
     if (tabId === 'tabBusiness' && typeof checkBusinessAccess === 'function') checkBusinessAccess();
-    if (tabId === 'tabShop' && typeof renderShopTools === 'function') renderShopTools();
+    if (tabId === 'tabShop' && typeof switchShopSection === 'function') switchShopSection('tools');
     if (tabId === 'tabReshala' && typeof checkReshalaAccess === 'function') checkReshalaAccess();
     if (tabId === 'tabContainers' && typeof renderContainersList === 'function') renderContainersList();
     if (tabId === 'tabContracts' && typeof renderContracts === 'function') renderContracts();
@@ -669,7 +671,6 @@ function launchDragRace() {
     if (car.unregistered) return showToast("🚫 Авто снято с учёта! Поставьте на учёт в гараже.");
     if (car.impounded) return showToast("🚨 Автомобиль на штрафстоянке! Сначала вызволите его.");
 
-    // ПРОВЕРКА РЕГЛАМЕНТА ДРАГА: ЛИЦЕНЗИЯ РАФ И КАРКАС ДЛЯ МОЩНЫХ МАШИН
     let carHp = car.power ? car.power : 100;
     if (carHp > 220 && !state.player.hasRacingLicense) {
         return showToast("🔒 Требуется лицензия пилота РАФ для машин свыше 220 л.с.! Оформите у Решалы.");
@@ -681,7 +682,6 @@ function launchDragRace() {
     let fuel = (state.player && state.player.fuel) ? state.player.fuel : 0;
     if (fuel < 10) return showToast("Нужно 10 ⛽ бензина для заезда!");
 
-    // ПРОВЕРКА ПОЛИЦЕЙСКОЙ ОБЛАВЫ
     let hasImmunity = (state.player && state.player.policeImmunityDays && state.player.policeImmunityDays > 0);
     state.player.consecutiveRaces = (state.player.consecutiveRaces || 0) + 1;
     let maxRaces = (state.player && state.player.maxRacesBeforeRaid) ? state.player.maxRacesBeforeRaid : 12;
@@ -697,7 +697,7 @@ function launchDragRace() {
         if (hasIllegalTune) car.unregistered = true;
 
         saveState();
-        renderGarage();
+        if (typeof renderGarage === 'function') renderGarage();
         updateRaceHeatBadge();
         tgHaptic('error');
 
@@ -715,13 +715,12 @@ function launchDragRace() {
     isRaceRunning = true;
     playEngineSound();
 
-    // ПОДБОР СОПЕРНИКА: ПРАКТИЧЕСКИ РАВНАЯ МОЩНОСТЬ (96% - 104%)
     let playerHp = car.power ? car.power : 100;
     const rivalHp = Math.round(playerHp * (0.96 + Math.random() * 0.08));
 
     let isPerfectLaunch = (tachoRpm >= 5500 && tachoRpm <= 6500);
     let launchBonus = isPerfectLaunch ? 18 : (tachoRpm > 7200 ? -15 : 0);
-    if (car.tuning && car.tuning.dragSlicks) launchBonus += 10; // Бонус за слики
+    if (car.tuning && car.tuning.dragSlicks) launchBonus += 10;
 
     setTxt('raceStatusText', isPerfectLaunch ? '🔥 ИДЕАЛЬНЫЙ ЛАНЧ-СТАРТ!' : '🚦 Заезд начался!');
 
@@ -754,7 +753,7 @@ function launchDragRace() {
                 addXp(30);
                 saveState();
                 updateHeaderUI();
-                openVerdictModal("ПОБЕДА НА 402М! 🏁", "Вы обогнали равного соперника на финише: +" + prize.toLocaleString() + " ₽!", true, prize);
+                openVerdictModal("ПОБЕДА НА 402М! 🏁", "Вы обогнали соперника на финише: +" + prize.toLocaleString() + " ₽!", true, prize);
             } else {
                 let mood = (state.player && state.player.mood) ? state.player.mood : 80;
                 state.player.mood = Math.max(0, mood - 15);
@@ -877,7 +876,6 @@ function participateInStreetEvent(eventId) {
     if (car.unregistered) return showToast("🚫 Авто снято с учёта! Восстановите регистрацию.");
     if (car.impounded) return showToast("🚨 Авто на штрафстоянке! Вызволите его перед выездом.");
 
-    // ПРОВЕРКА РЕГЛАМЕНТА ДРИФТА
     if (eventId === 'drift') {
         let t = car.tuning ? car.tuning : {};
         if (!t.hydroHandbrake || !t.weldedDiff || !t.steeringAngle) {
@@ -951,14 +949,14 @@ function participateInStreetEvent(eventId) {
                 car.impoundedDays = 1;
                 car.impoundFine = 45000;
                 saveState();
-                renderGarage();
+                if (typeof renderGarage === 'function') renderGarage();
                 openVerdictModal("УЧЁТ АННУЛИРОВАН! 🚨", "Облава спецбатальона! За нелегальный дрифт и агрессивный тюнинг регистрация «" + car.name + "» АННУЛИРОВАНА, а машина отправлена на штрафстоянку!", false);
             } else {
                 car.impounded = true;
                 car.impoundedDays = 1;
                 car.impoundFine = 30000;
                 saveState();
-                renderGarage();
+                if (typeof renderGarage === 'function') renderGarage();
                 openVerdictModal("ЭВАКУАЦИЯ НА ШТРАФСТОЯНКУ! 🚔", "ДПС перекрыли выезды с площадки! «" + car.name + "» эвакуирован на штрафстоянку за опасное вождение.", false);
             }
         } else {
