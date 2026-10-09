@@ -579,7 +579,7 @@ function attemptMarketHaggle(percent) {
     
     successChance += (lvl * 0.5);
     if (karma > 60) successChance += 10;
-    if (car.type === 'premium' || car.type === 'hyper') successChance -= 15; // Сложно торговаться с владельцами дорогих авто
+    if (car.type === 'premium' || car.type === 'hyper') successChance -= 15;
 
     car.haggled = true; 
     const hArea = document.getElementById("dealHaggleArea");
@@ -618,7 +618,7 @@ function confirmMarketPurchaseSuccess() {
     const car = pendingMarketCar.car;
     const carIndex = pendingMarketCar.carIndex;
     
-    const maxSlots = getTotalGarageSlots(); 
+    const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2; 
     let currentSlots = state.garage ? state.garage.length : 0;
 
     if (currentSlots >= maxSlots) return showToast("Гараж полон! Вместимость: " + maxSlots + " мест.");
@@ -651,18 +651,18 @@ function confirmMarketPurchaseSuccess() {
     }
     
     pendingMarketCar = null; 
-    addXp(40);
+    if (typeof addXp === 'function') addXp(40);
     
     let carName = car.name ? car.name : "Авто";
     showToast("✅ " + carName + " куплен за " + price.toLocaleString() + " ₽!"); 
     playSound('win'); 
     tgHaptic('success'); 
-    spawnFloatingReward("-" + price.toLocaleString() + " ₽");
+    if (typeof spawnFloatingReward === 'function') spawnFloatingReward("-" + price.toLocaleString() + " ₽");
     
     saveState(); 
     renderMarketFeed(); 
-    renderGarage(); 
-    setTimeout(() => { switchTab("tabGarage"); }, 350);
+    if (typeof renderGarage === 'function') renderGarage(); 
+    setTimeout(() => { if (typeof switchTab === 'function') switchTab("tabGarage"); }, 350);
 }
 
 function openGaugeModal(carId) { 
