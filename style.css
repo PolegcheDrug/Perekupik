@@ -395,7 +395,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   КАРТОЧКИ
+   КАРТОЧКИ И ПАНЕЛЬ КЛАССОВ ТЕХНИКИ
    ======================================================== */
 .glass-card {
   background: var(--bg-card);
@@ -422,6 +422,111 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .glass-card.item-locked {
   filter: grayscale(0.85);
   opacity: 0.65;
+}
+
+/* ОБНОВЛЕННАЯ СЕТКА КЛАССОВ ТЕХНИКИ */
+.market-filter-card {
+  padding: 12px;
+  background: radial-gradient(circle at 50% 0%, #151f33 0%, #090e18 100%);
+  border: 1px solid rgba(0, 242, 254, 0.2);
+}
+
+.category-header-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(0, 242, 254, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  font-size: 15px;
+}
+
+.market-categories-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.cat-tile {
+  background: #0d1424;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 4px 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  outline: none;
+}
+
+.cat-tile:active {
+  transform: scale(0.96);
+}
+
+.cat-tile-icon {
+  font-size: 18px;
+  color: var(--text-sub);
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.cat-tile-name {
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.2px;
+}
+
+.cat-tile-sub {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-sub);
+}
+
+.cat-tile.active {
+  background: linear-gradient(145deg, rgba(0, 242, 254, 0.25), rgba(2, 132, 199, 0.35));
+  border-color: var(--cyan);
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.35);
+}
+
+.cat-tile.active .cat-tile-icon {
+  color: var(--cyan);
+  transform: scale(1.15);
+}
+
+.cat-tile.active .cat-tile-sub {
+  color: #a5f3fc;
+}
+
+.cat-tile.locked {
+  background: #080c14;
+  border-color: rgba(255, 255, 255, 0.04);
+  opacity: 0.6;
+}
+
+.cat-tile.locked .cat-tile-icon {
+  color: #475569;
+}
+
+.cat-tile.locked .cat-tile-name {
+  color: #94a3b8;
+}
+
+.cat-tile.locked .cat-tile-sub {
+  color: #f87171;
+}
+
+.cat-info-banner {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px dashed rgba(0, 242, 254, 0.25);
+  border-radius: 8px;
+  padding: 8px 10px;
 }
 
 .barn-tier-card {
@@ -458,40 +563,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 
 .timer-clock { font-size: 26px; font-weight: 900; color: var(--amber); margin-bottom: 6px; }
 .timer-text { font-size: 11px; color: #fff; font-weight: bold; margin-bottom: 10px; }
-
-.market-categories-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-.cat-chip {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 18px;
-  padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--text-sub);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  text-transform: uppercase;
-}
-
-.cat-chip.active {
-  background: linear-gradient(135deg, var(--cyan), #0284c7);
-  color: #000;
-  border-color: transparent;
-}
-
-.cat-chip.locked {
-  opacity: 0.5;
-  cursor: not-allowed;
-  filter: grayscale(1);
-}
 
 /* ========================================================
    КНОПКИ
