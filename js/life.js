@@ -1,9 +1,132 @@
 // ========================================================
-// js/life.js — ЖИЗНЬ, БИЗНЕС, САРАИ, ЖИЛЬЁ, ПОРТ, МАРКЕТ, КОЛЕСО (v0.4.0)
+// js/life.js — ЖИЗНЬ, БИЗНЕС, САРАИ, ЖИЛЬЁ, МАГАЗИН, ПОРТ, КОЛЕСО (v0.4.0)
 // ========================================================
 
 // ========================================================
-// 1. РЕШАЛА АРТУР (СВЯЗИ, КРЫША, ЛЕГАЛИЗАЦИЯ VIN, ЛИЦЕНЗИЯ РАФ)
+// 1. МАГАЗИН (ПРИБОРЫ, СЫРЬЁ, ТЮНИНГ, ДОМ) - ИСПРАВЛЕННЫЙ
+// ========================================================
+const SHOP_CATALOG = {
+    tools: [
+        { id: "gauge", name: "Базовый толщиномер ЛКП", cost: 15000, desc: "Определяет толщину краски и шпатлевки на кузове. Обязателен для осмотра." },
+        { id: "obd", name: "Сканер OBD-II (ELM327)", cost: 25000, desc: "Считывает ошибки ЭБУ, показывает износ двигателя и КПП. Экономит деньги на СТО." },
+        { id: "endoscope", name: "Эндоскоп для цилиндров", cost: 45000, desc: "Позволяет заглянуть в цилиндры и увидеть задиры до покупки (скоро)." },
+        { id: "compressor", name: "Компрессометр", cost: 18000, desc: "Замеряет компрессию, выявляет мертвые моторы." }
+    ],
+    consumables: [
+        { id: "oil", name: "Моторное масло (Бочка 200л)", cost: 35000, desc: "Сырье для бесперебойной работы СТО. Заполняет склад." },
+        { id: "polish", name: "Полировальная паста (Набор)", cost: 12000, desc: "Сырье для Детейлинга. Хватает надолго." },
+        { id: "shampoo", name: "Автошампунь (Концентрат 50л)", cost: 8000, desc: "Сырье для Автомойки." },
+        { id: "parts", name: "Контрактные запчасти (Паллета)", cost: 85000, desc: "Для активной работы Авторазборки." }
+    ],
+    tuningParts: [
+        { id: "chip_pro", name: "Программатор ЭБУ (Чип-Тюнинг)", cost: 120000, desc: "Позволяет самостоятельно прошивать авто (Stage 1-3) прямо в гараже." },
+        { id: "toolbox", name: "Профессиональный набор ключей", cost: 65000, desc: "Снижает стоимость установки тюнинга на 25%." }
+    ],
+    homeItems: [
+        { id: "home_ps5", name: "Игровая консоль PlayStation 5", cost: 75000, desc: "+25% настроения и куража каждый день" },
+        { id: "home_leather_sofa", name: "Кожаный итальянский диван", cost: 120000, desc: "+15% к восстановлению сил и сытости" },
+        { id: "home_cinema_audio", name: "Домашний кинотеатр 4K", cost: 250000, desc: "+35% настроения и статус перед гостями" },
+        { id: "home_safe_valberg", name: "Огнеупорный сейф перекупа", cost: 180000, desc: "Защита заначки от проверок и облав" }
+    ]
+};
+
+function switchShopSection(section) {
+    ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
+        const btn = document.getElementById('shopTab-' + s);
+        const sec = document.getElementById('shopSec-' + s);
+        if (btn) {
+            btn.className = (s === section) ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
+        }
+        if (sec) {
+            sec.style.display = (s === section) ? 'block' : 'none';
+        }
+    });
+
+    renderShopItems(section);
+}
+
+function renderShopItems(section) {
+    let listId = 'shopToolsList';
+    if (section === 'consumables') listId = 'shopConsumablesList';
+    if (section === 'tuningParts') listId = 'shopTuningPartsList';
+    if (section === 'homeItems') listId = 'shopHomeItemsList';
+
+    const list = document.getElementById(listId);
+    if (!list) return;
+
+    const items = SHOP_CATALOG[section] || [];
+    if (items.length === 0) {
+        list.innerHTML = "<div class='sub-label text-center py-2'>В этом разделе пока пусто.</div>";
+        return;
+    }
+
+    let html = "";
+    items.forEach(item => {
+        let isBought = false;
+        if (section === 'tools' && state.player.tools && state.player.tools[item.id]) isBought = true;
+        if (section === 'homeItems' && state.player.furniture && state.player.furniture.includes(item.id)) isBought = true;
+        if (section === 'tuningParts' && state.player.tools && state.player.tools[item.id]) isBought = true;
+
+        let btnHtml = "";
+        if (isBought) {
+            btnHtml = "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Куплено ✓</button>";
+        } else {
+            btnHtml = "<button onclick=\"buyShopItem('" + section + "', '" + item.id + "', " + item.cost + ")\" class='btn btn-green btn-sm btn-auto'>Купить (" + item.cost.toLocaleString() + " ₽)</button>";
+        }
+
+        html += 
+        "<div class='glass-card flex-between p-2 mb-2'>" +
+            "<div>" +
+                "<b class='text-xs color-cyan'>" + item.name + "</b>" +
+                "<div class='sub-label' style='font-size:10px;'>" + item.desc + "</div>" +
+            "</div>" +
+            btnHtml +
+        "</div>";
+    });
+
+    list.innerHTML = html;
+}
+
+function buyShopItem(section, itemId, cost) {
+    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
+    if (cash < cost) return showToast("Не хватает денег на покупку!");
+
+    if (section === 'consumables') {
+        let added = false;
+        if (state.businesses) {
+            state.businesses.forEach(b => {
+                if (b.level > 0 && b.stock < 100) {
+                    b.stock = Math.min(100, b.stock + 50);
+                    added = true;
+                }
+            });
+        }
+        if (!added) return showToast("У вас нет активных предприятий, требующих пополнения сырья!");
+        state.player.cash -= cost;
+        showToast("Сырье успешно распределено по складам ваших предприятий!");
+    } else {
+        state.player.cash -= cost;
+        if (section === 'tools' || section === 'tuningParts') {
+            if (!state.player.tools) state.player.tools = {};
+            state.player.tools[itemId] = true;
+            showToast("Инструмент куплен и добавлен в Арсенал!");
+        } else if (section === 'homeItems') {
+            if (!state.player.furniture) state.player.furniture = [];
+            state.player.furniture.push(itemId);
+            showToast("Предмет интерьера куплен! Доступен в вашем жилье.");
+        }
+    }
+
+    saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
+    renderShopItems(section);
+    playSound('win');
+    tgHaptic('success');
+}
+
+
+// ========================================================
+// 2. РЕШАЛА АРТУР (СВЯЗИ, КРЫША, ЛЕГАЛИЗАЦИЯ VIN, ЛИЦЕНЗИЯ РАФ)
 // ========================================================
 function buyReshalaPack(type) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -20,7 +143,7 @@ function buyReshalaPack(type) {
         showToast("Оптовый пакет связей (+5 🤝) активирован!");
     }
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
 }
 
 function checkReshalaAccess() {
@@ -117,7 +240,7 @@ function buyReshalaService(service) {
         state.player.hasRacingLicense = true;
         saveState();
         checkReshalaAccess();
-        updateHeaderUI();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         playSound('win');
         tgHaptic('success');
         openVerdictModal("ЛИЦЕНЗИЯ ПИЛОТА РАФ! 🏎️", "Официальный допуск пилота к заездам 402м получен!", true);
@@ -181,7 +304,7 @@ function confirmLegalizeCar(carId) {
 }
 
 // ========================================================
-// 2. ИНТЕРАКТИВНЫЙ БИЗНЕС
+// 3. ИНТЕРАКТИВНЫЙ БИЗНЕС
 // ========================================================
 function checkBusinessAccess() {
     const lock = document.getElementById('businessLockCover');
@@ -324,7 +447,7 @@ function collectAllBusinessCash() {
 }
 
 // ========================================================
-// 3. САРАИ
+// 4. САРАИ
 // ========================================================
 const BARN_TIERS_CONFIG = [
     { tier: 1, reqLvl: 1, cost: 35000, title: "🏚️ Сарай в СНТ «Заря»", desc: "Дачный кооператив. Советская классика.", classGrade: "barn-grade-1", rareIdx: 0 },
@@ -444,7 +567,7 @@ function scoutBarnTier(tier) {
 }
 
 // ========================================================
-// 4. НЕДВИЖИМОСТЬ И ОБУСТРОЙСТВО
+// 5. НЕДВИЖИМОСТЬ И ОБУСТРОЙСТВО
 // ========================================================
 function renderHousing() {
     const list = document.getElementById('housingMarketList');
@@ -529,7 +652,7 @@ function rentHousing(hId) {
     state.player.housingType = 'rent';
     saveState();
     renderHousing();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     showToast("Вы переехали в арендованное жилье!");
 }
 
@@ -549,7 +672,7 @@ function buyHousingProperty(hId) {
 
     saveState();
     renderHousing();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     playSound('win');
     tgHaptic('success');
     openVerdictModal("НОВОСЕЛЬЕ! 🍾", "Вы выкупили «" + h.name + "» в собственность!", true);
@@ -560,7 +683,7 @@ function moveIntoHousing(hId) {
     state.player.housingType = 'own';
     saveState();
     renderHousing();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     showToast("Вы переехали в собственное жилье!");
 }
 
@@ -609,7 +732,7 @@ function buyHomeFurniture(fId, cost) {
     state.player.furniture.push(fId);
 
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     playSound('win');
     tgHaptic('success');
     showToast("Куплено и установлено в вашем доме!");
@@ -619,7 +742,7 @@ function buyHomeFurniture(fId, cost) {
 }
 
 // ========================================================
-// 5. ПОРТОВЫЕ КОНТЕЙНЕРЫ И ТЕНЕВОЙ АУКЦИОН
+// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ И ТЕНЕВОЙ АУКЦИОН
 // ========================================================
 function renderContainersList() {
     const container = document.getElementById('containersListRender');
@@ -677,7 +800,7 @@ function openPortContainerAction(boxId, cost) {
         let winPrize = Math.round(cost * (1.35 + Math.random() * 0.65));
         state.player.cash += winPrize;
         saveState();
-        updateHeaderUI();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         playSound('win');
         tgHaptic('success');
         openVerdictModal("ТАМОЖЕННЫЙ ДЖЕКПОТ! 🚢", "В контейнере найден ценный зарубежный лот! Выручка: +" + winPrize.toLocaleString() + " ₽", true, winPrize);
@@ -685,11 +808,11 @@ function openPortContainerAction(boxId, cost) {
         let partValue = Math.round(cost * 0.75);
         state.player.cash += partValue;
         saveState();
-        updateHeaderUI();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         openVerdictModal("РАСПИЛ НА ЗАПЧАСТИ 🔩", "Кузов повреждён при доставке. Сдан на разбор: +" + partValue.toLocaleString() + " ₽", false);
     } else {
         saveState();
-        updateHeaderUI();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         tgHaptic('error');
         openVerdictModal("ТАМОЖЕННАЯ ПУСТЫШКА 💨", "В контейнере оказались только битые запчасти. Убыток: -" + cost.toLocaleString() + " ₽", false);
     }
@@ -770,7 +893,7 @@ function placeBlindBid() {
 
     closeModal('modalBlindAuction');
     if (typeof renderGarage === 'function') renderGarage();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
 
     let title = isTrash ? "КОТ В МЕШКЕ! 🗑️" : "ОТЛИЧНЫЙ ЛОТ! 🎉";
     let msg = "Под чехлом оказался «" + car.name + "». ";
@@ -792,7 +915,7 @@ function placeBlindBid() {
 }
 
 // ========================================================
-// 6. ЗАКАЗЫ СИНДИКАТА (ПРОВЕРКА УРОВНЯ И ОБОРУДОВАНИЯ)
+// 7. ЗАКАЗЫ СИНДИКАТА
 // ========================================================
 function generateContracts() {
     state.contracts = [
@@ -847,7 +970,7 @@ function refreshContractsManual() {
     state.player.cash -= 15000;
     generateContracts();
     renderContracts();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     showToast("База заказов обновлена!");
 }
 
@@ -873,13 +996,14 @@ function completeContract(contractId) {
     const surrenderedCar = state.garage[matchIdx];
     state.garage.splice(matchIdx, 1);
     state.player.cash = (state.player.cash || 0) + cnt.reward;
-    addXp(60);
+    
+    if (typeof addXp === 'function') addXp(60);
 
     state.contracts = state.contracts.filter(c => c.id !== contractId);
     if (state.contracts.length < 2) generateContracts();
 
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     renderContracts();
     if (typeof renderGarage === 'function') renderGarage();
     playSound('win');
@@ -888,7 +1012,7 @@ function completeContract(contractId) {
 }
 
 // ========================================================
-// 7. ЛОМБАРД, СМЕНА ДНЯ, РАЦИОН, АВТО-ПОДСТАВЫ
+// 8. ЛОМБАРД, СМЕНА ДНЯ, РАЦИОН, АВТО-ПОДСТАВЫ
 // ========================================================
 function takeLoan(amount) {
     let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
@@ -897,7 +1021,7 @@ function takeLoan(amount) {
     state.player.cash = (state.player.cash || 0) + (amount * 0.95);
     state.player.loanDebt = debt + amount;
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     showToast("Одобрено: " + amount.toLocaleString() + " ₽ (Комиссия 5%)");
 }
 
@@ -912,14 +1036,13 @@ function repayLoan(percent) {
     state.player.cash -= amt;
     state.player.loanDebt = Math.max(0, debt - amt);
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     showToast("Оплачено " + amt.toLocaleString() + " ₽ долга");
 }
 
-// АВТО-ПОДСТАВЫ
 function triggerRandomRoadEvent() {
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    if (lvl < 5) return; // Новичков не трогают
+    if (lvl < 5) return;
 
     if (Math.random() < 0.08) { 
         const modal = document.getElementById('modalAutoPodstava');
@@ -935,7 +1058,7 @@ function resolvePodstava(action) {
         let cost = Math.min(150000, cash);
         state.player.cash -= cost;
         state.player.mood = Math.max(0, (state.player.mood || 80) - 20);
-        saveState(); updateHeaderUI();
+        saveState(); if(typeof updateHeaderUI === 'function') updateHeaderUI();
         openVerdictModal("ВЫ ЗАПЛАТИЛИ РЭКЕТИРАМ", "Вы отдали " + cost.toLocaleString() + " ₽. Настроение испорчено.", false);
     } else if (action === 'reshala') {
         let conn = (state.player && state.player.connections) ? state.player.connections : 0;
@@ -945,16 +1068,16 @@ function resolvePodstava(action) {
             return;
         }
         state.player.connections -= 1;
-        saveState(); updateHeaderUI();
+        saveState(); if(typeof updateHeaderUI === 'function') updateHeaderUI();
         openVerdictModal("РЕШАЛА РАЗРУЛИЛ", "Один звонок Артуру, и «братки» с извинениями уехали. Связь потрачена.", true);
     } else if (action === 'fight') {
         let karma = (state.player && state.player.karma) ? state.player.karma : 50;
-        let winChance = karma > 70 ? 0.6 : 0.3; // Хорошая карма = тебя боятся
+        let winChance = karma > 70 ? 0.6 : 0.3; 
         
         if (Math.random() < winChance) {
             state.player.karma = Math.min(100, karma + 10);
             state.player.mood = Math.min(100, (state.player.mood || 50) + 20);
-            saveState(); updateHeaderUI();
+            saveState(); if(typeof updateHeaderUI === 'function') updateHeaderUI();
             openVerdictModal("ВЫ ДАЛИ ОТПОР!", "Вы достали монтировку и отстояли свою правоту. Мошенники сбежали! Карма и кураж выросли.", true);
         } else {
             state.player.mood = Math.max(0, (state.player.mood || 50) - 40);
@@ -964,7 +1087,7 @@ function resolvePodstava(action) {
                 car.condition = Math.max(10, car.condition - 30);
                 if(car.bodyThickness) { car.bodyThickness.doors = 300; car.bodyThickness.wings = 250; }
             }
-            saveState(); updateHeaderUI(); 
+            saveState(); if(typeof updateHeaderUI === 'function') updateHeaderUI(); 
             if (typeof renderGarage === 'function') renderGarage();
             openVerdictModal("ВАС ИЗБИЛИ И РАЗБИЛИ АВТО", "Численный перевес был не на вашей стороне. Ваша машина сильно помята.", false);
         }
@@ -992,12 +1115,11 @@ function nextDayAction() {
         state.player.policeImmunityDays -= 1;
     }
 
-    // Списание сырья на предприятиях и начисление пассивного дохода
     if (state.businesses) {
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
                 if (b.stock > 0) {
-                    b.stock = Math.max(0, b.stock - 15); // Предприятие тратит 15% сырья за день
+                    b.stock = Math.max(0, b.stock - 15); 
                     let currentStored = b.stored ? b.stored : 0;
                     let inc = b.income ? b.income : 0;
                     b.stored = currentStored + (inc * b.level);
@@ -1009,7 +1131,7 @@ function nextDayAction() {
     }
 
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     renderHousing();
     renderBarnFind();
     checkBusinessAccess();
@@ -1051,7 +1173,7 @@ function eatMeal(id, cost, hunger, mood) {
     state.player.mood = Math.min(100, (state.player.mood || 85) + mood);
 
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     showToast("Вы перекусили! Силы восстановлены.");
 }
 
@@ -1114,7 +1236,7 @@ function roadAssistanceAction() {
         showToast("Вы помогли сотруднику ведомства! (+1 🤝 Связь и +5 Карма)");
     }
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
 }
 
 function donatePartsToMechanic() {
@@ -1128,7 +1250,7 @@ function donatePartsToMechanic() {
     state.player.karma = Math.min(100, karma + 8);
 
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     showToast("Дядя Ваня благодарен за запчасти! (+1 🤝 Связь и +8 Карма)");
 }
 
@@ -1141,12 +1263,12 @@ function bigCharityDonate() {
     state.player.karma = Math.min(100, karma + 25);
 
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     showToast("Доброе дело сделано! (+25 Кармы 😊)");
 }
 
 // ========================================================
-// 8. ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
+// 9. ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
 // ========================================================
 const WHEEL_SECTORS = [
     { label: "150,000 ₽", color: "#00e676", textColor: "#000", reward: { cash: 150000 } },
@@ -1249,7 +1371,7 @@ function spinWheelAction(isFree) {
         if (prize.reward.connections) state.player.connections = (state.player.connections || 0) + prize.reward.connections;
 
         saveState();
-        updateHeaderUI();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         playSound('win');
         tgHaptic('success');
         openVerdictModal("ПРИЗ С VIP КОЛЕСА! 🎡", "Поздравляем! Ваш выигрыш: " + prize.label, true);
@@ -1280,13 +1402,13 @@ function playThimbles(chosenIdx) {
         let win = currentThimblesBet * 2;
         state.player.cash += win;
         saveState();
-        updateHeaderUI();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         playSound('win');
         tgHaptic('success');
         setTxt('thimblesResultText', "🎉 ВЫ УГАДАЛИ! Выигрыш: +" + win.toLocaleString() + " ₽!");
     } else {
         saveState();
-        updateHeaderUI();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         tgHaptic('error');
         setTxt('thimblesResultText', "💨 Пусто! Ключ был под другим стаканчиком.");
     }
@@ -1405,7 +1527,7 @@ function endCasinoGame(isWin, msg) {
     casinoBet = 0;
     setTxt('currentBetDisplay', "0 ₽");
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
 }
 
 function refuelAction(type) {
@@ -1415,13 +1537,13 @@ function refuelAction(type) {
         state.player.cash -= 5000;
         state.player.fuel = 100;
         saveState();
-        updateHeaderUI();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         playSound('win');
         showToast("Бак заправлен на 100 ⛽!");
     } else {
         state.player.fuel = 100;
         saveState();
-        updateHeaderUI();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         playSound('win');
         showToast("Заправка за рекламу завершена: 100 ⛽!");
     }
@@ -1431,7 +1553,7 @@ function watchAdsgram() {
     state.player.cash = (state.player.cash || 0) + 25000;
     state.player.connections = ((state.player && state.player.connections) ? state.player.connections : 0) + 1;
     saveState();
-    updateHeaderUI();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
     playSound('win');
     showToast("Награда за просмотр: +25,000 ₽ и +1 🤝!");
 }
