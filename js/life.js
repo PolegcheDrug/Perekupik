@@ -1,5 +1,5 @@
 // ========================================================
-// js/life.js — ЖИЗНЬ, БИЗНЕС, САРАИ, ЖИЛЬЁ, ПОРТ, ЗАКАЗЫ, МАРКЕТ
+// js/life.js — ЖИЗНЬ, БИЗНЕС, САРАИ, ЖИЛЬЁ, ПОРТ, МАРКЕТ, КОЛЕСО
 // ========================================================
 
 // ========================================================
@@ -197,8 +197,7 @@ function generateConfiscatedCarLot() {
     } else {
         const pools = ['economy', 'comfort', 'premium'];
         const chosenCat = pools[Math.floor(Math.random() * pools.length)];
-        let pool = CAR_DATABASE.economy;
-        if (CAR_DATABASE[chosenCat]) pool = CAR_DATABASE[chosenCat];
+        let pool = CAR_DATABASE[chosenCat] ? CAR_DATABASE[chosenCat] : CAR_DATABASE.economy;
         template = pool[Math.floor(Math.random() * pool.length)];
         category = chosenCat;
     }
@@ -463,9 +462,9 @@ const BARN_TIERS_CONFIG = [
         reqLvl: 1,
         cost: 35000,
         title: "🏚️ Сарай в СНТ «Заря»",
-        desc: "Дачный кооператив. В основном советская классика под слоем сена и старых запчастей.",
+        desc: "Дачный кооператив. Советская классика под слоем сена и старых запчастей.",
         classGrade: "barn-grade-1",
-        rareIdx: 0 // ВАЗ-2101 «Копейка» (Дрифт-Спек)
+        rareIdx: 0
     },
     {
         tier: 2,
@@ -474,7 +473,7 @@ const BARN_TIERS_CONFIG = [
         title: "🏢 Заброшенный бокс ГСК-4",
         desc: "Кооператив возле промзоны. Забытые иномарки 90-х под слоем пыли.",
         classGrade: "barn-grade-2",
-        rareIdx: 1 // BMW E30 Coupe
+        rareIdx: 1
     },
     {
         tier: 3,
@@ -483,7 +482,7 @@ const BARN_TIERS_CONFIG = [
         title: "🏭 Ангар механического завода",
         desc: "Закрытый цех оборонного предприятия. Контрабандные японские турбо-купе эпохи JDM.",
         classGrade: "barn-grade-3",
-        rareIdx: 2 // Nissan Silvia S13
+        rareIdx: 2
     },
     {
         tier: 4,
@@ -492,7 +491,7 @@ const BARN_TIERS_CONFIG = [
         title: "🏛️ Коллекционный подземный бокс",
         desc: "Опечатанный паркинг банка-банкрота. Капсулы времени, редчайший хром и раритеты.",
         classGrade: "barn-grade-4",
-        rareIdx: 4 // ГАЗ-24 «Волга» V8
+        rareIdx: 4
     }
 ];
 
@@ -979,8 +978,79 @@ function completeContract(contractId) {
 }
 
 // ========================================================
-// 7. МАГАЗИН ПЕРЕКУПА (4 ПОЛНЫЕ ВКЛАДКИ)
+// 7. МАКСИМАЛЬНО РАСШИРЕННЫЙ МАРКЕТ (ПО 15-20 ТОВАРОВ В РАЗДЕЛЕ)
 // ========================================================
+const SHOP_EXPANDED_CATALOG = {
+    tools: [
+        { id: 'gauge_basic', name: 'Толщиномер ЛКП EM2271', cost: 12000, desc: 'Базовый прибор. Показывает шпаклевку на стали.' },
+        { id: 'gauge_pro', name: 'Толщиномер ETARI ET-555 Pro', cost: 28000, desc: 'Профи-замер по черным и цветным металлам (алюминий).' },
+        { id: 'gauge_color', name: 'Толщиномер с цветным дисплеем', cost: 45000, desc: 'Моментальная индикация заводского ЛКП и переходов.' },
+        { id: 'obd_elm', name: 'Сканер ELM327 Bluetooth v1.5', cost: 8500, desc: 'Чтение стандартных ошибок мотора через телефон.' },
+        { id: 'obd_launch', name: 'Мультимарочный сканер Launch X431', cost: 42000, desc: 'Глубокая диагностика блоков ABS, АКПП, подушек SRS.' },
+        { id: 'obd_vasya', name: 'Адаптер Вася Диагност Pro', cost: 32000, desc: 'Чтение реального пробега в блоках DSG и мехатрониках VAG.' },
+        { id: 'endoscope_usb', name: 'Эндоскоп с поворотной камерой', cost: 38000, desc: 'Проверка цилиндров на задиры, нагар и состояние хона.' },
+        { id: 'compressor_tester', name: 'Компрессометр резьбовой', cost: 15000, desc: 'Замер компрессии в цилиндрах перед покупкой авто.' },
+        { id: 'booster_jump', name: 'Пусковое устройство (Бустер 20000mAh)', cost: 19000, desc: 'Запуск севших авто на морозе без прикуривания.' },
+        { id: 'refractometer', name: 'Оптический рефрактометр', cost: 9500, desc: 'Точный тест температуры замерзания антифриза и тормозухи.' },
+        { id: 'mechanic_steth', name: 'Стетоскоп механика с щупом', cost: 6500, desc: 'Локализация стуков клапанов, гидрокомпенсаторов и вкладышей.' },
+        { id: 'laser_pyrometer', name: 'Лазерный пирометр термометр', cost: 14000, desc: 'Контроль температуры радиатора, термостата и тормозных дисков.' },
+        { id: 'leak_detector', name: 'Детектор утечек дымогенератор', cost: 35000, desc: 'Поиск подсосов воздуха во впускном тракте (ошибка P0171).' },
+        { id: 'spark_tester', name: 'Тестер искры и катушек зажигания', cost: 11000, desc: 'Быстрая диагностика пропусков зажигания в цилиндрах (P0300).' },
+        { id: 'battery_analyzer', name: 'Анализатор пускового тока АКБ', cost: 22000, desc: 'Оценка остаточного ресурса и пускового тока аккумулятора.' }
+    ],
+    consumables: [
+        { id: 'chem_shampoo', name: 'Партия активной пены Koch Chemie', cost: 15000, desc: 'Сырьё для автомойки (+40% запаса склада).' },
+        { id: 'chem_polish', name: 'Набор полировальных паст Menzerna', cost: 22000, desc: 'Расходники для предпродажки и блеска кузова.' },
+        { id: 'chem_ceramic', name: 'Защитный керамический состав 9H', cost: 38000, desc: 'Глубокий глянец и гидрофоб для топовых авто.' },
+        { id: 'oil_barrel_5w40', name: 'Бочка синтетики Motul 5W-40 (60л)', cost: 45000, desc: 'Запас моторного масла для автосервиса дяди Вани.' },
+        { id: 'oil_barrel_10w40', name: 'Бочка полусинтетики Лукойл 10W-40 (60л)', cost: 25000, desc: 'Бюджетное масло для обслуживания эконом-класса.' },
+        { id: 'brake_fluid', name: 'Комплект тормозной жидкости DOT 4 (10л)', cost: 12000, desc: 'Расходники для прокачки тормозов в автосервисе.' },
+        { id: 'antifreeze_g12', name: 'Канистры карбоксилатного антифриза G12+', cost: 14000, desc: 'Запас охлаждающей жидкости для клиентов СТО.' },
+        { id: 'freon_r134a', name: 'Баллон хладагента Фреон R134a (13.6кг)', cost: 34000, desc: 'Сырьё для заправки автокондиционеров летом.' },
+        { id: 'brake_pads_set', name: 'Оптовая коробка тормозных колодок', cost: 29000, desc: 'Ходовые колодки для популярных моделей.' },
+        { id: 'spark_plugs_iridium', name: 'Комплект иридиевых свечей NGK', cost: 18000, desc: 'Запчасти для устранения пропусков зажигания.' },
+        { id: 'filters_pack', name: 'Пакет масляных и воздушных фильтров MANN', cost: 16000, desc: 'Базовый запас для проведения ТО на станции.' },
+        { id: 'throttle_cleaner', name: 'Ящик очистителя дросселя и карбюратора', cost: 9000, desc: 'Химия для промывки дроссельных заслонок.' },
+        { id: 'tint_film_roll', name: 'Рулон американской пленки Llumar 5%', cost: 26000, desc: 'Сырьё для студии тонировки «Бункер».' },
+        { id: 'leather_care', name: 'Кондиционер для кожи салона LeTech', cost: 13500, desc: 'Восстановление мягкости и запаха кожи.' },
+        { id: 'sealant_rust', name: 'Антикоррозийный состав Dinitrol', cost: 21000, desc: 'Обработка скрытых полостей и арок авто.' }
+    ],
+    tuningParts: [
+        { id: 'tune_raf_license', name: '🏎️ Гоночная Лицензия РАФ', cost: 85000, desc: 'Официальный допуск пилота к заездам 402м.' },
+        { id: 'tune_hydro_handbrake', name: 'Гидроручник на цилиндре Wilwood', cost: 32000, desc: 'Мгновенный срыв задней оси для заноса.' },
+        { id: 'tune_diff_weld', name: 'Усиленная заварка редуктора', cost: 18000, desc: '100% постоянная блокировка колес.' },
+        { id: 'tune_krasnoyarsk_angle', name: 'Красноярский выворот (рычаги + сошки)', cost: 36000, desc: 'Дикий угол перекладки в дрифте.' },
+        { id: 'tune_bucket_bride', name: 'Спортивный ковш Bride Low Max', cost: 45000, desc: 'Жесткая боковая фиксация пилота.' },
+        { id: 'tune_takata_belts', name: '4-точечные ремни безопасности Takata', cost: 19000, desc: 'Спортивный регламент безопасности.' },
+        { id: 'tune_akrapovic_exhaust', name: 'Титановый прямоток Akrapovic', cost: 58000, desc: 'Глубокий спортивный бас выхлопа (+25% 12.5.1).' },
+        { id: 'tune_stance_air', name: '4-контурная пневмоподвеска с пультом', cost: 75000, desc: 'Дроп кузова на асфальт (+40 баллов на шоу).' },
+        { id: 'tune_rays_wheels', name: 'Кованые диски RAYS Volk Racing TE37', cost: 88000, desc: 'Легкий вес и культовый гоночный стиль.' },
+        { id: 'tune_toyo_slicks', name: 'Полуслики Toyo Proxes R888R', cost: 52000, desc: 'Зацеп на старте для идеального ланча.' },
+        { id: 'tune_roll_cage', name: 'Болтовой каркас безопасности в салон', cost: 68000, desc: 'Максимальная жесткость кузова (+20% 12.5.1).' },
+        { id: 'tune_intercooler_kit', name: 'Фронтальный интеркулер Mishimoto', cost: 42000, desc: 'Охлаждение наддувочного воздуха турбины.' },
+        { id: 'tune_blow_off', name: 'Блоу-офф клапан HKS SSQV IV', cost: 24000, desc: 'Громкий пшик при сбросе давления наддува.' },
+        { id: 'tune_oil_cooler', name: 'Масляный радиатор с термостатом', cost: 27000, desc: 'Защита мотора от перегрева в затяжных заездах.' },
+        { id: 'tune_coilovers', name: 'Регулируемые винтовые стойки BC Racing', cost: 64000, desc: 'Настройка жесткости и клиренса под трек.' }
+    ],
+    homeItems: [
+        { id: 'home_ps5', name: '🎮 Sony PlayStation 5 Slim 1TB', cost: 75000, desc: '+25% к куражу и настроению каждый день.' },
+        { id: 'home_xbox', name: '🟢 Консоль Xbox Series X', cost: 68000, desc: '+20% настроения и вечерний релакс.' },
+        { id: 'home_rtx4090_pc', name: '🖥️ Топовый игровой ПК (RTX 4090 / i9)', cost: 350000, desc: '+40% настроения и симулятор гонок дома.' },
+        { id: 'home_tv_75', name: '📺 4K OLED Телевизор Samsung 75"', cost: 180000, desc: '+30% настроения при просмотре авто-обзоров.' },
+        { id: 'home_leather_sofa', name: '🛋️ Кожаный итальянский диван', cost: 120000, desc: '+15% к восстановлению сил и сытости.' },
+        { id: 'home_coffee_delonghi', name: '☕ Зерновая кофемашина DeLonghi', cost: 55000, desc: 'Бодрящий эспрессо перед выездом на авторынок.' },
+        { id: 'home_jbl_partybox', name: '🔊 Беспроводная колонка JBL Partybox 710', cost: 85000, desc: 'Басы на весь этаж, заряд энергии перекупа.' },
+        { id: 'home_minibar', name: '🍷 Встроенный винный шкаф мини-бар', cost: 95000, desc: 'Празднование удачных сделок с клиентами.' },
+        { id: 'home_safe_valberg', name: '🔒 Огнеупорный сейф перекупа Valberg', cost: 180000, desc: 'Надёжная защита заначки от проверок и облав.' },
+        { id: 'home_robot_cleaner', name: '🤖 Робот-пылесос со станцией очистки', cost: 48000, desc: 'Идеальная чистота без траты своего времени.' },
+        { id: 'home_herman_chair', name: '🪑 Эргономичное кресло Herman Miller', cost: 140000, desc: 'Комфортный поиск объявлений на компьютере.' },
+        { id: 'home_ac_climate', name: '❄️ Сплит-система с климат-контролем', cost: 62000, desc: 'Прохлада летом и тепло зимой в вашем доме.' },
+        { id: 'home_cinema_audio', name: '🍿 Акустическая система 7.1 Домашний кинотеатр', cost: 250000, desc: 'Звук кинотеатра у вас в гостиной.' },
+        { id: 'home_billiards', name: '🎱 Американский бильярдный стол', cost: 220000, desc: 'Статусное развлечение для деловых гостей.' },
+        { id: 'home_jacuzzi', name: '🛁 Гидромассажная спа-ванна джакузи', cost: 310000, desc: 'Полный релакс после тяжёлого дня на рынке.' }
+    ]
+};
+
 function switchShopSection(sec) {
     ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
         const el = document.getElementById('shopSec-' + s);
@@ -1007,24 +1077,18 @@ function renderShopTools() {
     const box = document.getElementById('shopToolsList');
     if (!box) return;
 
-    const tools = [
-        { id: 'gauge', name: "Толщиномер ЛКП", cost: 15000, desc: "Бесплатный замер шпакли в объявлениях" },
-        { id: 'obd', name: "OBD2 Сканер ЭБУ", cost: 25000, desc: "Чтение реального износа и скрытых DTC-ошибок" },
-        { id: 'endoscope', name: "Эндоскоп двигателя", cost: 40000, desc: "Проверка задиров в цилиндрах при покупке" }
-    ];
-
     let html = "";
-    tools.forEach(t => {
+    SHOP_EXPANDED_CATALOG.tools.forEach(t => {
         let has = state.player.tools && state.player.tools[t.id];
         let btn = has 
             ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Куплено ✓</button>" 
-            : "<button onclick=\"buyToolAction('" + t.id + "', " + t.cost + ")\" class='btn btn-cyan btn-sm btn-auto'>" + t.cost.toLocaleString() + " ₽</button>";
+            : "<button onclick=\"buyShopItemAction('tools', '" + t.id + "', " + t.cost + ")\" class='btn btn-cyan btn-sm btn-auto'>" + t.cost.toLocaleString() + " ₽</button>";
 
         html += 
         "<div class='glass-card p-2 flex-between mb-2'>" +
             "<div>" +
                 "<b class='text-xs color-cyan'>" + t.name + "</b>" +
-                "<div class='sub-label'>" + t.desc + "</div>" +
+                "<div class='sub-label' style='font-size:10px;'>" + t.desc + "</div>" +
             "</div>" +
             btn +
         "</div>";
@@ -1032,71 +1096,112 @@ function renderShopTools() {
     box.innerHTML = html;
 }
 
-function buyToolAction(tId, cost) {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < cost) return showToast("Не хватает денег!");
-    state.player.cash -= cost;
-    if (!state.player.tools) state.player.tools = {};
-    state.player.tools[tId] = true;
-    saveState();
-    renderShopTools();
-    playSound('win');
-    showToast("Прибор куплен и добавлен в арсенал!");
-}
-
 function renderShopConsumables() {
     const box = document.getElementById('shopConsumablesList');
     if (!box) return;
-    box.innerHTML = 
-        "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div><b class='text-xs color-amber'>Партия автохимии (Мойка)</b><div class='sub-label'>Запас расходников для 100% сырья</div></div>" +
-            "<button onclick='buyGenericSupplies(15000)' class='btn btn-amber btn-sm btn-auto'>15,000 ₽</button>" +
-        "</div>" +
-        "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div><b class='text-xs color-amber'>Комплект масел и фильтров (СТО)</b><div class='sub-label'>Сырьё для слесарей на 100%</div></div>" +
-            "<button onclick='buyGenericSupplies(25000)' class='btn btn-amber btn-sm btn-auto'>25,000 ₽</button>" +
-        "</div>";
-}
 
-function buyGenericSupplies(cost) {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < cost) return showToast("Не хватает денег!");
-    state.player.cash -= cost;
-    if (state.businesses) {
-        state.businesses.forEach(b => { if (b.level > 0) b.stock = 100; });
-    }
-    saveState();
-    renderBusinessList();
-    playSound('win');
-    showToast("Все предприятия обеспечены сырьём на 100%!");
+    let html = "";
+    SHOP_EXPANDED_CATALOG.consumables.forEach(c => {
+        html += 
+        "<div class='glass-card p-2 flex-between mb-2'>" +
+            "<div>" +
+                "<b class='text-xs color-amber'>" + c.name + "</b>" +
+                "<div class='sub-label' style='font-size:10px;'>" + c.desc + "</div>" +
+            "</div>" +
+            "<button onclick=\"buyShopItemAction('consumables', '" + c.id + "', " + c.cost + ")\" class='btn btn-amber btn-sm btn-auto'>" + c.cost.toLocaleString() + " ₽</button>" +
+        "</div>";
+    });
+    box.innerHTML = html;
 }
 
 function renderShopTuningParts() {
     const box = document.getElementById('shopTuningPartsList');
     if (!box) return;
-    box.innerHTML = 
+
+    let html = "";
+    SHOP_EXPANDED_CATALOG.tuningParts.forEach(tp => {
+        let isLic = tp.id === 'tune_raf_license';
+        let isBought = isLic && state.player.hasRacingLicense;
+        let btn = isBought
+            ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Оформлено ✓</button>"
+            : "<button onclick=\"buyShopItemAction('tuningParts', '" + tp.id + "', " + tp.cost + ")\" class='btn btn-cyan btn-sm btn-auto'>" + tp.cost.toLocaleString() + " ₽</button>";
+
+        html += 
         "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div><b class='text-xs color-red'>🏎️ Лицензия пилота РАФ</b><div class='sub-label'>Допуск к ночным заездам на 402м</div></div>" +
-            "<button onclick=\"buyReshalaService('license')\" class='btn btn-cyan btn-sm btn-auto'>85,000 ₽</button>" +
-        "</div>" +
-        "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div><b class='text-xs color-red'>🔩 Комплект выворота (Красноярск)</b><div class='sub-label'>Необходимо для заездов в дрифте</div></div>" +
-            "<button onclick='switchTab(\"tabGarage\")' class='btn btn-dark btn-sm btn-auto'>В Тюнинг</button>" +
+            "<div>" +
+                "<b class='text-xs color-red'>" + tp.name + "</b>" +
+                "<div class='sub-label' style='font-size:10px;'>" + tp.desc + "</div>" +
+            "</div>" +
+            btn +
         "</div>";
+    });
+    box.innerHTML = html;
 }
 
 function renderShopHomeItems() {
     const box = document.getElementById('shopHomeItemsList');
     if (!box) return;
-    box.innerHTML = 
+
+    let html = "";
+    SHOP_EXPANDED_CATALOG.homeItems.forEach(hi => {
+        let isBought = state.player.furniture && state.player.furniture.includes(hi.id);
+        let btn = isBought
+            ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>В доме ✓</button>"
+            : "<button onclick=\"buyShopItemAction('homeItems', '" + hi.id + "', " + hi.cost + ")\" class='btn btn-green btn-sm btn-auto'>" + hi.cost.toLocaleString() + " ₽</button>";
+
+        html += 
         "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div><b class='text-xs color-green'>🎮 PlayStation 5</b><div class='sub-label'>+25% к настроению каждый день</div></div>" +
-            "<button onclick='switchTab(\"tabHousing\")' class='btn btn-cyan btn-sm btn-auto'>В Недвижимость</button>" +
-        "</div>" +
-        "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div><b class='text-xs color-green'>🛋️ Мягкая мебель</b><div class='sub-label'>Обустройство собственного жилья</div></div>" +
-            "<button onclick='switchTab(\"tabHousing\")' class='btn btn-cyan btn-sm btn-auto'>В Недвижимость</button>" +
+            "<div>" +
+                "<b class='text-xs color-green'>" + hi.name + "</b>" +
+                "<div class='sub-label' style='font-size:10px;'>" + hi.desc + "</div>" +
+            "</div>" +
+            btn +
         "</div>";
+    });
+    box.innerHTML = html;
+}
+
+function buyShopItemAction(category, itemId, cost) {
+    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
+    if (cash < cost) return showToast("Не хватает денег на покупку!");
+
+    state.player.cash -= cost;
+
+    if (category === 'tools') {
+        if (!state.player.tools) state.player.tools = {};
+        state.player.tools[itemId] = true;
+        // Обратная совместимость с базовыми флагами
+        if (itemId.includes('gauge')) state.player.tools.gauge = true;
+        if (itemId.includes('obd')) state.player.tools.obd = true;
+        if (itemId.includes('endoscope')) state.player.tools.endoscope = true;
+        renderShopTools();
+        showToast("Прибор куплен и добавлен в диагностический арсенал!");
+    } else if (category === 'consumables') {
+        if (state.businesses) {
+            state.businesses.forEach(b => { if (b.level > 0) b.stock = 100; });
+        }
+        showToast("Партия сырья доставлена на ваши предприятия (+100% сырья)!");
+    } else if (category === 'tuningParts') {
+        if (itemId === 'tune_raf_license') {
+            state.player.hasRacingLicense = true;
+            checkReshalaAccess();
+            showToast("Лицензия пилота РАФ получена! Допуск к 402м открыт.");
+        } else {
+            showToast("Деталь закуплена! Перейдите в Гараж для установки на автомобиль.");
+        }
+        renderShopTuningParts();
+    } else if (category === 'homeItems') {
+        if (!state.player.furniture) state.player.furniture = [];
+        if (!state.player.furniture.includes(itemId)) state.player.furniture.push(itemId);
+        state.player.mood = Math.min(100, (state.player.mood || 85) + 20);
+        renderShopHomeItems();
+        showToast("Товар куплен и доставлен в ваше жильё! Кураж повышен.");
+    }
+
+    saveState();
+    updateHeaderUI();
+    playSound('win');
+    tgHaptic('success');
 }
 
 // ========================================================
@@ -1141,7 +1246,7 @@ function nextDayAction() {
         state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
     }
 
-    if (state.player.furniture && state.player.furniture.includes('ps5')) {
+    if (state.player.furniture && state.player.furniture.includes('home_ps5')) {
         state.player.mood = Math.min(100, (state.player.mood || 85) + 25);
     }
 
@@ -1295,8 +1400,120 @@ function bigCharityDonate() {
 }
 
 // ========================================================
-// 9. ФОРТУНА: ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
+// 9. НЕОНОВЫЙ VIP ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
 // ========================================================
+const WHEEL_SECTORS = [
+    { label: "150,000 ₽", color: "#00e676", textColor: "#000", reward: { cash: 150000 } },
+    { label: "15 ⭐", color: "#ffb300", textColor: "#000", reward: { stars: 15 } },
+    { label: "25,000 ₽", color: "#1e293b", textColor: "#fff", reward: { cash: 25000 } },
+    { label: "+1 🤝 Связь", color: "#c084fc", textColor: "#000", reward: { connections: 1 } },
+    { label: "350,000 ₽", color: "#00f2fe", textColor: "#000", reward: { cash: 350000 } },
+    { label: "50 ⛽ Бак", color: "#0284c7", textColor: "#fff", reward: { fuel: 50 } },
+    { label: "50,000 ₽", color: "#334155", textColor: "#fff", reward: { cash: 50000 } },
+    { label: "JACKPOT 1M", color: "#ff3366", textColor: "#fff", reward: { cash: 1000000 } }
+];
+
+let isWheelSpinning = false;
+let currentWheelRotation = 0;
+
+function initWheelModule() {
+    const cvs = document.getElementById('wheelCanvas');
+    if (!cvs) return;
+    const ctx = cvs.getContext('2d');
+    const totalSectors = WHEEL_SECTORS.length;
+    const arc = (2 * Math.PI) / totalSectors;
+    const cx = 280;
+    const cy = 280;
+    const radius = 270;
+
+    ctx.clearRect(0, 0, 560, 560);
+
+    for (let i = 0; i < totalSectors; i++) {
+        const angle = i * arc;
+        const sec = WHEEL_SECTORS[i];
+
+        ctx.beginPath();
+        ctx.fillStyle = sec.color;
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, angle, angle + arc);
+        ctx.lineTo(cx, cy);
+        ctx.fill();
+
+        // Неоновый золотой разделитель
+        ctx.strokeStyle = "rgba(255, 215, 0, 0.4)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Текст сектора
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle + arc / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = sec.textColor;
+        ctx.font = "900 18px sans-serif";
+        ctx.shadowColor = "rgba(0,0,0,0.7)";
+        ctx.shadowBlur = 4;
+        ctx.fillText(sec.label, radius - 24, 6);
+        ctx.restore();
+    }
+}
+
+function spinWheelAction(isFree) {
+    if (isWheelSpinning) return;
+
+    if (isFree) {
+        let pDay = (state.player && state.player.day) ? state.player.day : 1;
+        let last = (state.player && state.player.lastFreeSpinDay) ? state.player.lastFreeSpinDay : 0;
+        if (last >= pDay) return showToast("Бесплатный спин доступен раз в день!");
+        state.player.lastFreeSpinDay = pDay;
+    } else {
+        let stars = (state.player && state.player.stars) ? state.player.stars : 0;
+        if (stars < 25) return showToast("Нужно 25 Stars ⭐!");
+        state.player.stars -= 25;
+    }
+
+    const cvs = document.getElementById('wheelCanvas');
+    if (!cvs) return;
+
+    isWheelSpinning = true;
+    playSound('tick');
+    tgHaptic('medium');
+
+    const winningIdx = Math.floor(Math.random() * WHEEL_SECTORS.length);
+    const totalSectors = WHEEL_SECTORS.length;
+    const arcDeg = 360 / totalSectors;
+    
+    // Вычисляем угол так, чтобы сектор остановился ровно под стрелкой вверху (-90 deg)
+    const targetDeg = (360 - (winningIdx * arcDeg) - (arcDeg / 2) - 90);
+    const spins = 360 * (5 + Math.floor(Math.random() * 3));
+    currentWheelRotation += spins + targetDeg;
+
+    cvs.style.transition = "transform 4.5s cubic-bezier(0.12, 0.95, 0.22, 1)";
+    cvs.style.transform = "rotate(" + currentWheelRotation + "deg)";
+
+    // Тикающие звуки при вращении
+    let tickerInterval = setInterval(() => {
+        playSound('tick');
+    }, 280);
+
+    setTimeout(() => {
+        clearInterval(tickerInterval);
+        isWheelSpinning = false;
+
+        const prize = WHEEL_SECTORS[winningIdx];
+        if (prize.reward.cash) state.player.cash += prize.reward.cash;
+        if (prize.reward.stars) state.player.stars += prize.reward.stars;
+        if (prize.reward.fuel) state.player.fuel = Math.min(100, state.player.fuel + prize.reward.fuel);
+        if (prize.reward.connections) state.player.connections = (state.player.connections || 0) + prize.reward.connections;
+
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        openVerdictModal("ПРИЗ С VIP КОЛЕСА! 🎡", "Поздравляем! Ваш выигрыш: " + prize.label, true);
+    }, 4600);
+}
+
 let currentThimblesBet = 10000;
 
 function setThimblesBet(amt) {
@@ -1338,60 +1555,6 @@ function playThimbles(chosenIdx) {
             if (sec) sec.innerText = "";
         }
     }, 2000);
-}
-
-function initWheelModule() {
-    const cvs = document.getElementById('wheelCanvas');
-    if (!cvs) return;
-    const ctx = cvs.getContext('2d');
-    const sectors = ["10k ₽", "100k ₽", "50k ₽", "1 🤝", "500k ₽", "25 ⛽", "0 ₽", "⭐ Stars"];
-    const colors = ["#00f2fe", "#00e676", "#ffb300", "#c084fc", "#ff3366", "#38bdf8", "#475569", "#fbbf24"];
-
-    const arc = (2 * Math.PI) / sectors.length;
-    for (let i = 0; i < sectors.length; i++) {
-        ctx.beginPath();
-        ctx.fillStyle = colors[i];
-        ctx.moveTo(270, 270);
-        ctx.arc(270, 270, 260, i * arc, (i + 1) * arc);
-        ctx.fill();
-        ctx.save();
-        ctx.fillStyle = "#000";
-        ctx.font = "bold 20px sans-serif";
-        ctx.translate(270 + Math.cos(i * arc + arc / 2) * 160, 270 + Math.sin(i * arc + arc / 2) * 160);
-        ctx.rotate(i * arc + arc / 2 + Math.PI / 2);
-        ctx.fillText(sectors[i], -ctx.measureText(sectors[i]).width / 2, 0);
-        ctx.restore();
-    }
-}
-
-function spinWheelAction(isFree) {
-    if (isFree) {
-        let pDay = (state.player && state.player.day) ? state.player.day : 1;
-        let last = (state.player && state.player.lastFreeSpinDay) ? state.player.lastFreeSpinDay : 0;
-        if (last >= pDay) return showToast("Бесплатный спин доступен раз в день!");
-        state.player.lastFreeSpinDay = pDay;
-    } else {
-        let stars = (state.player && state.player.stars) ? state.player.stars : 0;
-        if (stars < 25) return showToast("Нужно 25 Stars ⭐!");
-        state.player.stars -= 25;
-    }
-
-    const cvs = document.getElementById('wheelCanvas');
-    if (!cvs) return;
-
-    let rot = Math.floor(1800 + Math.random() * 1800);
-    cvs.style.transition = "transform 3s cubic-bezier(0.1, 0.9, 0.2, 1)";
-    cvs.style.transform = "rotate(" + rot + "deg)";
-
-    setTimeout(() => {
-        let win = 50000;
-        state.player.cash = (state.player.cash || 0) + win;
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        openVerdictModal("ПРИЗ С КОЛЕСА! 🎡", "Вы выиграли +" + win.toLocaleString() + " ₽!", true, win);
-    }, 3200);
 }
 
 let casinoBet = 0;
