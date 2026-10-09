@@ -570,3 +570,7 @@ function collectAllBusinessCash() {
     tgHaptic('success');
     playSound('win');
     spawnFloatingReward("+" 
+   tgHaptic('success');
+        playSound('win');
+        spawnFloatingReward("+" + totalCollected.toLocaleString() + " ₽");
+    } // закрываем функцию
