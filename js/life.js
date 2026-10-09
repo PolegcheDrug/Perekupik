@@ -1,6 +1,5 @@
 // ========================================================
-// js/life.js — ПОЛНЫЙ МОДУЛЬ: ЖИЗНЬ, БИЗНЕС, САРАИ, ЖИЛЬЁ, 
-// ПОРТ, ЗАКАЗЫ СИНДИКАТА, МАРКЕТ И РЕШАЛА
+// js/life.js — ЖИЗНЬ, БИЗНЕС, САРАИ, ЖИЛЬЁ, ПОРТ, ЗАКАЗЫ, МАРКЕТ
 // ========================================================
 
 // ========================================================
@@ -198,7 +197,8 @@ function generateConfiscatedCarLot() {
     } else {
         const pools = ['economy', 'comfort', 'premium'];
         const chosenCat = pools[Math.floor(Math.random() * pools.length)];
-        let pool = CAR_DATABASE[chosenCat] ? CAR_DATABASE[chosenCat] : CAR_DATABASE.economy;
+        let pool = CAR_DATABASE.economy;
+        if (CAR_DATABASE[chosenCat]) pool = CAR_DATABASE[chosenCat];
         template = pool[Math.floor(Math.random() * pool.length)];
         category = chosenCat;
     }
@@ -223,7 +223,7 @@ function generateConfiscatedCarLot() {
         price: buyPrice,
         baseMarketValue: marketVal,
         marketValue: marketVal + 250000,
-        img: template.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
+        img: template.img || "assets/cars/comfort/camry.jpg",
         plate: plate,
         customPlate: plate,
         isExclusive: isExclusive,
@@ -312,7 +312,7 @@ function buyConfiscatedCar() {
 }
 
 // ========================================================
-// 2. ИНТЕРАКТИВНЫЙ БИЗНЕС
+// 2. ИНТЕРАКТИВНЫЙ БИЗНЕС (ВСЕ 21 ПРЕДПРИЯТИЕ ИЗ DATA.JS)
 // ========================================================
 function checkBusinessAccess() {
     const lock = document.getElementById('businessLockCover');
@@ -347,14 +347,7 @@ function renderBusinessList() {
         let isLocked = lvl < biz.minLevel;
         let cost = (biz.level > 0) ? biz.cost * (biz.level + 1) : biz.cost;
 
-        const defaultBizImgs = [
-            'https://images.unsplash.com/photo-1601362840469-51e4d8d58785?w=400&q=80',
-            'https://images.unsplash.com/photo-1599256614138-0ceec0e766c8?w=400&q=80',
-            'https://images.unsplash.com/photo-1616423640778-28d1b53229bd?w=400&q=80',
-            'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=400&q=80'
-        ];
-        const imgSrc = biz.img ? biz.img : defaultBizImgs[idx % defaultBizImgs.length];
-
+        let imgSrc = biz.img || "assets/houses/garage.jpg";
         let lockBlock = isLocked ? "<div class='cooldown-timer' style='display:flex; opacity:1; font-size:14px;'><i class='fa-solid fa-lock mb-2'></i> С " + biz.minLevel + " УРОВНЯ</div>" : "";
         let rankText = isMax ? "MAX" : "Ур. " + (biz.level || 0);
 
@@ -377,12 +370,12 @@ function renderBusinessList() {
         let bInc = biz.income ? biz.income : 0;
         let bLvl = biz.level ? biz.level : 0;
         let incTotal = bInc * bLvl;
-        let stockVal = (biz.stock !== undefined) ? biz.stock : 75;
+        let stockVal = (biz.stock !== undefined) ? biz.stock : 100;
 
         html += 
         "<div class='" + cardClass + "'>" +
             "<div class='" + imgClass + "'>" +
-                "<img src='" + imgSrc + "' class='business-img' onerror=\"this.src='https://images.unsplash.com/photo-1556740749-887f6717d7e4?w=400&q=80'\">" +
+                "<img src='" + imgSrc + "' class='business-img' onerror=\"this.src='assets/houses/garage.jpg'\">" +
                 lockBlock +
                 "<div class='badge-tag bg-tag-cyan' style='bottom:8px; left:8px; right:auto;'>" + rankText + "</div>" +
             "</div>" +
@@ -462,7 +455,7 @@ function collectAllBusinessCash() {
 }
 
 // ========================================================
-// 3. САРАИ: 4 ПОЛНЫХ ГРЕЙДА С ЭТАПАМИ РАСКОПОК
+// 3. САРАИ: 4 ПОЛНЫХ ГРЕЙДА И ЛУТ ИЗ BARN_FINDS
 // ========================================================
 const BARN_TIERS_CONFIG = [
     {
@@ -470,59 +463,36 @@ const BARN_TIERS_CONFIG = [
         reqLvl: 1,
         cost: 35000,
         title: "🏚️ Сарай в СНТ «Заря»",
-        desc: "Старый дачный кооператив. В основном советская классика, но дедушки часто консервировали машины с блатными номерами.",
+        desc: "Дачный кооператив. В основном советская классика под слоем сена и старых запчастей.",
         classGrade: "barn-grade-1",
-        rareName: "ВАЗ-2101 «Копейка» (Дрифт-Спек)",
-        rareImg: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=400&q=80",
-        pool: [
-            { name: "Москвич-412", basePrice: 40000, power: 75, img: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=400&q=80" },
-            { name: "Ока (ВАЗ-1111)", basePrice: 35000, power: 33, img: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=400&q=80" },
-            { name: "ВАЗ-2106 «Шестерка»", basePrice: 65000, power: 75, img: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80" }
-        ]
+        rareIdx: 0 // ВАЗ-2101 «Копейка» (Дрифт-Спек)
     },
     {
         tier: 2,
         reqLvl: 7,
         cost: 120000,
         title: "🏢 Заброшенный бокс ГСК-4",
-        desc: "Кооператив возле промзоны. Забытые иномарки 90-х годов под слоем пыли и старых покрышек.",
+        desc: "Кооператив возле промзоны. Забытые иномарки 90-х под слоем пыли.",
         classGrade: "barn-grade-2",
-        rareName: "BMW E30 Coupe (M-Tech)",
-        rareImg: "https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&w=400&q=80",
-        pool: [
-            { name: "Volkswagen Golf 2 GTI", basePrice: 160000, power: 112, img: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=400&q=80" },
-            { name: "Mercedes-Benz W124", basePrice: 210000, power: 136, img: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=400&q=80" },
-            { name: "Toyota Mark II (GX81)", basePrice: 240000, power: 135, img: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80" }
-        ]
+        rareIdx: 1 // BMW E30 Coupe
     },
     {
         tier: 3,
         reqLvl: 15,
         cost: 350000,
         title: "🏭 Ангар механического завода",
-        desc: "Закрытый цех оборонного предприятия. Контрабандные японские турбо-купе эпохи золотого дрифта.",
+        desc: "Закрытый цех оборонного предприятия. Контрабандные японские турбо-купе эпохи JDM.",
         classGrade: "barn-grade-3",
-        rareName: "Nissan Silvia S13 (SR20DET)",
-        rareImg: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=400&q=80",
-        pool: [
-            { name: "Nissan 180SX", basePrice: 550000, power: 205, img: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80" },
-            { name: "Toyota Chaser Tourer V", basePrice: 650000, power: 280, img: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=400&q=80" },
-            { name: "Nissan Skyline R33 GTS-T", basePrice: 720000, power: 250, img: "https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&w=400&q=80" }
-        ]
+        rareIdx: 2 // Nissan Silvia S13
     },
     {
         tier: 4,
         reqLvl: 25,
         cost: 850000,
         title: "🏛️ Коллекционный подземный бокс",
-        desc: "Опечатанный паркинг банка-банкрота. Капсулы времени, редчайший хром и музейные раритеты.",
+        desc: "Опечатанный паркинг банка-банкрота. Капсулы времени, редчайший хром и раритеты.",
         classGrade: "barn-grade-4",
-        rareName: "Porsche 911 Carrera (G-Series)",
-        rareImg: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80",
-        pool: [
-            { name: "ГАЗ-21 «Волга» (Музейный хром)", basePrice: 1200000, power: 75, img: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=400&q=80" },
-            { name: "Mercedes-Benz 500 SL (R129)", basePrice: 1650000, power: 326, img: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=400&q=80" }
-        ]
+        rareIdx: 4 // ГАЗ-24 «Волга» V8
     }
 ];
 
@@ -540,21 +510,13 @@ function renderBarnFind() {
         let isLvlLocked = lvl < b.reqLvl;
         let isDoneToday = !canScoutToday;
 
-        let statusBadge = "";
-        let btnDisabled = "";
-        let btnText = "Вскрыть ангар (" + (b.cost / 1000).toFixed(0) + "k ₽)";
+        let rareCar = (typeof BARN_FINDS !== 'undefined' && BARN_FINDS[b.rareIdx]) ? BARN_FINDS[b.rareIdx] : { name: "Раритет" };
+        let statusBadge = isLvlLocked 
+            ? "<span class='tag-badge bg-tag-red'><i class='fa-solid fa-lock'></i> С " + b.reqLvl + " УР</span>"
+            : (isDoneToday ? "<span class='tag-badge bg-tag-amber'>Разведка завершена</span>" : "<span class='tag-badge bg-tag-green'>Готово к разведке</span>");
 
-        if (isLvlLocked) {
-            statusBadge = "<span class='tag-badge bg-tag-red'><i class='fa-solid fa-lock'></i> С " + b.reqLvl + " УР</span>";
-            btnDisabled = "disabled";
-            btnText = "Требуется " + b.reqLvl + " уровень";
-        } else if (isDoneToday) {
-            statusBadge = "<span class='tag-badge bg-tag-amber'>Разведка завершена</span>";
-            btnDisabled = "disabled";
-            btnText = "Доступно завтра (Смена дня 🌙)";
-        } else {
-            statusBadge = "<span class='tag-badge bg-tag-green'>Готово к разведке</span>";
-        }
+        let btnDisabled = (isLvlLocked || isDoneToday) ? "disabled" : "";
+        let btnText = isLvlLocked ? "Требуется " + b.reqLvl + " уровень" : (isDoneToday ? "Доступно завтра (Смена дня 🌙)" : "Вскрыть ангар (" + (b.cost / 1000).toFixed(0) + "k ₽)");
 
         html += 
         "<div class='barn-tier-card " + b.classGrade + "'>" +
@@ -563,8 +525,8 @@ function renderBarnFind() {
                 statusBadge +
             "</div>" +
             "<p class='sub-label mb-2'>" + b.desc + "</p>" +
-            "<div class='text-xs mb-1 color-amber'>⭐ Редкий дроп (5%): <b>" + b.rareName + "</b></div>" +
-            "<div class='text-xs mb-2 color-purple'>🏷️ Шанс на блатные номера: <b>15%</b></div>" +
+            "<div class='text-xs mb-1 color-amber'>⭐ Редкий дроп (5%): <b>" + rareCar.name + "</b></div>" +
+            "<div class='text-xs mb-2 color-purple'>🏷️ Шанс на архивные госномера: <b>15%</b></div>" +
             "<button onclick='scoutBarnTier(" + b.tier + ")' class='btn btn-cyan btn-sm w-full' " + btnDisabled + ">" +
                 btnText +
             "</button>" +
@@ -595,16 +557,12 @@ function scoutBarnTier(tier) {
     let isRare = Math.random() < 0.05;
     let foundCar = null;
 
-    if (isRare) {
-        foundCar = {
-            name: config.rareName,
-            power: 140,
-            basePrice: config.cost * 4,
-            img: config.rareImg
-        };
+    if (isRare && typeof BARN_FINDS !== 'undefined' && BARN_FINDS[config.rareIdx]) {
+        foundCar = BARN_FINDS[config.rareIdx];
+    } else if (typeof CAR_DATABASE !== 'undefined' && CAR_DATABASE.economy) {
+        foundCar = CAR_DATABASE.economy[Math.floor(Math.random() * CAR_DATABASE.economy.length)];
     } else {
-        const pool = config.pool;
-        foundCar = pool[Math.floor(Math.random() * pool.length)];
+        foundCar = { name: "ВАЗ-2101 «Копейка»", power: 64, basePrice: 65000, img: "assets/cars/economy/vaz-2101.jpg" };
     }
 
     let genPlate = "ТРАНЗИТ";
@@ -615,19 +573,18 @@ function scoutBarnTier(tier) {
         genPlate = generateNormalPlate();
     }
 
-    let pVal = 0;
-    if (typeof calculatePlateValue === 'function') pVal = calculatePlateValue(genPlate);
+    let pVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(genPlate) : 0;
 
     let newCar = {
         id: "barn_" + Date.now(),
         name: foundCar.name,
-        type: 'economy',
-        power: foundCar.power,
-        basePrice: foundCar.basePrice,
-        price: foundCar.basePrice,
-        baseMarketValue: foundCar.basePrice,
-        marketValue: foundCar.basePrice + pVal,
-        img: foundCar.img,
+        type: foundCar.type || 'economy',
+        power: foundCar.power || 75,
+        basePrice: foundCar.basePrice || config.cost * 2,
+        price: foundCar.basePrice || config.cost * 2,
+        baseMarketValue: foundCar.marketValue || foundCar.basePrice * 1.3,
+        marketValue: (foundCar.marketValue || foundCar.basePrice * 1.3) + pVal,
+        img: foundCar.img || "assets/cars/economy/vaz-2101.jpg",
         plate: genPlate,
         customPlate: genPlate,
         condition: Math.floor(40 + Math.random() * 25),
@@ -652,15 +609,8 @@ function scoutBarnTier(tier) {
 }
 
 // ========================================================
-// 4. ИНТЕРАКТИВНОЕ ЖИЛЬЁ И ОБУСТРОЙСТВО (МЕБЕЛЬ, PS5, СЕЙФ)
+// 4. НЕДВИЖИМОСТЬ И ОБУСТРОЙСТВО (ИЗ DATA.JS HOUSING_LIST)
 // ========================================================
-const HOUSING_INTERIOR_CATALOG = [
-    { id: "ps5", name: "🎮 Игровая консоль PlayStation 5", cost: 75000, perk: "+25% настроения и куража каждый день" },
-    { id: "sofa", name: "🛋️ Кожаный итальянский диван", cost: 120000, perk: "+15% к восстановлению сил и сытости" },
-    { id: "hometheater", name: "🍿 Домашний кинотеатр 4K", cost: 250000, perk: "+35% настроения и престиж" },
-    { id: "safe", name: "🔒 Огнеупорный сейф перекупа", cost: 180000, perk: "Защита заначки от проверок и облав" }
-];
-
 function renderHousing() {
     const list = document.getElementById('housingMarketList');
     if (!list) return;
@@ -677,17 +627,22 @@ function renderHousing() {
     let curTitle = currentHouse ? currentHouse.name : "Комната в общежитии";
     setTxt('currentHomeText', "Текущее: " + curTitle);
 
+    let lvl = (state.player && state.player.level) ? state.player.level : 1;
     let html = "";
+
     HOUSING_LIST.forEach(h => {
         let isCurrent = curId === h.id;
         let isPurchased = owned.includes(h.id);
+        let isLvlLocked = lvl < (h.minLevel || 1);
 
         let statusTag = isPurchased 
             ? "<span class='tag-badge bg-tag-green'>В собственности</span>" 
             : "<span class='tag-badge bg-tag-amber'>Аренда</span>";
 
         let actionBtns = "";
-        if (isCurrent && isPurchased) {
+        if (isLvlLocked) {
+            actionBtns = "<button class='btn btn-dark btn-sm w-full opacity-50' disabled>Доступно с " + h.minLevel + " уровня</button>";
+        } else if (isCurrent && isPurchased) {
             actionBtns = 
             "<div class='grid-2 mt-2'>" +
                 "<button onclick=\"openHomeInteriorModal('" + h.id + "')\" class='btn btn-cyan btn-sm'>🛋️ Обустройство дома</button>" +
@@ -706,24 +661,27 @@ function renderHousing() {
                 "<button onclick=\"moveIntoHousing('" + h.id + "')\" class='btn btn-green btn-sm'>Переехать 🚚</button>" +
             "</div>";
         } else {
+            let rentVal = h.rent ? h.rent : (h.rentPrice ? h.rentPrice : 2000);
             actionBtns = 
             "<div class='grid-2 mt-2'>" +
-                "<button onclick=\"rentHousing('" + h.id + "')\" class='btn btn-cyan btn-sm'>Аренда (" + h.rentPrice.toLocaleString() + " ₽/д)</button>" +
+                "<button onclick=\"rentHousing('" + h.id + "')\" class='btn btn-cyan btn-sm'>Аренда (" + rentVal.toLocaleString() + " ₽/д)</button>" +
                 "<button onclick=\"buyHousingProperty('" + h.id + "')\" class='btn btn-amber btn-sm'>Купить (" + (h.buyPrice / 1000000).toFixed(1) + "M ₽)</button>" +
             "</div>";
         }
 
+        let imgSrc = h.img || "assets/houses/room.jpg";
+
         html += 
         "<div class='glass-card mb-3'>" +
             "<div class='car-img-wrap' style='height:140px;'>" +
-                "<img src='" + h.img + "' class='car-img' onerror=\"this.src='https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=400&q=80'\">" +
+                "<img src='" + imgSrc + "' class='car-img' onerror=\"this.src='assets/houses/room.jpg'\">" +
                 "<div class='badge-tag' style='bottom:8px; right:8px;'>" + statusTag + "</div>" +
             "</div>" +
             "<div class='flex-between mb-1'>" +
                 "<h4 class='font-bold'>" + h.name + "</h4>" +
                 "<div class='color-cyan font-bold text-xs'>+" + h.slots + " мест гаража</div>" +
             "</div>" +
-            "<p class='sub-label mb-2'>" + h.desc + "</p>" +
+            "<p class='sub-label mb-2'>" + (h.desc || "Комфортное жильё для отдыха перекупа.") + "</p>" +
             actionBtns +
         "</div>";
     });
@@ -783,21 +741,23 @@ function openHomeInteriorModal(hId) {
     if (!list) return;
 
     let html = "";
-    HOUSING_INTERIOR_CATALOG.forEach(item => {
-        let isBought = state.player.furniture.includes(item.id);
-        let btnContent = isBought 
-            ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Куплено ✓</button>" 
-            : "<button onclick=\"buyHomeFurniture('" + item.id + "', " + item.cost + ")\" class='btn btn-green btn-sm btn-auto'>" + (item.cost / 1000).toFixed(0) + "k ₽</button>";
+    if (typeof HOUSING_INTERIOR_CATALOG !== 'undefined') {
+        HOUSING_INTERIOR_CATALOG.forEach(item => {
+            let isBought = state.player.furniture.includes(item.id);
+            let btnContent = isBought 
+                ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Куплено ✓</button>" 
+                : "<button onclick=\"buyHomeFurniture('" + item.id + "', " + item.cost + ")\" class='btn btn-green btn-sm btn-auto'>" + (item.cost / 1000).toFixed(0) + "k ₽</button>";
 
-        html += 
-        "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div>" +
-                "<div class='font-bold text-xs color-cyan'>" + item.name + "</div>" +
-                "<div class='sub-label' style='font-size:10px;'>" + item.perk + "</div>" +
-            "</div>" +
-            btnContent +
-        "</div>";
-    });
+            html += 
+            "<div class='glass-card p-2 flex-between mb-2'>" +
+                "<div>" +
+                    "<div class='font-bold text-xs color-cyan'>" + item.name + "</div>" +
+                    "<div class='sub-label' style='font-size:10px;'>" + item.perk + "</div>" +
+                "</div>" +
+                btnContent +
+            "</div>";
+        });
+    }
 
     list.innerHTML = html;
     const modal = document.getElementById('modalHomeInterior');
@@ -824,38 +784,8 @@ function buyHomeFurniture(fId, cost) {
 }
 
 // ========================================================
-// 5. ПОРТОВЫЕ КОНТЕЙНЕРЫ (3 МОРСКИХ НАПРАВЛЕНИЯ С ВИЗУАЛОМ)
+// 5. ПОРТОВЫЕ КОНТЕЙНЕРЫ (ИЗ CONTAINER_ITEMS DATA.JS)
 // ========================================================
-const PORT_CONTAINERS_CATALOG = [
-    {
-        id: "vladivostok",
-        name: "⚓ Контейнер из Владивостока (Япония)",
-        cost: 450000,
-        reqLvl: 12,
-        desc: "Праворульные легенды JDM, распилы под корчи или тюнингованные Маркообразные.",
-        img: "https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=400&q=80",
-        classBadge: "bg-tag-cyan"
-    },
-    {
-        id: "dubai",
-        name: "🐪 Контейнер из Дубая (ОАЭ)",
-        cost: 1500000,
-        reqLvl: 20,
-        desc: "Спорткары шейхов, редкие внедорожники и риск нарваться на утопленный суперкар.",
-        img: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&q=80",
-        classBadge: "bg-tag-purple"
-    },
-    {
-        id: "rotterdam",
-        name: "🚢 Контейнер из Роттердама (Европа)",
-        cost: 3200000,
-        reqLvl: 30,
-        desc: "Немецкие люксовые седаны и трековые купе в идеальном музейном сохране.",
-        img: "https://images.unsplash.com/photo-1542314831-c6a4d2729a67?w=400&q=80",
-        classBadge: "bg-tag-amber"
-    }
-];
-
 function renderContainersList() {
     const container = document.getElementById('containersListRender');
     const lockCover = document.getElementById('containersLockCover');
@@ -873,15 +803,17 @@ function renderContainersList() {
     container.style.display = 'block';
     let html = "";
 
-    PORT_CONTAINERS_CATALOG.forEach(box => {
-        let isLocked = lvl < box.reqLvl;
-        let btnText = isLocked ? "С " + box.reqLvl + " уровня" : "Вскрыть (" + (box.cost / 1000).toFixed(0) + "k ₽)";
+    const catalog = (typeof CONTAINER_ITEMS !== 'undefined') ? CONTAINER_ITEMS : [];
+    catalog.forEach(box => {
+        let minLvl = box.minLevel || 12;
+        let isLocked = lvl < minLvl;
+        let btnText = isLocked ? "С " + minLvl + " уровня" : "Вскрыть (" + (box.cost / 1000).toFixed(0) + "k ₽)";
 
         html += 
         "<div class='glass-card mb-3'>" +
             "<div class='car-img-wrap' style='height:130px;'>" +
-                "<img src='" + box.img + "' class='car-img'>" +
-                "<div class='badge-tag' style='bottom:8px; right:8px;'><span class='tag-badge " + box.classBadge + "'>Порт</span></div>" +
+                "<img src='" + box.img + "' class='car-img' onerror=\"this.src='assets/containers/japan.jpg'\">" +
+                "<div class='badge-tag' style='bottom:8px; right:8px;'><span class='tag-badge bg-tag-purple'>" + box.badge + "</span></div>" +
             "</div>" +
             "<div class='flex-between mb-1'>" +
                 "<b class='font-bold'>" + box.name + "</b>" +
@@ -899,18 +831,17 @@ function renderContainersList() {
 
 function openPortContainerAction(boxId, cost) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < cost) return showToast("Не хватает денег на таможенный контейнер!");
+    if (cash < cost) return showToast("Не хватает денег на контейнер!");
 
     let maxSlots = getTotalGarageSlots();
     let currentSlots = (state.garage && state.garage.length) ? state.garage.length : 0;
-    if (currentSlots >= maxSlots) return showToast("В гараже нет свободного места под авто из порта!");
+    if (currentSlots >= maxSlots) return showToast("В гараже нет места под авто из контейнера!");
 
     state.player.cash -= cost;
 
     let roll = Math.random();
     if (roll < 0.40) {
-        // Успех: ценный спорткар
-        let winPrize = Math.round(cost * (1.4 + Math.random() * 0.7));
+        let winPrize = Math.round(cost * (1.35 + Math.random() * 0.65));
         state.player.cash += winPrize;
         saveState();
         updateHeaderUI();
@@ -918,52 +849,50 @@ function openPortContainerAction(boxId, cost) {
         tgHaptic('success');
         openVerdictModal("ТАМОЖЕННЫЙ ДЖЕКПОТ! 🚢", "В контейнере найден ценный зарубежный лот! Выручка с перепродажи: +" + winPrize.toLocaleString() + " ₽", true, winPrize);
     } else if (roll < 0.75) {
-        // Обычный распил
         let partValue = Math.round(cost * 0.75);
         state.player.cash += partValue;
         saveState();
         updateHeaderUI();
-        openVerdictModal("РАСПИЛ НА ЗАПЧАСТИ 🔩", "Кузов повреждён при транспортировке. Сдан на разбор: +" + partValue.toLocaleString() + " ₽", false);
+        openVerdictModal("РАСПИЛ НА ЗАПЧАСТИ 🔩", "Кузов повреждён при доставке. Сдан на разбор: +" + partValue.toLocaleString() + " ₽", false);
     } else {
-        // Пустышка
         saveState();
         updateHeaderUI();
         tgHaptic('error');
-        openVerdictModal("ТАМОЖЕННАЯ ПУСТЫШКА 💨", "Контейнер оказался с бракованными деталями. Убыток: -" + cost.toLocaleString() + " ₽", false);
+        openVerdictModal("ТАМОЖЕННАЯ ПУСТЫШКА 💨", "В контейнере оказались только битые запчасти. Убыток: -" + cost.toLocaleString() + " ₽", false);
     }
 }
 
 // ========================================================
-// 6. ЗАКАЗЫ СИНДИКАТА (С ПРОВЕРКОЙ ГАРАЖА И СДАЧЕЙ АВТО)
+// 6. ЗАКАЗЫ СИНДИКАТА (С ПРОВЕРКОЙ МАШИНЫ В ГАРАЖЕ)
 // ========================================================
 function generateContracts() {
     state.contracts = [
         {
             id: "cnt_1",
-            title: "Подбор комфортного седана для таксопарка",
+            title: "Подбор эконом-седана под такси",
             brandReq: "любой",
-            minPower: 110,
-            minCond: 75,
-            reward: 120000,
-            desc: "Требуется целый авто без скрытых дефектов с кондиционером."
+            minPower: 80,
+            minCond: 70,
+            reward: 140000,
+            desc: "Требуется целый авто без скрытых дефектов для работы в парке."
         },
         {
             id: "cnt_2",
-            title: "Mercedes / BMW для регионального бизнесмена",
-            brandReq: "немец",
-            minPower: 170,
-            minCond: 85,
+            title: "Немецкий седан (Mercedes / BMW) под выкуп",
+            brandReq: "комфорт",
+            minPower: 150,
+            minCond: 80,
             reward: 350000,
-            desc: "Строго чистый VIN, подтвержденный пробег и ровный кузов."
+            desc: "Строго чистый VIN, родной пробег и ровные зазоры кузова."
         },
         {
             id: "cnt_3",
-            title: "Корч под зимний дрифт для новичка",
+            title: "Заднеприводный корч под зимний дрифт",
             brandReq: "любой",
-            minPower: 80,
+            minPower: 70,
             minCond: 50,
-            reward: 90000,
-            desc: "Подойдёт живая классика с заваркой или выворотом."
+            reward: 95000,
+            desc: "Живая классика без тотальных повреждений."
         }
     ];
     saveState();
@@ -1021,16 +950,15 @@ function completeContract(contractId) {
     const cnt = state.contracts.find(c => c.id === contractId);
     if (!cnt) return;
 
-    // Поиск подходящей машины в гараже
     const matchIdx = state.garage.findIndex(car => {
         if (!car || car.impounded || car.unregistered) return false;
-        let p = car.power ? car.power : 100;
+        let p = car.power ? car.power : 75;
         let c = car.condition ? car.condition : 80;
         return p >= cnt.minPower && c >= cnt.minCond;
     });
 
     if (matchIdx === -1) {
-        return showToast("В гараже нет машины с " + cnt.minPower + "+ л.с. и состоянием " + cnt.minCond + "%!");
+        return showToast("В гараже нет авто с " + cnt.minPower + "+ л.с. и состоянием от " + cnt.minCond + "%!");
     }
 
     const surrenderedCar = state.garage[matchIdx];
@@ -1038,7 +966,6 @@ function completeContract(contractId) {
     state.player.cash = (state.player.cash || 0) + cnt.reward;
     addXp(60);
 
-    // Удаляем выполненный заказ и генерируем новый
     state.contracts = state.contracts.filter(c => c.id !== contractId);
     if (state.contracts.length < 2) generateContracts();
 
@@ -1052,7 +979,7 @@ function completeContract(contractId) {
 }
 
 // ========================================================
-// 7. МАГАЗИН ПЕРЕКУПА (ПО ВСЕМ 4 СЕКЦИЯМ)
+// 7. МАГАЗИН ПЕРЕКУПА (4 ПОЛНЫЕ ВКЛАДКИ)
 // ========================================================
 function switchShopSection(sec) {
     ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
@@ -1173,7 +1100,7 @@ function renderShopHomeItems() {
 }
 
 // ========================================================
-// 8. ЛОМБАРД, СМЕНА ДНЯ, РАЦИОН, ЧАТ И РЕПУТАЦИЯ
+// 8. ЛОМБАРД, СМЕНА ДНЯ, РАЦИОН (ИЗ DIETS), ЭФИР
 // ========================================================
 function takeLoan(amount) {
     let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
@@ -1210,9 +1137,8 @@ function nextDayAction() {
     let isOwn = (state.player && state.player.ownedHouses) ? state.player.ownedHouses.includes(curId) : false;
     if (!isOwn && typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
         const h = HOUSING_LIST.find(item => item.id === curId);
-        if (h && h.rentPrice) {
-            state.player.cash = Math.max(0, (state.player.cash || 0) - h.rentPrice);
-        }
+        let rentVal = h ? (h.rent || h.rentPrice || 2500) : 2500;
+        state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
     }
 
     if (state.player.furniture && state.player.furniture.includes('ps5')) {
@@ -1247,19 +1173,17 @@ function renderDiets() {
     const list = document.getElementById('dietList');
     if (!list) return;
 
-    const diets = [
-        { id: "shaurma", name: "Шаурма на вокзале", cost: 350, hunger: 25, mood: 10 },
-        { id: "stolovaya", name: "Обед в рабочей столовой", cost: 750, hunger: 50, mood: 20 },
-        { id: "restik", name: "Ресторан у авторынка", cost: 3500, hunger: 90, mood: 50 }
+    const catalog = (typeof DIETS !== 'undefined') ? DIETS : [
+        { id: "shaurma", name: "Шаурма на вокзале", cost: 800, hunger: 50, mood: -5, desc: "Сытно, но жирно и тоскливо" }
     ];
 
     let html = "";
-    diets.forEach(d => {
+    catalog.forEach(d => {
         html += 
         "<div class='glass-card flex-between p-2 mb-1'>" +
             "<div>" +
                 "<b class='text-xs color-green'>" + d.name + "</b>" +
-                "<div class='sub-label'>Сытость: +" + d.hunger + "% / Настроение: +" + d.mood + "%</div>" +
+                "<div class='sub-label'>" + (d.desc || "Питание перекупа") + "</div>" +
             "</div>" +
             "<button onclick=\"eatMeal('" + d.id + "', " + d.cost + ", " + d.hunger + ", " + d.mood + ")\" class='btn btn-dark btn-auto btn-sm'>" + d.cost.toLocaleString() + " ₽</button>" +
         "</div>";
@@ -1283,13 +1207,18 @@ function eatMeal(id, cost, hunger, mood) {
 function renderLifeChat() {
     const feed = document.getElementById('lifeChatFeed');
     if (!feed) return;
+
     if (!state.lifeChatMessages || state.lifeChatMessages.length === 0) {
-        state.lifeChatMessages = [
-            { sender: "Колян_99", text: "Кто на кольце сегодня? ДПСников вроде нет." },
-            { sender: "Артур_Решала", text: "Номера 777 в наличии, пишите в личку." },
-            { sender: "Серый_СТО", text: "Сварка выворота на классику — скидки до конца дня." }
-        ];
+        if (typeof STREET_CHAT_LOG !== 'undefined' && Array.isArray(STREET_CHAT_LOG)) {
+            state.lifeChatMessages = STREET_CHAT_LOG.slice(0, 5).map(m => ({ sender: m.author, text: m.text }));
+        } else {
+            state.lifeChatMessages = [
+                { sender: "Колян_99", text: "Кто на кольце сегодня? ДПСников вроде нет." },
+                { sender: "Артур_Решала", text: "Номера 777 в наличии, пишите в личку." }
+            ];
+        }
     }
+
     let html = "";
     state.lifeChatMessages.forEach(m => {
         let isMine = m.isMine ? "mine" : "";
