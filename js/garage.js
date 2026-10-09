@@ -1,4 +1,6 @@
-// ===================== ПОЛНАЯ ВЕРСИЯ: js/garage.js =====================
+// ========================================================
+// js/garage.js — ГАРАЖ, ОБСЛУЖИВАНИЕ, ОБД2, ТЮНИНГ, НОМЕРА
+// ========================================================
 
 let selectedCarIndex = null; 
 let activePreSaleCarIndex = null; 
@@ -20,26 +22,19 @@ function calculatePlateValue(plateStr) {
 
     let value = 1500;
 
-    if (num === '777') { value += 850000; }
-    else if (num === '007') { value += 850000; }
-    else if (num === '001') { value += 850000; }
+    if (num === '777' || num === '007' || num === '001') { value += 850000; }
     else if (num.length === 3 && num[0] === num[1] && num[1] === num[2]) { value += 380000; }
     else if (num.startsWith('00')) { value += 120000; }
     else if (num.endsWith('00')) { value += 65000; }
     else if (num.length === 3 && num[0] === num[2]) { value += 15000; }
 
     if (letters.length === 3 && letters[0] === letters[1] && letters[1] === letters[2]) { value += 450000; }
-    if (letters === 'АМР') { value += 1500000; }
-    if (letters === 'ЕКХ') { value += 1500000; }
-    if (letters === 'СКР') { value += 700000; }
-    if (letters === 'САС') { value += 700000; }
-    if (letters === 'ВОР') { value += 700000; }
-    if (letters === 'МММ') { value += 700000; }
+    if (letters === 'АМР' || letters === 'ЕКХ') { value += 1500000; }
+    if (letters === 'СКР' || letters === 'САС' || letters === 'ВОР' || letters === 'МММ') { value += 700000; }
 
-    if (reg === '77') { value = Math.round(value * 1.3); }
-    if (reg === '99') { value = Math.round(value * 1.3); }
-    if (reg === '97') { value = Math.round(value * 1.3); }
-    if (reg === '777') { value = Math.round(value * 1.3); }
+    if (reg === '77' || reg === '99' || reg === '97' || reg === '777') {
+        value = Math.round(value * 1.3);
+    }
 
     if (value <= 2000) {
         return Math.floor(Math.random() * 1000) + 500;
@@ -52,9 +47,8 @@ function renderGarage() {
     const list = document.getElementById('garageList'); 
     if (!list) return; 
     
-    const totalSlots = getTotalGarageSlots(); 
-    let currentCount = 0;
-    if (state.garage && state.garage.length) currentCount = state.garage.length;
+    const totalSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2; 
+    let currentCount = (state.garage && state.garage.length) ? state.garage.length : 0;
     
     setTxt('garageDetailedSlots', currentCount + " из " + totalSlots + " боксов занято");
     
@@ -71,8 +65,8 @@ function renderGarage() {
     state.garage.forEach((car, idx) => {
         if (!car) return;
         
-        let cost = car.purchaseCost ? car.purchaseCost : (car.basePrice ? car.basePrice : (car.price ? car.price : 100000));
-        let carImg = car.img ? car.img : "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+        let cost = car.purchaseCost ? car.purchaseCost : (car.basePrice ? car.basePrice : 100000);
+        let carImg = car.img ? car.img : "assets/cars/economy/vaz-2107.jpg";
         let carType = car.type ? car.type.toUpperCase() : "ECONOMY";
         let carPlate = car.customPlate ? car.customPlate : (car.plate ? car.plate : "ТРАНЗИТ");
         let carPower = car.power ? car.power : 100;
@@ -84,7 +78,7 @@ function renderGarage() {
         const marketVal = baseVal + plateVal;
         car.marketValue = marketVal;
 
-        // Блок неисправностей
+        // Неисправности
         let defectBlock = "";
         if (car.hiddenDefect) {
             let defectText = car.hasAdditive ? "Присадка залита (Стук заглушен)" : (car.hiddenDefect.text ? car.hiddenDefect.text : "Неисправность узлов");
@@ -97,7 +91,7 @@ function renderGarage() {
             "</div>";
         }
 
-        // Блок штрафстоянки
+        // Штрафстоянка
         let impoundedBlock = "";
         if (car.impounded) {
             let daysAtLot = car.impoundedDays ? car.impoundedDays : 1;
@@ -115,7 +109,7 @@ function renderGarage() {
             "</div>";
         }
 
-        // Блок аннулированного учёта
+        // Аннулированный учёт (12.5.1)
         let unregBlock = "";
         if (car.unregistered) {
             unregBlock = 
@@ -132,26 +126,21 @@ function renderGarage() {
         }
 
         let isBlocked = car.impounded || car.unregistered;
-        let preSaleDisabled = isBlocked ? "disabled" : "";
-        let lotDisabled = isBlocked ? "disabled" : "";
-
         let dangerClass = (car.hiddenDefect && !car.hasAdditive) ? "card-danger" : "";
         let bonusPlateBlock = plateVal > 5000 
             ? "<div class='text-xs color-cyan font-bold'>+" + plateVal.toLocaleString() + " ₽ за номер</div>" 
             : "";
 
-        let carName = car.name ? car.name : "Автомобиль";
-
         htmlContent += 
         "<div class='glass-card mb-3 " + dangerClass + "'>" +
             "<div class='car-img-wrap' style='height: 140px;'>" +
-                "<img src='" + carImg + "' class='car-img' onerror=\"this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'\">" +
+                "<img src='" + carImg + "' class='car-img' onerror=\"this.src='assets/cars/economy/vaz-2107.jpg'\">" +
                 "<div class='badge-tag' style='bottom: 8px; right: 8px;'>" + carType + "</div>" +
                 "<div class='plate-corner'><div class='license-plate'>" + carPlate + " <div class='license-flag'>RUS</div></div></div>" +
             "</div>" +
             "<div class='flex-between mb-2'>" +
                 "<div>" +
-                    "<h4 class='font-bold'>" + carName + "</h4>" +
+                    "<h4 class='font-bold'>" + car.name + "</h4>" +
                     "<div class='sub-label'>" + carPower + " л.с. / Пробег: " + carMileageStr + " км / Сост: " + carCondition + "%</div>" +
                     "<div class='text-xs color-amber mt-1'>Куплена за: <b>" + cost.toLocaleString() + " ₽</b></div>" +
                 "</div>" +
@@ -166,11 +155,11 @@ function renderGarage() {
             unregBlock +
             "<div class='grid-2 mb-2'>" +
                 "<button onclick='openPreviewModal(" + idx + ")' class='btn btn-dark'>🔍 Осмотр / Звук</button>" +
-                "<button onclick='openPreSaleModal(" + idx + ")' class='btn btn-dark' " + preSaleDisabled + ">🪄 Предпродажка</button>" +
+                "<button onclick='openPreSaleModal(" + idx + ")' class='btn btn-dark' " + (isBlocked ? "disabled" : "") + ">🪄 Предпродажка</button>" +
             "</div>" +
             "<div class='grid-2 mb-2'>" +
-                "<button onclick='openTuningModal(" + idx + ")' class='btn btn-dark' " + preSaleDisabled + ">🛠 Тюнинг</button>" +
-                "<button onclick='openPutOnLotModal(" + idx + ")' class='btn btn-green' " + lotDisabled + ">🏪 На площадку</button>" +
+                "<button onclick='openTuningModal(" + idx + ")' class='btn btn-dark' " + (isBlocked ? "disabled" : "") + ">🛠 Тюнинг</button>" +
+                "<button onclick='openPutOnLotModal(" + idx + ")' class='btn btn-green' " + (isBlocked ? "disabled" : "") + ">🏪 На площадку</button>" +
             "</div>" +
             "<button onclick='scrapCar(" + idx + ")' class='btn btn-dark btn-sm w-full'>Сдать на разборку (-35% стоимости)</button>" +
         "</div>";
@@ -205,7 +194,7 @@ function registerCarAction(idx, method) {
         renderGarage();
         playSound('win');
         tgHaptic('success');
-        openVerdictModal("УЧЁТ ВОССТАНОВЛЕН! 📋", "Мастера СТО демонтировали нелегальный тюнинг и прошли техосмотр. Машина снова на номерах!", true);
+        openVerdictModal("УЧЁТ ВОССТАНОВЛЕН! 📋", "Мастера СТО демонтировали прямоток/тюнинг и прошли техосмотр. Машина снова чиста перед ДПС!", true);
     } else if (method === 'reshala') {
         let conn = (state.player && state.player.connections) ? state.player.connections : 0;
         if (conn < 2) return showToast("Нужно 2 Связи 🤝 для звонка Артуру!");
@@ -221,7 +210,7 @@ function registerCarAction(idx, method) {
 }
 
 function buyGarageSlot() { 
-    const cost = getGarageSlotCost();
+    const cost = (typeof getGarageSlotCost === 'function') ? getGarageSlotCost() : 250000;
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
 
     if (cash < cost) return showToast("Нужно " + cost.toLocaleString() + " ₽ на расширение!"); 
@@ -267,7 +256,7 @@ function openPreviewModal(idx) {
 
     const imgEl = document.getElementById("prevImg");
     if (imgEl) {
-        imgEl.src = car.img ? car.img : "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+        imgEl.src = car.img ? car.img : "assets/cars/economy/vaz-2107.jpg";
     }
     
     let cType = car.type ? car.type : "car";
@@ -987,7 +976,7 @@ function checkBarterEvent() {
     let nType = npcTemplate.type ? npcTemplate.type : 'economy';
     let nPower = npcTemplate.power ? npcTemplate.power : 100;
     let nBaseP = npcTemplate.basePrice ? npcTemplate.basePrice : 100000;
-    let nImg = npcTemplate.img ? npcTemplate.img : "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+    let nImg = npcTemplate.img ? npcTemplate.img : "assets/cars/economy/vaz-2107.jpg";
 
     pendingBarterCar = {
         myCarIdx: myCarIdx,
