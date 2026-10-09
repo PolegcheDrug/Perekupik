@@ -1,5 +1,6 @@
 // ===================== Вкладка: ЖИЗНЬ, БИЗНЕС И СЕРВИСЫ (js/life.js) =====================
 
+// ===================== 1. ТЕНЕВЫЕ СВЯЗИ (РЕШАЛА АРТУР) =====================
 function buyReshalaPack(type) {
     let cash = 0;
     if (state.player && state.player.cash) cash = state.player.cash;
@@ -139,13 +140,7 @@ function confirmLegalizeCar(carId) {
     let conn = 0;
     if (state.player && state.player.connections) conn = state.player.connections;
 
-    let noMoney = false;
-    if (cash < 200000) noMoney = true;
-    let noConn = false;
-    if (conn < 1) noConn = true;
-
-    if (noMoney) return showToast("Нужно 200,000 ₽ и 1 Связь 🤝!");
-    if (noConn) return showToast("Нужно 200,000 ₽ и 1 Связь 🤝!");
+    if (cash < 200000 || conn < 1) return showToast("Нужно 200,000 ₽ и 1 Связь 🤝!");
 
     state.player.cash -= 200000;
     state.player.connections -= 1;
@@ -241,34 +236,19 @@ function renderConfiscatedCardUI() {
     
     let conn = 0;
     if (state.player && state.player.connections) conn = state.player.connections;
+    let hasEnoughConn = conn >= lot.requiredConnections;
     
-    let hasEnoughConn = false;
-    if (conn >= lot.requiredConnections) hasEnoughConn = true;
-    
-    let minLvl = 12;
-    if (lot.isExclusive) minLvl = 20;
-    
+    let minLvl = lot.isExclusive ? 20 : 12;
     let lvl = 1;
     if (state.player && state.player.level) lvl = state.player.level;
-    
-    let isLevelOk = false;
-    if (lvl >= minLvl) isLevelOk = true;
+    let isLevelOk = lvl >= minLvl;
 
-    let titleText = "📦 Теневой конфискат (ФССП)";
-    let badgeClass = "bg-tag-purple";
-    let badgeText = "СКИДКА 45%";
-    let btnClass = "btn-purple";
+    let titleText = lot.isExclusive ? "👑 АРЕСТОВАННЫЙ ЭКСКЛЮЗИВ" : "📦 Теневой конфискат (ФССП)";
+    let badgeClass = lot.isExclusive ? "bg-tag-amber" : "bg-tag-purple";
+    let badgeText = lot.isExclusive ? "СКИДКА 50%" : "СКИДКА 45%";
+    let btnClass = lot.isExclusive ? "btn-amber" : "btn-purple";
 
-    if (lot.isExclusive) {
-        titleText = "👑 АРЕСТОВАННЫЙ ЭКСКЛЮЗИВ";
-        badgeClass = "bg-tag-amber";
-        badgeText = "СКИДКА 50%";
-        btnClass = "btn-amber";
-    }
-
-    let isDis = "";
-    if (!isLevelOk) isDis = "disabled";
-    else if (!hasEnoughConn) isDis = "disabled";
+    let isDis = (!isLevelOk || !hasEnoughConn) ? "disabled" : "";
 
     let btnText = "Выкупить (" + lot.price.toLocaleString() + " ₽ + " + lot.requiredConnections + " 🤝)";
     if (!isLevelOk) btnText = "С " + minLvl + " УРОВНЯ";
@@ -292,9 +272,7 @@ function buyConfiscatedCar() {
     const lot = state.confiscatedLot;
     if (!lot) return;
     
-    let minLvl = 12;
-    if (lot.isExclusive) minLvl = 20;
-
+    let minLvl = lot.isExclusive ? 20 : 12;
     let lvl = 1;
     if (state.player && state.player.level) lvl = state.player.level;
 
@@ -316,9 +294,7 @@ function buyConfiscatedCar() {
     state.player.cash -= lot.price;
     state.player.connections -= lot.requiredConnections;
     
-    let cChip = 0;
-    if (lot.isExclusive) cChip = 1;
-
+    let cChip = lot.isExclusive ? 1 : 0;
     const carToAdd = Object.assign({}, lot);
     carToAdd.id = 'car_conf_' + Date.now();
     carToAdd.purchaseCost = lot.price;
@@ -331,8 +307,7 @@ function buyConfiscatedCar() {
     renderGarage();
     renderConfiscatedCardUI();
     
-    let vTitle = "АВТО СО ШТРАФСТОЯНКИ! 🚔";
-    if (lot.isExclusive) vTitle = "РЕЗЕРВ ФССП ВЫКУПЛЕН! 👑";
+    let vTitle = lot.isExclusive ? "РЕЗЕРВ ФССП ВЫКУПЛЕН! 👑" : "АВТО СО ШТРАФСТОЯНКИ! 🚔";
 
     openVerdictModal(
         vTitle,
@@ -430,6 +405,16 @@ function repayLoan(percent) {
     showToast("Оплачено " + amt.toLocaleString() + " ₽ долга"); 
 }
 
+// ===================== 2. ИНТЕРАКТИВНЫЙ АВТОБИЗНЕС СО СНАБЖЕНИЕМ =====================
+
+const BUSINESS_SUPPLY_CONFIG = {
+    wash: { name: "Автошампунь & Воск", unitCost: 1500, stockPerPack: 25 },
+    shina: { name: "Грузики & Жгуты", unitCost: 2500, stockPerPack: 25 },
+    sto: { name: "Моторное масло & Фильтры", unitCost: 4500, stockPerPack: 25 },
+    shaurma: { name: "Мясо & Лаваши", unitCost: 3500, stockPerPack: 35 },
+    detailing: { name: "Керамика & Полироли", unitCost: 8000, stockPerPack: 25 }
+};
+
 function checkBusinessAccess() {
     const c = document.getElementById('businessList');
     const lock = document.getElementById('businessLockCover');
@@ -446,21 +431,14 @@ function checkBusinessAccess() {
     
     if (lock) lock.style.display = 'none';
     if (activeBox) activeBox.style.display = 'block';
-    
-    if (!c) return;
-    if (typeof BUSINESS_DATA === 'undefined') return;
+    if (!c || typeof BUSINESS_DATA === 'undefined') return;
     
     let html = "";
     state.businesses.forEach((b, i) => {
         if (!b) return;
-        let isMax = false;
-        if (b.level >= 10) isMax = true;
-        
-        let isLocked = false;
-        if (lvl < b.minLevel) isLocked = true;
-        
-        let cost = b.cost;
-        if (b.level > 0) cost = b.cost * (b.level + 1);
+        let isMax = b.level >= 10;
+        let isLocked = lvl < b.minLevel;
+        let cost = b.level > 0 ? b.cost * (b.level + 1) : b.cost;
         
         const defaultBizImgs = [
             'https://images.unsplash.com/photo-1601362840469-51e4d8d58785?w=400&q=80',
@@ -470,40 +448,48 @@ function checkBusinessAccess() {
         ];
         const imgSrc = defaultBizImgs[i % defaultBizImgs.length];
         
-        let lockBlock = "";
-        if (isLocked) {
-            lockBlock = "<div class='cooldown-timer' style='display:flex; opacity:1; font-size:14px;'><i class='fa-solid fa-lock mb-2'></i> С " + b.minLevel + " УРОВНЯ</div>";
-        }
+        let lockBlock = isLocked 
+            ? "<div class='cooldown-timer' style='display:flex; opacity:1; font-size:14px;'><i class='fa-solid fa-lock mb-2'></i> С " + b.minLevel + " УРОВНЯ</div>" 
+            : "";
         
-        let rankText = "Ур. " + b.level;
-        if (isMax) rankText = "MAX";
+        let rankText = isMax ? "MAX" : "Ур. " + b.level;
+        let lvlPct = (b.level / 10) * 100;
 
-        let storedBlock = "";
+        let stockVal = (typeof b.stock === 'number') ? b.stock : 100;
+        b.stock = stockVal;
+
+        let supplyConfig = BUSINESS_SUPPLY_CONFIG[b.id];
+        let supplyBuyCost = supplyConfig ? supplyConfig.unitCost : 3000;
+
+        let interactiveControlBlock = "";
         if (b.level > 0) {
-            let s = 0; if (b.stored) s = b.stored;
-            storedBlock = "<div class='color-green text-xs font-bold mb-2'>В кассе: " + s.toLocaleString() + " ₽</div>";
+            let s = b.stored || 0;
+            let stockColor = stockVal > 25 ? "color-green" : "color-red";
+            
+            interactiveControlBlock = 
+            "<div class='sub-label mb-1 flex-between'><span>Прокачка уровня:</span><b class='color-cyan'>" + b.level + "/10</b></div>" +
+            "<div class='biz-progress-track'><div class='biz-progress-fill fill-biz-lvl' style='width:" + lvlPct + "%;'></div></div>" +
+            
+            "<div class='sub-label mb-1 flex-between'><span>Запас сырья:</span><b class='" + stockColor + "'>" + stockVal + "%</b></div>" +
+            "<div class='biz-progress-track'><div class='biz-progress-fill fill-biz-stock' style='width:" + stockVal + "%;'></div></div>" +
+            
+            "<div class='color-green text-xs font-bold mb-2'>В кассе: " + s.toLocaleString() + " ₽</div>" +
+            
+            "<div class='grid-2 mb-2'>" +
+                "<button onclick='refillBusinessStock(" + i + ")' class='btn btn-amber btn-sm'>📦 Сырьё (" + supplyBuyCost.toLocaleString() + " ₽)</button>" +
+                "<button onclick='upgradeBusiness(" + i + ")' class='btn " + (isMax ? "btn-dark" : "btn-cyan") + " btn-sm' " + (isMax ? "disabled" : "") + ">" + 
+                    (isMax ? "Макс" : "Апгрейд (" + cost.toLocaleString() + " ₽)") + 
+                "</button>" +
+            "</div>";
+        } else {
+            let dis = isLocked ? "disabled" : "";
+            let btnText = isLocked ? "С " + b.minLevel + " ур" : "Купить (" + cost.toLocaleString() + " ₽)";
+            interactiveControlBlock = "<button onclick='upgradeBusiness(" + i + ")' class='btn btn-cyan btn-sm' " + dis + ">" + btnText + "</button>";
         }
-        
-        let btnClass = "btn-cyan";
-        if (isMax) btnClass = "btn-dark";
 
-        let dis = "";
-        if (isMax || isLocked) dis = "disabled";
-
-        let btnText = "Купить (" + cost.toLocaleString() + " ₽)";
-        if (isMax) btnText = "Максимум";
-        else if (isLocked) btnText = "С " + b.minLevel + " ур";
-        else if (b.level > 0) btnText = "Улучшить (" + cost.toLocaleString() + " ₽)";
-
-        let cardClass = "business-card";
-        if (!isLocked) cardClass += " unlocked";
-
-        let imgClass = "business-img-box";
-        if (isLocked) imgClass += " item-locked";
-
-        let bInc = 0; if (b.income) bInc = b.income;
-        let bLvl = 0; if (b.level) bLvl = b.level;
-        let incTotal = bInc * bLvl;
+        let cardClass = isLocked ? "business-card" : "business-card unlocked";
+        let imgClass = isLocked ? "business-img-box item-locked" : "business-img-box";
+        let bInc = (b.income || 0) * (b.level || 0);
 
         html += 
         "<div class='" + cardClass + "'>" +
@@ -515,37 +501,54 @@ function checkBusinessAccess() {
             "<div class='business-content'>" +
                 "<div class='flex-between mb-1'>" +
                     "<b class='text-xs'>" + b.name + "</b>" +
-                    "<div class='sub-label'>Доход: <span class='color-green font-bold'>" + incTotal.toLocaleString() + " ₽</span></div>" +
+                    "<div class='sub-label'>Доход: <span class='color-green font-bold'>" + bInc.toLocaleString() + " ₽</span></div>" +
                 "</div>" +
-                "<div class='business-perk-badge'>⭐ Перк: " + (b.perk ? b.perk : 'Пассивный доход') + "</div>" +
-                storedBlock +
-                "<button onclick='upgradeBusiness(" + i + ")' class='btn " + btnClass + " btn-sm' " + dis + ">" + btnText + "</button>" +
+                "<div class='business-perk-badge'>⭐ Перк: " + (b.perk || 'Пассивный доход') + "</div>" +
+                interactiveControlBlock +
             "</div>" +
         "</div>";
     });
     c.innerHTML = html;
 }
 
+function refillBusinessStock(idx) {
+    const b = state.businesses[idx];
+    if (!b || b.level <= 0) return;
+    
+    let curStock = b.stock || 0;
+    if (curStock >= 100) return showToast("Склады сырья заполнены на 100%!");
+    
+    let supplyConfig = BUSINESS_SUPPLY_CONFIG[b.id];
+    let cost = supplyConfig ? supplyConfig.unitCost : 3000;
+    let addPack = supplyConfig ? supplyConfig.stockPerPack : 25;
+    
+    let cash = state.player?.cash || 0;
+    if (cash < cost) return showToast("Не хватает " + cost.toLocaleString() + " ₽ на сырьё!");
+    
+    state.player.cash -= cost;
+    b.stock = Math.min(100, curStock + addPack);
+    saveState();
+    checkBusinessAccess();
+    playSound('tick');
+    tgHaptic('success');
+    showToast("Сырьё поставлено (+ " + addPack + "%)!");
+}
+
 function upgradeBusiness(idx) {
     const b = state.businesses[idx];
     if (!b) return;
     
-    let lvl = 1;
-    if (state.player && state.player.level) lvl = state.player.level;
-
+    let lvl = state.player?.level || 1;
     if (lvl < b.minLevel) return showToast("Этот бизнес доступен с " + b.minLevel + " уровня!");
     if (b.level >= 10) return showToast("Бизнес достиг максимума!");
     
-    let cost = b.cost;
-    if (b.level > 0) cost = b.cost * (b.level + 1);
-    
-    let cash = 0;
-    if (state.player && state.player.cash) cash = state.player.cash;
-
+    let cost = b.level > 0 ? b.cost * (b.level + 1) : b.cost;
+    let cash = state.player?.cash || 0;
     if (cash < cost) return showToast("Не хватает денег!");
     
     state.player.cash -= cost;
     b.level += 1;
+    if (!b.stock) b.stock = 100;
     saveState(); 
     checkBusinessAccess();
     showToast("Бизнес «" + b.name + "» улучшен до " + b.level + " уровня!");
@@ -573,11 +576,21 @@ function collectAllBusinessCash() {
     showToast("Инкассация: снято " + totalCollected.toLocaleString() + " ₽!");
 }
 
+// ===================== 3. МАГАЗИН ПЕРЕКУПА (С РАЗДЕЛОМ РАСХОДНИКИ) =====================
+
 const SHOP_TOOLS = [
-    { id: 'gauge', name: 'Цифровой толщиномер ET-111', icon: 'fa-ruler-combined', price: 25000, desc: 'Бесплатно и точно измеряет ЛКП (шпаклёвку/окрасы) на авторынке.', reqLvl: 1 },
-    { id: 'obd', name: 'OBD2 Сканер «Вася-Диагност Pro»', icon: 'fa-laptop-code', price: 65000, desc: 'Открывает диагностику блоков ЭБУ, мотора и коробки перед сделкой.', reqLvl: 5 },
-    { id: 'endoscope', name: 'Поворотный HD-Эндоскоп', icon: 'fa-camera', price: 110000, desc: 'Заглядывает в цилиндры: защита от покупки задиристых моторов.', reqLvl: 10 },
-    { id: 'compressor', name: 'Турбо-бустер и компрессор 12V', icon: 'fa-bolt', price: 40000, desc: '+10 к успеху при выезде на помощь на дороге и реанимации сараев.', reqLvl: 8 }
+    { id: 'gauge', name: 'Цифровой толщиномер ET-111', icon: 'fa-ruler-combined', price: 25000, desc: 'Бесплатно и точно измеряет ЛКП на авторынке.', reqLvl: 1 },
+    { id: 'obd', name: 'OBD2 Сканер «Вася-Диагност Pro»', icon: 'fa-laptop-code', price: 65000, desc: 'Открывает чтение блоков ЭБУ и мотора перед сделкой.', reqLvl: 5 },
+    { id: 'endoscope', name: 'Поворотный HD-Эндоскоп', icon: 'fa-camera', price: 110000, desc: 'Заглядывает в цилиндры: защита от покупки задиров.', reqLvl: 10 },
+    { id: 'compressor', name: 'Турбо-бустер и компрессор 12V', icon: 'fa-bolt', price: 40000, desc: '+10 к успеху при выезде на помощь на трассе.', reqLvl: 8 }
+];
+
+const SHOP_CONSUMABLES = [
+    { id: 'wash', name: 'Канистра автошампуня (Для автомойки)', cost: 1500, stockBonus: 25, icon: 'fa-soap', desc: '+25% сырья для работы автомойки' },
+    { id: 'shina', name: 'Набор грузиков и жгутов (Для шинки)', cost: 2500, stockBonus: 25, icon: 'fa-circle-notch', desc: '+25% расходников на балансировку' },
+    { id: 'sto', name: 'Бочка моторного масла 5W-40 (Для СТО)', cost: 4500, stockBonus: 25, icon: 'fa-oil-can', desc: '+25% масел и расходников для сервиса' },
+    { id: 'shaurma', name: 'Партия свежего мяса и лавашей (Шаурма)', cost: 3500, stockBonus: 35, icon: 'fa-drumstick-bite', desc: '+35% сырья для точки с фастфудом' },
+    { id: 'detailing', name: 'Керамика & Полировальные круги', cost: 8000, stockBonus: 25, icon: 'fa-wand-magic-sparkles', desc: '+25% химии для студии детейлинга' }
 ];
 
 const SHOP_SUPPLIES = [
@@ -587,28 +600,70 @@ const SHOP_SUPPLIES = [
 ];
 
 function switchShopSection(sec) {
-    const list = ['tools', 'plates', 'supplies'];
+    const list = ['tools', 'consumables', 'plates', 'supplies'];
     list.forEach(s => {
         const btn = document.getElementById("shopTab-" + s);
         const block = document.getElementById("shopSec-" + s);
         if (btn) {
-            if (s === sec) {
-                btn.classList.add('btn-cyan');
-                btn.classList.remove('btn-dark');
-            } else {
-                btn.classList.add('btn-dark');
-                btn.classList.remove('btn-cyan');
-            }
+            btn.classList.toggle('btn-cyan', s === sec);
+            btn.classList.toggle('btn-dark', s !== sec);
         }
         if (block) {
-            if (s === sec) block.style.display = 'block';
-            else block.style.display = 'none';
+            block.style.display = (s === sec) ? 'block' : 'none';
         }
     });
 
     if (sec === 'tools') renderShopTools();
+    if (sec === 'consumables') renderShopConsumables();
     if (sec === 'plates') renderShopPlates();
     if (sec === 'supplies') renderShopSupplies();
+}
+
+function renderShopConsumables() {
+    const container = document.getElementById('shopConsumablesList');
+    if (!container) return;
+    
+    let html = "";
+    SHOP_CONSUMABLES.forEach(c => {
+        let linkedBiz = state.businesses ? state.businesses.find(b => b.id === c.id) : null;
+        let isOwned = linkedBiz && linkedBiz.level > 0;
+        let stockVal = linkedBiz ? (linkedBiz.stock || 0) : 0;
+
+        html += 
+        "<div class='glass-card p-3 mb-2 flex-between'>" +
+            "<div style='flex:1; padding-right:12px;'>" +
+                "<div class='flex-between mb-1'>" +
+                    "<b class='font-bold text-xs color-amber'><i class='fa-solid " + c.icon + "'></i> " + c.name + "</b>" +
+                    "<span class='text-xs font-bold color-green'>" + c.cost.toLocaleString() + " ₽</span>" +
+                "</div>" +
+                "<div class='sub-label mb-1'>" + c.desc + "</div>" +
+                (isOwned ? "<div class='text-xs color-cyan'>Запас на предприятии: <b>" + stockVal + "%</b></div>" : "<div class='sub-label color-red'>Предприятие не куплено</div>") +
+            "</div>" +
+            "<button onclick=\"buyConsumableForBiz('" + c.id + "', " + c.cost + ", " + c.stockBonus + ")\" class='btn btn-amber btn-auto btn-sm' " + (!isOwned ? "disabled" : "") + ">" +
+                "Купить" +
+            "</button>" +
+        "</div>";
+    });
+    container.innerHTML = html;
+}
+
+function buyConsumableForBiz(bizId, cost, stockBonus) {
+    let cash = state.player?.cash || 0;
+    if (cash < cost) return showToast("Не хватает " + cost.toLocaleString() + " ₽!");
+    
+    let targetBiz = state.businesses ? state.businesses.find(b => b.id === bizId) : null;
+    if (!targetBiz || targetBiz.level <= 0) return showToast("Сначала приобретите это предприятие!");
+    
+    let curStock = targetBiz.stock || 0;
+    if (curStock >= 100) return showToast("Склады уже заполнены на 100%!");
+    
+    state.player.cash -= cost;
+    targetBiz.stock = Math.min(100, curStock + stockBonus);
+    saveState();
+    renderShopConsumables();
+    playSound('tick');
+    tgHaptic('success');
+    showToast("Сырьё куплено и развезено на базу (+ " + stockBonus + "%)!");
 }
 
 function renderShopTools() {
@@ -619,54 +674,27 @@ function renderShopTools() {
         state.player.tools = { gauge: false, obd: false, endoscope: false, compressor: false };
     }
 
-    let hasGauge = false;
-    if (state.player && state.player.tools && state.player.tools.gauge) hasGauge = true;
-
-    let hasObd = false;
-    if (state.player && state.player.tools && state.player.tools.obd) hasObd = true;
-
-    let lvl = 1;
-    if (state.player && state.player.level) lvl = state.player.level;
-
-    let canDoContracts = false;
-    if (hasGauge && hasObd && lvl >= 15) canDoContracts = true;
+    let hasGauge = !!(state.player && state.player.tools && state.player.tools.gauge);
+    let hasObd = !!(state.player && state.player.tools && state.player.tools.obd);
+    let lvl = state.player?.level || 1;
+    let canDoContracts = hasGauge && hasObd && lvl >= 15;
 
     const statusBadge = document.getElementById('syndicateEquipStatus');
     if (statusBadge) {
-        if (canDoContracts) {
-            statusBadge.innerText = "Заказы: Доступны ✓";
-            statusBadge.className = "tag-badge bg-tag-green";
-        } else {
-            statusBadge.innerText = "Заказы: Нужен Толщиномер + OBD";
-            statusBadge.className = "tag-badge bg-tag-amber";
-        }
+        statusBadge.innerText = canDoContracts ? "Заказы: Доступны ✓" : "Заказы: Нужен Толщиномер + OBD";
+        statusBadge.className = canDoContracts ? "tag-badge bg-tag-green" : "tag-badge bg-tag-amber";
     }
 
     let html = "";
     SHOP_TOOLS.forEach(tool => {
-        let isOwned = false;
-        if (state.player && state.player.tools && state.player.tools[tool.id]) isOwned = true;
-        
-        let isLocked = false;
-        if (lvl < tool.reqLvl) isLocked = true;
-
-        let statusColor = "color-amber";
-        if (isOwned) statusColor = "color-green";
-
-        let statusText = tool.price.toLocaleString() + " ₽";
-        if (isOwned) statusText = "КУПЛЕНО ✓";
-
-        let lockHtml = "";
-        if (isLocked) lockHtml = "<div class='sub-label color-red font-bold'>С " + tool.reqLvl + " уровня</div>";
-
-        let btnClass = "btn-cyan";
-        if (isOwned) btnClass = "btn-dark";
-
-        let dis = "";
-        if (isOwned || isLocked) dis = "disabled";
-
-        let btnText = "Купить";
-        if (isOwned) btnText = "В наличии";
+        let isOwned = !!(state.player && state.player.tools && state.player.tools[tool.id]);
+        let isLocked = lvl < tool.reqLvl;
+        let statusColor = isOwned ? "color-green" : "color-amber";
+        let statusText = isOwned ? "КУПЛЕНО ✓" : tool.price.toLocaleString() + " ₽";
+        let lockHtml = isLocked ? "<div class='sub-label color-red font-bold'>С " + tool.reqLvl + " уровня</div>" : "";
+        let btnClass = isOwned ? "btn-dark" : "btn-cyan";
+        let dis = (isOwned || isLocked) ? "disabled" : "";
+        let btnText = isOwned ? "В наличии" : "Купить";
 
         html += 
         "<div class='glass-card p-3 mb-2 flex-between'>" +
@@ -688,9 +716,7 @@ function buyShopTool(toolId) {
     const tool = SHOP_TOOLS.find(t => t.id === toolId);
     if (!tool) return;
     
-    let cash = 0;
-    if (state.player && state.player.cash) cash = state.player.cash;
-
+    let cash = state.player?.cash || 0;
     if (cash < tool.price) return showToast("Не хватает денег на прибор!");
     state.player.cash -= tool.price;
     state.player.tools[toolId] = true;
@@ -725,18 +751,14 @@ function buyShopSupply(itemId) {
     const item = SHOP_SUPPLIES.find(i => i.id === itemId);
     if (!item) return;
     
-    let cash = 0;
-    if (state.player && state.player.cash) cash = state.player.cash;
-
+    let cash = state.player?.cash || 0;
     if (cash < item.cost) return showToast("Не хватает денег!");
     state.player.cash -= item.cost;
     
-    let hng = 80;
-    if (state.player && state.player.hunger) hng = state.player.hunger;
+    let hng = state.player?.hunger || 80;
     state.player.hunger = Math.min(100, hng + item.hunger);
     
-    let mod = 85;
-    if (state.player && state.player.mood) mod = state.player.mood;
+    let mod = state.player?.mood || 85;
     state.player.mood = Math.min(100, mod + item.mood);
     
     saveState();
@@ -748,11 +770,7 @@ function renderShopPlates() {
     const container = document.getElementById('plateMarketListDetailed');
     if (!container) return;
     
-    let noPlates = false;
-    if (!state.plateCatalog) noPlates = true;
-    else if (state.plateCatalog.length === 0) noPlates = true;
-
-    if (noPlates) {
+    if (!state.plateCatalog || state.plateCatalog.length === 0) {
         if (typeof refreshPlateCatalog === 'function') refreshPlateCatalog();
     }
     
@@ -760,10 +778,8 @@ function renderShopPlates() {
     if (state.plateCatalog) {
         state.plateCatalog.forEach((item, idx) => {
             if (!item) return;
-            let price = 0;
-            if (item.price) price = item.price;
-            let pStr = "ТРАНЗИТ";
-            if (item.plate) pStr = item.plate;
+            let price = item.price || 0;
+            let pStr = item.plate || "ТРАНЗИТ";
 
             html += 
             "<div class='glass-card flex-between p-2 mb-2'>" +
@@ -782,9 +798,7 @@ function buyPlateFromShop(idx) {
     const item = state.plateCatalog[idx];
     if (!item) return;
     
-    let cash = 0;
-    if (state.player && state.player.cash) cash = state.player.cash;
-
+    let cash = state.player?.cash || 0;
     if (cash < item.price) return showToast("Не хватает денег на госномер!");
     state.player.cash -= item.price;
     if (!state.ownedPlates) state.ownedPlates = [];
@@ -795,6 +809,8 @@ function buyPlateFromShop(idx) {
     tgHaptic('success');
     showToast("Госномер " + item.plate + " добавлен в коллекцию!");
 }
+
+// ===================== 4. ЗАКАЗЫ СИНДИКАТА =====================
 
 const CONTRACT_CLIENT_TYPES = [
     { client: "Бизнесмен Игорь", avatar: "💼", reqClass: "premium", minHp: 240, cleanOnly: true, desc: "Строгий представительский авто для деловых встреч." },
@@ -813,8 +829,7 @@ function generateContracts() {
         else if (t.reqClass === 'comfort') rb = 250000;
         
         const reward = Math.round(rb * (0.9 + Math.random() * 0.35));
-        let bxp = 60;
-        if (t.reqClass === 'premium') bxp = 120;
+        let bxp = t.reqClass === 'premium' ? 120 : 60;
 
         state.contracts.push({
             id: 'cnt_' + Date.now() + '_' + i,
@@ -834,9 +849,7 @@ function renderContracts() {
     const c = document.getElementById('contractsList');
     const lock = document.getElementById('contractsLockCover');
     
-    let lvl = 1;
-    if (state.player && state.player.level) lvl = state.player.level;
-
+    let lvl = state.player?.level || 1;
     if (lvl < 15) {
         if (c) c.style.display = 'none';
         if (lock) lock.style.display = 'block';
@@ -846,16 +859,10 @@ function renderContracts() {
     if (!c) return;
     c.style.display = 'block';
     
-    let hasGauge = false;
-    if (state.player && state.player.tools && state.player.tools.gauge) hasGauge = true;
+    let hasGauge = !!(state.player && state.player.tools && state.player.tools.gauge);
+    let hasObd = !!(state.player && state.player.tools && state.player.tools.obd);
 
-    let hasObd = false;
-    if (state.player && state.player.tools && state.player.tools.obd) hasObd = true;
-
-    let hasTools = false;
-    if (hasGauge && hasObd) hasTools = true;
-
-    if (!hasTools) {
+    if (!hasGauge || !hasObd) {
         c.innerHTML = 
         "<div class='glass-card text-center py-6'>" +
             "<i class='fa-solid fa-lock color-amber' style='font-size:32px; margin-bottom:10px;'></i>" +
@@ -866,11 +873,7 @@ function renderContracts() {
         return;
     }
 
-    let noContr = false;
-    if (!state.contracts) noContr = true;
-    else if (state.contracts.length === 0) noContr = true;
-
-    if (noContr) {
+    if (!state.contracts || state.contracts.length === 0) {
         generateContracts();
     }
 
@@ -881,35 +884,27 @@ function renderContracts() {
         let suitableCar = null;
         if (state.garage && state.garage.length > 0) {
             suitableCar = state.garage.find(car => {
-                if (!car) return false;
-                if (car.type !== cnt.reqClass) return false;
-                if (car.impounded) return false;
-                let cPow = 100;
-                if (car.power) cPow = car.power;
+                if (!car || car.type !== cnt.reqClass || car.impounded) return false;
+                let cPow = car.power || 100;
                 if (cPow < cnt.minHp) return false;
                 if (cnt.cleanOnly && car.isStolen) return false;
                 return true;
             });
         }
 
-        let btnClass = "btn-dark";
-        let btnText = "Нет подходящего авто в гараже";
-        if (suitableCar) {
-            btnClass = "btn-green";
-            let sName = "Авто"; if (suitableCar.name) sName = suitableCar.name;
-            let cRew = 0; if (cnt.reward) cRew = cnt.reward;
-            btnText = "✓ Отдать «" + sName + "» (Выплата +" + cRew.toLocaleString() + " ₽)";
-        }
-        
-        let cRew = 0; if (cnt.reward) cRew = cnt.reward;
-        let cAva = ""; if (cnt.avatar) cAva = cnt.avatar;
-        let cClient = ""; if (cnt.client) cClient = cnt.client;
-        let cDesc = ""; if (cnt.desc) cDesc = cnt.desc;
-        let cClass = ""; if (cnt.reqClass) cClass = cnt.reqClass.toUpperCase();
-        let cHp = 0; if (cnt.minHp) cHp = cnt.minHp;
-        
-        let cleanText = "Любая история";
-        if (cnt.cleanOnly) cleanText = "Только чистый VIN";
+        let btnClass = suitableCar ? "btn-green" : "btn-dark";
+        let sName = suitableCar ? (suitableCar.name || "Авто") : "";
+        let cRew = cnt.reward || 0;
+        let btnText = suitableCar 
+            ? "✓ Отдать «" + sName + "» (Выплата +" + cRew.toLocaleString() + " ₽)" 
+            : "Нет подходящего авто в гараже";
+
+        let cAva = cnt.avatar || "";
+        let cClient = cnt.client || "";
+        let cDesc = cnt.desc || "";
+        let cClass = cnt.reqClass ? cnt.reqClass.toUpperCase() : "";
+        let cHp = cnt.minHp || 0;
+        let cleanText = cnt.cleanOnly ? "Только чистый VIN" : "Любая история";
 
         html += 
         "<div class='glass-card mb-2' style='border-left: 4px solid var(--cyan);'>" +
@@ -935,11 +930,8 @@ function completeContract(idx) {
     let carIdx = -1;
     if (state.garage && state.garage.length > 0) {
         carIdx = state.garage.findIndex(car => {
-            if (!car) return false;
-            if (car.type !== cnt.reqClass) return false;
-            if (car.impounded) return false;
-            let cPow = 100;
-            if (car.power) cPow = car.power;
+            if (!car || car.type !== cnt.reqClass || car.impounded) return false;
+            let cPow = car.power || 100;
             if (cPow < cnt.minHp) return false;
             if (cnt.cleanOnly && car.isStolen) return false;
             return true;
@@ -947,31 +939,23 @@ function completeContract(idx) {
     }
 
     if (carIdx === -1) {
-        let rClass = ""; if (cnt.reqClass) rClass = cnt.reqClass.toUpperCase();
+        let rClass = cnt.reqClass ? cnt.reqClass.toUpperCase() : "";
         return showToast("Нужен не арестованный авто класса " + rClass + " от " + cnt.minHp + " л.с.!");
     }
 
     const car = state.garage[carIdx];
     state.garage.splice(carIdx, 1);
 
-    let mVal = 100000;
-    if (car.marketValue) mVal = car.marketValue;
-    else if (car.price) mVal = car.price;
-
-    let cRew = 0; if (cnt.reward) cRew = cnt.reward;
-
+    let mVal = car.marketValue || car.price || 100000;
+    let cRew = cnt.reward || 0;
     const totalPayout = mVal + cRew;
     state.player.cash += totalPayout;
     
     if (!state.player.stats) state.player.stats = {};
-    if (!state.player.stats.sold) state.player.stats.sold = 0;
-    state.player.stats.sold += 1;
-
-    if (!state.player.stats.totalNetProfit) state.player.stats.totalNetProfit = 0;
-    state.player.stats.totalNetProfit += cRew;
+    state.player.stats.sold = (state.player.stats.sold || 0) + 1;
+    state.player.stats.totalNetProfit = (state.player.stats.totalNetProfit || 0) + cRew;
     
-    let bxp = 50; if (cnt.bonusXp) bxp = cnt.bonusXp;
-    addXp(bxp);
+    addXp(cnt.bonusXp || 50);
 
     state.contracts.splice(idx, 1);
     saveState();
@@ -981,15 +965,13 @@ function completeContract(idx) {
     tgHaptic('success');
     playSound('win');
     
-    let cClient = ""; if (cnt.client) cClient = cnt.client;
-    let cName = "Авто"; if (car.name) cName = car.name;
-
+    let cClient = cnt.client || "";
+    let cName = car.name || "Авто";
     openVerdictModal("ЗАКАЗ ВЫПОЛНЕН! 🤝", cClient + " забрал " + cName + ". Оплата зачислена!", true, totalPayout, cRew);
 }
 
 function refreshContractsManual() {
-    let cash = 0;
-    if (state.player && state.player.cash) cash = state.player.cash;
+    let cash = state.player?.cash || 0;
     if (cash < 15000) return showToast("Обновление базы стоит 15,000 ₽!");
     
     state.player.cash -= 15000;
@@ -999,32 +981,23 @@ function refreshContractsManual() {
     showToast("Список заказов обновлен!");
 }
 
+// ===================== 5. САРАИ (ГАРАЖНЫЕ НАХОДКИ) =====================
+
 function renderBarnFind() {
     const b = document.getElementById('barnFindContent');
-    if (!b) return;
-    if (typeof BARN_FINDS === 'undefined') return;
+    if (!b || typeof BARN_FINDS === 'undefined') return;
 
-    let lDay = 0;
-    if (state.player && state.player.lastBarnDay) lDay = state.player.lastBarnDay;
-    
-    let pDay = 1;
-    if (state.player && state.player.day) pDay = state.player.day;
-
-    let canExplore = false;
-    if (lDay < pDay) canExplore = true;
+    let lDay = state.player?.lastBarnDay || 0;
+    let pDay = state.player?.day || 1;
+    let canExplore = lDay < pDay;
 
     let html = "";
     BARN_FINDS.forEach((barn, i) => {
-        let bName = ""; if (barn.name) bName = barn.name;
-        let bVal = 0; if (barn.marketValue) bVal = barn.marketValue;
-        let bImg = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
-        if (barn.img) bImg = barn.img;
-
-        let dis = "";
-        if (!canExplore) dis = "disabled";
-
-        let btnText = "Разведать сарай (50,000 ₽)";
-        if (!canExplore) btnText = "Разведка будет доступна завтра";
+        let bName = barn.name || "";
+        let bVal = barn.marketValue || 0;
+        let bImg = barn.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+        let dis = canExplore ? "" : "disabled";
+        let btnText = canExplore ? "Разведать сарай (50,000 ₽)" : "Разведка будет доступна завтра";
 
         html += 
         "<div class='barn-tier-card'>" +
@@ -1042,29 +1015,16 @@ function renderBarnFind() {
 }
 
 function exploreBarn(idx) {
-    let lDay = 0;
-    if (state.player && state.player.lastBarnDay) lDay = state.player.lastBarnDay;
-    let pDay = 1;
-    if (state.player && state.player.day) pDay = state.player.day;
-
-    if (lDay >= pDay) {
-        return showToast("Разведка доступна только 1 раз в день!");
-    }
+    let lDay = state.player?.lastBarnDay || 0;
+    let pDay = state.player?.day || 1;
+    if (lDay >= pDay) return showToast("Разведка доступна только 1 раз в день!");
     
-    let cash = 0;
-    if (state.player && state.player.cash) cash = state.player.cash;
-
-    if (cash < 50000) {
-        return showToast("Не хватает 50,000 ₽ на разведку!");
-    }
+    let cash = state.player?.cash || 0;
+    if (cash < 50000) return showToast("Не хватает 50,000 ₽ на разведку!");
     
     const maxSlots = getTotalGarageSlots();
-    let currentSlots = 0;
-    if (state.garage && state.garage.length) currentSlots = state.garage.length;
-
-    if (currentSlots >= maxSlots) {
-        return showToast("В гараже нет свободного места! Вместимость: " + maxSlots + " мест.");
-    }
+    let currentSlots = state.garage ? state.garage.length : 0;
+    if (currentSlots >= maxSlots) return showToast("В гараже нет свободного места! Вместимость: " + maxSlots + " мест.");
 
     state.player.cash -= 50000;
     state.player.lastBarnDay = pDay;
@@ -1073,14 +1033,12 @@ function exploreBarn(idx) {
     if (!template) return;
 
     const plate = 'С777ВВ 77';
-    
-    let tName = "Авто"; if (template.name) tName = template.name;
-    let tPow = 120; if (template.power) tPow = template.power;
-    let tType = "economy"; if (template.type) tType = template.type;
-    let tBaseP = 400000; if (template.basePrice) tBaseP = template.basePrice;
-    let tMVal = 800000; if (template.marketValue) tMVal = template.marketValue;
-    let tImg = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
-    if (template.img) tImg = template.img;
+    let tName = template.name || "Авто";
+    let tPow = template.power || 120;
+    let tType = template.type || "economy";
+    let tBaseP = template.basePrice || 400000;
+    let tMVal = template.marketValue || 800000;
+    let tImg = template.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
 
     const foundCar = {
         id: 'barn_' + Date.now(),
@@ -1114,23 +1072,22 @@ function exploreBarn(idx) {
     openVerdictModal("НАХОДКА! 🏚️", "Вы нашли «" + tName + "»! Автомобиль доставлен в бокс и ждёт восстановления.", true);
 }
 
+// ===================== 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ =====================
+
 const activeContainerTimers = {};
 
 function renderContainersList() {
     const r = document.getElementById('containersListRender');
     const lock = document.getElementById('containersLockCover');
     
-    let lvl = 1;
-    if (state.player && state.player.level) lvl = state.player.level;
-
+    let lvl = state.player?.level || 1;
     if (lvl < 20) {
         if (r) r.style.display = 'none';
         if (lock) lock.style.display = 'block';
         return;
     }
     if (lock) lock.style.display = 'none';
-    if (!r) return;
-    if (typeof CONTAINER_ITEMS === 'undefined') return;
+    if (!r || typeof CONTAINER_ITEMS === 'undefined') return;
     
     r.style.display = 'block';
 
@@ -1138,31 +1095,20 @@ function renderContainersList() {
     CONTAINER_ITEMS.forEach(item => {
         if (!item) return;
 
-        let isOpening = false;
-        if (activeContainerTimers[item.id]) isOpening = true;
+        let isOpening = !!activeContainerTimers[item.id];
+        let progress = isOpening ? activeContainerTimers[item.id].progress : 0;
+        let secondsLeft = isOpening ? activeContainerTimers[item.id].secondsLeft : item.timer;
 
-        let progress = 0;
-        if (isOpening) progress = activeContainerTimers[item.id].progress;
+        let iImg = item.img || "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80";
+        let iBadge = item.badge || "";
+        let iName = item.name || "Контейнер";
+        let iCost = item.cost || 0;
+        let iDesc = item.desc || "";
+        let iTimer = item.timer || 30;
 
-        let secondsLeft = item.timer;
-        if (isOpening) secondsLeft = activeContainerTimers[item.id].secondsLeft;
-
-        let iImg = "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80";
-        if (item.img) iImg = item.img;
-        let iBadge = ""; if (item.badge) iBadge = item.badge;
-        let iName = "Контейнер"; if (item.name) iName = item.name;
-        let iCost = 0; if (item.cost) iCost = item.cost;
-        let iDesc = ""; if (item.desc) iDesc = item.desc;
-        let iTimer = 30; if (item.timer) iTimer = item.timer;
-
-        let dis = "";
-        if (isOpening) dis = "disabled";
-
-        let wrapDisp = "none";
-        if (isOpening) wrapDisp = "block";
-
-        let btnText = "Открыть контейнер (" + iCost.toLocaleString() + " ₽)";
-        if (isOpening) btnText = "Вскрытие... (" + secondsLeft + "с)";
+        let dis = isOpening ? "disabled" : "";
+        let wrapDisp = isOpening ? "block" : "none";
+        let btnText = isOpening ? "Вскрытие... (" + secondsLeft + "с)" : "Открыть контейнер (" + iCost.toLocaleString() + " ₽)";
 
         html += 
         "<div class='glass-card mb-3'>" +
@@ -1190,15 +1136,11 @@ function renderContainersList() {
 function startContainerUnboxing(type, price, durationSec) {
     if (activeContainerTimers[type]) return showToast("Контейнер уже вскрывается!");
     
-    let cash = 0;
-    if (state.player && state.player.cash) cash = state.player.cash;
-
+    let cash = state.player?.cash || 0;
     if (cash < price) return showToast("Не хватает денег на покупку контейнера!");
     
     const maxSlots = getTotalGarageSlots();
-    let currentSlots = 0;
-    if (state.garage && state.garage.length) currentSlots = state.garage.length;
-
+    let currentSlots = state.garage ? state.garage.length : 0;
     if (currentSlots >= maxSlots) return showToast("Гараж полон! Освободите место.");
 
     state.player.cash -= price;
@@ -1218,11 +1160,8 @@ function startContainerUnboxing(type, price, durationSec) {
 
     const interval = setInterval(() => {
         elapsed += 1;
-        let pct = (elapsed / totalDuration) * 100;
-        if (pct > 100) pct = 100;
-        
-        let rem = totalDuration - elapsed;
-        if (rem < 0) rem = 0;
+        let pct = Math.min(100, (elapsed / totalDuration) * 100);
+        let rem = Math.max(0, totalDuration - elapsed);
 
         if (activeContainerTimers[type]) {
             activeContainerTimers[type].progress = pct;
@@ -1276,12 +1215,8 @@ function finishContainerOpening(type, price) {
     won.plate = plate;
     won.customPlate = plate;
     
-    let plateVal = 250000;
-    if (typeof calculatePlateValue === 'function') plateVal = calculatePlateValue(plate);
-
-    let baseM = won.price;
-    if (won.baseMarketValue) baseM = won.baseMarketValue;
-
+    let plateVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(plate) : 250000;
+    let baseM = won.baseMarketValue || won.price;
     won.marketValue = baseM + plateVal;
 
     if (!state.garage) state.garage = [];
@@ -1296,78 +1231,51 @@ function finishContainerOpening(type, price) {
     openVerdictModal("КОНТЕЙНЕР ВСКРЫТ! 🎁", "В контейнере находился автомобиль: «" + won.name + "» с номерами " + plate + "!", true);
 }
 
+// ===================== 7. НЕДВИЖИМОСТЬ =====================
+
 function renderHousing() {
     const list = document.getElementById('housingMarketList');
-    if (!list) return;
-    if (typeof HOUSING_LIST === 'undefined') return;
+    if (!list || typeof HOUSING_LIST === 'undefined') return;
 
     let html = "";
     HOUSING_LIST.forEach(h => {
         if (!h) return;
         
-        let hId = ""; if (state.player && state.player.housingId) hId = state.player.housingId;
-        let isCurrent = false;
-        if (hId === h.id) isCurrent = true;
-
-        let isOwned = false;
-        if (state.player && state.player.ownedHouses && state.player.ownedHouses.includes(h.id)) isOwned = true;
-
-        let lvl = 1; if (state.player && state.player.level) lvl = state.player.level;
-        let isLocked = false;
-        if (lvl < h.minLevel) isLocked = true;
+        let isCurrent = state.player && state.player.housingId === h.id;
+        let isOwned = state.player && state.player.ownedHouses && state.player.ownedHouses.includes(h.id);
+        let lvl = state.player?.level || 1;
+        let isLocked = lvl < h.minLevel;
 
         let rentBtn = "";
-        let hRent = 0; if (h.rent) hRent = h.rent;
+        let hRent = h.rent || 0;
 
         if (hRent > 0 && !isOwned) {
-            let rClass = "btn-dark";
-            let hType = ""; if (state.player && state.player.housingType) hType = state.player.housingType;
-            if (isCurrent && hType === 'rent') rClass = "btn-cyan";
-            
-            let dis = ""; if (isLocked) dis = "disabled";
+            let rClass = (isCurrent && state.player?.housingType === 'rent') ? "btn-cyan" : "btn-dark";
+            let dis = isLocked ? "disabled" : "";
             rentBtn = "<button onclick=\"rentHouse('" + h.id + "')\" class='btn " + rClass + " btn-sm' " + dis + ">Аренда (" + hRent.toLocaleString() + " ₽/д)</button>";
         }
 
         let buyBtn = "";
-        let hBuy = 0; if (h.buyPrice) hBuy = h.buyPrice;
+        let hBuy = h.buyPrice || 0;
 
         if (hBuy > 0) {
-            let bClass = "btn-amber";
-            if (isOwned) bClass = "btn-green";
-
-            let bText = "Купить (" + (hBuy / 1000000).toFixed(1) + "M ₽)";
-            if (isOwned) bText = "В собственности";
-
-            let dis = "";
-            if (isOwned || isLocked) dis = "disabled";
-
+            let bClass = isOwned ? "btn-green" : "btn-amber";
+            let bText = isOwned ? "В собственности" : "Купить (" + (hBuy / 1000000).toFixed(1) + "M ₽)";
+            let dis = (isOwned || isLocked) ? "disabled" : "";
             buyBtn = "<button onclick=\"buyHouse('" + h.id + "')\" class='btn " + bClass + " btn-sm' " + dis + ">" + bText + "</button>";
         }
 
-        let hImg = "https://images.unsplash.com/photo-1513828583688-c52646db42da?auto=format&fit=crop&w=400&q=80";
-        if (h.img) hImg = h.img;
+        let hImg = h.img || "https://images.unsplash.com/photo-1513828583688-c52646db42da?auto=format&fit=crop&w=400&q=80";
+        let hName = h.name || "";
+        let hSlots = h.slots || 0;
+        let hMood = h.moodBonus || 0;
+        let hMinLvl = h.minLevel || 1;
 
-        let hName = ""; if (h.name) hName = h.name;
-        let hSlots = 0; if (h.slots) hSlots = h.slots;
-        let hMood = 0; if (h.moodBonus) hMood = h.moodBonus;
-        let hMinLvl = 1; if (h.minLevel) hMinLvl = h.minLevel;
-
-        let curText = "";
-        if (isCurrent) curText = " 🏠 (Вы здесь)";
-
-        let ownText = "АРЕНДА";
-        if (isOwned) ownText = "СОБСТВЕННОСТЬ";
-
-        let borderSty = "";
-        if (isCurrent) borderSty = "border-color:var(--cyan);";
-
-        let imgSty = "height: 125px;";
-        if (isLocked) imgSty += " filter: grayscale(1); opacity: 0.7;";
-
-        let lockHtml = "";
-        if (isLocked) {
-            lockHtml = "<div class='cooldown-timer' style='display:flex; font-size:14px; opacity:1;'><i class='fa-solid fa-lock mr-2'></i>С " + hMinLvl + " УР</div>";
-        }
+        let curText = isCurrent ? " 🏠 (Вы здесь)" : "";
+        let ownText = isOwned ? "СОБСТВЕННОСТЬ" : "АРЕНДА";
+        let borderSty = isCurrent ? "border-color:var(--cyan);" : "";
+        let imgSty = isLocked ? "height: 125px; filter: grayscale(1); opacity: 0.7;" : "height: 125px;";
+        let lockHtml = isLocked ? "<div class='cooldown-timer' style='display:flex; font-size:14px; opacity:1;'><i class='fa-solid fa-lock mr-2'></i>С " + hMinLvl + " УР</div>" : "";
 
         html += 
         "<div class='glass-card mb-3' style='" + borderSty + "'>" +
@@ -1402,10 +1310,8 @@ function buyHouse(id) {
     const house = HOUSING_LIST.find(h => h && h.id === id);
     if (!house) return;
     
-    let cash = 0;
-    if (state.player && state.player.cash) cash = state.player.cash;
-    
-    let hBuy = 0; if (house.buyPrice) hBuy = house.buyPrice;
+    let cash = state.player?.cash || 0;
+    let hBuy = house.buyPrice || 0;
 
     if (cash < hBuy) return showToast("Не хватает денег на покупку!");
     
@@ -1419,37 +1325,30 @@ function buyHouse(id) {
     renderHousing(); 
     renderGarage();
     
-    let hName = ""; if (house.name) hName = house.name;
+    let hName = house.name || "";
     openVerdictModal("НЕДВИЖИМОСТЬ КУПЛЕНА! 🏠", "Вы приобрели «" + hName + "»! Места закреплены навсегда.", true);
 }
 
+// ===================== 8. РАЦИОН ПИТАНИЯ =====================
+
 function renderDiets() {
     const dietList = document.getElementById('dietList');
-    if (!dietList) return;
-    if (typeof DIETS === 'undefined') return;
+    if (!dietList || typeof DIETS === 'undefined') return;
 
     let html = "";
     DIETS.forEach(d => {
         if (!d) return;
         
-        let pDiet = ""; if (state.player && state.player.diet) pDiet = state.player.diet;
-        let isSel = false; if (pDiet === d.id) isSel = true;
+        let isSel = state.player?.diet === d.id;
+        let dName = d.name || "";
+        let dDesc = d.desc || "";
+        let dHung = d.hunger || 0;
+        let dMood = d.mood || 0;
+        let dCost = d.cost || 0;
 
-        let dName = ""; if (d.name) dName = d.name;
-        let dDesc = ""; if (d.desc) dDesc = d.desc;
-        let dHung = 0; if (d.hunger) dHung = d.hunger;
-        let dMood = 0; if (d.mood) dMood = d.mood;
-        let dCost = 0; if (d.cost) dCost = d.cost;
-
-        let moodPrefix = "";
-        if (dMood > 0) moodPrefix = "+";
-
-        let btnClass = "btn-dark";
-        if (isSel) btnClass = "btn-green";
-
-        let btnText = dCost.toLocaleString() + " ₽";
-        if (dCost === 0) btnText = "Бесплатно";
-        if (isSel) btnText = "Выбрано";
+        let moodPrefix = dMood > 0 ? "+" : "";
+        let btnClass = isSel ? "btn-green" : "btn-dark";
+        let btnText = isSel ? "Выбрано" : (dCost === 0 ? "Бесплатно" : dCost.toLocaleString() + " ₽");
 
         html += 
         "<div class='glass-card flex-between p-2 mb-2'>" +
@@ -1473,75 +1372,499 @@ function selectDiet(id) {
     showToast("Рацион питания изменен!");
 }
 
+// ===================== 9. КОЛЕСО ФОРТУНЫ =====================
+
+const WHEEL_SECTORS = [
+    { label: "15,000 ₽", color: "#0284c7", textColor: "#fff", type: "cash", value: 15000 },
+    { label: "1 🤝 Связь", color: "#9333ea", textColor: "#fff", type: "conn", value: 1 },
+    { label: "50,000 ₽", color: "#059669", textColor: "#fff", type: "cash", value: 50000 },
+    { label: "5 Stars ⭐", color: "#d97706", textColor: "#fff", type: "stars", value: 5 },
+    { label: "100,000 ₽", color: "#0284c7", textColor: "#fff", type: "cash", value: 100000 },
+    { label: "2 🎟️ Талона", color: "#c084fc", textColor: "#000", type: "tickets", value: 2 },
+    { label: "250,000 ₽", color: "#10b981", textColor: "#fff", type: "cash", value: 250000 },
+    { label: "ДЖЕКПОТ!", color: "#e11d48", textColor: "#fff", type: "jackpot", value: 500000 }
+];
+
+let currentWheelAngle = 0;
+let isWheelSpinning = false;
+
+function initWheelModule() {
+    drawWheelCanvas(currentWheelAngle);
+    const now = Date.now();
+    let lastSpin = state.player?.lastFreeSpin || 0;
+    let canFree = (now - lastSpin) >= 86400000;
+    
+    const statusBadge = document.getElementById('wheelStatusBadge');
+    if (statusBadge) {
+        if (canFree) {
+            statusBadge.innerText = "Доступно";
+            statusBadge.className = "tag-badge bg-tag-green";
+        } else {
+            let hours = Math.ceil((86400000 - (now - lastSpin)) / 3600000);
+            statusBadge.innerText = "КД " + hours + "ч";
+            statusBadge.className = "tag-badge bg-tag-amber";
+        }
+    }
+}
+
+function drawWheelCanvas(angle) {
+    const canvas = document.getElementById('wheelCanvas'); 
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const size = canvas.width; 
+    const center = size / 2; 
+    const radius = center - 8;
+    const numSectors = WHEEL_SECTORS.length; 
+    const arc = (2 * Math.PI) / numSectors;
+
+    ctx.clearRect(0, 0, size, size);
+
+    for (let i = 0; i < numSectors; i++) {
+        const sectorAngle = angle + (i * arc);
+        ctx.beginPath();
+        ctx.fillStyle = WHEEL_SECTORS[i].color;
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, sectorAngle, sectorAngle + arc);
+        ctx.lineTo(center, center);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.25)"; 
+        ctx.lineWidth = 3; 
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(sectorAngle + arc / 2);
+        ctx.textAlign = "right"; 
+        ctx.fillStyle = WHEEL_SECTORS[i].textColor;
+        ctx.font = "bold 24px -apple-system, sans-serif";
+        ctx.fillText(WHEEL_SECTORS[i].label, radius - 28, 8);
+        ctx.restore();
+    }
+
+    ctx.beginPath(); 
+    ctx.arc(center, center, radius, 0, 2 * Math.PI); 
+    ctx.strokeStyle = "#00f2fe"; 
+    ctx.lineWidth = 6; 
+    ctx.stroke();
+}
+
+function spinWheelAction(isFree) {
+    if (isWheelSpinning) return;
+    const now = Date.now();
+    let lastSpin = state.player?.lastFreeSpin || 0;
+
+    if (isFree) {
+        if (now - lastSpin < 86400000) {
+            let hours = Math.ceil((86400000 - (now - lastSpin)) / 3600000);
+            return showToast("Бесплатный спин через " + hours + " ч.");
+        }
+        state.player.lastFreeSpin = now;
+    } else {
+        let stars = state.player?.stars || 0;
+        if (stars < 25) return showToast("Не хватает 25 Telegram Stars ⭐!");
+        state.player.stars -= 25;
+    }
+
+    isWheelSpinning = true; 
+    saveState(); 
+    updateHeaderUI();
+
+    const winningIndex = Math.floor(Math.random() * WHEEL_SECTORS.length);
+    const numSectors = WHEEL_SECTORS.length; 
+    const arc = (2 * Math.PI) / numSectors;
+    const targetSectorCenter = (3 * Math.PI / 2) - (winningIndex * arc) - (arc / 2);
+    const extraRotations = (6 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
+    const targetAngle = currentWheelAngle + extraRotations + (targetSectorCenter - (currentWheelAngle % (2 * Math.PI)));
+
+    const startAngle = currentWheelAngle; 
+    const duration = 3800; 
+    const startTime = performance.now();
+
+    function animateWheel(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        currentWheelAngle = startAngle + (targetAngle - startAngle) * easeOut;
+        drawWheelCanvas(currentWheelAngle);
+
+        if (progress < 1) {
+            requestAnimationFrame(animateWheel);
+        } else { 
+            isWheelSpinning = false; 
+            giveWheelPrize(WHEEL_SECTORS[winningIndex]); 
+            initWheelModule(); 
+        }
+    }
+    requestAnimationFrame(animateWheel);
+}
+
+function giveWheelPrize(prize) {
+    playSound('win'); 
+    tgHaptic('success');
+    if (prize.type === 'cash') {
+        state.player.cash += prize.value;
+        openVerdictModal("ПРИЗ В КОЛЕСЕ! 🎉", "Выигрыш: +" + prize.value.toLocaleString() + " ₽ на баланс!", true, prize.value);
+    } else if (prize.type === 'conn') {
+        state.player.connections = (state.player.connections || 0) + prize.value;
+        openVerdictModal("СВЯЗИ ОТ РЕШАЛЫ! 🤝", "Начислено: +" + prize.value + " Связь!", true);
+    } else if (prize.type === 'stars') {
+        state.player.stars += prize.value;
+        openVerdictModal("ЗВЁЗДЫ! ⭐", "Начислено: +" + prize.value + " Telegram Stars!", true);
+    } else if (prize.type === 'tickets') {
+        let maxT = state.player?.maxExpressTickets || 25;
+        state.player.expressTickets = Math.min(maxT, (state.player.expressTickets || 0) + prize.value);
+        openVerdictModal("ТАЛОНЫ! 🎟️", "Получено: +" + prize.value + " экспресс-пропуска!", true);
+    } else if (prize.type === 'jackpot') {
+        state.player.cash += prize.value; 
+        state.player.stars += 25;
+        let maxT = state.player?.maxExpressTickets || 25;
+        state.player.expressTickets = Math.min(maxT, (state.player.expressTickets || 0) + 5);
+        openVerdictModal("ГРАНД ДЖЕКПОТ! 👑", "ДЖЕКПОТ: +500,000 ₽, +25 Stars ⭐ и +5 Пропусков 🎟️!", true, 500000);
+    }
+    saveState(); 
+    updateHeaderUI();
+}
+
+// ===================== 10. МИНИ-ИГРА: НАПЁРСТКИ ПЕРЕКУПА (x2) =====================
+
+let currentThimblesBet = 10000;
+let isThimblesLocked = false;
+
+function setThimblesBet(amt) {
+    if (isThimblesLocked) return;
+    currentThimblesBet = amt;
+    setTxt('thimblesBetText', amt.toLocaleString() + " ₽");
+    playSound('tick');
+}
+
+function playThimbles(chosenIndex) {
+    if (isThimblesLocked) return;
+    
+    let cash = state.player?.cash || 0;
+    if (cash < currentThimblesBet) return showToast("Не хватает " + currentThimblesBet.toLocaleString() + " ₽ для игры!");
+    
+    isThimblesLocked = true;
+    state.player.cash -= currentThimblesBet;
+    saveState();
+    updateHeaderUI();
+    
+    setTxt('thimblesResultText', "Стаканчики крутятся... Следите внимательно!");
+    playSound('tick');
+    
+    for (let i = 0; i < 3; i++) {
+        setTxt('thimble-secret-' + i, "");
+        const cup = document.getElementById('thimble-cup-' + i);
+        if (cup) cup.style.transform = "translateY(0)";
+    }
+
+    setTimeout(() => {
+        const winningIndex = Math.floor(Math.random() * 3);
+        const isWin = (chosenIndex === winningIndex);
+
+        for (let i = 0; i < 3; i++) {
+            const cup = document.getElementById('thimble-cup-' + i);
+            if (cup) cup.style.transform = "translateY(-12px)";
+            setTxt('thimble-secret-' + i, (i === winningIndex) ? "🔑" : "💨");
+        }
+
+        if (isWin) {
+            const prize = currentThimblesBet * 2;
+            state.player.cash += prize;
+            saveState();
+            updateHeaderUI();
+            playSound('win');
+            tgHaptic('success');
+            setTxt('thimblesResultText', "<span class='color-green font-bold'>ПОБЕДА! Ключ найден! (+" + prize.toLocaleString() + " ₽)</span>");
+        } else {
+            playSound('tick');
+            tgHaptic('error');
+            setTxt('thimblesResultText', "<span class='color-red font-bold'>Мимо! Стаканчик оказался пустым (-" + currentThimblesBet.toLocaleString() + " ₽)</span>");
+        }
+
+        setTimeout(() => {
+            for (let i = 0; i < 3; i++) {
+                const cup = document.getElementById('thimble-cup-' + i);
+                if (cup) cup.style.transform = "translateY(0)";
+            }
+            isThimblesLocked = false;
+        }, 1800);
+    }, 700);
+}
+
+// ===================== 11. ПОДПОЛЬНЫЙ КЛУБ «21» =====================
+
+let casinoBet = 0; 
+let casinoState = 'betting'; 
+let pHand = []; 
+let dHand = []; 
+let deck = [];
+
+function getCasinoMaxBet() { 
+    let lvl = state.player?.level || 1;
+    let cash = state.player?.cash || 0;
+
+    if (lvl <= 10) return Math.min(50000, Math.max(5000, Math.round(cash * 0.10)));
+    if (lvl <= 20) return Math.min(300000, Math.max(15000, Math.round(cash * 0.20)));
+    return Math.min(2500000, Math.max(50000, Math.round(cash * 0.40)));
+}
+
+function initCasino() { 
+    setTxt('casinoMaxBetText', "Лимит: " + getCasinoMaxBet().toLocaleString() + " ₽"); 
+    if (casinoState === 'betting') resetCasinoUI(); 
+}
+
+function resetCasinoUI() { 
+    casinoBet = 0; 
+    pHand = []; 
+    dHand = []; 
+    casinoState = 'betting'; 
+    setTxt('currentBetDisplay', '0 ₽'); 
+    setTxt('casinoMaxBetText', "Лимит: " + getCasinoMaxBet().toLocaleString() + " ₽"); 
+    
+    const bArea = document.getElementById('casinoBettingArea');
+    if (bArea) bArea.style.display = 'block'; 
+    const pArea = document.getElementById('casinoPlayingArea');
+    if (pArea) pArea.style.display = 'none'; 
+    const rArea = document.getElementById('casinoResultArea');
+    if (rArea) rArea.style.display = 'none'; 
+    
+    const pHBox = document.getElementById('playerHandBox');
+    if (pHBox) pHBox.innerHTML = ''; 
+    const dHBox = document.getElementById('dealerHandBox');
+    if (dHBox) dHBox.innerHTML = ''; 
+    
+    setTxt('playerScore', '0'); 
+    setTxt('dealerScore', '?'); 
+}
+
+function addCasinoBet(amt) { 
+    const maxAllowed = getCasinoMaxBet(); 
+    let cash = state.player?.cash || 0;
+
+    if (casinoBet + amt > maxAllowed) {
+        casinoBet = maxAllowed;
+    } else if (cash < casinoBet + amt) {
+        return showToast("Не хватает денег!"); 
+    } else {
+        casinoBet += amt; 
+    }
+    setTxt('currentBetDisplay', casinoBet.toLocaleString() + " ₽"); 
+}
+
+function setCasinoMaxBet() { 
+    let cash = state.player?.cash || 0;
+    casinoBet = Math.min(getCasinoMaxBet(), cash); 
+    setTxt('currentBetDisplay', casinoBet.toLocaleString() + " ₽"); 
+}
+
+function clearCasinoBet() { 
+    casinoBet = 0; 
+    setTxt('currentBetDisplay', '0 ₽'); 
+}
+
+function get21Deck() { 
+    const suits = ['♠','♥','♣','♦']; 
+    const vals = ['6','7','8','9','10','J','Q','K','A']; 
+    let d = []; 
+    suits.forEach(s => { 
+        vals.forEach(v => { d.push({ v: v, s: s }); }); 
+    }); 
+    return d.sort(() => Math.random() - 0.5); 
+}
+
+function get21Score(hand) { 
+    let score = 0; 
+    let aces = 0; 
+    hand.forEach(c => { 
+        if (c.v === 'J') score += 2; 
+        else if (c.v === 'Q') score += 3; 
+        else if (c.v === 'K') score += 4; 
+        else if (c.v === 'A') { score += 11; aces += 1; } 
+        else score += parseInt(c.v); 
+    }); 
+    while (score > 21 && aces > 0) { 
+        score -= 10; 
+        aces -= 1; 
+    } 
+    return score; 
+}
+
+function isTwoAces(hand) { 
+    return !!(hand && hand.length === 2 && hand[0].v === 'A' && hand[1].v === 'A');
+}
+
+function renderCard(c, hidden) { 
+    if (hidden) return "<div class='playing-card card-hidden' style='background:#131c2e; padding:4px 8px; border-radius:6px; border:1px solid var(--border-glass);'>?</div>"; 
+    let colorClass = (c.s === '♥' || c.s === '♦') ? 'color-red' : 'color-cyan';
+    return "<div class='playing-card " + colorClass + "' style='background:#131c2e; padding:4px 8px; border-radius:6px; border:1px solid var(--border-glass); font-weight:900;'>" + c.v + c.s + "</div>"; 
+}
+
+function updateCasinoTable(showDealerHidden) { 
+    const pHBox = document.getElementById('playerHandBox');
+    if (pHBox) pHBox.innerHTML = pHand.map(c => renderCard(c, false)).join(''); 
+    
+    let pScoreText = isTwoAces(pHand) ? '21 (Золотое!)' : get21Score(pHand);
+    setTxt('playerScore', pScoreText); 
+
+    const dHBox = document.getElementById('dealerHandBox');
+    if (showDealerHidden) { 
+        if (dHBox) dHBox.innerHTML = dHand.map(c => renderCard(c, false)).join(''); 
+        let dScoreText = isTwoAces(dHand) ? '21 (Золотое!)' : get21Score(dHand);
+        setTxt('dealerScore', dScoreText); 
+    } else { 
+        if (dHBox && dHand.length >= 2) {
+            dHBox.innerHTML = renderCard(dHand[0], false) + renderCard(dHand[1], true); 
+        }
+        let initialDealer = (dHand.length > 0 && dHand[0].v === 'A') ? '11' : '?';
+        setTxt('dealerScore', initialDealer); 
+    } 
+}
+
+function startCasinoGame() {
+    if (casinoBet <= 0) return showToast("Сделайте ставку!"); 
+    let cash = state.player?.cash || 0;
+    if (cash < casinoBet) return showToast("Не хватает денег!");
+    
+    state.player.cash -= casinoBet; 
+    saveState(); 
+    
+    deck = get21Deck(); 
+    pHand = [deck.pop(), deck.pop()]; 
+    dHand = [deck.pop(), deck.pop()]; 
+    casinoState = 'playing'; 
+    
+    const bArea = document.getElementById('casinoBettingArea');
+    if (bArea) bArea.style.display = 'none'; 
+    const pArea = document.getElementById('casinoPlayingArea');
+    if (pArea) pArea.style.display = 'block'; 
+    
+    updateCasinoTable(false); 
+    
+    if (get21Score(pHand) === 21 || isTwoAces(pHand)) {
+        setTimeout(standCasino, 600);
+    }
+}
+
+function hitCasino() { 
+    if (casinoState !== 'playing') return; 
+    pHand.push(deck.pop()); 
+    updateCasinoTable(false); 
+    if (get21Score(pHand) >= 21) setTimeout(standCasino, 500); 
+}
+
+function standCasino() { 
+    if (casinoState !== 'playing') return; 
+    const pArea = document.getElementById('casinoPlayingArea');
+    if (pArea) pArea.style.display = 'none'; 
+    endCasinoGame(); 
+}
+
+function endCasinoGame() {
+    casinoState = 'done';
+    let pScore = isTwoAces(pHand) ? 21 : get21Score(pHand);
+
+    if (pScore <= 21) { 
+        let dScore = isTwoAces(dHand) ? 21 : get21Score(dHand); 
+        while (dScore < 17 && deck.length > 0) { 
+            dHand.push(deck.pop()); 
+            dScore = isTwoAces(dHand) ? 21 : get21Score(dHand); 
+        } 
+    }
+    
+    updateCasinoTable(true); 
+    let dScore = isTwoAces(dHand) ? 21 : get21Score(dHand); 
+    
+    const resBox = document.getElementById('casinoResultArea'); 
+    if (resBox) resBox.style.display = 'block'; 
+    
+    if (pScore > 21) {
+        if (resBox) resBox.innerHTML = "<span class='color-red'>ПЕРЕБОР (-" + casinoBet.toLocaleString() + " ₽)</span>";
+    } else if (dScore > 21 || pScore > dScore) { 
+        let mult = isTwoAces(pHand) ? 2.5 : 2;
+        const payout = Math.round(casinoBet * mult); 
+        state.player.cash += payout; 
+        if (resBox) resBox.innerHTML = "<span class='color-green'>ПОБЕДА (+" + (payout - casinoBet).toLocaleString() + " ₽)</span>"; 
+        playSound('win'); 
+    } else if (pScore === dScore) { 
+        state.player.cash += casinoBet; 
+        if (resBox) resBox.innerHTML = "<span class='color-amber'>НИЧЬЯ (Возврат)</span>"; 
+    } else {
+        if (resBox) resBox.innerHTML = "<span class='color-red'>КРУПЬЕ ЗАБРАЛ БАНК</span>";
+    }
+    
+    if (resBox) resBox.innerHTML += "<br><button onclick='resetCasinoUI()' class='btn btn-dark btn-sm mt-2'>Сыграть снова</button>"; 
+    saveState(); 
+    updateHeaderUI();
+}
+
+// ===================== 12. СМЕНА ДНЯ И РАСХОД СЫРЬЯ =====================
+
 function nextDayAction() {
-    let day = 1; if (state.player && state.player.day) day = state.player.day;
+    let day = state.player?.day || 1;
     state.player.day = day + 1;
     
-    let lvl = 1; if (state.player && state.player.level) lvl = state.player.level;
-    
+    let lvl = state.player?.level || 1;
     let dailyCost = 1500;
+    
     if (typeof DIETS !== 'undefined') {
-        let pDiet = ""; if (state.player && state.player.diet) pDiet = state.player.diet;
-        const diet = DIETS.find(d => d && d.id === pDiet);
+        const diet = DIETS.find(d => d && d.id === state.player?.diet);
         if (diet && diet.cost > 0) dailyCost = diet.cost;
     }
 
-    let hType = ""; if (state.player && state.player.housingType) hType = state.player.housingType;
-    let hId = ""; if (state.player && state.player.housingId) hId = state.player.housingId;
-
-    if (hType === 'rent' && typeof HOUSING_LIST !== 'undefined') {
-        const house = HOUSING_LIST.find(h => h && h.id === hId);
+    if (state.player?.housingType === 'rent' && typeof HOUSING_LIST !== 'undefined') {
+        const house = HOUSING_LIST.find(h => h && h.id === state.player?.housingId);
         if (house && house.rent > 0) dailyCost += house.rent;
     }
 
     if (lvl >= 20 && state.garage && state.garage.length > 0) {
         let garageValue = 0;
         state.garage.forEach(c => {
-            if (c) {
-                if (c.marketValue) garageValue += c.marketValue;
-                else if (c.price) garageValue += c.price;
-            }
+            if (c) garageValue += (c.marketValue || c.price || 0);
         });
-        const tax = Math.round(garageValue * 0.005);
-        dailyCost += tax;
+        dailyCost += Math.round(garageValue * 0.005);
     }
 
-    let debt = 0; if (state.player && state.player.loanDebt) debt = state.player.loanDebt;
+    let debt = state.player?.loanDebt || 0;
     if (debt > 0) {
-        const debtInterest = Math.round(debt * 0.15);
-        state.player.loanDebt = debt + debtInterest;
+        state.player.loanDebt = debt + Math.round(debt * 0.15);
     }
 
     if (state.garage) {
         state.garage.forEach(car => {
             if (car && car.impounded) {
-                let d = 0; if (car.impoundedDays) d = car.impoundedDays;
-                car.impoundedDays = d + 1;
+                car.impoundedDays = (car.impoundedDays || 0) + 1;
             }
         });
     }
 
-    let cash = 0; if (state.player && state.player.cash) cash = state.player.cash;
+    let cash = state.player?.cash || 0;
     state.player.cash = Math.max(-500000, cash - dailyCost);
-    
     state.player.fuel = 100;
     
-    let curT = 0; if (state.player && state.player.expressTickets) curT = state.player.expressTickets;
-    let maxT = 25; if (state.player && state.player.maxExpressTickets) maxT = state.player.maxExpressTickets;
+    let curT = state.player?.expressTickets || 0;
+    let maxT = state.player?.maxExpressTickets || 25;
     state.player.expressTickets = Math.min(maxT, curT + 25);
 
-    let pIm = 0; if (state.player && state.player.policeImmunityDays) pIm = state.player.policeImmunityDays;
-    if (pIm > 0) {
-        state.player.policeImmunityDays = pIm - 1;
-    }
+    let pIm = state.player?.policeImmunityDays || 0;
+    if (pIm > 0) state.player.policeImmunityDays = pIm - 1;
 
+    // Начисление дохода предприятий с учетом расхода сырья
     if (state.businesses) {
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
-                let st = 0; if (b.stored) st = b.stored;
-                let inc = 0; if (b.income) inc = b.income;
-                let bLvl = 1; if (b.level) bLvl = b.level;
-                b.stored = st + (inc * bLvl);
+                let st = b.stored || 0;
+                let inc = b.income || 0;
+                let bLvl = b.level || 1;
+                let stock = (typeof b.stock === 'number') ? b.stock : 100;
+
+                // Если есть сырьё — генерируем доход
+                let efficiency = stock > 0 ? (stock / 100) : 0;
+                let generatedIncome = Math.round(inc * bLvl * efficiency);
+                b.stored = st + generatedIncome;
+
+                // Расходуем 20% сырья в сутки
+                b.stock = Math.max(0, stock - 20);
             }
         });
     }
@@ -1554,9 +1877,29 @@ function nextDayAction() {
     renderDiets(); 
     renderHousing(); 
     renderConfiscatedCardUI();
+    checkBusinessAccess();
     if (typeof renderShopPlates === 'function') renderShopPlates();
     
-    let curDay = 1; if (state.player && state.player.day) curDay = state.player.day;
-    showToast("День " + curDay + ": расходы составили " + dailyCost.toLocaleString() + " ₽");
+    showToast("День " + state.player.day + ": списано " + dailyCost.toLocaleString() + " ₽ расходов");
     updateHeaderUI();
+}
+
+function watchAdsgram() { 
+    state.player.cash += 25000; 
+    state.player.connections = (state.player.connections || 0) + 1; 
+    saveState(); 
+    updateHeaderUI();
+    showToast("+25k ₽ и +1 🤝 за просмотр!"); 
+}
+
+function refuelAction(type) { 
+    if (type === 'cash') {
+        let cash = state.player?.cash || 0;
+        if (cash < 5000) return showToast("Нужно 5,000 ₽!");
+        state.player.cash -= 5000;
+    }
+    state.player.fuel = 100; 
+    saveState(); 
+    updateHeaderUI();
+    showToast("Бак заправлен до 100 ⛽!"); 
 }
