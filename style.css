@@ -424,7 +424,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   opacity: 0.65;
 }
 
-/* ОБНОВЛЕННАЯ СЕТКА КЛАССОВ ТЕХНИКИ */
+/* СЕТКА 3x3 КЛАССОВ ТЕХНИКИ */
 .market-filter-card {
   padding: 12px;
   background: radial-gradient(circle at 50% 0%, #151f33 0%, #090e18 100%);
@@ -529,15 +529,21 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   padding: 8px 10px;
 }
 
+/* ========================================================
+   4 ГРЕЙДА САРАЕВ
+   ======================================================== */
 .barn-tier-card {
   width: 100%;
   background: #0d131f;
   border: 1px solid var(--border-glass);
-  border-left: 4px solid var(--cyan);
   border-radius: var(--radius-lg);
   padding: 14px;
   margin-bottom: 12px;
 }
+.barn-grade-1 { border-left: 4px solid var(--green); }
+.barn-grade-2 { border-left: 4px solid var(--cyan); }
+.barn-grade-3 { border-left: 4px solid var(--purple); }
+.barn-grade-4 { border-left: 4px solid var(--amber); box-shadow: 0 0 16px rgba(255, 179, 0, 0.2); }
 
 .glass-card.busy > *:not(.cooldown-timer) {
   filter: blur(2px) grayscale(0.8);
