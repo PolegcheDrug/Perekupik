@@ -1,22 +1,23 @@
-// ===================== ПОЛНАЯ ВЕРСИЯ: js/life.js =====================
+// ========================================================
+// js/life.js — ПОЛНЫЙ МОДУЛЬ: ЖИЗНЬ, БИЗНЕС, САРАИ, ЖИЛЬЁ, 
+// ПОРТ, ЗАКАЗЫ СИНДИКАТА, МАРКЕТ И РЕШАЛА
+// ========================================================
 
-// ----------------------------------------------------
-// 1. РЕШАЛА АРТУР (СВЯЗИ, КРЫША, ЛЕГАЛИЗАЦИЯ, ЛИЦЕНЗИЯ РАФ)
-// ----------------------------------------------------
+// ========================================================
+// 1. РЕШАЛА АРТУР (СВЯЗИ, КРЫША, ЛЕГАЛИЗАЦИЯ VIN, ЛИЦЕНЗИЯ РАФ)
+// ========================================================
 function buyReshalaPack(type) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
 
     if (type === 'pack1') {
         if (cash < 150000) return showToast("Не хватает 150,000 ₽!");
         state.player.cash -= 150000;
-        let conn = (state.player && state.player.connections) ? state.player.connections : 0;
-        state.player.connections = conn + 1;
+        state.player.connections = (state.player.connections || 0) + 1;
         showToast("Связи приобретены (+1 🤝)!");
     } else if (type === 'pack5') {
         if (cash < 650000) return showToast("Не хватает 650,000 ₽!");
         state.player.cash -= 650000;
-        let conn = (state.player && state.player.connections) ? state.player.connections : 0;
-        state.player.connections = conn + 5;
+        state.player.connections = (state.player.connections || 0) + 5;
         showToast("Оптовый пакет связей (+5 🤝) активирован!");
     }
     saveState();
@@ -122,7 +123,7 @@ function buyReshalaService(service) {
         updateHeaderUI();
         playSound('win');
         tgHaptic('success');
-        openVerdictModal("ЛИЦЕНЗИЯ ПИЛОТА РАФ! 🏎️", "Решала уладил все вопросы: официальный допуск пилота к заездам 402м получен!", true);
+        openVerdictModal("ЛИЦЕНЗИЯ ПИЛОТА РАФ! 🏎️", "Официальный допуск пилота к заездам 402м получен!", true);
     }
 }
 
@@ -142,7 +143,7 @@ function openLegalizeCarModal() {
         criminalCars.forEach(c => {
             let cName = c.name ? c.name : "Авто";
             let cPlate = c.customPlate ? c.customPlate : (c.plate ? c.plate : "ТРАНЗИТ");
-            let reason = c.isStolen ? "В розыске" : "Учёт аннулирован";
+            let reason = c.isStolen ? "В розыске" : "Учёт аннулирован (12.5.1)";
 
             html += 
             "<div class='glass-card flex-between p-2 mb-1'>" +
@@ -163,8 +164,7 @@ function confirmLegalizeCar(carId) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
     let conn = (state.player && state.player.connections) ? state.player.connections : 0;
 
-    if (cash < 200000) return showToast("Нужно 200,000 ₽ и 1 Связь 🤝!");
-    if (conn < 1) return showToast("Нужно 200,000 ₽ и 1 Связь 🤝!");
+    if (cash < 200000 || conn < 1) return showToast("Нужно 200,000 ₽ и 1 Связь 🤝!");
 
     state.player.cash -= 200000;
     state.player.connections -= 1;
@@ -179,7 +179,7 @@ function confirmLegalizeCar(carId) {
     }
     closeModal('modalLegalizeCar');
     saveState();
-    renderGarage();
+    if (typeof renderGarage === 'function') renderGarage();
     openVerdictModal("VIN ОТМЫТ! 🔏", "Автомобиль теперь юридически чист во всех базах ГИБДД!", true);
 }
 
@@ -198,8 +198,7 @@ function generateConfiscatedCarLot() {
     } else {
         const pools = ['economy', 'comfort', 'premium'];
         const chosenCat = pools[Math.floor(Math.random() * pools.length)];
-        let pool = CAR_DATABASE.economy;
-        if (CAR_DATABASE[chosenCat]) pool = CAR_DATABASE[chosenCat];
+        let pool = CAR_DATABASE[chosenCat] ? CAR_DATABASE[chosenCat] : CAR_DATABASE.economy;
         template = pool[Math.floor(Math.random() * pool.length)];
         category = chosenCat;
     }
@@ -212,26 +211,19 @@ function generateConfiscatedCarLot() {
     const marketVal = Math.round(dynPrice * 1.15);
     const plate = isExclusive ? 'Е777КХ 77' : 'А123МР 77';
 
-    let tName = template.name ? template.name : "Авто";
-    let tPow = template.power ? template.power : 120;
-    let tType = template.type ? template.type : "comfort";
-    let tImg = template.img ? template.img : "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
-
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    let reqConn = 2;
-    if (isExclusive) reqConn = 5;
-    else if (lvl >= 20) reqConn = 3;
+    let reqConn = isExclusive ? 5 : (lvl >= 20 ? 3 : 2);
 
     state.confiscatedLot = {
         id: 'confiscated_' + Date.now(),
-        name: tName,
-        power: tPow,
-        type: tType,
+        name: template.name || "Авто",
+        power: template.power || 120,
+        type: template.type || "comfort",
         basePrice: dynPrice,
         price: buyPrice,
         baseMarketValue: marketVal,
         marketValue: marketVal + 250000,
-        img: tImg,
+        img: template.img || "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80",
         plate: plate,
         customPlate: plate,
         isExclusive: isExclusive,
@@ -312,16 +304,16 @@ function buyConfiscatedCar() {
     state.garage.push(carToAdd);
     state.confiscatedLot = null;
     saveState();
-    renderGarage();
+    if (typeof renderGarage === 'function') renderGarage();
     renderConfiscatedCardUI();
 
     let vTitle = lot.isExclusive ? "РЕЗЕРВ ФССП ВЫКУПЛЕН! 👑" : "АВТО СО ШТРАФСТОЯНКИ! 🚔";
     openVerdictModal(vTitle, "Вы забрали " + lot.name + " с солидным дисконтом!", true, lot.marketValue - lot.price);
 }
 
-// ----------------------------------------------------
+// ========================================================
 // 2. ИНТЕРАКТИВНЫЙ БИЗНЕС
-// ----------------------------------------------------
+// ========================================================
 function checkBusinessAccess() {
     const lock = document.getElementById('businessLockCover');
     const activeBox = document.getElementById('businessActiveBox');
@@ -469,9 +461,71 @@ function collectAllBusinessCash() {
     showToast("Собрана выручка: +" + totalCollected.toLocaleString() + " ₽!");
 }
 
-// ----------------------------------------------------
-// 3. САРАИ: 4 ГРЕЙДА И ЛУТ
-// ----------------------------------------------------
+// ========================================================
+// 3. САРАИ: 4 ПОЛНЫХ ГРЕЙДА С ЭТАПАМИ РАСКОПОК
+// ========================================================
+const BARN_TIERS_CONFIG = [
+    {
+        tier: 1,
+        reqLvl: 1,
+        cost: 35000,
+        title: "🏚️ Сарай в СНТ «Заря»",
+        desc: "Старый дачный кооператив. В основном советская классика, но дедушки часто консервировали машины с блатными номерами.",
+        classGrade: "barn-grade-1",
+        rareName: "ВАЗ-2101 «Копейка» (Дрифт-Спек)",
+        rareImg: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=400&q=80",
+        pool: [
+            { name: "Москвич-412", basePrice: 40000, power: 75, img: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=400&q=80" },
+            { name: "Ока (ВАЗ-1111)", basePrice: 35000, power: 33, img: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=400&q=80" },
+            { name: "ВАЗ-2106 «Шестерка»", basePrice: 65000, power: 75, img: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80" }
+        ]
+    },
+    {
+        tier: 2,
+        reqLvl: 7,
+        cost: 120000,
+        title: "🏢 Заброшенный бокс ГСК-4",
+        desc: "Кооператив возле промзоны. Забытые иномарки 90-х годов под слоем пыли и старых покрышек.",
+        classGrade: "barn-grade-2",
+        rareName: "BMW E30 Coupe (M-Tech)",
+        rareImg: "https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&w=400&q=80",
+        pool: [
+            { name: "Volkswagen Golf 2 GTI", basePrice: 160000, power: 112, img: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=400&q=80" },
+            { name: "Mercedes-Benz W124", basePrice: 210000, power: 136, img: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=400&q=80" },
+            { name: "Toyota Mark II (GX81)", basePrice: 240000, power: 135, img: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80" }
+        ]
+    },
+    {
+        tier: 3,
+        reqLvl: 15,
+        cost: 350000,
+        title: "🏭 Ангар механического завода",
+        desc: "Закрытый цех оборонного предприятия. Контрабандные японские турбо-купе эпохи золотого дрифта.",
+        classGrade: "barn-grade-3",
+        rareName: "Nissan Silvia S13 (SR20DET)",
+        rareImg: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=400&q=80",
+        pool: [
+            { name: "Nissan 180SX", basePrice: 550000, power: 205, img: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80" },
+            { name: "Toyota Chaser Tourer V", basePrice: 650000, power: 280, img: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=400&q=80" },
+            { name: "Nissan Skyline R33 GTS-T", basePrice: 720000, power: 250, img: "https://images.unsplash.com/photo-1580273916550-e323be2ae537?auto=format&fit=crop&w=400&q=80" }
+        ]
+    },
+    {
+        tier: 4,
+        reqLvl: 25,
+        cost: 850000,
+        title: "🏛️ Коллекционный подземный бокс",
+        desc: "Опечатанный паркинг банка-банкрота. Капсулы времени, редчайший хром и музейные раритеты.",
+        classGrade: "barn-grade-4",
+        rareName: "Porsche 911 Carrera (G-Series)",
+        rareImg: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=400&q=80",
+        pool: [
+            { name: "ГАЗ-21 «Волга» (Музейный хром)", basePrice: 1200000, power: 75, img: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=400&q=80" },
+            { name: "Mercedes-Benz 500 SL (R129)", basePrice: 1650000, power: 326, img: "https://images.unsplash.com/photo-1617814076367-b759c7d7e738?auto=format&fit=crop&w=400&q=80" }
+        ]
+    }
+];
+
 function renderBarnFind() {
     const container = document.getElementById('barnFindContent');
     if (!container) return;
@@ -588,6 +642,7 @@ function scoutBarnTier(tier) {
 
     saveState();
     renderBarnFind();
+    if (typeof renderGarage === 'function') renderGarage();
     playSound('win');
     tgHaptic('success');
 
@@ -596,18 +651,30 @@ function scoutBarnTier(tier) {
     openVerdictModal("НАХОДКА В САРАЕ! 🏚️", verdictMsg, true, 0);
 }
 
-// ----------------------------------------------------
-// 4. ИНТЕРАКТИВНОЕ ЖИЛЬЁ И ОБУСТРОЙСТВО
-// ----------------------------------------------------
+// ========================================================
+// 4. ИНТЕРАКТИВНОЕ ЖИЛЬЁ И ОБУСТРОЙСТВО (МЕБЕЛЬ, PS5, СЕЙФ)
+// ========================================================
+const HOUSING_INTERIOR_CATALOG = [
+    { id: "ps5", name: "🎮 Игровая консоль PlayStation 5", cost: 75000, perk: "+25% настроения и куража каждый день" },
+    { id: "sofa", name: "🛋️ Кожаный итальянский диван", cost: 120000, perk: "+15% к восстановлению сил и сытости" },
+    { id: "hometheater", name: "🍿 Домашний кинотеатр 4K", cost: 250000, perk: "+35% настроения и престиж" },
+    { id: "safe", name: "🔒 Огнеупорный сейф перекупа", cost: 180000, perk: "Защита заначки от проверок и облав" }
+];
+
 function renderHousing() {
     const list = document.getElementById('housingMarketList');
-    if (!list || typeof HOUSING_LIST === 'undefined') return;
+    if (!list) return;
+
+    if (typeof HOUSING_LIST === 'undefined' || !Array.isArray(HOUSING_LIST) || HOUSING_LIST.length === 0) {
+        list.innerHTML = "<div class='glass-card text-center sub-label py-4'>База недвижимости не загружена.</div>";
+        return;
+    }
 
     let curId = (state.player && state.player.housingId) ? state.player.housingId : 'room';
     let owned = (state.player && state.player.ownedHouses) ? state.player.ownedHouses : [];
 
     let currentHouse = HOUSING_LIST.find(h => h.id === curId);
-    let curTitle = currentHouse ? currentHouse.name : "Комната";
+    let curTitle = currentHouse ? currentHouse.name : "Комната в общежитии";
     setTxt('currentHomeText', "Текущее: " + curTitle);
 
     let html = "";
@@ -674,6 +741,7 @@ function rentHousing(hId) {
 }
 
 function buyHousingProperty(hId) {
+    if (typeof HOUSING_LIST === 'undefined') return;
     const h = HOUSING_LIST.find(item => item.id === hId);
     if (!h) return;
 
@@ -691,7 +759,7 @@ function buyHousingProperty(hId) {
     updateHeaderUI();
     playSound('win');
     tgHaptic('success');
-    openVerdictModal("НОВОСЕЛЬЕ! 🍾", "Вы выкупили недвижимость «" + h.name + "» в собственность!", true);
+    openVerdictModal("НОВОСЕЛЬЕ! 🍾", "Вы выкупили «" + h.name + "» в собственность! Теперь жильё можно обустраивать.", true);
 }
 
 function moveIntoHousing(hId) {
@@ -704,6 +772,7 @@ function moveIntoHousing(hId) {
 }
 
 function openHomeInteriorModal(hId) {
+    if (typeof HOUSING_LIST === 'undefined') return;
     const h = HOUSING_LIST.find(item => item.id === hId);
     if (!h) return;
 
@@ -748,15 +817,243 @@ function buyHomeFurniture(fId, cost) {
     updateHeaderUI();
     playSound('win');
     tgHaptic('success');
-    showToast("Установлено в вашем доме!");
+    showToast("Куплено и установлено в вашем доме!");
 
     let curId = (state.player && state.player.housingId) ? state.player.housingId : 'room';
     openHomeInteriorModal(curId);
 }
 
-// ----------------------------------------------------
-// 5. МАГАЗИН ПЕРЕКУПА (ПОЛНОСТЬЮ)
-// ----------------------------------------------------
+// ========================================================
+// 5. ПОРТОВЫЕ КОНТЕЙНЕРЫ (3 МОРСКИХ НАПРАВЛЕНИЯ С ВИЗУАЛОМ)
+// ========================================================
+const PORT_CONTAINERS_CATALOG = [
+    {
+        id: "vladivostok",
+        name: "⚓ Контейнер из Владивостока (Япония)",
+        cost: 450000,
+        reqLvl: 12,
+        desc: "Праворульные легенды JDM, распилы под корчи или тюнингованные Маркообразные.",
+        img: "https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=400&q=80",
+        classBadge: "bg-tag-cyan"
+    },
+    {
+        id: "dubai",
+        name: "🐪 Контейнер из Дубая (ОАЭ)",
+        cost: 1500000,
+        reqLvl: 20,
+        desc: "Спорткары шейхов, редкие внедорожники и риск нарваться на утопленный суперкар.",
+        img: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=400&q=80",
+        classBadge: "bg-tag-purple"
+    },
+    {
+        id: "rotterdam",
+        name: "🚢 Контейнер из Роттердама (Европа)",
+        cost: 3200000,
+        reqLvl: 30,
+        desc: "Немецкие люксовые седаны и трековые купе в идеальном музейном сохране.",
+        img: "https://images.unsplash.com/photo-1542314831-c6a4d2729a67?w=400&q=80",
+        classBadge: "bg-tag-amber"
+    }
+];
+
+function renderContainersList() {
+    const container = document.getElementById('containersListRender');
+    const lockCover = document.getElementById('containersLockCover');
+    let lvl = (state.player && state.player.level) ? state.player.level : 1;
+
+    if (lvl < 12) {
+        if (container) container.style.display = 'none';
+        if (lockCover) lockCover.style.display = 'block';
+        return;
+    }
+
+    if (lockCover) lockCover.style.display = 'none';
+    if (!container) return;
+
+    container.style.display = 'block';
+    let html = "";
+
+    PORT_CONTAINERS_CATALOG.forEach(box => {
+        let isLocked = lvl < box.reqLvl;
+        let btnText = isLocked ? "С " + box.reqLvl + " уровня" : "Вскрыть (" + (box.cost / 1000).toFixed(0) + "k ₽)";
+
+        html += 
+        "<div class='glass-card mb-3'>" +
+            "<div class='car-img-wrap' style='height:130px;'>" +
+                "<img src='" + box.img + "' class='car-img'>" +
+                "<div class='badge-tag' style='bottom:8px; right:8px;'><span class='tag-badge " + box.classBadge + "'>Порт</span></div>" +
+            "</div>" +
+            "<div class='flex-between mb-1'>" +
+                "<b class='font-bold'>" + box.name + "</b>" +
+                "<span class='price-val text-xs'>" + box.cost.toLocaleString() + " ₽</span>" +
+            "</div>" +
+            "<p class='sub-label mb-2'>" + box.desc + "</p>" +
+            "<button onclick=\"openPortContainerAction('" + box.id + "', " + box.cost + ")\" class='btn btn-purple w-full' " + (isLocked ? "disabled" : "") + ">" +
+                btnText +
+            "</button>" +
+        "</div>";
+    });
+
+    container.innerHTML = html;
+}
+
+function openPortContainerAction(boxId, cost) {
+    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
+    if (cash < cost) return showToast("Не хватает денег на таможенный контейнер!");
+
+    let maxSlots = getTotalGarageSlots();
+    let currentSlots = (state.garage && state.garage.length) ? state.garage.length : 0;
+    if (currentSlots >= maxSlots) return showToast("В гараже нет свободного места под авто из порта!");
+
+    state.player.cash -= cost;
+
+    let roll = Math.random();
+    if (roll < 0.40) {
+        // Успех: ценный спорткар
+        let winPrize = Math.round(cost * (1.4 + Math.random() * 0.7));
+        state.player.cash += winPrize;
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        openVerdictModal("ТАМОЖЕННЫЙ ДЖЕКПОТ! 🚢", "В контейнере найден ценный зарубежный лот! Выручка с перепродажи: +" + winPrize.toLocaleString() + " ₽", true, winPrize);
+    } else if (roll < 0.75) {
+        // Обычный распил
+        let partValue = Math.round(cost * 0.75);
+        state.player.cash += partValue;
+        saveState();
+        updateHeaderUI();
+        openVerdictModal("РАСПИЛ НА ЗАПЧАСТИ 🔩", "Кузов повреждён при транспортировке. Сдан на разбор: +" + partValue.toLocaleString() + " ₽", false);
+    } else {
+        // Пустышка
+        saveState();
+        updateHeaderUI();
+        tgHaptic('error');
+        openVerdictModal("ТАМОЖЕННАЯ ПУСТЫШКА 💨", "Контейнер оказался с бракованными деталями. Убыток: -" + cost.toLocaleString() + " ₽", false);
+    }
+}
+
+// ========================================================
+// 6. ЗАКАЗЫ СИНДИКАТА (С ПРОВЕРКОЙ ГАРАЖА И СДАЧЕЙ АВТО)
+// ========================================================
+function generateContracts() {
+    state.contracts = [
+        {
+            id: "cnt_1",
+            title: "Подбор комфортного седана для таксопарка",
+            brandReq: "любой",
+            minPower: 110,
+            minCond: 75,
+            reward: 120000,
+            desc: "Требуется целый авто без скрытых дефектов с кондиционером."
+        },
+        {
+            id: "cnt_2",
+            title: "Mercedes / BMW для регионального бизнесмена",
+            brandReq: "немец",
+            minPower: 170,
+            minCond: 85,
+            reward: 350000,
+            desc: "Строго чистый VIN, подтвержденный пробег и ровный кузов."
+        },
+        {
+            id: "cnt_3",
+            title: "Корч под зимний дрифт для новичка",
+            brandReq: "любой",
+            minPower: 80,
+            minCond: 50,
+            reward: 90000,
+            desc: "Подойдёт живая классика с заваркой или выворотом."
+        }
+    ];
+    saveState();
+}
+
+function renderContracts() {
+    const list = document.getElementById('contractsList');
+    const lockCover = document.getElementById('contractsLockCover');
+    let lvl = (state.player && state.player.level) ? state.player.level : 1;
+
+    if (lvl < 15) {
+        if (list) list.style.display = 'none';
+        if (lockCover) lockCover.style.display = 'block';
+        return;
+    }
+
+    if (lockCover) lockCover.style.display = 'none';
+    if (!list) return;
+
+    list.style.display = 'block';
+    if (!state.contracts || state.contracts.length === 0) generateContracts();
+
+    let html = "";
+    state.contracts.forEach(cnt => {
+        html += 
+        "<div class='glass-card mb-2'>" +
+            "<div class='flex-between mb-1'>" +
+                "<b class='text-xs color-cyan'>" + cnt.title + "</b>" +
+                "<span class='color-green font-bold text-xs'>+" + cnt.reward.toLocaleString() + " ₽</span>" +
+            "</div>" +
+            "<p class='sub-label mb-1'>" + cnt.desc + "</p>" +
+            "<div class='text-xs color-amber mb-2'>Требования: от " + cnt.minPower + " л.с. | Состояние от " + cnt.minCond + "%</div>" +
+            "<button onclick=\"completeContract('" + cnt.id + "')\" class='btn btn-cyan btn-sm w-full'>Сдать подходящее авто из гаража</button>" +
+        "</div>";
+    });
+
+    list.innerHTML = html;
+}
+
+function refreshContractsManual() {
+    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
+    if (cash < 15000) return showToast("Нужно 15,000 ₽ на обновление базы!");
+    state.player.cash -= 15000;
+    generateContracts();
+    renderContracts();
+    updateHeaderUI();
+    showToast("База заказов обновлена!");
+}
+
+function completeContract(contractId) {
+    if (!state.garage || state.garage.length === 0) {
+        return showToast("В гараже нет машин! Купите подходящее авто на рынке.");
+    }
+
+    const cnt = state.contracts.find(c => c.id === contractId);
+    if (!cnt) return;
+
+    // Поиск подходящей машины в гараже
+    const matchIdx = state.garage.findIndex(car => {
+        if (!car || car.impounded || car.unregistered) return false;
+        let p = car.power ? car.power : 100;
+        let c = car.condition ? car.condition : 80;
+        return p >= cnt.minPower && c >= cnt.minCond;
+    });
+
+    if (matchIdx === -1) {
+        return showToast("В гараже нет машины с " + cnt.minPower + "+ л.с. и состоянием " + cnt.minCond + "%!");
+    }
+
+    const surrenderedCar = state.garage[matchIdx];
+    state.garage.splice(matchIdx, 1);
+    state.player.cash = (state.player.cash || 0) + cnt.reward;
+    addXp(60);
+
+    // Удаляем выполненный заказ и генерируем новый
+    state.contracts = state.contracts.filter(c => c.id !== contractId);
+    if (state.contracts.length < 2) generateContracts();
+
+    saveState();
+    updateHeaderUI();
+    renderContracts();
+    if (typeof renderGarage === 'function') renderGarage();
+    playSound('win');
+    tgHaptic('success');
+    openVerdictModal("ЗАКАЗ СДАН! 🤝", "Клиент принял «" + surrenderedCar.name + "»! Выплата: +" + cnt.reward.toLocaleString() + " ₽", true, cnt.reward);
+}
+
+// ========================================================
+// 7. МАГАЗИН ПЕРЕКУПА (ПО ВСЕМ 4 СЕКЦИЯМ)
+// ========================================================
 function switchShopSection(sec) {
     ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
         const el = document.getElementById('shopSec-' + s);
@@ -785,7 +1082,7 @@ function renderShopTools() {
 
     const tools = [
         { id: 'gauge', name: "Толщиномер ЛКП", cost: 15000, desc: "Бесплатный замер шпакли в объявлениях" },
-        { id: 'obd', name: "OBD2 Сканер ЭБУ", cost: 25000, desc: "Чтение реального износа и ошибок мотора" },
+        { id: 'obd', name: "OBD2 Сканер ЭБУ", cost: 25000, desc: "Чтение реального износа и скрытых DTC-ошибок" },
         { id: 'endoscope', name: "Эндоскоп двигателя", cost: 40000, desc: "Проверка задиров в цилиндрах при покупке" }
     ];
 
@@ -825,11 +1122,11 @@ function renderShopConsumables() {
     if (!box) return;
     box.innerHTML = 
         "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div><b class='text-xs color-amber'>Партия автошампуня (Мойка)</b><div class='sub-label'>Расходники для 100% сырья</div></div>" +
+            "<div><b class='text-xs color-amber'>Партия автохимии (Мойка)</b><div class='sub-label'>Запас расходников для 100% сырья</div></div>" +
             "<button onclick='buyGenericSupplies(15000)' class='btn btn-amber btn-sm btn-auto'>15,000 ₽</button>" +
         "</div>" +
         "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div><b class='text-xs color-amber'>Комплект масел и фильтров (СТО)</b><div class='sub-label'>Запас расходников для слесарей</div></div>" +
+            "<div><b class='text-xs color-amber'>Комплект масел и фильтров (СТО)</b><div class='sub-label'>Сырьё для слесарей на 100%</div></div>" +
             "<button onclick='buyGenericSupplies(25000)' class='btn btn-amber btn-sm btn-auto'>25,000 ₽</button>" +
         "</div>";
 }
@@ -839,7 +1136,7 @@ function buyGenericSupplies(cost) {
     if (cash < cost) return showToast("Не хватает денег!");
     state.player.cash -= cost;
     if (state.businesses) {
-        state.businesses.forEach(b => { if (b.unlocked) b.stock = 100; });
+        state.businesses.forEach(b => { if (b.level > 0) b.stock = 100; });
     }
     saveState();
     renderBusinessList();
@@ -875,103 +1172,9 @@ function renderShopHomeItems() {
         "</div>";
 }
 
-// ----------------------------------------------------
-// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ И ЗАКАЗЫ СИНДИКАТА
-// ----------------------------------------------------
-function renderContainersList() {
-    const container = document.getElementById('containersListRender');
-    const lockCover = document.getElementById('containersLockCover');
-    let lvl = (state.player && state.player.level) ? state.player.level : 1;
-
-    if (lvl < 20) {
-        if (container) container.style.display = 'none';
-        if (lockCover) lockCover.style.display = 'block';
-        return;
-    }
-
-    if (lockCover) lockCover.style.display = 'none';
-    if (container) {
-        container.style.display = 'block';
-        container.innerHTML = 
-        "<div class='glass-card card-purple mb-3'>" +
-            "<div class='flex-between mb-2'>" +
-                "<div><b class='color-purple'>Контейнер из Дубая</b><div class='sub-label'>Шанс на гиперкар или пустой кузов</div></div>" +
-                "<span class='price-val color-purple'>1,500,000 ₽</span>" +
-            "</div>" +
-            "<button onclick='openPortContainerAction(1500000)' class='btn btn-purple w-full'>Вскрыть контейнер</button>" +
-        "</div>";
-    }
-}
-
-function openPortContainerAction(cost) {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < cost) return showToast("Не хватает денег на таможенный контейнер!");
-    state.player.cash -= cost;
-
-    let isWin = Math.random() < 0.45;
-    if (isWin) {
-        let winPrize = Math.round(cost * (1.5 + Math.random()));
-        state.player.cash += winPrize;
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        openVerdictModal("ТАМОЖЕННЫЙ КУШ! 🚢", "В контейнере найден раритетный спорткар! Прибыль с лота: +" + winPrize.toLocaleString() + " ₽", true, winPrize);
-    } else {
-        saveState();
-        updateHeaderUI();
-        tgHaptic('error');
-        openVerdictModal("ТАМОЖЕННЫЙ ПУСТЫШКА 💨", "В контейнере оказались только битые запчасти. Убыток: -" + cost.toLocaleString() + " ₽", false);
-    }
-}
-
-function renderContracts() {
-    const list = document.getElementById('contractsList');
-    const lockCover = document.getElementById('contractsLockCover');
-    let lvl = (state.player && state.player.level) ? state.player.level : 1;
-
-    if (lvl < 15) {
-        if (list) list.style.display = 'none';
-        if (lockCover) lockCover.style.display = 'block';
-        return;
-    }
-
-    if (lockCover) lockCover.style.display = 'none';
-    if (list) {
-        list.style.display = 'block';
-        list.innerHTML = 
-        "<div class='glass-card mb-2'>" +
-            "<div class='flex-between mb-1'>" +
-                "<b class='text-xs color-cyan'>Подбор Mercedes W221 для чиновника</b>" +
-                "<span class='color-green font-bold text-xs'>+250,000 ₽</span>" +
-            "</div>" +
-            "<p class='sub-label mb-2'>Требуется авто в идеале без ДТП и окрасов.</p>" +
-            "<button onclick='completeContractAction(250000)' class='btn btn-cyan btn-sm w-full'>Сдать заказ клиенту</button>" +
-        "</div>";
-    }
-}
-
-function refreshContractsManual() {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 15000) return showToast("Нужно 15,000 ₽ на обновление базы!");
-    state.player.cash -= 15000;
-    saveState();
-    updateHeaderUI();
-    renderContracts();
-    showToast("База заказов обновлена!");
-}
-
-function completeContractAction(reward) {
-    state.player.cash = (state.player.cash || 0) + reward;
-    addXp(45);
-    saveState();
-    updateHeaderUI();
-    playSound('win');
-    showToast("Заказ Синдиката выполнен! +" + reward.toLocaleString() + " ₽");
-}
-
-// ----------------------------------------------------
-// 7. ЛОМБАРД, СМЕНА ДНЯ, РАЦИОН И ЧАТ
-// ----------------------------------------------------
+// ========================================================
+// 8. ЛОМБАРД, СМЕНА ДНЯ, РАЦИОН, ЧАТ И РЕПУТАЦИЯ
+// ========================================================
 function takeLoan(amount) {
     let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
     if (debt >= 1000000) return showToast("Лимит долга исчерпан!");
@@ -1005,7 +1208,7 @@ function nextDayAction() {
 
     let curId = (state.player && state.player.housingId) ? state.player.housingId : 'room';
     let isOwn = (state.player && state.player.ownedHouses) ? state.player.ownedHouses.includes(curId) : false;
-    if (!isOwn && typeof HOUSING_LIST !== 'undefined') {
+    if (!isOwn && typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
         const h = HOUSING_LIST.find(item => item.id === curId);
         if (h && h.rentPrice) {
             state.player.cash = Math.max(0, (state.player.cash || 0) - h.rentPrice);
@@ -1020,7 +1223,6 @@ function nextDayAction() {
         state.player.policeImmunityDays -= 1;
     }
 
-    // Начисление выручки с предприятий
     if (state.businesses) {
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
@@ -1116,9 +1318,56 @@ function sendChatMessageFromInput() {
     renderLifeChat();
 }
 
-// ----------------------------------------------------
-// 8. ФОРТУНА: ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
-// ----------------------------------------------------
+function roadAssistanceAction() {
+    let fuel = (state.player && state.player.fuel) ? state.player.fuel : 0;
+    if (fuel < 10) return showToast("Нужно 10 ⛽ бензина для выезда!");
+    state.player.fuel -= 10;
+
+    let karma = (state.player && state.player.karma) ? state.player.karma : 0;
+    if (Math.random() < 0.65) {
+        state.player.karma = Math.min(100, karma + 12);
+        showToast("Вы прикурили аккумулятор на трассе! (+12 Кармы 😊)");
+    } else {
+        let conn = (state.player && state.player.connections) ? state.player.connections : 0;
+        state.player.connections = conn + 1;
+        state.player.karma = Math.min(100, karma + 5);
+        showToast("Вы помогли сотруднику ведомства! (+1 🤝 Связь и +5 Карма)");
+    }
+    saveState();
+    updateHeaderUI();
+}
+
+function donatePartsToMechanic() {
+    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
+    if (cash < 35000) return showToast("Нужно 35,000 ₽ на закупку деталей!");
+
+    state.player.cash -= 35000;
+    let conn = (state.player && state.player.connections) ? state.player.connections : 0;
+    state.player.connections = conn + 1;
+    let karma = (state.player && state.player.karma) ? state.player.karma : 0;
+    state.player.karma = Math.min(100, karma + 8);
+
+    saveState();
+    updateHeaderUI();
+    showToast("Дядя Ваня благодарен за запчасти! (+1 🤝 Связь и +8 Карма)");
+}
+
+function bigCharityDonate() {
+    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
+    if (cash < 100000) return showToast("Нужно 100,000 ₽!");
+
+    state.player.cash -= 100000;
+    let karma = (state.player && state.player.karma) ? state.player.karma : 0;
+    state.player.karma = Math.min(100, karma + 25);
+
+    saveState();
+    updateHeaderUI();
+    showToast("Доброе дело сделано! (+25 Кармы 😊)");
+}
+
+// ========================================================
+// 9. ФОРТУНА: ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
+// ========================================================
 let currentThimblesBet = 10000;
 
 function setThimblesBet(amt) {
@@ -1351,51 +1600,4 @@ function watchAdsgram() {
     updateHeaderUI();
     playSound('win');
     showToast("Награда за просмотр: +25,000 ₽ и +1 🤝!");
-}
-
-function roadAssistanceAction() {
-    let fuel = (state.player && state.player.fuel) ? state.player.fuel : 0;
-    if (fuel < 10) return showToast("Нужно 10 ⛽ бензина для выезда!");
-    state.player.fuel -= 10;
-
-    let karma = (state.player && state.player.karma) ? state.player.karma : 0;
-    if (Math.random() < 0.65) {
-        state.player.karma = Math.min(100, karma + 12);
-        showToast("Вы прикурили аккумулятор на трассе! (+12 Кармы 😊)");
-    } else {
-        let conn = (state.player && state.player.connections) ? state.player.connections : 0;
-        state.player.connections = conn + 1;
-        state.player.karma = Math.min(100, karma + 5);
-        showToast("Вы помогли сотруднику ведомства! (+1 🤝 Связь и +5 Карма)");
-    }
-    saveState();
-    updateHeaderUI();
-}
-
-function donatePartsToMechanic() {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 35000) return showToast("Нужно 35,000 ₽ на закупку деталей!");
-
-    state.player.cash -= 35000;
-    let conn = (state.player && state.player.connections) ? state.player.connections : 0;
-    state.player.connections = conn + 1;
-    let karma = (state.player && state.player.karma) ? state.player.karma : 0;
-    state.player.karma = Math.min(100, karma + 8);
-
-    saveState();
-    updateHeaderUI();
-    showToast("Дядя Ваня благодарен за запчасти! (+1 🤝 Связь и +8 Карма)");
-}
-
-function bigCharityDonate() {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 100000) return showToast("Нужно 100,000 ₽!");
-
-    state.player.cash -= 100000;
-    let karma = (state.player && state.player.karma) ? state.player.karma : 0;
-    state.player.karma = Math.min(100, karma + 25);
-
-    saveState();
-    updateHeaderUI();
-    showToast("Доброе дело сделано! (+25 Кармы 😊)");
 }
