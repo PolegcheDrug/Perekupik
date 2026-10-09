@@ -830,6 +830,22 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   transition: left 0.08s ease;
 }
 
+/* СТРИТ-МЕРОПРИЯТИЯ */
+.street-event-card {
+  background: #090e18;
+  border: 1px solid var(--border-glass);
+  border-left: 4px solid var(--cyan);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  margin-bottom: 8px;
+}
+.street-event-card.card-drift {
+  border-left-color: var(--red);
+}
+.street-event-card.card-show {
+  border-left-color: var(--amber);
+}
+
 /* ========================================================
    ШКАЛА КОНТЕЙНЕРОВ
    ======================================================== */
@@ -926,7 +942,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .fill-biz-stock { background: linear-gradient(90deg, var(--amber), #22c55e); }
 
 /* ========================================================
-   ЧИТ-ПУЛЬТ ПРОФИЛЯ
+   ЧИТ-ПУЛЬТ ПРОФИЛЯ И ПАТЧНОУТ
    ======================================================== */
 .cheat-adjust-row {
   display: flex;
@@ -937,6 +953,27 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border-radius: 8px;
   border: 1px solid var(--border-glass);
   margin-bottom: 6px;
+}
+
+.patch-item {
+  background: #0d1424;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border-left: 3px solid var(--cyan);
+}
+
+.credits-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.credit-pill {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 /* ========================================================
@@ -1146,6 +1183,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .mt-1 { margin-top: 4px; }
 .mt-2 { margin-top: 8px; }
 .p-2 { padding: 8px; }
+.p-3 { padding: 12px; }
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 .text-xs { font-size: 10px; }
