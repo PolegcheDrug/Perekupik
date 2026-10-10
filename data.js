@@ -152,10 +152,10 @@ const CAR_DATABASE = {
         { name: "Volvo FH16", power: 750, basePrice: 15500000, type: "truck", img: "assets/cars/truck/volvo.jpg" }
     ],
     yacht: [
-        { name: "Гидроцикл Yamaha FX", power: 250, basePrice: 1800000, type: "yacht", img: "assets/water/yamaha.jpg" },
-        { name: "Катер Bayliner VR5", power: 200, basePrice: 4500000, type: "yacht", img: "assets/water/bayliner.jpg" },
-        { name: "Azimut Atlantis 45", power: 880, basePrice: 75000000, type: "yacht", img: "assets/water/azimut.jpg" },
-        { name: "Sunseeker 95 Yacht", power: 3900, basePrice: 450000000, type: "yacht", img: "assets/water/sunseeker.jpg" }
+        { name: "Гидроцикл Yamaha FX", power: 250, basePrice: 1800000, type: "yacht", img: "assets/cars/yacht/yamaha.jpg" },
+        { name: "Катер Bayliner VR5", power: 200, basePrice: 4500000, type: "yacht", img: "assets/cars/yacht/bayliner.jpg" },
+        { name: "Azimut Atlantis 45", power: 880, basePrice: 75000000, type: "yacht", img: "assets/cars/yacht/azimut.jpg" },
+        { name: "Sunseeker 95 Yacht", power: 3900, basePrice: 450000000, type: "yacht", img: "assets/cars/yacht/sunseeker.jpg" }
     ]
 };
 
