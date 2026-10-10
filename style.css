@@ -12,6 +12,7 @@
   --amber: #ffb300;
   --amber-glow: rgba(255, 179, 0, 0.35);
   --red: #ff3366;
+  --red-glow: rgba(255, 51, 102, 0.4);
   --purple: #c084fc;
   --purple-dark: #7e22ce;
   --purple-glow: rgba(192, 132, 252, 0.4);
@@ -319,53 +320,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .fill-mood { background: linear-gradient(90deg, #ec4899, #38bdf8); }
 
 /* ========================================================
-   НАВИГАЦИОННАЯ ЛЕНТА
-   ======================================================== */
-.sub-nav-wrapper {
-  flex-shrink: 0;
-  background: rgba(11, 15, 23, 0.98);
-  border-bottom: 1px solid var(--border-glass);
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
-  z-index: 90;
-  width: 100%;
-}
-.sub-nav-wrapper::-webkit-scrollbar { display: none; }
-
-.sub-nav-track {
-  display: flex;
-  gap: 6px;
-  padding: 8px 14px;
-  width: max-content;
-}
-
-.sub-nav-btn {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-sub);
-  border: 1px solid var(--border-glass);
-  padding: 7px 12px;
-  border-radius: var(--radius-md);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  transition: background 0.2s, border-color 0.2s;
-}
-
-.sub-nav-btn.active {
-  background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(59, 130, 246, 0.25));
-  color: #fff;
-  border-color: var(--cyan);
-  box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
-}
-
-/* ========================================================
    ОСНОВНОЙ КОНТЕЙНЕР
    ======================================================== */
 .main-content {
@@ -374,7 +328,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 14px 24px 14px;
+  padding: 10px 14px 24px 14px;
   position: relative;
   z-index: 10;
 }
@@ -481,11 +435,11 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-/* СЕТКА ИКОНОК ПРИЛОЖЕНИЙ (4x2) */
+/* СЕТКА ИКОНОК ПРИЛОЖЕНИЙ (4 В РЯД) */
 .phone-home-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px 8px;
+  gap: 14px 6px;
   padding: 8px 2px 14px 2px;
 }
 
@@ -493,33 +447,39 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
   transition: transform 0.12s ease;
 }
 .phone-app-icon-wrap:active { transform: scale(0.92); }
 
 .phone-app-icon {
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 21px;
   color: #fff;
   position: relative;
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
+/* Градиенты приложений */
 .phone-app-icon.bg-cyan { background: linear-gradient(135deg, #00f2fe, #0284c7); }
 .phone-app-icon.bg-green { background: linear-gradient(135deg, #00e676, #059669); }
+.phone-app-icon.bg-emerald { background: linear-gradient(135deg, #10b981, #047857); }
+.phone-app-icon.bg-teal { background: linear-gradient(135deg, #14b8a6, #0f766e); }
 .phone-app-icon.bg-dark-purple { background: linear-gradient(135deg, #9333ea, #3b0764); }
 .phone-app-icon.bg-purple { background: linear-gradient(135deg, #c084fc, #7e22ce); }
 .phone-app-icon.bg-amber { background: linear-gradient(135deg, #ffd700, #b45309); color: #000; }
-.phone-app-icon.bg-teal { background: linear-gradient(135deg, #2dd4bf, #0f766e); }
+.phone-app-icon.bg-indigo { background: linear-gradient(135deg, #6366f1, #3730a3); }
 .phone-app-icon.bg-red { background: linear-gradient(135deg, #ff3366, #b91c1c); }
+.phone-app-icon.bg-rose { background: linear-gradient(135deg, #f43f5e, #881337); }
+.phone-app-icon.bg-orange { background: linear-gradient(135deg, #f97316, #9a3412); }
+.phone-app-icon.bg-yellow { background: linear-gradient(135deg, #eab308, #854d0e); color: #000; }
 .phone-app-icon.bg-blue { background: linear-gradient(135deg, #38bdf8, #1d4ed8); }
 
 .phone-app-badge {
@@ -536,7 +496,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 .phone-app-label {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 800;
   color: #cbd5e1;
   text-align: center;
@@ -651,7 +611,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   flex-shrink: 0;
 }
 
-/* ИКОНКА ТЕЛЕФОНА В НИЖНЕЙ НАВИГАЦИИ */
+/* ИКОНКА ТЕЛЕФОНА В НАВИГАЦИИ */
 .phone-nav-icon-wrap {
   position: relative;
   display: inline-flex;
@@ -895,6 +855,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .btn-green { background: linear-gradient(135deg, var(--green), #059669); color: #000; }
 .btn-amber { background: linear-gradient(135deg, #ffd700, var(--amber)); color: #000; }
 .btn-purple { background: linear-gradient(135deg, #c084fc, #9333ea); color: #fff; }
+.btn-red { background: linear-gradient(135deg, var(--red), #dc2626); color: #fff; box-shadow: 0 0 10px rgba(255, 51, 102, 0.35); }
 .btn-dark { background: rgba(255, 255, 255, 0.06); color: #e2e8f0; border: 1px solid var(--border-glass); }
 .btn-danger { background: #dc2626; color: #fff; }
 .btn-sm { font-size: 10px; padding: 7px 10px; }
@@ -1233,7 +1194,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   СТРИТ И ДРАГ-РЕЙСИНГ
+   СТРИТ, ДРАГ-РЕЙСИНГ & RDS ДРИФТ
    ======================================================== */
 .race-panel {
   background: #080d16;
@@ -1320,6 +1281,65 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 .street-event-card.card-drift { border-left-color: var(--red); }
 .street-event-card.card-show { border-left-color: var(--amber); }
+
+/* ========================================================
+   ЛИЧНЫЙ АВТОМОБИЛЬ И КОМПАКТНЫЕ ИКОНКИ ТЮНИНГА
+   ======================================================== */
+.glass-card.personal-car-card {
+  border: 1.5px solid rgba(255, 179, 0, 0.6) !important;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 179, 0, 0.12) 0%, rgba(11, 16, 26, 0.98) 100%) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 15px rgba(255, 179, 0, 0.25) !important;
+}
+
+.car-mods-badges-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  min-height: 22px;
+}
+
+.mod-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+  transition: transform 0.1s ease;
+}
+
+.mod-pill:hover {
+  transform: scale(1.1);
+}
+
+.mod-pill.color-cyan {
+  border-color: rgba(0, 242, 254, 0.35);
+  background: rgba(0, 242, 254, 0.08);
+}
+
+.mod-pill.color-green {
+  border-color: rgba(0, 230, 118, 0.35);
+  background: rgba(0, 230, 118, 0.08);
+}
+
+.mod-pill.color-amber {
+  border-color: rgba(255, 179, 0, 0.35);
+  background: rgba(255, 179, 0, 0.08);
+}
+
+.mod-pill.color-red {
+  border-color: rgba(255, 51, 102, 0.35);
+  background: rgba(255, 51, 102, 0.08);
+}
+
+.mod-pill.color-purple {
+  border-color: rgba(192, 132, 252, 0.35);
+  background: rgba(192, 132, 252, 0.08);
+}
 
 /* ========================================================
    ШКАЛА КОНТЕЙНЕРОВ
@@ -1763,6 +1783,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .mr-1 { margin-right: 4px; }
 .mx-1 { margin-left: 4px; margin-right: 4px; }
 .my-1 { margin-top: 4px; margin-bottom: 4px; }
+.p-1 { padding: 4px; }
 .p-2 { padding: 8px; }
 .p-3 { padding: 12px; }
 .text-center { text-align: center; }

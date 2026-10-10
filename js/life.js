@@ -838,6 +838,12 @@ function nextDayAction() {
         state.player.mood = Math.min(100, (state.player.mood || 85) + 25);
     }
 
+    // Бонус к настроению за владение личным автомобилем (+15%)
+    let hasPersonal = state.garage && state.garage.some(c => c && c.isPersonal);
+    if (hasPersonal) {
+        state.player.mood = Math.min(100, (state.player.mood || 85) + 15);
+    }
+
     if (state.player.policeImmunityDays && state.player.policeImmunityDays > 0) {
         state.player.policeImmunityDays -= 1;
     }

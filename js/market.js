@@ -1,11 +1,11 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ОБЪЯВЛЕНИЯ, ТОЛЩИНОМЕР, АВТОТЕКА И ДКП (v0.4.2)
+// js/market.js — АВТОРЫНОК, РЕЕСТР УНИКАЛЬНЫХ НОМЕРОВ, ДКП (v0.4.3)
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
 const REGIONS = ['77', '99', '97', '177', '199', '777', '799', '50', '90', '150', '190', '750'];
 
-function generateNormalPlate() {
+function generateRawNormalPlate() {
     const l1 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
     const l2 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
     const l3 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
@@ -14,9 +14,9 @@ function generateNormalPlate() {
     return l1 + num + l2 + l3 + " " + reg;
 }
 
-function generateCoolPlate() {
+function generateRawCoolPlate() {
     let letters = "";
-    if (Math.random() > 0.5) {
+    if (Math.random() > 0.6) {
         const l = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
         letters = l + l + l;
     } else {
@@ -24,10 +24,34 @@ function generateCoolPlate() {
         const l2 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
         letters = l1 + l2 + l2;
     }
-    const coolNums = ['001', '007', '111', '222', '333', '444', '555', '666', '777', '888', '999'];
+    const coolNums = ['111', '222', '333', '444', '555', '666', '777', '888', '999', '007', '001'];
     const num = coolNums[Math.floor(Math.random() * coolNums.length)];
-    const reg = ['77', '99', '97', '777'][Math.floor(Math.random() * 4)];
+    const reg = ['77', '99', '97', '777', '50'][Math.floor(Math.random() * 5)];
     return letters.charAt(0) + num + letters.substring(1) + " " + reg;
+}
+
+// ГЕНЕРАТОР УНИКАЛЬНЫХ ГОСНОМЕРОВ (БЕЗ ДУБЛЕЙ)
+function getUniquePlate(preferCool = false) {
+    if (!state.registeredPlates) state.registeredPlates = [];
+    
+    let plateCandidate = "";
+    let attempts = 0;
+
+    do {
+        attempts++;
+        plateCandidate = preferCool ? generateRawCoolPlate() : generateRawNormalPlate();
+    } while (state.registeredPlates.includes(plateCandidate) && attempts < 30);
+
+    state.registeredPlates.push(plateCandidate);
+    return plateCandidate;
+}
+
+function generateNormalPlate() {
+    return getUniquePlate(false);
+}
+
+function generateCoolPlate() {
+    return getUniquePlate(true);
 }
 
 function evaluatePlate(plateStr) {
@@ -42,9 +66,8 @@ function evaluatePlate(plateStr) {
 function refreshPlateCatalog() {
     state.plateCatalog = [];
     for (let i = 0; i < 6; i++) {
-        const isCool = Math.random() > 0.45;
-        let p = generateNormalPlate();
-        if (isCool) p = generateCoolPlate();
+        const isCool = Math.random() < 0.20;
+        let p = isCool ? generateCoolPlate() : generateNormalPlate();
         const cost = Math.round(evaluatePlate(p) * (1.1 + Math.random() * 0.25));
         state.plateCatalog.push({ plate: p, price: cost });
     }
@@ -112,7 +135,7 @@ function setCategory(cat) {
 function refreshMarketFeedManual() {
     const cost = getMarketRefreshCost();
     let pCash = (state.player && state.player.cash) ? state.player.cash : 0;
-    let pFuel = (state.player && state.player.fuel) ? state.player.fuel : 0;
+    let pFuel = (state.player && state.player.fuel !== undefined) ? state.player.fuel : 0;
 
     if (pCash < cost) return showToast("Не хватает " + cost.toLocaleString() + " ₽!");
     if (pFuel < 5) return showToast("Закончился бензин ⛽! Заправьтесь на АЗС.");
@@ -134,7 +157,7 @@ function refreshMarketFeedManual() {
 }
 
 // ----------------------------------------------------
-// ГЕНЕРАТОР РАЗНООБРАЗИЯ И ЖИВОЙ ЭКОНОМИКИ РЫНКА
+// ГЕНЕРАТОР РАЗНООБРАЗИЯ И ЧЕСТНОГО БАЛАНСА НОМЕРОВ
 // ----------------------------------------------------
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
@@ -143,7 +166,6 @@ function populateMarketFeed() {
     let pool = CAR_DATABASE[cat] ? CAR_DATABASE[cat] : CAR_DATABASE.economy;
     if (!pool || pool.length === 0) return;
 
-    // Перемешивание пула (Fisher-Yates) для исключения повторений одних и тех же машин
     let shuffledPool = [...pool];
     for (let i = shuffledPool.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -160,30 +182,25 @@ function populateMarketFeed() {
         const template = shuffledPool[i % shuffledPool.length];
         if (!template) continue;
 
-        // Генерация рыночного архетипа сделки:
-        // 1. urgent: Срочный выкуп (очень выгодно, но быстро уходит) ~25%
-        // 2. normal: Обычный рынок (умеренная маржа) ~45%
-        // 3. overprice: Оверпрайс/Жадный продавец (в минус, если не сторговать) ~30%
         let dealRoll = Math.random();
         let dealType = 'normal';
         let priceMultiplier = 0.85;
 
-        if (dealRoll < 0.25) {
+        if (dealRoll < 0.22) {
             dealType = 'urgent';
-            priceMultiplier = 0.65 + Math.random() * 0.12; // Сладкая цена (выгода 25-35%)
-        } else if (dealRoll < 0.70) {
+            priceMultiplier = 0.68 + Math.random() * 0.10; // Срочный выкуп с хорошей скидкой
+        } else if (dealRoll < 0.68) {
             dealType = 'normal';
-            priceMultiplier = 0.82 + Math.random() * 0.14; // Стандарт (выгода 5-15%)
+            priceMultiplier = 0.82 + Math.random() * 0.12; // Обычный рынок
         } else {
             dealType = 'overprice';
-            priceMultiplier = 1.05 + Math.random() * 0.20; // Переоценена на 5-25% выше рынка!
+            priceMultiplier = 1.05 + Math.random() * 0.18; // Переоцененная машина
         }
 
-        // Влияние уровня и кармы на шанс дефектов
-        let defectChance = 0.40;
-        if (dealType === 'urgent') defectChance = 0.60; // На срочных машинах чаще есть проблемы
-        if (lvl <= 5) defectChance = 0.30;
-        else if (lvl >= 20) defectChance = 0.50;
+        let defectChance = 0.38;
+        if (dealType === 'urgent') defectChance = 0.55;
+        if (lvl <= 5) defectChance = 0.28;
+        else if (lvl >= 20) defectChance = 0.48;
         if (cat === 'premium' || cat === 'hyper') defectChance -= 0.10;
 
         let hasHiddenDefect = false;
@@ -191,11 +208,12 @@ function populateMarketFeed() {
             if (Math.random() < defectChance) hasHiddenDefect = true;
         }
 
-        let isStolen = Math.random() < (dealType === 'urgent' ? 0.25 : 0.12);
+        let isStolen = Math.random() < (dealType === 'urgent' ? 0.20 : 0.10);
         const carId = "m_" + Date.now() + "_" + i;
         
-        let genPlate = generateNormalPlate();
-        if (Math.random() < 0.20) genPlate = generateCoolPlate();
+        // РЕАЛИСТИЧНЫЙ ШАНС БЛАТНЫХ НОМЕРОВ: ВСЕГО 3.5%
+        let isCoolNumber = Math.random() < 0.035;
+        let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
 
         let baseP = template.basePrice ? template.basePrice : 100000;
         let tType = template.type ? template.type : 'economy';
@@ -208,9 +226,10 @@ function populateMarketFeed() {
         let sellerPrice = carOnlyPrice;
         let isLuckyFind = false;
 
+        // Если красивый номер выпал продавцу
         if (plateVal > 5000) {
-            if (Math.random() < 0.05) {
-                isLuckyFind = true; // Продавец не в курсе ценности номера
+            if (Math.random() < 0.08) {
+                isLuckyFind = true; // Продавец не знает цены номеров
                 sellerPrice = carOnlyPrice;
             } else {
                 let plateMarkup = Math.round(plateVal * (0.80 + Math.random() * 0.15));
@@ -262,7 +281,6 @@ function populateMarketFeed() {
         let engWear = hasHiddenDefect ? (35 + Math.random() * 35) : (75 + Math.random() * 20);
         let transWear = hasHiddenDefect ? (40 + Math.random() * 30) : (80 + Math.random() * 15);
 
-        // Черты продавца для продвинутого торга
         const sellerTypes = ['greedy', 'calm', 'hurried'];
         const currentSellerType = dealType === 'urgent' ? 'hurried' : (dealType === 'overprice' ? 'greedy' : sellerTypes[Math.floor(Math.random() * sellerTypes.length)]);
 
@@ -352,7 +370,6 @@ function renderMarketFeed() {
         let obdIcon = hasScanner ? "OBD2 ✓" : "OBD2 (5k)";
         let autoIcon = car.autotekaChecked ? "0" : "5k";
 
-        // Индикатор выгодности для опытного взгляда перекупа
         let dealBadge = "";
         if (car.dealType === 'urgent') {
             dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🔥 СРОЧНО</span>";
@@ -523,7 +540,7 @@ function paidCallMarketCar(carId) {
 }
 
 // ----------------------------------------------------
-// ЛОГИКА РЕАЛИСТИЧНОГО ТОРГА ПРИ ПОКУПКЕ
+// ЛОГИКА ТОРГА ПРИ ПОКУПКЕ
 // ----------------------------------------------------
 function openMarketDeal(carId) {
     const carIndex = state.marketFeed.findIndex(c => c && c.id === carId); 
@@ -579,7 +596,6 @@ function renderMarketHaggleControls() {
         return;
     }
 
-    // Если игрок заранее проверил авто толщиномером или сканером, даём сильный козырь в торгах
     let inspectionBonusBtn = "";
     if (car.stoChecked && car.hiddenDefect) {
         inspectionBonusBtn = `
@@ -622,7 +638,7 @@ function attemptDefectArgueHaggle() {
     let discount = Math.round(car.price * 0.10);
     car.price = Math.max(10000, car.price - discount);
     car.hagglePatience -= 1;
-    car.stoChecked = false; // Использовали аргумент
+    car.stoChecked = false;
 
     setTxt("dealCarPrice", car.price.toLocaleString() + " ₽");
 
@@ -647,7 +663,7 @@ function attemptPaintArgueHaggle() {
     let discount = Math.round(car.price * 0.07);
     car.price = Math.max(10000, car.price - discount);
     car.hagglePatience -= 1;
-    car.gaugeChecked = false; // Использовали аргумент
+    car.gaugeChecked = false;
 
     setTxt("dealCarPrice", car.price.toLocaleString() + " ₽");
 
