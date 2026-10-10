@@ -1,5 +1,5 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ОБЪЯВЛЕНИЯ, ТОЛЩИНОМЕР И АВТОТЕКА (v0.4.0)
+// js/market.js — АВТОРЫНОК, ОБЪЯВЛЕНИЯ, ТОЛЩИНОМЕР, АВТОТЕКА И ДКП (v0.4.0)
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -249,6 +249,7 @@ function populateMarketFeed() {
             hiddenDefect: defectObj,
             sellerNote: sNote,
             condition: cCond,
+            insurance: null,
             tuning: { 
                 chip: 0, exhaust: false, stance: false, bodykit: false, 
                 rollCage: false, dragSlicks: false, hydroHandbrake: false, 
@@ -520,8 +521,10 @@ function openMarketDeal(carId) {
     }
     const randIdx = numSum % avatars.length;
     
+    const sellerTitle = names[randIdx];
+    pendingMarketCar.sellerName = sellerTitle;
     setTxt("dealSellerAvatar", avatars[randIdx]);
-    setTxt("dealSellerName", names[randIdx] + " (Продавец)");
+    setTxt("dealSellerName", sellerTitle + " (Продавец)");
 
     const thread = document.getElementById("dealChatThread");
     if (thread) {
@@ -610,10 +613,12 @@ function attemptMarketHaggle(percent) {
     saveState();
 }
 
+// ----------------------------------------------------
+// ВЫКУП АВТО ЧЕРЕЗ БЛАНК ДКП
+// ----------------------------------------------------
 function confirmMarketPurchaseSuccess() {
     if (!pendingMarketCar) return; 
     const car = pendingMarketCar.car;
-    const carIndex = pendingMarketCar.carIndex;
     
     const maxSlots = getTotalGarageSlots(); 
     let currentSlots = state.garage ? state.garage.length : 0;
@@ -626,6 +631,29 @@ function confirmMarketPurchaseSuccess() {
     if (cash < price) return showToast("Недостаточно денег на выкуп!");
     
     closeModal("modalMarketDeal");
+
+    // Инициализация интерактивного бланка ДКП для покупки ТС
+    activePendingDKPDeal = {
+        type: 'buy',
+        car: car,
+        carIndex: pendingMarketCar.carIndex,
+        seller: pendingMarketCar.sellerName || "Продавец",
+        buyer: (state.player && state.player.name) ? state.player.name : "Перекуп #777",
+        price: price
+    };
+
+    if (typeof openDKPModal === 'function') {
+        openDKPModal(activePendingDKPDeal);
+    } else {
+        finishMarketCarBuyProcess(activePendingDKPDeal);
+    }
+}
+
+function finishMarketCarBuyProcess(deal) {
+    const car = deal.car;
+    const price = deal.price;
+    const carIndex = deal.carIndex;
+
     state.player.cash -= price; 
     
     if (!state.player.stats) state.player.stats = {};
@@ -637,11 +665,12 @@ function confirmMarketPurchaseSuccess() {
     newCar.customPlate = car.plate;
     newCar.impounded = false;
     newCar.unregistered = false;
+    newCar.insurance = null; // Новая машина пока без страховки
     newCar.purchaseCost = price;
     newCar.wear = car.wear ? car.wear : { engine: 85, transmission: 85 };
     newCar.preSaleVisited = false;
     
-    // Гарантируем чистый тюнинг для купленного автомобиля
+    // Чистый тюнинг для купленного автомобиля
     newCar.tuning = { 
         chip: 0, exhaust: false, stance: false, bodykit: false, 
         rollCage: false, dragSlicks: false, hydroHandbrake: false, 
@@ -656,18 +685,17 @@ function confirmMarketPurchaseSuccess() {
     }
     
     pendingMarketCar = null; 
+    activePendingDKPDeal = null;
     addXp(40);
     
     let carName = car.name ? car.name : "Авто";
     showToast("✅ " + carName + " куплен за " + price.toLocaleString() + " ₽!"); 
-    playSound('win'); 
-    tgHaptic('success'); 
     spawnFloatingReward("-" + price.toLocaleString() + " ₽");
     
     saveState(); 
     renderMarketFeed(); 
     renderGarage(); 
-    setTimeout(() => { switchTab("tabGarage"); }, 350);
+    setTimeout(() => { switchTab("tabGarage"); }, 400);
 }
 
 function openGaugeModal(carId) { 

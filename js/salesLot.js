@@ -1,5 +1,5 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ПОКУПАТЕЛИ И ТОРГ (v0.4.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ПОКУПАТЕЛИ, ТОРГ И ДКП (v0.4.0)
 // ========================================================
 
 const BUYERS_CATALOG = {
@@ -7,24 +7,47 @@ const BUYERS_CATALOG = {
         { name: "Студент Макс", avatar: "🧑‍🎓", rate: 0.82, type: "economy" },
         { name: "Таксист Ашот", avatar: "🧔", rate: 0.88, type: "economy" },
         { name: "Дед Михалыч", avatar: "👴", rate: 0.95, type: "economy" },
-        { name: "Перекуп Саня", avatar: "😎", rate: 0.75, type: "economy" }
+        { name: "Перекуп Саня", avatar: "😎", rate: 0.75, type: "economy" },
+        { name: "Дачник Петрович", avatar: "👨‍🌾", rate: 0.90, type: "economy" },
+        { name: "Курьер Руслан", avatar: "🛵", rate: 0.85, type: "economy" },
+        { name: "Пацан с района Костян", avatar: "🧢", rate: 0.78, type: "economy" },
+        { name: "Новичок с правами Лера", avatar: "👩‍🦰", rate: 0.93, type: "economy" },
+        { name: "Гаражный мастер Толя", avatar: "👨‍🔧", rate: 0.80, type: "economy" },
+        { name: "Бригадир Валера", avatar: "👷‍♂️", rate: 0.89, type: "economy" }
     ],
     comfort: [
         { name: "Менеджер Олег", avatar: "👨‍💼", rate: 0.88, type: "comfort" },
         { name: "Семейный Илья", avatar: "👨‍👩‍👦", rate: 0.92, type: "comfort" },
         { name: "Блогерша Аня", avatar: "👩‍🎤", rate: 0.95, type: "comfort" },
-        { name: "Автоподборщик", avatar: "🕵️‍♂️", rate: 0.80, type: "comfort" }
+        { name: "Автоподборщик", avatar: "🕵️‍♂️", rate: 0.80, type: "comfort" },
+        { name: "IT-тимлид Денис", avatar: "👨‍💻", rate: 0.94, type: "comfort" },
+        { name: "Риелтор Кристина", avatar: "👩‍💼", rate: 0.91, type: "comfort" },
+        { name: "Фитнес-тренер Влад", avatar: "💪", rate: 0.87, type: "comfort" },
+        { name: "Врач-стоматолог Павел", avatar: "👨‍⚕️", rate: 0.96, type: "comfort" },
+        { name: "Торговый представитель Юра", avatar: "🚘", rate: 0.84, type: "comfort" },
+        { name: "Дизайнер интерьеров Соня", avatar: "🎨", rate: 0.93, type: "comfort" }
     ],
     premium: [
         { name: "Бизнесмен Игорь", avatar: "🤵", rate: 0.90, type: "premium" },
         { name: "Мажор Артур", avatar: "🕺", rate: 0.98, type: "premium" },
         { name: "Депутат Виталий", avatar: "🕴️", rate: 0.85, type: "premium" },
-        { name: "Владелец таксопарка", avatar: "🧔‍♂️", rate: 0.82, type: "premium" }
+        { name: "Владелец таксопарка", avatar: "🧔‍♂️", rate: 0.82, type: "premium" },
+        { name: "Застройщик Альберт", avatar: "🏗️", rate: 0.93, type: "premium" },
+        { name: "Продюсер Марк", avatar: "🎬", rate: 0.97, type: "premium" },
+        { name: "Ресторатор Карен", avatar: "🍽️", rate: 0.89, type: "premium" },
+        { name: "Юрист международник Яна", avatar: "⚖️", rate: 0.92, type: "premium" },
+        { name: "Владелец сети клиник Борис", avatar: "🩺", rate: 0.95, type: "premium" },
+        { name: "Инвестор Герман", avatar: "📈", rate: 0.86, type: "premium" }
     ],
     hyper: [
         { name: "Шейх Мансур", avatar: "👳‍♂️", rate: 1.05, type: "hyper" },
         { name: "Олигарх Роман", avatar: "🛥️", rate: 0.95, type: "hyper" },
-        { name: "Крипто-миллионер", avatar: "🤑", rate: 1.10, type: "hyper" }
+        { name: "Крипто-миллионер", avatar: "🤑", rate: 1.10, type: "hyper" },
+        { name: "Стример-хайпожор", avatar: "🎮", rate: 1.08, type: "hyper" },
+        { name: "Звезда футбола Алекс", avatar: "⚽", rate: 1.02, type: "hyper" },
+        { name: "Коллекционер редких авто", avatar: "🏛️", rate: 1.15, type: "hyper" },
+        { name: "IT-фаундер из Дубая", avatar: "🚀", rate: 0.99, type: "hyper" },
+        { name: "Наследник синдиката Тариэл", avatar: "🕶️", rate: 0.92, type: "hyper" }
     ]
 };
 
@@ -359,6 +382,11 @@ function attemptHaggleSale(type) {
     }
 }
 
+// ========================================================
+// ИНТЕРАКТИВНОЕ ОФОРМЛЕНИЕ ДОГОВОРА КУПЛИ-ПРОДАЖИ (ДКП)
+// ========================================================
+let activePendingDKPDeal = null;
+
 function acceptBuyerOffer(idx) {
     const slot = state.salesLot[idx];
     if (!slot || !slot.currentBuyer) return;
@@ -367,31 +395,121 @@ function acceptBuyerOffer(idx) {
     const car = slot.car;
     const finalPrice = buyer.offerPrice;
 
-    state.salesLot.splice(idx, 1);
-    state.player.cash = (state.player.cash || 0) + finalPrice;
-
     let purchaseCost = car.purchaseCost ? car.purchaseCost : (car.basePrice ? car.basePrice : 100000);
     let netProfit = finalPrice - purchaseCost;
 
-    if (!state.player.stats) state.player.stats = { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
-    state.player.stats.sold = (state.player.stats.sold || 0) + 1;
-    if (!state.player.stats.totalNetProfit) state.player.stats.totalNetProfit = 0;
-    state.player.stats.totalNetProfit += netProfit;
+    activePendingDKPDeal = {
+        type: 'sale',
+        lotIndex: idx,
+        car: car,
+        seller: (state.player && state.player.name) ? state.player.name : "Перекуп #777",
+        buyer: buyer.name,
+        price: finalPrice,
+        profit: netProfit
+    };
 
-    if (netProfit >= 0) {
-        state.player.stats.profitableSales = (state.player.stats.profitableSales || 0) + 1;
-    } else {
-        state.player.stats.lossSales = (state.player.stats.lossSales || 0) + 1;
+    openDKPModal(activePendingDKPDeal);
+}
+
+function openDKPModal(dealData) {
+    setTxt('dkpSellerName', dealData.seller);
+    setTxt('dkpBuyerName', dealData.buyer);
+    setTxt('dkpCarTitle', dealData.car.name);
+    
+    let power = dealData.car.power || 100;
+    let mileage = typeof dealData.car.mileage === 'number' ? dealData.car.mileage.toLocaleString() : "85 000";
+    setTxt('dkpCarSpecs', `Мощность: ${power} л.с. | Пробег: ${mileage} км`);
+    
+    let plate = dealData.car.customPlate || dealData.car.plate || "ТРАНЗИТ";
+    setTxt('dkpCarPlate', plate);
+    setTxt('dkpPriceAmount', dealData.price.toLocaleString() + " ₽");
+
+    const profitBadge = document.getElementById('dkpNetProfitBadge');
+    if (profitBadge) {
+        if (dealData.profit !== undefined) {
+            profitBadge.style.display = 'block';
+            if (dealData.profit > 0) {
+                profitBadge.className = 'text-xs text-center font-bold mb-2 color-green';
+                profitBadge.innerText = `Чистая прибыль от продажи: +${dealData.profit.toLocaleString()} ₽ 📈`;
+            } else if (dealData.profit < 0) {
+                profitBadge.className = 'text-xs text-center font-bold mb-2 color-red';
+                profitBadge.innerText = `Убыток от сделки: ${dealData.profit.toLocaleString()} ₽ 📉`;
+            } else {
+                profitBadge.className = 'text-xs text-center font-bold mb-2 color-amber';
+                profitBadge.innerText = `Сделка закрыта в ноль (0 ₽)`;
+            }
+        } else {
+            profitBadge.style.display = 'none';
+        }
     }
 
-    addXp(50);
-    state.player.mood = Math.min(100, (state.player.mood || 80) + 10);
+    const stamp = document.getElementById('dkpOfficialStamp');
+    if (stamp) stamp.classList.remove('stamp-approved');
 
-    saveState();
-    renderSalesLot();
-    updateHeaderUI();
+    setTxt('dkpSellerSig', "✓ Подписано");
+    setTxt('dkpBuyerSig', "✍️ Ожидает подписи...");
 
-    openVerdictModal("АВТО ПРОДАНО! 🤝", "ДКП подписан! Покупатель забрал «" + car.name + "» за " + finalPrice.toLocaleString() + " ₽.", true, finalPrice, netProfit);
+    const btnSign = document.getElementById('btnSignDKP');
+    const btnClose = document.getElementById('btnCloseDKP');
+    if (btnSign) {
+        btnSign.style.display = 'block';
+        btnSign.innerText = dealData.type === 'buy' ? "✍️ Подписать ДКП и выкупить ТС" : "✍️ Подписать ДКП и забрать деньги";
+    }
+    if (btnClose) btnClose.style.display = 'none';
+
+    const modal = document.getElementById('modalDKP');
+    if (modal) modal.classList.add('active');
+    playSound('tick');
+}
+
+function confirmSignDKP() {
+    if (!activePendingDKPDeal) return;
+    const deal = activePendingDKPDeal;
+
+    // Анимация штемпельного удара печати МРЭО ГИБДД
+    const stamp = document.getElementById('dkpOfficialStamp');
+    if (stamp) stamp.classList.add('stamp-approved');
+
+    setTxt('dkpBuyerSig', "✓ Подписано (Игрок)");
+    playSound('win');
+    tgHaptic('success');
+
+    const btnSign = document.getElementById('btnSignDKP');
+    const btnClose = document.getElementById('btnCloseDKP');
+    if (btnSign) btnSign.style.display = 'none';
+    if (btnClose) btnClose.style.display = 'block';
+
+    if (deal.type === 'sale') {
+        // Удаляем из списка продаж
+        state.salesLot.splice(deal.lotIndex, 1);
+        
+        // Зачисляем наличные
+        state.player.cash = (state.player.cash || 0) + deal.price;
+
+        // Обновляем аналитику
+        if (!state.player.stats) state.player.stats = { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
+        state.player.stats.sold = (state.player.stats.sold || 0) + 1;
+        state.player.stats.totalNetProfit = (state.player.stats.totalNetProfit || 0) + deal.profit;
+
+        if (deal.profit >= 0) {
+            state.player.stats.profitableSales = (state.player.stats.profitableSales || 0) + 1;
+        } else {
+            state.player.stats.lossSales = (state.player.stats.lossSales || 0) + 1;
+        }
+
+        addXp(50);
+        state.player.mood = Math.min(100, (state.player.mood || 80) + 10);
+
+        saveState();
+        renderSalesLot();
+        updateHeaderUI();
+        showToast("🤝 ДКП зарегистрирован! Средства зачислены.");
+    } else if (deal.type === 'buy') {
+        // Логика покупки вызывается из market.js через callback
+        if (typeof finishMarketCarBuyProcess === 'function') {
+            finishMarketCarBuyProcess(deal);
+        }
+    }
 }
 
 function confirmSaleFromHaggleModal() {

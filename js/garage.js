@@ -136,6 +136,14 @@ function renderGarage() {
             "</div>";
         }
 
+        // Блок статуса страховки КАСКО / ОСАГО
+        let insuranceBadge = "";
+        if (car.insurance === 'casco') {
+            insuranceBadge = "<span class='tag-badge bg-tag-green' style='margin-left:4px;'>🛡️ КАСКО</span>";
+        } else if (car.insurance === 'osago') {
+            insuranceBadge = "<span class='tag-badge bg-tag-cyan' style='margin-left:4px;'>📋 ОСАГО</span>";
+        }
+
         let isBlocked = car.impounded || car.unregistered;
         let dangerClass = (car.hiddenDefect && !car.hasAdditive) ? "card-danger" : "";
         let bonusPlateBlock = plateVal > 5000 
@@ -146,7 +154,7 @@ function renderGarage() {
         "<div class='glass-card mb-3 " + dangerClass + "'>" +
             "<div class='car-img-wrap' style='height: 140px;'>" +
                 "<img src='" + carImg + "' class='car-img' onerror=\"this.src='assets/cars/economy/vaz-2107.jpg'\">" +
-                "<div class='badge-tag' style='bottom: 8px; right: 8px;'>" + carType + "</div>" +
+                "<div class='badge-tag' style='bottom: 8px; right: 8px;'>" + carType + insuranceBadge + "</div>" +
                 "<div class='plate-corner'><div class='license-plate'>" + carPlate + " <div class='license-flag'>RUS</div></div></div>" +
             "</div>" +
             "<div class='flex-between mb-2'>" +
@@ -309,6 +317,44 @@ function openTuningFromPreview() {
 }
 
 // ----------------------------------------------------
+// АВТОСТРАХОВАНИЕ (КАСКО / ОСАГО)
+// ----------------------------------------------------
+function openInsuranceModalFromPreview() {
+    if (selectedCarIndex === null) return;
+    const car = state.garage[selectedCarIndex];
+    if (!car) return;
+
+    setTxt('insureCarTitle', `${car.name} (${car.customPlate || car.plate || "ТРАНЗИТ"})`);
+    closeModal('modalPreview');
+    const modal = document.getElementById('modalInsurance');
+    if (modal) modal.classList.add('active');
+    playSound('tick');
+}
+
+function confirmPurchaseInsurance(type) {
+    if (selectedCarIndex === null) return;
+    const car = state.garage[selectedCarIndex];
+    if (!car) return;
+
+    const cost = type === 'casco' ? 18000 : 7500;
+    let cash = state.player?.cash || 0;
+    if (cash < cost) return showToast("Не хватает денег на оформление полиса!");
+
+    state.player.cash -= cost;
+    car.insurance = type;
+    saveState();
+    closeModal('modalInsurance');
+    renderGarage();
+    playSound('win');
+    tgHaptic('success');
+    openVerdictModal(
+        "СТРАХОВКА ОФОРМЛЕНА! 🛡️", 
+        `Полис ${type === 'casco' ? 'КАСКО' : 'ОСАГО'} успешно привязан к «${car.name}». Автомобиль защищён от потерь при ЧП!`, 
+        true
+    );
+}
+
+// ----------------------------------------------------
 // ПРЕДПРОДАЖНАЯ ПОДГОТОВКА
 // ----------------------------------------------------
 function openPreSaleModal(idx) {
@@ -324,7 +370,7 @@ function openPreSaleModal(idx) {
 
     let mVal = car.marketValue ? car.marketValue : 0;
     let cName = car.name ? car.name : "Авто";
-    setTxt("preSaleCarTitle", cName + " (Оценка: " + mVal.toLocaleString() + " ₽)");
+    setTxt("preSaleCarTitle", cName + " (Оценка: " + mVal.toLocaleString() + " ₽)"); 
     
     let washLevel = 0;
     let stoLevel = 0;
@@ -946,13 +992,15 @@ function confirmPutOnLot() {
     closeModal("modalPutOnLot"); 
     state.garage.splice(carToLotIndex, 1); 
     
+    // ИСПРАВЛЕНИЕ БАГА ТАЙМЕРА: единый расчёт для maxTimer и timer (старт строго с 0%)
+    const waitTime = Math.floor(60 + Math.random() * 180);
     if (!state.salesLot) state.salesLot = [];
     state.salesLot.push({ 
         id: "lot_" + Date.now(), 
         car: car, 
         askingPrice: askingPrice, 
-        maxTimer: Math.floor(60 + Math.random() * 180),
-        timer: Math.floor(60 + Math.random() * 180), 
+        maxTimer: waitTime,
+        timer: waitTime, 
         currentBuyer: null 
     }); 
     

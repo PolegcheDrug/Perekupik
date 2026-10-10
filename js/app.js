@@ -1,8 +1,8 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.0)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.1)
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.4.0";
+const CURRENT_GAME_VERSION = "v0.4.1";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -181,7 +181,8 @@ const DEFAULT_STATE = {
         diet: 'shaurma', housingId: 'room', housingType: 'rent', ownedHouses: [], selectedStreetCarIndex: 0, 
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
         hasRacingLicense: false, consecutiveRaces: 0, maxRacesBeforeRaid: 12,
-        tools: { gauge: false, obd: false, endoscope: false, compressor: false },
+        safeDeposit: 0,
+        tools: { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false },
         furniture: []
     },
     garage: [], salesLot: [], contracts: [], plateCatalog: [], ownedPlates: ["В777ВВ 77"], 
@@ -392,13 +393,26 @@ function sanitizeState() {
     if (!Array.isArray(state.player.furniture)) state.player.furniture = [];
     if (typeof state.player.cash !== 'number' || state.player.cash < 0) state.player.cash = 150000;
     if (typeof state.player.loanDebt !== 'number' || state.player.loanDebt < 0) state.player.loanDebt = 0;
-    if (!state.player.tools) state.player.tools = { gauge: false, obd: false, endoscope: false, compressor: false };
+    if (typeof state.player.safeDeposit !== 'number') state.player.safeDeposit = 0;
+    if (!state.player.tools) state.player.tools = { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false };
     
+    // Синхронизация путей к картинкам бизнеса из data.js
+    if (state.businesses && typeof BUSINESS_DATA !== 'undefined') {
+        state.businesses.forEach(b => {
+            const template = BUSINESS_DATA.find(d => d.id === b.id);
+            if (template) {
+                b.img = template.img;
+                if (!b.perk) b.perk = template.perk;
+            }
+        });
+    }
+
     if (state.garage && Array.isArray(state.garage)) {
         state.garage.forEach(car => {
             if (car && !car.tuning) {
                 car.tuning = { chip: 0, exhaust: false, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 };
             }
+            if (car && car.insurance === undefined) car.insurance = null;
         });
     }
 
@@ -436,6 +450,42 @@ function saveState() {
         }
     } catch(e) {}
     updateHeaderUI();
+}
+
+// ========================================================
+// СБРОС ИГРОВОГО ПРОГРЕССА (ПОЛНАЯ ОЧИСТКА ОБЛАКА И ЛОКАЛА)
+// ========================================================
+function resetGameData() {
+    if (!confirm("Внимание! Вы уверены, что хотите полностью стереть весь прогресс, гараж, бизнес и начать заново? Это действие необратимо!")) {
+        return;
+    }
+
+    try {
+        localStorage.removeItem("perekup_save_" + tgUserId);
+        localStorage.removeItem('perekoop_sim_save_v105_release');
+        localStorage.removeItem('perekup_last_seen_version');
+
+        const cleanState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+        const cleanJson = JSON.stringify(cleanState);
+
+        if (isCloudStorageAvailable && window.Telegram?.WebApp?.CloudStorage) {
+            saveToTelegramCloud(cleanJson, () => {
+                console.log("TG Cloud очищен.");
+            });
+        }
+
+        if (window.FB_Bridge && typeof window.FB_Bridge.CloudSave?.pushSave === 'function') {
+            window.FB_Bridge.CloudSave.pushSave(tgUserId, cleanState);
+        }
+
+        tgHaptic('warning');
+        showToast("Прогресс сброшен. Перезагрузка...");
+        setTimeout(() => {
+            location.reload();
+        }, 600);
+    } catch(e) {
+        location.reload();
+    }
 }
 
 function syncCloudStorageManual() {
@@ -693,7 +743,7 @@ function claimDailyReward() {
 }
 
 // ========================================================
-// МАГАЗИН ПЕРЕКУПА (ОБОРУДОВАНИЕ, СЫРЬЕ, ТЮНИНГ, ДОМ)
+// МАГАЗИН ПЕРЕКУПА (ПОЛНЫЙ КАТАЛОГ ИЗ data.js)
 // ========================================================
 function switchShopSection(section) {
     ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
@@ -714,11 +764,7 @@ function switchShopSection(section) {
 function renderShopTools() {
     const box = document.getElementById('shopToolsList');
     if (!box) return;
-    const tools = [
-        { id: "gauge", name: "Магнитный толщиномер ЛКП", cost: 35000, desc: "Бесплатная проверка кузова на шпаклевку на рынке." },
-        { id: "obd", name: "Диагностический автосканер OBD2 Bluetooth", cost: 65000, desc: "Чтение кодов ошибок ЭБУ и открытие доступа к Заказам Синдиката." },
-        { id: "endoscope", name: "HD Видеоэндоскоп мотора", cost: 85000, desc: "Оценка задиров цилиндров и состояния клапанов." }
-    ];
+    const tools = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.tools) ? SHOP_CATALOG.tools : [];
 
     let html = "";
     tools.forEach(t => {
@@ -728,8 +774,8 @@ function renderShopTools() {
             : `<button onclick="buyToolAction('${t.id}', ${t.cost})" class="btn btn-cyan btn-sm btn-auto">${t.cost.toLocaleString()} ₽</button>`;
         html += `
         <div class="glass-card flex-between p-2 mb-2">
-            <div>
-                <b class="text-xs color-cyan">${t.name}</b>
+            <div style="flex:1; margin-right:8px;">
+                <b class="text-xs color-cyan"><i class="fa-solid ${t.icon || 'fa-wrench'} mr-1"></i> ${t.name}</b>
                 <div class="sub-label" style="font-size:10px;">${t.desc}</div>
             </div>
             ${btn}
@@ -754,19 +800,15 @@ function buyToolAction(toolId, cost) {
 function renderShopConsumables() {
     const box = document.getElementById('shopConsumablesList');
     if (!box) return;
-    const packs = [
-        { id: "oil_pack", name: "Партия масел и фильтров (+30% сырья на СТО)", cost: 25000, value: 30 },
-        { id: "chem_pack", name: "Бочка автохимии для Детейлинга (+50% сырья)", cost: 45000, value: 50 },
-        { id: "full_stock", name: "Полный оптовый запас для всех предприятий (100%)", cost: 120000, value: 100 }
-    ];
+    const packs = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.consumables) ? SHOP_CATALOG.consumables : [];
 
     let html = "";
     packs.forEach(p => {
         html += `
         <div class="glass-card flex-between p-2 mb-2">
-            <div>
+            <div style="flex:1; margin-right:8px;">
                 <b class="text-xs color-amber">${p.name}</b>
-                <div class="sub-label" style="font-size:10px;">Снабжает ваши бизнесы сырьём для бесперебойного дохода.</div>
+                <div class="sub-label" style="font-size:10px;">${p.desc}</div>
             </div>
             <button onclick="buyConsumableAction(${p.cost}, ${p.value})" class="btn btn-amber btn-sm btn-auto">${p.cost.toLocaleString()} ₽</button>
         </div>`;
@@ -791,34 +833,52 @@ function buyConsumableAction(cost, val) {
 function renderShopTuningParts() {
     const box = document.getElementById('shopTuningPartsList');
     if (!box) return;
-    let licOwned = !!state.player.hasRacingLicense;
-    let licBtn = licOwned 
-        ? `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Получена ✓</button>`
-        : `<button onclick="buyShopRafLicense()" class="btn btn-danger btn-sm btn-auto">85,000 ₽</button>`;
+    const parts = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.tuningParts) ? SHOP_CATALOG.tuningParts : [];
 
-    box.innerHTML = `
-    <div class="glass-card flex-between p-2 mb-2">
-        <div>
-            <b class="text-xs color-red">Лицензия пилота РАФ</b>
-            <div class="sub-label" style="font-size:10px;">Глобальный допуск пилота к Стрит-Арене (1 раз на аккаунт).</div>
-        </div>
-        ${licBtn}
-    </div>
+    let html = "";
+    parts.forEach(p => {
+        let isBought = false;
+        if (p.id === 'raf_license') isBought = !!state.player.hasRacingLicense;
+        let btn = isBought
+            ? `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Оформлено ✓</button>`
+            : `<button onclick="buyShopDocAction('${p.id}', ${p.cost})" class="btn btn-red btn-sm btn-auto">${p.cost.toLocaleString()} ₽</button>`;
+
+        html += `
+        <div class="glass-card flex-between p-2 mb-2">
+            <div style="flex:1; margin-right:8px;">
+                <b class="text-xs color-red"><i class="fa-solid ${p.icon || 'fa-file'} mr-1"></i> ${p.name}</b>
+                <div class="sub-label" style="font-size:10px;">${p.desc}</div>
+            </div>
+            ${btn}
+        </div>`;
+    });
+
+    html += `
     <div class="glass-card p-2 text-center sub-label" style="font-size:10px;">
-        💡 Компоненты доработок (чип, выворот, гидроручник, каркас) покупаются непосредственно в <b>Гараже</b> под конкретный кузов автомобиля!
+        💡 Спортивные компоненты (чип Stage, каркас, гидроручник, заварка, выворот) покупаются непосредственно в <b>Гараже</b> под конкретный кузов!
     </div>`;
+
+    box.innerHTML = html;
 }
 
-function buyShopRafLicense() {
-    if (state.player.hasRacingLicense) return showToast("Лицензия уже получена!");
+function buyShopDocAction(docId, cost) {
     let cash = state.player.cash || 0;
-    if (cash < 85000) return showToast("Нужно 85,000 ₽ на оформление лицензии!");
-    state.player.cash -= 85000;
-    state.player.hasRacingLicense = true;
+    if (cash < cost) return showToast("Не хватает денег!");
+    state.player.cash -= cost;
+
+    if (docId === 'raf_license') {
+        state.player.hasRacingLicense = true;
+        openVerdictModal("ЛИЦЕНЗИЯ ПИЛОТА РАФ! 🏎️", "Официальная лицензия оформлена. Доступ к ночным заездам на 402м открыт!", true);
+    } else if (docId === 'insurance_osago') {
+        showToast("Полис оформлен! Вы можете активировать его на любой авто в Гараже.");
+    } else if (docId === 'gps_tracker') {
+        showToast("GPS-маяк приобретен в арсенал безопасности!");
+    }
+
     saveState();
     renderShopTuningParts();
-    playSound('win'); tgHaptic('success');
-    openVerdictModal("ЛИЦЕНЗИЯ ПИЛОТА РАФ! 🏎️", "Официальная лицензия оформлена на ваш аккаунт. Доступ к ночным заездам открыт!", true);
+    playSound('win');
+    tgHaptic('success');
 }
 
 function renderShopHomeItems() {
@@ -1093,6 +1153,7 @@ function switchTab(tabId) {
     if (tabId === 'tabContracts' && typeof renderContracts === 'function') renderContracts();
     if (tabId === 'tabBarn' && typeof renderBarnFind === 'function') renderBarnFind();
     if (tabId === 'tabLife') {
+        if (typeof updateCityHubStatus === 'function') updateCityHubStatus();
         if (typeof renderDiets === 'function') renderDiets(); 
         if (typeof renderLifeChat === 'function') renderLifeChat();
     }
@@ -1162,6 +1223,7 @@ function initApp() {
         if (typeof renderContainersList === 'function') renderContainersList(); 
         if (typeof renderBarnFind === 'function') renderBarnFind();
         if (typeof checkBusinessAccess === 'function') checkBusinessAccess();
+        if (typeof updateCityHubStatus === 'function') updateCityHubStatus();
         
         initMarketScrollListener();
         switchTab('tabMarket');
@@ -1194,6 +1256,7 @@ setInterval(() => {
             if (bTab && bTab.classList.contains('active') && typeof renderBusinessList === 'function') {
                 renderBusinessList();
             }
+            if (typeof updateCityHubStatus === 'function') updateCityHubStatus();
         }
     }
 

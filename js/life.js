@@ -1,9 +1,55 @@
 // ========================================================
-// js/life.js — ЖИЗНЬ, БИЗНЕС, САРАИ, ЖИЛЬЁ, ПОРТ, МАРКЕТ, КОЛЕСО (v0.4.0)
+// js/life.js — ЖИЗНЬ, ГОРОДСКОЙ ХАБ, СЕЙФ, БИЗНЕС, САРАИ (v0.4.1)
 // ========================================================
 
 // ========================================================
-// 1. РЕШАЛА АРТУР (СВЯЗИ, КРЫША, ЛЕГАЛИЗАЦИЯ VIN, ЛИЦЕНЗИЯ РАФ)
+// 1. ГОРОДСКОЙ ХАБ И БАНКОВСКИЙ СЕЙФ ПЕРЕКУПА (+3% В ДЕНЬ)
+// ========================================================
+function updateCityHubStatus() {
+    const hubBiz = document.getElementById('hubBizStatus');
+    if (hubBiz && state.businesses) {
+        let activeBizCount = state.businesses.filter(b => b && b.level > 0).length;
+        hubBiz.innerText = activeBizCount > 0 ? `Активно: ${activeBizCount} точ.` : "Сеть СТО/Моек";
+    }
+
+    const safeBalEl = document.getElementById('safeBalanceText');
+    if (safeBalEl) {
+        let safeCash = state.player?.safeDeposit || 0;
+        safeBalEl.innerText = safeCash.toLocaleString() + " ₽";
+    }
+}
+
+function depositToSafeAction(amount) {
+    let cash = state.player?.cash || 0;
+    if (cash < amount) return showToast("Не хватает наличных денег для внесения в сейф!");
+
+    state.player.cash -= amount;
+    state.player.safeDeposit = (state.player.safeDeposit || 0) + amount;
+    saveState();
+    updateHeaderUI();
+    updateCityHubStatus();
+    playSound('tick');
+    tgHaptic('light');
+    showToast(`Заначка пополнена на +${amount.toLocaleString()} ₽! Деньги защищены.`);
+}
+
+function withdrawFromSafeAction() {
+    let safeCash = state.player?.safeDeposit || 0;
+    if (safeCash <= 0) return showToast("В сейфе пока пусто! Отложите часть прибыли.");
+
+    state.player.cash = (state.player.cash || 0) + safeCash;
+    state.player.safeDeposit = 0;
+    saveState();
+    updateHeaderUI();
+    updateCityHubStatus();
+    playSound('win');
+    tgHaptic('success');
+    spawnFloatingReward(`+${safeCash.toLocaleString()} ₽`);
+    showToast(`Вы забрали всю заначку из сейфа: +${safeCash.toLocaleString()} ₽!`);
+}
+
+// ========================================================
+// 2. РЕШАЛА АРТУР (СВЯЗИ, КРЫША, ЛЕГАЛИЗАЦИЯ VIN, ЛИЦЕНЗИЯ РАФ)
 // ========================================================
 function buyReshalaPack(type) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -181,7 +227,7 @@ function confirmLegalizeCar(carId) {
 }
 
 // ========================================================
-// 2. ИНТЕРАКТИВНЫЙ БИЗНЕС
+// 3. ИНТЕРАКТИВНЫЙ БИЗНЕС
 // ========================================================
 function checkBusinessAccess() {
     const lock = document.getElementById('businessLockCover');
@@ -209,13 +255,23 @@ function renderBusinessList() {
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
     let html = "";
 
+    const defaultIcons = {
+        wash: 'fa-soap',
+        shina: 'fa-compact-disc',
+        sto: 'fa-screwdriver-wrench',
+        detailing: 'fa-spray-can-sparkles',
+        razborka: 'fa-car-burst',
+        taxi: 'fa-taxi'
+    };
+
     state.businesses.forEach((biz, idx) => {
         if (!biz) return;
         let isMax = biz.level >= 10;
         let isLocked = lvl < biz.minLevel;
         let cost = (biz.level > 0) ? biz.cost * (biz.level + 1) : biz.cost;
 
-        let imgSrc = biz.img || "assets/houses/garage.jpg";
+        let imgSrc = biz.img || ("assets/business/" + biz.id + ".jpg");
+        let fallbackIcon = defaultIcons[biz.id] || 'fa-briefcase';
         let lockBlock = isLocked ? "<div class='cooldown-timer' style='display:flex; opacity:1; font-size:14px;'><i class='fa-solid fa-lock mb-2'></i> С " + biz.minLevel + " УРОВНЯ</div>" : "";
         let rankText = isMax ? "MAX" : "Ур. " + (biz.level || 0);
 
@@ -249,7 +305,8 @@ function renderBusinessList() {
         html += 
         "<div class='" + cardClass + "'>" +
             "<div class='" + imgClass + "'>" +
-                "<img src='" + imgSrc + "' class='business-img' onerror=\"this.src='assets/houses/garage.jpg'\">" +
+                "<img src='" + imgSrc + "' class='business-img' onerror=\"this.style.display='none'; this.nextElementSibling.style.display='flex';\">" +
+                "<div class='business-fallback-icon' style='display:none;'><i class='fa-solid " + fallbackIcon + "'></i></div>" +
                 lockBlock +
                 "<div class='badge-tag bg-tag-cyan' style='bottom:8px; left:8px; right:auto;'>" + rankText + "</div>" +
             "</div>" +
@@ -335,7 +392,7 @@ function collectAllBusinessCash() {
 }
 
 // ========================================================
-// 3. САРАИ
+// 4. САРАИ
 // ========================================================
 const BARN_TIERS_CONFIG = [
     { tier: 1, reqLvl: 1, cost: 35000, title: "🏚️ Сарай в СНТ «Заря»", desc: "Дачный кооператив. Советская классика.", classGrade: "barn-grade-1", rareIdx: 0 },
@@ -430,12 +487,13 @@ function scoutBarnTier(tier) {
         price: foundCar.basePrice || config.cost * 2,
         baseMarketValue: foundCar.marketValue || foundCar.basePrice * 1.3,
         marketValue: (foundCar.marketValue || foundCar.basePrice * 1.3) + pVal,
-        img: foundCar.img || "assets/cars/economy/vaz-2101.jpg",
+        img: foundCar.img || "assets/cars/economy/vaz-2107.jpg",
         plate: genPlate,
         customPlate: genPlate,
         condition: Math.floor(40 + Math.random() * 25),
         wear: { engine: 50, transmission: 50 },
         hiddenDefect: { text: "Залегшие кольца и старое масло", cost: 15000 },
+        insurance: null,
         tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 },
         purchaseCost: config.cost
     };
@@ -455,7 +513,7 @@ function scoutBarnTier(tier) {
 }
 
 // ========================================================
-// 4. НЕДВИЖИМОСТЬ И ОБУСТРОЙСТВО
+// 5. НЕДВИЖИМОСТЬ И ОБУСТРОЙСТВО
 // ========================================================
 function renderHousing() {
     const list = document.getElementById('housingMarketList');
@@ -515,7 +573,7 @@ function renderHousing() {
             "</div>";
         }
 
-        let imgSrc = h.img || "assets/houses/room.jpg";
+        let imgSrc = h.img || ("assets/houses/" + h.id + ".jpg");
 
         html += 
         "<div class='glass-card mb-3'>" +
@@ -598,7 +656,7 @@ function openHomeInteriorModal(hId) {
             "<div class='glass-card p-2 flex-between mb-2'>" +
                 "<div>" +
                     "<div class='font-bold text-xs color-cyan'>" + item.name + "</div>" +
-                    "<div class='sub-label' style='font-size:10px;'>" + item.perk + "</div>" +
+                    "<div class='sub-label' style='font-size:10px;'>${item.perk}</div>" +
                 "</div>" +
                 btnContent +
             "</div>";
@@ -630,7 +688,7 @@ function buyHomeFurniture(fId, cost) {
 }
 
 // ========================================================
-// 5. ПОРТОВЫЕ КОНТЕЙНЕРЫ И ТЕНЕВОЙ АУКЦИОН
+// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ И ТЕНЕВОЙ АУКЦИОН
 // ========================================================
 function renderContainersList() {
     const container = document.getElementById('containersListRender');
@@ -706,7 +764,6 @@ function openPortContainerAction(boxId, cost) {
     }
 }
 
-// === ТЕНЕВОЙ АУКЦИОН КОНФИСКАТА (СЛЕПОЙ ЛОТ) ===
 let currentBlindLot = null;
 
 function openBlindAuctionModal() {
@@ -770,6 +827,7 @@ function placeBlindBid() {
         isStolen: isStolen,
         unregistered: false,
         impounded: false,
+        insurance: null,
         autotekaChecked: true,
         tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 },
         purchaseCost: currentBlindLot.bid
@@ -803,7 +861,7 @@ function placeBlindBid() {
 }
 
 // ========================================================
-// 6. УМНЫЕ ЗАКАЗЫ СИНДИКАТА (С ВЫБОРОМ И ЗАЩИТОЙ ДОРОГИХ АВТО)
+// 7. УМНЫЕ ЗАКАЗЫ СИНДИКАТА (С ВЫБОРОМ И ЗАЩИТОЙ ДОРОГИХ АВТО)
 // ========================================================
 let activeContractForDelivery = null;
 
@@ -996,7 +1054,126 @@ function confirmContractDelivery(carIdx) {
 }
 
 // ========================================================
-// 7. ЛОМБАРД, СМЕНА ДНЯ, РАЦИОН, АВТО-ПОДСТАВЫ
+// 8. СЛУЧАЙНЫЕ СОБЫТИЯ В ГАРАЖЕ (УГОН, ДТП, СТРАХОВКА)
+// ========================================================
+function triggerGarageRandomEvent() {
+    if (!state.garage || state.garage.length === 0) return;
+    if (typeof GARAGE_RANDOM_EVENTS === 'undefined') return;
+    if (Math.random() > 0.18) return; 
+
+    const carIdx = Math.floor(Math.random() * state.garage.length);
+    const car = state.garage[carIdx];
+    if (!car || car.impounded) return;
+
+    const event = GARAGE_RANDOM_EVENTS[Math.floor(Math.random() * GARAGE_RANDOM_EVENTS.length)];
+    if (!event) return;
+
+    setTxt('garageEventTitle', event.title);
+    setTxt('garageEventBadge', event.badge);
+    setTxt('garageEventDesc', event.desc);
+    setTxt('garageEventCarName', `${car.name} (${car.customPlate || car.plate || "ТРАНЗИТ"})`);
+
+    const actionsBox = document.getElementById('garageEventActions');
+    if (!actionsBox) return;
+
+    if (event.id === 'hit_and_run') {
+        setTxt('garageEventEmoji', "💥");
+        if (car.insurance === 'casco') {
+            actionsBox.innerHTML = `
+            <div class="sub-label mb-2 color-green">✓ Полис КАСКО активен! Страховая полностью покрыла ремонт.</div>
+            <button onclick="resolveGarageEvent('insure_payout', ${carIdx}, 0)" class="btn btn-green w-full">Получить бесплатный ремонт</button>`;
+        } else {
+            actionsBox.innerHTML = `
+            <button onclick="resolveGarageEvent('pay_repair', ${carIdx}, ${event.impact.repairCost})" class="btn btn-dark w-full">Отремонтировать (${event.impact.repairCost.toLocaleString()} ₽)</button>
+            <button onclick="resolveGarageEvent('ignore_damage', ${carIdx}, 0)" class="btn btn-danger w-full">Оставить вмятину (-25% состояния)</button>`;
+        }
+    } else if (event.id === 'theft_attempt') {
+        setTxt('garageEventEmoji', "🚨");
+        if (car.insurance === 'casco' || (state.player.furniture && state.player.furniture.includes('home_cctv'))) {
+            actionsBox.innerHTML = `
+            <div class="sub-label mb-2 color-green">✓ Охрана жилья и КАСКО предотвратили кражу! Замки заменены по страховке.</div>
+            <button onclick="resolveGarageEvent('insure_payout', ${carIdx}, 0)" class="btn btn-green w-full">Отлично</button>`;
+        } else {
+            actionsBox.innerHTML = `
+            <button onclick="resolveGarageEvent('pay_repair', ${carIdx}, ${event.impact.repairCost})" class="btn btn-dark w-full">Заменить личинки и замки (${event.impact.repairCost.toLocaleString()} ₽)</button>
+            <button onclick="resolveGarageEvent('reshala_guard', ${carIdx}, 0)" class="btn btn-purple w-full">Звонок Решале (1 🤝 Связь)</button>`;
+        }
+    } else if (event.id === 'bailiff_arrest') {
+        setTxt('garageEventEmoji', "⚖️");
+        actionsBox.innerHTML = `
+        <button onclick="resolveGarageEvent('reshala_legalize', ${carIdx}, 0)" class="btn btn-purple w-full">Решить вопрос через Артура (2 🤝 Связи)</button>
+        <button onclick="resolveGarageEvent('accept_arrest', ${carIdx}, 0)" class="btn btn-dark w-full">Принять запрет (Учёт аннулирован)</button>`;
+    } else if (event.id === 'urgent_buyer_call') {
+        setTxt('garageEventEmoji', "📞");
+        let offer = Math.round((car.marketValue || 100000) * (1 + (event.impact.instantOfferBonus || 0.15)));
+        actionsBox.innerHTML = `
+        <button onclick="resolveGarageEvent('quick_sale', ${carIdx}, ${offer})" class="btn btn-green w-full">Продать сразу за ${offer.toLocaleString()} ₽ 🤝</button>
+        <button onclick="closeModal('modalGarageEvent')" class="btn btn-dark w-full">Отказаться от выкупа</button>`;
+    }
+
+    const modal = document.getElementById('modalGarageEvent');
+    if (modal) modal.classList.add('active');
+    playSound('error');
+    tgHaptic('warning');
+}
+
+function resolveGarageEvent(action, carIdx, param) {
+    const car = state.garage[carIdx];
+    closeModal('modalGarageEvent');
+    if (!car) return;
+
+    if (action === 'insure_payout') {
+        playSound('win');
+        tgHaptic('success');
+        showToast("🛡️ Страховая компания полностью покрыла ущерб!");
+    } else if (action === 'pay_repair') {
+        let cash = state.player?.cash || 0;
+        if (cash < param) {
+            car.condition = Math.max(20, (car.condition || 80) - 20);
+            showToast("Не хватило денег на ремонт! Состояние авто снизилось.");
+        } else {
+            state.player.cash -= param;
+            showToast(`Ремонт оплачен (-${param.toLocaleString()} ₽)`);
+        }
+    } else if (action === 'ignore_damage') {
+        car.condition = Math.max(15, (car.condition || 80) - 25);
+        if (car.bodyThickness) car.bodyThickness.wings = 280;
+        showToast("Кузов замят. Оценка авто снизилась.");
+    } else if (action === 'reshala_guard') {
+        let conn = state.player?.connections || 0;
+        if (conn >= 1) {
+            state.player.connections -= 1;
+            showToast("🤝 Решала нашёл хулиганов и возместил ущерб!");
+        } else {
+            showToast("Связей нет! Пришлось зафиксировать повреждения.");
+            car.condition = Math.max(20, (car.condition || 80) - 20);
+        }
+    } else if (action === 'reshala_legalize') {
+        let conn = state.player?.connections || 0;
+        if (conn >= 2) {
+            state.player.connections -= 2;
+            car.unregistered = false;
+            showToast("🤝 Артур снял запрет регдействий в базе ГИБДД!");
+        } else {
+            car.unregistered = true;
+            showToast("Недостаточно связей! Учёт автомобиля аннулирован.");
+        }
+    } else if (action === 'quick_sale') {
+        state.garage.splice(carIdx, 1);
+        state.player.cash = (state.player.cash || 0) + param;
+        addXp(45);
+        showToast(`Автомобиль моментально выкуплен за ${param.toLocaleString()} ₽!`);
+        playSound('win');
+        tgHaptic('success');
+    }
+
+    saveState();
+    updateHeaderUI();
+    renderGarage();
+}
+
+// ========================================================
+// 9. ЛОМБАРД, СМЕНА ДНЯ, РАЦИОН, АВТО-ПОДСТАВЫ
 // ========================================================
 function takeLoan(amount) {
     let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
@@ -1099,7 +1276,13 @@ function nextDayAction() {
         state.player.policeImmunityDays -= 1;
     }
 
-    // Суточное списание сырья на предприятиях и начисление дохода
+    // НАЧИСЛЕНИЕ +3% ПАССИВНОЙ ПРИБЫЛИ ПО СЕЙФУ ПЕРЕКУПА
+    if (state.player.safeDeposit && state.player.safeDeposit > 0) {
+        let percentEarned = Math.round(state.player.safeDeposit * 0.03);
+        state.player.safeDeposit += percentEarned;
+        spawnFloatingReward(`+${percentEarned.toLocaleString()} ₽ в сейфе`);
+    }
+
     if (state.businesses) {
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
@@ -1115,7 +1298,6 @@ function nextDayAction() {
         });
     }
 
-    // Естественный суточный спад потребностей
     state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
     state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
 
@@ -1124,11 +1306,15 @@ function nextDayAction() {
     renderHousing();
     renderBarnFind();
     checkBusinessAccess();
+    updateCityHubStatus();
     playSound('tick');
     tgHaptic('light');
-    showToast("Наступил новый игровой день ☀️ Кассы пополнились!");
+    showToast("Наступил новый игровой день ☀️ Кассы и сейф пополнились!");
 
-    setTimeout(() => { triggerRandomRoadEvent(); }, 800);
+    setTimeout(() => { 
+        triggerRandomRoadEvent(); 
+        triggerGarageRandomEvent();
+    }, 800);
 }
 
 function renderDiets() {
@@ -1257,7 +1443,7 @@ function bigCharityDonate() {
 }
 
 // ========================================================
-// 8. ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
+// 10. ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
 // ========================================================
 const WHEEL_SECTORS = [
     { label: "150,000 ₽", color: "#00e676", textColor: "#000", reward: { cash: 150000 } },
