@@ -1,5 +1,5 @@
 // ========================================================
-// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, СМЕНА ДНЯ, ФОРТУНА (v0.4.3)
+// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, СМЕНА ДНЯ, ФОРТУНА, ПОРТ (v0.4.4)
 // ========================================================
 
 // ========================================================
@@ -80,7 +80,7 @@ function buyReshalaPack(type) {
 }
 
 function checkReshalaAccess() {
-    // Вызывается для совместимости
+    // Совместимость
 }
 
 function buyReshalaService(service) {
@@ -350,14 +350,19 @@ function collectAllBusinessCash() {
 }
 
 // ========================================================
-// 4. САРАИ (ДЛЯ ПРИЛОЖЕНИЯ В ТЕЛЕФОНЕ)
+// 4. САРАИ (БЕЗ ДУБЛИКАТОВ КОНСТАНТ)
 // ========================================================
-const BARN_TIERS_CONFIG = [
-    { tier: 1, reqLvl: 1, cost: 35000, title: "🏚️ Сарай в СНТ «Заря»", desc: "Дачный кооператив. Советская классика.", classGrade: "barn-grade-1", rareIdx: 0 },
-    { tier: 2, reqLvl: 7, cost: 120000, title: "🏢 Заброшенный бокс ГСК-4", desc: "Кооператив возле промзоны.", classGrade: "barn-grade-2", rareIdx: 1 },
-    { tier: 3, reqLvl: 15, cost: 350000, title: "🏭 Ангар механического завода", desc: "Закрытый цех. JDM купе.", classGrade: "barn-grade-3", rareIdx: 2 },
-    { tier: 4, reqLvl: 25, cost: 850000, title: "🏛️ Коллекционный подземный бокс", desc: "Опечатанный паркинг банка.", classGrade: "barn-grade-4", rareIdx: 4 }
-];
+function getBarnTiersSafe() {
+    if (typeof BARN_TIERS_CONFIG !== 'undefined' && Array.isArray(BARN_TIERS_CONFIG)) {
+        return BARN_TIERS_CONFIG;
+    }
+    return [
+        { tier: 1, reqLvl: 1, cost: 35000, title: "🏚️ Сарай в СНТ «Заря»", desc: "Дачный кооператив. Советская классика.", classGrade: "barn-grade-1", rareIdx: 0, fallback: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80" },
+        { tier: 2, reqLvl: 7, cost: 120000, title: "🏢 Заброшенный бокс ГСК-4", desc: "Кооператив возле промзоны.", classGrade: "barn-grade-2", rareIdx: 1, fallback: "https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?auto=format&fit=crop&w=600&q=80" },
+        { tier: 3, reqLvl: 15, cost: 350000, title: "🏭 Ангар механического завода", desc: "Закрытый цех. JDM купе.", classGrade: "barn-grade-3", rareIdx: 2, fallback: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=600&q=80" },
+        { tier: 4, reqLvl: 25, cost: 850000, title: "🏛️ Коллекционный подземный бокс", desc: "Опечатанный паркинг банка.", classGrade: "barn-grade-4", rareIdx: 4, fallback: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80" }
+    ];
+}
 
 function renderBarnFind() {
     const container = document.getElementById('barnFindContent');
@@ -369,7 +374,7 @@ function renderBarnFind() {
     const lvl = (state.player && state.player.level) ? state.player.level : 1;
 
     let html = "";
-    BARN_TIERS_CONFIG.forEach(b => {
+    getBarnTiersSafe().forEach(b => {
         let isLvlLocked = lvl < b.reqLvl;
         let isDoneToday = !canScoutToday;
 
@@ -380,18 +385,24 @@ function renderBarnFind() {
 
         let btnDisabled = (isLvlLocked || isDoneToday) ? "disabled" : "";
         let btnText = isLvlLocked ? "Требуется " + b.reqLvl + " уровень" : (isDoneToday ? "Доступно завтра (Смена дня 🌙)" : "Вскрыть ангар (" + (b.cost / 1000).toFixed(0) + "k ₽)");
+        let imgSrc = b.img || `assets/barns/barn_tier${b.tier}.jpg`;
+        let fallbackSrc = b.fallback || "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80";
 
-        html += 
-        "<div class='barn-tier-card " + b.classGrade + "'>" +
-            "<div class='flex-between mb-1'>" +
-                "<b class='text-xs color-cyan'>" + b.title + "</b>" +
-                statusBadge +
-            "</div>" +
-            "<p class='sub-label mb-2'>" + b.desc + "</p>" +
-            "<div class='text-xs mb-1 color-amber'>⭐ Редкий дроп (5%): <b>" + rareCar.name + "</b></div>" +
-            "<div class='text-xs mb-2 color-purple'>🏷️ Шанс на архивные госномера: <b>15%</b></div>" +
-            "<button onclick='scoutBarnTier(" + b.tier + ")' class='btn btn-cyan btn-sm w-full' " + btnDisabled + ">" + btnText + "</button>" +
-        "</div>";
+        html += `
+        <div class='glass-card mb-3 p-2 ${b.classGrade}'>
+            <div class='car-img-wrap mb-2' style='height:120px; position:relative;'>
+                <img src='${imgSrc}' class='car-img' onerror="this.onerror=null; this.src='${fallbackSrc}';">
+                <div class='badge-tag' style='bottom:6px; right:6px;'>${statusBadge}</div>
+            </div>
+            <div class='flex-between mb-1'>
+                <b class='text-xs color-cyan'>${b.title}</b>
+                <span class='price-val text-xs color-amber'>${b.cost.toLocaleString()} ₽</span>
+            </div>
+            <p class='sub-label mb-2'>${b.desc}</p>
+            <div class='text-xs mb-1 color-amber'>⭐ Редкий дроп (5%): <b>${rareCar.name}</b></div>
+            <div class='text-xs mb-2 color-purple'>🏷️ Шанс на архивные госномера: <b>15%</b></div>
+            <button onclick='scoutBarnTier(${b.tier})' class='btn btn-cyan btn-sm w-full' ${btnDisabled}>${btnText}</button>
+        </div>`;
     });
 
     container.innerHTML = html;
@@ -402,7 +413,7 @@ function scoutBarnTier(tier) {
     const lastDay = (state.player && state.player.lastBarnDay) ? state.player.lastBarnDay : 0;
     if (lastDay >= pDay) return showToast("Вы уже исследовали сараи сегодня! Смените день 🌙.");
 
-    const config = BARN_TIERS_CONFIG.find(b => b.tier === tier);
+    const config = getBarnTiersSafe().find(b => b.tier === tier);
     if (!config) return;
 
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -496,6 +507,8 @@ function renderHousing() {
         let isCurrent = curId === h.id;
         let isPurchased = owned.includes(h.id);
         let isLvlLocked = lvl < (h.minLevel || 1);
+        let imgSrc = h.img || `assets/houses/${h.id}.jpg`;
+        let fallbackSrc = h.fallback || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80';
 
         let statusTag = isPurchased 
             ? "<span class='tag-badge bg-tag-green'>В собственности</span>" 
@@ -531,21 +544,19 @@ function renderHousing() {
             "</div>";
         }
 
-        let imgSrc = h.img || ("assets/houses/" + h.id + ".jpg");
-
-        html += 
-        "<div class='glass-card mb-3'>" +
-            "<div class='car-img-wrap' style='height:140px;'>" +
-                "<img src='" + imgSrc + "' class='car-img' onerror=\"this.src='assets/houses/room.jpg'\">" +
-                "<div class='badge-tag' style='bottom:8px; right:8px;'>" + statusTag + "</div>" +
-            "</div>" +
-            "<div class='flex-between mb-1'>" +
-                "<h4 class='font-bold'>" + h.name + "</h4>" +
-                "<div class='color-cyan font-bold text-xs'>+" + h.slots + " мест гаража</div>" +
-            "</div>" +
-            "<p class='sub-label mb-2'>" + (h.desc || "Комфортное жильё для отдыха перекупа.") + "</p>" +
-            actionBtns +
-        "</div>";
+        html += `
+        <div class='glass-card mb-3'>
+            <div class='car-img-wrap' style='height:140px; position:relative;'>
+                <img src='${imgSrc}' class='car-img' onerror="this.onerror=null; this.src='${fallbackSrc}';">
+                <div class='badge-tag' style='bottom:8px; right:8px;'>${statusTag}</div>
+            </div>
+            <div class='flex-between mb-1'>
+                <h4 class='font-bold'>${h.name}</h4>
+                <div class='color-cyan font-bold text-xs'>+${h.slots} мест гаража</div>
+            </div>
+            <p class='sub-label mb-2'>${h.desc || "Комфортное жильё для отдыха перекупа."}</p>
+            ${actionBtns}
+        </div>`;
     });
 
     list.innerHTML = html;
@@ -614,7 +625,7 @@ function openHomeInteriorModal(hId) {
             "<div class='glass-card p-2 flex-between mb-2'>" +
                 "<div>" +
                     "<div class='font-bold text-xs color-cyan'>" + item.name + "</div>" +
-                    "<div class='sub-label' style='font-size:10px;'>${item.perk}</div>" +
+                    "<div class='sub-label' style='font-size:10px;'>" + item.perk + "</div>" +
                 "</div>" +
                 btnContent +
             "</div>";
@@ -646,7 +657,7 @@ function buyHomeFurniture(fId, cost) {
 }
 
 // ========================================================
-// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ (ДЛЯ ПРИЛОЖЕНИЯ В ТЕЛЕФОНЕ)
+// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ (С НАДЕЖНЫМИ ФОТО-FALLBACKS)
 // ========================================================
 function renderContainersList() {
     const container = document.getElementById('containersListRender');
@@ -665,25 +676,35 @@ function renderContainersList() {
     container.style.display = 'block';
     let html = "";
 
-    const catalog = (typeof CONTAINER_ITEMS !== 'undefined') ? CONTAINER_ITEMS : [];
+    const catalog = (typeof CONTAINER_ITEMS !== 'undefined' && Array.isArray(CONTAINER_ITEMS)) ? CONTAINER_ITEMS : [
+        { id: 'japan', name: 'Японский Контейнер', cost: 150000, timer: 30, minLevel: 12, badge: 'JDM & Мото', desc: 'Прямые поставки из порта Кобе.', img: 'assets/containers/japan.jpg', fallback: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80' },
+        { id: 'europe', name: 'Европейский Автовоз', cost: 450000, timer: 35, minLevel: 15, badge: 'Комфорт & Премиум', desc: 'Автомобили из Германии без пробега по РФ.', img: 'assets/containers/europe.jpg', fallback: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80' },
+        { id: 'usa_auction', name: 'Американский Аукцион', cost: 750000, timer: 40, minLevel: 18, badge: 'Битые & Маслкары', desc: 'Контейнер с Copart. Кот в мешке.', img: 'assets/containers/usa.jpg', fallback: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80' },
+        { id: 'china_ship', name: 'Китайский Сухогруз', cost: 950000, timer: 38, minLevel: 22, badge: 'Электрички & Новые', desc: 'Свежие Lixiang и Zeekr прямиком из Гуанчжоу.', img: 'assets/containers/china.jpg', fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80' },
+        { id: 'dubai', name: 'Эмиратский Контейнер', cost: 1200000, timer: 45, minLevel: 25, badge: 'Катера & Суперкары', desc: 'Аукционная роскошь шейхов.', img: 'assets/containers/dubai.jpg', fallback: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80' },
+        { id: 'hangar', name: 'Заброшенный Ангар', cost: 5000000, timer: 60, minLevel: 30, badge: 'Тягачи & Гиперкары', desc: 'Списанное имущество логистического хаба!', img: 'assets/containers/hangar.jpg', fallback: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80' }
+    ];
+
     catalog.forEach(box => {
         let minLvl = box.minLevel || 12;
         let isLocked = lvl < minLvl;
         let btnText = isLocked ? "С " + minLvl + " уровня" : "Вскрыть (" + (box.cost / 1000).toFixed(0) + "k ₽)";
+        let imgSrc = box.img || 'assets/containers/japan.jpg';
+        let fallbackSrc = box.fallback || 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80';
 
-        html += 
-        "<div class='glass-card mb-3'>" +
-            "<div class='car-img-wrap' style='height:130px;'>" +
-                "<img src='" + box.img + "' class='car-img' onerror=\"this.src='assets/containers/japan.jpg'\">" +
-                "<div class='badge-tag' style='bottom:8px; right:8px;'><span class='tag-badge bg-tag-purple'>" + box.badge + "</span></div>" +
-            "</div>" +
-            "<div class='flex-between mb-1'>" +
-                "<b class='font-bold'>" + box.name + "</b>" +
-                "<span class='price-val text-xs'>" + box.cost.toLocaleString() + " ₽</span>" +
-            "</div>" +
-            "<p class='sub-label mb-2'>" + box.desc + "</p>" +
-            "<button onclick=\"openPortContainerAction('" + box.id + "', " + box.cost + ")\" class='btn btn-purple w-full' " + (isLocked ? "disabled" : "") + ">" + btnText + "</button>" +
-        "</div>";
+        html += `
+        <div class='glass-card mb-3'>
+            <div class='car-img-wrap' style='height:130px; position:relative;'>
+                <img src='${imgSrc}' class='car-img' onerror="this.onerror=null; this.src='${fallbackSrc}';">
+                <div class='badge-tag' style='bottom:8px; right:8px;'><span class='tag-badge bg-tag-purple'>${box.badge}</span></div>
+            </div>
+            <div class='flex-between mb-1'>
+                <b class='font-bold'>${box.name}</b>
+                <span class='price-val text-xs'>${box.cost.toLocaleString()} ₽</span>
+            </div>
+            <p class='sub-label mb-2'>${box.desc}</p>
+            <button onclick="openPortContainerAction('${box.id}', ${box.cost})" class='btn btn-purple w-full' ${isLocked ? "disabled" : ""}>${btnText}</button>
+        </div>`;
     });
 
     container.innerHTML = html;
@@ -838,7 +859,6 @@ function nextDayAction() {
         state.player.mood = Math.min(100, (state.player.mood || 85) + 25);
     }
 
-    // Бонус к настроению за владение личным автомобилем (+15%)
     let hasPersonal = state.garage && state.garage.some(c => c && c.isPersonal);
     if (hasPersonal) {
         state.player.mood = Math.min(100, (state.player.mood || 85) + 15);
@@ -848,13 +868,11 @@ function nextDayAction() {
         state.player.policeImmunityDays -= 1;
     }
 
-    // НАЧИСЛЕНИЕ +3% В СЕЙФ И ВХОДЯЩЕЕ SMS ОТ ВО-БАНКА
     if (state.player.safeDeposit && state.player.safeDeposit > 0) {
         let percentEarned = Math.round(state.player.safeDeposit * 0.03);
         state.player.safeDeposit += percentEarned;
         spawnFloatingReward(`+${percentEarned.toLocaleString()} ₽ в сейфе`);
 
-        // Отправка SMS в телефон
         if (state.player.phoneMessages) {
             state.player.phoneMessages.unshift({
                 id: "sms_bank_" + Date.now(),
@@ -870,7 +888,6 @@ function nextDayAction() {
         }
     }
 
-    // ОБРАБОТКА БИЗНЕСА
     if (state.businesses) {
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
@@ -889,7 +906,6 @@ function nextDayAction() {
     state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
     state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
 
-    // КАРМИЧЕСКИЕ СОБЫТИЯ
     let karma = state.player.karma !== undefined ? state.player.karma : 50;
 
     if (karma >= 70 && Math.random() < 0.35) {
@@ -980,24 +996,34 @@ function resolvePodstava(action) {
     }
 }
 
+// ========================================================
+// 8. РАЦИОН ПИТАНИЯ (С ГАРАНТИРОВАННЫМИ ДАННЫМИ)
+// ========================================================
 function renderDiets() {
     const list = document.getElementById('dietList');
     if (!list) return;
 
-    const catalog = (typeof DIETS !== 'undefined') ? DIETS : [
-        { id: "shaurma", name: "Шаурма на вокзале", cost: 800, hunger: 50, mood: -5, desc: "Сытно, но жирно и тоскливо" }
+    const catalog = (typeof DIETS !== 'undefined' && Array.isArray(DIETS)) ? DIETS : [
+        { id: 'water', name: 'Вода из-под крана', cost: 0, hunger: 5, mood: -30, desc: 'Живот крутит, жить не хочется' },
+        { id: 'doshik', name: 'Бич-пакет и сухари', cost: 150, hunger: 20, mood: -15, desc: 'Желудок ноет, депрессия, тяжело торговаться' },
+        { id: 'home_sandwich', name: 'Бутерброд из дома', cost: 250, hunger: 30, mood: -5, desc: 'Майонез, колбаса "Красная цена", терпимо' },
+        { id: 'pelmeni', name: 'Пельмени по акции', cost: 400, hunger: 45, mood: 0, desc: 'Дешево и сердито, главное сварить' },
+        { id: 'shaurma', name: 'Шаурма на вокзале', cost: 800, hunger: 50, mood: -5, desc: 'Сытно, но жирно и тоскливо' },
+        { id: 'fastfood', name: 'Фастфуд комбо', cost: 1200, hunger: 60, mood: 10, desc: 'Бургер, картошка, кола. Классика.' },
+        { id: 'stolovka', name: 'Обед в столовой', cost: 2200, hunger: 70, mood: 15, desc: 'Нормальное первое, второе и компот' },
+        { id: 'cafe', name: 'Бизнес-ланч в ресторане', cost: 6500, hunger: 90, mood: 25, desc: 'Свежий стейк, кофе и уверенность в себе' }
     ];
 
     let html = "";
     catalog.forEach(d => {
-        html += 
-        "<div class='glass-card flex-between p-2 mb-1'>" +
-            "<div>" +
-                "<b class='text-xs color-green'>" + d.name + "</b>" +
-                "<div class='sub-label'>" + (d.desc || "Питание перекупа") + "</div>" +
-            "</div>" +
-            "<button onclick=\"eatMeal('" + d.id + "', " + d.cost + ", " + d.hunger + ", " + d.mood + ")\" class='btn btn-dark btn-auto btn-sm'>" + d.cost.toLocaleString() + " ₽</button>" +
-        "</div>";
+        html += `
+        <div class='glass-card flex-between p-2 mb-2'>
+            <div>
+                <b class='text-xs color-green'>${d.name}</b>
+                <div class='sub-label' style='font-size:10px;'>${d.desc || "Питание перекупа"} (+${d.hunger}% сытости)</div>
+            </div>
+            <button onclick="eatMeal('${d.id}', ${d.cost}, ${d.hunger}, ${d.mood})" class='btn btn-dark btn-auto btn-sm'>${d.cost.toLocaleString()} ₽</button>
+        </div>`;
     });
     list.innerHTML = html;
 }
@@ -1015,17 +1041,23 @@ function eatMeal(id, cost, hunger, mood) {
     showToast("Вы перекусили! Силы восстановлены.");
 }
 
+// ========================================================
+// 9. ГОРОДСКОЙ ЭФИР (С ГАРАНТИРОВАННЫМИ ДАННЫМИ)
+// ========================================================
 function renderLifeChat() {
     const feed = document.getElementById('lifeChatFeed');
     if (!feed) return;
 
     if (!state.lifeChatMessages || state.lifeChatMessages.length === 0) {
         if (typeof STREET_CHAT_LOG !== 'undefined' && Array.isArray(STREET_CHAT_LOG)) {
-            state.lifeChatMessages = STREET_CHAT_LOG.slice(0, 5).map(m => ({ sender: m.author, text: m.text }));
+            state.lifeChatMessages = STREET_CHAT_LOG.slice(0, 6).map(m => ({ sender: m.author, text: m.text }));
         } else {
             state.lifeChatMessages = [
+                { sender: "🚨 ДПС_Инфо", text: "Внимание! На ул. Ленина рейд по 12.5.1, прячьте прямотоки!" },
                 { sender: "Колян_99", text: "Кто на кольце сегодня? ДПСников вроде нет." },
-                { sender: "Артур_Решала", text: "Номера 777 в наличии, пишите в приложении." }
+                { sender: "Артур_Решала", text: "Номера 777 в наличии, пишите в приложении." },
+                { sender: "Vazovod_77", text: "Куплю кузов под корч ВАЗ 2107 или 2101, срочно в лс!" },
+                { sender: "Perecup_Pro", text: "Продам Солярис, не бит не крашен (крашена только крыша)." }
             ];
         }
     }
@@ -1033,10 +1065,10 @@ function renderLifeChat() {
     let html = "";
     state.lifeChatMessages.forEach(m => {
         let isMine = m.isMine ? "mine" : "";
-        html += 
-        "<div class='chat-bubble " + isMine + "'>" +
-            "<b class='color-cyan text-xs'>" + m.sender + ":</b> " + m.text +
-        "</div>";
+        html += `
+        <div class='chat-bubble ${isMine}'>
+            <b class='color-cyan text-xs'>${m.sender}:</b> ${m.text}
+        </div>`;
     });
     feed.innerHTML = html;
     feed.scrollTop = feed.scrollHeight;
@@ -1106,7 +1138,7 @@ function bigCharityDonate() {
 }
 
 // ========================================================
-// 8. ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
+// 10. ВИЛСПИН И СТАВКИ
 // ========================================================
 const WHEEL_SECTORS = [
     { label: "150,000 ₽", color: "#00e676", textColor: "#000", reward: { cash: 150000 } },
@@ -1216,158 +1248,6 @@ function spinWheelAction(isFree) {
     }, 4600);
 }
 
-let currentThimblesBet = 10000;
-
-function setThimblesBet(amt) {
-    currentThimblesBet = amt;
-    setTxt('thimblesBetText', amt.toLocaleString() + " ₽");
-    tgHaptic('light');
-}
-
-function playThimbles(chosenIdx) {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < currentThimblesBet) return showToast("Не хватает денег на ставку в напёрстках!");
-
-    state.player.cash -= currentThimblesBet;
-    const winningIdx = Math.floor(Math.random() * 3);
-
-    for (let i = 0; i < 3; i++) {
-        const sec = document.getElementById('thimble-secret-' + i);
-        if (sec) sec.innerText = (i === winningIdx) ? "🔑" : "❌";
-    }
-
-    if (chosenIdx === winningIdx) {
-        let win = currentThimblesBet * 2;
-        state.player.cash += win;
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        setTxt('thimblesResultText', "🎉 ВЫ УГАДАЛИ! Выигрыш: +" + win.toLocaleString() + " ₽!");
-    } else {
-        saveState();
-        updateHeaderUI();
-        tgHaptic('error');
-        setTxt('thimblesResultText', "💨 Пусто! Ключ был под другим стаканчиком.");
-    }
-
-    setTimeout(() => {
-        for (let i = 0; i < 3; i++) {
-            const sec = document.getElementById('thimble-secret-' + i);
-            if (sec) sec.innerText = "";
-        }
-    }, 2000);
-}
-
-let casinoBet = 0;
-let playerHand = [];
-let dealerHand = [];
-
-function initCasino() {
-    setTxt('currentBetDisplay', casinoBet.toLocaleString() + " ₽");
-}
-
-function addCasinoBet(amt) {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < casinoBet + amt) return showToast("Не хватает денег на ставку!");
-    casinoBet += amt;
-    setTxt('currentBetDisplay', casinoBet.toLocaleString() + " ₽");
-    playSound('tick');
-}
-
-function clearCasinoBet() {
-    casinoBet = 0;
-    setTxt('currentBetDisplay', "0 ₽");
-}
-
-function setCasinoMaxBet() {
-    casinoBet = 50000;
-    setTxt('currentBetDisplay', casinoBet.toLocaleString() + " ₽");
-}
-
-function startCasinoGame() {
-    if (casinoBet <= 0) return showToast("Сделайте ставку!");
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < casinoBet) return showToast("Не хватает денег!");
-
-    state.player.cash -= casinoBet;
-    playerHand = [getCardVal(), getCardVal()];
-    dealerHand = [getCardVal()];
-
-    const bArea = document.getElementById('casinoBettingArea');
-    const pArea = document.getElementById('casinoPlayingArea');
-    if (bArea) bArea.style.display = 'none';
-    if (pArea) pArea.style.display = 'block';
-    updateCasinoUI();
-}
-
-function getCardVal() {
-    return Math.floor(Math.random() * 9) + 2;
-}
-
-function getHandScore(hand) {
-    let sum = 0;
-    hand.forEach(v => { sum += v; });
-    return sum;
-}
-
-function updateCasinoUI() {
-    setTxt('playerScore', getHandScore(playerHand));
-    setTxt('dealerScore', getHandScore(dealerHand));
-
-    const pBox = document.getElementById('playerHandBox');
-    const dBox = document.getElementById('dealerHandBox');
-    if (pBox) pBox.innerHTML = playerHand.map(c => "<span class='tag-badge bg-tag-cyan'>" + c + "</span>").join(" ");
-    if (dBox) dBox.innerHTML = dealerHand.map(c => "<span class='tag-badge bg-tag-red'>" + c + "</span>").join(" ");
-}
-
-function hitCasino() {
-    playerHand.push(getCardVal());
-    updateCasinoUI();
-    if (getHandScore(playerHand) > 21) {
-        endCasinoGame(false, "Перебор! Больше 21 очка.");
-    }
-}
-
-function standCasino() {
-    while (getHandScore(dealerHand) < 17) {
-        dealerHand.push(getCardVal());
-    }
-    updateCasinoUI();
-
-    let p = getHandScore(playerHand);
-    let d = getHandScore(dealerHand);
-
-    if (d > 21 || p > d) {
-        endCasinoGame(true, "Вы выиграли! У крупье " + d + " очков.");
-    } else {
-        endCasinoGame(false, "Крупье победил с " + d + " очками.");
-    }
-}
-
-function endCasinoGame(isWin, msg) {
-    const bArea = document.getElementById('casinoBettingArea');
-    const pArea = document.getElementById('casinoPlayingArea');
-    if (pArea) pArea.style.display = 'none';
-    if (bArea) bArea.style.display = 'block';
-
-    if (isWin) {
-        let win = casinoBet * 2;
-        state.player.cash = (state.player.cash || 0) + win;
-        playSound('win');
-        tgHaptic('success');
-        openVerdictModal("ПОБЕДА В КЛУБЕ 21! 🃏", msg + " +" + win.toLocaleString() + " ₽", true, win);
-    } else {
-        tgHaptic('error');
-        openVerdictModal("ПРОИГРЫШ В 21 💨", msg + " -" + casinoBet.toLocaleString() + " ₽", false);
-    }
-
-    casinoBet = 0;
-    setTxt('currentBetDisplay', "0 ₽");
-    saveState();
-    updateHeaderUI();
-}
-
 function refuelAction(type) {
     if (type === 'cash') {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -1385,13 +1265,4 @@ function refuelAction(type) {
         playSound('win');
         showToast("Заправка за рекламу завершена: 100 ⛽!");
     }
-}
-
-function watchAdsgram() {
-    state.player.cash = (state.player.cash || 0) + 25000;
-    state.player.connections = ((state.player && state.player.connections) ? state.player.connections : 0) + 1;
-    saveState();
-    updateHeaderUI();
-    playSound('win');
-    showToast("Награда за просмотр: +25,000 ₽ и +1 🤝!");
 }
