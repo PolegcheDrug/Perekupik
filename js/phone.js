@@ -1,5 +1,6 @@
 // ========================================================
-// js/phone.js — ИНТЕРАКТИВНЫЙ СМАРТФОН «PerekupOS» (v0.4.3)
+// js/phone.js — ИНТЕРАКТИВНЫЙ СМАРТФОН «PerekupOS» (v0.4.4)
+// Полная версия: 16 приложений, виджет квестов, супер вилспин
 // ========================================================
 
 const PhoneManager = {
@@ -71,7 +72,14 @@ const PhoneManager = {
             state.player.streetCred = 100;
         }
         if (state.player.superSpinTickets === undefined) {
-            state.player.superSpinTickets = 1; // 1 бесплатный билет на старте
+            state.player.superSpinTickets = 1;
+        }
+        if (!state.player.dailyQuests || state.player.dailyQuests.length === 0) {
+            state.player.dailyQuests = [
+                { id: "q_inspect", text: "Осмотреть толщиномером 2 авто", cur: 0, max: 2, reward: 35000, done: false },
+                { id: "q_race", text: "Выиграть заезд 402м в Стрите", cur: 0, max: 1, reward: 50000, done: false },
+                { id: "q_biz", text: "Собрать кассу с предприятий", cur: 0, max: 1, reward: 25000, done: false }
+            ];
         }
         this.updateUnreadBadge();
         this.updatePhoneClock();
@@ -181,6 +189,65 @@ const PhoneManager = {
         `;
     },
 
+    renderDailyQuestsWidget() {
+        const widget = document.getElementById('phoneDailyQuestsWidget');
+        if (!widget) return;
+
+        if (!state.player.dailyQuests) {
+            state.player.dailyQuests = [
+                { id: "q_inspect", text: "Осмотреть толщиномером 2 авто", cur: 0, max: 2, reward: 35000, done: false },
+                { id: "q_race", text: "Выиграть заезд 402м в Стрите", cur: 0, max: 1, reward: 50000, done: false },
+                { id: "q_biz", text: "Собрать кассу с предприятий", cur: 0, max: 1, reward: 25000, done: false }
+            ];
+        }
+
+        let quests = state.player.dailyQuests;
+        let html = `
+            <div class="flex-between mb-1">
+                <div class="flex-gap" style="align-items:center;">
+                    <i class="fa-solid fa-list-check color-cyan" style="font-size:12px;"></i>
+                    <b class="text-xs" style="font-size:11px;">План перекупа на день</b>
+                </div>
+                <span class="sub-label" style="font-size:9px; color:var(--cyan);">Сброс в полночь</span>
+            </div>
+        `;
+
+        quests.forEach((q, idx) => {
+            let pct = Math.min(100, Math.round((q.cur / q.max) * 100));
+            let btn = q.done
+                ? `<span class="tag-badge bg-tag-green">Выполнено ✓</span>`
+                : (q.cur >= q.max 
+                    ? `<button onclick="PhoneManager.claimQuestReward(${idx})" class="btn btn-green btn-auto btn-sm" style="padding:3px 8px; font-size:9px;">Забрать +${(q.reward/1000).toFixed(0)}k</button>`
+                    : `<span class="sub-label" style="font-size:9px;">${q.cur}/${q.max}</span>`);
+
+            html += `
+            <div class="quest-item-row">
+                <div style="flex:1; margin-right:8px;">
+                    <div style="font-size:10px; color:#e2e8f0;">${q.text}</div>
+                    <div class="quest-progress-mini"><div class="quest-progress-fill" style="width:${pct}%;"></div></div>
+                </div>
+                ${btn}
+            </div>`;
+        });
+
+        widget.innerHTML = html;
+    },
+
+    claimQuestReward(idx) {
+        let q = state.player.dailyQuests[idx];
+        if (!q || q.done || q.cur < q.max) return;
+
+        q.done = true;
+        state.player.cash = (state.player.cash || 0) + q.reward;
+        addXp(35);
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast(`Цель выполнена! Получено +${q.reward.toLocaleString()} ₽!`);
+        this.renderDailyQuestsWidget();
+    },
+
     renderPhoneScreen() {
         const homeScreen = document.getElementById('phoneHomeScreen');
         const appContainer = document.getElementById('phoneAppContainer');
@@ -194,6 +261,7 @@ const PhoneManager = {
             appContainer.style.display = 'none';
             appContainer.innerHTML = '';
             this.renderBusinessWidget();
+            this.renderDailyQuestsWidget();
         } else {
             homeScreen.style.display = 'none';
             appContainer.style.display = 'block';
@@ -244,6 +312,12 @@ const PhoneManager = {
             this.renderFortuneApp(container);
         } else if (this.currentApp === 'radar') {
             this.renderRadarApp(container);
+        } else if (this.currentApp === 'gosuslugi') {
+            this.renderGosuslugiApp(container);
+        } else if (this.currentApp === 'radio') {
+            this.renderRadioApp(container);
+        } else if (this.currentApp === 'notepad') {
+            this.renderNotepadApp(container);
         } else if (this.currentApp === 'messages') {
             if (this.activeChatId) {
                 this.renderChatConversation(container, this.activeChatId);
@@ -254,7 +328,7 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // 1. БИЗНЕС С ПРЕВЬЮ И ОБЛОЖКАМИ
+    // 1. БИЗНЕС
     // ========================================================
     renderBusinessApp(container) {
         if (!state.businesses || state.businesses.length === 0) {
@@ -372,7 +446,7 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // 2. ЖИЛЬЁ С ПРЕВЬЮ И ОБЛОЖКАМИ
+    // 2. ЖИЛЬЁ
     // ========================================================
     renderHousingApp(container) {
         let curId = state.player?.housingId || 'room';
@@ -496,7 +570,7 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // 3. САРАИ С ФОТО-ОБЛОЖКАМИ И ПРЕВЬЮ
+    // 3. САРАИ
     // ========================================================
     renderBarnApp(container) {
         const pDay = state.player?.day || 1;
@@ -557,12 +631,11 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // 4. ФОРТУНА: СУПЕР ВИЛСПИН (3 БАРАБАНА) + ЛАВКА ФОРТУНЫ
+    // 4. ФОРТУНА: СУПЕР ВИЛСПИН + ЛАВКА
     // ========================================================
     renderFortuneApp(container) {
         let tickets = state.player?.superSpinTickets || 0;
         let stars = state.player?.stars || 0;
-        let cash = state.player?.cash || 0;
 
         container.innerHTML = `
             <div class="phone-app-header">
@@ -572,7 +645,7 @@ const PhoneManager = {
             </div>
             <div class="phone-app-body">
                 
-                <!-- 🔥 СУПЕР ВИЛСПИН НА 3 БАРАБАНА (FORZA HORIZON STYLE) -->
+                <!-- СУПЕР ВИЛСПИН НА 3 БАРАБАНА -->
                 <div class="glass-card mb-3 p-3" style="background: radial-gradient(circle at 50% 0%, #1e1338 0%, #090e18 100%); border: 1.5px solid var(--purple); box-shadow: 0 0 20px rgba(192,132,252,0.3);">
                     <div class="flex-between mb-2">
                         <div>
@@ -582,23 +655,19 @@ const PhoneManager = {
                         <span class="tag-badge bg-tag-purple">Билетов: ${tickets} 🎟️</span>
                     </div>
 
-                    <!-- ТРИ БАРАБАНА -->
                     <div class="grid-3 my-2" style="gap:6px;">
-                        <!-- Барабан 1: Автомобиль -->
                         <div class="p-2 text-center" id="superReel1" style="background:#090d16; border-radius:10px; border:1px solid rgba(0,242,254,0.3); min-height:85px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
                             <div style="font-size:26px;">🚗</div>
                             <b class="text-xs color-cyan mt-1" id="reelTxt1">АВТОМОБИЛЬ</b>
                             <div class="sub-label" style="font-size:8px;">(До +1 ур. выше)</div>
                         </div>
 
-                        <!-- Барабан 2: Топливо / Кэш -->
                         <div class="p-2 text-center" id="superReel2" style="background:#090d16; border-radius:10px; border:1px solid rgba(0,230,118,0.3); min-height:85px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
                             <div style="font-size:26px;">⛽</div>
                             <b class="text-xs color-green mt-1" id="reelTxt2">РЕСУРСЫ</b>
                             <div class="sub-label" style="font-size:8px;">(Бак / Кэш / Талоны)</div>
                         </div>
 
-                        <!-- Барабан 3: Эксклюзивы -->
                         <div class="p-2 text-center" id="superReel3" style="background:#090d16; border-radius:10px; border:1px solid rgba(255,179,0,0.3); min-height:85px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
                             <div style="font-size:26px;">💎</div>
                             <b class="text-xs color-amber mt-1" id="reelTxt3">ЭКСКЛЮЗИВ</b>
@@ -611,7 +680,7 @@ const PhoneManager = {
                     </button>
                 </div>
 
-                <!-- 🎡 КЛАССИЧЕСКОЕ ВИП КОЛЕСО ФОРТУНЫ (1 ПРИЗ) -->
+                <!-- КЛАССИЧЕСКОЕ КОЛЕСО -->
                 <div class="glass-card text-center mb-3 p-2">
                     <b class="text-xs color-amber">🎡 VIP Колесо Фортуны (1 Спин)</b>
                     <div class="wheel-stage-container my-1" style="transform: scale(0.82); margin: 0 auto;">
@@ -627,7 +696,7 @@ const PhoneManager = {
                     </div>
                 </div>
 
-                <!-- 🛒 ЛАВКА ФОРТУНЫ (ПОКУПКИ) -->
+                <!-- ЛАВКА ФОРТУНЫ -->
                 <div class="glass-card mb-3 p-2">
                     <div class="flex-between mb-2">
                         <b class="text-xs color-cyan"><i class="fa-solid fa-store"></i> Лавка Фортуны</b>
@@ -635,7 +704,6 @@ const PhoneManager = {
                     </div>
 
                     <div class="space-y-2">
-                        <!-- Покупка билета Супер Вилспина -->
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
                             <div>
                                 <b class="text-xs color-purple">🎫 1х Билет Супер Вилспин</b>
@@ -647,7 +715,6 @@ const PhoneManager = {
                             </div>
                         </div>
 
-                        <!-- 3 билета со скидкой -->
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
                             <div>
                                 <b class="text-xs color-purple">🎟️ 3х Билета Супер Вилспин (-20%)</b>
@@ -659,7 +726,6 @@ const PhoneManager = {
                             </div>
                         </div>
 
-                        <!-- Канистра бензина -->
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
                             <div>
                                 <b class="text-xs color-cyan">⛽ Бак Экстра (100 ⛽)</b>
@@ -671,7 +737,6 @@ const PhoneManager = {
                             </div>
                         </div>
 
-                        <!-- Экспресс талоны -->
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
                             <div>
                                 <b class="text-xs color-amber">⚡ Экспресс-талоны (25 шт)</b>
@@ -680,7 +745,6 @@ const PhoneManager = {
                             <button onclick="upgradeExpressCapacity()" class="btn btn-amber btn-sm btn-auto">50k ₽</button>
                         </div>
 
-                        <!-- Обменник на Stars -->
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
                             <div>
                                 <b class="text-xs color-green">💱 Обменник валют: 50 ⭐ Stars</b>
@@ -750,9 +814,6 @@ const PhoneManager = {
         this.renderFortuneApp(document.getElementById('phoneAppContainer'));
     },
 
-    // ----------------------------------------------------
-    // ДВИЖОК СУПЕР ВИЛСПИНА (3 БАРАБАНА)
-    // ----------------------------------------------------
     spinSuperWheelAction() {
         if (this.isSuperSpinning) return;
 
@@ -780,10 +841,7 @@ const PhoneManager = {
         const btn = document.getElementById('btnLaunchSuperSpin');
         if (btn) btn.disabled = true;
 
-        // Анимация кручения
-        let ticks = 0;
         let spinAnim = setInterval(() => {
-            ticks++;
             if (r1) r1.innerText = ["Lada Priora", "BMW M340i", "Porsche 911", "Golf GTI", "Toyota Camry"][Math.floor(Math.random() * 5)];
             if (r2) r2.innerText = ["100 ⛽ Бак", "500,000 ₽", "1,500,000 ₽", "25 🎟️ Талонов", "+2 🤝"][Math.floor(Math.random() * 5)];
             if (r3) r3.innerText = ["А777АА 77", "Stage 3 Big Turbo", "Stance Пневма", "50 ⭐ Stars", "Каркас РАФ"][Math.floor(Math.random() * 5)];
@@ -795,13 +853,12 @@ const PhoneManager = {
             this.isSuperSpinning = false;
             if (btn) btn.disabled = false;
 
-            // РАСЧЁТ ВЫИГРЫША
             let lvl = state.player?.level || 1;
 
-            // 1. БАРАБАН: АВТОМОБИЛЬ (с шансом на класс выше!)
+            // 1. БАРАБАН: АВТОМОБИЛЬ
             let targetCategory = 'economy';
             if (lvl < 8) {
-                targetCategory = Math.random() < 0.40 ? 'comfort' : 'economy'; // ШАНС НА КЛАСС ВЫШЕ!
+                targetCategory = Math.random() < 0.40 ? 'comfort' : 'economy';
             } else if (lvl < 25) {
                 targetCategory = Math.random() < 0.35 ? 'premium' : 'comfort';
             } else if (lvl < 45) {
@@ -822,11 +879,12 @@ const PhoneManager = {
                 price: carTmpl.basePrice,
                 marketValue: Math.round(carTmpl.basePrice * 1.15),
                 img: carTmpl.img,
+                fallback: carTmpl.fallback || (typeof getCategoryFallback === 'function' ? getCategoryFallback(carTmpl.type) : ''),
                 plate: (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77",
                 customPlate: "ТРАНЗИТ",
                 condition: 100,
                 wear: { engine: 95, transmission: 95 },
-                insurance: 'casco', // бонус КАСКО
+                insurance: 'casco',
                 tuning: { chip: 1, exhaust: true, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 }
             };
 
@@ -879,7 +937,6 @@ const PhoneManager = {
                 exRewardText = "🚀 Сертификат тюнинга (+750k ₽)";
             }
 
-            // Фиксация на экране
             if (r1) r1.innerText = wonCar.name;
             if (r2) r2.innerText = resRewardText;
             if (r3) r3.innerText = exRewardText;
@@ -900,7 +957,96 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // ДИСЦИПЛИНЫ STREET UNDERGROUND
+    // 5. НОВЫЕ ПРИЛОЖЕНИЯ: ГОСУСЛУГИ, МАГНИТОЛА, БЛОКНОТ
+    // ========================================================
+    renderGosuslugiApp(container) {
+        let fines = state.player.trafficFines || 0;
+        container.innerHTML = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
+                <div class="phone-app-title"><i class="fa-solid fa-building-columns color-cyan"></i> Госуслуги Авто</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body">
+                <div class="glass-card mb-2 p-2">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs">Штрафы ГИБДД (со скидкой 50%)</b>
+                        <span class="tag-badge ${fines > 0 ? 'bg-tag-red' : 'bg-tag-green'}">${fines > 0 ? fines.toLocaleString() + ' ₽' : 'Штрафов нет'}</span>
+                    </div>
+                    <p class="sub-label mb-2" style="font-size:10px;">Проверка камер фотовидеофиксации на дорогах.</p>
+                    <button onclick="PhoneManager.payTrafficFines()" class="btn btn-cyan btn-sm w-full" ${fines <= 0 ? 'disabled' : ''}>Оплатить штрафы со скидкой 50%</button>
+                </div>
+                <div class="glass-card p-2">
+                    <b class="text-xs color-green mb-1 block">✓ Проверка запретов на рег. действия</b>
+                    <p class="sub-label" style="font-size:10px;">Все автомобили в личном гараже проверены по базам ФССП и реестру залогов.</p>
+                </div>
+            </div>
+        `;
+    },
+
+    payTrafficFines() {
+        let fines = state.player.trafficFines || 0;
+        let discountCost = Math.round(fines * 0.5);
+        if (state.player.cash < discountCost) return showToast("Не хватает денег!");
+        state.player.cash -= discountCost;
+        state.player.trafficFines = 0;
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast("Штрафы ГИБДД успешно оплачены!");
+        this.renderGosuslugiApp(document.getElementById('phoneAppContainer'));
+    },
+
+    renderRadioApp(container) {
+        container.innerHTML = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
+                <div class="phone-app-title"><i class="fa-solid fa-radio color-purple"></i> Авто-Магнитола</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body text-center">
+                <div class="glass-card p-3 mb-2">
+                    <div style="font-size:36px; margin-bottom:8px;">📻 🔊 🎶</div>
+                    <b class="color-cyan text-xs">Perekup FM / Drift Station</b>
+                    <div class="sub-label my-1" style="font-size:10px;">Волна: 104.2 FM • Ночной город</div>
+                    <div class="grid-3 mt-2">
+                        <button onclick="playSound('win'); showToast('Волна Drift Phonk активна!');" class="btn btn-purple btn-sm">Phonk</button>
+                        <button onclick="playEngineSound(); showToast('Волна Turbo Bass активна!');" class="btn btn-red btn-sm">Bass</button>
+                        <button onclick="playSound('tick'); showToast('Волна Retro Synth активна!');" class="btn btn-cyan btn-sm">Synth</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    renderNotepadApp(container) {
+        let s = state.player?.stats || {};
+        container.innerHTML = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
+                <div class="phone-app-title"><i class="fa-solid fa-note-sticky color-amber"></i> Блокнот Дельца</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body">
+                <div class="glass-card p-2 mb-2">
+                    <b class="text-xs color-amber mb-1 block">🎯 Главная цель:</b>
+                    <p class="sub-label" style="font-size:10px;">Собрать капитал 100,000,000 ₽ и выкупить остров с яхтой.</p>
+                </div>
+                <div class="glass-card p-2">
+                    <b class="text-xs color-cyan mb-1 block">📊 Личные рекорды:</b>
+                    <div class="sub-label" style="font-size:10px;">
+                        • Куплено авто: <b>${s.bought || 0}</b> шт.<br>
+                        • Продано авто: <b>${s.sold || 0}</b> шт.<br>
+                        • Чистая прибыль: <b class="color-green">${(s.totalNetProfit || 0).toLocaleString()} ₽</b>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    // ========================================================
+    // 6. STREET UNDERGROUND
     // ========================================================
     renderStreetApp(container) {
         let sub = this.streetSubTab || 'drift';
@@ -914,7 +1060,6 @@ const PhoneManager = {
                 <div style="width:40px;"></div>
             </div>
             <div class="phone-app-body">
-                
                 <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(255, 51, 102, 0.2) 0%, #090e18 100%); border-color: rgba(255, 51, 102, 0.4);">
                     <div class="flex-between mb-1">
                         <div>
@@ -925,7 +1070,6 @@ const PhoneManager = {
                     </div>
                 </div>
 
-                <!-- НАВИГАЦИЯ ДИСЦИПЛИН -->
                 <div class="grid-4 mb-2">
                     <button onclick="PhoneManager.switchStreetSubTab('drift')" class="btn ${sub === 'drift' ? 'btn-red' : 'btn-dark'} btn-sm">💨 Дрифт</button>
                     <button onclick="PhoneManager.switchStreetSubTab('drag')" class="btn ${sub === 'drag' ? 'btn-red' : 'btn-dark'} btn-sm">🏁 402м</button>
@@ -1295,6 +1439,13 @@ const PhoneManager = {
                     let winAmt = bet * 2;
                     state.player.cash += winAmt;
                     state.player.streetCred = (state.player.streetCred || 100) + 20;
+
+                    // Квест: выиграть заезд
+                    if (state.player?.dailyQuests) {
+                        let quest = state.player.dailyQuests.find(q => q.id === 'q_race');
+                        if (quest && !quest.done) quest.cur = Math.min(quest.max, quest.cur + 1);
+                    }
+
                     playSound('win');
                     tgHaptic('success');
                     openVerdictModal("ПОБЕДА НА 402М! 🏆", `Вы опередили соперника!\nВаше время: ${myTime}с | Соперник: ${rivalTime}с\nВыигрыш: +${winAmt.toLocaleString()} ₽ (+20 Респекта)`, true, winAmt);
@@ -1524,9 +1675,9 @@ const PhoneManager = {
         }, 1700);
     },
 
-    // ----------------------------------------------------
-    // ДРУГИЕ ПРИЛОЖЕНИЯ PEREKUP OS
-    // ----------------------------------------------------
+    // ========================================================
+    // 7. СЕРВИСНЫЕ ПРИЛОЖЕНИЯ
+    // ========================================================
     renderAutodrotApp(container) {
         let sub = this.autodrotSubTab || 'market';
         container.innerHTML = `

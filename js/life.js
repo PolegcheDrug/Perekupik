@@ -3,7 +3,7 @@
 // ========================================================
 
 // ========================================================
-// 1. ФИНАНСОВЫЕ ОПЕРАЦИИ (ПЕРЕНЕСЕНЫ В «ВО-БАНК» В СМАРТФОНЕ)
+// 1. ФИНАНСОВЫЕ ОПЕРАЦИИ И БАНК
 // ========================================================
 function depositToSafeAction(amount) {
     let cash = state.player?.cash || 0;
@@ -59,7 +59,7 @@ function repayLoan(percent) {
 }
 
 // ========================================================
-// 2. РЕШАЛА АРТУР (СЕРВИСЫ ДЛЯ ПРИЛОЖЕНИЯ В СМАРТФОНЕ)
+// 2. РЕШАЛА АРТУР (ТЕНЕВЫЕ СЕРВИСЫ)
 // ========================================================
 function buyReshalaPack(type) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -80,7 +80,7 @@ function buyReshalaPack(type) {
 }
 
 function checkReshalaAccess() {
-    // Совместимость
+    // Совместимость вызовов
 }
 
 function buyReshalaService(service) {
@@ -340,9 +340,21 @@ function collectAllBusinessCash() {
     if (totalCollected <= 0) return showToast("В кассах предприятий пока пусто!");
 
     state.player.cash = (state.player.cash || 0) + totalCollected;
+    
+    // Квест: собрать кассу с предприятий
+    if (state.player?.dailyQuests) {
+        let quest = state.player.dailyQuests.find(q => q.id === 'q_biz');
+        if (quest && !quest.done) {
+            quest.cur = Math.min(quest.max, quest.cur + 1);
+        }
+    }
+
     saveState();
     checkBusinessAccess();
-    if (typeof PhoneManager !== 'undefined') PhoneManager.renderBusinessWidget();
+    if (typeof PhoneManager !== 'undefined') {
+        PhoneManager.renderBusinessWidget();
+        PhoneManager.renderDailyQuestsWidget();
+    }
     tgHaptic('success');
     playSound('win');
     spawnFloatingReward("+" + totalCollected.toLocaleString() + " ₽");
@@ -657,7 +669,7 @@ function buyHomeFurniture(fId, cost) {
 }
 
 // ========================================================
-// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ (С НАДЕЖНЫМИ ФОТО-FALLBACKS)
+// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ (С ФОТО-FALLBACKS)
 // ========================================================
 function renderContainersList() {
     const container = document.getElementById('containersListRender');
@@ -840,7 +852,7 @@ function placeBlindBid() {
 }
 
 // ========================================================
-// 7. СМЕНА ДНЯ С УВЕДОМЛЕНИЯМИ В СМАРТФОН
+// 7. СМЕНА ДНЯ И СОБЫТИЯ
 // ========================================================
 function nextDayAction() {
     state.player.day = (state.player.day || 1) + 1;
@@ -953,6 +965,39 @@ function triggerRandomRoadEvent() {
     }
 }
 
+function triggerGarageRandomEvent() {
+    if (!state.garage || state.garage.length === 0) return;
+    if (Math.random() > 0.12) return;
+
+    const car = state.garage[Math.floor(Math.random() * state.garage.length)];
+    const modal = document.getElementById('modalGarageEvent');
+    const actions = document.getElementById('garageEventActions');
+    if (!modal || !actions) return;
+
+    let hasCasco = car.insurance === 'casco';
+    let hasOsago = car.insurance === 'osago';
+
+    setTxt('garageEventTitle', "Ночной инцидент на парковке!");
+    setTxt('garageEventCarName', car.name);
+    setTxt('garageEventDesc', `Неизвестный задел крыло вашего «${car.name}» во дворе и скрылся с места ДТП.`);
+
+    let resolveHtml = "";
+    if (hasCasco) {
+        resolveHtml = `<button onclick="closeModal('modalGarageEvent'); showToast('Страховая КАСКО возместила ущерб 100%!');" class="btn btn-green w-full">КАСКО покрыло 100% ущерба ✓</button>`;
+    } else if (hasOsago) {
+        let cost = 12000;
+        resolveHtml = `<button onclick="state.player.cash = Math.max(0, state.player.cash - ${cost}); closeModal('modalGarageEvent'); saveState(); updateHeaderUI();" class="btn btn-amber w-full">ОСАГО покрыло 50% (Доплата ${cost.toLocaleString()} ₽)</button>`;
+    } else {
+        let cost = 25000;
+        resolveHtml = `<button onclick="state.player.cash = Math.max(0, state.player.cash - ${cost}); closeModal('modalGarageEvent'); saveState(); updateHeaderUI();" class="btn btn-danger w-full">Оплатить ремонт (${cost.toLocaleString()} ₽)</button>`;
+    }
+
+    actions.innerHTML = resolveHtml;
+    modal.classList.add('active');
+    playSound('error');
+    tgHaptic('error');
+}
+
 function resolvePodstava(action) {
     closeModal('modalAutoPodstava');
     if (action === 'pay') {
@@ -997,7 +1042,7 @@ function resolvePodstava(action) {
 }
 
 // ========================================================
-// 8. РАЦИОН ПИТАНИЯ (С ГАРАНТИРОВАННЫМИ ДАННЫМИ)
+// 8. РАЦИОН ПИТАНИЯ
 // ========================================================
 function renderDiets() {
     const list = document.getElementById('dietList');
@@ -1042,7 +1087,7 @@ function eatMeal(id, cost, hunger, mood) {
 }
 
 // ========================================================
-// 9. ГОРОДСКОЙ ЭФИР (С ГАРАНТИРОВАННЫМИ ДАННЫМИ)
+// 9. ГОРОДСКОЙ ЭФИР
 // ========================================================
 function renderLifeChat() {
     const feed = document.getElementById('lifeChatFeed');
@@ -1138,7 +1183,7 @@ function bigCharityDonate() {
 }
 
 // ========================================================
-// 10. ВИЛСПИН И СТАВКИ
+// 10. КЛАССИЧЕСКОЕ КОЛЕСО И ТОПЛИВО
 // ========================================================
 const WHEEL_SECTORS = [
     { label: "150,000 ₽", color: "#00e676", textColor: "#000", reward: { cash: 150000 } },
