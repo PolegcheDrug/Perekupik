@@ -1,7 +1,7 @@
 // ========================================================
-// firebase-bridge.js — ОБЛАЧНАЯ СИНХРОНИЗАЦИЯ, P2P И ТОП (v0.4.0)
+// firebase-bridge.js — ОБЛАЧНАЯ СИНХРОНИЗАЦИЯ, P2P И ТОП (v0.4.3)
 // Улучшенная версия (REST API): Не требует загрузки тяжелых SDK.
-// Идеально оптимизировано для Telegram Mini Apps.
+// Оптимизировано для Telegram Mini Apps.
 // ========================================================
 
 const FIREBASE_CONFIG = {
@@ -90,7 +90,7 @@ const CloudSaveManager = {
         const lightState = {
             player: gameState.player,
             timestamp: Date.now(),
-            version: "v0.4.0"
+            version: "v0.4.3"
         };
         
         await fb_put(`saves/${userId}`, lightState);
@@ -104,7 +104,7 @@ const CloudSaveManager = {
 };
 
 // ========================================================
-// 2. ГЛОБАЛЬНАЯ P2P БИРЖА ТЕХНИКИ И НОМЕРОВ
+// 2. ГЛОБАЛЬНАЯ P2P БИРЖА ТЕХНИКИ, НОМЕРОВ, БИЗНЕСА И ЖИЛЬЯ
 // ========================================================
 const P2PMarketManager = {
     // Выставить лот на глобальный рынок
@@ -234,7 +234,7 @@ const SyndicateClubsManager = {
     }
 })();
 
-// Экспорт методов в глобальную область (для вызова из app.js и syndicate.js)
+// Экспорт методов в глобальную область
 window.FB_Bridge = {
     CloudSave: CloudSaveManager,
     P2P: P2PMarketManager,

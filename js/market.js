@@ -105,6 +105,16 @@ const CATEGORY_META = {
     yacht: { name: "ЯХТЫ", title: "Морской сегмент", capital: "от 15 000 000 ₽", desc: "Элитная морская техника для настоящих автомобильных олигархов." }
 };
 
+function toggleMarketCategories() {
+    const grid = document.getElementById('marketCatListContainer');
+    const btnIcon = document.querySelector('#btnToggleMarketGrid i');
+    if (!grid) return;
+    grid.classList.toggle('collapsed');
+    if (btnIcon) {
+        btnIcon.className = grid.classList.contains('collapsed') ? "fa-solid fa-chevron-down" : "fa-solid fa-chevron-up";
+    }
+}
+
 function setCategory(cat) {
     let lvl = state.player?.level ? state.player.level : 1;
     
@@ -174,7 +184,6 @@ function populateMarketFeed() {
 
     state.marketFeed = [];
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     
     const feedCount = Math.min(8, Math.max(6, shuffledPool.length));
 
@@ -188,13 +197,13 @@ function populateMarketFeed() {
 
         if (dealRoll < 0.22) {
             dealType = 'urgent';
-            priceMultiplier = 0.68 + Math.random() * 0.10; // Срочный выкуп с хорошей скидкой
+            priceMultiplier = 0.68 + Math.random() * 0.10;
         } else if (dealRoll < 0.68) {
             dealType = 'normal';
-            priceMultiplier = 0.82 + Math.random() * 0.12; // Обычный рынок
+            priceMultiplier = 0.82 + Math.random() * 0.12;
         } else {
             dealType = 'overprice';
-            priceMultiplier = 1.05 + Math.random() * 0.18; // Переоцененная машина
+            priceMultiplier = 1.05 + Math.random() * 0.18;
         }
 
         let defectChance = 0.38;
@@ -211,7 +220,6 @@ function populateMarketFeed() {
         let isStolen = Math.random() < (dealType === 'urgent' ? 0.20 : 0.10);
         const carId = "m_" + Date.now() + "_" + i;
         
-        // РЕАЛИСТИЧНЫЙ ШАНС БЛАТНЫХ НОМЕРОВ: ВСЕГО 3.5%
         let isCoolNumber = Math.random() < 0.035;
         let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
 
@@ -226,10 +234,9 @@ function populateMarketFeed() {
         let sellerPrice = carOnlyPrice;
         let isLuckyFind = false;
 
-        // Если красивый номер выпал продавцу
         if (plateVal > 5000) {
             if (Math.random() < 0.08) {
-                isLuckyFind = true; // Продавец не знает цены номеров
+                isLuckyFind = true;
                 sellerPrice = carOnlyPrice;
             } else {
                 let plateMarkup = Math.round(plateVal * (0.80 + Math.random() * 0.15));
@@ -323,6 +330,7 @@ function populateMarketFeed() {
             hasAdditive: false,
             isRepainted: false,
             isPolished: false,
+            isPersonal: false,
             viewed: false
         });
     }
@@ -785,6 +793,7 @@ function finishMarketCarBuyProcess(deal) {
     newCar.purchaseCost = price;
     newCar.wear = car.wear ? car.wear : { engine: 85, transmission: 85 };
     newCar.preSaleVisited = false;
+    newCar.isPersonal = false;
     
     newCar.tuning = { 
         chip: 0, exhaust: false, stance: false, bodykit: false, 

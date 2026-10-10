@@ -1,6 +1,6 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.4.0)
-// Полная и расширенная версия контента с путями к ассетам
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.4.3)
+// Обложки жилья, бизнеса, сараев и конфигурация Супер Вилспина
 // ========================================================
 
 const CAR_DATABASE = {
@@ -27,15 +27,15 @@ const CAR_DATABASE = {
         { name: "Ford Focus I", power: 100, basePrice: 300000, type: "economy", img: "assets/cars/economy/focus1.jpg" },
         { name: "Hyundai Solaris I", power: 123, basePrice: 620000, type: "economy", img: "assets/cars/economy/solaris.jpg" },
         { name: "Kia Rio 3", power: 123, basePrice: 650000, type: "economy", img: "assets/cars/economy/rio.jpg" },
-        { name: "Toyota Mark II (JZX90 Самурай)", power: 180, basePrice: 450000, type: "economy", img: "assets/cars/economy/mark2.jpg" },
+        { name: "Toyota Mark II (JZX90)", power: 180, basePrice: 450000, type: "economy", img: "assets/cars/economy/mark2.jpg" },
         { name: "Mitsubishi Lancer IX", power: 98, basePrice: 380000, type: "economy", img: "assets/cars/economy/lancer9.jpg" },
-        { name: "BMW E34 520i (Гнилая)", power: 150, basePrice: 250000, type: "economy", img: "assets/cars/economy/e34.jpg" },
-        { name: "Mercedes W210 (Лупатый)", power: 136, basePrice: 300000, type: "economy", img: "assets/cars/economy/w210.jpg" },
-        { name: "BMW E38 740i (Требует вложений)", power: 286, basePrice: 450000, type: "economy", img: "assets/cars/economy/e38.jpg" },
-        { name: "Audi A6 C5 (Проблемы с АКПП)", power: 165, basePrice: 350000, type: "economy", img: "assets/cars/economy/a6c5.jpg" },
-        { name: "Range Rover P38 (Пневма упала)", power: 218, basePrice: 400000, type: "economy", img: "assets/cars/economy/p38.jpg" },
-        { name: "Porsche Cayenne 955 (Задиры)", power: 340, basePrice: 500000, type: "economy", img: "assets/cars/economy/cayenne_old.jpg" },
-        { name: "Mercedes W140 S500 (Кабан)", power: 320, basePrice: 600000, type: "economy", img: "assets/cars/economy/w140.jpg" }
+        { name: "BMW E34 520i", power: 150, basePrice: 250000, type: "economy", img: "assets/cars/economy/e34.jpg" },
+        { name: "Mercedes W210", power: 136, basePrice: 300000, type: "economy", img: "assets/cars/economy/w210.jpg" },
+        { name: "BMW E38 740i", power: 286, basePrice: 450000, type: "economy", img: "assets/cars/economy/e38.jpg" },
+        { name: "Audi A6 C5", power: 165, basePrice: 350000, type: "economy", img: "assets/cars/economy/a6c5.jpg" },
+        { name: "Range Rover P38", power: 218, basePrice: 400000, type: "economy", img: "assets/cars/economy/p38.jpg" },
+        { name: "Porsche Cayenne 955", power: 340, basePrice: 500000, type: "economy", img: "assets/cars/economy/cayenne_old.jpg" },
+        { name: "Mercedes W140 S500", power: 320, basePrice: 600000, type: "economy", img: "assets/cars/economy/w140.jpg" }
     ],
     scooter: [
         { name: "Honda Dio AF34", power: 7, basePrice: 45000, type: "scooter", img: "assets/moto/dio.jpg" },
@@ -160,7 +160,225 @@ const CAR_DATABASE = {
 };
 
 // ========================================================
-// ПОЛНЫЙ АССОРТИМЕНТ МАГАЗИНА ПЕРЕКУПА (v0.4.0)
+// НЕДВИЖИМОСТЬ: РЕАЛЬНЫЕ ОБЛОЖКИ И НАДЕЖНЫЕ FALLBACKS
+// ========================================================
+const HOUSING_LIST = [
+    { 
+        id: 'trailer', name: 'Бытовка на стройплощадке', rent: 800, buyPrice: 450000, slots: 0, moodBonus: -5, minLevel: 1, 
+        desc: 'Временный вагончик. Сквозняки, запах мазута, но крыша над головой.', 
+        img: 'assets/houses/trailer.jpg',
+        fallback: 'https://images.unsplash.com/photo-1590725140246-201552a488c9?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'room', name: 'Комната в общежитии', rent: 2500, buyPrice: 1800000, slots: 1, moodBonus: 5, minLevel: 2, 
+        desc: 'Угол в спальном районе. Одно парковочное место под окном во дворе.', 
+        img: 'assets/houses/room.jpg',
+        fallback: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'khrusch', name: 'Убитая "Хрущевка"', rent: 15000, buyPrice: 4500000, slots: 1, moodBonus: 10, minLevel: 6, 
+        desc: 'Бабушкин ремонт, старый паркет, зато своя кухня.', 
+        img: 'assets/houses/khrusch.jpg',
+        fallback: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'garage', name: 'Кирпичный гараж с ямой', rent: 18000, buyPrice: 3000000, slots: 3, moodBonus: 12, minLevel: 10, 
+        desc: 'Капитальный бокс с верстаком, печкой и смотровой ямой.', 
+        img: 'assets/houses/garage.jpg',
+        fallback: 'https://images.unsplash.com/photo-1616423640778-28d1b53229bd?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'dvushka', name: 'Двушка в спальном районе', rent: 25000, buyPrice: 8500000, slots: 2, moodBonus: 15, minLevel: 15, 
+        desc: 'Хороший кирпичный дом, стеклопакеты и парковка во дворе.', 
+        img: 'assets/houses/dvushka.jpg',
+        fallback: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'euro_treshka', name: 'Евро-трешка (Новостройка)', rent: 45000, buyPrice: 15000000, slots: 3, moodBonus: 25, minLevel: 22, 
+        desc: 'Свежий ремонт, закрытый двор без машин и консьерж.', 
+        img: 'assets/houses/treshka.jpg',
+        fallback: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'cottage', name: 'Коттедж за городом', rent: 65000, buyPrice: 22000000, slots: 6, moodBonus: 30, minLevel: 30, 
+        desc: 'Собственный участок, просторный гараж и мангальная зона.', 
+        img: 'assets/houses/cottage.jpg',
+        fallback: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'loft', name: 'Дизайнерский Лофт в центре', rent: 80000, buyPrice: 35000000, slots: 4, moodBonus: 35, minLevel: 45, 
+        desc: 'Красный кирпич, панорамные окна и вид на набережную.', 
+        img: 'assets/houses/loft.jpg',
+        fallback: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'penthouse', name: 'Пентхаус в Москва-Сити', rent: 250000, buyPrice: 140000000, slots: 6, moodBonus: 50, minLevel: 65, 
+        desc: 'Панорамный вид с 65 этажа и доступ в подземный VIP-паркинг.', 
+        img: 'assets/houses/penthouse.jpg',
+        fallback: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'villa', name: 'Особняк на Рублёвке', rent: 600000, buyPrice: 450000000, slots: 15, moodBonus: 80, minLevel: 85, 
+        desc: 'Гектар сосен, вертолетная площадка и гаражный комплекс.', 
+        img: 'assets/houses/villa.jpg',
+        fallback: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'island', name: 'Частный остров с виллой', rent: 2000000, buyPrice: 1500000000, slots: 30, moodBonus: 100, minLevel: 100, 
+        desc: 'Абсолютная автономия, личный пирс для яхт и ангар для спорткаров.', 
+        img: 'assets/houses/island.jpg',
+        fallback: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'
+    }
+];
+
+// ========================================================
+// ПРЕДПРИЯТИЯ И БИЗНЕС С ОБЛОЖКАМИ
+// ========================================================
+const BUSINESS_DATA = [
+    { 
+        id: 'wash', name: 'Автомойка 24/7', minLevel: 5, income: 900, level: 0, cost: 90000, stored: 0, stock: 100, 
+        perk: 'Скидка 50% на полировку и химчистку', 
+        img: 'assets/business/wash.jpg',
+        fallback: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 8, income: 1500, level: 0, cost: 150000, stored: 0, stock: 100, 
+        perk: '+10% к стоимости авто на правильных дисках', 
+        img: 'assets/business/shina.jpg',
+        fallback: 'https://images.unsplash.com/photo-1578844251758-2f71da64c96f?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'sto', name: 'СТО дяди Вани', minLevel: 12, income: 2200, level: 0, cost: 300000, stored: 0, stock: 100, 
+        perk: 'Скидка 40% на ремонт мотора', 
+        img: 'assets/business/sto.jpg',
+        fallback: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'detailing', name: 'Детейлинг Студия', minLevel: 20, income: 6500, level: 0, cost: 950000, stored: 0, stock: 100, 
+        perk: '+35% к баллам на Автошоу', 
+        img: 'assets/business/detailing.jpg',
+        fallback: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 8000, level: 0, cost: 1200000, stored: 0, stock: 100, 
+        perk: 'Детали на ремонт обходятся дешевле на 30%', 
+        img: 'assets/business/razborka.jpg',
+        fallback: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, stored: 0, stock: 100, 
+        perk: 'Пассивный доход и +1 🤝 связь каждый день', 
+        img: 'assets/business/taxi.jpg',
+        fallback: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80'
+    }
+];
+
+// ========================================================
+// 4 ГРЕЙДА САРАЕВ С ОБЛОЖКАМИ И FALLBACKS
+// ========================================================
+const BARN_TIERS_CONFIG = [
+    { 
+        tier: 1, reqLvl: 1, cost: 35000, title: "🏚️ Сарай в СНТ «Заря»", 
+        desc: "Дачный кооператив. Старый деревянный сарай среди яблонь. Советская классика.", 
+        classGrade: "barn-grade-1", rareIdx: 0,
+        img: "assets/barns/barn_tier1.jpg",
+        fallback: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80"
+    },
+    { 
+        tier: 2, reqLvl: 7, cost: 120000, title: "🏢 Заброшенный бокс ГСК-4", 
+        desc: "Кооператив возле промзоны. Ржавые ворота, но сухой бетон внутри.", 
+        classGrade: "barn-grade-2", rareIdx: 1,
+        img: "assets/barns/barn_tier2.jpg",
+        fallback: "https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?auto=format&fit=crop&w=600&q=80"
+    },
+    { 
+        tier: 3, reqLvl: 15, cost: 350000, title: "🏭 Ангар механического завода", 
+        desc: "Закрытый цех советского завода. Высокие потолки, пыльные чехлы и JDM янгтаймеры.", 
+        classGrade: "barn-grade-3", rareIdx: 2,
+        img: "assets/barns/barn_tier3.jpg",
+        fallback: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=600&q=80"
+    },
+    { 
+        tier: 4, reqLvl: 25, cost: 850000, title: "🏛️ Подземный коллекционный бункер", 
+        desc: "Опечатанный подземный паркинг обанкротившегося банка. Настоящая сокровищница!", 
+        classGrade: "barn-grade-4", rareIdx: 4,
+        img: "assets/barns/barn_tier4.jpg",
+        fallback: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80"
+    }
+];
+
+const BARN_FINDS = [
+    { name: "ВАЗ-2101 «Копейка» (Дрифт-Спек)", power: 160, type: 'economy', basePrice: 850000, marketValue: 1250000, img: "assets/cars/barn/vaz2101_drift.jpg" },
+    { name: "BMW E30 Coupe", power: 170, type: 'comfort', basePrice: 650000, marketValue: 1300000, img: "assets/cars/barn/e30.jpg" },
+    { name: "Nissan Silvia S13", power: 200, type: 'comfort', basePrice: 900000, marketValue: 1800000, img: "assets/cars/barn/silvia.jpg" },
+    { name: "VW Golf VI GTI (Stage 2 Project)", power: 280, type: 'comfort', basePrice: 1100000, marketValue: 1900000, img: "assets/cars/barn/golf6.jpg" },
+    { name: "ГАЗ-24 «Волга» V8", power: 220, type: 'economy', basePrice: 700000, marketValue: 1500000, img: "assets/cars/barn/volga24.jpg" },
+    { name: "Nissan Skyline GT-R R34 (В пыли)", power: 280, type: 'premium', basePrice: 4500000, marketValue: 9500000, img: "assets/cars/barn/r34.jpg" },
+    { name: "Toyota Supra A80 (Без мотора)", power: 0, type: 'premium', basePrice: 3200000, marketValue: 7000000, img: "assets/cars/barn/supra.jpg" }
+];
+
+// ========================================================
+// ЛАВКА ФОРТУНЫ: ПОКУПКИ И АЗАРТНЫЕ ПАКИ
+// ========================================================
+const FORTUNE_SHOP_CATALOG = [
+    {
+        id: "super_spin_ticket_1",
+        title: "🎫 1х Билет «Супер Вилспин»",
+        desc: "Вращение Forza-слота: Автомобиль + Ресурсы + Эксклюзивы!",
+        costStars: 35,
+        costCash: 350000,
+        type: "superspin",
+        count: 1
+    },
+    {
+        id: "super_spin_ticket_3",
+        title: "🎟️ 3х Билета «Супер Вилспин» (Пак)",
+        desc: "Скидка 20%! Три шанса забрать суперкар и сорвать джекпот.",
+        costStars: 85,
+        costCash: 850000,
+        type: "superspin",
+        count: 3
+    },
+    {
+        id: "fuel_canister_max",
+        title: "⛽ Канистра Экстра 100 ⛽",
+        desc: "Моментальная заправка бака без ожидания и очередей на АЗС.",
+        costStars: 5,
+        costCash: 5000,
+        type: "fuel",
+        amount: 100
+    },
+    {
+        id: "express_tickets_pack",
+        title: "⚡ Экспресс-Талоны (25 шт)",
+        desc: "25 мгновенных призывов клиентов на площадку продажи.",
+        costStars: 15,
+        costCash: 60000,
+        type: "express",
+        amount: 25
+    },
+    {
+        id: "connection_token",
+        title: "🤝 Теневая Связь Синдиката",
+        desc: "+1 Связь для Решалы (снятие розыска, крыша ГИБДД, контракты).",
+        costStars: 20,
+        costCash: 150000,
+        type: "connection",
+        amount: 1
+    },
+    {
+        id: "vip_pro_pass",
+        title: "👑 VIP Pro Статус (7 дней)",
+        desc: "Удвоенный XP, бесплатная Автотека 0 ₽, иммунитет от рейдов ДПС!",
+        costStars: 60,
+        costCash: 600000,
+        type: "vip",
+        days: 7
+    }
+];
+
+// ========================================================
+// ДРУГИЕ СПИСКИ И КАТАЛОГИ
 // ========================================================
 const SHOP_CATALOG = {
     tools: [
@@ -186,23 +404,6 @@ const SHOP_CATALOG = {
     ]
 };
 
-// ========================================================
-// НЕДВИЖИМОСТЬ (assets/houses/)
-// ========================================================
-const HOUSING_LIST = [
-    { id: 'trailer', name: 'Бытовка на стройплощадке', rent: 800, buyPrice: 450000, slots: 0, moodBonus: -5, minLevel: 1, desc: 'Временный вагончик. Сквозняки, запах мазута, но крыша над головой.', img: 'assets/houses/trailer.jpg' },
-    { id: 'room', name: 'Комната в общежитии', rent: 2500, buyPrice: 1800000, slots: 1, moodBonus: 5, minLevel: 2, desc: 'Угол в спальном районе. Одно парковочное место под окном во дворе.', img: 'assets/houses/room.jpg' },
-    { id: 'khrusch', name: 'Убитая "Хрущевка"', rent: 15000, buyPrice: 4500000, slots: 1, moodBonus: 10, minLevel: 6, desc: 'Бабушкин ремонт, старый паркет, зато своя кухня.', img: 'assets/houses/khrusch.jpg' },
-    { id: 'garage', name: 'Кирпичный гараж с ямой', rent: 18000, buyPrice: 3000000, slots: 3, moodBonus: 12, minLevel: 10, desc: 'Капитальный бокс с верстаком, печкой и смотровой ямой.', img: 'assets/houses/garage.jpg' },
-    { id: 'dvushka', name: 'Двушка в спальном районе', rent: 25000, buyPrice: 8500000, slots: 2, moodBonus: 15, minLevel: 15, desc: 'Хороший кирпичный дом, стеклопакеты и парковка во дворе.', img: 'assets/houses/dvushka.jpg' },
-    { id: 'euro_treshka', name: 'Евро-трешка (Новостройка)', rent: 45000, buyPrice: 15000000, slots: 3, moodBonus: 25, minLevel: 22, desc: 'Свежий ремонт, закрытый двор без машин и консьерж.', img: 'assets/houses/treshka.jpg' },
-    { id: 'cottage', name: 'Коттедж за городом', rent: 65000, buyPrice: 22000000, slots: 6, moodBonus: 30, minLevel: 30, desc: 'Собственный участок, просторный гараж и мангальная зона.', img: 'assets/houses/cottage.jpg' },
-    { id: 'loft', name: 'Дизайнерский Лофт в центре', rent: 80000, buyPrice: 35000000, slots: 4, moodBonus: 35, minLevel: 45, desc: 'Красный кирпич, панорамные окна и вид на набережную.', img: 'assets/houses/loft.jpg' },
-    { id: 'penthouse', name: 'Пентхаус в Москва-Сити', rent: 250000, buyPrice: 140000000, slots: 6, moodBonus: 50, minLevel: 65, desc: 'Панорамный вид с 65 этажа и доступ в подземный VIP-паркинг.', img: 'assets/houses/penthouse.jpg' },
-    { id: 'villa', name: 'Особняк на Рублёвке', rent: 600000, buyPrice: 450000000, slots: 15, moodBonus: 80, minLevel: 85, desc: 'Гектар сосен, вертолетная площадка и гаражный комплекс.', img: 'assets/houses/villa.jpg' },
-    { id: 'island', name: 'Частный остров с виллой', rent: 2000000, buyPrice: 1500000000, slots: 30, moodBonus: 100, minLevel: 100, desc: 'Абсолютная автономия, личный пирс для яхт и ангар для спорткаров.', img: 'assets/houses/island.jpg' }
-];
-
 const HOUSING_INTERIOR_CATALOG = [
     { id: "home_ps5", name: "🎮 Игровая консоль PlayStation 5", cost: 75000, perk: "+25% настроения и куража каждый день" },
     { id: "home_leather_sofa", name: "🛋️ Кожаный итальянский диван", cost: 120000, perk: "+15% к восстановлению сил и сытости" },
@@ -225,9 +426,6 @@ const STREET_CHAT_LOG = [
     { author: "Kislota_Drift", text: "Пацаны, у кого есть съёмник пружин? Срочно надо дропнуть тачку.", warning: false }
 ];
 
-// ========================================================
-// ПОРТОВЫЕ КОНТЕЙНЕРЫ (assets/containers/)
-// ========================================================
 const CONTAINER_ITEMS = [
     { id: 'japan', name: 'Японский Контейнер', cost: 150000, timer: 30, minLevel: 12, badge: 'JDM & Мото', desc: 'Прямые поставки из порта Кобе.', img: 'assets/containers/japan.jpg' },
     { id: 'europe', name: 'Европейский Автовоз', cost: 450000, timer: 35, minLevel: 15, badge: 'Комфорт & Премиум', desc: 'Автомобили из Германии без пробега по РФ.', img: 'assets/containers/europe.jpg' },
@@ -265,18 +463,6 @@ const DIETS = [
     { id: 'cafe', name: 'Бизнес-ланч в ресторане', cost: 6500, hunger: 90, mood: 25, desc: 'Свежий стейк, кофе и уверенность в себе' }
 ];
 
-// ========================================================
-// ПРЕДПРИЯТИЯ И БИЗНЕС (assets/business/)
-// ========================================================
-const BUSINESS_DATA = [
-    { id: 'wash', name: 'Автомойка 24/7', minLevel: 5, income: 900, level: 0, cost: 90000, stored: 0, stock: 100, perk: 'Скидка 50% на полировку и химчистку', img: 'assets/business/wash.jpg' },
-    { id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 8, income: 1500, level: 0, cost: 150000, stored: 0, stock: 100, perk: '+10% к стоимости авто на правильных дисках', img: 'assets/business/shina.jpg' },
-    { id: 'sto', name: 'СТО дяди Вани', minLevel: 12, income: 2200, level: 0, cost: 300000, stored: 0, stock: 100, perk: 'Скидка 40% на ремонт мотора', img: 'assets/business/sto.jpg' },
-    { id: 'detailing', name: 'Детейлинг Студия', minLevel: 20, income: 6500, level: 0, cost: 950000, stored: 0, stock: 100, perk: '+35% к баллам на Автошоу', img: 'assets/business/detailing.jpg' },
-    { id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 8000, level: 0, cost: 1200000, stored: 0, stock: 100, perk: 'Детали на ремонт обходятся дешевле на 30%', img: 'assets/business/razborka.jpg' },
-    { id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, stored: 0, stock: 100, perk: 'Пассивный доход и +1 🤝 связь каждый день', img: 'assets/business/taxi.jpg' }
-];
-
 const OBD_ERRORS = [
     { text: "P0101: Выход сигнала ДМРВ из допустимого диапазона", cost: 5000, severity: "Низкая" },
     { text: "P0171: Слишком бедная смесь (Подсос воздуха)", cost: 4000, severity: "Средняя" },
@@ -297,48 +483,4 @@ const DAILY_REWARDS_CONFIG = [
     { day: 5, title: "+200k ₽ & 15 ⭐", reward: { cash: 200000, stars: 15 } },
     { day: 6, title: "+350k ₽ & Бак", reward: { cash: 350000, fuel: 100 } },
     { day: 7, title: "+600k ₽ & 25 ⭐", reward: { cash: 600000, stars: 25, specialPlate: "Х777ХХ 77" } }
-];
-
-const BARN_FINDS = [
-    { name: "ВАЗ-2101 «Копейка» (Дрифт-Спек)", power: 160, type: 'economy', basePrice: 850000, marketValue: 1250000, img: "assets/cars/barn/vaz2101_drift.jpg" },
-    { name: "BMW E30 Coupe", power: 170, type: 'comfort', basePrice: 650000, marketValue: 1300000, img: "assets/cars/barn/e30.jpg" },
-    { name: "Nissan Silvia S13", power: 200, type: 'comfort', basePrice: 900000, marketValue: 1800000, img: "assets/cars/barn/silvia.jpg" },
-    { name: "VW Golf VI GTI (Stage 2 Project)", power: 280, type: 'comfort', basePrice: 1100000, marketValue: 1900000, img: "assets/cars/barn/golf6.jpg" },
-    { name: "ГАЗ-24 «Волга» V8", power: 220, type: 'economy', basePrice: 700000, marketValue: 1500000, img: "assets/cars/barn/volga24.jpg" },
-    { name: "Nissan Skyline GT-R R34 (В пыли)", power: 280, type: 'premium', basePrice: 4500000, marketValue: 9500000, img: "assets/cars/barn/r34.jpg" },
-    { name: "Toyota Supra A80 (Без мотора)", power: 0, type: 'premium', basePrice: 3200000, marketValue: 7000000, img: "assets/cars/barn/supra.jpg" }
-];
-
-// ========================================================
-// КОНФИГУРАЦИЯ СЛУЧАЙНЫХ СОБЫТИЙ В ГАРАЖЕ (v0.4.0)
-// ========================================================
-const GARAGE_RANDOM_EVENTS = [
-    {
-        id: "hit_and_run",
-        title: "💥 ПРИТЁРЛИ ВО ДВОРЕ!",
-        desc: "Ночью во дворе неизвестный задел крыло и скрылся. На кузове глубокая вмятина.",
-        impact: { damageCond: 25, repairCost: 28000 },
-        badge: "ДТП НА ПАРКОВКЕ"
-    },
-    {
-        id: "theft_attempt",
-        title: "🚨 ПОПЫТКА УГОНА!",
-        desc: "Злоумышленники вскрыли личинку замка и пытались прописать новый чип-ключ.",
-        impact: { damageCond: 15, repairCost: 45000 },
-        badge: "КРИМИНАЛ"
-    },
-    {
-        id: "bailiff_arrest",
-        title: "⚖️ СУДЕБНЫЙ ЗАПРЕТ РЕГИСТРАЦИИ!",
-        desc: "Предыдущий владелец накопил штрафы, и приставы наложили запрет на регдействия.",
-        impact: { makeUnregistered: true },
-        badge: "ФССП РОССИИ"
-    },
-    {
-        id: "urgent_buyer_call",
-        title: "📞 ЗВОНОК СРОЧНОГО ПОКУПАТЕЛЯ!",
-        desc: "Вам позвонил сосед по гаражу и предлагает выкупить автомобиль прямо сейчас с наценкой +15%!",
-        impact: { instantOfferBonus: 0.15 },
-        badge: "БЫСТРЫЙ ВЫКУП"
-    }
 ];

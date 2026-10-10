@@ -629,36 +629,61 @@
       </div>
     </div>
 
-    <!-- ОКНО СПИСКА ИЗМЕНЕНИЙ (PATCH NOTES v0.4.3) -->
+    <!-- ОКНО СПИСКА ИЗМЕНЕНИЙ (PATCH NOTES v0.4.4) -->
     <div id="modalPatchNotes" class="modal-overlay">
-      <div class="modal-box">
+      <div class="modal-box holo-card">
         <div class="flex-between mb-2">
-          <h4 class="color-purple font-bold"><i class="fa-solid fa-code-commit"></i> Список изменений v0.4.3</h4>
-          <button onclick="closeModal('modalPatchNotes')" class="btn btn-dark btn-auto btn-sm">✕</button>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="category-header-icon" style="background:rgba(192,132,252,0.15); border-color:var(--purple); color:var(--purple);">
+              <i class="fa-solid fa-fire-flame-curved"></i>
+            </div>
+            <div>
+              <h4 class="color-purple font-bold">Список изменений v0.4.4</h4>
+              <span class="tag-badge bg-tag-purple" style="font-size:8px;">Carbon & Super Spin Edition</span>
+            </div>
+          </div>
+          <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
 
-        <div class="p-2 mb-2" style="background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+        <div class="p-2 mb-2" style="background:#0d1424; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
           <div class="flex-between text-xs mb-1">
-            <span>Сборка игры:</span>
-            <b class="color-green">v0.4.3 (PerekupOS, Autodrot & Во-Банк)</b>
+            <span>Текущая сборка:</span>
+            <b class="color-green font-bold">v0.4.4 (Super Spin & Carbon OS)</b>
           </div>
           <div class="biz-progress-track"><div class="biz-progress-fill fill-biz-lvl" style="width:100%;"></div></div>
         </div>
 
-        <div class="space-y-2 text-xs mb-3" style="line-height:1.4;">
-          <div class="patch-item">
-            <b class="color-cyan">✓ Полная экосистема смартфона</b> — все сервисы города перенесены в PerekupOS.
+        <div class="space-y-2 text-xs mb-3" style="line-height:1.45;">
+          <div class="patch-item" style="border-left-color: var(--purple);">
+            <b class="color-purple">🎰 3-Слотовый Супер Вилспин</b> — Forza-рулетка на 3 одновременных барабана с гарантированным авто (с шансом на класс выше уровня игрока), ресурсами и тюнингом!
           </div>
-          <div class="patch-item">
-            <b class="color-green">✓ Заказы Синдиката под ключ</b> — поставка кастомных авто клиентам с огромной премией.
+          <div class="patch-item" style="border-left-color: var(--cyan);">
+            <b class="color-cyan">🖼️ Галерея недвижимости, сараев и бизнеса</b> — добавлены детальные фото-обложки для всех 11 типов жилья, 6 предприятий и 4 уровней заброшенных ангаров с авто-фоллбэками.
           </div>
-          <div class="patch-item">
-            <b class="color-amber">✓ Продажа Бизнеса и Жилья</b> — сброс инвесторам (NPC) или публикация на P2P-бирже.
+          <div class="patch-item" style="border-left-color: var(--amber);">
+            <b class="color-amber">🛒 Лавка Фортуны & Обменник</b> — покупка билетов Супер Вилспина, канистр экстра-топлива 100 ⛽, пакетов талонов и прямой обмен рублей на валюту Stars ⭐.
           </div>
-          <div class="patch-item">
-            <b class="color-purple">✓ Личный авто и чистые иконки</b> — золотой статус дейли-кара и бейджи тюнинга.
+          <div class="patch-item" style="border-left-color: var(--green);">
+            <b class="color-green">👑 Личный авто и чистые иконки</b> — статус дейли-кара с защитой от продажи, +15% к настроению в день и лаконичные цветные бейджи доработок без визуального мусора.
+          </div>
+          <div class="patch-item" style="border-left-color: #38bdf8;">
+            <b class="color-cyan">🏎️ Дизайн «Carbon OS»</b> — карбоновый микропаттерн карточек, голографический перелив редких лотов и неоновый спидометр-скролл.
           </div>
         </div>
+
+        <div class="p-2 mb-3" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
+          <div class="sub-label mb-2 color-amber font-bold">🛠 КОМАНДА РАЗРАБОТЧИКОВ:</div>
+          <div class="credits-grid">
+            <div class="credit-pill">👑 <b>Илюха DXF</b> — Lead Architect & Creator</div>
+            <div class="credit-pill">⚡ <b>Святой Максиман</b> — Balance & Tuning Mechanics</div>
+            <div class="credit-pill">🔧 <b>Серёга Техно</b> — Physics Engine & Telegram Sync</div>
+            <div class="credit-pill">🤖 <b>Жиминка Пендосовская</b> — AI Co-Pilot & UX Engineering</div>
+          </div>
+        </div>
+
+        <button onclick="dismissPatchNotesModal()" class="btn btn-purple w-full">Погнали тестить! 🚀</button>
+      </div>
+    </div>
 
         <div class="p-2 mb-3" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
           <div class="sub-label mb-2 color-amber font-bold">🛠 КОМАНДА РАЗРАБОТЧИКОВ:</div>

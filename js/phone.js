@@ -9,6 +9,7 @@ const PhoneManager = {
     autodrotSubTab: 'market', // market | chat | hotdeals
     autodrotP2PFilter: 'cars', // cars | plates | business | housing
     streetSubTab: 'drift', // drift | drag | stance | sprint
+    isSuperSpinning: false,
 
     defaultMessages: [
         {
@@ -68,6 +69,9 @@ const PhoneManager = {
         }
         if (state.player.streetCred === undefined) {
             state.player.streetCred = 100;
+        }
+        if (state.player.superSpinTickets === undefined) {
+            state.player.superSpinTickets = 1; // 1 бесплатный билет на старте
         }
         this.updateUnreadBadge();
         this.updatePhoneClock();
@@ -250,7 +254,653 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // ДИСЦИПЛИНЫ STREET UNDERGROUND: РЕАЛИСТИЧНЫЙ ДВИЖОК
+    // 1. БИЗНЕС С ПРЕВЬЮ И ОБЛОЖКАМИ
+    // ========================================================
+    renderBusinessApp(container) {
+        if (!state.businesses || state.businesses.length === 0) {
+            if (typeof BUSINESS_DATA !== 'undefined') state.businesses = JSON.parse(JSON.stringify(BUSINESS_DATA));
+        }
+
+        let lvl = state.player?.level || 1;
+        let html = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
+                <div class="phone-app-title"><i class="fa-solid fa-briefcase color-green"></i> Мой Бизнес</div>
+                <button onclick="collectAllBusinessCash(); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-auto btn-sm">Касса</button>
+            </div>
+            <div class="phone-app-body">
+        `;
+
+        state.businesses.forEach((biz, idx) => {
+            if (!biz) return;
+            let isLocked = lvl < biz.minLevel;
+            let isOwned = biz.level > 0;
+            let cost = isOwned ? biz.cost * (biz.level + 1) : biz.cost;
+            let saleToNpcPrice = isOwned ? Math.round(biz.cost * biz.level * 0.75) : 0;
+            let imgSrc = biz.img || `assets/business/${biz.id}.jpg`;
+            let fallbackSrc = biz.fallback || 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80';
+
+            let actionBlock = "";
+            if (isLocked) {
+                actionBlock = `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>С ${biz.minLevel} уровня</button>`;
+            } else if (!isOwned) {
+                actionBlock = `<button onclick="upgradeBusiness(${idx}); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm w-full">Купить (${cost.toLocaleString()} ₽)</button>`;
+            } else {
+                actionBlock = `
+                    <div class="grid-2 mb-1">
+                        <button onclick="upgradeBusiness(${idx}); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm">Апгрейд (${cost.toLocaleString()} ₽)</button>
+                        <button onclick="restockBusiness(${idx}); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-amber btn-sm">Сырьё (15k)</button>
+                    </div>
+                    <div class="grid-2">
+                        <button onclick="PhoneManager.sellBusinessToNPC('${biz.id}', ${saleToNpcPrice})" class="btn btn-dark btn-sm">Продать NPC (${saleToNpcPrice.toLocaleString()} ₽)</button>
+                        <button onclick="PhoneManager.listBusinessOnP2P('${biz.id}')" class="btn btn-purple btn-sm">На P2P биржу</button>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="glass-card mb-3 p-2">
+                    <div class="car-img-wrap mb-2" style="height:115px; position:relative;">
+                        <img src="${imgSrc}" class="car-img" onerror="this.onerror=null; this.src='${fallbackSrc}';">
+                        <div class="badge-tag" style="bottom:6px; right:6px;">
+                            <span class="tag-badge ${isOwned ? 'bg-tag-green' : 'bg-tag-amber'}">${isOwned ? 'Ур. ' + biz.level : 'С ' + biz.minLevel + ' ур'}</span>
+                        </div>
+                    </div>
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-green">${biz.name}</b>
+                        <span class="price-val text-xs">${((biz.income || 0) * (biz.level || 0)).toLocaleString()} ₽/д</span>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:10px;">⭐ Перк: ${biz.perk || 'Пассивный доход'} | Сырьё: <b>${biz.stock || 0}%</b></div>
+                    ${actionBlock}
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+    },
+
+    sellBusinessToNPC(bizId, refundAmount) {
+        const biz = (state.businesses || []).find(b => b.id === bizId);
+        if (!biz || biz.level <= 0) return;
+
+        if (!confirm(`Продать «${biz.name}» городскому инвестору за ${refundAmount.toLocaleString()} ₽? Точка будет ликвидирована.`)) return;
+
+        state.player.cash = (state.player.cash || 0) + refundAmount;
+        biz.level = 0;
+        biz.stock = 0;
+        biz.stored = 0;
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast(`Бизнес продан инвестору (+${refundAmount.toLocaleString()} ₽)!`);
+        this.renderBusinessApp(document.getElementById('phoneAppContainer'));
+        this.renderBusinessWidget();
+    },
+
+    listBusinessOnP2P(bizId) {
+        const biz = (state.businesses || []).find(b => b.id === bizId);
+        if (!biz || biz.level <= 0) return;
+
+        let priceStr = prompt(`Введите желаемую цену продажи «${biz.name} (Ур. ${biz.level})» на P2P бирже:`, String(biz.cost * biz.level));
+        if (!priceStr) return;
+        let price = parseInt(priceStr);
+        if (isNaN(price) || price <= 0) return showToast("Некорректная цена!");
+
+        if (!state.p2pMarketListings) state.p2pMarketListings = [];
+        let lotId = "p2p_biz_" + Date.now();
+        state.p2pMarketListings.unshift({
+            id: lotId,
+            seller: state.player?.name || "Перекуп",
+            type: "business",
+            name: `${biz.name} (Ур. ${biz.level})`,
+            bizId: biz.id,
+            bizLevel: biz.level,
+            price: price,
+            desc: `Готовая точка с доходностью ${((biz.income || 0) * biz.level).toLocaleString()} ₽/д.`
+        });
+
+        if (!state.myP2PListings) state.myP2PListings = [];
+        state.myP2PListings.push(lotId);
+
+        biz.level = 0;
+        biz.stock = 0;
+        saveState();
+        showToast("Бизнес успешно выставлен на онлайн P2P биржу Autodrot!");
+        this.renderBusinessApp(document.getElementById('phoneAppContainer'));
+    },
+
+    // ========================================================
+    // 2. ЖИЛЬЁ С ПРЕВЬЮ И ОБЛОЖКАМИ
+    // ========================================================
+    renderHousingApp(container) {
+        let curId = state.player?.housingId || 'room';
+        let owned = state.player?.ownedHouses || [];
+        let lvl = state.player?.level || 1;
+
+        let html = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
+                <div class="phone-app-title"><i class="fa-solid fa-house color-cyan"></i> Моя Недвижимость</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body">
+        `;
+
+        (typeof HOUSING_LIST !== 'undefined' ? HOUSING_LIST : []).forEach(h => {
+            let isCur = curId === h.id;
+            let isPurchased = owned.includes(h.id);
+            let isLvlLocked = lvl < (h.minLevel || 1);
+            let refundPrice = Math.round((h.buyPrice || 1000000) * 0.8);
+            let imgSrc = h.img || `assets/houses/${h.id}.jpg`;
+            let fallbackSrc = h.fallback || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80';
+
+            let actionBtns = "";
+            if (isLvlLocked) {
+                actionBtns = `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>С ${h.minLevel} уровня</button>`;
+            } else if (isPurchased) {
+                actionBtns = `
+                    <div class="grid-2 mb-1">
+                        <button onclick="openHomeInteriorModal('${h.id}')" class="btn btn-cyan btn-sm">🛋️ Интерьер</button>
+                        ${isCur ? '<button class="btn btn-dark btn-sm opacity-50" disabled>Живёте здесь</button>' : `<button onclick="moveIntoHousing('${h.id}'); PhoneManager.renderHousingApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-sm">Переехать</button>`}
+                    </div>
+                    <div class="grid-2">
+                        <button onclick="PhoneManager.sellHousingToNPC('${h.id}', ${refundPrice})" class="btn btn-dark btn-sm">Продать риелтору (${(refundPrice / 1000000).toFixed(1)}M)</button>
+                        <button onclick="PhoneManager.listHousingOnP2P('${h.id}')" class="btn btn-purple btn-sm">На P2P биржу</button>
+                    </div>
+                `;
+            } else {
+                actionBtns = `
+                    <div class="grid-2">
+                        <button onclick="rentHousing('${h.id}'); PhoneManager.renderHousingApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm">Аренда (${(h.rent || 2000).toLocaleString()} ₽/д)</button>
+                        <button onclick="buyHousingProperty('${h.id}'); PhoneManager.renderHousingApp(document.getElementById('phoneAppContainer'));" class="btn btn-amber btn-sm">Купить (${(h.buyPrice / 1000000).toFixed(1)}M)</button>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="glass-card mb-3 p-2">
+                    <div class="car-img-wrap mb-2" style="height:120px; position:relative;">
+                        <img src="${imgSrc}" class="car-img" onerror="this.onerror=null; this.src='${fallbackSrc}';">
+                        <div class="badge-tag" style="bottom:6px; right:6px;">
+                            <span class="tag-badge ${isPurchased ? 'bg-tag-green' : 'bg-tag-amber'}">${isPurchased ? 'Собственность' : 'Аренда'}</span>
+                        </div>
+                    </div>
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan">${h.name}</b>
+                        <span class="color-green font-bold text-xs">+${h.slots} мест гаража</span>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:10px;">${h.desc || ''}</div>
+                    ${actionBtns}
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+    },
+
+    sellHousingToNPC(hId, refundAmount) {
+        if (!confirm(`Продать недвижимость агентству за ${refundAmount.toLocaleString()} ₽? Право собственности будет аннулировано.`)) return;
+
+        state.player.cash = (state.player.cash || 0) + refundAmount;
+        state.player.ownedHouses = (state.player.ownedHouses || []).filter(id => id !== hId);
+
+        if (state.player.housingId === hId) {
+            state.player.housingId = 'room';
+            state.player.housingType = 'rent';
+        }
+
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast(`Недвижимость продана риелторам (+${refundAmount.toLocaleString()} ₽)!`);
+        this.renderHousingApp(document.getElementById('phoneAppContainer'));
+    },
+
+    listHousingOnP2P(hId) {
+        const h = (typeof HOUSING_LIST !== 'undefined' ? HOUSING_LIST : []).find(item => item.id === hId);
+        if (!h) return;
+
+        let priceStr = prompt(`Введите цену продажи «${h.name}» на P2P бирже:`, String(h.buyPrice));
+        if (!priceStr) return;
+        let price = parseInt(priceStr);
+        if (isNaN(price) || price <= 0) return showToast("Некорректная цена!");
+
+        if (!state.p2pMarketListings) state.p2pMarketListings = [];
+        let lotId = "p2p_house_" + Date.now();
+        state.p2pMarketListings.unshift({
+            id: lotId,
+            seller: state.player?.name || "Перекуп",
+            type: "housing",
+            name: h.name,
+            houseId: h.id,
+            price: price,
+            desc: `Недвижимость в собственности. Гараж на +${h.slots} мест.`
+        });
+
+        if (!state.myP2PListings) state.myP2PListings = [];
+        state.myP2PListings.push(lotId);
+
+        state.player.ownedHouses = (state.player.ownedHouses || []).filter(id => id !== hId);
+        if (state.player.housingId === hId) {
+            state.player.housingId = 'room';
+            state.player.housingType = 'rent';
+        }
+
+        saveState();
+        showToast("Недвижимость выставлена на онлайн P2P биржу Autodrot!");
+        this.renderHousingApp(document.getElementById('phoneAppContainer'));
+    },
+
+    // ========================================================
+    // 3. САРАИ С ФОТО-ОБЛОЖКАМИ И ПРЕВЬЮ
+    // ========================================================
+    renderBarnApp(container) {
+        const pDay = state.player?.day || 1;
+        const lastDay = state.player?.lastBarnDay || 0;
+        const canScoutToday = lastDay < pDay;
+        const lvl = state.player?.level || 1;
+
+        let html = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
+                <div class="phone-app-title"><i class="fa-solid fa-screwdriver-wrench color-amber"></i> Находки в сараях</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body">
+                <div class="glass-card mb-2 p-2 flex-between">
+                    <div>
+                        <b class="text-xs color-amber">Разведка заброшек</b>
+                        <div class="sub-label" style="font-size:10px;">Шанс найти ретро-классику и архивные номера!</div>
+                    </div>
+                    <span class="tag-badge bg-tag-amber">1 раз/день</span>
+                </div>
+        `;
+
+        (typeof BARN_TIERS_CONFIG !== 'undefined' ? BARN_TIERS_CONFIG : []).forEach(b => {
+            let isLvlLocked = lvl < b.reqLvl;
+            let isDoneToday = !canScoutToday;
+            let rareCar = (typeof BARN_FINDS !== 'undefined' && BARN_FINDS[b.rareIdx]) ? BARN_FINDS[b.rareIdx] : { name: "Раритет" };
+            let imgSrc = b.img || `assets/barns/barn_tier${b.tier}.jpg`;
+            let fallbackSrc = b.fallback || 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80';
+
+            let statusBadge = isLvlLocked 
+                ? `<span class='tag-badge bg-tag-red'><i class='fa-solid fa-lock'></i> С ${b.reqLvl} УР</span>`
+                : (isDoneToday ? "<span class='tag-badge bg-tag-amber'>Осмотрено</span>" : "<span class='tag-badge bg-tag-green'>Доступно</span>");
+
+            let btnDisabled = (isLvlLocked || isDoneToday) ? "disabled" : "";
+            let btnText = isLvlLocked ? `Требуется ${b.reqLvl} уровень` : (isDoneToday ? "Осмотрено (Смените день 🌙)" : `Вскрыть ангар (${(b.cost / 1000).toFixed(0)}k ₽)`);
+
+            html += `
+                <div class="glass-card mb-3 p-2 ${b.classGrade}">
+                    <div class="car-img-wrap mb-2" style="height:120px; position:relative;">
+                        <img src="${imgSrc}" class="car-img" onerror="this.onerror=null; this.src='${fallbackSrc}';">
+                        <div class="badge-tag" style="bottom:6px; right:6px;">${statusBadge}</div>
+                    </div>
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan">${b.title}</b>
+                        <span class="price-val text-xs color-amber">${b.cost.toLocaleString()} ₽</span>
+                    </div>
+                    <p class="sub-label mb-2" style="font-size:10px;">${b.desc}</p>
+                    <div class="text-xs mb-1 color-amber">⭐ Редкий дроп (5%): <b>${rareCar.name}</b></div>
+                    <div class="text-xs mb-2 color-purple">🏷️ Архивные номера: <b>15% шанс</b></div>
+                    <button onclick="scoutBarnTier(${b.tier})" class="btn btn-cyan btn-sm w-full" ${btnDisabled}>${btnText}</button>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+    },
+
+    // ========================================================
+    // 4. ФОРТУНА: СУПЕР ВИЛСПИН (3 БАРАБАНА) + ЛАВКА ФОРТУНЫ
+    // ========================================================
+    renderFortuneApp(container) {
+        let tickets = state.player?.superSpinTickets || 0;
+        let stars = state.player?.stars || 0;
+        let cash = state.player?.cash || 0;
+
+        container.innerHTML = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
+                <div class="phone-app-title"><i class="fa-solid fa-clover color-amber"></i> Клуб Фортуны</div>
+                <div class="text-xs color-amber font-bold">${stars} ⭐</div>
+            </div>
+            <div class="phone-app-body">
+                
+                <!-- 🔥 СУПЕР ВИЛСПИН НА 3 БАРАБАНА (FORZA HORIZON STYLE) -->
+                <div class="glass-card mb-3 p-3" style="background: radial-gradient(circle at 50% 0%, #1e1338 0%, #090e18 100%); border: 1.5px solid var(--purple); box-shadow: 0 0 20px rgba(192,132,252,0.3);">
+                    <div class="flex-between mb-2">
+                        <div>
+                            <b class="text-xs color-purple" style="font-size:13px;">🎰 СУПЕР ВИЛСПИН</b>
+                            <div class="sub-label" style="font-size:9.5px;">3 приза одновременно: Авто + Ресурсы + Эксклюзив!</div>
+                        </div>
+                        <span class="tag-badge bg-tag-purple">Билетов: ${tickets} 🎟️</span>
+                    </div>
+
+                    <!-- ТРИ БАРАБАНА -->
+                    <div class="grid-3 my-2" style="gap:6px;">
+                        <!-- Барабан 1: Автомобиль -->
+                        <div class="p-2 text-center" id="superReel1" style="background:#090d16; border-radius:10px; border:1px solid rgba(0,242,254,0.3); min-height:85px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                            <div style="font-size:26px;">🚗</div>
+                            <b class="text-xs color-cyan mt-1" id="reelTxt1">АВТОМОБИЛЬ</b>
+                            <div class="sub-label" style="font-size:8px;">(До +1 ур. выше)</div>
+                        </div>
+
+                        <!-- Барабан 2: Топливо / Кэш -->
+                        <div class="p-2 text-center" id="superReel2" style="background:#090d16; border-radius:10px; border:1px solid rgba(0,230,118,0.3); min-height:85px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                            <div style="font-size:26px;">⛽</div>
+                            <b class="text-xs color-green mt-1" id="reelTxt2">РЕСУРСЫ</b>
+                            <div class="sub-label" style="font-size:8px;">(Бак / Кэш / Талоны)</div>
+                        </div>
+
+                        <!-- Барабан 3: Эксклюзивы -->
+                        <div class="p-2 text-center" id="superReel3" style="background:#090d16; border-radius:10px; border:1px solid rgba(255,179,0,0.3); min-height:85px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                            <div style="font-size:26px;">💎</div>
+                            <b class="text-xs color-amber mt-1" id="reelTxt3">ЭКСКЛЮЗИВ</b>
+                            <div class="sub-label" style="font-size:8px;">(Номера / Тюнинг)</div>
+                        </div>
+                    </div>
+
+                    <button id="btnLaunchSuperSpin" onclick="PhoneManager.spinSuperWheelAction()" class="btn btn-purple btn-sm w-full mt-2">
+                        🎰 КРУТИТЬ СУПЕР ВИЛСПИН ${tickets > 0 ? '(1 Билет 🎟️)' : '(350k ₽ / 35 ⭐)'}
+                    </button>
+                </div>
+
+                <!-- 🎡 КЛАССИЧЕСКОЕ ВИП КОЛЕСО ФОРТУНЫ (1 ПРИЗ) -->
+                <div class="glass-card text-center mb-3 p-2">
+                    <b class="text-xs color-amber">🎡 VIP Колесо Фортуны (1 Спин)</b>
+                    <div class="wheel-stage-container my-1" style="transform: scale(0.82); margin: 0 auto;">
+                        <div class="wheel-outer-ring">
+                            <canvas id="wheelCanvas" width="560" height="560" class="neon-wheel-canvas"></canvas>
+                            <div class="wheel-center-hub">⭐</div>
+                        </div>
+                        <div class="wheel-arrow-ticker">▼</div>
+                    </div>
+                    <div class="grid-2 mt-1">
+                        <button id="btnWheelFree" onclick="spinWheelAction(true)" class="btn btn-green btn-sm">🎁 Бесплатно</button>
+                        <button id="btnWheelPaid" onclick="spinWheelAction(false)" class="btn btn-amber btn-sm">⭐ 25 Stars</button>
+                    </div>
+                </div>
+
+                <!-- 🛒 ЛАВКА ФОРТУНЫ (ПОКУПКИ) -->
+                <div class="glass-card mb-3 p-2">
+                    <div class="flex-between mb-2">
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-store"></i> Лавка Фортуны</b>
+                        <span class="sub-label" style="font-size:10px;">Пакеты ресурсов и билетов</span>
+                    </div>
+
+                    <div class="space-y-2">
+                        <!-- Покупка билета Супер Вилспина -->
+                        <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+                            <div>
+                                <b class="text-xs color-purple">🎫 1х Билет Супер Вилспин</b>
+                                <div class="sub-label" style="font-size:9.5px;">Гарантированное авто + 2 приза</div>
+                            </div>
+                            <div class="flex-gap">
+                                <button onclick="PhoneManager.buySuperSpinTicket('cash')" class="btn btn-dark btn-sm btn-auto">350k ₽</button>
+                                <button onclick="PhoneManager.buySuperSpinTicket('stars')" class="btn btn-purple btn-sm btn-auto">35 ⭐</button>
+                            </div>
+                        </div>
+
+                        <!-- 3 билета со скидкой -->
+                        <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+                            <div>
+                                <b class="text-xs color-purple">🎟️ 3х Билета Супер Вилспин (-20%)</b>
+                                <div class="sub-label" style="font-size:9.5px;">Выгодный пак вращений</div>
+                            </div>
+                            <div class="flex-gap">
+                                <button onclick="PhoneManager.buySuperSpinPack('cash')" class="btn btn-dark btn-sm btn-auto">850k ₽</button>
+                                <button onclick="PhoneManager.buySuperSpinPack('stars')" class="btn btn-purple btn-sm btn-auto">85 ⭐</button>
+                            </div>
+                        </div>
+
+                        <!-- Канистра бензина -->
+                        <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+                            <div>
+                                <b class="text-xs color-cyan">⛽ Бак Экстра (100 ⛽)</b>
+                                <div class="sub-label" style="font-size:9.5px;">Мгновенная заправка автопарка</div>
+                            </div>
+                            <div class="flex-gap">
+                                <button onclick="refuelAction('cash')" class="btn btn-dark btn-sm btn-auto">5,000 ₽</button>
+                                <button onclick="refuelAction('free')" class="btn btn-cyan btn-sm btn-auto">Реклама</button>
+                            </div>
+                        </div>
+
+                        <!-- Экспресс талоны -->
+                        <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+                            <div>
+                                <b class="text-xs color-amber">⚡ Экспресс-талоны (25 шт)</b>
+                                <div class="sub-label" style="font-size:9.5px;">Быстрый призыв клиентов на лот</div>
+                            </div>
+                            <button onclick="upgradeExpressCapacity()" class="btn btn-amber btn-sm btn-auto">50k ₽</button>
+                        </div>
+
+                        <!-- Обменник на Stars -->
+                        <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+                            <div>
+                                <b class="text-xs color-green">💱 Обменник валют: 50 ⭐ Stars</b>
+                                <div class="sub-label" style="font-size:9.5px;">Премиальная валюта за рубли</div>
+                            </div>
+                            <button onclick="PhoneManager.exchangeCashForStars(500000, 50)" class="btn btn-green btn-sm btn-auto">500,000 ₽</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        if (typeof initWheelModule === 'function') initWheelModule();
+    },
+
+    buySuperSpinTicket(currency) {
+        if (currency === 'stars') {
+            let s = state.player?.stars || 0;
+            if (s < 35) return showToast("Нужно 35 Stars ⭐!");
+            state.player.stars -= 35;
+        } else {
+            let c = state.player?.cash || 0;
+            if (c < 350000) return showToast("Нужно 350,000 ₽!");
+            state.player.cash -= 350000;
+        }
+
+        state.player.superSpinTickets = (state.player.superSpinTickets || 0) + 1;
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast("Билет «Супер Вилспин» приобретён!");
+        this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+    },
+
+    buySuperSpinPack(currency) {
+        if (currency === 'stars') {
+            let s = state.player?.stars || 0;
+            if (s < 85) return showToast("Нужно 85 Stars ⭐!");
+            state.player.stars -= 85;
+        } else {
+            let c = state.player?.cash || 0;
+            if (c < 850000) return showToast("Нужно 850,000 ₽!");
+            state.player.cash -= 850000;
+        }
+
+        state.player.superSpinTickets = (state.player.superSpinTickets || 0) + 3;
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast("Пак из 3 билетов Супер Вилспина приобретён!");
+        this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+    },
+
+    exchangeCashForStars(costCash, starsGain) {
+        let cash = state.player?.cash || 0;
+        if (cash < costCash) return showToast("Не хватает денег для обмена!");
+
+        state.player.cash -= costCash;
+        state.player.stars = (state.player.stars || 0) + starsGain;
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast(`Успешно получено +${starsGain} ⭐ Stars!`);
+        this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+    },
+
+    // ----------------------------------------------------
+    // ДВИЖОК СУПЕР ВИЛСПИНА (3 БАРАБАНА)
+    // ----------------------------------------------------
+    spinSuperWheelAction() {
+        if (this.isSuperSpinning) return;
+
+        let tickets = state.player?.superSpinTickets || 0;
+        let cash = state.player?.cash || 0;
+        let stars = state.player?.stars || 0;
+
+        if (tickets > 0) {
+            state.player.superSpinTickets -= 1;
+        } else if (stars >= 35) {
+            state.player.stars -= 35;
+        } else if (cash >= 350000) {
+            state.player.cash -= 350000;
+        } else {
+            return showToast("Нужен 1 Билет, 35 ⭐ Stars или 350,000 ₽!");
+        }
+
+        this.isSuperSpinning = true;
+        playSound('tick');
+        tgHaptic('medium');
+
+        const r1 = document.getElementById('reelTxt1');
+        const r2 = document.getElementById('reelTxt2');
+        const r3 = document.getElementById('reelTxt3');
+        const btn = document.getElementById('btnLaunchSuperSpin');
+        if (btn) btn.disabled = true;
+
+        // Анимация кручения
+        let ticks = 0;
+        let spinAnim = setInterval(() => {
+            ticks++;
+            if (r1) r1.innerText = ["Lada Priora", "BMW M340i", "Porsche 911", "Golf GTI", "Toyota Camry"][Math.floor(Math.random() * 5)];
+            if (r2) r2.innerText = ["100 ⛽ Бак", "500,000 ₽", "1,500,000 ₽", "25 🎟️ Талонов", "+2 🤝"][Math.floor(Math.random() * 5)];
+            if (r3) r3.innerText = ["А777АА 77", "Stage 3 Big Turbo", "Stance Пневма", "50 ⭐ Stars", "Каркас РАФ"][Math.floor(Math.random() * 5)];
+            playSound('tick');
+        }, 100);
+
+        setTimeout(() => {
+            clearInterval(spinAnim);
+            this.isSuperSpinning = false;
+            if (btn) btn.disabled = false;
+
+            // РАСЧЁТ ВЫИГРЫША
+            let lvl = state.player?.level || 1;
+
+            // 1. БАРАБАН: АВТОМОБИЛЬ (с шансом на класс выше!)
+            let targetCategory = 'economy';
+            if (lvl < 8) {
+                targetCategory = Math.random() < 0.40 ? 'comfort' : 'economy'; // ШАНС НА КЛАСС ВЫШЕ!
+            } else if (lvl < 25) {
+                targetCategory = Math.random() < 0.35 ? 'premium' : 'comfort';
+            } else if (lvl < 45) {
+                targetCategory = Math.random() < 0.30 ? 'hyper' : 'premium';
+            } else {
+                targetCategory = 'hyper';
+            }
+
+            let pool = (typeof CAR_DATABASE !== 'undefined' && CAR_DATABASE[targetCategory]) ? CAR_DATABASE[targetCategory] : CAR_DATABASE.economy;
+            let carTmpl = pool[Math.floor(Math.random() * pool.length)];
+
+            let wonCar = {
+                id: "super_car_" + Date.now(),
+                name: carTmpl.name,
+                type: carTmpl.type,
+                power: carTmpl.power,
+                basePrice: carTmpl.basePrice,
+                price: carTmpl.basePrice,
+                marketValue: Math.round(carTmpl.basePrice * 1.15),
+                img: carTmpl.img,
+                plate: (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77",
+                customPlate: "ТРАНЗИТ",
+                condition: 100,
+                wear: { engine: 95, transmission: 95 },
+                insurance: 'casco', // бонус КАСКО
+                tuning: { chip: 1, exhaust: true, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 }
+            };
+
+            let maxSlots = getTotalGarageSlots();
+            let curSlots = state.garage ? state.garage.length : 0;
+            let carRewardText = "";
+
+            if (curSlots < maxSlots) {
+                state.garage.push(wonCar);
+                carRewardText = `🚗 ${wonCar.name} (${wonCar.power} л.с.) добавлен в гараж!`;
+            } else {
+                let compensation = wonCar.marketValue;
+                state.player.cash = (state.player.cash || 0) + compensation;
+                carRewardText = `🚗 ${wonCar.name} (Гараж полон: компенсация +${compensation.toLocaleString()} ₽!)`;
+            }
+
+            // 2. БАРАБАН: РЕСУРСЫ
+            let resRoll = Math.random();
+            let resRewardText = "";
+            if (resRoll < 0.30) {
+                state.player.cash = (state.player.cash || 0) + 500000;
+                resRewardText = "+500,000 ₽ наличными";
+            } else if (resRoll < 0.55) {
+                state.player.fuel = 100;
+                resRewardText = "100 ⛽ Полный бак";
+            } else if (resRoll < 0.75) {
+                state.player.expressTickets = (state.player.expressTickets || 0) + 25;
+                resRewardText = "+25 🎟️ Экспресс-талонов";
+            } else if (resRoll < 0.90) {
+                state.player.connections = (state.player.connections || 0) + 2;
+                resRewardText = "+2 🤝 Связи Синдиката";
+            } else {
+                state.player.cash = (state.player.cash || 0) + 1500000;
+                resRewardText = "🔥 ДЖЕКПОТ +1,500,000 ₽!";
+            }
+
+            // 3. БАРАБАН: ЭКСКЛЮЗИВЫ
+            let exRoll = Math.random();
+            let exRewardText = "";
+            if (exRoll < 0.35) {
+                let coolPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "О777ОО 77";
+                if (!state.ownedPlates) state.ownedPlates = [];
+                state.ownedPlates.push(coolPlate);
+                exRewardText = `🏷️ Архивный госномер «${coolPlate}»`;
+            } else if (exRoll < 0.65) {
+                state.player.stars = (state.player.stars || 0) + 50;
+                exRewardText = "+50 ⭐ Stars на счёт";
+            } else {
+                state.player.cash = (state.player.cash || 0) + 750000;
+                exRewardText = "🚀 Сертификат тюнинга (+750k ₽)";
+            }
+
+            // Фиксация на экране
+            if (r1) r1.innerText = wonCar.name;
+            if (r2) r2.innerText = resRewardText;
+            if (r3) r3.innerText = exRewardText;
+
+            saveState();
+            updateHeaderUI();
+            playSound('win');
+            tgHaptic('success');
+
+            openVerdictModal(
+                "СУПЕР ВИЛСПИН! 🎉",
+                `Вы сорвали 3 приза одновременно!\n\n1. ${carRewardText}\n2. 💰 ${resRewardText}\n3. ⭐ ${exRewardText}`,
+                true
+            );
+
+            this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+        }, 3200);
+    },
+
+    // ========================================================
+    // ДИСЦИПЛИНЫ STREET UNDERGROUND
     // ========================================================
     renderStreetApp(container) {
         let sub = this.streetSubTab || 'drift';
@@ -312,9 +962,6 @@ const PhoneManager = {
         }
     },
 
-    // ----------------------------------------------------
-    // 1. ДИСЦИПЛИНА ДРИФТА: ТРЁХУРОВНЕВЫЙ РЕАЛИСТИЧНЫЙ ТЕХКОМ
-    // ----------------------------------------------------
     getDriftSpecInfo(car) {
         if (!car) return { ready: false, reason: "Машина не выбрана" };
         let power = car.power || 100;
@@ -335,13 +982,10 @@ const PhoneManager = {
             hasCage,
             hasSeats,
             hasSlicks,
-            // 1. Зимний дрифт / Паркинг ТЦ: минимум 75 сил, заварка, выворот
             matsuriReady: hasDiff && hasAngle && power >= 75,
             matsuriReason: !hasDiff ? "Нужна заварка редуктора" : (!hasAngle ? "Нужен Красноярский выворот" : (power < 75 ? "Нужно минимум 75 л.с." : "Готов")),
-            // 2. RDS Europe: минимум 220 сил, заварка, выворот, гидроручник
             europeReady: hasDiff && hasAngle && hasHydro && power >= 220,
             europeReason: power < 220 ? `Нехватка мощности: ${power}/220 л.с. (машина распрямится)` : (!hasHydro ? "Нужен гидроручник" : (!hasDiff || !hasAngle ? "Нужна заварка и выворот" : "Готов")),
-            // 3. RDS GP: минимум 450 сил, каркас, гидроручник, ковши, выворот
             gpReady: hasDiff && hasAngle && hasHydro && hasCage && hasSeats && power >= 450,
             gpReason: power < 450 ? `Слабый мотор: ${power}/450 л.с. (судьи снимут за темп)` : (!hasCage ? "Нужен вварной каркас безопасности" : (!hasSeats ? "Нужны ковши с омологацией" : "Готов"))
         };
@@ -374,10 +1018,7 @@ const PhoneManager = {
                 </div>
             </div>
 
-            <!-- ТРИ ДИВИЗИОНА ДРИФТА -->
             <div class="space-y-2">
-                
-                <!-- 1. ЗИМНИЙ ПАРКИНГ / МАТСУРИ -->
                 <div class="glass-card p-2" style="border-left: 3px solid var(--cyan);">
                     <div class="flex-between mb-1">
                         <div>
@@ -395,7 +1036,6 @@ const PhoneManager = {
                     </button>
                 </div>
 
-                <!-- 2. RDS EUROPE (КУБОК РЕГИОНОВ) -->
                 <div class="glass-card p-2" style="border-left: 3px solid var(--amber);">
                     <div class="flex-between mb-1">
                         <div>
@@ -413,12 +1053,11 @@ const PhoneManager = {
                     </button>
                 </div>
 
-                <!-- 3. RDS GP (ГЛАВНЫЙ ЧЕМПИОНАТ СТРАНЫ) -->
                 <div class="glass-card p-2" style="border-left: 3px solid var(--red);">
                     <div class="flex-between mb-1">
                         <div>
                             <b class="text-xs color-red">3. RDS GP (Высшая Лига)</b>
-                            <div class="sub-label" style="font-size:9px;">Огромные скорости, фуридаши на 140+ км/ч, дым из-под арок</div>
+                            <div class="sub-label" style="font-size:9px;">Огромные скорости, фуридаши на 140+ км/ч</div>
                         </div>
                         <span class="tag-badge ${spec.gpReady ? 'bg-tag-green' : 'bg-tag-red'}">${spec.gpReady ? 'ДОПУЩЕН' : 'НЕДОПУСК'}</span>
                     </div>
@@ -461,7 +1100,6 @@ const PhoneManager = {
             <div class="glass-card text-center p-3">
                 <div style="font-size:24px;">💨 🔥 🏎️</div>
                 <div class="font-bold text-xs color-amber my-1">РАЗГОН... ИНИЦИАЦИЯ ЗАНОСА...</div>
-                <div class="sub-label" style="font-size:10px;">Судьи фиксируют скорость клиппинга и угол перекладки...</div>
             </div>
         `;
 
@@ -531,7 +1169,7 @@ const PhoneManager = {
     },
 
     // ----------------------------------------------------
-    // 2. ДИСЦИПЛИНА ДРАГ 402М
+    // ДРАГ 402М
     // ----------------------------------------------------
     renderDragDiscipline(container) {
         if (!state.garage || state.garage.length === 0) {
@@ -678,7 +1316,7 @@ const PhoneManager = {
     },
 
     // ----------------------------------------------------
-    // 3. ДИСЦИПЛИНА СТЕНС & ТЮНИНГ ФЕСТИВАЛЬ
+    // СТЕНС
     // ----------------------------------------------------
     renderStanceDiscipline(container) {
         if (!state.garage || state.garage.length === 0) {
@@ -800,7 +1438,7 @@ const PhoneManager = {
     },
 
     // ----------------------------------------------------
-    // 4. ДИСЦИПЛИНА ШАШКИ В ПОТОКЕ (СПРИНТ ПО ГОРОДУ)
+    // ШАШКИ В ПОТОКЕ
     // ----------------------------------------------------
     renderSprintDiscipline(container) {
         let carIdx = state.player.selectedStreetCarIndex || 0;
@@ -887,7 +1525,7 @@ const PhoneManager = {
     },
 
     // ----------------------------------------------------
-    // ОСТАЛЬНЫЕ ПРИЛОЖЕНИЯ PEREKUP OS
+    // ДРУГИЕ ПРИЛОЖЕНИЯ PEREKUP OS
     // ----------------------------------------------------
     renderAutodrotApp(container) {
         let sub = this.autodrotSubTab || 'market';
@@ -1048,226 +1686,6 @@ const PhoneManager = {
         playSound('win');
         tgHaptic('success');
         this.renderAutodrotSubScreen();
-    },
-
-    renderBusinessApp(container) {
-        if (!state.businesses || state.businesses.length === 0) {
-            if (typeof BUSINESS_DATA !== 'undefined') state.businesses = JSON.parse(JSON.stringify(BUSINESS_DATA));
-        }
-
-        let lvl = state.player?.level || 1;
-        let html = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
-                <div class="phone-app-title"><i class="fa-solid fa-briefcase color-green"></i> Мой Бизнес</div>
-                <button onclick="collectAllBusinessCash(); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-auto btn-sm">Касса</button>
-            </div>
-            <div class="phone-app-body">
-        `;
-
-        state.businesses.forEach((biz, idx) => {
-            if (!biz) return;
-            let isLocked = lvl < biz.minLevel;
-            let isOwned = biz.level > 0;
-            let cost = isOwned ? biz.cost * (biz.level + 1) : biz.cost;
-            let saleToNpcPrice = isOwned ? Math.round(biz.cost * biz.level * 0.75) : 0;
-
-            let actionBlock = "";
-            if (isLocked) {
-                actionBlock = `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>С ${biz.minLevel} уровня</button>`;
-            } else if (!isOwned) {
-                actionBlock = `<button onclick="upgradeBusiness(${idx}); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm w-full">Купить (${cost.toLocaleString()} ₽)</button>`;
-            } else {
-                actionBlock = `
-                    <div class="grid-2 mb-1">
-                        <button onclick="upgradeBusiness(${idx}); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm">Апгрейд (${cost.toLocaleString()} ₽)</button>
-                        <button onclick="restockBusiness(${idx}); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-amber btn-sm">Сырьё (15k)</button>
-                    </div>
-                    <div class="grid-2">
-                        <button onclick="PhoneManager.sellBusinessToNPC('${biz.id}', ${saleToNpcPrice})" class="btn btn-dark btn-sm">Продать NPC (${saleToNpcPrice.toLocaleString()} ₽)</button>
-                        <button onclick="PhoneManager.listBusinessOnP2P('${biz.id}')" class="btn btn-purple btn-sm">На P2P биржу</button>
-                    </div>
-                `;
-            }
-
-            html += `
-                <div class="glass-card mb-2 p-2">
-                    <div class="flex-between mb-1">
-                        <b class="text-xs color-green">${biz.name}</b>
-                        <span class="tag-badge ${isOwned ? 'bg-tag-green' : 'bg-tag-amber'}">${isOwned ? 'Ур. ' + biz.level : 'Не куплено'}</span>
-                    </div>
-                    <div class="sub-label mb-1" style="font-size:10px;">Доход: <b>${((biz.income || 0) * (biz.level || 0)).toLocaleString()} ₽/д</b> | Сырьё: <b>${biz.stock || 0}%</b></div>
-                    ${actionBlock}
-                </div>
-            `;
-        });
-
-        html += `</div>`;
-        container.innerHTML = html;
-    },
-
-    sellBusinessToNPC(bizId, refundAmount) {
-        const biz = (state.businesses || []).find(b => b.id === bizId);
-        if (!biz || biz.level <= 0) return;
-
-        if (!confirm(`Продать «${biz.name}» городскому инвестору за ${refundAmount.toLocaleString()} ₽? Точка будет ликвидирована.`)) return;
-
-        state.player.cash = (state.player.cash || 0) + refundAmount;
-        biz.level = 0;
-        biz.stock = 0;
-        biz.stored = 0;
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast(`Бизнес продан инвестору (+${refundAmount.toLocaleString()} ₽)!`);
-        this.renderBusinessApp(document.getElementById('phoneAppContainer'));
-        this.renderBusinessWidget();
-    },
-
-    listBusinessOnP2P(bizId) {
-        const biz = (state.businesses || []).find(b => b.id === bizId);
-        if (!biz || biz.level <= 0) return;
-
-        let priceStr = prompt(`Введите желаемую цену продажи «${biz.name} (Ур. ${biz.level})» на P2P бирже в рублях:`, String(biz.cost * biz.level));
-        if (!priceStr) return;
-        let price = parseInt(priceStr);
-        if (isNaN(price) || price <= 0) return showToast("Некорректная цена!");
-
-        if (!state.p2pMarketListings) state.p2pMarketListings = [];
-        let lotId = "p2p_biz_" + Date.now();
-        state.p2pMarketListings.unshift({
-            id: lotId,
-            seller: state.player?.name || "Перекуп",
-            type: "business",
-            name: `${biz.name} (Ур. ${biz.level})`,
-            bizId: biz.id,
-            bizLevel: biz.level,
-            price: price,
-            desc: `Готовая точка с доходностью ${((biz.income || 0) * biz.level).toLocaleString()} ₽/д.`
-        });
-
-        if (!state.myP2PListings) state.myP2PListings = [];
-        state.myP2PListings.push(lotId);
-
-        biz.level = 0;
-        biz.stock = 0;
-        saveState();
-        showToast("Бизнес успешно выставлен на онлайн P2P биржу Autodrot!");
-        this.renderBusinessApp(document.getElementById('phoneAppContainer'));
-    },
-
-    renderHousingApp(container) {
-        let curId = state.player?.housingId || 'room';
-        let owned = state.player?.ownedHouses || [];
-        let lvl = state.player?.level || 1;
-
-        let html = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
-                <div class="phone-app-title"><i class="fa-solid fa-house color-cyan"></i> Моя Недвижимость</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-        `;
-
-        (typeof HOUSING_LIST !== 'undefined' ? HOUSING_LIST : []).forEach(h => {
-            let isCur = curId === h.id;
-            let isPurchased = owned.includes(h.id);
-            let isLvlLocked = lvl < (h.minLevel || 1);
-            let refundPrice = Math.round((h.buyPrice || 1000000) * 0.8);
-
-            let actionBtns = "";
-            if (isLvlLocked) {
-                actionBtns = `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>С ${h.minLevel} уровня</button>`;
-            } else if (isPurchased) {
-                actionBtns = `
-                    <div class="grid-2 mb-1">
-                        <button onclick="openHomeInteriorModal('${h.id}')" class="btn btn-cyan btn-sm">🛋️ Интерьер</button>
-                        ${isCur ? '<button class="btn btn-dark btn-sm opacity-50" disabled>Живёте здесь</button>' : `<button onclick="moveIntoHousing('${h.id}'); PhoneManager.renderHousingApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-sm">Переехать</button>`}
-                    </div>
-                    <div class="grid-2">
-                        <button onclick="PhoneManager.sellHousingToNPC('${h.id}', ${refundPrice})" class="btn btn-dark btn-sm">Продать риелтору (${(refundPrice / 1000000).toFixed(1)}M)</button>
-                        <button onclick="PhoneManager.listHousingOnP2P('${h.id}')" class="btn btn-purple btn-sm">На P2P биржу</button>
-                    </div>
-                `;
-            } else {
-                actionBtns = `
-                    <div class="grid-2 mb-1">
-                        <button onclick="rentHousing('${h.id}'); PhoneManager.renderHousingApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm">Аренда (${(h.rent || 2000).toLocaleString()} ₽/д)</button>
-                        <button onclick="buyHousingProperty('${h.id}'); PhoneManager.renderHousingApp(document.getElementById('phoneAppContainer'));" class="btn btn-amber btn-sm">Купить (${(h.buyPrice / 1000000).toFixed(1)}M)</button>
-                    </div>
-                `;
-            }
-
-            html += `
-                <div class="glass-card mb-2 p-2">
-                    <div class="flex-between mb-1">
-                        <b class="text-xs color-cyan">${h.name}</b>
-                        <span class="tag-badge ${isPurchased ? 'bg-tag-green' : 'bg-tag-amber'}">${isPurchased ? 'Собственность' : 'Аренда'}</span>
-                    </div>
-                    <div class="sub-label mb-2" style="font-size:10px;">Гараж: <b>+${h.slots}</b> мест | ${h.desc || ''}</div>
-                    ${actionBtns}
-                </div>
-            `;
-        });
-
-        html += `</div>`;
-        container.innerHTML = html;
-    },
-
-    sellHousingToNPC(hId, refundAmount) {
-        if (!confirm(`Продать недвижимость агентству за ${refundAmount.toLocaleString()} ₽? Право собственности будет аннулировано.`)) return;
-
-        state.player.cash = (state.player.cash || 0) + refundAmount;
-        state.player.ownedHouses = (state.player.ownedHouses || []).filter(id => id !== hId);
-
-        if (state.player.housingId === hId) {
-            state.player.housingId = 'room';
-            state.player.housingType = 'rent';
-        }
-
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast(`Недвижимость продана риелторам (+${refundAmount.toLocaleString()} ₽)!`);
-        this.renderHousingApp(document.getElementById('phoneAppContainer'));
-    },
-
-    listHousingOnP2P(hId) {
-        const h = (typeof HOUSING_LIST !== 'undefined' ? HOUSING_LIST : []).find(item => item.id === hId);
-        if (!h) return;
-
-        let priceStr = prompt(`Введите цену продажи «${h.name}» на P2P бирже:`, String(h.buyPrice));
-        if (!priceStr) return;
-        let price = parseInt(priceStr);
-        if (isNaN(price) || price <= 0) return showToast("Некорректная цена!");
-
-        if (!state.p2pMarketListings) state.p2pMarketListings = [];
-        let lotId = "p2p_house_" + Date.now();
-        state.p2pMarketListings.unshift({
-            id: lotId,
-            seller: state.player?.name || "Перекуп",
-            type: "housing",
-            name: h.name,
-            houseId: h.id,
-            price: price,
-            desc: `Недвижимость в собственности. Гараж на +${h.slots} мест.`
-        });
-
-        if (!state.myP2PListings) state.myP2PListings = [];
-        state.myP2PListings.push(lotId);
-
-        state.player.ownedHouses = (state.player.ownedHouses || []).filter(id => id !== hId);
-        if (state.player.housingId === hId) {
-            state.player.housingId = 'room';
-            state.player.housingType = 'rent';
-        }
-
-        saveState();
-        showToast("Недвижимость выставлена на онлайн P2P биржу Autodrot!");
-        this.renderHousingApp(document.getElementById('phoneAppContainer'));
     },
 
     renderBankApp(container) {
@@ -1451,27 +1869,6 @@ const PhoneManager = {
         if (typeof renderContracts === 'function') renderContracts();
     },
 
-    renderBarnApp(container) {
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
-                <div class="phone-app-title"><i class="fa-solid fa-screwdriver-wrench color-amber"></i> Находки в сараях</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="glass-card mb-2 p-2 flex-between">
-                    <div>
-                        <b class="text-xs color-amber">Разведка заброшек</b>
-                        <div class="sub-label" style="font-size:10px;">Шанс найти ретро-классику и архивные номера!</div>
-                    </div>
-                    <span class="tag-badge bg-tag-amber">1 раз/день</span>
-                </div>
-                <div id="barnFindContent"></div>
-            </div>
-        `;
-        if (typeof renderBarnFind === 'function') renderBarnFind();
-    },
-
     renderContainersApp(container) {
         container.innerHTML = `
             <div class="phone-app-header">
@@ -1526,41 +1923,6 @@ const PhoneManager = {
             </div>
         `;
         if (typeof switchShopSection === 'function') switchShopSection('tools');
-    },
-
-    renderFortuneApp(container) {
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
-                <div class="phone-app-title"><i class="fa-solid fa-clover color-amber"></i> Клуб Фортуны</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="glass-card text-center mb-2 p-2">
-                    <b class="text-xs color-amber">🎡 VIP Колесо Фортуны</b>
-                    <div class="wheel-stage-container my-1" style="transform: scale(0.85); margin: 0 auto;">
-                        <div class="wheel-outer-ring">
-                            <canvas id="wheelCanvas" width="560" height="560" class="neon-wheel-canvas"></canvas>
-                            <div class="wheel-center-hub">⭐</div>
-                        </div>
-                        <div class="wheel-arrow-ticker">▼</div>
-                    </div>
-                    <div class="grid-2 mt-1">
-                        <button id="btnWheelFree" onclick="spinWheelAction(true)" class="btn btn-green btn-sm">🎁 Спин</button>
-                        <button id="btnWheelPaid" onclick="spinWheelAction(false)" class="btn btn-amber btn-sm">⭐ 25 Stars</button>
-                    </div>
-                </div>
-
-                <div class="glass-card mb-2 p-2">
-                    <b class="text-xs color-cyan">⛽ Городская АЗС</b>
-                    <div class="grid-2 mt-1">
-                        <button onclick="refuelAction('cash')" class="btn btn-dark btn-sm">Бак (5,000 ₽)</button>
-                        <button onclick="refuelAction('free')" class="btn btn-cyan btn-sm">За рекламу</button>
-                    </div>
-                </div>
-            </div>
-        `;
-        if (typeof initWheelModule === 'function') initWheelModule();
     },
 
     renderRadarApp(container) {

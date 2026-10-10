@@ -1,8 +1,8 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.3)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.4)
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.4.3";
+const CURRENT_GAME_VERSION = "v0.4.4";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
