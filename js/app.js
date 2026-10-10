@@ -1,8 +1,8 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.1)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.3)
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.4.1";
+const CURRENT_GAME_VERSION = "v0.4.3";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -106,7 +106,7 @@ function showToast(msg) {
     if (!t) return;
     t.innerText = msg;
     t.classList.add('show');
-    setTimeout(() => { t.classList.remove('show'); }, 2300);
+    setTimeout(() => { t.classList.remove('show'); }, 2500);
 }
 
 function closeModal(id) {
@@ -176,14 +176,15 @@ const DEFAULT_STATE = {
         name: "Перекуп #777", avatarUrl: null, cash: 150000, stars: 15, connections: 1, 
         expressTickets: 25, maxExpressTickets: 25, fuel: 100, level: 1, xp: 0, maxXp: 120, 
         baseSlots: 2, vip: false, vipPro: false, lastFreeSpinDay: 0, club: null, karma: 50, 
-        stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 }, 
+        stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0, scandalsAvoided: 0 }, 
         hunger: 80, mood: 85, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0, 
         diet: 'shaurma', housingId: 'room', housingType: 'rent', ownedHouses: [], selectedStreetCarIndex: 0, 
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
         hasRacingLicense: false, consecutiveRaces: 0, maxRacesBeforeRaid: 12,
         safeDeposit: 0,
         tools: { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false },
-        furniture: []
+        furniture: [],
+        phoneMessages: []
     },
     garage: [], salesLot: [], contracts: [], plateCatalog: [], ownedPlates: ["В777ВВ 77"], 
     activeCategory: 'economy', marketFeed: [], p2pMode: 'cars', syndicateSubTab: 'p2p', 
@@ -225,7 +226,7 @@ function getTotalGarageSlots() {
 }
 
 // ========================================================
-// TELEGRAM CLOUD STORAGE ЧАНКИНГ (ОБХОД ЛИМИТА 4 КБ)
+// TELEGRAM CLOUD STORAGE ЧАНКИНГ
 // ========================================================
 const CHUNK_SIZE = 3600;
 
@@ -369,6 +370,7 @@ function applyLoadedState(parsed) {
         state.player = { ...DEFAULT_STATE.player, ...parsed.player };
         if (parsed.player.stats) state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
         if (parsed.player.tools) state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
+        if (Array.isArray(parsed.player.phoneMessages)) state.player.phoneMessages = parsed.player.phoneMessages;
     }
     if (Array.isArray(parsed.garage)) state.garage = parsed.garage;
     if (Array.isArray(parsed.salesLot)) state.salesLot = parsed.salesLot;
@@ -391,12 +393,14 @@ function sanitizeState() {
     if (typeof state.player.maxRacesBeforeRaid !== 'number') state.player.maxRacesBeforeRaid = Math.floor(10 + Math.random() * 5);
     if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
     if (!Array.isArray(state.player.furniture)) state.player.furniture = [];
+    if (!Array.isArray(state.player.phoneMessages)) state.player.phoneMessages = [];
     if (typeof state.player.cash !== 'number' || state.player.cash < 0) state.player.cash = 150000;
     if (typeof state.player.loanDebt !== 'number' || state.player.loanDebt < 0) state.player.loanDebt = 0;
     if (typeof state.player.safeDeposit !== 'number') state.player.safeDeposit = 0;
+    if (typeof state.player.fuel !== 'number') state.player.fuel = 100;
+    if (typeof state.player.karma !== 'number') state.player.karma = 50;
     if (!state.player.tools) state.player.tools = { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false };
     
-    // Синхронизация путей к картинкам бизнеса из data.js
     if (state.businesses && typeof BUSINESS_DATA !== 'undefined') {
         state.businesses.forEach(b => {
             const template = BUSINESS_DATA.find(d => d.id === b.id);
@@ -452,9 +456,6 @@ function saveState() {
     updateHeaderUI();
 }
 
-// ========================================================
-// СБРОС ИГРОВОГО ПРОГРЕССА (ПОЛНАЯ ОЧИСТКА ОБЛАКА И ЛОКАЛА)
-// ========================================================
 function resetGameData() {
     if (!confirm("Внимание! Вы уверены, что хотите полностью стереть весь прогресс, гараж, бизнес и начать заново? Это действие необратимо!")) {
         return;
@@ -551,13 +552,13 @@ function importSaveCodeAction() {
 function updateHeaderUI() {
     let cash = state.player?.cash || 0;
     let stars = state.player?.stars || 0;
-    let fuel = state.player?.fuel || 0;
+    let fuel = state.player?.fuel !== undefined ? state.player.fuel : 100;
     let tck = state.player?.expressTickets || 0;
     let mTck = state.player?.maxExpressTickets || 25;
     let pName = state.player?.name || "Перекуп #777";
     let lvl = state.player?.level || 1;
     let conn = state.player?.connections || 0;
-    let karma = state.player?.karma || 50;
+    let karma = Math.max(0, Math.min(100, state.player?.karma !== undefined ? state.player.karma : 50));
 
     setTxt('cashAmount', cash.toLocaleString()); 
     setTxt('starsAmount', stars); 
@@ -611,6 +612,7 @@ function updateHeaderUI() {
     if (loanEl) loanEl.innerText = "Долг: " + debt.toLocaleString() + " ₽";
 
     updateRaceHeatBadge();
+    if (typeof PhoneManager !== 'undefined') PhoneManager.updateUnreadBadge();
 }
 
 function updateRaceHeatBadge() {
@@ -727,7 +729,7 @@ function claimDailyReward() {
     let currentReward = DAILY_REWARDS_CONFIG.find(r => r.day === sDay) || DAILY_REWARDS_CONFIG[0];
     const r = currentReward.reward;
     if (r.cash) state.player.cash += r.cash;
-    if (r.fuel) state.player.fuel = Math.min(100, state.player.fuel + r.fuel);
+    if (r.fuel) state.player.fuel = Math.min(100, (state.player.fuel || 0) + r.fuel);
     if (r.connections) state.player.connections = (state.player.connections || 0) + r.connections;
     if (r.stars) state.player.stars += r.stars;
     if (r.specialPlate) {
@@ -743,7 +745,7 @@ function claimDailyReward() {
 }
 
 // ========================================================
-// МАГАЗИН ПЕРЕКУПА (ПОЛНЫЙ КАТАЛОГ ИЗ data.js)
+// МАГАЗИН ПЕРЕКУПА
 // ========================================================
 function switchShopSection(section) {
     ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
@@ -1114,7 +1116,7 @@ function renderProfileAnalytics() {
 }
 
 // ========================================================
-// НАВИГАЦИЯ И ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
+// НАВИГАЦИЯ И ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК (С ИНТЕГРАЦИЕЙ ТЕЛЕФОНА)
 // ========================================================
 function switchTab(tabId) {
     initAudio(); 
@@ -1137,12 +1139,15 @@ function switchTab(tabId) {
     if (tabId === 'tabMarket') { const el = document.getElementById('bnav-tabMarket'); if (el) el.classList.add('active'); }
     else if (tabId === 'tabGarage') { const el = document.getElementById('bnav-tabGarage'); if (el) el.classList.add('active'); }
     else if (tabId === 'tabSalesLot') { const el = document.getElementById('bnav-tabSalesLot'); if (el) el.classList.add('active'); }
-    else if (tabId === 'tabSyndicate') { const el = document.getElementById('bnav-tabSyndicate'); if (el) el.classList.add('active'); }
+    else if (tabId === 'tabPhone') { const el = document.getElementById('bnav-tabPhone'); if (el) el.classList.add('active'); }
     else { const el = document.getElementById('bnav-tabLife'); if (el) el.classList.add('active'); }
 
     if (tabId === 'tabMarket' && typeof renderMarketFeed === 'function') renderMarketFeed();
     if (tabId === 'tabGarage' && typeof renderGarage === 'function') renderGarage(); 
     if (tabId === 'tabSalesLot' && typeof renderSalesLot === 'function') renderSalesLot();
+    if (tabId === 'tabPhone') {
+        if (typeof PhoneManager !== 'undefined') PhoneManager.renderPhoneScreen();
+    }
     if (tabId === 'tabBusiness') {
         if (typeof checkBusinessAccess === 'function') checkBusinessAccess();
     }
@@ -1164,9 +1169,6 @@ function switchTab(tabId) {
     if (tabId === 'tabHousing') {
         if (typeof renderHousing === 'function') renderHousing();
     }
-    if (tabId === 'tabSyndicate') {
-        if (typeof renderSyndicateHub === 'function') renderSyndicateHub();
-    }
     if (tabId === 'tabProfile') renderProfileAnalytics();
 }
 
@@ -1179,21 +1181,50 @@ function checkAutoShowPatchNotes() {
     } catch(e) {}
 }
 
+// ========================================================
+// СВАЙП-ЛИСТЕНЕР РЫНКА (РАЗВОРАЧИВАНИЕ КАТЕГОРИЙ ПРИ СКРОЛЛЕ ВВЕРХ)
+// ========================================================
 function initMarketScrollListener() {
     const mainContent = document.querySelector('.main-content');
     if (!mainContent) return;
+
+    let touchStartY = 0;
+    let touchEndY = 0;
+
     mainContent.addEventListener('scroll', () => {
         const marketTab = document.getElementById('tabMarket');
         if (!marketTab || !marketTab.classList.contains('active')) return;
-        if (mainContent.scrollTop > 80) {
-            const grid = document.getElementById('marketCatListContainer');
-            const btnIcon = document.querySelector('#btnToggleMarketGrid i');
+
+        const grid = document.getElementById('marketCatListContainer');
+        const btnIcon = document.querySelector('#btnToggleMarketGrid i');
+
+        if (mainContent.scrollTop > 90) {
             if (grid && !grid.classList.contains('collapsed')) {
                 grid.classList.add('collapsed');
                 if (btnIcon) btnIcon.className = "fa-solid fa-chevron-down";
             }
         }
     });
+
+    mainContent.addEventListener('touchstart', (e) => {
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    mainContent.addEventListener('touchmove', (e) => {
+        touchEndY = e.touches[0].clientY;
+        const marketTab = document.getElementById('tabMarket');
+        if (!marketTab || !marketTab.classList.contains('active')) return;
+
+        if (mainContent.scrollTop <= 2 && touchEndY - touchStartY > 65) {
+            const grid = document.getElementById('marketCatListContainer');
+            const btnIcon = document.querySelector('#btnToggleMarketGrid i');
+            if (grid && grid.classList.contains('collapsed')) {
+                grid.classList.remove('collapsed');
+                if (btnIcon) btnIcon.className = "fa-solid fa-chevron-up";
+                tgHaptic('light');
+            }
+        }
+    }, { passive: true });
 }
 
 // ========================================================
@@ -1224,6 +1255,11 @@ function initApp() {
         if (typeof renderBarnFind === 'function') renderBarnFind();
         if (typeof checkBusinessAccess === 'function') checkBusinessAccess();
         if (typeof updateCityHubStatus === 'function') updateCityHubStatus();
+        
+        // Инициализация смартфона PerekupOS
+        if (typeof PhoneManager !== 'undefined') {
+            PhoneManager.init();
+        }
         
         initMarketScrollListener();
         switchTab('tabMarket');
@@ -1267,7 +1303,7 @@ setInterval(() => {
         updateHeaderUI();
     }
 
-    // 3. ОБРАБОТКА ТАЙМЕРОВ ПЛОЩАДКИ ПРОДАЖ (БЕЗ ПОТЕРИ АВТОМОБИЛЕЙ)
+    // 3. ОБРАБОТКА ТАЙМЕРОВ ПЛОЩАДКИ ПРОДАЖ
     if (state.salesLot && state.salesLot.length > 0) {
         for (let i = 0; i < state.salesLot.length; i++) {
             let slot = state.salesLot[i];
@@ -1320,13 +1356,6 @@ setInterval(() => {
     const sTab = document.getElementById('tabSalesLot');
     if (lotChanged && sTab && sTab.classList.contains('active') && typeof renderSalesLot === 'function') {
         renderSalesLot();
-    }
-    
-    // Восстановление бензина
-    let pFuel = (state.player && state.player.fuel !== undefined) ? state.player.fuel : 100;
-    if (pFuel < 100) {
-        state.player.fuel = Math.min(100, pFuel + 1);
-        setTxt('fuelAmount', state.player.fuel);
     }
     
     // Обновление таймеров рынка (дозвон продавцу)

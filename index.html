@@ -8,6 +8,8 @@
     
     <!-- Базы данных и библиотеки -->
     <script src="data.js?v=143"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="js/network.js?v=143"></script>
     <script src="firebase-bridge.js?v=143"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -1421,6 +1423,21 @@
     </div>
 
     <div id="toastNotification" class="toast">Уведомление</div>
+
+    <!-- МОДАЛЬНОЕ ОКНО ЛИЧНЫХ СООБЩЕНИЙ С ДРУГИМ ИГРОКОМ -->
+    <div id="modalDirectChat" class="modal-overlay">
+      <div class="modal-box" style="display:flex; flex-direction:column; height:420px;">
+        <div class="flex-between mb-2">
+          <h4 class="color-cyan font-bold" id="dmModalTitle">Чат с перекупом</h4>
+          <button onclick="closeModal('modalDirectChat')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div id="dmMessagesBox" class="chat-messages-container" style="flex:1;"></div>
+        <div class="chat-compose-box mt-2">
+          <input type="text" id="dmInputText" class="chat-input" placeholder="Предложить цену..." maxlength="150">
+          <button onclick="NetworkManager.sendDirectMessage()" class="chat-send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
 
     <!-- ПОДКЛЮЧЕНИЕ СКРИПТОВ ЯДРА И ЛОГИКИ v0.4.1 -->
     <script src="js/market.js?v=143"></script>

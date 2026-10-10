@@ -1,55 +1,57 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ПОКУПАТЕЛИ, ТОРГ И ДКП (v0.4.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ПОКУПАТЕЛИ, ТОРГ И ДКП (v0.4.2)
 // ========================================================
 
 const BUYERS_CATALOG = {
     economy: [
-        { name: "Студент Макс", avatar: "🧑‍🎓", rate: 0.82, type: "economy" },
-        { name: "Таксист Ашот", avatar: "🧔", rate: 0.88, type: "economy" },
-        { name: "Дед Михалыч", avatar: "👴", rate: 0.95, type: "economy" },
-        { name: "Перекуп Саня", avatar: "😎", rate: 0.75, type: "economy" },
-        { name: "Дачник Петрович", avatar: "👨‍🌾", rate: 0.90, type: "economy" },
-        { name: "Курьер Руслан", avatar: "🛵", rate: 0.85, type: "economy" },
-        { name: "Пацан с района Костян", avatar: "🧢", rate: 0.78, type: "economy" },
-        { name: "Новичок с правами Лера", avatar: "👩‍🦰", rate: 0.93, type: "economy" },
-        { name: "Гаражный мастер Толя", avatar: "👨‍🔧", rate: 0.80, type: "economy" },
-        { name: "Бригадир Валера", avatar: "👷‍♂️", rate: 0.89, type: "economy" }
+        { name: "Студент Макс", avatar: "🧑‍🎓", rate: 0.82, type: "economy", meticulous: 0.15 },
+        { name: "Таксист Ашот", avatar: "🧔", rate: 0.88, type: "economy", meticulous: 0.45 },
+        { name: "Дед Михалыч", avatar: "👴", rate: 0.95, type: "economy", meticulous: 0.10 },
+        { name: "Перекуп Саня", avatar: "😎", rate: 0.75, type: "economy", meticulous: 0.85 },
+        { name: "Дачник Петрович", avatar: "👨‍🌾", rate: 0.90, type: "economy", meticulous: 0.20 },
+        { name: "Курьер Руслан", avatar: "🛵", rate: 0.85, type: "economy", meticulous: 0.25 },
+        { name: "Пацан с района Костян", avatar: "🧢", rate: 0.78, type: "economy", meticulous: 0.10 },
+        { name: "Новичок с правами Лера", avatar: "👩‍🦰", rate: 0.93, type: "economy", meticulous: 0.30 },
+        { name: "Гаражный мастер Толя", avatar: "👨‍🔧", rate: 0.80, type: "economy", meticulous: 0.70 },
+        { name: "Бригадир Валера", avatar: "👷‍♂️", rate: 0.89, type: "economy", meticulous: 0.35 }
     ],
     comfort: [
-        { name: "Менеджер Олег", avatar: "👨‍💼", rate: 0.88, type: "comfort" },
-        { name: "Семейный Илья", avatar: "👨‍👩‍👦", rate: 0.92, type: "comfort" },
-        { name: "Блогерша Аня", avatar: "👩‍🎤", rate: 0.95, type: "comfort" },
-        { name: "Автоподборщик", avatar: "🕵️‍♂️", rate: 0.80, type: "comfort" },
-        { name: "IT-тимлид Денис", avatar: "👨‍💻", rate: 0.94, type: "comfort" },
-        { name: "Риелтор Кристина", avatar: "👩‍💼", rate: 0.91, type: "comfort" },
-        { name: "Фитнес-тренер Влад", avatar: "💪", rate: 0.87, type: "comfort" },
-        { name: "Врач-стоматолог Павел", avatar: "👨‍⚕️", rate: 0.96, type: "comfort" },
-        { name: "Торговый представитель Юра", avatar: "🚘", rate: 0.84, type: "comfort" },
-        { name: "Дизайнер интерьеров Соня", avatar: "🎨", rate: 0.93, type: "comfort" }
+        { name: "Менеджер Олег", avatar: "👨‍💼", rate: 0.88, type: "comfort", meticulous: 0.40 },
+        { name: "Семейный Илья", avatar: "👨‍👩‍👦", rate: 0.92, type: "comfort", meticulous: 0.50 },
+        { name: "Блогерша Аня", avatar: "👩‍🎤", rate: 0.95, type: "comfort", meticulous: 0.20 },
+        { name: "Автоподборщик со сканером", avatar: "🕵️‍♂️", rate: 0.80, type: "comfort", meticulous: 0.90 },
+        { name: "IT-тимлид Денис", avatar: "👨‍💻", rate: 0.94, type: "comfort", meticulous: 0.65 },
+        { name: "Риелтор Кристина", avatar: "👩‍💼", rate: 0.91, type: "comfort", meticulous: 0.35 },
+        { name: "Фитнес-тренер Влад", avatar: "💪", rate: 0.87, type: "comfort", meticulous: 0.25 },
+        { name: "Врач-стоматолог Павел", avatar: "👨‍⚕️", rate: 0.96, type: "comfort", meticulous: 0.60 },
+        { name: "Торговый представитель Юра", avatar: "🚘", rate: 0.84, type: "comfort", meticulous: 0.55 },
+        { name: "Дизайнер интерьеров Соня", avatar: "🎨", rate: 0.93, type: "comfort", meticulous: 0.30 }
     ],
     premium: [
-        { name: "Бизнесмен Игорь", avatar: "🤵", rate: 0.90, type: "premium" },
-        { name: "Мажор Артур", avatar: "🕺", rate: 0.98, type: "premium" },
-        { name: "Депутат Виталий", avatar: "🕴️", rate: 0.85, type: "premium" },
-        { name: "Владелец таксопарка", avatar: "🧔‍♂️", rate: 0.82, type: "premium" },
-        { name: "Застройщик Альберт", avatar: "🏗️", rate: 0.93, type: "premium" },
-        { name: "Продюсер Марк", avatar: "🎬", rate: 0.97, type: "premium" },
-        { name: "Ресторатор Карен", avatar: "🍽️", rate: 0.89, type: "premium" },
-        { name: "Юрист международник Яна", avatar: "⚖️", rate: 0.92, type: "premium" },
-        { name: "Владелец сети клиник Борис", avatar: "🩺", rate: 0.95, type: "premium" },
-        { name: "Инвестор Герман", avatar: "📈", rate: 0.86, type: "premium" }
+        { name: "Бизнесмен Игорь", avatar: "🤵", rate: 0.90, type: "premium", meticulous: 0.60 },
+        { name: "Мажор Артур", avatar: "🕺", rate: 0.98, type: "premium", meticulous: 0.15 },
+        { name: "Депутат Виталий", avatar: "🕴️", rate: 0.85, type: "premium", meticulous: 0.70 },
+        { name: "Владелец таксопарка", avatar: "🧔‍♂️", rate: 0.82, type: "premium", meticulous: 0.80 },
+        { name: "Застройщик Альберт", avatar: "🏗️", rate: 0.93, type: "premium", meticulous: 0.55 },
+        { name: "Продюсер Марк", avatar: "🎬", rate: 0.97, type: "premium", meticulous: 0.30 },
+        { name: "Ресторатор Карен", avatar: "🍽️", rate: 0.89, type: "premium", meticulous: 0.40 },
+        { name: "Юрист международник Яна", avatar: "⚖️", rate: 0.92, type: "premium", meticulous: 0.85 },
+        { name: "Владелец сети клиник Борис", avatar: "🩺", rate: 0.95, type: "premium", meticulous: 0.65 },
+        { name: "Инвестор Герман", avatar: "📈", rate: 0.86, type: "premium", meticulous: 0.75 }
     ],
     hyper: [
-        { name: "Шейх Мансур", avatar: "👳‍♂️", rate: 1.05, type: "hyper" },
-        { name: "Олигарх Роман", avatar: "🛥️", rate: 0.95, type: "hyper" },
-        { name: "Крипто-миллионер", avatar: "🤑", rate: 1.10, type: "hyper" },
-        { name: "Стример-хайпожор", avatar: "🎮", rate: 1.08, type: "hyper" },
-        { name: "Звезда футбола Алекс", avatar: "⚽", rate: 1.02, type: "hyper" },
-        { name: "Коллекционер редких авто", avatar: "🏛️", rate: 1.15, type: "hyper" },
-        { name: "IT-фаундер из Дубая", avatar: "🚀", rate: 0.99, type: "hyper" },
-        { name: "Наследник синдиката Тариэл", avatar: "🕶️", rate: 0.92, type: "hyper" }
+        { name: "Шейх Мансур", avatar: "👳‍♂️", rate: 1.05, type: "hyper", meticulous: 0.30 },
+        { name: "Олигарх Роман", avatar: "🛥️", rate: 0.95, type: "hyper", meticulous: 0.80 },
+        { name: "Крипто-миллионер", avatar: "🤑", rate: 1.10, type: "hyper", meticulous: 0.20 },
+        { name: "Стример-хайпожор", avatar: "🎮", rate: 1.08, type: "hyper", meticulous: 0.25 },
+        { name: "Звезда футбола Алекс", avatar: "⚽", rate: 1.02, type: "hyper", meticulous: 0.35 },
+        { name: "Коллекционер редких авто", avatar: "🏛️", rate: 1.15, type: "hyper", meticulous: 0.95 },
+        { name: "IT-фаундер из Дубая", avatar: "🚀", rate: 0.99, type: "hyper", meticulous: 0.50 },
+        { name: "Наследник синдиката Тариэл", avatar: "🕶️", rate: 0.92, type: "hyper", meticulous: 0.70 }
     ]
 };
+
+let dkpAutoCloseTimer = null;
 
 function renderSalesLot() {
     const list = document.getElementById('salesLotList');
@@ -159,30 +161,41 @@ function generateBuyerForSlot(slot) {
     }
     if (car.isPolished) tuneBonus += 0.05;
 
-    // ПЕРЕПЛАТА ЗА ЭКСКЛЮЗИВНЫЕ ГОСНОМЕРА (+30-50%)
+    // Бонус за карму перекупа
+    let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
+    let karmaBonus = ((karma - 50) / 100) * 0.08; // от -4% до +4%
+
+    // Переплата за крутые номера
     let plateBonus = 0;
     let cPlate = car.customPlate || car.plate;
     let pVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(cPlate) : 0;
     if (pVal >= 40000) {
-        plateBonus = 0.30 + Math.random() * 0.20;
+        plateBonus = 0.25 + Math.random() * 0.15;
     }
     
-    let rate = template.rate + tuneBonus + plateBonus;
-    let offer = Math.round(baseVal * (rate + (Math.random() * 0.08 - 0.04)));
+    let rate = template.rate + tuneBonus + plateBonus + karmaBonus;
+    let offer = Math.round(baseVal * (rate + (Math.random() * 0.06 - 0.03)));
     
-    if (offer > asking * 1.15) offer = asking;
-    if (offer < asking * 0.5) offer = Math.round(asking * 0.55);
+    if (offer > asking * 1.10) offer = asking;
+    if (offer < asking * 0.45) offer = Math.round(asking * 0.50);
+
+    // Дотошность клиента (шанс заметить косяки) зависит от шаблона и низкой кармы игрока
+    let calculatedMeticulous = template.meticulous || 0.3;
+    if (karma < 40) calculatedMeticulous += 0.20; // При низкой карме клиенты подозрительнее!
 
     slot.currentBuyer = {
         name: template.name,
         avatar: template.avatar,
         type: template.type,
         offerPrice: offer,
-        maxOfferPrice: Math.round(offer * (1.08 + Math.random() * 0.14)),
-        patience: 100
+        initialOfferPrice: offer,
+        maxOfferPrice: Math.round(offer * (1.06 + Math.random() * 0.10)), // предел торга не космический
+        patience: 100,
+        meticulous: Math.min(0.95, calculatedMeticulous),
+        successfulHagglesCount: 0,
+        maxAllowedHaggles: Math.floor(2 + Math.random() * 2) // максимум 2-3 успешных наценки
     };
     
-    // Таймер терпения покупателя (от 1 до 5 минут)
     slot.buyerTimerLeft = Math.floor(60 + Math.random() * 240); 
 
     try {
@@ -247,7 +260,7 @@ function cancelSalesLot(idx) {
 }
 
 // ========================================================
-// ЛОГИКА ТОРГА И ДИАЛОГОВ
+// ЛОГИКА ТОРГА И ДИАЛОГОВ ПРИ ПРОДАЖЕ
 // ========================================================
 let activeHaggleLotIndex = null;
 let currentSaleBuyer = null;
@@ -297,19 +310,73 @@ function attemptHaggleSale(type) {
     
     const slot = state.salesLot[activeHaggleLotIndex];
     if (!slot) return;
+    const car = slot.car;
+    const thread = document.getElementById("saleHaggleChatThread");
 
-    let baseSuccess = type === 'safe' ? 0.85 : 0.45;
-    let karma = (state.player && state.player.karma) ? state.player.karma : 50;
+    // 1. ПРОВЕРКА НА РАСКРЫТИЕ ОБМАНА (СКРУЧЕННЫЙ ПРОБЕГ, ПРИСАДКА, СКРЫТЫЕ ДЕФЕКТЫ)
+    let isDeceitful = car.rolledOdometer || car.hasAdditive || (car.hiddenDefect && !car.hasAdditive);
+    if (isDeceitful) {
+        let bustRoll = Math.random();
+        if (bustRoll < currentSaleBuyer.meticulous) {
+            // КЛИЕНТ РАСКУСИЛ ОБМАН!
+            let scamReason = car.rolledOdometer 
+                ? "скрученный в два раза пробег по блоку ABS!" 
+                : (car.hasAdditive ? "залитую загущающую присадку в стучащий двигатель!" : "скрытый дефект узлов, о котором вы умолчали!");
+
+            if (thread) {
+                thread.innerHTML += `
+                    <div class="chat-msg msg-player">«Машина в идеале, брат, отвечаю!»</div>
+                    <div class="chat-msg msg-seller" style="background:#3b050d; border-color:var(--red);">
+                        «Ты кого развести вздумал?! Я подключил свой прибор и нашёл ${scamReason} Перекуп проклятый!»
+                    </div>`;
+                thread.scrollTop = thread.scrollHeight;
+            }
+
+            // ШТРАФ КАРМЫ
+            let karmaLoss = 20;
+            state.player.karma = Math.max(0, (state.player.karma || 50) - karmaLoss);
+            saveState();
+            updateHeaderUI();
+            tgHaptic('error');
+            playSound('error');
+
+            setTimeout(() => {
+                closeModal("modalHaggleSale");
+                slot.currentBuyer = null;
+                slot.maxTimer = 120;
+                slot.timer = 120;
+                saveState();
+                renderSalesLot();
+                openVerdictModal("СКАНДАЛ НА ПЛОЩАДКЕ! 🚨", `Клиент раскусил обман (${scamReason}). Он ушёл и разнёс плохую славу. Карма упала на -${karmaLoss} пунктов!`, false);
+            }, 1800);
+            return;
+        }
+    }
+
+    // 2. ПРОВЕРКА НА ДОСТИЖЕНИЕ ЛИМИТА УСПЕШНЫХ НАЦЕНОК
+    if (currentSaleBuyer.successfulHagglesCount >= currentSaleBuyer.maxAllowedHaggles) {
+        if (thread) {
+            thread.innerHTML += `
+                <div class="chat-msg msg-player">«Может накинешь еще немного сверху?»</div>
+                <div class="chat-msg msg-seller">«Всё, хватит! Я уже и так поднял цену до предела. Либо забираю по этой цене, либо я ухожу!»</div>`;
+            thread.scrollTop = thread.scrollHeight;
+        }
+        showToast("⚠️ Покупатель упёрся в потолок своего бюджета!");
+        return;
+    }
+
+    // 3. БАЗОВАЯ ВЕРОЯТНОСТЬ УСПЕХА
+    let baseSuccess = type === 'safe' ? 0.80 : 0.40;
+    let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    let statBonus = (karma / 500) + (lvl / 200); 
+    let statBonus = ((karma - 50) / 250) + (lvl / 300); 
     
     let successChance = baseSuccess + statBonus;
     let success = Math.random() < successChance;
 
-    const thread = document.getElementById("saleHaggleChatThread");
-
     if (success) {
-        let increasePercent = type === 'safe' ? (0.02 + Math.random() * 0.01) : (0.06 + Math.random() * 0.03);
+        currentSaleBuyer.successfulHagglesCount += 1;
+        let increasePercent = type === 'safe' ? (0.02 + Math.random() * 0.015) : (0.05 + Math.random() * 0.03);
         let delta = Math.round(currentSaleBuyer.offerPrice * increasePercent);
         
         if (currentSaleBuyer.offerPrice + delta > currentSaleBuyer.maxOfferPrice) {
@@ -318,8 +385,8 @@ function attemptHaggleSale(type) {
 
         if (delta <= 0) {
             if (thread) {
-                thread.innerHTML += "<div class='chat-msg msg-player'>«Может накинешь еще немного?»</div>";
-                thread.innerHTML += "<div class='chat-msg msg-seller'>«Брат, это мой край. Больше ни копейки не дам, бюджет впритык!»</div>";
+                thread.innerHTML += "<div class='chat-msg msg-player'>«Ну накинь еще чуток за состояние!»</div>";
+                thread.innerHTML += "<div class='chat-msg msg-seller'>«Брат, это мой край. Больше ни рубля не дам!»</div>";
                 thread.scrollTop = thread.scrollHeight;
             }
             showToast("⚠️ Покупатель достиг предела своего бюджета!");
@@ -342,9 +409,19 @@ function attemptHaggleSale(type) {
         playSound('win');
         tgHaptic('success');
     } else {
-        let damage = type === 'safe' ? Math.floor(15 + Math.random() * 10) : Math.floor(45 + Math.random() * 20);
+        let damage = type === 'safe' ? Math.floor(20 + Math.random() * 15) : Math.floor(40 + Math.random() * 25);
         currentSaleBuyer.patience = Math.max(0, currentSaleBuyer.patience - damage);
         
+        // Наглый покупатель может в ответ даже СРЕЗАТЬ оффер назад!
+        if (type === 'firm' && Math.random() < 0.35) {
+            let cutback = Math.round(currentSaleBuyer.offerPrice * 0.03);
+            currentSaleBuyer.offerPrice = Math.max(currentSaleBuyer.initialOfferPrice * 0.85, currentSaleBuyer.offerPrice - cutback);
+            setTxt("saleBuyerOfferVal", currentSaleBuyer.offerPrice.toLocaleString() + " ₽");
+            if (thread) {
+                thread.innerHTML += `<div class='chat-msg msg-seller color-red'>«Ах так? За твою наглость я сбиваю предложение на -${cutback.toLocaleString()} ₽!»</div>`;
+            }
+        }
+
         setTxt("saleBuyerPatienceText", currentSaleBuyer.patience + "%");
         const fill = document.getElementById("saleBuyerPatienceFill");
         if (fill) {
@@ -376,7 +453,7 @@ function attemptHaggleSale(type) {
                 saveState();
                 renderSalesLot();
                 updateHeaderUI();
-                openVerdictModal("ПОКУПАТЕЛЬ УШЁЛ 🚶‍♂️", "Из-за излишней наглости в торгах покупатель развернулся и ушел. Слот ищет следующего клиента.", false);
+                openVerdictModal("ПОКУПАТЕЛЬ УШЁЛ 🚶‍♂️", "Из-за излишней наглости в торгах покупатель развернулся и ушел. Площадка ищет следующего клиента.", false);
             }, 1200);
         }
     }
@@ -412,6 +489,11 @@ function acceptBuyerOffer(idx) {
 }
 
 function openDKPModal(dealData) {
+    if (dkpAutoCloseTimer) {
+        clearInterval(dkpAutoCloseTimer);
+        dkpAutoCloseTimer = null;
+    }
+
     setTxt('dkpSellerName', dealData.seller);
     setTxt('dkpBuyerName', dealData.buyer);
     setTxt('dkpCarTitle', dealData.car.name);
@@ -462,11 +544,12 @@ function openDKPModal(dealData) {
     playSound('tick');
 }
 
+// ПОДТВЕРЖДЕНИЕ И АВТОСВОРАЧИВАНИЕ ОКНА ЧЕРЕЗ 5 СЕКУНД
 function confirmSignDKP() {
     if (!activePendingDKPDeal) return;
     const deal = activePendingDKPDeal;
 
-    // Анимация штемпельного удара печати МРЭО ГИБДД
+    // 1. Анимация штампа МРЭО ГИБДД
     const stamp = document.getElementById('dkpOfficialStamp');
     if (stamp) stamp.classList.add('stamp-approved');
 
@@ -477,16 +560,16 @@ function confirmSignDKP() {
     const btnSign = document.getElementById('btnSignDKP');
     const btnClose = document.getElementById('btnCloseDKP');
     if (btnSign) btnSign.style.display = 'none';
-    if (btnClose) btnClose.style.display = 'block';
+    if (btnClose) {
+        btnClose.style.display = 'block';
+        btnClose.innerText = "Готово (автозакрытие через 5с...)";
+    }
 
+    // 2. Обработка логики сделки
     if (deal.type === 'sale') {
-        // Удаляем из списка продаж
         state.salesLot.splice(deal.lotIndex, 1);
-        
-        // Зачисляем наличные
         state.player.cash = (state.player.cash || 0) + deal.price;
 
-        // Обновляем аналитику
         if (!state.player.stats) state.player.stats = { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
         state.player.stats.sold = (state.player.stats.sold || 0) + 1;
         state.player.stats.totalNetProfit = (state.player.stats.totalNetProfit || 0) + deal.profit;
@@ -497,6 +580,14 @@ function confirmSignDKP() {
             state.player.stats.lossSales = (state.player.stats.lossSales || 0) + 1;
         }
 
+        // БОНУС КАРМЫ ЗА ЧЕСТНУЮ СДЕЛКУ
+        let car = deal.car;
+        let isCleanCar = !car.rolledOdometer && !car.hasAdditive && !car.hiddenDefect && car.condition >= 85;
+        if (isCleanCar) {
+            state.player.karma = Math.min(100, (state.player.karma || 50) + 5);
+            showToast("🕊️ Честная сделка! Карма выросла (+5)");
+        }
+
         addXp(50);
         state.player.mood = Math.min(100, (state.player.mood || 80) + 10);
 
@@ -505,11 +596,27 @@ function confirmSignDKP() {
         updateHeaderUI();
         showToast("🤝 ДКП зарегистрирован! Средства зачислены.");
     } else if (deal.type === 'buy') {
-        // Логика покупки вызывается из market.js через callback
         if (typeof finishMarketCarBuyProcess === 'function') {
             finishMarketCarBuyProcess(deal);
         }
     }
+
+    // 3. ТАЙМЕР АВТОМАТИЧЕСКОГО СВОРАЧИВАНИЯ НА 5 СЕКУНД
+    let secondsLeft = 5;
+    if (dkpAutoCloseTimer) clearInterval(dkpAutoCloseTimer);
+
+    dkpAutoCloseTimer = setInterval(() => {
+        secondsLeft--;
+        if (btnClose) {
+            btnClose.innerText = `Готово (закроется через ${secondsLeft}с...)`;
+        }
+
+        if (secondsLeft <= 0) {
+            clearInterval(dkpAutoCloseTimer);
+            dkpAutoCloseTimer = null;
+            closeModal('modalDKP');
+        }
+    }, 1000);
 }
 
 function confirmSaleFromHaggleModal() {

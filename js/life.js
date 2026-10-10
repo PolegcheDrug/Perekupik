@@ -1,24 +1,10 @@
 // ========================================================
-// js/life.js — ЖИЗНЬ, ГОРОДСКОЙ ХАБ, СЕЙФ, БИЗНЕС, САРАИ (v0.4.1)
+// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, СМЕНА ДНЯ, ФОРТУНА (v0.4.3)
 // ========================================================
 
 // ========================================================
-// 1. ГОРОДСКОЙ ХАБ И БАНКОВСКИЙ СЕЙФ ПЕРЕКУПА (+3% В ДЕНЬ)
+// 1. ФИНАНСОВЫЕ ОПЕРАЦИИ (ПЕРЕНЕСЕНЫ В «ВО-БАНК» В СМАРТФОНЕ)
 // ========================================================
-function updateCityHubStatus() {
-    const hubBiz = document.getElementById('hubBizStatus');
-    if (hubBiz && state.businesses) {
-        let activeBizCount = state.businesses.filter(b => b && b.level > 0).length;
-        hubBiz.innerText = activeBizCount > 0 ? `Активно: ${activeBizCount} точ.` : "Сеть СТО/Моек";
-    }
-
-    const safeBalEl = document.getElementById('safeBalanceText');
-    if (safeBalEl) {
-        let safeCash = state.player?.safeDeposit || 0;
-        safeBalEl.innerText = safeCash.toLocaleString() + " ₽";
-    }
-}
-
 function depositToSafeAction(amount) {
     let cash = state.player?.cash || 0;
     if (cash < amount) return showToast("Не хватает наличных денег для внесения в сейф!");
@@ -27,10 +13,9 @@ function depositToSafeAction(amount) {
     state.player.safeDeposit = (state.player.safeDeposit || 0) + amount;
     saveState();
     updateHeaderUI();
-    updateCityHubStatus();
     playSound('tick');
     tgHaptic('light');
-    showToast(`Заначка пополнена на +${amount.toLocaleString()} ₽! Деньги защищены.`);
+    showToast(`Заначка пополнена на +${amount.toLocaleString()} ₽! Деньги защищены в Во-Банке.`);
 }
 
 function withdrawFromSafeAction() {
@@ -41,15 +26,40 @@ function withdrawFromSafeAction() {
     state.player.safeDeposit = 0;
     saveState();
     updateHeaderUI();
-    updateCityHubStatus();
     playSound('win');
     tgHaptic('success');
     spawnFloatingReward(`+${safeCash.toLocaleString()} ₽`);
     showToast(`Вы забрали всю заначку из сейфа: +${safeCash.toLocaleString()} ₽!`);
 }
 
+function takeLoan(amount) {
+    let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
+    if (debt >= 1000000) return showToast("Лимит долга в Во-Банке исчерпан!");
+
+    state.player.cash = (state.player.cash || 0) + (amount * 0.95);
+    state.player.loanDebt = debt + amount;
+    saveState();
+    updateHeaderUI();
+    showToast("Во-Банк одобрил: " + amount.toLocaleString() + " ₽ (Комиссия 5%)");
+}
+
+function repayLoan(percent) {
+    let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
+    if (debt <= 0) return showToast("У вас нет задолженности перед банком!");
+
+    let amt = Math.ceil(debt * (percent / 100));
+    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
+    if (cash < amt) return showToast("Не хватает денег для оплаты долга!");
+
+    state.player.cash -= amt;
+    state.player.loanDebt = Math.max(0, debt - amt);
+    saveState();
+    updateHeaderUI();
+    showToast("Оплачено " + amt.toLocaleString() + " ₽ долга");
+}
+
 // ========================================================
-// 2. РЕШАЛА АРТУР (СВЯЗИ, КРЫША, ЛЕГАЛИЗАЦИЯ VIN, ЛИЦЕНЗИЯ РАФ)
+// 2. РЕШАЛА АРТУР (СЕРВИСЫ ДЛЯ ПРИЛОЖЕНИЯ В СМАРТФОНЕ)
 // ========================================================
 function buyReshalaPack(type) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -70,60 +80,7 @@ function buyReshalaPack(type) {
 }
 
 function checkReshalaAccess() {
-    const roofCard = document.getElementById('reshala-roof-card');
-    const legalCard = document.getElementById('reshala-legalize-card');
-    let lvl = (state.player && state.player.level) ? state.player.level : 1;
-
-    if (roofCard) {
-        const btn = roofCard.querySelector('button');
-        if (state.player && state.player.policeImmunityDays > 0) {
-            roofCard.classList.remove('item-locked');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerText = "Иммунитет активен (" + state.player.policeImmunityDays + " дн.)";
-            }
-        } else if (lvl < 10) {
-            roofCard.classList.add('item-locked');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerText = "С 10 УРОВНЯ";
-            }
-        } else {
-            roofCard.classList.remove('item-locked');
-            if (btn) {
-                btn.disabled = false;
-                btn.innerText = "Оформить (350k ₽ / 45 ⭐)";
-            }
-        }
-    }
-
-    if (legalCard) {
-        const btn = legalCard.querySelector('button');
-        if (lvl < 15) {
-            legalCard.classList.add('item-locked');
-            if (btn) {
-                btn.disabled = true;
-                btn.innerText = "С 15 УРОВНЯ";
-            }
-        } else {
-            legalCard.classList.remove('item-locked');
-            if (btn) {
-                btn.disabled = false;
-                btn.innerText = "Легализовать (200k ₽ + 1 🤝)";
-            }
-        }
-    }
-
-    const btnLic = document.getElementById('btnReshalaLicense');
-    if (btnLic) {
-        if (state.player && state.player.hasRacingLicense) {
-            btnLic.disabled = true;
-            btnLic.innerText = "Лицензия оформлена ✓";
-        } else {
-            btnLic.disabled = false;
-            btnLic.innerText = "Оформить (85k ₽ / 1 🤝)";
-        }
-    }
+    // Вызывается для совместимости
 }
 
 function buyReshalaService(service) {
@@ -145,7 +102,6 @@ function buyReshalaService(service) {
         let d = (state.player && state.player.policeImmunityDays) ? state.player.policeImmunityDays : 0;
         state.player.policeImmunityDays = d + 3;
         saveState();
-        checkReshalaAccess();
         openVerdictModal("🚨 КРЫША ОФОРМЛЕНА", "ГИБДД не тронет ваши авто следующие 3 дня!", true);
     } else if (service === 'license') {
         if (state.player && state.player.hasRacingLicense) return showToast("Лицензия уже получена!");
@@ -162,7 +118,6 @@ function buyReshalaService(service) {
 
         state.player.hasRacingLicense = true;
         saveState();
-        checkReshalaAccess();
         updateHeaderUI();
         playSound('win');
         tgHaptic('success');
@@ -227,7 +182,7 @@ function confirmLegalizeCar(carId) {
 }
 
 // ========================================================
-// 3. ИНТЕРАКТИВНЫЙ БИЗНЕС
+// 3. БИЗНЕС
 // ========================================================
 function checkBusinessAccess() {
     const lock = document.getElementById('businessLockCover');
@@ -353,6 +308,7 @@ function upgradeBusiness(idx) {
     if (b.stock === undefined) b.stock = 100;
     saveState();
     checkBusinessAccess();
+    if (typeof PhoneManager !== 'undefined') PhoneManager.renderBusinessWidget();
     showToast("Бизнес «" + b.name + "» улучшен до " + b.level + " уровня!");
 }
 
@@ -367,6 +323,7 @@ function restockBusiness(idx) {
     b.stock = Math.min(100, (b.stock || 0) + 50);
     saveState();
     renderBusinessList();
+    if (typeof PhoneManager !== 'undefined') PhoneManager.renderBusinessWidget();
     showToast("Склад сырья пополнен (+50%)!");
 }
 
@@ -385,6 +342,7 @@ function collectAllBusinessCash() {
     state.player.cash = (state.player.cash || 0) + totalCollected;
     saveState();
     checkBusinessAccess();
+    if (typeof PhoneManager !== 'undefined') PhoneManager.renderBusinessWidget();
     tgHaptic('success');
     playSound('win');
     spawnFloatingReward("+" + totalCollected.toLocaleString() + " ₽");
@@ -392,7 +350,7 @@ function collectAllBusinessCash() {
 }
 
 // ========================================================
-// 4. САРАИ
+// 4. САРАИ (ДЛЯ ПРИЛОЖЕНИЯ В ТЕЛЕФОНЕ)
 // ========================================================
 const BARN_TIERS_CONFIG = [
     { tier: 1, reqLvl: 1, cost: 35000, title: "🏚️ Сарай в СНТ «Заря»", desc: "Дачный кооператив. Советская классика.", classGrade: "barn-grade-1", rareIdx: 0 },
@@ -513,7 +471,7 @@ function scoutBarnTier(tier) {
 }
 
 // ========================================================
-// 5. НЕДВИЖИМОСТЬ И ОБУСТРОЙСТВО
+// 5. НЕДВИЖИМОСТЬ
 // ========================================================
 function renderHousing() {
     const list = document.getElementById('housingMarketList');
@@ -688,7 +646,7 @@ function buyHomeFurniture(fId, cost) {
 }
 
 // ========================================================
-// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ И ТЕНЕВОЙ АУКЦИОН
+// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ (ДЛЯ ПРИЛОЖЕНИЯ В ТЕЛЕФОНЕ)
 // ========================================================
 function renderContainersList() {
     const container = document.getElementById('containersListRender');
@@ -861,351 +819,112 @@ function placeBlindBid() {
 }
 
 // ========================================================
-// 7. УМНЫЕ ЗАКАЗЫ СИНДИКАТА (С ВЫБОРОМ И ЗАЩИТОЙ ДОРОГИХ АВТО)
+// 7. СМЕНА ДНЯ С УВЕДОМЛЕНИЯМИ В СМАРТФОН
 // ========================================================
-let activeContractForDelivery = null;
+function nextDayAction() {
+    state.player.day = (state.player.day || 1) + 1;
+    state.player.expressTickets = state.player.maxExpressTickets ? state.player.maxExpressTickets : 25;
+    state.player.consecutiveRaces = 0;
 
-function generateContracts() {
-    state.contracts = [
-        { 
-            id: "cnt_econ", 
-            title: "Рабочая лошадка в таксопарк", 
-            targetType: "economy", 
-            minPower: 60, 
-            minCond: 60, 
-            reward: 130000, 
-            desc: "Требуется бюджетный седан или хэтчбек эконом-класса." 
-        },
-        { 
-            id: "cnt_comfort", 
-            title: "Немецкий седан под выкуп", 
-            targetType: "comfort", 
-            minPower: 140, 
-            minCond: 80, 
-            reward: 650000, 
-            desc: "Строго городской комфорт/бизнес-класс с целым кузовом." 
-        },
-        { 
-            id: "cnt_drift", 
-            title: "Заднеприводный корч под проект", 
-            targetType: "economy", 
-            minPower: 70, 
-            minCond: 45, 
-            reward: 160000, 
-            desc: "Живой кузов под зимний дрифт." 
-        },
-        { 
-            id: "cnt_vip", 
-            title: "Представительский кортеж", 
-            targetType: "premium", 
-            minPower: 240, 
-            minCond: 85, 
-            reward: 3500000, 
-            desc: "Элитный кроссовер или представительский седан с чистым VIN." 
-        }
-    ];
-    saveState();
-}
-
-function renderContracts() {
-    const list = document.getElementById('contractsList');
-    const lockCover = document.getElementById('contractsLockCover');
-    let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    let hasGauge = !!(state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_basic || state.player.tools.gauge_pro));
-    let hasOBD = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_elm || state.player.tools.obd_launch));
-
-    if (lvl < 15 || !hasGauge || !hasOBD) {
-        if (list) list.style.display = 'none';
-        if (lockCover) {
-            lockCover.style.display = 'block';
-            let reason = lvl < 15 
-                ? "Требуется 15 уровень авторитета." 
-                : "В инвентаре отсутствуют обязательные приборы: Толщиномер ЛКП и OBD2 Сканер (купите в Магазине)!";
-            lockCover.innerHTML = "<i class='fa-solid fa-lock color-cyan' style='font-size:38px; margin-bottom:10px;'></i><h4 class='font-bold'>Синдикат закрыт</h4><p class='sub-label'>" + reason + "</p>";
-        }
-        return;
+    let curId = (state.player && state.player.housingId) ? state.player.housingId : 'room';
+    let isOwn = (state.player && state.player.ownedHouses) ? state.player.ownedHouses.includes(curId) : false;
+    if (!isOwn && typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
+        const h = HOUSING_LIST.find(item => item.id === curId);
+        let rentVal = h ? (h.rent || 2500) : 2500;
+        state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
     }
 
-    if (lockCover) lockCover.style.display = 'none';
-    if (!list) return;
-    list.style.display = 'block';
-
-    if (!state.contracts || state.contracts.length === 0) generateContracts();
-
-    let html = "";
-    state.contracts.forEach(cnt => {
-        let typeBadge = cnt.targetType ? cnt.targetType.toUpperCase() : "ЛЮБОЙ";
-        html += 
-        "<div class='glass-card mb-2'>" +
-            "<div class='flex-between mb-1'>" +
-                "<b class='text-xs color-cyan'>" + cnt.title + "</b>" +
-                "<span class='color-green font-bold text-xs'>+" + cnt.reward.toLocaleString() + " ₽</span>" +
-            "</div>" +
-            "<p class='sub-label mb-1'>" + cnt.desc + "</p>" +
-            "<div class='flex-between text-xs mb-2'>" +
-                "<span class='tag-badge bg-tag-cyan'>Класс: " + typeBadge + "</span>" +
-                "<span class='color-amber'>от " + cnt.minPower + " л.с. | Сост. от " + cnt.minCond + "%</span>" +
-            "</div>" +
-            "<button onclick=\"openContractCarSelectModal('" + cnt.id + "')\" class='btn btn-cyan btn-sm w-full'>Выбрать авто из гаража</button>" +
-        "</div>";
-    });
-    list.innerHTML = html;
-}
-
-function refreshContractsManual() {
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 15000) return showToast("Нужно 15,000 ₽ на обновление базы!");
-    state.player.cash -= 15000;
-    generateContracts();
-    renderContracts();
-    updateHeaderUI();
-    showToast("База заказов обновлена!");
-}
-
-function openContractCarSelectModal(contractId) {
-    if (!state.garage || state.garage.length === 0) {
-        return showToast("В гараже нет автомобилей!");
+    if (state.player.furniture && state.player.furniture.includes('home_ps5')) {
+        state.player.mood = Math.min(100, (state.player.mood || 85) + 25);
     }
-    const cnt = state.contracts.find(c => c.id === contractId);
-    if (!cnt) return;
-    activeContractForDelivery = cnt;
 
-    setTxt('contractTargetInfo', "Заказ: <b>" + cnt.title + "</b> (Награда: +" + cnt.reward.toLocaleString() + " ₽)<br>Требования: класс " + cnt.targetType.toUpperCase() + ", от " + cnt.minPower + " л.с., состояние от " + cnt.minCond + "%");
+    if (state.player.policeImmunityDays && state.player.policeImmunityDays > 0) {
+        state.player.policeImmunityDays -= 1;
+    }
 
-    const list = document.getElementById('contractCarsSelectList');
-    if (!list) return;
+    // НАЧИСЛЕНИЕ +3% В СЕЙФ И ВХОДЯЩЕЕ SMS ОТ ВО-БАНКА
+    if (state.player.safeDeposit && state.player.safeDeposit > 0) {
+        let percentEarned = Math.round(state.player.safeDeposit * 0.03);
+        state.player.safeDeposit += percentEarned;
+        spawnFloatingReward(`+${percentEarned.toLocaleString()} ₽ в сейфе`);
 
-    const matchingCars = [];
-    state.garage.forEach((car, idx) => {
-        if (!car || car.impounded || car.unregistered || car.isStolen) return;
-        let p = car.power || 75;
-        let c = car.condition || 80;
-        let t = car.type || 'economy';
-
-        if (t === cnt.targetType && p >= cnt.minPower && c >= cnt.minCond) {
-            matchingCars.push({ car, idx });
+        // Отправка SMS в телефон
+        if (state.player.phoneMessages) {
+            state.player.phoneMessages.unshift({
+                id: "sms_bank_" + Date.now(),
+                sender: "💳 Во-Банк Онлайн",
+                avatar: "🏦",
+                preview: `Выплата процентов по сейфу: +${percentEarned.toLocaleString()} ₽!`,
+                time: "09:00",
+                unread: true,
+                chatHistory: [
+                    { from: "them", text: `Начислена ежедневная капитализация по сейфу перекупа: +${percentEarned.toLocaleString()} ₽. Текущий баланс сейфа: ${state.player.safeDeposit.toLocaleString()} ₽.` }
+                ]
+            });
         }
-    });
+    }
 
-    if (matchingCars.length === 0) {
-        list.innerHTML = "<div class='sub-label text-center py-4'>В гараже нет подходящих авто класса <b>" + cnt.targetType.toUpperCase() + "</b> с нужными характеристиками!</div>";
-    } else {
-        let html = "";
-        matchingCars.forEach(item => {
-            let car = item.car;
-            let mVal = car.marketValue || car.price || 100000;
-            let isLoss = mVal > (cnt.reward * 1.25);
-            let diff = mVal - cnt.reward;
-
-            let warningText = isLoss 
-                ? "<div class='text-xs color-red font-bold mt-1'>⚠️ Убыток сделки: -" + diff.toLocaleString() + " ₽ (Рыночная цена машины выше награды!)</div>" 
-                : "<div class='text-xs color-green mt-1'>Оценка: " + mVal.toLocaleString() + " ₽</div>";
-
-            html += 
-            "<div class='glass-card p-2 flex-between mb-2' style='" + (isLoss ? "border-color: rgba(255,51,102,0.4);" : "") + "'>" +
-                "<div style='flex:1;'>" +
-                    "<b class='text-xs'>" + car.name + "</b>" +
-                    "<div class='sub-label'>" + car.power + " л.с. | Состояние: " + car.condition + "%</div>" +
-                    warningText +
-                "</div>" +
-                "<button onclick=\"confirmContractDelivery(" + item.idx + ")\" class='btn " + (isLoss ? "btn-danger" : "btn-green") + " btn-sm btn-auto'>" +
-                    "Отдать" +
-                "</button>" +
-            "</div>";
+    // ОБРАБОТКА БИЗНЕСА
+    if (state.businesses) {
+        state.businesses.forEach(b => {
+            if (b && b.level > 0) {
+                if (b.stock > 0) {
+                    b.stock = Math.max(0, b.stock - 20);
+                    let currentStored = b.stored ? b.stored : 0;
+                    let inc = b.income ? b.income : 0;
+                    b.stored = currentStored + (inc * b.level);
+                } else {
+                    showToast("⚠️ Бизнес «" + b.name + "» простаивает из-за нехватки сырья!");
+                }
+            }
         });
-        list.innerHTML = html;
     }
 
-    const modal = document.getElementById('modalSelectContractCar');
-    if (modal) modal.classList.add('active');
+    state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
+    state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
+
+    // КАРМИЧЕСКИЕ СОБЫТИЯ
+    let karma = state.player.karma !== undefined ? state.player.karma : 50;
+
+    if (karma >= 70 && Math.random() < 0.35) {
+        let rewardBonus = Math.floor(35000 + Math.random() * 40000);
+        state.player.cash = (state.player.cash || 0) + rewardBonus;
+        if (typeof PhoneManager !== 'undefined') {
+            PhoneManager.pushBuyerFollowupSMS("Toyota Camry", false, "Семейный клиент");
+        }
+    } else if (karma <= 35 && Math.random() < 0.40) {
+        if (typeof PhoneManager !== 'undefined') {
+            PhoneManager.pushBuyerFollowupSMS("ВАЗ-2114", true, "Разъярённый покупатель");
+        }
+    }
+
+    saveState();
+    updateHeaderUI();
+    renderHousing();
+    renderBarnFind();
+    checkBusinessAccess();
+    if (typeof PhoneManager !== 'undefined') {
+        PhoneManager.renderBusinessWidget();
+        PhoneManager.updateUnreadBadge();
+    }
     playSound('tick');
-}
+    tgHaptic('light');
+    showToast("Наступил новый игровой день ☀️ Проценты в Во-Банке начислены!");
 
-function confirmContractDelivery(carIdx) {
-    if (!activeContractForDelivery) return;
-    const car = state.garage[carIdx];
-    if (!car) return;
-
-    let cnt = activeContractForDelivery;
-    let mVal = car.marketValue || car.price || 100000;
-
-    if (mVal > cnt.reward * 2) {
-        if (!confirm("Вы действительно хотите отдать «" + car.name + "» стоимостью " + mVal.toLocaleString() + " ₽ всего за " + cnt.reward.toLocaleString() + " ₽? Это приведёт к огромному убытку!")) {
-            return;
-        }
-    }
-
-    closeModal('modalSelectContractCar');
-    state.garage.splice(carIdx, 1);
-    state.player.cash = (state.player.cash || 0) + cnt.reward;
-    addXp(60);
-
-    state.contracts = state.contracts.filter(c => c.id !== cnt.id);
-    if (state.contracts.length < 2) generateContracts();
-
-    saveState();
-    updateHeaderUI();
-    renderContracts();
-    if (typeof renderGarage === 'function') renderGarage();
-    playSound('win');
-    tgHaptic('success');
-    openVerdictModal("КОНТРАКТ ВЫПОЛНЕН! 🤝", "Синдикат принял «" + car.name + "». Выплата: +" + cnt.reward.toLocaleString() + " ₽", true, cnt.reward);
-    activeContractForDelivery = null;
-}
-
-// ========================================================
-// 8. СЛУЧАЙНЫЕ СОБЫТИЯ В ГАРАЖЕ (УГОН, ДТП, СТРАХОВКА)
-// ========================================================
-function triggerGarageRandomEvent() {
-    if (!state.garage || state.garage.length === 0) return;
-    if (typeof GARAGE_RANDOM_EVENTS === 'undefined') return;
-    if (Math.random() > 0.18) return; 
-
-    const carIdx = Math.floor(Math.random() * state.garage.length);
-    const car = state.garage[carIdx];
-    if (!car || car.impounded) return;
-
-    const event = GARAGE_RANDOM_EVENTS[Math.floor(Math.random() * GARAGE_RANDOM_EVENTS.length)];
-    if (!event) return;
-
-    setTxt('garageEventTitle', event.title);
-    setTxt('garageEventBadge', event.badge);
-    setTxt('garageEventDesc', event.desc);
-    setTxt('garageEventCarName', `${car.name} (${car.customPlate || car.plate || "ТРАНЗИТ"})`);
-
-    const actionsBox = document.getElementById('garageEventActions');
-    if (!actionsBox) return;
-
-    if (event.id === 'hit_and_run') {
-        setTxt('garageEventEmoji', "💥");
-        if (car.insurance === 'casco') {
-            actionsBox.innerHTML = `
-            <div class="sub-label mb-2 color-green">✓ Полис КАСКО активен! Страховая полностью покрыла ремонт.</div>
-            <button onclick="resolveGarageEvent('insure_payout', ${carIdx}, 0)" class="btn btn-green w-full">Получить бесплатный ремонт</button>`;
-        } else {
-            actionsBox.innerHTML = `
-            <button onclick="resolveGarageEvent('pay_repair', ${carIdx}, ${event.impact.repairCost})" class="btn btn-dark w-full">Отремонтировать (${event.impact.repairCost.toLocaleString()} ₽)</button>
-            <button onclick="resolveGarageEvent('ignore_damage', ${carIdx}, 0)" class="btn btn-danger w-full">Оставить вмятину (-25% состояния)</button>`;
-        }
-    } else if (event.id === 'theft_attempt') {
-        setTxt('garageEventEmoji', "🚨");
-        if (car.insurance === 'casco' || (state.player.furniture && state.player.furniture.includes('home_cctv'))) {
-            actionsBox.innerHTML = `
-            <div class="sub-label mb-2 color-green">✓ Охрана жилья и КАСКО предотвратили кражу! Замки заменены по страховке.</div>
-            <button onclick="resolveGarageEvent('insure_payout', ${carIdx}, 0)" class="btn btn-green w-full">Отлично</button>`;
-        } else {
-            actionsBox.innerHTML = `
-            <button onclick="resolveGarageEvent('pay_repair', ${carIdx}, ${event.impact.repairCost})" class="btn btn-dark w-full">Заменить личинки и замки (${event.impact.repairCost.toLocaleString()} ₽)</button>
-            <button onclick="resolveGarageEvent('reshala_guard', ${carIdx}, 0)" class="btn btn-purple w-full">Звонок Решале (1 🤝 Связь)</button>`;
-        }
-    } else if (event.id === 'bailiff_arrest') {
-        setTxt('garageEventEmoji', "⚖️");
-        actionsBox.innerHTML = `
-        <button onclick="resolveGarageEvent('reshala_legalize', ${carIdx}, 0)" class="btn btn-purple w-full">Решить вопрос через Артура (2 🤝 Связи)</button>
-        <button onclick="resolveGarageEvent('accept_arrest', ${carIdx}, 0)" class="btn btn-dark w-full">Принять запрет (Учёт аннулирован)</button>`;
-    } else if (event.id === 'urgent_buyer_call') {
-        setTxt('garageEventEmoji', "📞");
-        let offer = Math.round((car.marketValue || 100000) * (1 + (event.impact.instantOfferBonus || 0.15)));
-        actionsBox.innerHTML = `
-        <button onclick="resolveGarageEvent('quick_sale', ${carIdx}, ${offer})" class="btn btn-green w-full">Продать сразу за ${offer.toLocaleString()} ₽ 🤝</button>
-        <button onclick="closeModal('modalGarageEvent')" class="btn btn-dark w-full">Отказаться от выкупа</button>`;
-    }
-
-    const modal = document.getElementById('modalGarageEvent');
-    if (modal) modal.classList.add('active');
-    playSound('error');
-    tgHaptic('warning');
-}
-
-function resolveGarageEvent(action, carIdx, param) {
-    const car = state.garage[carIdx];
-    closeModal('modalGarageEvent');
-    if (!car) return;
-
-    if (action === 'insure_payout') {
-        playSound('win');
-        tgHaptic('success');
-        showToast("🛡️ Страховая компания полностью покрыла ущерб!");
-    } else if (action === 'pay_repair') {
-        let cash = state.player?.cash || 0;
-        if (cash < param) {
-            car.condition = Math.max(20, (car.condition || 80) - 20);
-            showToast("Не хватило денег на ремонт! Состояние авто снизилось.");
-        } else {
-            state.player.cash -= param;
-            showToast(`Ремонт оплачен (-${param.toLocaleString()} ₽)`);
-        }
-    } else if (action === 'ignore_damage') {
-        car.condition = Math.max(15, (car.condition || 80) - 25);
-        if (car.bodyThickness) car.bodyThickness.wings = 280;
-        showToast("Кузов замят. Оценка авто снизилась.");
-    } else if (action === 'reshala_guard') {
-        let conn = state.player?.connections || 0;
-        if (conn >= 1) {
-            state.player.connections -= 1;
-            showToast("🤝 Решала нашёл хулиганов и возместил ущерб!");
-        } else {
-            showToast("Связей нет! Пришлось зафиксировать повреждения.");
-            car.condition = Math.max(20, (car.condition || 80) - 20);
-        }
-    } else if (action === 'reshala_legalize') {
-        let conn = state.player?.connections || 0;
-        if (conn >= 2) {
-            state.player.connections -= 2;
-            car.unregistered = false;
-            showToast("🤝 Артур снял запрет регдействий в базе ГИБДД!");
-        } else {
-            car.unregistered = true;
-            showToast("Недостаточно связей! Учёт автомобиля аннулирован.");
-        }
-    } else if (action === 'quick_sale') {
-        state.garage.splice(carIdx, 1);
-        state.player.cash = (state.player.cash || 0) + param;
-        addXp(45);
-        showToast(`Автомобиль моментально выкуплен за ${param.toLocaleString()} ₽!`);
-        playSound('win');
-        tgHaptic('success');
-    }
-
-    saveState();
-    updateHeaderUI();
-    renderGarage();
-}
-
-// ========================================================
-// 9. ЛОМБАРД, СМЕНА ДНЯ, РАЦИОН, АВТО-ПОДСТАВЫ
-// ========================================================
-function takeLoan(amount) {
-    let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
-    if (debt >= 1000000) return showToast("Лимит долга исчерпан!");
-
-    state.player.cash = (state.player.cash || 0) + (amount * 0.95);
-    state.player.loanDebt = debt + amount;
-    saveState();
-    updateHeaderUI();
-    showToast("Одобрено: " + amount.toLocaleString() + " ₽ (Комиссия 5%)");
-}
-
-function repayLoan(percent) {
-    let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
-    if (debt <= 0) return showToast("У вас нет задолженности!");
-
-    let amt = Math.ceil(debt * (percent / 100));
-    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < amt) return showToast("Не хватает денег для оплаты!");
-
-    state.player.cash -= amt;
-    state.player.loanDebt = Math.max(0, debt - amt);
-    saveState();
-    updateHeaderUI();
-    showToast("Оплачено " + amt.toLocaleString() + " ₽ долга");
+    setTimeout(() => { 
+        triggerRandomRoadEvent(); 
+        triggerGarageRandomEvent();
+    }, 800);
 }
 
 function triggerRandomRoadEvent() {
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
     if (lvl < 5) return;
 
-    if (Math.random() < 0.08) { 
+    let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
+    let podstavaChance = karma < 40 ? 0.16 : 0.07;
+
+    if (Math.random() < podstavaChance) { 
         const modal = document.getElementById('modalAutoPodstava');
         if (modal) modal.classList.add('active');
         try { playSound('error'); tgHaptic('error'); } catch(e){}
@@ -1232,8 +951,8 @@ function resolvePodstava(action) {
         saveState(); updateHeaderUI();
         openVerdictModal("РЕШАЛА РАЗРУЛИЛ", "Один звонок Артуру, и «братки» с извинениями уехали. Связь потрачена.", true);
     } else if (action === 'fight') {
-        let karma = (state.player && state.player.karma) ? state.player.karma : 50;
-        let winChance = karma > 70 ? 0.6 : 0.3;
+        let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
+        let winChance = karma > 70 ? 0.75 : (karma < 35 ? 0.25 : 0.45);
         
         if (Math.random() < winChance) {
             state.player.karma = Math.min(100, karma + 10);
@@ -1253,68 +972,6 @@ function resolvePodstava(action) {
             openVerdictModal("ВАС ИЗБИЛИ И РАЗБИЛИ АВТО", "Численный перевес был не на вашей стороне. Ваша машина сильно помята.", false);
         }
     }
-}
-
-function nextDayAction() {
-    state.player.day = (state.player.day || 1) + 1;
-    state.player.expressTickets = state.player.maxExpressTickets ? state.player.maxExpressTickets : 25;
-    state.player.consecutiveRaces = 0;
-
-    let curId = (state.player && state.player.housingId) ? state.player.housingId : 'room';
-    let isOwn = (state.player && state.player.ownedHouses) ? state.player.ownedHouses.includes(curId) : false;
-    if (!isOwn && typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
-        const h = HOUSING_LIST.find(item => item.id === curId);
-        let rentVal = h ? (h.rent || 2500) : 2500;
-        state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
-    }
-
-    if (state.player.furniture && state.player.furniture.includes('home_ps5')) {
-        state.player.mood = Math.min(100, (state.player.mood || 85) + 25);
-    }
-
-    if (state.player.policeImmunityDays && state.player.policeImmunityDays > 0) {
-        state.player.policeImmunityDays -= 1;
-    }
-
-    // НАЧИСЛЕНИЕ +3% ПАССИВНОЙ ПРИБЫЛИ ПО СЕЙФУ ПЕРЕКУПА
-    if (state.player.safeDeposit && state.player.safeDeposit > 0) {
-        let percentEarned = Math.round(state.player.safeDeposit * 0.03);
-        state.player.safeDeposit += percentEarned;
-        spawnFloatingReward(`+${percentEarned.toLocaleString()} ₽ в сейфе`);
-    }
-
-    if (state.businesses) {
-        state.businesses.forEach(b => {
-            if (b && b.level > 0) {
-                if (b.stock > 0) {
-                    b.stock = Math.max(0, b.stock - 20);
-                    let currentStored = b.stored ? b.stored : 0;
-                    let inc = b.income ? b.income : 0;
-                    b.stored = currentStored + (inc * b.level);
-                } else {
-                    showToast("⚠️ Бизнес «" + b.name + "» простаивает из-за нехватки сырья!");
-                }
-            }
-        });
-    }
-
-    state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
-    state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
-
-    saveState();
-    updateHeaderUI();
-    renderHousing();
-    renderBarnFind();
-    checkBusinessAccess();
-    updateCityHubStatus();
-    playSound('tick');
-    tgHaptic('light');
-    showToast("Наступил новый игровой день ☀️ Кассы и сейф пополнились!");
-
-    setTimeout(() => { 
-        triggerRandomRoadEvent(); 
-        triggerGarageRandomEvent();
-    }, 800);
 }
 
 function renderDiets() {
@@ -1362,7 +1019,7 @@ function renderLifeChat() {
         } else {
             state.lifeChatMessages = [
                 { sender: "Колян_99", text: "Кто на кольце сегодня? ДПСников вроде нет." },
-                { sender: "Артур_Решала", text: "Номера 777 в наличии, пишите в личку." }
+                { sender: "Артур_Решала", text: "Номера 777 в наличии, пишите в приложении." }
             ];
         }
     }
@@ -1396,11 +1053,11 @@ function sendChatMessageFromInput() {
 }
 
 function roadAssistanceAction() {
-    let fuel = (state.player && state.player.fuel) ? state.player.fuel : 0;
+    let fuel = (state.player && state.player.fuel !== undefined) ? state.player.fuel : 0;
     if (fuel < 10) return showToast("Нужно 10 ⛽ бензина для выезда!");
     state.player.fuel -= 10;
 
-    let karma = (state.player && state.player.karma) ? state.player.karma : 0;
+    let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     if (Math.random() < 0.65) {
         state.player.karma = Math.min(100, karma + 12);
         showToast("Вы прикурили аккумулятор на трассе! (+12 Кармы 😊)");
@@ -1421,7 +1078,7 @@ function donatePartsToMechanic() {
     state.player.cash -= 35000;
     let conn = (state.player && state.player.connections) ? state.player.connections : 0;
     state.player.connections = conn + 1;
-    let karma = (state.player && state.player.karma) ? state.player.karma : 0;
+    let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     state.player.karma = Math.min(100, karma + 8);
 
     saveState();
@@ -1434,7 +1091,7 @@ function bigCharityDonate() {
     if (cash < 100000) return showToast("Нужно 100,000 ₽!");
 
     state.player.cash -= 100000;
-    let karma = (state.player && state.player.karma) ? state.player.karma : 0;
+    let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     state.player.karma = Math.min(100, karma + 25);
 
     saveState();
@@ -1443,7 +1100,7 @@ function bigCharityDonate() {
 }
 
 // ========================================================
-// 10. ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
+// 8. ВИЛСПИН, НАПЁРСТКИ, КАЗИНО 21, АЗС, ADSGRAM
 // ========================================================
 const WHEEL_SECTORS = [
     { label: "150,000 ₽", color: "#00e676", textColor: "#000", reward: { cash: 150000 } },
@@ -1542,7 +1199,7 @@ function spinWheelAction(isFree) {
         const prize = WHEEL_SECTORS[winningIdx];
         if (prize.reward.cash) state.player.cash += prize.reward.cash;
         if (prize.reward.stars) state.player.stars += prize.reward.stars;
-        if (prize.reward.fuel) state.player.fuel = Math.min(100, state.player.fuel + prize.reward.fuel);
+        if (prize.reward.fuel) state.player.fuel = Math.min(100, (state.player.fuel || 0) + prize.reward.fuel);
         if (prize.reward.connections) state.player.connections = (state.player.connections || 0) + prize.reward.connections;
 
         saveState();

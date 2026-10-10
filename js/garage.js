@@ -1,5 +1,5 @@
 // ========================================================
-// js/garage.js — ГАРАЖ, ИНДИВИДУАЛЬНЫЙ ТЮНИНГ ТАЧЕК, OBD2 (v0.4.0)
+// js/garage.js — ГАРАЖ, ИНДИВИДУАЛЬНЫЙ ТЮНИНГ ТАЧЕК, OBD2 (v0.4.2)
 // ========================================================
 
 let selectedCarIndex = null; 
@@ -102,6 +102,8 @@ function renderGarage() {
                 "<span>⚠ <b>" + defectText + "</b></span>" +
                 "<button onclick='repairCarDefect(" + idx + ")' class='btn btn-amber btn-auto btn-sm'>Капиталка (" + dCost.toLocaleString() + " ₽)</button>" +
             "</div>";
+        } else if (car.isOverhauled) {
+            defectBlock = "<div class='mb-2 text-xs color-green font-bold'><i class='fa-solid fa-check-circle'></i> Мотор после честной капиталки (+Карма)</div>";
         }
 
         let impoundedBlock = "";
@@ -136,7 +138,6 @@ function renderGarage() {
             "</div>";
         }
 
-        // Блок статуса страховки КАСКО / ОСАГО
         let insuranceBadge = "";
         if (car.insurance === 'casco') {
             insuranceBadge = "<span class='tag-badge bg-tag-green' style='margin-left:4px;'>🛡️ КАСКО</span>";
@@ -296,7 +297,7 @@ function openPreviewModal(idx) {
 
     const obdBtn = document.getElementById("btnPreviewObdScan");
     if (obdBtn) {
-        let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_elm || state.player.tools.obd_launch));
+        let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
         if (hasScanner) {
             obdBtn.innerText = "OBD2 Сканер";
             obdBtn.className = "btn btn-cyan";
@@ -484,7 +485,7 @@ function applyPreSaleMod(type) {
         if (cash < 6000) return showToast("Не хватает 6,000 ₽!"); 
         state.player.cash -= 6000; 
         car.hasAdditive = true; 
-        showToast("🧪 «Медовая» присадка залита! Стук мотора заглушен."); 
+        showToast("🧪 «Медовая» присадка залита! Стук мотора заглушен. (Внимание: дотошный покупатель может раскрыть!)"); 
     } else if (type === 'odometer') { 
         if (car.rolledOdometer) return showToast("Пробег уже скручивался!"); 
         if (cash < 8000) return showToast("Не хватает 8,000 ₽!"); 
@@ -499,7 +500,7 @@ function applyPreSaleMod(type) {
         let cPlate = car.customPlate ? car.customPlate : (car.plate ? car.plate : "ТРАНЗИТ");
         car.marketValue = car.baseMarketValue + calculatePlateValue(cPlate); 
         car.rolledOdometer = true; 
-        showToast("⏳ Пробег скручен вдвое! Машина помолодела."); 
+        showToast("⏳ Пробег скручен вдвое! (Осторожно: сканер подборщика может раскрыть обман!)"); 
     } 
     
     saveState(); 
@@ -507,6 +508,9 @@ function applyPreSaleMod(type) {
     openPreSaleModal(activePreSaleCarIndex);
 }
 
+// ----------------------------------------------------
+// КАПИТАЛКА И ПОВЫШЕНИЕ КАРМЫ
+// ----------------------------------------------------
 function repairCarDefect(idx) {
     const car = state.garage[idx]; 
     if (!car) return; 
@@ -526,10 +530,17 @@ function repairCarDefect(idx) {
     state.player.cash -= cost; 
     car.hiddenDefect = null; 
     car.hasAdditive = false; 
-    car.condition = 95; 
+    car.condition = 98; 
+    car.isOverhauled = true; // Отметка честного капремонта
+
+    // РОСТ КАРМЫ ЗА ЧЕСТНЫЙ РЕМОНТ
+    state.player.karma = Math.min(100, (state.player.karma || 50) + 8);
+
     saveState(); 
     renderGarage(); 
-    showToast("Дефект устранён!");
+    playSound('win');
+    tgHaptic('success');
+    showToast("🔧 Капремонт узлов завершён! Машина в идеале, Карма выросла (+8)!");
 }
 
 // ----------------------------------------------------
@@ -537,7 +548,7 @@ function repairCarDefect(idx) {
 // ----------------------------------------------------
 function openOBD2Modal() {
     if (selectedCarIndex === null) return; 
-    let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_elm || state.player.tools.obd_launch));
+    let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
     if (!hasScanner) return showToast("🔒 Требуется OBD2-сканер! Купите его в Маркете.");
 
     obdActiveCarIdx = selectedCarIndex; 
@@ -591,6 +602,9 @@ function repairOBDErrorFromScanner() {
     
     state.player.cash -= cost; 
     car.hiddenDefect = null; 
+    car.hasAdditive = false;
+    car.isOverhauled = true;
+
     if (!car.wear) car.wear = { engine: 90, transmission: 90 };
     car.wear.engine = Math.max(90, (car.wear.engine || 90) + 30); 
     car.wear.transmission = Math.max(90, (car.wear.transmission || 90) + 30); 
@@ -601,10 +615,13 @@ function repairOBDErrorFromScanner() {
     let cPlate = car.customPlate ? car.customPlate : (car.plate ? car.plate : "ТРАНЗИТ");
     car.marketValue = car.baseMarketValue + calculatePlateValue(cPlate); 
     
+    // РОСТ КАРМЫ
+    state.player.karma = Math.min(100, (state.player.karma || 50) + 6);
+
     saveState(); 
     closeOBD2Modal(); 
     renderGarage(); 
-    showToast("Ремонт узлов выполнен успешно!"); 
+    showToast("Ремонт узлов выполнен! Карма перекупа выросла (+6)!"); 
 }
 
 // ----------------------------------------------------
@@ -694,7 +711,7 @@ function installPlateOnCar(plate, plateIdx) {
 }
 
 // ----------------------------------------------------
-// СПОРТИВНЫЙ ТЮНИНГ (ПРИВЯЗКА К КАЖДОЙ МАШИНЕ ОТДЕЛЬНО)
+// СПОРТИВНЫЙ ТЮНИНГ
 // ----------------------------------------------------
 function updateTuningRiskUI(car) { 
     let risk = (car && car.tuning && car.tuning.risk1251) ? car.tuning.risk1251 : 0;
@@ -992,7 +1009,7 @@ function confirmPutOnLot() {
     closeModal("modalPutOnLot"); 
     state.garage.splice(carToLotIndex, 1); 
     
-    // ИСПРАВЛЕНИЕ БАГА ТАЙМЕРА: единый расчёт для maxTimer и timer (старт строго с 0%)
+    // Таймер поиска покупателя стартует строго с 0%
     const waitTime = Math.floor(60 + Math.random() * 180);
     if (!state.salesLot) state.salesLot = [];
     state.salesLot.push({ 
