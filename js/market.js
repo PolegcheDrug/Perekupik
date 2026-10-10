@@ -1,9 +1,24 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, РЕЕСТР УНИКАЛЬНЫХ НОМЕРОВ, ДКП (v0.4.3)
+// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.4.4)
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
 const REGIONS = ['77', '99', '97', '177', '199', '777', '799', '50', '90', '150', '190', '750'];
+
+function t(key) {
+    let lang = state.lang || 'ru';
+    if (typeof I18N_TRANSLATIONS !== 'undefined' && I18N_TRANSLATIONS[lang] && I18N_TRANSLATIONS[lang][key]) {
+        return I18N_TRANSLATIONS[lang][key];
+    }
+    return key;
+}
+
+function getCategoryFallback(type) {
+    if (typeof CAR_FALLBACKS_BY_CATEGORY !== 'undefined' && CAR_FALLBACKS_BY_CATEGORY[type]) {
+        return CAR_FALLBACKS_BY_CATEGORY[type];
+    }
+    return "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80";
+}
 
 function generateRawNormalPlate() {
     const l1 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
@@ -167,7 +182,7 @@ function refreshMarketFeedManual() {
 }
 
 // ----------------------------------------------------
-// ГЕНЕРАТОР РАЗНООБРАЗИЯ И ЧЕСТНОГО БАЛАНСА НОМЕРОВ
+// ГЕНЕРАТОР ПРЕДЛОЖЕНИЙ С ТОЧНЫМИ ФОТО-ФОЛЛБЭКАМИ
 // ----------------------------------------------------
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
@@ -224,7 +239,7 @@ function populateMarketFeed() {
         let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
 
         let baseP = template.basePrice ? template.basePrice : 100000;
-        let tType = template.type ? template.type : 'economy';
+        let tType = template.type ? template.type : cat;
         const dynPrice = getDynamicPrice(baseP, tType);
 
         let carOnlyPrice = Math.round(dynPrice * priceMultiplier);
@@ -275,9 +290,10 @@ function populateMarketFeed() {
             sNote = SELLER_ADS_PHRASES[Math.floor(Math.random() * SELLER_ADS_PHRASES.length)];
         }
 
-        let cName = template.name ? template.name : "Автомобиль";
+        let cName = template.name ? template.name : "Техника";
         let cPower = template.power ? template.power : 100;
-        let cImg = template.img ? template.img : "assets/cars/economy/vaz-2107.jpg";
+        let cImg = template.img ? template.img : "";
+        let cFallback = template.fallback || getCategoryFallback(tType);
 
         let cCond = hasHiddenDefect ? Math.floor(40 + Math.random() * 30) : Math.floor(75 + Math.random() * 20);
         if (cat === 'premium' || cat === 'hyper') cCond = Math.max(65, cCond);
@@ -303,6 +319,7 @@ function populateMarketFeed() {
             baseMarketValue: baseVal,
             marketValue: baseVal + plateVal,
             img: cImg,
+            fallback: cFallback,
             plate: genPlate,
             isStolen: isStolen,
             autotekaChecked: false,
@@ -350,7 +367,7 @@ function renderMarketFeed() {
     const now = Date.now();
 
     if (!state.marketFeed || state.marketFeed.length === 0) {
-        container.innerHTML = "<div class='glass-card text-center py-6 sub-label'>Нет предложений на рынке. Выберите класс и нажмите «Обновить ленту»!</div>";
+        container.innerHTML = `<div class='glass-card text-center py-6 sub-label'>${t('classes_title')}: нет активных лотов. Нажмите «${t('btn_refresh_market')}»!</div>`;
         return;
     }
     
@@ -367,9 +384,11 @@ function renderMarketFeed() {
         let carPrice = (typeof car.price === 'number') ? car.price.toLocaleString() : "100 000";
         let carMarketVal = (typeof car.marketValue === 'number') ? car.marketValue.toLocaleString() : carPrice;
         let carType = car.type ? car.type.toUpperCase() : "CAR";
-        let carImg = car.img ? car.img : "assets/cars/economy/vaz-2107.jpg";
         
-        let viewedBadge = car.viewed ? "<div class='viewed-badge'><i class='fa-solid fa-eye'></i> Просмотрено</div>" : "";
+        let fallbackUrl = car.fallback || getCategoryFallback(car.type);
+        let carImg = car.img ? car.img : fallbackUrl;
+        
+        let viewedBadge = car.viewed ? `<div class='viewed-badge'><i class='fa-solid fa-eye'></i> ${t('inspected')}</div>` : "";
         let busyClass = isBusy ? "busy" : "";
         let viewedClass = car.viewed ? "viewed-card" : "";
         let sellerNoteBlock = car.sellerNote ? "<div class='seller-note-card'>" + car.sellerNote + "</div>" : "";
@@ -380,49 +399,57 @@ function renderMarketFeed() {
 
         let dealBadge = "";
         if (car.dealType === 'urgent') {
-            dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🔥 СРОЧНО</span>";
+            dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🔥 URGENT</span>";
         } else if (car.dealType === 'overprice') {
-            dealBadge = "<span class='tag-badge bg-tag-red ml-1'>⚠️ ОВЕРПРАЙС</span>";
+            dealBadge = "<span class='tag-badge bg-tag-red ml-1'>⚠️ OVERPRICE</span>";
         }
 
         let carName = car.name ? car.name : "Автомобиль";
         let carPower = car.power ? car.power : 100;
         let carPlate = car.plate ? car.plate : "ТРАНЗИТ";
 
-        htmlContent += 
-        "<div class='glass-card mb-3 " + busyClass + " " + viewedClass + "' id='card_" + car.id + "'>" +
-            viewedBadge +
-            "<div class='cooldown-timer'>" +
-                "<div class='timer-clock' id='timer_num_" + car.id + "'>" + timeLeft + "с</div>" +
-                "<div class='timer-text'>Абонент занят</div>" +
-                "<button onclick=\"paidCallMarketCar('" + car.id + "')\" class='btn btn-amber' style='width: 80%;'>Платный дозвон (1000 ₽)</button>" +
-            "</div>" +
-            "<div class='car-img-wrap'>" +
-                "<img src='" + carImg + "' class='car-img' onerror=\"this.src='assets/cars/economy/vaz-2107.jpg'\">" +
-                "<div class='badge-tag' style='bottom: 8px; right: 8px;'>" + carType + dealBadge + "</div>" +
-                "<div class='plate-corner'><div class='license-plate'>" + carPlate + " <div class='license-flag'>RUS</div></div></div>" +
-            "</div>" +
-            "<div class='mb-2'>" +
-                "<h4 class='font-bold'>" + carName + "</h4>" +
-                "<div class='sub-label mb-2'>" + carPower + " л.с. / Пробег: " + carMileage + " км</div>" +
-                sellerNoteBlock +
-            "</div>" +
-            "<div class='price-box'>" +
-                "<div>" +
-                    "<span class='text-xs color-green font-bold'>ЦЕНА:</span>" +
-                    "<div class='price-val' id='price_txt_" + car.id + "'>" + carPrice + " ₽</div>" +
-                "</div>" +
-                "<div class='sub-label'>Оценка рынка: ~" + carMarketVal + " ₽</div>" +
-            "</div>" +
-            "<div class='grid-3 mb-2'>" +
-                "<button onclick=\"openGaugeModal('" + car.id + "')\" class='btn btn-dark btn-sm'>Толщиномер " + toolIcon + "</button>" +
-                "<button onclick=\"quickOBDScanMarketCar('" + car.id + "')\" class='btn btn-dark btn-sm'>" + obdIcon + "</button>" +
-                "<button onclick=\"openAutotekaModal('" + car.id + "')\" class='btn btn-dark btn-sm'>Автотека (" + autoIcon + ")</button>" +
-            "</div>" +
-            "<button onclick=\"initiateBuyMarketCar('" + car.id + "')\" class='btn btn-cyan w-full'>" +
-                "<i class='fa-solid fa-phone'></i> Позвонить продавцу" +
-            "</button>" +
-        "</div>";
+        htmlContent += `
+        <div class='glass-card mb-3 ${busyClass} ${viewedClass}' id='card_${car.id}'>
+            ${viewedBadge}
+            
+            <!-- ОВЕРЛЕЙ КУЛДАУНА (БЛОКИРУЕТ МЕРЦАНИЕ) -->
+            <div class='cooldown-timer notranslate' translate='no' style='${isBusy ? "display:flex !important;" : "display:none !important;"}'>
+                <div class='timer-clock notranslate' translate='no' id='timer_num_${car.id}'>${timeLeft}с</div>
+                <div class='timer-text'>${t('busy_subscriber')}</div>
+                <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>${t('paid_call')} (1000 ₽)</button>
+            </div>
+
+            <!-- КАРТИНКА С КАТЕГОРИЗИРОВАННЫМ ФОЛЛБЭКОМ -->
+            <div class='car-img-wrap'>
+                <img src='${carImg}' class='car-img' onerror="this.onerror=null; this.src='${fallbackUrl}';">
+                <div class='badge-tag' style='bottom: 8px; right: 8px;'>${carType} ${dealBadge}</div>
+                <div class='plate-corner'><div class='license-plate notranslate' translate='no'>${carPlate} <div class='license-flag'>RUS</div></div></div>
+            </div>
+
+            <div class='mb-2'>
+                <h4 class='font-bold'>${carName}</h4>
+                <div class='sub-label mb-2'>${carPower} л.с. / Пробег: ${carMileage} км</div>
+                ${sellerNoteBlock}
+            </div>
+
+            <div class='price-box'>
+                <div>
+                    <span class='text-xs color-green font-bold'>${t('price')}:</span>
+                    <div class='price-val notranslate' translate='no' id='price_txt_${car.id}'>${carPrice} ₽</div>
+                </div>
+                <div class='sub-label'>${t('market_estimate')}: ~${carMarketVal} ₽</div>
+            </div>
+
+            <div class='grid-3 mb-2'>
+                <button onclick="openGaugeModal('${car.id}')" class='btn btn-dark btn-sm'>${t('thickness_gauge')} ${toolIcon}</button>
+                <button onclick="quickOBDScanMarketCar('${car.id}')" class='btn btn-dark btn-sm'>${obdIcon}</button>
+                <button onclick="openAutotekaModal('${car.id}')" class='btn btn-dark btn-sm'>${t('autoteka')} (${autoIcon})</button>
+            </div>
+
+            <button onclick="initiateBuyMarketCar('${car.id}')" class='btn btn-cyan w-full'>
+                <i class='fa-solid fa-phone'></i> ${t('call_seller')}
+            </button>
+        </div>`;
     });
     
     container.innerHTML = htmlContent;
@@ -557,7 +584,11 @@ function openMarketDeal(carId) {
     pendingMarketCar = { car: car, carIndex: carIndex };
     
     const imgEl = document.getElementById("dealCarImg");
-    if (imgEl) imgEl.src = car.img ? car.img : "";
+    if (imgEl) {
+        let fallbackUrl = car.fallback || getCategoryFallback(car.type);
+        imgEl.src = car.img ? car.img : fallbackUrl;
+        imgEl.onerror = () => { imgEl.src = fallbackUrl; };
+    }
     
     let cName = car.name ? car.name : "Авто";
     setTxt("dealCarTitle", cName); 
@@ -903,37 +934,37 @@ function openAutotekaModal(carId) {
         let transWear = car.wear?.transmission ? Math.round(car.wear.transmission) : 85;
         let avgTech = Math.round((engWear + transWear) / 2);
 
-        rep.innerHTML = 
-            "<div class='flex-between mb-2'>" +
-                "<div>" +
-                    "<b class='color-cyan' style='font-size:13px;'>" + cName + "</b>" +
-                    "<div class='sub-label'>Госномер: <span class='license-plate text-xs' style='padding:1px 4px;'>" + cPlate + "</span></div>" +
-                "</div>" +
-                legalStatus +
-            "</div>" +
+        rep.innerHTML = `
+            <div class='flex-between mb-2'>
+                <div>
+                    <b class='color-cyan' style='font-size:13px;'>${cName}</b>
+                    <div class='sub-label'>Госномер: <span class='license-plate text-xs notranslate' translate='no' style='padding:1px 4px;'>${cPlate}</span></div>
+                </div>
+                ${legalStatus}
+            </div>
 
-            "<div class='p-2 mb-2' style='background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);'>" +
-                "<div class='flex-between text-xs mb-1'>" +
-                    "<span>Зафиксированный пробег:</span>" +
-                    "<b class='color-amber'>" + mVal.toLocaleString() + " км</b>" +
-                "</div>" +
-                "<div class='biz-progress-track'><div class='biz-progress-fill fill-biz-stock' style='width:" + mileagePercent + "%;'></div></div>" +
-                "<div class='text-right'>" + odoWarning + "</div>" +
-            "</div>" +
+            <div class='p-2 mb-2' style='background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);'>
+                <div class='flex-between text-xs mb-1'>
+                    <span>Зафиксированный пробег:</span>
+                    <b class='color-amber notranslate' translate='no'>${mVal.toLocaleString()} км</b>
+                </div>
+                <div class='biz-progress-track'><div class='biz-progress-fill fill-biz-stock' style='width:${mileagePercent}%;'></div></div>
+                <div class='text-right'>${odoWarning}</div>
+            </div>
 
-            "<div class='p-2 mb-2' style='background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);'>" +
-                "<div class='flex-between text-xs mb-1'>" +
-                    "<span>Ресурс силовых агрегатов:</span>" +
-                    "<b class='color-green'>" + avgTech + "%</b>" +
-                "</div>" +
-                "<div class='biz-progress-track'><div class='biz-progress-fill fill-biz-lvl' style='width:" + avgTech + "%;'></div></div>" +
-                "<div class='sub-label text-xs'>Мотор: " + engWear + "% | КПП: " + transWear + "%</div>" +
-            "</div>" +
+            <div class='p-2 mb-2' style='background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);'>
+                <div class='flex-between text-xs mb-1'>
+                    <span>Ресурс силовых агрегатов:</span>
+                    <b class='color-green notranslate' translate='no'>${avgTech}%</b>
+                </div>
+                <div class='biz-progress-track'><div class='biz-progress-fill fill-biz-lvl' style='width:${avgTech}%;'></div></div>
+                <div class='sub-label text-xs notranslate' translate='no'>Мотор: ${engWear}% | КПП: ${transWear}%</div>
+            </div>
 
-            "<div class='flex-between text-xs p-2' style='background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);'>" +
-                "<span>История ДТП и расчёты ремонтов:</span>" +
-                "<span class='tag-badge " + dtpBadgeClass + "'>" + dtpCount + "</span>" +
-            "</div>";
+            <div class='flex-between text-xs p-2' style='background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);'>
+                <span>История ДТП и расчёты ремонтов:</span>
+                <span class='tag-badge ${dtpBadgeClass}'>${dtpCount}</span>
+            </div>`;
     }
     
     const modal = document.getElementById("modalAutoteka");
@@ -942,20 +973,30 @@ function openAutotekaModal(carId) {
     renderMarketFeed();
 }
 
+// ----------------------------------------------------
+// ОБНОВЛЕНИЕ ТАЙМЕРОВ БЕЗ ПЕРЕРИСОВКИ DOM
+// (ПРЕДОТВРАЩАЕТ МЕРЦАНИЕ ПРИ ПЕРЕВОДЕ)
+// ----------------------------------------------------
 function updateMarketTimers() {
     if (!state.marketFeed) return;
     const now = Date.now();
-    let needRender = false;
+    let needFullReRender = false;
+
     state.marketFeed.forEach(car => {
         if (!car) return;
+        const cardEl = document.getElementById("card_" + car.id);
+        const timerNumEl = document.getElementById("timer_num_" + car.id);
+
         if (car.cooldownUntil && car.cooldownUntil > now) {
             const timeLeft = Math.ceil((car.cooldownUntil - now) / 1000);
-            const el = document.getElementById("timer_num_" + car.id);
-            if (el) el.innerText = timeLeft + "с";
+            if (timerNumEl) timerNumEl.innerText = timeLeft + "с";
+            if (cardEl && !cardEl.classList.contains('busy')) cardEl.classList.add('busy');
         } else if (car.cooldownUntil && car.cooldownUntil <= now) {
             car.cooldownUntil = 0;
-            needRender = true;
+            if (cardEl) cardEl.classList.remove('busy');
+            needFullReRender = true;
         }
     });
-    if (needRender) renderMarketFeed();
+
+    if (needFullReRender) renderMarketFeed();
 }
