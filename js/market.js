@@ -1,5 +1,6 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.4.4)
+// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.4.5)
+// Полная связка с алгоритмом ценности госномеров и торгом
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -39,7 +40,7 @@ function generateRawCoolPlate() {
         const l2 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
         letters = l1 + l2 + l2;
     }
-    const coolNums = ['111', '222', '333', '444', '555', '666', '777', '888', '999', '007', '001'];
+    const coolNums = ['111', '222', '333', '444', '555', '666', '777', '888', '999', '007', '001', '100', '700'];
     const num = coolNums[Math.floor(Math.random() * coolNums.length)];
     const reg = ['77', '99', '97', '777', '50'][Math.floor(Math.random() * 5)];
     return letters.charAt(0) + num + letters.substring(1) + " " + reg;
@@ -55,7 +56,7 @@ function getUniquePlate(preferCool = false) {
     do {
         attempts++;
         plateCandidate = preferCool ? generateRawCoolPlate() : generateRawNormalPlate();
-    } while (state.registeredPlates.includes(plateCandidate) && attempts < 30);
+    } while (state.registeredPlates.includes(plateCandidate) && attempts < 35);
 
     state.registeredPlates.push(plateCandidate);
     return plateCandidate;
@@ -75,15 +76,15 @@ function evaluatePlate(plateStr) {
     }
     if (!plateStr) return 0;
     if (String(plateStr).startsWith('ТРАНЗИТ')) return 0;
-    return 1500;
+    return 2500;
 }
 
 function refreshPlateCatalog() {
     state.plateCatalog = [];
     for (let i = 0; i < 6; i++) {
-        const isCool = Math.random() < 0.20;
+        const isCool = Math.random() < 0.25;
         let p = isCool ? generateCoolPlate() : generateNormalPlate();
-        const cost = Math.round(evaluatePlate(p) * (1.1 + Math.random() * 0.25));
+        const cost = Math.round(evaluatePlate(p) * (1.05 + Math.random() * 0.20));
         state.plateCatalog.push({ plate: p, price: cost });
     }
 }
@@ -235,7 +236,7 @@ function populateMarketFeed() {
         let isStolen = Math.random() < (dealType === 'urgent' ? 0.20 : 0.10);
         const carId = "m_" + Date.now() + "_" + i;
         
-        let isCoolNumber = Math.random() < 0.035;
+        let isCoolNumber = Math.random() < 0.06; // 6% шанс на блатной номер на кузове
         let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
 
         let baseP = template.basePrice ? template.basePrice : 100000;
@@ -249,12 +250,14 @@ function populateMarketFeed() {
         let sellerPrice = carOnlyPrice;
         let isLuckyFind = false;
 
+        // Если номер дорогой
         if (plateVal > 5000) {
-            if (Math.random() < 0.08) {
+            if (Math.random() < 0.14) {
+                // Продавец не знает цены номеров (перекупский куш!)
                 isLuckyFind = true;
                 sellerPrice = carOnlyPrice;
             } else {
-                let plateMarkup = Math.round(plateVal * (0.80 + Math.random() * 0.15));
+                let plateMarkup = Math.round(plateVal * (0.75 + Math.random() * 0.20));
                 sellerPrice = carOnlyPrice + plateMarkup;
             }
         }
@@ -277,7 +280,7 @@ function populateMarketFeed() {
             sNote = overpriceNotes[Math.floor(Math.random() * overpriceNotes.length)];
         } else if (dealType === 'urgent') {
             sNote = "«Срочно нужны деньги до вечера, отдам с хорошим дисконтом!»";
-        } else if (plateVal > 5000) {
+        } else if (plateVal > 15000) {
             sNote = "«Продаю только вместе с красивым госномером " + genPlate + ", торга нет!»";
         } else if (hasHiddenDefect) {
             const riskyPhrases = [
@@ -312,6 +315,7 @@ function populateMarketFeed() {
             name: cName,
             power: cPower,
             type: tType,
+            drivetrain: template.drivetrain || 'rwd',
             basePrice: baseP,
             mileage: Math.floor(Math.random() * (tType === 'premium' ? 80000 : 180000)) + 15000,
             price: sellerPrice,
@@ -404,6 +408,11 @@ function renderMarketFeed() {
             dealBadge = "<span class='tag-badge bg-tag-red ml-1'>⚠️ OVERPRICE</span>";
         }
 
+        let pVal = evaluatePlate(car.plate);
+        let coolPlateBadge = pVal > 15000 
+            ? "<span class='tag-badge bg-tag-purple ml-1'>🏷️ БЛАТНЫЕ НОМЕРА</span>" 
+            : "";
+
         let carName = car.name ? car.name : "Автомобиль";
         let carPower = car.power ? car.power : 100;
         let carPlate = car.plate ? car.plate : "ТРАНЗИТ";
@@ -412,17 +421,15 @@ function renderMarketFeed() {
         <div class='glass-card mb-3 ${busyClass} ${viewedClass}' id='card_${car.id}'>
             ${viewedBadge}
             
-            <!-- ОВЕРЛЕЙ КУЛДАУНА (БЛОКИРУЕТ МЕРЦАНИЕ) -->
             <div class='cooldown-timer notranslate' translate='no' style='${isBusy ? "display:flex !important;" : "display:none !important;"}'>
                 <div class='timer-clock notranslate' translate='no' id='timer_num_${car.id}'>${timeLeft}с</div>
                 <div class='timer-text'>${t('busy_subscriber')}</div>
                 <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>${t('paid_call')} (1000 ₽)</button>
             </div>
 
-            <!-- КАРТИНКА С КАТЕГОРИЗИРОВАННЫМ ФОЛЛБЭКОМ -->
             <div class='car-img-wrap'>
                 <img src='${carImg}' class='car-img' onerror="this.onerror=null; this.src='${fallbackUrl}';">
-                <div class='badge-tag' style='bottom: 8px; right: 8px;'>${carType} ${dealBadge}</div>
+                <div class='badge-tag' style='bottom: 8px; right: 8px;'>${carType} ${dealBadge} ${coolPlateBadge}</div>
                 <div class='plate-corner'><div class='license-plate notranslate' translate='no'>${carPlate} <div class='license-flag'>RUS</div></div></div>
             </div>
 
@@ -833,6 +840,11 @@ function finishMarketCarBuyProcess(deal) {
         customWheels: false, risk1251: 0 
     };
 
+    // Гарантированный перерасчет рыночной цены в гараже с учетом номера
+    if (typeof recalculateCarMarketValue === 'function') {
+        recalculateCarMarketValue(newCar);
+    }
+
     state.garage.push(newCar);
     
     if (state.marketFeed && state.marketFeed.length > carIndex) {
@@ -973,10 +985,6 @@ function openAutotekaModal(carId) {
     renderMarketFeed();
 }
 
-// ----------------------------------------------------
-// ОБНОВЛЕНИЕ ТАЙМЕРОВ БЕЗ ПЕРЕРИСОВКИ DOM
-// (ПРЕДОТВРАЩАЕТ МЕРЦАНИЕ ПРИ ПЕРЕВОДЕ)
-// ----------------------------------------------------
 function updateMarketTimers() {
     if (!state.marketFeed) return;
     const now = Date.now();

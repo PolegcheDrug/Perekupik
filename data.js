@@ -1,10 +1,101 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.4.4)
-// Локализация (RU/EN), категоризированные фото-фоллбэки
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.4.5)
+// Логика оценки госномеров, характеристики техники,
+// недвижимость, бизнес, раритеты и локализация.
 // ========================================================
 
 // ========================================================
-// СЛОВАРЬ ЛОКАЛИЗАЦИИ (RU / EN)
+// 1. АВТОНОМНЫЙ АЛГОРИТМ ОЦЕНКИ БЛАТНЫХ ГОСНОМЕРОВ
+// ========================================================
+function calculatePlateValue(plateStr) {
+    if (!plateStr || typeof plateStr !== 'string') return 0;
+    const clean = plateStr.trim().toUpperCase();
+    if (clean.includes('ТРАНЗИТ')) return 0;
+
+    let value = 2500; // Базовая пошлина обычного знака
+
+    // Парсинг формата: Б ЦЦЦ ББ РЕГИОН (напр. А777АА 77 или А 777 АА 777)
+    const match = clean.match(/^([А-ЯA-Z])\s*(\d{3})\s*([А-ЯA-Z]{2})\s*(\d{2,3})$/);
+    
+    if (!match) {
+        // Нестандартный номерной знак / архивный формат
+        if (clean.includes('777')) value += 45000;
+        if (clean.includes('ЕКХ') || clean.includes('АМР')) value += 250000;
+        return value;
+    }
+
+    const firstLetter = match[1];
+    const numStr = match[2];
+    const tailLetters = match[3];
+    const regStr = match[4];
+
+    const letters = firstLetter + tailLetters; // 3 буквы
+    const d1 = numStr[0], d2 = numStr[1], d3 = numStr[2];
+
+    // 1. Анализ цифр
+    if (numStr === '777') {
+        value += 350000;
+    } else if (numStr === '001') {
+        value += 280000;
+    } else if (numStr === '007') {
+        value += 220000;
+    } else if (d1 === d2 && d2 === d3) {
+        // 111, 222, 333, 444, 555, 666, 888, 999
+        value += 160000;
+    } else if (numStr.startsWith('00')) {
+        // 002-009
+        value += 95000;
+    } else if (numStr.endsWith('00')) {
+        // 100, 200, 300...900
+        value += 65000;
+    } else if (d1 === d3 && d1 !== d2) {
+        // Зеркальные цифры (101, 727, 959)
+        value += 28000;
+    }
+
+    // 2. Анализ букв (Спецсерии)
+    const specSeries = {
+        'АМР': 850000,
+        'ЕКХ': 1200000,
+        'СКР': 650000,
+        'ВОР': 400000,
+        'САС': 250000,
+        'ХХХ': 300000,
+        'ООО': 320000,
+        'ААА': 280000,
+        'МММ': 260000
+    };
+
+    if (specSeries[letters]) {
+        value += specSeries[letters];
+    } else if (letters[0] === letters[1] && letters[1] === letters[2]) {
+        // Любые три одинаковые буквы (напр. ВВВ, ТТТ)
+        value += 180000;
+    } else if (tailLetters[0] === tailLetters[1]) {
+        // Две одинаковые на конце
+        value += 15000;
+    }
+
+    // 3. Анализ региона
+    const eliteRegions = ['77', '99', '97', '777'];
+    const prestigeRegions = ['177', '199', '799', '50', '90', '150', '190', '750'];
+
+    if (eliteRegions.includes(regStr)) {
+        value = Math.round(value * 1.5);
+    } else if (prestigeRegions.includes(regStr)) {
+        value = Math.round(value * 1.2);
+    }
+
+    // Суперкомбо: если номер вида А777АА 77
+    if (numStr === '777' && regStr === '777' && letters[0] === letters[1] && letters[1] === letters[2]) {
+        value = Math.max(value, 3500000);
+    }
+
+    return value;
+}
+
+// ========================================================
+// 2. СЛОВАРЬ ЛОКАЛИЗАЦИИ (RU / EN)
 // ========================================================
 const I18N_TRANSLATIONS = {
     ru: {
@@ -34,7 +125,8 @@ const I18N_TRANSLATIONS = {
         price: "ЦЕНА",
         thickness_gauge: "Толщиномер",
         autoteka: "Автотека",
-        inspected: "Просмотрено"
+        inspected: "Просмотрено",
+        plate_bonus_tip: "🔥 Установлен блатной номер! Рыночная стоимость повышена."
     },
     en: {
         classes_title: "Vehicle Classes",
@@ -63,12 +155,13 @@ const I18N_TRANSLATIONS = {
         price: "PRICE",
         thickness_gauge: "Paint Gauge",
         autoteka: "History Report",
-        inspected: "Viewed"
+        inspected: "Viewed",
+        plate_bonus_tip: "🔥 Elite plate equipped! Vehicle value boosted."
     }
 };
 
 // ========================================================
-// КАТЕГОРИЗИРОВАННЫЕ ФОТО-ФОЛЛБЭКИ (ЗАЩИТА ОТ СЛЁТА КАРТИНОК)
+// 3. ФОТО-ФОЛЛБЭКИ ПО КАТЕГОРИЯМ
 // ========================================================
 const CAR_FALLBACKS_BY_CATEGORY = {
     economy: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80",
@@ -82,164 +175,167 @@ const CAR_FALLBACKS_BY_CATEGORY = {
     yacht: "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=600&q=80"
 };
 
+// ========================================================
+// 4. КАТАЛОГ ТЕХНИКИ С ХАРАКТЕРИСТИКАМИ ПОД ДРАГ И ДРИФТ
+// ========================================================
 const CAR_DATABASE = {
     economy: [
-        { name: "Ока (ВАЗ-1111)", power: 33, basePrice: 40000, type: "economy", img: "assets/cars/economy/oka.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ЗАЗ-968М «Запорожец»", power: 40, basePrice: 35000, type: "economy", img: "assets/cars/economy/zaz.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Москвич-412", power: 75, basePrice: 50000, type: "economy", img: "assets/cars/economy/moskvich.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ИЖ-2126 «Ода»", power: 73, basePrice: 55000, type: "economy", img: "assets/cars/economy/izh.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ВАЗ-2101 «Копейка»", power: 64, basePrice: 65000, type: "economy", img: "assets/cars/economy/vaz-2101.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ВАЗ-2106 «Шестерка»", power: 75, basePrice: 75000, type: "economy", img: "assets/cars/economy/vaz-2106.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ВАЗ-2107 «Семёрка»", power: 74, basePrice: 95000, type: "economy", img: "assets/cars/economy/vaz-2107.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ВАЗ-2108 «Зубило»", power: 70, basePrice: 110000, type: "economy", img: "assets/cars/economy/vaz-2108.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ВАЗ-2109 «Девятка»", power: 72, basePrice: 125000, type: "economy", img: "assets/cars/economy/vaz-2109.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ВАЗ-2110 «Десятка»", power: 89, basePrice: 135000, type: "economy", img: "assets/cars/economy/vaz-2110.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ВАЗ-2114 «Четырка»", power: 81, basePrice: 140000, type: "economy", img: "assets/cars/economy/vaz-2114.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "ГАЗ-3110 «Волга»", power: 130, basePrice: 120000, type: "economy", img: "assets/cars/economy/volga.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Lada Kalina I", power: 81, basePrice: 220000, type: "economy", img: "assets/cars/economy/kalina.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Lada Priora", power: 98, basePrice: 280000, type: "economy", img: "assets/cars/economy/priora.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Daewoo Matiz", power: 51, basePrice: 120000, type: "economy", img: "assets/cars/economy/matiz.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Daewoo Nexia", power: 80, basePrice: 150000, type: "economy", img: "assets/cars/economy/nexia.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Chevrolet Lanos", power: 86, basePrice: 170000, type: "economy", img: "assets/cars/economy/lanos.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Renault Logan I", power: 75, basePrice: 350000, type: "economy", img: "assets/cars/economy/logan.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Nissan Almera Classic", power: 107, basePrice: 400000, type: "economy", img: "assets/cars/economy/almera.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Ford Focus I", power: 100, basePrice: 300000, type: "economy", img: "assets/cars/economy/focus1.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Hyundai Solaris I", power: 123, basePrice: 620000, type: "economy", img: "assets/cars/economy/solaris.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Kia Rio 3", power: 123, basePrice: 650000, type: "economy", img: "assets/cars/economy/rio.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Toyota Mark II (JZX90)", power: 180, basePrice: 450000, type: "economy", img: "assets/cars/economy/mark2.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mitsubishi Lancer IX", power: 98, basePrice: 380000, type: "economy", img: "assets/cars/economy/lancer9.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "BMW E34 520i", power: 150, basePrice: 250000, type: "economy", img: "assets/cars/economy/e34.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mercedes W210", power: 136, basePrice: 300000, type: "economy", img: "assets/cars/economy/w210.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "BMW E38 740i", power: 286, basePrice: 450000, type: "economy", img: "assets/cars/economy/e38.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Audi A6 C5", power: 165, basePrice: 350000, type: "economy", img: "assets/cars/economy/a6c5.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Range Rover P38", power: 218, basePrice: 400000, type: "economy", img: "assets/cars/economy/p38.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Porsche Cayenne 955", power: 340, basePrice: 500000, type: "economy", img: "assets/cars/economy/cayenne_old.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mercedes W140 S500", power: 320, basePrice: 600000, type: "economy", img: "assets/cars/economy/w140.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" }
+        { name: "Ока (ВАЗ-1111)", power: 33, basePrice: 40000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/oka.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ЗАЗ-968М «Запорожец»", power: 40, basePrice: 35000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/zaz.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Москвич-412", power: 75, basePrice: 50000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/moskvich.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ИЖ-2126 «Ода»", power: 73, basePrice: 55000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/izh.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2101 «Копейка»", power: 64, basePrice: 65000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/vaz-2101.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2106 «Шестерка»", power: 75, basePrice: 75000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/vaz-2106.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2107 «Семёрка»", power: 74, basePrice: 95000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/vaz-2107.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2108 «Зубило»", power: 70, basePrice: 110000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2108.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2109 «Девятка»", power: 72, basePrice: 125000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2109.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2110 «Десятка»", power: 89, basePrice: 135000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2110.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2114 «Четырка»", power: 81, basePrice: 140000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2114.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ГАЗ-3110 «Волга»", power: 130, basePrice: 120000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/volga.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Lada Kalina I", power: 81, basePrice: 220000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/kalina.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Lada Priora", power: 98, basePrice: 280000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/priora.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Daewoo Matiz", power: 51, basePrice: 120000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/matiz.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Daewoo Nexia", power: 80, basePrice: 150000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/nexia.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Chevrolet Lanos", power: 86, basePrice: 170000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/lanos.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Renault Logan I", power: 75, basePrice: 350000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/logan.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Nissan Almera Classic", power: 107, basePrice: 400000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/almera.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Ford Focus I", power: 100, basePrice: 300000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/focus1.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Hyundai Solaris I", power: 123, basePrice: 620000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/solaris.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Kia Rio 3", power: 123, basePrice: 650000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/rio.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Toyota Mark II (JZX90)", power: 180, basePrice: 450000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/mark2.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Mitsubishi Lancer IX", power: 98, basePrice: 380000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/lancer9.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "BMW E34 520i", power: 150, basePrice: 250000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/e34.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Mercedes W210", power: 136, basePrice: 300000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/w210.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "BMW E38 740i", power: 286, basePrice: 450000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/e38.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Audi A6 C5", power: 165, basePrice: 350000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/a6c5.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Range Rover P38", power: 218, basePrice: 400000, drivetrain: "awd", type: "economy", img: "assets/cars/economy/p38.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Porsche Cayenne 955", power: 340, basePrice: 500000, drivetrain: "awd", type: "economy", img: "assets/cars/economy/cayenne_old.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Mercedes W140 S500", power: 320, basePrice: 600000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/w140.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy }
     ],
     scooter: [
-        { name: "Honda Dio AF34", power: 7, basePrice: 45000, type: "scooter", img: "assets/moto/dio.jpg", fallback: "https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=600&q=80" },
-        { name: "Yamaha Jog ZR", power: 8, basePrice: 55000, type: "scooter", img: "assets/moto/jog.jpg", fallback: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=600&q=80" },
-        { name: "Suzuki Lets 2", power: 6, basePrice: 35000, type: "scooter", img: "assets/moto/lets.jpg", fallback: "https://images.unsplash.com/photo-1558980394-4c7c9299fe96?auto=format&fit=crop&w=600&q=80" },
-        { name: "Vespa LX 125", power: 10, basePrice: 120000, type: "scooter", img: "assets/moto/vespa.jpg", fallback: "https://images.unsplash.com/photo-1525160354320-d8e92641c563?auto=format&fit=crop&w=600&q=80" }
+        { name: "Honda Dio AF34", power: 7, basePrice: 45000, drivetrain: "rwd", type: "scooter", img: "assets/moto/dio.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
+        { name: "Yamaha Jog ZR", power: 8, basePrice: 55000, drivetrain: "rwd", type: "scooter", img: "assets/moto/jog.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
+        { name: "Suzuki Lets 2", power: 6, basePrice: 35000, drivetrain: "rwd", type: "scooter", img: "assets/moto/lets.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
+        { name: "Vespa LX 125", power: 10, basePrice: 120000, drivetrain: "rwd", type: "scooter", img: "assets/moto/vespa.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.scooter }
     ],
     moto: [
-        { name: "Bajaj Pulsar NS200", power: 25, basePrice: 240000, type: "moto", img: "assets/moto/pulsar.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "Kawasaki Ninja 300", power: 39, basePrice: 450000, type: "moto", img: "assets/moto/ninja.jpg", fallback: "https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=600&q=80" },
-        { name: "Honda CB400 Super Four", power: 53, basePrice: 350000, type: "moto", img: "assets/moto/cb400.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "Yamaha MT-07", power: 74, basePrice: 890000, type: "moto", img: "assets/moto/mt07.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "KTM 390 Duke", power: 44, basePrice: 550000, type: "moto", img: "assets/moto/duke.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "Harley-Davidson Iron 883", power: 51, basePrice: 1200000, type: "moto", img: "assets/moto/iron883.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "Triumph Bonneville T100", power: 55, basePrice: 1300000, type: "moto", img: "assets/moto/bonneville.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "Kawasaki Z900", power: 125, basePrice: 1100000, type: "moto", img: "assets/moto/z900.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "BMW R1250GS", power: 136, basePrice: 2500000, type: "moto", img: "assets/moto/gs1250.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "Suzuki Hayabusa", power: 197, basePrice: 1800000, type: "moto", img: "assets/moto/hayabusa.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "Yamaha YZF-R1", power: 200, basePrice: 2200000, type: "moto", img: "assets/moto/r1.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" },
-        { name: "Ducati Panigale V4", power: 214, basePrice: 3200000, type: "moto", img: "assets/moto/ducati.jpg", fallback: "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80" }
+        { name: "Bajaj Pulsar NS200", power: 25, basePrice: 240000, drivetrain: "rwd", type: "moto", img: "assets/moto/pulsar.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Kawasaki Ninja 300", power: 39, basePrice: 450000, drivetrain: "rwd", type: "moto", img: "assets/moto/ninja.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Honda CB400 Super Four", power: 53, basePrice: 350000, drivetrain: "rwd", type: "moto", img: "assets/moto/cb400.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Yamaha MT-07", power: 74, basePrice: 890000, drivetrain: "rwd", type: "moto", img: "assets/moto/mt07.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "KTM 390 Duke", power: 44, basePrice: 550000, drivetrain: "rwd", type: "moto", img: "assets/moto/duke.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Harley-Davidson Iron 883", power: 51, basePrice: 1200000, drivetrain: "rwd", type: "moto", img: "assets/moto/iron883.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Triumph Bonneville T100", power: 55, basePrice: 1300000, drivetrain: "rwd", type: "moto", img: "assets/moto/bonneville.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Kawasaki Z900", power: 125, basePrice: 1100000, drivetrain: "rwd", type: "moto", img: "assets/moto/z900.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "BMW R1250GS", power: 136, basePrice: 2500000, drivetrain: "rwd", type: "moto", img: "assets/moto/gs1250.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Suzuki Hayabusa", power: 197, basePrice: 1800000, drivetrain: "rwd", type: "moto", img: "assets/moto/hayabusa.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Yamaha YZF-R1", power: 200, basePrice: 2200000, drivetrain: "rwd", type: "moto", img: "assets/moto/r1.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Ducati Panigale V4", power: 214, basePrice: 3200000, drivetrain: "rwd", type: "moto", img: "assets/moto/ducati.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto }
     ],
     atv: [
-        { name: "CFMOTO CFORCE 500", power: 35, basePrice: 620000, type: "atv", img: "assets/moto/cforce.jpg", fallback: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80" },
-        { name: "Stels Guepard 850", power: 71, basePrice: 950000, type: "atv", img: "assets/moto/guepard.jpg", fallback: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80" },
-        { name: "Suzuki KingQuad 750", power: 50, basePrice: 1200000, type: "atv", img: "assets/moto/kingquad.jpg", fallback: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80" },
-        { name: "Polaris Sportsman 850", power: 78, basePrice: 1600000, type: "atv", img: "assets/moto/sportsman.jpg", fallback: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80" },
-        { name: "Yamaha Grizzly 700", power: 49, basePrice: 1400000, type: "atv", img: "assets/moto/grizzly.jpg", fallback: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80" },
-        { name: "BRP Can-Am Maverick", power: 195, basePrice: 3500000, type: "atv", img: "assets/moto/maverick.jpg", fallback: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=600&q=80" }
+        { name: "CFMOTO CFORCE 500", power: 35, basePrice: 620000, drivetrain: "awd", type: "atv", img: "assets/moto/cforce.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
+        { name: "Stels Guepard 850", power: 71, basePrice: 950000, drivetrain: "awd", type: "atv", img: "assets/moto/guepard.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
+        { name: "Suzuki KingQuad 750", power: 50, basePrice: 1200000, drivetrain: "awd", type: "atv", img: "assets/moto/kingquad.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
+        { name: "Polaris Sportsman 850", power: 78, basePrice: 1600000, drivetrain: "awd", type: "atv", img: "assets/moto/sportsman.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
+        { name: "Yamaha Grizzly 700", power: 49, basePrice: 1400000, drivetrain: "awd", type: "atv", img: "assets/moto/grizzly.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
+        { name: "BRP Can-Am Maverick", power: 195, basePrice: 3500000, drivetrain: "awd", type: "atv", img: "assets/moto/maverick.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv }
     ],
     comfort: [
-        { name: "VW Polo Sedan", power: 110, basePrice: 850000, type: "comfort", img: "assets/cars/comfort/polo.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Ford Focus III", power: 125, basePrice: 950000, type: "comfort", img: "assets/cars/comfort/focus.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Chevrolet Cruze", power: 109, basePrice: 750000, type: "comfort", img: "assets/cars/comfort/cruze.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Hyundai Elantra", power: 128, basePrice: 1100000, type: "comfort", img: "assets/cars/comfort/elantra.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Kia Cerato", power: 130, basePrice: 1150000, type: "comfort", img: "assets/cars/comfort/cerato.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Skoda Octavia A7 1.8", power: 180, basePrice: 1450000, type: "comfort", img: "assets/cars/comfort/octavia.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "VW Jetta", power: 150, basePrice: 1300000, type: "comfort", img: "assets/cars/comfort/jetta.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Opel Astra J", power: 140, basePrice: 850000, type: "comfort", img: "assets/cars/comfort/astra.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Peugeot 408", power: 120, basePrice: 900000, type: "comfort", img: "assets/cars/comfort/peugeot408.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Toyota Corolla E150", power: 124, basePrice: 1050000, type: "comfort", img: "assets/cars/comfort/corolla.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mazda 3 (BM)", power: 120, basePrice: 1250000, type: "comfort", img: "assets/cars/comfort/mazda3.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Ford Mondeo V", power: 149, basePrice: 1600000, type: "comfort", img: "assets/cars/comfort/mondeo.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Hyundai Sonata", power: 150, basePrice: 1900000, type: "comfort", img: "assets/cars/comfort/sonata.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Kia Optima", power: 150, basePrice: 1850000, type: "comfort", img: "assets/cars/comfort/optima.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Toyota Camry XV50", power: 181, basePrice: 1800000, type: "comfort", img: "assets/cars/comfort/camry.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Kia K5", power: 194, basePrice: 2400000, type: "comfort", img: "assets/cars/comfort/k5.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "VW Golf VI GTI", power: 260, basePrice: 1450000, type: "comfort", img: "assets/cars/comfort/golf6.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Renault Duster", power: 143, basePrice: 1100000, type: "comfort", img: "assets/cars/comfort/duster.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Hyundai Creta", power: 123, basePrice: 1500000, type: "comfort", img: "assets/cars/comfort/creta.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Nissan Qashqai", power: 144, basePrice: 1600000, type: "comfort", img: "assets/cars/comfort/qashqai.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Skoda Karoq", power: 150, basePrice: 2100000, type: "comfort", img: "assets/cars/comfort/karoq.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Toyota RAV4", power: 149, basePrice: 2500000, type: "comfort", img: "assets/cars/comfort/rav4.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mazda CX-5", power: 150, basePrice: 2300000, type: "comfort", img: "assets/cars/comfort/cx5.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Geely Coolray", power: 150, basePrice: 2100000, type: "comfort", img: "assets/cars/comfort/coolray.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-        { name: "Haval Jolion", power: 150, basePrice: 2000000, type: "comfort", img: "assets/cars/comfort/jolion.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" }
+        { name: "VW Polo Sedan", power: 110, basePrice: 850000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/polo.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Ford Focus III", power: 125, basePrice: 950000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/focus.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Chevrolet Cruze", power: 109, basePrice: 750000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/cruze.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Hyundai Elantra", power: 128, basePrice: 1100000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/elantra.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Kia Cerato", power: 130, basePrice: 1150000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/cerato.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Skoda Octavia A7 1.8", power: 180, basePrice: 1450000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/octavia.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "VW Jetta", power: 150, basePrice: 1300000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/jetta.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Opel Astra J", power: 140, basePrice: 850000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/astra.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Peugeot 408", power: 120, basePrice: 900000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/peugeot408.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Toyota Corolla E150", power: 124, basePrice: 1050000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/corolla.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Mazda 3 (BM)", power: 120, basePrice: 1250000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/mazda3.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Ford Mondeo V", power: 149, basePrice: 1600000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/mondeo.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Hyundai Sonata", power: 150, basePrice: 1900000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/sonata.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Kia Optima", power: 150, basePrice: 1850000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/optima.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Toyota Camry XV50", power: 181, basePrice: 1800000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/camry.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Kia K5", power: 194, basePrice: 2400000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/k5.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "VW Golf VI GTI", power: 260, basePrice: 1450000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/golf6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Renault Duster", power: 143, basePrice: 1100000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/duster.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Hyundai Creta", power: 123, basePrice: 1500000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/creta.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Nissan Qashqai", power: 144, basePrice: 1600000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/qashqai.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Skoda Karoq", power: 150, basePrice: 2100000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/karoq.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Toyota RAV4", power: 149, basePrice: 2500000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/rav4.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Mazda CX-5", power: 150, basePrice: 2300000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/cx5.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Geely Coolray", power: 150, basePrice: 2100000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/coolray.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Haval Jolion", power: 150, basePrice: 2000000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/jolion.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort }
     ],
     premium: [
-        { name: "BMW 5 Series (G30)", power: 190, basePrice: 3500000, type: "premium", img: "assets/cars/premium/g30.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mercedes E-Class (W213)", power: 197, basePrice: 3800000, type: "premium", img: "assets/cars/premium/w213.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Audi A6 (C8)", power: 245, basePrice: 4000000, type: "premium", img: "assets/cars/premium/a6.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "BMW X7", power: 184, basePrice: 3800000, type: "premium", img: "assets/cars/premium/bmwx7.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mercedes C63s AMG", power: 197, basePrice: 4200000, type: "premium", img: "assets/cars/premium/mercedes_c_с63_w205_sedan.jpeg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "BMW M340i", power: 249, basePrice: 4800000, type: "premium", img: "assets/cars/premium/bmw_m_340i.jpeg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Lexus RX 350", power: 300, basePrice: 5500000, type: "premium", img: "assets/cars/premium/rx350.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Porsche Macan S", power: 354, basePrice: 6500000, type: "premium", img: "assets/cars/premium/macan.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Audi Q7", power: 249, basePrice: 7000000, type: "premium", img: "assets/cars/premium/q7.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "BMW X5 (G05)", power: 340, basePrice: 8500000, type: "premium", img: "assets/cars/premium/x5.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "BMW X6 (G06)", power: 340, basePrice: 9000000, type: "premium", img: "assets/cars/premium/x6.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mercedes GLE 400d", power: 330, basePrice: 9500000, type: "premium", img: "assets/cars/premium/gle.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Porsche Cayenne (PO536)", power: 340, basePrice: 10500000, type: "premium", img: "assets/cars/premium/cayenne_new.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Audi Q8", power: 340, basePrice: 9800000, type: "premium", img: "assets/cars/premium/q8.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Lexus LX 600", power: 415, basePrice: 14000000, type: "premium", img: "assets/cars/premium/lx600.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Toyota Land Cruiser 300", power: 415, basePrice: 12000000, type: "premium", img: "assets/cars/premium/lc300.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Range Rover Sport", power: 400, basePrice: 13500000, type: "premium", img: "assets/cars/premium/rr_sport.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Volvo XC90", power: 235, basePrice: 6800000, type: "premium", img: "assets/cars/premium/xc90.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Genesis GV80", power: 249, basePrice: 7500000, type: "premium", img: "assets/cars/premium/gv80.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Cadillac Escalade", power: 416, basePrice: 11000000, type: "premium", img: "assets/cars/premium/escalade.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Infiniti QX80", power: 405, basePrice: 8500000, type: "premium", img: "assets/cars/premium/qx80.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Maserati Levante", power: 350, basePrice: 9000000, type: "premium", img: "assets/cars/premium/levante.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mercedes S-Class (W223)", power: 367, basePrice: 16000000, type: "premium", img: "assets/cars/premium/w223.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "BMW 7 Series (G70)", power: 381, basePrice: 15500000, type: "premium", img: "assets/cars/premium/g70.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mercedes G63 AMG", power: 585, basePrice: 14500000, type: "premium", img: "assets/cars/premium/mercedes_g63amg.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Porsche Panamera Turbo S", power: 630, basePrice: 13500000, type: "premium", img: "assets/cars/premium/panamera.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-        { name: "Audi RS6 Avant", power: 600, basePrice: 12800000, type: "premium", img: "assets/cars/premium/rs6.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" }
+        { name: "BMW 5 Series (G30)", power: 190, basePrice: 3500000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/g30.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes E-Class (W213)", power: 197, basePrice: 3800000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/w213.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Audi A6 (C8)", power: 245, basePrice: 4000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/a6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "BMW X7", power: 340, basePrice: 8800000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/bmwx7.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes C63s AMG", power: 510, basePrice: 5200000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/mercedes_c_с63_w205_sedan.jpeg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "BMW M340i", power: 387, basePrice: 4800000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/bmw_m_340i.jpeg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Lexus RX 350", power: 300, basePrice: 5500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/rx350.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Porsche Macan S", power: 354, basePrice: 6500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/macan.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Audi Q7", power: 249, basePrice: 7000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/q7.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "BMW X5 (G05)", power: 340, basePrice: 8500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/x5.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "BMW X6 (G06)", power: 340, basePrice: 9000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/x6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes GLE 400d", power: 330, basePrice: 9500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/gle.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Porsche Cayenne (PO536)", power: 340, basePrice: 10500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/cayenne_new.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Audi Q8", power: 340, basePrice: 9800000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/q8.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Lexus LX 600", power: 415, basePrice: 14000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/lx600.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Toyota Land Cruiser 300", power: 415, basePrice: 12000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/lc300.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Range Rover Sport", power: 400, basePrice: 13500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/rr_sport.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Volvo XC90", power: 235, basePrice: 6800000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/xc90.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Genesis GV80", power: 249, basePrice: 7500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/gv80.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Cadillac Escalade", power: 416, basePrice: 11000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/escalade.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Infiniti QX80", power: 405, basePrice: 8500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/qx80.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Maserati Levante", power: 350, basePrice: 9000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/levante.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes S-Class (W223)", power: 367, basePrice: 16000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/w223.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "BMW 7 Series (G70)", power: 381, basePrice: 15500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/g70.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes G63 AMG", power: 585, basePrice: 14500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/mercedes_g63amg.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Porsche Panamera Turbo S", power: 630, basePrice: 13500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/panamera.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Audi RS6 Avant", power: 600, basePrice: 12800000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/rs6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium }
     ],
     hyper: [
-        { name: "Nissan GT-R R35", power: 570, basePrice: 12000000, type: "hyper", img: "assets/cars/hyper/gtr.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "Porsche 911 GT3 RS", power: 525, basePrice: 29000000, type: "hyper", img: "assets/cars/hyper/911.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "Lamborghini Huracan", power: 640, basePrice: 35000000, type: "hyper", img: "assets/cars/hyper/huracan.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "Ferrari SF90 Stradale", power: 1000, basePrice: 75000000, type: "hyper", img: "assets/cars/hyper/sf90.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "McLaren 720S", power: 720, basePrice: 32000000, type: "hyper", img: "assets/cars/hyper/mclaren.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "Lamborghini Aventador SVJ", power: 770, basePrice: 65000000, type: "hyper", img: "assets/cars/hyper/aventador.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "Porsche 918 Spyder", power: 887, basePrice: 120000000, type: "hyper", img: "assets/cars/hyper/918.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "McLaren P1", power: 916, basePrice: 140000000, type: "hyper", img: "assets/cars/hyper/p1.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "LaFerrari", power: 963, basePrice: 250000000, type: "hyper", img: "assets/cars/hyper/laferrari.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "Bugatti Chiron", power: 1500, basePrice: 350000000, type: "hyper", img: "assets/cars/hyper/chiron.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "Koenigsegg Jesko", power: 1600, basePrice: 400000000, type: "hyper", img: "assets/cars/hyper/jesko.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "Pagani Huayra", power: 730, basePrice: 280000000, type: "hyper", img: "assets/cars/hyper/huayra.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" },
-        { name: "Aston Martin Valkyrie", power: 1160, basePrice: 380000000, type: "hyper", img: "assets/cars/hyper/valkyrie.jpg", fallback: "https://images.unsplash.com/photo-1614162692292-7ac56d7f7f1e?auto=format&fit=crop&w=600&q=80" }
+        { name: "Nissan GT-R R35", power: 570, basePrice: 12000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/gtr.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Porsche 911 GT3 RS", power: 525, basePrice: 29000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/911.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Lamborghini Huracan", power: 640, basePrice: 35000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/huracan.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Ferrari SF90 Stradale", power: 1000, basePrice: 75000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/sf90.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "McLaren 720S", power: 720, basePrice: 32000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/mclaren.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Lamborghini Aventador SVJ", power: 770, basePrice: 65000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/aventador.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Porsche 918 Spyder", power: 887, basePrice: 120000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/918.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "McLaren P1", power: 916, basePrice: 140000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/p1.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "LaFerrari", power: 963, basePrice: 250000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/laferrari.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Bugatti Chiron", power: 1500, basePrice: 350000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/chiron.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Koenigsegg Jesko", power: 1600, basePrice: 400000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/jesko.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Pagani Huayra", power: 730, basePrice: 280000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/huayra.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Aston Martin Valkyrie", power: 1160, basePrice: 380000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/valkyrie.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper }
     ],
     truck: [
-        { name: "ЗИЛ-130 (С колхоза)", power: 150, basePrice: 250000, type: "truck", img: "assets/cars/truck/zil.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "Урал NEXT", power: 312, basePrice: 4500000, type: "truck", img: "assets/cars/truck/ural.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "ГАЗель NEXT", power: 149, basePrice: 1800000, type: "truck", img: "assets/cars/truck/gazel.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "КАМАЗ-54901 Continent", power: 460, basePrice: 7200000, type: "truck", img: "assets/cars/truck/kamaz.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "DAF XF 105", power: 460, basePrice: 4500000, type: "truck", img: "assets/cars/truck/daf.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "MAN TGX", power: 480, basePrice: 9500000, type: "truck", img: "assets/cars/truck/man.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "Mercedes-Benz Actros", power: 510, basePrice: 12000000, type: "truck", img: "assets/cars/truck/actros.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "Iveco Stralis", power: 460, basePrice: 3800000, type: "truck", img: "assets/cars/truck/iveco.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "Renault T-High", power: 520, basePrice: 8500000, type: "truck", img: "assets/cars/truck/renault_t.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "Freightliner Cascadia", power: 505, basePrice: 6500000, type: "truck", img: "assets/cars/truck/freightliner.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "Peterbilt 389", power: 550, basePrice: 14000000, type: "truck", img: "assets/cars/truck/peterbilt.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "Kenworth W900", power: 600, basePrice: 15500000, type: "truck", img: "assets/cars/truck/kenworth.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" },
-        { name: "Volvo FH16", power: 750, basePrice: 15500000, type: "truck", img: "assets/cars/truck/volvo.jpg", fallback: "https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80" }
+        { name: "ЗИЛ-130 (С колхоза)", power: 150, basePrice: 250000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/zil.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Урал NEXT", power: 312, basePrice: 4500000, drivetrain: "awd", type: "truck", img: "assets/cars/truck/ural.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "ГАЗель NEXT", power: 149, basePrice: 1800000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/gazel.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "КАМАЗ-54901 Continent", power: 460, basePrice: 7200000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/kamaz.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "DAF XF 105", power: 460, basePrice: 4500000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/daf.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "MAN TGX", power: 480, basePrice: 9500000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/man.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Mercedes-Benz Actros", power: 510, basePrice: 12000000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/actros.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Iveco Stralis", power: 460, basePrice: 3800000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/iveco.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Renault T-High", power: 520, basePrice: 8500000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/renault_t.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Freightliner Cascadia", power: 505, basePrice: 6500000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/freightliner.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Peterbilt 389", power: 550, basePrice: 14000000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/peterbilt.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Kenworth W900", power: 600, basePrice: 15500000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/kenworth.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Volvo FH16", power: 750, basePrice: 15500000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/volvo.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck }
     ],
     yacht: [
-        { name: "Гидроцикл Yamaha FX", power: 250, basePrice: 1800000, type: "yacht", img: "assets/cars/yacht/yamaha.jpg", fallback: "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=600&q=80" },
-        { name: "Катер Bayliner VR5", power: 200, basePrice: 4500000, type: "yacht", img: "assets/cars/yacht/bayliner.jpg", fallback: "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=600&q=80" },
-        { name: "Azimut Atlantis 45", power: 880, basePrice: 75000000, type: "yacht", img: "assets/cars/yacht/azimut.jpg", fallback: "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=600&q=80" },
-        { name: "Sunseeker 95 Yacht", power: 3900, basePrice: 450000000, type: "yacht", img: "assets/cars/yacht/sunseeker.jpg", fallback: "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?auto=format&fit=crop&w=600&q=80" }
+        { name: "Гидроцикл Yamaha FX", power: 250, basePrice: 1800000, drivetrain: "jet", type: "yacht", img: "assets/cars/yacht/yamaha.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.yacht },
+        { name: "Катер Bayliner VR5", power: 200, basePrice: 4500000, drivetrain: "prop", type: "yacht", img: "assets/cars/yacht/bayliner.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.yacht },
+        { name: "Azimut Atlantis 45", power: 880, basePrice: 75000000, drivetrain: "prop", type: "yacht", img: "assets/cars/yacht/azimut.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.yacht },
+        { name: "Sunseeker 95 Yacht", power: 3900, basePrice: 450000000, drivetrain: "prop", type: "yacht", img: "assets/cars/yacht/sunseeker.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.yacht }
     ]
 };
 
 // ========================================================
-// НЕДВИЖИМОСТЬ
+// 5. НЕДВИЖИМОСТЬ
 // ========================================================
 const HOUSING_LIST = [
     { 
@@ -311,7 +407,7 @@ const HOUSING_LIST = [
 ];
 
 // ========================================================
-// ПРЕДПРИЯТИЯ И БИЗНЕС
+// 6. ПРЕДПРИЯТИЯ И БИЗНЕС
 // ========================================================
 const BUSINESS_DATA = [
     { 
@@ -353,7 +449,7 @@ const BUSINESS_DATA = [
 ];
 
 // ========================================================
-// САРАИ И РАРИТЕТЫ
+// 7. САРАИ И РАРИТЕТЫ
 // ========================================================
 const BARN_TIERS_CONFIG = [
     { 
@@ -387,17 +483,17 @@ const BARN_TIERS_CONFIG = [
 ];
 
 const BARN_FINDS = [
-    { name: "ВАЗ-2101 «Копейка» (Дрифт-Спек)", power: 160, type: 'economy', basePrice: 850000, marketValue: 1250000, img: "assets/cars/barn/vaz2101_drift.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-    { name: "BMW E30 Coupe", power: 170, type: 'comfort', basePrice: 650000, marketValue: 1300000, img: "assets/cars/barn/e30.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-    { name: "Nissan Silvia S13", power: 200, type: 'comfort', basePrice: 900000, marketValue: 1800000, img: "assets/cars/barn/silvia.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-    { name: "VW Golf VI GTI (Stage 2 Project)", power: 280, type: 'comfort', basePrice: 1100000, marketValue: 1900000, img: "assets/cars/barn/golf6.jpg", fallback: "https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?auto=format&fit=crop&w=600&q=80" },
-    { name: "ГАЗ-24 «Волга» V8", power: 220, type: 'economy', basePrice: 700000, marketValue: 1500000, img: "assets/cars/barn/volga24.jpg", fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80" },
-    { name: "Nissan Skyline GT-R R34 (В пыли)", power: 280, type: 'premium', basePrice: 4500000, marketValue: 9500000, img: "assets/cars/barn/r34.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" },
-    { name: "Toyota Supra A80 (Без мотора)", power: 0, type: 'premium', basePrice: 3200000, marketValue: 7000000, img: "assets/cars/barn/supra.jpg", fallback: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80" }
+    { name: "ВАЗ-2101 «Копейка» (Дрифт-Спек)", power: 160, type: 'economy', basePrice: 850000, marketValue: 1250000, img: "assets/cars/barn/vaz2101_drift.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+    { name: "BMW E30 Coupe", power: 170, type: 'comfort', basePrice: 650000, marketValue: 1300000, img: "assets/cars/barn/e30.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+    { name: "Nissan Silvia S13", power: 200, type: 'comfort', basePrice: 900000, marketValue: 1800000, img: "assets/cars/barn/silvia.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+    { name: "VW Golf VI GTI (Stage 2 Project)", power: 280, type: 'comfort', basePrice: 1100000, marketValue: 1900000, img: "assets/cars/barn/golf6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+    { name: "ГАЗ-24 «Волга» V8", power: 220, type: 'economy', basePrice: 700000, marketValue: 1500000, img: "assets/cars/barn/volga24.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+    { name: "Nissan Skyline GT-R R34 (В пыли)", power: 280, type: 'premium', basePrice: 4500000, marketValue: 9500000, img: "assets/cars/barn/r34.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+    { name: "Toyota Supra A80 (Без мотора)", power: 0, type: 'premium', basePrice: 3200000, marketValue: 7000000, img: "assets/cars/barn/supra.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium }
 ];
 
 // ========================================================
-// ЛАВКА ФОРТУНЫ
+// 8. ЛАВКА ФОРТУНЫ
 // ========================================================
 const FORTUNE_SHOP_CATALOG = [
     {
@@ -457,7 +553,7 @@ const FORTUNE_SHOP_CATALOG = [
 ];
 
 // ========================================================
-// КАТАЛОГ МАГАЗИНА
+// 9. КАТАЛОГ МАГАЗИНА
 // ========================================================
 const SHOP_CATALOG = {
     tools: [

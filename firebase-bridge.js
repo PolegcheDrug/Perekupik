@@ -1,5 +1,5 @@
 // ========================================================
-// firebase-bridge.js — ОБЛАЧНАЯ СИНХРОНИЗАЦИЯ, P2P И ТОП (v0.4.3)
+// firebase-bridge.js — ОБЛАЧНАЯ СИНХРОНИЗАЦИЯ, P2P И ТОП (v0.4.5)
 // Улучшенная версия (REST API): Не требует загрузки тяжелых SDK.
 // Оптимизировано для Telegram Mini Apps.
 // ========================================================
@@ -14,9 +14,9 @@ const FIREBASE_CONFIG = {
 // Внутренний логгер для отладки
 function fbLog(msg, data = null) {
     if (data) {
-        console.log(`[☁️ Firebase Bridge] ${msg}`, data);
+        console.log(`[☁️ Firebase Bridge v0.4.5] ${msg}`, data);
     } else {
-        console.log(`[☁️ Firebase Bridge] ${msg}`);
+        console.log(`[☁️ Firebase Bridge v0.4.5] ${msg}`);
     }
 }
 
@@ -26,7 +26,10 @@ function fbLog(msg, data = null) {
 async function fb_get(path) {
     if (!FIREBASE_CONFIG.enabled) return null;
     try {
-        const response = await fetch(`${FIREBASE_CONFIG.dbUrl}/${path}.json`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const response = await fetch(`${FIREBASE_CONFIG.dbUrl}/${path}.json`, { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (!response.ok) throw new Error("Сетевая ошибка при GET-запросе");
         return await response.json();
     } catch (error) {
@@ -38,11 +41,15 @@ async function fb_get(path) {
 async function fb_put(path, data) {
     if (!FIREBASE_CONFIG.enabled) return true;
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
         const response = await fetch(`${FIREBASE_CONFIG.dbUrl}/${path}.json`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         return response.ok;
     } catch (error) {
         console.error("[Firebase Bridge] Ошибка PUT:", error);
@@ -53,11 +60,15 @@ async function fb_put(path, data) {
 async function fb_patch(path, data) {
     if (!FIREBASE_CONFIG.enabled) return true;
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
         const response = await fetch(`${FIREBASE_CONFIG.dbUrl}/${path}.json`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: JSON.stringify(data),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         return response.ok;
     } catch (error) {
         console.error("[Firebase Bridge] Ошибка PATCH:", error);
@@ -68,9 +79,13 @@ async function fb_patch(path, data) {
 async function fb_delete(path) {
     if (!FIREBASE_CONFIG.enabled) return true;
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
         const response = await fetch(`${FIREBASE_CONFIG.dbUrl}/${path}.json`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         return response.ok;
     } catch (error) {
         console.error("[Firebase Bridge] Ошибка DELETE:", error);
@@ -90,7 +105,7 @@ const CloudSaveManager = {
         const lightState = {
             player: gameState.player,
             timestamp: Date.now(),
-            version: "v0.4.3"
+            version: "v0.4.5"
         };
         
         await fb_put(`saves/${userId}`, lightState);
@@ -117,7 +132,10 @@ const P2PMarketManager = {
         fbLog(`Публикация лота: ${lotData.id}`);
         // Используем PATCH, чтобы добавить лот, не затирая чужие
         const payload = {};
-        payload[lotData.id] = lotData;
+        payload[lotData.id] = {
+            ...lotData,
+            timestamp: Date.now()
+        };
         
         return await fb_patch(`p2p_market`, payload);
     },
@@ -139,7 +157,7 @@ const P2PMarketManager = {
         }
         
         // Сортируем: свежие сверху
-        lots.sort((a, b) => b.timestamp - a.timestamp);
+        lots.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         return lots;
     },
 
@@ -192,7 +210,7 @@ const LeaderboardManager = {
         }
 
         // Сортировка по убыванию прибыли
-        players.sort((a, b) => b.profit - a.profit);
+        players.sort((a, b) => (b.profit || 0) - (a.profit || 0));
         
         // Возвращаем только топ 50
         return players.slice(0, 50);
@@ -230,7 +248,7 @@ const SyndicateClubsManager = {
         fbLog("Инициализация завершена. РЕЖИМ МУЛЬТИПЛЕЕРА АКТИВЕН 🌐");
         fbLog(`Подключено к БД: ${FIREBASE_CONFIG.dbUrl}`);
     } else {
-        fbLog("Модуль работает в локальном (offline) режиме 🔒. Для включения мультиплеера измените FIREBASE_CONFIG.enabled на true.");
+        fbLog("Модуль работает в локальном (offline) режиме 🔒. Для включения мультиплеера установите FIREBASE_CONFIG.enabled в true.");
     }
 })();
 

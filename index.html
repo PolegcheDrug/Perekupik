@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v0.4.4</title>
-    <link rel="stylesheet" href="style.css?v=152">
+    <title>Симулятор Перекупа v0.4.5</title>
+    <link rel="stylesheet" href="style.css?v=153">
     
     <!-- Базы данных и внешние библиотеки -->
-    <script src="data.js?v=152"></script>
+    <script src="data.js?v=153"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="js/network.js?v=152"></script>
-    <script src="firebase-bridge.js?v=152"></script>
+    <script src="js/network.js?v=153"></script>
+    <script src="firebase-bridge.js?v=153"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
@@ -382,7 +382,7 @@
             </div>
 
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-sparkles"></i> Список изменений v0.4.4 & Команда
+              <i class="fa-solid fa-sparkles"></i> Список изменений v0.4.5 & Патчноут
             </button>
             <div class="grid-2 mb-2">
               <div class="stat-box"><div class="sub-label">Плюс:</div><div id="statProfitable" class="stat-value color-green">0</div></div>
@@ -459,6 +459,49 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА ИГРЫ -->
+
+    <!-- МОДАЛЬНОЕ ОКНО: СПИСОК ИЗМЕНЕНИЙ (PATCH NOTES v0.4.5) -->
+    <div id="modalPatchNotes" class="modal-overlay">
+      <div class="modal-box" style="max-width: 420px;">
+        <div class="flex-between mb-2">
+          <h4 class="color-cyan font-bold"><i class="fa-solid fa-code-merge"></i> Обновление v0.4.5</h4>
+          <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div class="sub-label mb-2 color-amber font-bold">Официальный патчноут глобального ребаланса:</div>
+        
+        <div class="space-y-2 mb-3" style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
+          <div class="patch-item">
+            <b class="text-xs color-green">🏷️ Динамическая стоимость госномеров:</b>
+            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
+              Полностью исправлена логика установки блатных номеров! Теперь при установке красивых, редких или спецсерийных знаков (777, ЕКХ, АМР, 001-007, одинаковые буквы) рыночная стоимость авто мгновенно пересчитывается и вырастает на точную стоимость номера. При снятии номера на «ТРАНЗИТ» базовая цена корректно возвращается.
+            </div>
+          </div>
+
+          <div class="patch-item">
+            <b class="text-xs color-cyan">🤝 Влияние номеров на покупателей:</b>
+            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
+              Клиенты на площадке продаж и заказчики Синдиката теперь напрямую учитывают дорогие архивные номера при формировании щедрых офферов, готовые переплачивать за эксклюзивный статус на дороге.
+            </div>
+          </div>
+
+          <div class="patch-item">
+            <b class="text-xs color-purple">🏁 Доработка Драг-рейсинга и RDS Дрифта:</b>
+            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
+              Введены строгие регламенты допуска техкома RDS (заварка, выворот, гидроручник, каркас, ковши). Динамика квотера 402м теперь комплексно учитывает тип привода (FWD/RWD/AWD), полуслики Toyo и ланч-контроль.
+            </div>
+          </div>
+
+          <div class="patch-item">
+            <b class="text-xs color-amber">💼 Баланс P2P биржи, Контейнеров и Сараев:</b>
+            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
+              Любой найденный или выкупленный автомобиль из сараев или с контейнеров автоматически рассчитывается по единой формуле рыночной оценки с сохранением всех модификаций.
+            </div>
+          </div>
+        </div>
+
+        <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
+      </div>
+    </div>
 
     <!-- ДКП -->
     <div id="modalDKP" class="modal-overlay">
@@ -710,7 +753,7 @@
       </div>
     </div>
 
-    <!-- ПРОДАЖА / ТОРГ С ПОКУПАТЕЛЕМ (ИСПРАВЛЕН onerror) -->
+    <!-- ПРОДАЖА / ТОРГ С ПОКУПАТЕЛЕМ -->
     <div id="modalHaggleSale" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -968,13 +1011,13 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- СКРИПТЫ -->
-    <script src="js/phone.js?v=152"></script>
-    <script src="js/market.js?v=152"></script>
-    <script src="js/garage.js?v=152"></script>
-    <script src="js/salesLot.js?v=152"></script>
-    <script src="js/life.js?v=152"></script>
-    <script src="js/syndicate.js?v=152"></script>
-    <script src="js/app.js?v=152"></script>
+    <script src="js/phone.js?v=153"></script>
+    <script src="js/market.js?v=153"></script>
+    <script src="js/garage.js?v=153"></script>
+    <script src="js/salesLot.js?v=153"></script>
+    <script src="js/life.js?v=153"></script>
+    <script src="js/syndicate.js?v=153"></script>
+    <script src="js/app.js?v=153"></script>
 
   </body>
 </html>

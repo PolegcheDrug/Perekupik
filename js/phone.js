@@ -1,6 +1,6 @@
 // ========================================================
-// js/phone.js — ИНТЕРАКТИВНЫЙ СМАРТФОН «PerekupOS» (v0.4.4)
-// Полная версия: 16 приложений, виджет квестов, супер вилспин
+// js/phone.js — ИНТЕРАКТИВНЫЙ СМАРТФОН «PerekupOS» (v0.4.5)
+// Полная версия: 16 приложений, RDS Дрифт, Драг 402м, Биржа
 // ========================================================
 
 const PhoneManager = {
@@ -645,7 +645,6 @@ const PhoneManager = {
             </div>
             <div class="phone-app-body">
                 
-                <!-- СУПЕР ВИЛСПИН НА 3 БАРАБАНА -->
                 <div class="glass-card mb-3 p-3" style="background: radial-gradient(circle at 50% 0%, #1e1338 0%, #090e18 100%); border: 1.5px solid var(--purple); box-shadow: 0 0 20px rgba(192,132,252,0.3);">
                     <div class="flex-between mb-2">
                         <div>
@@ -680,7 +679,6 @@ const PhoneManager = {
                     </button>
                 </div>
 
-                <!-- КЛАССИЧЕСКОЕ КОЛЕСО -->
                 <div class="glass-card text-center mb-3 p-2">
                     <b class="text-xs color-amber">🎡 VIP Колесо Фортуны (1 Спин)</b>
                     <div class="wheel-stage-container my-1" style="transform: scale(0.82); margin: 0 auto;">
@@ -696,7 +694,6 @@ const PhoneManager = {
                     </div>
                 </div>
 
-                <!-- ЛАВКА ФОРТУНЫ -->
                 <div class="glass-card mb-3 p-2">
                     <div class="flex-between mb-2">
                         <b class="text-xs color-cyan"><i class="fa-solid fa-store"></i> Лавка Фортуны</b>
@@ -855,7 +852,6 @@ const PhoneManager = {
 
             let lvl = state.player?.level || 1;
 
-            // 1. БАРАБАН: АВТОМОБИЛЬ
             let targetCategory = 'economy';
             if (lvl < 8) {
                 targetCategory = Math.random() < 0.40 ? 'comfort' : 'economy';
@@ -869,6 +865,7 @@ const PhoneManager = {
 
             let pool = (typeof CAR_DATABASE !== 'undefined' && CAR_DATABASE[targetCategory]) ? CAR_DATABASE[targetCategory] : CAR_DATABASE.economy;
             let carTmpl = pool[Math.floor(Math.random() * pool.length)];
+            let wonPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77";
 
             let wonCar = {
                 id: "super_car_" + Date.now(),
@@ -880,13 +877,17 @@ const PhoneManager = {
                 marketValue: Math.round(carTmpl.basePrice * 1.15),
                 img: carTmpl.img,
                 fallback: carTmpl.fallback || (typeof getCategoryFallback === 'function' ? getCategoryFallback(carTmpl.type) : ''),
-                plate: (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77",
-                customPlate: "ТРАНЗИТ",
+                plate: wonPlate,
+                customPlate: wonPlate,
                 condition: 100,
                 wear: { engine: 95, transmission: 95 },
                 insurance: 'casco',
                 tuning: { chip: 1, exhaust: true, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 }
             };
+
+            if (typeof recalculateCarMarketValue === 'function') {
+                recalculateCarMarketValue(wonCar);
+            }
 
             let maxSlots = getTotalGarageSlots();
             let curSlots = state.garage ? state.garage.length : 0;
@@ -894,14 +895,13 @@ const PhoneManager = {
 
             if (curSlots < maxSlots) {
                 state.garage.push(wonCar);
-                carRewardText = `🚗 ${wonCar.name} (${wonCar.power} л.с.) добавлен в гараж!`;
+                carRewardText = `🚗 ${wonCar.name} (${wonCar.power} л.с., номера ${wonPlate}) добавлен в гараж!`;
             } else {
                 let compensation = wonCar.marketValue;
                 state.player.cash = (state.player.cash || 0) + compensation;
                 carRewardText = `🚗 ${wonCar.name} (Гараж полон: компенсация +${compensation.toLocaleString()} ₽!)`;
             }
 
-            // 2. БАРАБАН: РЕСУРСЫ
             let resRoll = Math.random();
             let resRewardText = "";
             if (resRoll < 0.30) {
@@ -921,7 +921,6 @@ const PhoneManager = {
                 resRewardText = "🔥 ДЖЕКПОТ +1,500,000 ₽!";
             }
 
-            // 3. БАРАБАН: ЭКСКЛЮЗИВЫ
             let exRoll = Math.random();
             let exRewardText = "";
             if (exRoll < 0.35) {
@@ -1440,7 +1439,6 @@ const PhoneManager = {
                     state.player.cash += winAmt;
                     state.player.streetCred = (state.player.streetCred || 100) + 20;
 
-                    // Квест: выиграть заезд
                     if (state.player?.dailyQuests) {
                         let quest = state.player.dailyQuests.find(q => q.id === 'q_race');
                         if (quest && !quest.done) quest.cur = Math.min(quest.max, quest.cur + 1);
@@ -1877,7 +1875,7 @@ const PhoneManager = {
 
                 <div class="glass-card mb-2 p-2">
                     <div class="flex-between mb-1">
-                        <b class="text-xs color-red"><i class="fa-solid fa-hand-holding-dollar"></i> Кредитная линия Во-Банка</b>
+                        <b class="text-xs color-red"><i class="fa-solid fa-handholding-dollar"></i> Кредитная линия Во-Банка</b>
                         <span class="sub-label text-xs">Долг: <b class="color-amber">${debt.toLocaleString()} ₽</b></span>
                     </div>
                     <div class="grid-2 mb-2">
@@ -2278,7 +2276,7 @@ const PhoneManager = {
                 time: "Только что",
                 unread: true,
                 chatHistory: [
-                    { from: "them", text: `Слышь, перекуп! Я доехал до дома на «${carName}», а мотор застучал! Сервис сказал, была залита загущающая присадка!` },
+                    { from: "them", text: `Слышь, перекуп! Я доехал до дома на «${carName}», а мотор застучал! Сервис сказал, была залита загущающая присадку!` },
                     { from: "them", text: `Жди гостей, я знаю твой гараж! Либо возвращай часть суммы, либо будут проблемы!` }
                 ]
             };

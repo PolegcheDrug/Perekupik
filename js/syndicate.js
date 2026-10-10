@@ -1,5 +1,6 @@
 // ========================================================
-// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, НОМЕРА, ТОП (v0.4.3)
+// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, НОМЕРА, ТОП (v0.4.5)
+// Полная связка с динамической оценкой авто и блатными номерами
 // ========================================================
 
 let p2pActiveFilter = 'cars';
@@ -245,40 +246,33 @@ function checkCarMeetsContract(car, c) {
     let reqs = c.reqs;
     let errors = [];
 
-    // 1. Класс
     let carType = car.type || 'economy';
     if (!reqs.allowedClasses.includes(carType)) {
         errors.push(`Не тот класс (${carType.toUpperCase()} вместо ${reqs.allowedClasses.join('/')})`);
     }
 
-    // 2. Мощность
     let power = car.power || 100;
     if (power < reqs.minPower) {
         errors.push(`Слабый мотор (${power}/${reqs.minPower} л.с.)`);
     }
 
-    // 3. Состояние
     let cond = car.condition || 50;
     if (cond < reqs.minCondition) {
         errors.push(`Плохое состояние кузова (${cond}/${reqs.minCondition}%)`);
     }
 
-    // 4. Пробег
     if (reqs.maxMileage && (car.mileage || 0) > reqs.maxMileage) {
         errors.push(`Слишком большой пробег (${(car.mileage || 0).toLocaleString()} км)`);
     }
 
-    // 5. Заварка редуктора
     if (reqs.reqWeldedDiff && !car.tuning?.weldedDiff) {
         errors.push(`Нет заварки редуктора`);
     }
 
-    // 6. Выворот
     if (reqs.reqSteeringAngle && !car.tuning?.steeringAngle) {
         errors.push(`Нет выворота колёс`);
     }
 
-    // 7. Полировка или чип
     if (reqs.reqPolishOrChip) {
         let hasPolish = !!car.isPolished;
         let hasChip = !!(car.tuning && car.tuning.chip >= 1);
@@ -287,18 +281,15 @@ function checkCarMeetsContract(car, c) {
         }
     }
 
-    // 8. Юридическая чистота
     if (reqs.noCriminal) {
         if (car.isStolen) errors.push(`Авто числится в розыске`);
         if (car.unregistered) errors.push(`Учёт аннулирован по 12.5.1`);
     }
 
-    // 9. Дефекты ЭБУ
     if (reqs.noDefects && car.hiddenDefect) {
         errors.push(`Горит чек: ${car.hiddenDefect.text}`);
     }
 
-    // 10. Защита личного авто
     if (car.isPersonal) {
         errors.push(`Это ваш личный автомобиль (снимите статус в гараже)`);
     }
@@ -325,6 +316,10 @@ function openSelectContractCarModal(contractId) {
     } else {
         let html = "";
         state.garage.forEach((car, idx) => {
+            if (typeof recalculateCarMarketValue === 'function') {
+                recalculateCarMarketValue(car);
+            }
+
             const check = checkCarMeetsContract(car, contract);
             let cImg = car.img || "assets/cars/economy/vaz-2107.jpg";
             let cPlate = car.customPlate || car.plate || "ТРАНЗИТ";
@@ -332,7 +327,7 @@ function openSelectContractCarModal(contractId) {
 
             let statusBlock = check.passed
                 ? `<div class="color-green text-xs font-bold mb-1">✓ Полностью соответствует всем требованиям!</div>
-                   <div class="sub-label mb-2" style="font-size:10px;">Итоговая выплата: <b class="color-green">+${basePayout.toLocaleString()} ₽</b></div>
+                   <div class="sub-label mb-2" style="font-size:10px;">Итоговая выплата с учётом авто и номеров: <b class="color-green">+${basePayout.toLocaleString()} ₽</b></div>
                    <button onclick="fulfillContract('${contract.id}', ${idx})" class="btn btn-green btn-sm w-full">Сдать автомобиль под контракт 🤝</button>`
                 : `<div class="color-red text-xs font-bold mb-1">✗ Не подходит:</div>
                    <div class="sub-label color-red mb-2" style="font-size:9.5px; line-height:1.3;">${check.errors.join('<br>')}</div>
@@ -366,26 +361,26 @@ function fulfillContract(contractId, carIndex) {
     const car = state.garage ? state.garage[carIndex] : null;
     if (!car) return;
 
+    if (typeof recalculateCarMarketValue === 'function') {
+        recalculateCarMarketValue(car);
+    }
+
     let carPrice = car.marketValue || car.basePrice || 100000;
     let totalPayout = carPrice + contract.rewardBonus;
 
-    // Списание авто
     state.garage.splice(carIndex, 1);
 
-    // Начисление средств и опыта
     state.player.cash = (state.player.cash || 0) + totalPayout;
     if (contract.rewardConn > 0) {
         state.player.connections = (state.player.connections || 0) + contract.rewardConn;
     }
     addXp(contract.rewardXp || 60);
 
-    // Статистика
     if (!state.player.stats) state.player.stats = {};
     state.player.stats.sold = (state.player.stats.sold || 0) + 1;
     let netGain = contract.rewardBonus;
     state.player.stats.totalNetProfit = (state.player.stats.totalNetProfit || 0) + netGain;
 
-    // Удаление выполненного контракта
     state.contracts.splice(cIdx, 1);
 
     closeModal('modalSelectContractCar');
@@ -615,7 +610,10 @@ function onP2PItemSelected(val) {
     if (val.startsWith('car_')) {
         let idx = parseInt(val.replace('car_', ''));
         let car = state.garage[idx];
-        if (car) input.value = car.marketValue || car.price || 150000;
+        if (car) {
+            if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
+            input.value = car.marketValue || car.price || 150000;
+        }
     } else if (val.startsWith('plate_')) {
         let idx = parseInt(val.replace('plate_', ''));
         let plate = state.ownedPlates[idx];
@@ -780,6 +778,9 @@ function buyP2PListing(listingId) {
         };
         
         carObj.purchaseCost = lot.price;
+        if (typeof recalculateCarMarketValue === 'function') {
+            recalculateCarMarketValue(carObj);
+        }
 
         if (!state.garage) state.garage = [];
         state.garage.push(carObj);
@@ -836,6 +837,10 @@ function cancelP2PListing(listingId) {
             tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, risk1251: 0 }
         };
 
+        if (typeof recalculateCarMarketValue === 'function') {
+            recalculateCarMarketValue(carObj);
+        }
+
         if (!state.garage) state.garage = [];
         state.garage.push(carObj);
     } else if (lot.type === 'plate') {
@@ -880,32 +885,33 @@ function generateBlackMarketPlates() {
         
         let plateType = Math.random();
         let plateStr = "";
-        let baseValue = 0;
 
         if (plateType < 0.25) {
             plateStr = l1 + l1 + l1 + " " + (Math.floor(Math.random()*899)+100) + " " + reg;
-            baseValue = 450000 + Math.random() * 200000;
-        } else if (plateType < 0.5) {
+        } else if (plateType < 0.50) {
             const nums = ['111', '222', '333', '444', '555', '666', '888', '999'];
             let n = nums[Math.floor(Math.random() * nums.length)];
             plateStr = l1 + n + l2 + l3 + " " + reg;
-            baseValue = 380000 + Math.random() * 150000;
         } else if (plateType < 0.75) {
             const eliteNums = ['777', '001', '007'];
             let n = eliteNums[Math.floor(Math.random() * eliteNums.length)];
             plateStr = l1 + n + l1 + l1 + " " + reg;
-            baseValue = 1200000 + Math.random() * 500000;
         } else {
-            const specList = ["АМР", "ЕКХ", "СКР"];
+            const specList = ["АМР", "ЕКХ", "СКР", "ВОР"];
             let spec = specList[Math.floor(Math.random() * specList.length)];
             plateStr = spec[0] + (Math.floor(Math.random()*899)+100) + spec[1] + spec[2] + " " + reg;
-            baseValue = 1800000 + Math.random() * 1000000;
         }
+
+        let calculatedValue = (typeof calculatePlateValue === 'function') 
+            ? calculatePlateValue(plateStr) 
+            : 450000;
+
+        let marketPrice = Math.round(calculatedValue * (1.10 + Math.random() * 0.15));
 
         generated.push({
             id: "bm_plate_" + Date.now() + "_" + i,
             plate: plateStr,
-            price: Math.round(baseValue)
+            price: marketPrice
         });
     }
 
@@ -974,7 +980,7 @@ function buyBlackMarketPlate(idx) {
     renderBlackMarketPlates();
     playSound('win');
     tgHaptic('success');
-    openVerdictModal("НОМЕР ПРИОБРЕТЕН! 🏷️", "Госзнак «" + lot.plate + "» добавлен в ваш инвентарь. Можете установить его в Гараже.", true);
+    openVerdictModal("НОМЕР ПРИОБРЕТЕН! 🏷️", "Госзнак «" + lot.plate + "» добавлен в ваш инвентарь. Можете установить его в Гараже, чтобы повысить стоимость любого автомобиля!", true);
 }
 
 // ----------------------------------------------------

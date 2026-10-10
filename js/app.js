@@ -1,8 +1,9 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.4)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.5)
+// Полная переоценка гаража, синхронизация и патчноут
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.4.4";
+const CURRENT_GAME_VERSION = "v0.4.5";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -183,7 +184,7 @@ const DEFAULT_STATE = {
         diet: 'shaurma', housingId: 'room', housingType: 'rent', ownedHouses: [], selectedStreetCarIndex: 0, 
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
         hasRacingLicense: false, consecutiveRaces: 0, maxRacesBeforeRaid: 12,
-        safeDeposit: 0,
+        safeDeposit: 0, trafficFines: 0,
         tools: { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false },
         furniture: [],
         phoneMessages: []
@@ -308,7 +309,6 @@ function loadFromTelegramCloud(callback) {
     });
 }
 
-// НАДЁЖНАЯ АВТОРИЗАЦИЯ TELEGRAM С ФОЛЛБЭКОМ
 function initTelegramAuthAndStorage(callback) {
     let callbackCalled = false;
     const safeCallback = () => {
@@ -318,7 +318,6 @@ function initTelegramAuthAndStorage(callback) {
         }
     };
 
-    // Страховочный таймаут: игра гарантированно запустится, даже если CloudStorage зависнет
     const fallbackTimer = setTimeout(() => {
         if (!callbackCalled) {
             loadFromLocalStorage();
@@ -401,7 +400,6 @@ function applyLoadedState(parsed) {
     if (Array.isArray(parsed.marketFeed)) state.marketFeed = parsed.marketFeed;
     if (Array.isArray(parsed.blackMarketPlates)) state.blackMarketPlates = parsed.blackMarketPlates;
     
-    // БЕЗУСЛОВНЫЙ ПРИОРИТЕТ АВТОРИЗАЦИИ TELEGRAM
     if (tgUserData) {
         let names = [];
         if (tgUserData.first_name) names.push(tgUserData.first_name);
@@ -453,6 +451,11 @@ function sanitizeState() {
             }
             if (car && car.insurance === undefined) car.insurance = null;
             if (car && car.isPersonal === undefined) car.isPersonal = false;
+
+            // Автоматическая переоценка всех машин в гараже при загрузке v0.4.5
+            if (typeof recalculateCarMarketValue === 'function') {
+                recalculateCarMarketValue(car);
+            }
         });
     }
 
@@ -975,7 +978,6 @@ function switchTab(tabId) {
     playSound('tick'); 
     tgHaptic('light'); 
     
-    // ПРОВЕРКА КЛИКА ПО ТЕЛЕФОНУ: ЕСЛИ УЖЕ В ТЕЛЕФОНЕ — ВОЗВРАТ НА ДОМАШНИЙ ЭКРАН!
     const activeTab = document.querySelector('.tab-screen.active');
     if (tabId === 'tabPhone' && activeTab && activeTab.id === 'tabPhone') {
         if (typeof PhoneManager !== 'undefined') {
@@ -1130,7 +1132,7 @@ setInterval(() => {
         updateHeaderUI();
     }
 
-    // 3. ОБРАБОТКА ТАЙМЕРОВ ПЛОЩАДКИ ПРОДАЖ (С УЧЁТОМ КАРМЫ)
+    // 3. ОБРАБОТКА ТАЙМЕРОВ ПЛОЩАДКИ ПРОДАЖ
     if (state.salesLot && state.salesLot.length > 0) {
         for (let i = 0; i < state.salesLot.length; i++) {
             let slot = state.salesLot[i];

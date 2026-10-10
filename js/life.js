@@ -1,5 +1,6 @@
 // ========================================================
-// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, СМЕНА ДНЯ, ФОРТУНА, ПОРТ (v0.4.4)
+// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, СМЕНА ДНЯ, ФОРТУНА, ПОРТ (v0.4.5)
+// Полная связка с динамической оценкой авто и архивных номеров
 // ========================================================
 
 // ========================================================
@@ -173,6 +174,9 @@ function confirmLegalizeCar(carId) {
             car.isStolen = false;
             car.unregistered = false;
             car.autotekaChecked = true;
+            if (typeof recalculateCarMarketValue === 'function') {
+                recalculateCarMarketValue(car);
+            }
         }
     }
     closeModal('modalLegalizeCar');
@@ -341,7 +345,6 @@ function collectAllBusinessCash() {
 
     state.player.cash = (state.player.cash || 0) + totalCollected;
     
-    // Квест: собрать кассу с предприятий
     if (state.player?.dailyQuests) {
         let quest = state.player.dailyQuests.find(q => q.id === 'q_biz');
         if (quest && !quest.done) {
@@ -362,7 +365,7 @@ function collectAllBusinessCash() {
 }
 
 // ========================================================
-// 4. САРАИ (БЕЗ ДУБЛИКАТОВ КОНСТАНТ)
+// 4. САРАИ (С ГЕНЕРАЦИЕЙ БЛАТНЫХ НОМЕРОВ И ПЕРЕОЦЕНКОЙ)
 // ========================================================
 function getBarnTiersSafe() {
     if (typeof BARN_TIERS_CONFIG !== 'undefined' && Array.isArray(BARN_TIERS_CONFIG)) {
@@ -412,7 +415,7 @@ function renderBarnFind() {
             </div>
             <p class='sub-label mb-2'>${b.desc}</p>
             <div class='text-xs mb-1 color-amber'>⭐ Редкий дроп (5%): <b>${rareCar.name}</b></div>
-            <div class='text-xs mb-2 color-purple'>🏷️ Шанс на архивные госномера: <b>15%</b></div>
+            <div class='text-xs mb-2 color-purple'>🏷️ Шанс на архивные госномера: <b>18%</b></div>
             <button onclick='scoutBarnTier(${b.tier})' class='btn btn-cyan btn-sm w-full' ${btnDisabled}>${btnText}</button>
         </div>`;
     });
@@ -438,7 +441,7 @@ function scoutBarnTier(tier) {
     state.player.cash -= config.cost;
     state.player.lastBarnDay = pDay;
 
-    let isRare = Math.random() < 0.05;
+    let isRare = Math.random() < 0.06;
     let foundCar = null;
 
     if (isRare && typeof BARN_FINDS !== 'undefined' && BARN_FINDS[config.rareIdx]) {
@@ -450,14 +453,12 @@ function scoutBarnTier(tier) {
     }
 
     let genPlate = "ТРАНЗИТ";
-    let isCoolPlate = Math.random() < 0.15;
+    let isCoolPlate = Math.random() < 0.18;
     if (isCoolPlate && typeof generateCoolPlate === 'function') {
         genPlate = generateCoolPlate();
     } else if (typeof generateNormalPlate === 'function') {
         genPlate = generateNormalPlate();
     }
-
-    let pVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(genPlate) : 0;
 
     let newCar = {
         id: "barn_" + Date.now(),
@@ -467,7 +468,7 @@ function scoutBarnTier(tier) {
         basePrice: foundCar.basePrice || config.cost * 2,
         price: foundCar.basePrice || config.cost * 2,
         baseMarketValue: foundCar.marketValue || foundCar.basePrice * 1.3,
-        marketValue: (foundCar.marketValue || foundCar.basePrice * 1.3) + pVal,
+        marketValue: foundCar.marketValue || foundCar.basePrice * 1.3,
         img: foundCar.img || "assets/cars/economy/vaz-2107.jpg",
         plate: genPlate,
         customPlate: genPlate,
@@ -479,6 +480,11 @@ function scoutBarnTier(tier) {
         purchaseCost: config.cost
     };
 
+    // ПЕРЕСЧЕТ СТОИМОСТИ С УЧЕТОМ НОМЕРОВ
+    if (typeof recalculateCarMarketValue === 'function') {
+        recalculateCarMarketValue(newCar);
+    }
+
     if (!state.garage) state.garage = [];
     state.garage.push(newCar);
 
@@ -489,7 +495,7 @@ function scoutBarnTier(tier) {
     tgHaptic('success');
 
     let verdictMsg = "В дальнем углу обнаружен «" + newCar.name + "»!";
-    if (isCoolPlate) verdictMsg += " На кузове висят архивные номера " + genPlate + "!";
+    if (isCoolPlate) verdictMsg += ` На кузове висят архивные номера ${genPlate} (+${(typeof calculatePlateValue === 'function' ? calculatePlateValue(genPlate).toLocaleString() : '0')} ₽ к оценке)!`;
     openVerdictModal("НАХОДКА В САРАЕ! 🏚️", verdictMsg, true, 0);
 }
 
@@ -669,7 +675,7 @@ function buyHomeFurniture(fId, cost) {
 }
 
 // ========================================================
-// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ (С ФОТО-FALLBACKS)
+// 6. ПОРТОВЫЕ КОНТЕЙНЕРЫ И СЛЕПОЙ АУКЦИОН
 // ========================================================
 function renderContainersList() {
     const container = document.getElementById('containersListRender');
@@ -797,7 +803,7 @@ function placeBlindBid() {
     let isTrash = Math.random() < 0.3; 
     let isStolen = Math.random() < 0.2; 
 
-    let plate = isStolen ? "ТРАНЗИТ" : (typeof generateNormalPlate === 'function' ? generateNormalPlate() : "А001АА 77");
+    let plate = isStolen ? "ТРАНЗИТ" : (typeof generateCoolPlate === 'function' && Math.random() < 0.25 ? generateCoolPlate() : generateNormalPlate());
     let baseVal = template.basePrice || 100000;
     
     let car = {
@@ -824,6 +830,10 @@ function placeBlindBid() {
         purchaseCost: currentBlindLot.bid
     };
 
+    if (typeof recalculateCarMarketValue === 'function') {
+        recalculateCarMarketValue(car);
+    }
+
     if (!state.garage) state.garage = [];
     state.garage.push(car);
     saveState();
@@ -843,7 +853,7 @@ function placeBlindBid() {
         playSound('win');
         tgHaptic('warning');
     } else {
-        msg += "Машина в идеале, вы сорвали куш!";
+        msg += `Машина в идеале, вы сорвали куш! Номера ${car.plate}.`;
         playSound('win');
         tgHaptic('success');
     }
@@ -965,39 +975,6 @@ function triggerRandomRoadEvent() {
     }
 }
 
-function triggerGarageRandomEvent() {
-    if (!state.garage || state.garage.length === 0) return;
-    if (Math.random() > 0.12) return;
-
-    const car = state.garage[Math.floor(Math.random() * state.garage.length)];
-    const modal = document.getElementById('modalGarageEvent');
-    const actions = document.getElementById('garageEventActions');
-    if (!modal || !actions) return;
-
-    let hasCasco = car.insurance === 'casco';
-    let hasOsago = car.insurance === 'osago';
-
-    setTxt('garageEventTitle', "Ночной инцидент на парковке!");
-    setTxt('garageEventCarName', car.name);
-    setTxt('garageEventDesc', `Неизвестный задел крыло вашего «${car.name}» во дворе и скрылся с места ДТП.`);
-
-    let resolveHtml = "";
-    if (hasCasco) {
-        resolveHtml = `<button onclick="closeModal('modalGarageEvent'); showToast('Страховая КАСКО возместила ущерб 100%!');" class="btn btn-green w-full">КАСКО покрыло 100% ущерба ✓</button>`;
-    } else if (hasOsago) {
-        let cost = 12000;
-        resolveHtml = `<button onclick="state.player.cash = Math.max(0, state.player.cash - ${cost}); closeModal('modalGarageEvent'); saveState(); updateHeaderUI();" class="btn btn-amber w-full">ОСАГО покрыло 50% (Доплата ${cost.toLocaleString()} ₽)</button>`;
-    } else {
-        let cost = 25000;
-        resolveHtml = `<button onclick="state.player.cash = Math.max(0, state.player.cash - ${cost}); closeModal('modalGarageEvent'); saveState(); updateHeaderUI();" class="btn btn-danger w-full">Оплатить ремонт (${cost.toLocaleString()} ₽)</button>`;
-    }
-
-    actions.innerHTML = resolveHtml;
-    modal.classList.add('active');
-    playSound('error');
-    tgHaptic('error');
-}
-
 function resolvePodstava(action) {
     closeModal('modalAutoPodstava');
     if (action === 'pay') {
@@ -1033,6 +1010,7 @@ function resolvePodstava(action) {
                 let car = state.garage[0];
                 car.condition = Math.max(10, car.condition - 30);
                 if (car.bodyThickness) { car.bodyThickness.doors = 300; car.bodyThickness.wings = 250; }
+                if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
             }
             saveState(); updateHeaderUI(); 
             if (typeof renderGarage === 'function') renderGarage();
