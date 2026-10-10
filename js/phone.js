@@ -1,7 +1,112 @@
 // ========================================================
 // js/phone.js — ИНТЕРАКТИВНЫЙ СМАРТФОН «PerekupOS» (v0.4.5)
-// Полная версия: 16 приложений, RDS Дрифт, Драг 402м, Биржа
+// Полная версия: 16 приложений, RDS Дрифт, Драг 402м, Биржа,
+// Сетевое интернет-радио: Record + SomaFM + Nightwave Plaza + DFM
 // ========================================================
+
+const ELECTRONIC_RADIO_STATIONS = [
+    // --- Сеть Radio Record ---
+    { id: 'rec_main', name: 'Radio Record (Main)', network: 'Record', genre: 'EDM / Club Dance', stream: 'https://radiorecord.hostingradio.ru/rr_main96.aacp' },
+    { id: 'rec_phonk', name: 'Record Phonk', network: 'Record', genre: 'Drift Phonk / Memphis', stream: 'https://radiorecord.hostingradio.ru/phonk96.aacp' },
+    { id: 'rec_ps', name: 'Пиратская Станция', network: 'Record', genre: 'Drum & Bass / Jungle', stream: 'https://radiorecord.hostingradio.ru/ps96.aacp' },
+    { id: 'rec_trap', name: 'Record Trap & Bass', network: 'Record', genre: 'Trap / Heavy Bass', stream: 'https://radiorecord.hostingradio.ru/trap96.aacp' },
+    { id: 'rec_techno', name: 'Record Techno', network: 'Record', genre: 'Peak-Time Techno / Rave', stream: 'https://radiorecord.hostingradio.ru/techno96.aacp' },
+    { id: 'rec_dub', name: 'Record Dubstep', network: 'Record', genre: 'Dubstep / Brostep', stream: 'https://radiorecord.hostingradio.ru/dub96.aacp' },
+    { id: 'rec_synth', name: 'Record Synthwave', network: 'Record', genre: 'Retrowave / 80s Electro', stream: 'https://radiorecord.hostingradio.ru/synth96.aacp' },
+    { id: 'rec_rus', name: 'Record Russian Mix', network: 'Record', genre: 'Русский Дэнс', stream: 'https://radiorecord.hostingradio.ru/rus96.aacp' },
+    { id: 'rec_chill', name: 'Record Chill-Out', network: 'Record', genre: 'Lounge / Atmospheric', stream: 'https://radiorecord.hostingradio.ru/chil96.aacp' },
+
+    // --- Альтернативные независимые электронные стримы (SomaFM, Plaza, DFM) ---
+    { id: 'soma_defcon', name: 'DEF CON Radio (SomaFM)', network: 'SomaFM', genre: 'Cyberpunk / Dark Electronic', stream: 'https://ice1.somafm.com/defcon-128-mp3' },
+    { id: 'soma_groove', name: 'Groove Salad (SomaFM)', network: 'SomaFM', genre: 'Downtempo / Ambient Electronic', stream: 'https://ice1.somafm.com/groovesalad-128-mp3' },
+    { id: 'soma_trip', name: 'The Trip (SomaFM)', network: 'SomaFM', genre: 'Progressive House & Trance', stream: 'https://ice1.somafm.com/thetrip-128-mp3' },
+    { id: 'soma_beat', name: 'Beat Blender (SomaFM)', network: 'SomaFM', genre: 'Deep House / Smooth Tech', stream: 'https://ice1.somafm.com/beatblender-128-mp3' },
+    { id: 'soma_dub', name: 'Dub Step Beyond (SomaFM)', network: 'SomaFM', genre: 'Deep Dubstep / Sub-Bass', stream: 'https://ice1.somafm.com/dubstep-128-mp3' },
+    { id: 'soma_space', name: 'Space Station (SomaFM)', network: 'SomaFM', genre: 'Midtempo Space Electronica', stream: 'https://ice1.somafm.com/spacestation-128-mp3' },
+    { id: 'nightwave', name: 'Nightwave Plaza', network: 'Plaza.one', genre: 'Vaporwave / Future Funk', stream: 'https://radio.plaza.one/mp3' },
+    { id: 'dfm_club', name: 'DFM Club Dance', network: 'DFM', genre: 'Club Electronic / House', stream: 'https://dfm.hostingradio.ru/dfm128.mp3' }
+];
+
+let recordAudioElement = null;
+let currentStationIdx = 0;
+let isRadioPlaying = false;
+let isRadioLoading = false;
+let radioVolume = 0.8;
+let radioNetworkFilter = 'all'; // 'all' | 'Record' | 'SomaFM' | 'Plaza_DFM'
+
+function getRecordAudio() {
+    if (!recordAudioElement) {
+        recordAudioElement = new Audio();
+        recordAudioElement.preload = "none";
+        recordAudioElement.volume = radioVolume;
+
+        recordAudioElement.addEventListener('playing', () => {
+            isRadioPlaying = true;
+            isRadioLoading = false;
+            updateRadioPlaybackUI();
+        });
+
+        recordAudioElement.addEventListener('pause', () => {
+            isRadioPlaying = false;
+            isRadioLoading = false;
+            updateRadioPlaybackUI();
+        });
+
+        recordAudioElement.addEventListener('waiting', () => {
+            isRadioLoading = true;
+            updateRadioPlaybackUI();
+        });
+
+        recordAudioElement.addEventListener('error', (e) => {
+            console.warn("[Radio Audio Error]:", e);
+            isRadioPlaying = false;
+            isRadioLoading = false;
+            updateRadioPlaybackUI();
+            showToast("⚠️ Ошибка соединения с аудиопотоком станции");
+        });
+    }
+    return recordAudioElement;
+}
+
+function updateRadioPlaybackUI() {
+    const playBtn = document.getElementById('radioPlayPauseBtn');
+    const statusText = document.getElementById('radioLiveStatus');
+    const visualizer = document.getElementById('radioWaveVisualizer');
+    const curStation = ELECTRONIC_RADIO_STATIONS[currentStationIdx];
+    if (!curStation) return;
+
+    if (playBtn) {
+        if (isRadioLoading) {
+            playBtn.innerHTML = "<i class='fa-solid fa-spinner fa-spin'></i> ЗАГРУЗКА...";
+            playBtn.className = "btn btn-dark btn-sm";
+        } else if (isRadioPlaying) {
+            playBtn.innerHTML = "<i class='fa-solid fa-pause'></i> ПАУЗА";
+            playBtn.className = "btn btn-amber btn-sm";
+        } else {
+            playBtn.innerHTML = "<i class='fa-solid fa-play'></i> СЛУШАТЬ";
+            playBtn.className = "btn btn-green btn-sm";
+        }
+    }
+
+    if (statusText) {
+        if (isRadioLoading) {
+            statusText.innerHTML = `<span class="color-amber font-bold"><i class="fa-solid fa-rotate fa-spin"></i> ПОДКЛЮЧЕНИЕ К ПОТОКУ...</span>`;
+        } else if (isRadioPlaying) {
+            statusText.innerHTML = `<span class="color-green font-bold"><i class="fa-solid fa-satellite-dish"></i> В ЭФИРЕ • Live Stream [${curStation.network}]</span>`;
+        } else {
+            statusText.innerHTML = `<span class="sub-label">ОСТАНОВЛЕНО</span>`;
+        }
+    }
+
+    if (visualizer) {
+        if (isRadioPlaying) visualizer.classList.add('playing');
+        else visualizer.classList.remove('playing');
+    }
+
+    setTxt('radioCurrentTrackName', curStation.name);
+    setTxt('radioCurrentGenre', `${curStation.genre} • ${curStation.network}`);
+    setTxt('radioNetworkBadgeText', curStation.network.toUpperCase());
+}
 
 const PhoneManager = {
     currentApp: null, // null = домашний экран
@@ -956,7 +1061,7 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // 5. НОВЫЕ ПРИЛОЖЕНИЯ: ГОСУСЛУГИ, МАГНИТОЛА, БЛОКНОТ
+    // 5. ГОСУСЛУГИ, МАГНИТОЛА RECORD/SOMAFM, БЛОКНОТ
     // ========================================================
     renderGosuslugiApp(container) {
         let fines = state.player.trafficFines || 0;
@@ -998,25 +1103,202 @@ const PhoneManager = {
     },
 
     renderRadioApp(container) {
+        const curStation = ELECTRONIC_RADIO_STATIONS[currentStationIdx] || ELECTRONIC_RADIO_STATIONS[0];
+
+        // Фильтрация списка станций по сети
+        let visibleStations = ELECTRONIC_RADIO_STATIONS;
+        if (radioNetworkFilter === 'Record') {
+            visibleStations = ELECTRONIC_RADIO_STATIONS.filter(s => s.network === 'Record');
+        } else if (radioNetworkFilter === 'SomaFM') {
+            visibleStations = ELECTRONIC_RADIO_STATIONS.filter(s => s.network === 'SomaFM');
+        } else if (radioNetworkFilter === 'Plaza_DFM') {
+            visibleStations = ELECTRONIC_RADIO_STATIONS.filter(s => s.network === 'Plaza.one' || s.network === 'DFM');
+        }
+
         container.innerHTML = `
             <div class="phone-app-header">
                 <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
-                <div class="phone-app-title"><i class="fa-solid fa-radio color-purple"></i> Авто-Магнитола</div>
+                <div class="phone-app-title"><i class="fa-solid fa-radio color-purple"></i> Авто-Магнитола Live</div>
                 <div style="width:40px;"></div>
             </div>
             <div class="phone-app-body text-center">
-                <div class="glass-card p-3 mb-2">
-                    <div style="font-size:36px; margin-bottom:8px;">📻 🔊 🎶</div>
-                    <b class="color-cyan text-xs">Perekup FM / Drift Station</b>
-                    <div class="sub-label my-1" style="font-size:10px;">Волна: 104.2 FM • Ночной город</div>
-                    <div class="grid-3 mt-2">
-                        <button onclick="playSound('win'); showToast('Волна Drift Phonk активна!');" class="btn btn-purple btn-sm">Phonk</button>
-                        <button onclick="playEngineSound(); showToast('Волна Turbo Bass активна!');" class="btn btn-red btn-sm">Bass</button>
-                        <button onclick="playSound('tick'); showToast('Волна Retro Synth активна!');" class="btn btn-cyan btn-sm">Synth</button>
+                
+                <!-- ГЛАВНЫЙ БЛОК ПЛЕЕРА -->
+                <div class="glass-card p-3 mb-2" style="background: radial-gradient(circle at 50% 0%, #1e1035 0%, #080d16 100%); border-color: rgba(192, 132, 252, 0.4); box-shadow: 0 0 20px rgba(192, 132, 252, 0.15);">
+                    <div class="radio-cassette-glow mb-2">
+                        <div class="radio-brand-badge" id="radioNetworkBadgeText">${curStation.network.toUpperCase()}</div>
+                        <div id="radioWaveVisualizer" class="radio-equalizer-bars ${isRadioPlaying ? 'playing' : ''}">
+                            <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+
+                    <b class="color-cyan text-xs" style="font-size:14px;" id="radioCurrentTrackName">${curStation.name}</b>
+                    <div class="sub-label mt-1 mb-2" id="radioCurrentGenre">${curStation.genre} • ${curStation.network}</div>
+                    <div id="radioLiveStatus" class="mb-3">
+                        ${isRadioPlaying ? `<span class="color-green font-bold"><i class="fa-solid fa-satellite-dish"></i> В ЭФИРЕ • Live Stream [${curStation.network}]</span>` : '<span class="sub-label">ОСТАНОВЛЕНО</span>'}
+                    </div>
+
+                    <!-- КНОПКИ УПРАВЛЕНИЯ ПЛЕЕРОМ -->
+                    <div class="grid-3 mb-3" style="align-items:center;">
+                        <button onclick="PhoneManager.changeRadioStation(-1)" class="btn btn-dark btn-sm" title="Предыдущая станция">
+                            <i class="fa-solid fa-backward-step"></i> Назад
+                        </button>
+                        <button id="radioPlayPauseBtn" onclick="PhoneManager.toggleRadioPlay()" class="btn ${isRadioPlaying ? 'btn-amber' : 'btn-green'} btn-sm">
+                            <i class="fa-solid ${isRadioPlaying ? 'fa-pause' : 'fa-play'}"></i> ${isRadioPlaying ? 'ПАУЗА' : 'СЛУШАТЬ'}
+                        </button>
+                        <button onclick="PhoneManager.changeRadioStation(1)" class="btn btn-dark btn-sm" title="Следующая станция">
+                            Вперёд <i class="fa-solid fa-forward-step"></i>
+                        </button>
+                    </div>
+
+                    <!-- РЕГУЛИРОВКА ГРОМКОСТИ -->
+                    <div class="p-2" style="background: #090e18; border-radius: 10px; border: 1px solid var(--border-glass);">
+                        <div class="flex-between text-xs mb-1">
+                            <span class="sub-label"><i class="fa-solid fa-volume-high color-cyan"></i> Громкость магнитолы:</span>
+                            <b id="radioVolumeDisplay" class="color-cyan">${Math.round(radioVolume * 100)}%</b>
+                        </div>
+                        <input type="range" id="radioVolumeSlider" min="0" max="1" step="0.05" value="${radioVolume}" oninput="PhoneManager.setRadioVolume(this.value)" style="width: 100%; accent-color: var(--cyan); cursor: pointer;">
                     </div>
                 </div>
+
+                <!-- ФИЛЬТР СЕТЕЙ ВЕЩАНИЯ -->
+                <div class="grid-4 mb-2">
+                    <button onclick="PhoneManager.setRadioFilter('all')" class="btn ${radioNetworkFilter === 'all' ? 'btn-cyan' : 'btn-dark'} btn-sm">Все (17)</button>
+                    <button onclick="PhoneManager.setRadioFilter('Record')" class="btn ${radioNetworkFilter === 'Record' ? 'btn-cyan' : 'btn-dark'} btn-sm">Record</button>
+                    <button onclick="PhoneManager.setRadioFilter('SomaFM')" class="btn ${radioNetworkFilter === 'SomaFM' ? 'btn-cyan' : 'btn-dark'} btn-sm">SomaFM</button>
+                    <button onclick="PhoneManager.setRadioFilter('Plaza_DFM')" class="btn ${radioNetworkFilter === 'Plaza_DFM' ? 'btn-cyan' : 'btn-dark'} btn-sm">Plaza/DFM</button>
+                </div>
+
+                <!-- СПИСОК СТАНЦИЙ -->
+                <div class="glass-card p-2 text-left" style="text-align: left;">
+                    <div class="text-xs font-bold color-purple mb-2"><i class="fa-solid fa-list-music"></i> Каталог потоков электронной музыки:</div>
+                    <div class="space-y-2" style="max-height: 190px; overflow-y: auto;">
+                        ${visibleStations.map(s => {
+                            const originalIdx = ELECTRONIC_RADIO_STATIONS.findIndex(orig => orig.id === s.id);
+                            const isCurrent = originalIdx === currentStationIdx;
+                            return `
+                            <div onclick="PhoneManager.selectExactStation(${originalIdx})" class="p-2 flex-between cursor-pointer station-row ${isCurrent ? 'active-station' : ''}" style="background: #090d16; border-radius: 8px; border: 1px solid ${isCurrent ? 'var(--cyan)' : 'var(--border-glass)'};">
+                                <div>
+                                    <div class="flex-gap" style="align-items:center;">
+                                        <b class="text-xs ${isCurrent ? 'color-cyan' : ''}">${s.name}</b>
+                                        <span class="tag-badge ${s.network === 'Record' ? 'bg-tag-red' : (s.network === 'SomaFM' ? 'bg-tag-amber' : 'bg-tag-purple')}" style="font-size:8px; padding:1px 4px;">${s.network}</span>
+                                    </div>
+                                    <div class="sub-label" style="font-size:9.5px;">${s.genre}</div>
+                                </div>
+                                ${isCurrent && isRadioPlaying ? '<span class="tag-badge bg-tag-green">ON AIR</span>' : '<i class="fa-solid fa-play text-xs color-sub"></i>'}
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+
             </div>
         `;
+    },
+
+    setRadioFilter(filter) {
+        radioNetworkFilter = filter;
+        this.renderRadioApp(document.getElementById('phoneAppContainer'));
+    },
+
+    toggleRadioPlay() {
+        const audio = getRecordAudio();
+        const curStation = ELECTRONIC_RADIO_STATIONS[currentStationIdx];
+
+        if (isRadioPlaying) {
+            audio.pause();
+            isRadioPlaying = false;
+            isRadioLoading = false;
+            tgHaptic('light');
+            updateRadioPlaybackUI();
+        } else {
+            isRadioLoading = true;
+            updateRadioPlaybackUI();
+
+            if (audio.src !== curStation.stream) {
+                audio.src = curStation.stream;
+                audio.load();
+            }
+
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    isRadioPlaying = true;
+                    isRadioLoading = false;
+                    tgHaptic('success');
+                    showToast(`📻 В эфире: ${curStation.name}!`);
+                    updateRadioPlaybackUI();
+                }).catch((err) => {
+                    console.warn("[Radio play error]:", err);
+                    isRadioPlaying = false;
+                    isRadioLoading = false;
+                    updateRadioPlaybackUI();
+                    showToast("Нажмите «СЛУШАТЬ» ещё раз для запуска");
+                });
+            }
+        }
+    },
+
+    changeRadioStation(delta) {
+        currentStationIdx = (currentStationIdx + delta + ELECTRONIC_RADIO_STATIONS.length) % ELECTRONIC_RADIO_STATIONS.length;
+        const curStation = ELECTRONIC_RADIO_STATIONS[currentStationIdx];
+        const audio = getRecordAudio();
+
+        audio.src = curStation.stream;
+        audio.load();
+
+        if (isRadioPlaying) {
+            isRadioLoading = true;
+            updateRadioPlaybackUI();
+            audio.play().then(() => {
+                isRadioPlaying = true;
+                isRadioLoading = false;
+                updateRadioPlaybackUI();
+            }).catch(() => {
+                isRadioLoading = false;
+                updateRadioPlaybackUI();
+            });
+        }
+
+        tgHaptic('light');
+        playSound('tick');
+        showToast(`Переключено на: ${curStation.name}`);
+        this.renderRadioApp(document.getElementById('phoneAppContainer'));
+    },
+
+    selectExactStation(idx) {
+        if (idx < 0 || idx >= ELECTRONIC_RADIO_STATIONS.length) return;
+        currentStationIdx = idx;
+        const curStation = ELECTRONIC_RADIO_STATIONS[currentStationIdx];
+        const audio = getRecordAudio();
+
+        audio.src = curStation.stream;
+        audio.load();
+
+        isRadioLoading = true;
+        updateRadioPlaybackUI();
+
+        audio.play().then(() => {
+            isRadioPlaying = true;
+            isRadioLoading = false;
+            tgHaptic('success');
+            showToast(`Включено: ${curStation.name}`);
+            updateRadioPlaybackUI();
+        }).catch((err) => {
+            console.warn("[Station change play failed]:", err);
+            isRadioPlaying = false;
+            isRadioLoading = false;
+            updateRadioPlaybackUI();
+        });
+
+        this.renderRadioApp(document.getElementById('phoneAppContainer'));
+    },
+
+    setRadioVolume(val) {
+        radioVolume = parseFloat(val);
+        const audio = getRecordAudio();
+        audio.volume = radioVolume;
+        const disp = document.getElementById('radioVolumeDisplay');
+        if (disp) disp.innerText = `${Math.round(radioVolume * 100)}%`;
     },
 
     renderNotepadApp(container) {
