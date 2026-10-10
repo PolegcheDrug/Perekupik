@@ -1,485 +1,401 @@
-// ===================== Вкладка: ПЛОЩАДКА ПРОДАЖ (js/salesLot.js) =====================
+// ========================================================
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ПОКУПАТЕЛИ И ТОРГ (v0.4.0)
+// ========================================================
 
-let activeHaggleSlotIdx = null;
-
-function upgradeExpressCapacity() {
-    let maxT = 25;
-    if (state.player && state.player.maxExpressTickets) maxT = state.player.maxExpressTickets;
-    
-    if (maxT >= 200) return showToast("Достигнут максимум склада талонов (200 шт)!");
-    
-    let cost = 50000;
-    if (typeof getExpressTicketUpgradeCost === 'function') cost = getExpressTicketUpgradeCost();
-    
-    let cash = 0;
-    if (state.player && state.player.cash) cash = state.player.cash;
-    
-    if (cash < cost) return showToast("Не хватает денег! Нужно " + cost.toLocaleString() + " ₽");
-    
-    state.player.cash -= cost;
-    state.player.maxExpressTickets = maxT + 25;
-    saveState();
-    renderSalesLot();
-    tgHaptic('success');
-    showToast("Вместимость склада увеличена до " + state.player.maxExpressTickets + " талонов!");
-}
+const BUYERS_CATALOG = {
+    economy: [
+        { name: "Студент Макс", avatar: "🧑‍🎓", rate: 0.82, type: "economy" },
+        { name: "Таксист Ашот", avatar: "🧔", rate: 0.88, type: "economy" },
+        { name: "Дед Михалыч", avatar: "👴", rate: 0.95, type: "economy" },
+        { name: "Перекуп Саня", avatar: "😎", rate: 0.75, type: "economy" }
+    ],
+    comfort: [
+        { name: "Менеджер Олег", avatar: "👨‍💼", rate: 0.88, type: "comfort" },
+        { name: "Семейный Илья", avatar: "👨‍👩‍👦", rate: 0.92, type: "comfort" },
+        { name: "Блогерша Аня", avatar: "👩‍🎤", rate: 0.95, type: "comfort" },
+        { name: "Автоподборщик", avatar: "🕵️‍♂️", rate: 0.80, type: "comfort" }
+    ],
+    premium: [
+        { name: "Бизнесмен Игорь", avatar: "🤵", rate: 0.90, type: "premium" },
+        { name: "Мажор Артур", avatar: "🕺", rate: 0.98, type: "premium" },
+        { name: "Депутат Виталий", avatar: "🕴️", rate: 0.85, type: "premium" },
+        { name: "Владелец таксопарка", avatar: "🧔‍♂️", rate: 0.82, type: "premium" }
+    ],
+    hyper: [
+        { name: "Шейх Мансур", avatar: "👳‍♂️", rate: 1.05, type: "hyper" },
+        { name: "Олигарх Роман", avatar: "🛥️", rate: 0.95, type: "hyper" },
+        { name: "Крипто-миллионер", avatar: "🤑", rate: 1.10, type: "hyper" }
+    ]
+};
 
 function renderSalesLot() {
     const list = document.getElementById('salesLotList');
     if (!list) return;
+
+    let count = (state.salesLot && state.salesLot.length) ? state.salesLot.length : 0;
+    setTxt('lotCountBadge', count + " авто на продаже");
     
-    let lCount = 0;
-    if (state.salesLot && state.salesLot.length) lCount = state.salesLot.length;
-    setTxt('lotCountBadge', lCount + " авто на продаже");
-    
-    let curT = 0;
-    if (state.player && state.player.expressTickets) curT = state.player.expressTickets;
-    let maxT = 25;
-    if (state.player && state.player.maxExpressTickets) maxT = state.player.maxExpressTickets;
-    setTxt('expressCountDisplay', curT + " / " + maxT);
-    
-    const upgBtn = document.getElementById('btnUpgradeTickets');
-    if (upgBtn) {
-        let cost = 50000;
-        if (typeof getExpressTicketUpgradeCost === 'function') cost = getExpressTicketUpgradeCost();
-        
-        if (maxT >= 200) {
-            upgBtn.innerText = "МАКСИМУМ";
-            upgBtn.disabled = true;
-        } else {
-            upgBtn.innerText = "Расширить (" + (cost / 1000).toFixed(0) + "k ₽)";
-            upgBtn.disabled = false;
-        }
-    }
-    
-    const mainContent = document.querySelector('.main-content');
-    const scrollPos = mainContent ? mainContent.scrollTop : 0;
-    
-    let noLots = false;
-    if (!state.salesLot) noLots = true;
-    else if (state.salesLot.length === 0) noLots = true;
-    
-    if (noLots) {
-        list.innerHTML = "<div class='glass-card text-center sub-label py-8'><i class='fa-solid fa-car-on color-green mb-2' style='font-size:32px;'></i><div>Площадка пуста. Выставьте авто из гаража!</div></div>";
+    let maxExpress = (state.player && state.player.maxExpressTickets) ? state.player.maxExpressTickets : 25;
+    let curExpress = (state.player && state.player.expressTickets) ? state.player.expressTickets : 0;
+    setTxt('expressCountDisplay', curExpress + " / " + maxExpress);
+
+    if (!state.salesLot || state.salesLot.length === 0) {
+        list.innerHTML = "<div class='glass-card text-center sub-label py-8'><i class='fa-solid fa-car-on color-cyan mb-2' style='font-size:32px;'></i><div>Площадка пуста. Выставьте автомобиль из гаража!</div></div>";
         return;
     }
-    
-    let htmlContent = "";
 
-    state.salesLot.forEach((slot, idx) => {
-        if (!slot) return;
-        if (!slot.car) return;
-        
-        const car = slot.car;
-        const buyer = slot.currentBuyer;
-        
-        let progressPercent = ((30 - slot.timer) / 30) * 100;
-        if (progressPercent < 0) progressPercent = 0;
-        if (progressPercent > 100) progressPercent = 100;
-        
-        let clientStatus = "";
-        if (slot.timer <= 0) clientStatus = "<span class='tag-badge bg-tag-green'>Клиент осматривает!</span>";
-        
-        let timerBlock = "";
-        let buyerBlock = "";
-        
-        let pTck = 0;
-        if (state.player && state.player.expressTickets) pTck = state.player.expressTickets;
+    let html = "";
+    state.salesLot.forEach((lot, idx) => {
+        if (!lot || !lot.car) return;
 
-        if (slot.timer > 0) {
-            timerBlock = 
-            "<div class='lot-progress-wrap'>" +
-                "<div class='lot-progress-bar' id='lot_progress_fill_" + idx + "' style='width: " + progressPercent + "%;'></div>" +
-            "</div>" +
-            "<div class='sub-label mb-2 text-center' id='lot_timer_text_" + idx + "'>Ожидание покупателя: " + slot.timer + "с</div>" +
-            "<div class='grid-2 mb-2'>" +
-                "<button onclick='speedUpLotWithTicket(" + idx + ")' class='btn btn-purple btn-sm'>🎟️ Пропуск (" + pTck + " шт)</button>" +
-                "<button onclick='speedUpLotWithStars(" + idx + ")' class='btn btn-amber btn-sm'>⭐ 5 Stars</button>" +
+        let car = lot.car;
+        let cName = car.name ? car.name : "Автомобиль";
+        let cImg = car.img ? car.img : "assets/cars/economy/vaz-2107.jpg";
+        let cPlate = car.customPlate ? car.customPlate : (car.plate ? car.plate : "ТРАНЗИТ");
+        let asking = lot.askingPrice ? lot.askingPrice : 100000;
+
+        let statusBlock = "";
+        if (!lot.currentBuyer) {
+            let maxTime = lot.maxTimer || 180;
+            let currentTimer = lot.timer || 0;
+            let progressPct = Math.max(0, Math.min(100, ((maxTime - currentTimer) / maxTime) * 100));
+
+            statusBlock = 
+            "<div class='p-2' style='background:#090e18; border-radius:8px; border:1px solid var(--border-glass);'>" +
+                "<div class='flex-between text-xs mb-1'>" +
+                    "<span id='lot_timer_text_" + idx + "'>Ожидание клиента: " + currentTimer + "с</span>" +
+                    "<span class='color-cyan font-bold'>Поиск покупателя</span>" +
+                "</div>" +
+                "<div class='container-progress-wrap'>" +
+                    "<div class='container-progress-bar' id='lot_progress_fill_" + idx + "' style='width:" + progressPct + "%;'></div>" +
+                "</div>" +
+                "<button onclick='useExpressTicket(" + idx + ")' class='btn btn-purple btn-sm w-full mt-2'>" +
+                    "⚡ Ускорить поиск (1 Талон 🎟️)" +
+                "</button>" +
             "</div>";
-        }
-
-        if (buyer) {
-            let disableHaggle = "";
-            if (buyer.offerPrice === 0) disableHaggle = "disabled";
-            
-            let bAva = "👤"; if (buyer.avatar) bAva = buyer.avatar;
-            let bName = "Покупатель"; if (buyer.name) bName = buyer.name;
-            let bPrice = 0; if (buyer.offerPrice) bPrice = buyer.offerPrice;
-            let bStat = ""; if (buyer.preStatus) bStat = buyer.preStatus;
-
-            buyerBlock = 
-            "<div class='glass-card p-3 mb-2' style='background:#090e18; border-color:var(--cyan);'>" +
+        } else {
+            let buyer = lot.currentBuyer;
+            let timeLeft = lot.buyerTimerLeft ? lot.buyerTimerLeft : 60;
+            statusBlock = 
+            "<div class='p-2' style='background:rgba(0,230,118,0.1); border:1px solid var(--green); border-radius:8px;'>" +
                 "<div class='flex-between mb-1'>" +
-                    "<div class='font-bold text-xs color-cyan'>" + bAva + " " + bName + "</div>" +
-                    "<div class='price-val'>" + bPrice.toLocaleString() + " ₽</div>" +
+                    "<div class='flex-gap' style='align-items:center;'>" +
+                        "<span style='font-size:20px;'>" + buyer.avatar + "</span>" +
+                        "<div><b class='text-xs color-green'>" + buyer.name + "</b><div class='sub-label' style='font-size:9px;'>Осматривает авто у капота</div></div>" +
+                    "</div>" +
+                    "<span class='tag-badge bg-tag-amber' id='lot_buyer_timer_" + idx + "'>⏳ " + timeLeft + "с</span>" +
                 "</div>" +
-                "<div class='sub-label mb-2 color-amber' style='font-style:italic;'>«" + bStat + "»</div>" +
-                "<div class='grid-3'>" +
-                    "<button onclick='acceptBuyerDeal(" + idx + ")' class='btn btn-green btn-sm'>Продать</button>" +
-                    "<button onclick='openHaggleSaleModal(" + idx + ")' class='btn btn-amber btn-sm' " + disableHaggle + ">Торг 🗣</button>" +
-                    "<button onclick='rejectBuyerDeal(" + idx + ")' class='btn btn-dark btn-sm'>Отказать</button>" +
+                "<div class='flex-between mb-2'>" +
+                    "<span class='sub-label'>Предложение:</span>" +
+                    "<span class='price-val text-xs'>" + buyer.offerPrice.toLocaleString() + " ₽</span>" +
+                "</div>" +
+                "<div class='grid-2'>" +
+                    "<button onclick=\"openSaleHaggleModal(" + idx + ")\" class='btn btn-cyan btn-sm'>💬 Торговаться</button>" +
+                    "<button onclick=\"acceptBuyerOffer(" + idx + ")\" class='btn btn-green btn-sm'>Продать 🤝</button>" +
                 "</div>" +
             "</div>";
         }
 
-        let cImg = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
-        if (car.img) cImg = car.img;
-
-        let cPlate = "ТРАНЗИТ";
-        if (car.customPlate) cPlate = car.customPlate;
-        else if (car.plate) cPlate = car.plate;
-
-        let cName = "Автомобиль";
-        if (car.name) cName = car.name;
-
-        let sPrice = 0;
-        if (slot.askingPrice) sPrice = slot.askingPrice;
-
-        htmlContent += 
+        html += 
         "<div class='glass-card mb-3'>" +
-            "<div class='car-img-wrap' style='height:135px;'>" +
-                "<img src='" + cImg + "' class='car-img' onerror=\"this.src='https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80'\">" +
-                "<div class='plate-corner'><div class='license-plate'>" + cPlate + "</div></div>" +
+            "<div class='car-img-wrap' style='height: 130px;'>" +
+                "<img src='" + cImg + "' class='car-img' onerror=\"this.src='assets/cars/economy/vaz-2107.jpg'\">" +
+                "<div class='plate-corner'><div class='license-plate'>" + cPlate + " <div class='license-flag'>RUS</div></div></div>" +
             "</div>" +
             "<div class='flex-between mb-2'>" +
                 "<div>" +
                     "<h4 class='font-bold'>" + cName + "</h4>" +
-                    "<div class='sub-label'>Цена выставления: <b class='color-green'>" + sPrice.toLocaleString() + " ₽</b></div>" +
+                    "<div class='sub-label'>Цена в объявлении: <b class='color-cyan'>" + asking.toLocaleString() + " ₽</b></div>" +
                 "</div>" +
-                "<div>" + clientStatus + "</div>" +
+                "<button onclick='cancelSalesLot(" + idx + ")' class='btn btn-dark btn-auto btn-sm'>Снять с продажи</button>" +
             "</div>" +
-            timerBlock +
-            buyerBlock +
-            "<button onclick='withdrawFromLot(" + idx + ")' class='btn btn-dark w-full mt-1 btn-sm'>Забрать обратно в гараж</button>" +
+            statusBlock +
         "</div>";
     });
 
-    list.innerHTML = htmlContent;
-    if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
+    list.innerHTML = html;
 }
 
-function speedUpLotWithTicket(idx) {
-    let tck = 0;
-    if (state.player && state.player.expressTickets) tck = state.player.expressTickets;
+function generateBuyerForSlot(slot) {
+    if (!slot || !slot.car) return;
+    const car = slot.car;
+    let carCat = car.type ? car.type : 'economy';
     
-    if (tck <= 0) {
-        return showToast("Нет пропусков! Купите у Решалы или дождитесь смены дня.");
+    if (!BUYERS_CATALOG[carCat]) carCat = 'premium';
+    const pool = BUYERS_CATALOG[carCat];
+    const template = pool[Math.floor(Math.random() * pool.length)];
+    
+    let asking = slot.askingPrice ? slot.askingPrice : car.marketValue;
+    let baseVal = car.marketValue || 100000;
+    
+    let tuneBonus = 0;
+    if (car.tuning) {
+        if (car.tuning.stance) tuneBonus += 0.05;
+        if (car.tuning.customWheels) tuneBonus += 0.05;
+        if (car.tuning.chip > 0) tuneBonus += 0.03;
     }
+    if (car.isPolished) tuneBonus += 0.05;
+
+    // ПЕРЕПЛАТА ЗА ЭКСКЛЮЗИВНЫЕ ГОСНОМЕРА (+30-50%)
+    let plateBonus = 0;
+    let cPlate = car.customPlate || car.plate;
+    let pVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(cPlate) : 0;
+    if (pVal >= 40000) {
+        plateBonus = 0.30 + Math.random() * 0.20;
+    }
+    
+    let rate = template.rate + tuneBonus + plateBonus;
+    let offer = Math.round(baseVal * (rate + (Math.random() * 0.08 - 0.04)));
+    
+    if (offer > asking * 1.15) offer = asking;
+    if (offer < asking * 0.5) offer = Math.round(asking * 0.55);
+
+    slot.currentBuyer = {
+        name: template.name,
+        avatar: template.avatar,
+        type: template.type,
+        offerPrice: offer,
+        maxOfferPrice: Math.round(offer * (1.08 + Math.random() * 0.14)),
+        patience: 100
+    };
+    
+    // Таймер терпения покупателя (от 1 до 5 минут)
+    slot.buyerTimerLeft = Math.floor(60 + Math.random() * 240); 
+
+    try {
+        tgHaptic('success');
+        playSound('tick');
+    } catch(e) {}
+    
+    let plateText = plateBonus > 0 ? " (🔥 Оценил красивый госномер!)" : "";
+    showToast("🔔 На площадке клиент: " + template.name + plateText);
+    renderSalesLot();
+}
+
+function upgradeExpressCapacity() {
+    let cost = getExpressTicketUpgradeCost();
+    let cash = (state.player && state.player.cash) ? state.player.cash : 0;
+    if (cash < cost) return showToast("Нужно " + cost.toLocaleString() + " ₽ для расширения хранилища талонов!");
+    
+    state.player.cash -= cost;
+    let maxT = (state.player && state.player.maxExpressTickets) ? state.player.maxExpressTickets : 25;
+    state.player.maxExpressTickets = maxT + 25;
+    state.player.expressTickets = state.player.maxExpressTickets;
+    
+    saveState();
+    updateHeaderUI();
+    renderSalesLot();
+    playSound('win');
+    tgHaptic('success');
+    showToast("Склад пропусков расширен и заполнен! (Вместимость: " + state.player.maxExpressTickets + ")");
+}
+
+function useExpressTicket(idx) {
+    let tck = (state.player && state.player.expressTickets) ? state.player.expressTickets : 0;
+    if (tck <= 0) return showToast("У вас закончились экспресс-пропуски 🎟️! Подождите смены дня.");
+
     state.player.expressTickets -= 1;
     const slot = state.salesLot[idx];
-    if (!slot) return;
-    slot.timer = 0;
-    generateBuyerForSlot(slot);
+    if (slot) {
+        slot.timer = 0;
+        generateBuyerForSlot(slot);
+    }
     saveState();
     renderSalesLot();
-    tgHaptic('success');
-    showToast("🎟️ Экспресс-пропуск активирован! Клиент подошёл к капоту.");
+    updateHeaderUI();
+    showToast("⚡ Экспресс-пропуск применен! Покупатель найден мгновенно.");
 }
 
-function speedUpLotWithStars(idx) {
-    let stars = 0;
-    if (state.player && state.player.stars) stars = state.player.stars;
-
-    if (stars < 5) return showToast("Не хватает 5 Telegram Stars ⭐!");
-    state.player.stars -= 5;
+function cancelSalesLot(idx) {
     const slot = state.salesLot[idx];
-    if (!slot) return;
-    slot.timer = 0;
-    generateBuyerForSlot(slot);
+    if (!slot || !slot.car) return;
+
+    let maxSlots = getTotalGarageSlots();
+    let curSlots = state.garage ? state.garage.length : 0;
+    if (curSlots >= maxSlots) return showToast("Гараж полон! Освободите место для возврата авто.");
+
+    state.garage.push(slot.car);
+    state.salesLot.splice(idx, 1);
     saveState();
     renderSalesLot();
-    tgHaptic('success');
-    showToast("⭐ VIP-покупатель сразу у капота!");
+    if (typeof renderGarage === 'function') renderGarage();
+    updateHeaderUI();
+    showToast("Автомобиль снят с продажи и возвращен в гараж.");
 }
 
-// --- ОТКРЫТИЕ ОКНА ТОРГА У КАПОТА В СТИЛЕ МЕССЕНДЖЕРА ---
-function openHaggleSaleModal(idx) {
-    activeHaggleSlotIdx = idx;
+// ========================================================
+// ЛОГИКА ТОРГА И ДИАЛОГОВ
+// ========================================================
+let activeHaggleLotIndex = null;
+let currentSaleBuyer = null;
+
+function openSaleHaggleModal(idx) {
+    activeHaggleLotIndex = idx;
     const slot = state.salesLot[idx];
-    if (!slot) return;
-    if (!slot.currentBuyer) return;
-    const buyer = slot.currentBuyer;
+    if (!slot || !slot.currentBuyer) return;
+
+    currentSaleBuyer = slot.currentBuyer;
     const car = slot.car;
-    
-    let karma = 50;
-    if (state.player && state.player.karma) karma = state.player.karma;
 
-    let bKarma = 0;
-    if (buyer.minKarma) bKarma = buyer.minKarma;
-
-    if (karma < bKarma) {
-        return showToast("Ваша репутация слишком низкая для торга с этим покупателем!");
-    }
+    const imgEl = document.getElementById("saleCarImg");
+    if (imgEl) imgEl.src = car.img ? car.img : "assets/cars/economy/vaz-2107.jpg";
     
-    let bAva = "👤"; if (buyer.avatar) bAva = buyer.avatar;
-    let bName = "Покупатель"; if (buyer.name) bName = buyer.name;
-    let bPrice = 0; if (buyer.offerPrice) bPrice = buyer.offerPrice;
+    setTxt("saleCarTitle", car.name ? car.name : "Автомобиль");
+    setTxt("saleBuyerOfferVal", currentSaleBuyer.offerPrice.toLocaleString() + " ₽");
+    setTxt("saleBuyerAvatar", currentSaleBuyer.avatar);
+    setTxt("saleBuyerName", currentSaleBuyer.name);
+    setTxt("saleBuyerPatienceText", currentSaleBuyer.patience + "%");
 
-    setTxt('saleBuyerAvatar', bAva);
-    setTxt('saleBuyerName', bName);
-    
-    const imgEl = document.getElementById('saleCarImg');
-    if (imgEl) {
-        if (car && car.img) imgEl.src = car.img;
-        else imgEl.src = "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=400&q=80";
+    const fill = document.getElementById("saleBuyerPatienceFill");
+    if (fill) {
+        fill.style.width = currentSaleBuyer.patience + "%";
+        fill.className = currentSaleBuyer.patience > 50 ? "risk-fill risk-low" : "risk-fill risk-high";
     }
 
-    let cName = "Автомобиль";
-    if (car && car.name) cName = car.name;
-    setTxt('saleCarTitle', cName);
-    setTxt('saleBuyerOfferVal', bPrice.toLocaleString() + " ₽");
-
-    const thread = document.getElementById('saleHaggleChatThread');
+    const thread = document.getElementById("saleHaggleChatThread");
     if (thread) {
-        let greetText = "«Машина хорошая, но цена кусается. Предлагаю " + bPrice.toLocaleString() + " ₽, по рукам?»";
-        if (buyer.preStatus) greetText = "«" + buyer.preStatus + " Предлагаю забрать за " + bPrice.toLocaleString() + " ₽.»";
-        thread.innerHTML = "<div class='chat-msg msg-seller'>" + greetText + "</div>";
+        const greetings = [
+            "«Машина интересная, но цена кусается. Давай обсудим...»",
+            "«Осмотрел тачку, есть пара вопросов. Скидку сделаешь?»",
+            "«Готов забрать сегодня за наличку, если подвинешься в цене.»",
+            "«Ну что, оформляем? Только цену давай адекватную сделаем.»"
+        ];
+        let randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+        thread.innerHTML = "<div class='chat-msg msg-seller' id='saleBuyerGreetingMsg'>" + randomGreeting + "</div>";
     }
 
-    updateSalePatienceUI(buyer.patience);
-
-    const mod = document.getElementById('modalHaggleSale');
-    if (mod) mod.classList.add('active');
+    const modal = document.getElementById("modalHaggleSale");
+    if (modal) modal.classList.add('active');
     playSound('tick');
 }
 
-function updateSalePatienceUI(patience) {
-    let pVal = typeof patience === 'number' ? patience : 100;
-    setTxt('saleBuyerPatienceText', pVal + "%");
+function attemptHaggleSale(type) {
+    if (activeHaggleLotIndex === null || !currentSaleBuyer) return;
     
-    const fill = document.getElementById('saleBuyerPatienceFill');
-    if (fill) {
-        fill.style.width = pVal + "%";
-        if (pVal > 50) {
-            fill.className = "risk-fill risk-low";
-        } else if (pVal > 25) {
-            fill.className = "risk-fill risk-mid";
-        } else {
-            fill.className = "risk-fill risk-high";
-        }
-    }
-}
-
-function attemptHaggleSale(strategy) {
-    if (activeHaggleSlotIdx === null) return;
-    const slot = state.salesLot[activeHaggleSlotIdx];
+    const slot = state.salesLot[activeHaggleLotIndex];
     if (!slot) return;
-    if (!slot.currentBuyer) return;
-    const buyer = slot.currentBuyer;
-    const lvl = state.player && state.player.level ? state.player.level : 1;
 
-    let priceBoost = 0;
-    let patienceHit = 0;
-    let failChance = 0;
-    let playerQuote = "";
+    let baseSuccess = type === 'safe' ? 0.85 : 0.45;
+    let karma = (state.player && state.player.karma) ? state.player.karma : 50;
+    let lvl = (state.player && state.player.level) ? state.player.level : 1;
+    let statBonus = (karma / 500) + (lvl / 200); 
     
-    let hardModifier = 1.0;
-    if (lvl >= 20) hardModifier = 1.35;
-    else if (lvl <= 5) hardModifier = 0.85;
-    
-    if (strategy === 'safe') {
-        priceBoost = 0.02;
-        patienceHit = Math.round(15 * hardModifier);
-        failChance = 0.15 * hardModifier;
-        playerQuote = "«Посмотри на кузов и салон, идеальное состояние без вложений!»";
-    } else if (strategy === 'firm') {
-        priceBoost = 0.06;
-        patienceHit = Math.round(35 * hardModifier);
-        failChance = 0.40 * hardModifier;
-        playerQuote = "«Таких машин на рынке единицы, за ней уже очередь стоит. Меньше не отдам!»";
-    }
-    
-    let isFailed = false;
-    if (Math.random() < failChance) isFailed = true;
-    if (buyer.patience - patienceHit <= 0) isFailed = true;
+    let successChance = baseSuccess + statBonus;
+    let success = Math.random() < successChance;
 
-    const thread = document.getElementById('saleHaggleChatThread');
+    const thread = document.getElementById("saleHaggleChatThread");
 
-    if (isFailed) {
-        let rejectSay = "За такие деньги я в салоне новую возьму! Сделки не будет.";
-        if (buyer.rejectSay) rejectSay = buyer.rejectSay;
-
-        if (thread) {
-            thread.innerHTML += 
-                "<div class='chat-msg msg-player'>" + playerQuote + "</div>" +
-                "<div class='chat-msg msg-seller color-red'>«" + rejectSay + "»</div>";
-            thread.scrollTop = thread.scrollHeight;
+    if (success) {
+        let increasePercent = type === 'safe' ? (0.02 + Math.random() * 0.01) : (0.06 + Math.random() * 0.03);
+        let delta = Math.round(currentSaleBuyer.offerPrice * increasePercent);
+        
+        if (currentSaleBuyer.offerPrice + delta > currentSaleBuyer.maxOfferPrice) {
+            delta = currentSaleBuyer.maxOfferPrice - currentSaleBuyer.offerPrice;
         }
 
-        tgHaptic('error');
-        setTimeout(() => {
-            closeModal('modalHaggleSale');
-            rejectBuyerDeal(activeHaggleSlotIdx);
-            showToast("😡 Покупатель развернулся и ушёл!");
-        }, 1100);
-    } else {
-        const ask = slot.askingPrice ? slot.askingPrice : 100000;
-        const bOff = buyer.offerPrice ? buyer.offerPrice : 100000;
-        let newOffer = Math.round(bOff * (1 + priceBoost));
-        if (newOffer > ask) newOffer = ask;
-        
-        const addedAmount = newOffer - bOff;
-        buyer.offerPrice = newOffer;
-        buyer.patience -= patienceHit;
-        
-        setTxt('saleBuyerOfferVal', newOffer.toLocaleString() + " ₽");
-        updateSalePatienceUI(buyer.patience);
+        if (delta <= 0) {
+            if (thread) {
+                thread.innerHTML += "<div class='chat-msg msg-player'>«Может накинешь еще немного?»</div>";
+                thread.innerHTML += "<div class='chat-msg msg-seller'>«Брат, это мой край. Больше ни копейки не дам, бюджет впритык!»</div>";
+                thread.scrollTop = thread.scrollHeight;
+            }
+            showToast("⚠️ Покупатель достиг предела своего бюджета!");
+            return;
+        }
 
+        currentSaleBuyer.offerPrice += delta;
+        setTxt("saleBuyerOfferVal", currentSaleBuyer.offerPrice.toLocaleString() + " ₽");
+        
         if (thread) {
-            thread.innerHTML += 
-                "<div class='chat-msg msg-player'>" + playerQuote + "</div>" +
-                "<div class='chat-msg msg-seller'>«Ладно, убедил... Добавлю +" + addedAmount.toLocaleString() + " ₽, забираю за " + newOffer.toLocaleString() + " ₽!»</div>";
+            let playerLines = type === 'safe' 
+                ? ["«По кузову тут всё в родне, давай чуть дороже.»", "«Ты посмотри на состояние салона, она стоит своих денег.»"] 
+                : ["«За такую тачку и номера люди в очереди стоят. Накидывай!»", "«Меньше этой суммы даже разговаривать не буду, эксклюзив!»"];
+            let pLine = playerLines[Math.floor(Math.random() * playerLines.length)];
+            thread.innerHTML += "<div class='chat-msg msg-player'>" + pLine + "</div>";
+            thread.innerHTML += "<div class='chat-msg msg-seller'>«Уговорил... Накину " + delta.toLocaleString() + " ₽. По рукам?»</div>";
             thread.scrollTop = thread.scrollHeight;
         }
 
         playSound('win');
         tgHaptic('success');
-        showToast("Удалось накинуть +" + addedAmount.toLocaleString() + " ₽!");
+    } else {
+        let damage = type === 'safe' ? Math.floor(15 + Math.random() * 10) : Math.floor(45 + Math.random() * 20);
+        currentSaleBuyer.patience = Math.max(0, currentSaleBuyer.patience - damage);
+        
+        setTxt("saleBuyerPatienceText", currentSaleBuyer.patience + "%");
+        const fill = document.getElementById("saleBuyerPatienceFill");
+        if (fill) {
+            fill.style.width = currentSaleBuyer.patience + "%";
+            fill.className = currentSaleBuyer.patience > 50 ? "risk-fill risk-low" : "risk-fill risk-high";
+        }
+
+        if (thread) {
+            let pLine = type === 'safe' ? "«А если еще немного накинуть за хорошую историю?»" : "«Цена космос, тачка эксклюзив, бери или уходи!»";
+            let sLines = [
+                "«Давай без сказок, я рынок знаю. Моя цена окончательная!»",
+                "«Слушай, не борзей. Я и так хорошую цену предложил.»",
+                "«Не надо мне тут наваливать, я с толщиномером всю её пробил!»"
+            ];
+            let sLine = sLines[Math.floor(Math.random() * sLines.length)];
+            thread.innerHTML += "<div class='chat-msg msg-player'>" + pLine + "</div>";
+            thread.innerHTML += "<div class='chat-msg msg-seller'>" + sLine + "</div>";
+            thread.scrollTop = thread.scrollHeight;
+        }
+
+        tgHaptic('warning');
+
+        if (currentSaleBuyer.patience <= 0) {
+            setTimeout(() => {
+                closeModal("modalHaggleSale");
+                slot.currentBuyer = null;
+                slot.maxTimer = Math.floor(60 + Math.random() * 120);
+                slot.timer = slot.maxTimer;
+                saveState();
+                renderSalesLot();
+                updateHeaderUI();
+                openVerdictModal("ПОКУПАТЕЛЬ УШЁЛ 🚶‍♂️", "Из-за излишней наглости в торгах покупатель развернулся и ушел. Слот ищет следующего клиента.", false);
+            }, 1200);
+        }
     }
+}
+
+function acceptBuyerOffer(idx) {
+    const slot = state.salesLot[idx];
+    if (!slot || !slot.currentBuyer) return;
+
+    const buyer = slot.currentBuyer;
+    const car = slot.car;
+    const finalPrice = buyer.offerPrice;
+
+    state.salesLot.splice(idx, 1);
+    state.player.cash = (state.player.cash || 0) + finalPrice;
+
+    let purchaseCost = car.purchaseCost ? car.purchaseCost : (car.basePrice ? car.basePrice : 100000);
+    let netProfit = finalPrice - purchaseCost;
+
+    if (!state.player.stats) state.player.stats = { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
+    state.player.stats.sold = (state.player.stats.sold || 0) + 1;
+    if (!state.player.stats.totalNetProfit) state.player.stats.totalNetProfit = 0;
+    state.player.stats.totalNetProfit += netProfit;
+
+    if (netProfit >= 0) {
+        state.player.stats.profitableSales = (state.player.stats.profitableSales || 0) + 1;
+    } else {
+        state.player.stats.lossSales = (state.player.stats.lossSales || 0) + 1;
+    }
+
+    addXp(50);
+    state.player.mood = Math.min(100, (state.player.mood || 80) + 10);
+
+    saveState();
+    renderSalesLot();
+    updateHeaderUI();
+
+    openVerdictModal("АВТО ПРОДАНО! 🤝", "ДКП подписан! Покупатель забрал «" + car.name + "» за " + finalPrice.toLocaleString() + " ₽.", true, finalPrice, netProfit);
 }
 
 function confirmSaleFromHaggleModal() {
-    if (activeHaggleSlotIdx === null) return;
-    closeModal('modalHaggleSale');
-    acceptBuyerDeal(activeHaggleSlotIdx);
-}
-
-function generateBuyerForSlot(slot) {
-    if (typeof EXPANDED_BUYERS_POOL === 'undefined') return;
-    const b = EXPANDED_BUYERS_POOL[Math.floor(Math.random() * EXPANDED_BUYERS_POOL.length)];
-    const car = slot.car;
-    
-    let cPlate = "";
-    if (car.customPlate) cPlate = car.customPlate;
-    else if (car.plate) cPlate = car.plate;
-
-    let plateVal = 0;
-    if (typeof calculatePlateValue === 'function') plateVal = calculatePlateValue(cPlate);
-    
-    let baseM = 150000;
-    if (car.baseMarketValue) baseM = car.baseMarketValue;
-    else if (car.price) baseM = car.price;
-
-    const realMarketVal = baseM + plateVal;
-    
-    let rate = b.rate + 0.05;
-    if (rate > 1.05) rate = 1.05;
-
-    let fairPrice = Math.round(realMarketVal * rate);
-    
-    let finalOffer = fairPrice;
-    if (slot.askingPrice && slot.askingPrice < fairPrice) finalOffer = slot.askingPrice;
-    
-    slot.currentBuyer = {
-        name: b.name,
-        avatar: b.avatar,
-        type: b.type,
-        minKarma: b.minKarma ? b.minKarma : 0,
-        offerPrice: finalOffer,
-        preStatus: b.preStatus,
-        rejectSay: b.rejectSay,
-        patience: 100
-    };
-}
-
-function acceptBuyerDeal(idx) {
-    const slot = state.salesLot[idx];
-    if (!slot) return;
-    if (!slot.currentBuyer) return;
-    const buyer = slot.currentBuyer;
-    const car = slot.car;
-    
-    if (car.isStolen) {
-        let pDays = 0;
-        if (state.player && state.player.policeImmunityDays) pDays = state.player.policeImmunityDays;
-        const hasRoof = pDays > 0;
-
-        let isCop = false;
-        if (buyer.type === 'inspector') isCop = true;
-        if (buyer.type === 'regular') isCop = true;
-
-        let willBust = false;
-        if (isCop) willBust = true;
-        if (Math.random() < 0.45) willBust = true;
-
-        if (!hasRoof && willBust) {
-            tgHaptic('error');
-            state.salesLot.splice(idx, 1);
-            
-            let cash = 0; if (state.player && state.player.cash) cash = state.player.cash;
-            state.player.cash = Math.max(0, cash - 150000);
-            
-            let karma = 50; if (state.player && state.player.karma) karma = state.player.karma;
-            state.player.karma = Math.max(0, karma - 20);
-            
-            saveState();
-            renderSalesLot();
-
-            let cName = "Авто"; if (car.name) cName = car.name;
-            let bName = "Покупатель"; if (buyer.name) bName = buyer.name;
-
-            openVerdictModal(
-                "🚨 ОБЛАВА ПРИ ПРОДАЖЕ!",
-                "Покупатель (" + bName + ") сверил VIN по базам ГИБДД и вызвал наряд! Автомобиль «" + cName + "» конфискован в пользу государства, наложен штраф 150,000 ₽.",
-                false
-            );
-            return;
-        } else if (hasRoof) {
-            showToast("🛡️ Крыша Решалы отвела проверку VIN!");
-        }
-    }
-    
-    let cost = 100000;
-    if (car.purchaseCost) cost = car.purchaseCost;
-    else if (car.basePrice) cost = car.basePrice;
-    else if (buyer.offerPrice) cost = Math.round(buyer.offerPrice * 0.9);
-
-    const netProfit = buyer.offerPrice - cost;
-    
-    state.player.cash += buyer.offerPrice;
-    
-    if (!state.player.stats) state.player.stats = {};
-    if (!state.player.stats.sold) state.player.stats.sold = 0;
-    state.player.stats.sold += 1;
-    
-    if (!state.player.stats.totalNetProfit) state.player.stats.totalNetProfit = 0;
-    state.player.stats.totalNetProfit += netProfit;
-    
-    if (netProfit >= 0) {
-        if (!state.player.stats.profitableSales) state.player.stats.profitableSales = 0;
-        state.player.stats.profitableSales += 1;
-    } else {
-        if (!state.player.stats.lossSales) state.player.stats.lossSales = 0;
-        state.player.stats.lossSales += 1;
-    }
-    
-    addXp(35);
-    state.salesLot.splice(idx, 1);
-    saveState();
-    renderSalesLot();
-
-    let cName = "Авто"; if (car.name) cName = car.name;
-    let bName = "Покупатель"; if (buyer.name) bName = buyer.name;
-
-    openVerdictModal("СДЕЛКА ЗАКРЫТА! 🎉", bName + " забрал «" + cName + "»!", true, buyer.offerPrice, netProfit);
-}
-
-function rejectBuyerDeal(idx) {
-    const slot = state.salesLot[idx];
-    if (!slot) return;
-    slot.currentBuyer = null;
-    slot.timer = 30;
-    saveState();
-    renderSalesLot();
-    showToast("Ждём следующего покупателя...");
-}
-
-function withdrawFromLot(idx) {
-    const slot = state.salesLot.splice(idx, 1)[0];
-    if (!state.garage) state.garage = [];
-    state.garage.push(slot.car);
-    saveState();
-    renderGarage();
-    renderSalesLot();
-    showToast("Автомобиль возвращен в бокс гаража.");
+    if (activeHaggleLotIndex === null) return;
+    closeModal("modalHaggleSale");
+    acceptBuyerOffer(activeHaggleLotIndex);
 }
