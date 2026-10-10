@@ -160,6 +160,33 @@ const CAR_DATABASE = {
 };
 
 // ========================================================
+// ПОЛНЫЙ АССОРТИМЕНТ МАГАЗИНА ПЕРЕКУПА (v0.4.0)
+// ========================================================
+const SHOP_CATALOG = {
+    tools: [
+        { id: "gauge", name: "Магнитный толщиномер ЛКП (Базовый)", cost: 35000, desc: "Проверяет шпаклёвку и вторичные окрасы на рынке без оплаты услуг эксперта.", icon: "fa-ruler-combined" },
+        { id: "gauge_pro", name: "Ультразвуковой толщиномер Pro (Цветмет)", cost: 75000, desc: "Точность до 1 мкм. Моментально находит переходы на алюминии и пластике.", icon: "fa-microchip" },
+        { id: "obd", name: "Диагностический автосканер ELM327 Bluetooth", cost: 65000, desc: "Считывает коды DTC в ЭБУ и открывает доступ к Заказам Синдиката.", icon: "fa-laptop-code" },
+        { id: "obd_launch", name: "Профессиональный мультимарочный сканер Launch", cost: 180000, desc: "Глубокая адаптация блоков, сброс сервисных интервалов и чтение реального пробега в АКПП.", icon: "fa-tablet-screen-button" },
+        { id: "endoscope", name: "HD Видеоэндоскоп мотора с поворотной камерой", cost: 95000, desc: "Позволяет заглянуть в цилиндры перед покупкой: выявляет задиры и нагар на клапанах.", icon: "fa-video" },
+        { id: "compressor", name: "Профессиональный компрессометр", cost: 45000, desc: "Замер компрессии в цилиндрах: предупреждает о прогаре поршня и залегших кольцах.", icon: "fa-gauge-high" },
+        { id: "battery_tester", name: "Нагрузочная вилка аккумулятора", cost: 25000, desc: "Быстрая проверка емкости и пускового тока АКБ перед зимним сезоном.", icon: "fa-car-battery" }
+    ],
+    consumables: [
+        { id: "oil_pack", name: "Партия синтетического масла и фильтров", cost: 25000, value: 30, desc: "+30% сырья на СТО дяди Вани. Обеспечивает бесперебойную работу подъемников." },
+        { id: "chem_pack", name: "Бочка премиальной автохимии и шампуней", cost: 45000, value: 50, desc: "+50% сырья для Автомойки и Детейлинга. Поддерживает идеальный блеск." },
+        { id: "tires_stock", name: "Комплект полусликов и жгутов для шиномонтажа", cost: 35000, value: 40, desc: "+40% сырья на Шиномонтаж «У Алика». Устраняет дефицит расходников." },
+        { id: "brake_pack", name: "Оптовая партия тормозных колодок и дисков", cost: 55000, value: 50, desc: "+50% запаса деталей на Авторазборку. Увеличивает доходность контрактов." },
+        { id: "full_stock", name: "Генеральный оптовый запас (100% на все точки)", cost: 140000, value: 100, desc: "Мгновенно заполняет склады всех имеющихся предприятий до 100%!" }
+    ],
+    tuningParts: [
+        { id: "raf_license", name: "Гоночная Лицензия пилота РАФ", cost: 85000, desc: "Официальный регламентный допуск к ночным заездам на 402м (покупается 1 раз на аккаунт).", icon: "fa-id-card" },
+        { id: "insurance_osago", name: "Годовой полис «КАСКО / Анти-Угон»", cost: 45000, desc: "100% защита от случайных повреждений на парковке, подстав и попыток угона авто в гараже.", icon: "fa-shield-halved" },
+        { id: "gps_tracker", name: "Скрытый поисковый GPS/ГЛОНАСС маяк", cost: 30000, desc: "Позволяет моментально найти и вернуть угнанную машину без помощи полиции и Решалы.", icon: "fa-satellite-dish" }
+    ]
+};
+
+// ========================================================
 // НЕДВИЖИМОСТЬ (assets/houses/)
 // ========================================================
 const HOUSING_LIST = [
@@ -180,7 +207,9 @@ const HOUSING_INTERIOR_CATALOG = [
     { id: "home_ps5", name: "🎮 Игровая консоль PlayStation 5", cost: 75000, perk: "+25% настроения и куража каждый день" },
     { id: "home_leather_sofa", name: "🛋️ Кожаный итальянский диван", cost: 120000, perk: "+15% к восстановлению сил и сытости" },
     { id: "home_cinema_audio", name: "🍿 Домашний кинотеатр 4K", cost: 250000, perk: "+35% настроения и статус перед гостями" },
-    { id: "home_safe_valberg", name: "🔒 Огнеупорный сейф перекупа", cost: 180000, perk: "Защита заначки от проверок и облав" }
+    { id: "home_safe_valberg", name: "🔒 Огнеупорный сейф перекупа", cost: 180000, perk: "Защита заначки от проверок и облав" },
+    { id: "home_garage_lift", name: "🏗️ Гидравлический автоподъёмник в гараж", cost: 320000, perk: "Ускоряет ремонт скрытых дефектов авто на 50%" },
+    { id: "home_cctv", name: "📹 Система видеонаблюдения периметра", cost: 140000, perk: "Снижает шанс ночного угона авто из гаража до 0%" }
 ];
 
 const STREET_CHAT_LOG = [
@@ -241,11 +270,11 @@ const DIETS = [
 // ========================================================
 const BUSINESS_DATA = [
     { id: 'wash', name: 'Автомойка 24/7', minLevel: 5, income: 900, level: 0, cost: 90000, stored: 0, stock: 100, perk: 'Скидка 50% на полировку и химчистку', img: 'assets/business/wash.jpg' },
-    { id: 'shina', name: 'Шиномонтаж «Вираж»', minLevel: 8, income: 1500, level: 0, cost: 150000, stored: 0, stock: 100, perk: '+10% к стоимости авто на правильных дисках', img: 'assets/business/shina.jpg' },
-    { id: 'sto', name: 'СТО PRoStreet', minLevel: 12, income: 2200, level: 0, cost: 300000, stored: 0, stock: 100, perk: 'Скидка 40% на ремонт мотора', img: 'assets/business/sto.jpg' },
-    { id: 'detailing', name: 'Детейлинг Студия «Vinneel»"', minLevel: 20, income: 6500, level: 0, cost: 950000, stored: 0, stock: 100, perk: '+35% к баллам на Автошоу', img: 'assets/business/detailing.jpg' },
+    { id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 8, income: 1500, level: 0, cost: 150000, stored: 0, stock: 100, perk: '+10% к стоимости авто на правильных дисках', img: 'assets/business/shina.jpg' },
+    { id: 'sto', name: 'СТО дяди Вани', minLevel: 12, income: 2200, level: 0, cost: 300000, stored: 0, stock: 100, perk: 'Скидка 40% на ремонт мотора', img: 'assets/business/sto.jpg' },
+    { id: 'detailing', name: 'Детейлинг Студия', minLevel: 20, income: 6500, level: 0, cost: 950000, stored: 0, stock: 100, perk: '+35% к баллам на Автошоу', img: 'assets/business/detailing.jpg' },
     { id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 8000, level: 0, cost: 1200000, stored: 0, stock: 100, perk: 'Детали на ремонт обходятся дешевле на 30%', img: 'assets/business/razborka.jpg' },
-    { id: 'taxi', name: 'Таксопарк «Taxico»', minLevel: 32, income: 18000, level: 0, cost: 3800000, stored: 0, stock: 100, perk: 'Пассивный доход и +1 🤝 связь каждый день', img: 'assets/business/taxi.jpg' }
+    { id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, stored: 0, stock: 100, perk: 'Пассивный доход и +1 🤝 связь каждый день', img: 'assets/business/taxi.jpg' }
 ];
 
 const OBD_ERRORS = [
@@ -278,4 +307,38 @@ const BARN_FINDS = [
     { name: "ГАЗ-24 «Волга» V8", power: 220, type: 'economy', basePrice: 700000, marketValue: 1500000, img: "assets/cars/barn/volga24.jpg" },
     { name: "Nissan Skyline GT-R R34 (В пыли)", power: 280, type: 'premium', basePrice: 4500000, marketValue: 9500000, img: "assets/cars/barn/r34.jpg" },
     { name: "Toyota Supra A80 (Без мотора)", power: 0, type: 'premium', basePrice: 3200000, marketValue: 7000000, img: "assets/cars/barn/supra.jpg" }
+];
+
+// ========================================================
+// КОНФИГУРАЦИЯ СЛУЧАЙНЫХ СОБЫТИЙ В ГАРАЖЕ (v0.4.0)
+// ========================================================
+const GARAGE_RANDOM_EVENTS = [
+    {
+        id: "hit_and_run",
+        title: "💥 ПРИТЁРЛИ ВО ДВОРЕ!",
+        desc: "Ночью во дворе неизвестный задел крыло и скрылся. На кузове глубокая вмятина.",
+        impact: { damageCond: 25, repairCost: 28000 },
+        badge: "ДТП НА ПАРКОВКЕ"
+    },
+    {
+        id: "theft_attempt",
+        title: "🚨 ПОПЫТКА УГОНА!",
+        desc: "Злоумышленники вскрыли личинку замка и пытались прописать новый чип-ключ.",
+        impact: { damageCond: 15, repairCost: 45000 },
+        badge: "КРИМИНАЛ"
+    },
+    {
+        id: "bailiff_arrest",
+        title: "⚖️ СУДЕБНЫЙ ЗАПРЕТ РЕГИСТРАЦИИ!",
+        desc: "Предыдущий владелец накопил штрафы, и приставы наложили запрет на регдействия.",
+        impact: { makeUnregistered: true },
+        badge: "ФССП РОССИИ"
+    },
+    {
+        id: "urgent_buyer_call",
+        title: "📞 ЗВОНОК СРОЧНОГО ПОКУПАТЕЛЯ!",
+        desc: "Вам позвонил сосед по гаражу и предлагает выкупить автомобиль прямо сейчас с наценкой +15%!",
+        impact: { instantOfferBonus: 0.15 },
+        badge: "БЫСТРЫЙ ВЫКУП"
+    }
 ];

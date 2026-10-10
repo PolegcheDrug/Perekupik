@@ -395,6 +395,73 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
+   ГОРОДСКОЙ ХАБ (РАЗДЕЛ «ЖИЗНЬ»)
+   ======================================================== */
+.city-hub-card {
+  background: radial-gradient(circle at 50% 0%, #152238 0%, #090e18 100%);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.city-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.city-tile {
+  background: #090e18;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.2s ease;
+}
+.city-tile:active {
+  transform: scale(0.95);
+  border-color: var(--cyan);
+}
+
+.city-tile-icon {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.city-tile-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.city-tile-badge {
+  font-size: 8px;
+  color: var(--text-sub);
+  margin-top: 2px;
+}
+
+/* ========================================================
+   БАНКОВСКИЙ СЕЙФ ПЕРЕКУПА
+   ======================================================== */
+.safe-bank-card {
+  background: radial-gradient(circle at 50% 0%, #1e1f14 0%, #090e18 100%);
+  border: 1px solid rgba(255, 179, 0, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.safe-balance-box {
+  background: #070b12;
+  border: 1px solid rgba(0, 230, 118, 0.25);
+  border-radius: 8px;
+}
+
+/* ========================================================
    КАРТОЧКИ И ПАНЕЛЬ КЛАССОВ ТЕХНИКИ
    ======================================================== */
 .glass-card {
@@ -424,7 +491,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   opacity: 0.65;
 }
 
-/* СЕТКА 3x3 КЛАССОВ ТЕХНИКИ */
 .market-filter-card {
   padding: 12px;
   background: radial-gradient(circle at 50% 0%, #151f33 0%, #090e18 100%);
@@ -448,7 +514,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-top: 6px;
-  transition: max-height 0.4s ease-out, opacity 0.3s ease-out, margin 0.3s ease-out;
+  transition: max-height 0.35s cubic-bezier(0, 1, 0, 1), opacity 0.25s ease-out;
   max-height: 500px;
   overflow: hidden;
   opacity: 1;
@@ -459,7 +525,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   opacity: 0;
   margin-top: 0;
   padding: 0;
-  border: none;
 }
 
 .cat-tile {
@@ -478,9 +543,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   outline: none;
 }
 
-.cat-tile:active {
-  transform: scale(0.96);
-}
+.cat-tile:active { transform: scale(0.96); }
 
 .cat-tile-icon {
   font-size: 18px;
@@ -512,9 +575,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   transform: scale(1.15);
 }
 
-.cat-tile.active .cat-tile-sub {
-  color: #a5f3fc;
-}
+.cat-tile.active .cat-tile-sub { color: #a5f3fc; }
 
 .cat-tile.locked {
   background: #080c14;
@@ -522,17 +583,9 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   opacity: 0.6;
 }
 
-.cat-tile.locked .cat-tile-icon {
-  color: #475569;
-}
-
-.cat-tile.locked .cat-tile-name {
-  color: #94a3b8;
-}
-
-.cat-tile.locked .cat-tile-sub {
-  color: #f87171;
-}
+.cat-tile.locked .cat-tile-icon { color: #475569; }
+.cat-tile.locked .cat-tile-name { color: #94a3b8; }
+.cat-tile.locked .cat-tile-sub { color: #f87171; }
 
 .cat-info-banner {
   background: rgba(0, 0, 0, 0.4);
@@ -575,9 +628,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   backdrop-filter: blur(4px);
 }
 
-.glass-card:not(.busy) .cooldown-timer {
-  display: none !important;
-}
+.glass-card:not(.busy) .cooldown-timer { display: none !important; }
 
 .timer-clock { font-size: 26px; font-weight: 900; color: var(--amber); margin-bottom: 6px; }
 .timer-text { font-size: 11px; color: #fff; font-weight: bold; margin-bottom: 10px; }
@@ -790,7 +841,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   ОКНО ЗВОНКА И ТОРГА (МЕССЕНДЖЕР)
+   ОКНО ЗВОНКА И ТОРГА
    ======================================================== */
 .chat-deal-box {
   padding: 14px;
@@ -865,7 +916,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   ШКАЛЫ РИСКА (12.5.1 И ТЕРПЕНИЕ)
+   ШКАЛЫ РИСКА
    ======================================================== */
 .risk-meter-box {
   background: #090e18;
@@ -1020,7 +1071,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   transition: left 0.08s ease;
 }
 
-/* СТРИТ-МЕРОПРИЯТИЯ */
 .street-event-card {
   background: #090e18;
   border: 1px solid var(--border-glass);
@@ -1054,7 +1104,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   НАПЁРСТКИ ПЕРЕКУПА (x2)
+   НАПЁРСТКИ ПЕРЕКУПА
    ======================================================== */
 .thimble-cup-btn {
   background: #090e18;
@@ -1100,6 +1150,17 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   object-fit: cover;
 }
 
+.business-fallback-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, #1a263d 0%, #0b111c 100%);
+  font-size: 42px;
+  color: var(--cyan);
+}
+
 .business-content { padding: 12px 14px 14px 14px; }
 
 .business-perk-badge {
@@ -1123,6 +1184,103 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .biz-progress-fill { height: 100%; transition: width 0.3s ease; }
 .fill-biz-lvl { background: linear-gradient(90deg, var(--cyan), var(--green)); }
 .fill-biz-stock { background: linear-gradient(90deg, var(--amber), #22c55e); }
+
+/* ========================================================
+   ОФИЦИАЛЬНЫЙ БЛАНК ДКП СО ШТАМПОМ МРЭО ГИБДД
+   ======================================================== */
+.dkp-official-blank {
+  background: linear-gradient(145deg, #101624 0%, #080d16 100%) !important;
+  border: 2px solid rgba(0, 242, 254, 0.4) !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 25px rgba(0, 242, 254, 0.2) !important;
+  padding: 14px !important;
+  max-width: 410px !important;
+}
+
+.dkp-blank-border {
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 12px;
+  position: relative;
+}
+
+.dkp-title {
+  color: #fff;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  margin: 2px 0;
+}
+
+.dkp-car-spec-box {
+  background: #070c14;
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+}
+
+.dkp-price-line {
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  border-radius: 8px;
+}
+
+.dkp-signatures-area {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+  min-height: 70px;
+}
+
+.dkp-sig-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.dkp-handwrite {
+  font-family: 'Brush Script MT', 'Segoe Script', cursive, sans-serif;
+  font-size: 14px;
+  color: var(--cyan);
+  margin-top: 4px;
+}
+
+.official-mreo-stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-12deg) scale(0);
+  width: 95px;
+  height: 95px;
+  border-radius: 50%;
+  border: 3px double #2563eb;
+  color: #3b82f6;
+  background: rgba(37, 99, 235, 0.05);
+  box-shadow: 0 0 14px rgba(37, 99, 235, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+  z-index: 10;
+}
+
+.official-mreo-stamp.stamp-approved {
+  transform: translate(-50%, -50%) rotate(-12deg) scale(1);
+  opacity: 0.95;
+}
+
+.stamp-inner {
+  display: flex;
+  flex-direction: column;
+  font-size: 8px;
+  line-height: 1.1;
+  font-weight: 900;
+  text-transform: uppercase;
+}
 
 /* ========================================================
    ЧИТ-ПУЛЬТ ПРОФИЛЯ И ПАТЧНОУТ
