@@ -1,6 +1,8 @@
 // ========================================================
 // js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.4.5)
-// Полная связка с алгоритмом ценности госномеров и торгом
+// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
+// Устранение бага зависания толщиномера ЛКП, диалог выбора
+// «Учёт РФ в МРЭО vs Перепродажа по ДКП», трекинг заданий
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -91,6 +93,7 @@ function refreshPlateCatalog() {
 
 let activeInspectCarId = null;
 let pendingMarketCar = null;
+let activePendingDKPDeal = null;
 
 function getDynamicPrice(basePrice, type) {
     if (!state.marketModifiers) state.marketModifiers = { economy: 1, comfort: 1, premium: 1, all: 1 };
@@ -236,7 +239,7 @@ function populateMarketFeed() {
         let isStolen = Math.random() < (dealType === 'urgent' ? 0.20 : 0.10);
         const carId = "m_" + Date.now() + "_" + i;
         
-        let isCoolNumber = Math.random() < 0.06; // 6% шанс на блатной номер на кузове
+        let isCoolNumber = Math.random() < 0.08;
         let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
 
         let baseP = template.basePrice ? template.basePrice : 100000;
@@ -250,10 +253,8 @@ function populateMarketFeed() {
         let sellerPrice = carOnlyPrice;
         let isLuckyFind = false;
 
-        // Если номер дорогой
         if (plateVal > 5000) {
             if (Math.random() < 0.14) {
-                // Продавец не знает цены номеров (перекупский куш!)
                 isLuckyFind = true;
                 sellerPrice = carOnlyPrice;
             } else {
@@ -352,6 +353,10 @@ function populateMarketFeed() {
             isRepainted: false,
             isPolished: false,
             isPersonal: false,
+            isRegisteredOnPlayer: true,
+            ownershipDays: 0,
+            engineTemp: 90,
+            tireWear: 100,
             viewed: false
         });
     }
@@ -480,6 +485,11 @@ function quickOBDScanMarketCar(carId) {
     }
 
     car.stoChecked = true;
+
+    if (typeof trackQuestProgress === 'function') {
+        trackQuestProgress('obd_scan', 1);
+    }
+
     saveState();
     renderMarketFeed();
 
@@ -807,8 +817,79 @@ function confirmMarketPurchaseSuccess() {
     if (typeof openDKPModal === 'function') {
         openDKPModal(activePendingDKPDeal);
     } else {
-        finishMarketCarBuyProcess(activePendingDKPDeal);
+        openRegistrationChoiceModal(activePendingDKPDeal);
     }
+}
+
+// ----------------------------------------------------
+// ВЫБОР РЕГИСТРАЦИИ: УЧЁТ РФ В МРЭО vs ПЕРЕПРОДАЖА НА ДКП
+// ----------------------------------------------------
+function openRegistrationChoiceModal(deal) {
+    activePendingDKPDeal = deal;
+    let price = deal.price || 100000;
+    let taxEstimate = Math.round(price * 0.13 * 0.2); // Ориентировочный налог
+
+    let modal = document.getElementById('modalRegistrationChoice');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalRegistrationChoice';
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-box text-center" style="max-width: 410px;">
+                <div style="font-size: 36px; margin-bottom: 6px;">📑</div>
+                <h3 class="font-bold mb-1 color-cyan">Способ оформления автомобиля</h3>
+                <p class="sub-label mb-3">Выберите форму владения для выкупленного авто:</p>
+
+                <div class="glass-card text-left p-2 mb-2" style="border-left: 3px solid var(--green);">
+                    <b class="text-xs color-green">1. Поставить на чистый учёт в МРЭО</b>
+                    <div class="sub-label my-1" style="font-size:10px;">
+                        • Оплата госпошлины: <b>2,850 ₽</b><br>
+                        • Юридическая чистота: 0 рисков при проверках ДПС.<br>
+                        • ⚠️ <b>Налог 13%</b> с чистой прибыли при быстрой перепродаже (до 3 лет владения)!
+                    </div>
+                    <button onclick="confirmRegistrationChoice(true)" class="btn btn-green btn-sm w-full mt-1">Оформить на себя в МРЭО (-2,850 ₽)</button>
+                </div>
+
+                <div class="glass-card text-left p-2 mb-3" style="border-left: 3px solid var(--amber);">
+                    <b class="text-xs color-amber">2. Оставить на ДКП (Перекупский режим)</b>
+                    <div class="sub-label my-1" style="font-size:10px;">
+                        • Пошлина: <b>0 ₽</b> (Экономия)<br>
+                        • Налог 13%: <b>Не платится</b> (Вся маржа ваша)<br>
+                        • 🚨 <b>Риск 10 дней:</b> если вас остановят ДПС с просроченным ДКП — штраф до 50,000 ₽!
+                    </div>
+                    <button onclick="confirmRegistrationChoice(false)" class="btn btn-amber btn-sm w-full mt-1">Оставить на ДКП (Без пошлины и налога)</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    modal.classList.add('active');
+    playSound('tick');
+    tgHaptic('light');
+}
+
+function confirmRegistrationChoice(registerOnPlayer) {
+    closeModal('modalRegistrationChoice');
+    if (!activePendingDKPDeal) return;
+
+    if (registerOnPlayer) {
+        let duty = 2850;
+        let cash = state.player?.cash || 0;
+        if (cash < duty) {
+            showToast("Не хватает 2,850 ₽ на госпошлину МРЭО! Авто оформлено по ДКП.");
+            activePendingDKPDeal.isRegisteredOnPlayer = false;
+        } else {
+            state.player.cash -= duty;
+            activePendingDKPDeal.isRegisteredOnPlayer = true;
+            showToast("Машина зарегистрирована в МРЭО ГИБДД (-2,850 ₽ госпошлина) ✓");
+        }
+    } else {
+        activePendingDKPDeal.isRegisteredOnPlayer = false;
+        showToast("Автомобиль оставлен на ДКП без постановки на учёт (Лимит: 10 дней)!");
+    }
+
+    finishMarketCarBuyProcess(activePendingDKPDeal);
 }
 
 function finishMarketCarBuyProcess(deal) {
@@ -832,6 +913,10 @@ function finishMarketCarBuyProcess(deal) {
     newCar.wear = car.wear ? car.wear : { engine: 85, transmission: 85 };
     newCar.preSaleVisited = false;
     newCar.isPersonal = false;
+    newCar.isRegisteredOnPlayer = !!deal.isRegisteredOnPlayer;
+    newCar.ownershipDays = 0;
+    newCar.engineTemp = 90;
+    newCar.tireWear = 100;
     
     newCar.tuning = { 
         chip: 0, exhaust: false, stance: false, bodykit: false, 
@@ -840,7 +925,6 @@ function finishMarketCarBuyProcess(deal) {
         customWheels: false, risk1251: 0 
     };
 
-    // Гарантированный перерасчет рыночной цены в гараже с учетом номера
     if (typeof recalculateCarMarketValue === 'function') {
         recalculateCarMarketValue(newCar);
     }
@@ -854,6 +938,10 @@ function finishMarketCarBuyProcess(deal) {
     pendingMarketCar = null; 
     activePendingDKPDeal = null;
     addXp(40);
+
+    if (typeof trackQuestProgress === 'function') {
+        trackQuestProgress('buy_car', 1);
+    }
     
     let carName = car.name ? car.name : "Авто";
     showToast("✅ " + carName + " куплен за " + price.toLocaleString() + " ₽!"); 
@@ -865,6 +953,9 @@ function finishMarketCarBuyProcess(deal) {
     setTimeout(() => { switchTab("tabGarage"); }, 400);
 }
 
+// ----------------------------------------------------
+// ТОЛЩИНОМЕР ЛКП (БЕЗ ЗАВИСАНИЯ И С ТРЕКИНГОМ ЗАДАНИЙ)
+// ----------------------------------------------------
 function openGaugeModal(carId) { 
     activeInspectCarId = carId; 
     if (!state.marketFeed) return;
@@ -878,8 +969,19 @@ function openGaugeModal(carId) {
 
     if (!hasGauge) {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-        if (cash < 3000) return showToast("Купите толщиномер в Маркете или отдайте 3,000 ₽ за замер!"); 
+        if (cash < 3000) return showToast("Купите толщиномер в Маркете или отдайте 3,000 ₽ за выездной замер!"); 
         state.player.cash -= 3000; 
+        showToast("Услуга замера оплачена: -3,000 ₽");
+    }
+
+    // Сброс надписей на кнопках замера перед открытием
+    ['hood', 'roof', 'doors', 'wings'].forEach(part => {
+        const el = document.getElementById("part-" + part);
+        if (el) el.innerHTML = "Замерить";
+    });
+
+    if (typeof trackQuestProgress === 'function') {
+        trackQuestProgress('gauge_check', 1);
     }
 
     saveState(); 
@@ -906,6 +1008,12 @@ function checkBodyPart(part) {
             el.innerHTML = "<span class='color-green'>" + val + " мкм (Завод)</span>";
         }
     }
+}
+
+function closeGaugeModal() {
+    closeModal("modalGauge");
+    activeInspectCarId = null;
+    playSound('tick');
 }
 
 function openAutotekaModal(carId) {
