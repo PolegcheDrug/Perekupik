@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v0.5.1</title>
-    <link rel="stylesheet" href="style.css?v=205">
+    <title>Симулятор Перекупа v0.5.2</title>
+    <link rel="stylesheet" href="style.css?v=206">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -169,7 +169,7 @@
               <button onclick="setCategory('comfort')" id="catBtn-comfort" class="cat-tile locked">
                 <div class="cat-tile-icon"><i class="fa-solid fa-taxi"></i></div>
                 <div class="cat-tile-name" data-i18n="cat_comfort">Комфорт</div>
-                <div class="cat-tile-sub" id="lock-comfort"><i class="fa-solid fa-lock"></i> 30 ур</div>
+                <div class="cat-tile-sub" id="lock-comfort"><i class="fa-solid fa-lock"></i> 20 ур</div>
               </button>
 
               <button onclick="setCategory('premium')" id="catBtn-premium" class="cat-tile locked">
@@ -207,7 +207,7 @@
           </div>
 
           <button onclick="refreshMarketFeedManual()" class="btn btn-cyan mb-3">
-            <i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="btn_refresh_market">Обновить ленту</span> (<span id="refreshCostText">150</span> ₽ + 5 ⛽)
+            <i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="btn_refresh_market">Обновить ленту</span> (<span id="refreshCostText">250</span> ₽ + 5 ⛽)
           </button>
           <div id="marketCardContainer"></div>
         </section>
@@ -220,7 +220,7 @@
                 <h3><i class="fa-solid fa-warehouse color-green"></i> <span data-i18n="garage_title">Мой Автопарк</span></h3>
                 <p class="sub-label"><span data-i18n="garage_capacity">Вместимость</span>: <span id="garageDetailedSlots">0 из 2</span></p>
               </div>
-              <button onclick="buyGarageSlot()" class="btn btn-dark btn-auto border-green color-green" id="btnBuyGarageSlot">+1 Бокс (250k ₽)</button>
+              <button onclick="buyGarageSlot()" class="btn btn-dark btn-auto border-green color-green" id="btnBuyGarageSlot">+1 Бокс</button>
             </div>
           </div>
           <div id="garageList"></div>
@@ -239,7 +239,7 @@
                 <div class="text-xs color-purple font-bold">🎟️ <span data-i18n="express_passes">Экспресс-пропуски</span>: <span id="expressCountDisplay">25 / 25</span></div>
                 <div class="sub-label" style="font-size:9px;" data-i18n="express_desc">Ускоряют поиск клиента до 0 сек.</div>
               </div>
-              <button onclick="upgradeExpressCapacity()" class="btn btn-dark btn-auto btn-sm" id="btnUpgradeTickets">Расширить (50k ₽)</button>
+              <button onclick="upgradeExpressCapacity()" class="btn btn-dark btn-auto btn-sm" id="btnUpgradeTickets">Расширить</button>
             </div>
           </div>
           <div id="salesLotList"></div>
@@ -373,9 +373,9 @@
             <p class="sub-label mb-2">Высокая карма повышает доверие покупателей и снижает риск облав на трассе.</p>
             <div class="grid-2 mb-2">
               <button onclick="roadAssistanceAction()" class="btn btn-dark btn-sm">🛞 Помощь на трассе (-10 ⛽)</button>
-              <button onclick="donatePartsToMechanic()" class="btn btn-dark btn-sm">🔩 Запчасти СТО (35k ₽ | +1 🤝)</button>
+              <button onclick="donatePartsToMechanic()" class="btn btn-dark btn-sm">🔩 Запчасти СТО (45k ₽ | +1 🤝)</button>
             </div>
-            <button onclick="bigCharityDonate()" class="btn btn-green w-full">🕊 Меценатство 100,000 ₽ (+25 Кармы)</button>
+            <button onclick="bigCharityDonate()" class="btn btn-green w-full">🕊 Меценатство 150,000 ₽ (+25 Кармы)</button>
           </div>
 
           <div class="live-chat-card mb-3">
@@ -415,7 +415,7 @@
             </div>
 
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-sparkles"></i> Список изменений v0.5.1 & Патчноут
+              <i class="fa-solid fa-sparkles"></i> Список изменений v0.5.2 & Патчноут
             </button>
             <div class="grid-2 mb-2">
               <div class="stat-box"><div class="sub-label">Плюс:</div><div id="statProfitable" class="stat-value color-green">0</div></div>
@@ -521,18 +521,17 @@
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-code-merge"></i> ОБНОВЛЕНИЕ v0.5.1</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-code-merge"></i> ОБНОВЛЕНИЕ v0.5.2</div>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.5.1 (Сборка #205)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.5.2 (Сборка #206)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>💰 Честная маржинальность перекупа:</b> Предложения рынка скорректированы на дисконт до 35-50%, а покупатели на площадке продаж предлагают реальные надбавки за подготовленные автомобили.</div>
-          <div class="patch-item"><b>🏁 Интерактивные зрелищные заезды:</b> 6-секундный дрифт по восьмерке со следами резины и дымом, дрэг с ёлкой старта и стравливание пневмы в пол на стенс-сходке.</div>
-          <div class="patch-item"><b>🤝 Реалистичная встреча у капота:</b> Толщиномер и сканер Launch OBD2 теперь используются прямо перед продавцом, открывая козыри для торга.</div>
-          <div class="patch-item"><b>📑 Чистый официальный бланк ДКП:</b> Устранено наложение штампа МРЭО на подписи. Выверенная табличная структура полей.</div>
-          <div class="patch-item"><b>🚘 Премиум-типографика карточек:</b> Характеристики вынесены в микро-плитки, госномер зафиксирован на фото, аккуратный заводской сток.</div>
-          <div class="patch-item"><b>📱 Сквозная тема PerekupOS:</b> Выбранный цвет оформления теперь полностью преображает интерфейс смартфона и его приложения.</div>
+          <div class="patch-item"><b>📉 Ребаланс экономики:</b> Снижена маржинальность, цены и торг стали реалистичнее. Ожидаемая прибыль теперь 20-40%.</div>
+          <div class="patch-item"><b>🏦 Во-Банк и Крипта:</b> Полноценное банковское приложение с картами и криптовалютной биржей (BTC, ETH).</div>
+          <div class="patch-item"><b>📈 Динамические тренды:</b> Макроэкономические события и новости теперь влияют на цены авто на рынке.</div>
+          <div class="patch-item"><b>🤖 Полуавтоматический бизнес:</b> С 5-го уровня управляющие сами закупают сырьё для ваших предприятий.</div>
+          <div class="patch-item"><b>💸 Финансовая дисциплина:</b> Введена ежедневная ставка по кредитам (2%) и подорожали услуги теневого Решалы.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
       </div>
@@ -875,8 +874,8 @@
           <div class="risk-track"><div id="saleBuyerPatienceFill" class="risk-fill risk-low" style="width: 100%;"></div></div>
         </div>
         <div class="space-y-2 mb-3">
-          <button onclick="attemptHaggleSale('safe')" class="btn btn-dark w-full">🛡 Обосновать по кузову (+2%)</button>
-          <button onclick="attemptHaggleSale('firm')" class="btn btn-dark w-full">🔥 Давить на эксклюзив (+6%)</button>
+          <button onclick="attemptHaggleSale('safe')" class="btn btn-dark w-full">🛡 Обосновать по кузову</button>
+          <button onclick="attemptHaggleSale('firm')" class="btn btn-dark w-full">🔥 Давить на эксклюзив</button>
         </div>
         <div class="grid-2">
           <button onclick="confirmSaleFromHaggleModal()" class="btn btn-green">Продать 🤝</button>
@@ -906,39 +905,22 @@
         <div class="presale-grid mb-3">
           <div class="presale-card">
             <div>✨ Полировка</div>
-            <button onclick="applyPreSaleMod('clean')" class="btn btn-cyan btn-sm mt-1" id="btnCleanPrice">4,000 ₽</button>
+            <button onclick="applyPreSaleMod('clean')" class="btn btn-cyan btn-sm mt-1" id="btnCleanPrice">7,000 ₽</button>
           </div>
           <div class="presale-card">
             <div>🎨 Облив</div>
-            <button onclick="applyPreSaleMod('paint')" class="btn btn-dark btn-sm mt-1" id="btnPaintPrice">12,000 ₽</button>
+            <button onclick="applyPreSaleMod('paint')" class="btn btn-dark btn-sm mt-1" id="btnPaintPrice">25,000 ₽</button>
           </div>
           <div class="presale-card">
             <div>🧪 Присадка</div>
-            <button onclick="applyPreSaleMod('additive')" class="btn btn-amber btn-sm mt-1" id="btnAdditivePrice">6,000 ₽</button>
+            <button onclick="applyPreSaleMod('additive')" class="btn btn-amber btn-sm mt-1" id="btnAdditivePrice">12,000 ₽</button>
           </div>
           <div class="presale-card">
             <div>⏳ Скрутка</div>
-            <button onclick="applyPreSaleMod('odometer')" class="btn btn-danger btn-sm mt-1" id="btnOdometerPrice">8,000 ₽</button>
+            <button onclick="applyPreSaleMod('odometer')" class="btn btn-danger btn-sm mt-1" id="btnOdometerPrice">15,000 ₽</button>
           </div>
         </div>
         <button onclick="closeModal('modalPreSale')" class="btn btn-dark w-full">Готово</button>
-      </div>
-    </div>
-
-    <div id="modalBarterDeal" class="modal-overlay">
-      <div class="modal-box text-center">
-        <div class="radar-spinner-ring mb-2">
-          <div class="radar-spinner-center">🤝</div>
-        </div>
-        <div class="modal-glow-badge mb-1">ПРЕДЛОЖЕНИЕ ОБМЕНА</div>
-        <div class="grid-2 my-3 p-2" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
-          <div>Ваша тачка: <br><b class="text-xs color-amber" id="barterMyCarName">-</b></div>
-          <div>Предлагают: <br><b class="text-xs color-cyan" id="barterNpcCarName">-</b></div>
-        </div>
-        <div class="grid-2">
-          <button onclick="confirmBarterExchange()" class="btn btn-green">Обмен 🤝</button>
-          <button onclick="closeModal('modalBarterDeal')" class="btn btn-dark">Отмена</button>
-        </div>
       </div>
     </div>
 
@@ -1138,7 +1120,7 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ -->
+    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ v0.5.2 -->
     <script>
       (function() {
         const modules = [
@@ -1160,12 +1142,12 @@
         function loadModule(name) {
           return new Promise((resolve) => {
             const s1 = document.createElement('script');
-            s1.src = name + '?v=205';
+            s1.src = name + '?v=206';
             s1.onload = () => resolve(true);
             s1.onerror = () => {
               s1.remove();
               const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=205';
+              s2.src = 'js/' + name + '?v=206';
               s2.onload = () => resolve(true);
               s2.onerror = () => {
                 console.warn('[Loader] Не удалось загрузить ' + name);

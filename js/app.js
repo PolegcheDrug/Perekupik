@@ -3,7 +3,7 @@
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Интерактивные неоновые жетоны наград, реальное время (00:00),
 // комбинированная экономика (₽ + ⭐), кастомизация цвета HUD,
-// динамические тренды авторынка (макроэкономика)
+// динамические тренды авторынка, крипта и авто-закупка бизнеса!
 // ========================================================
 
 const CURRENT_GAME_VERSION = "v0.5.2";
@@ -336,6 +336,8 @@ const DEFAULT_STATE = {
         ownedNickEffects: ['none'],
         ownedAvatarEffects: ['none'],
         soundProfile: 'cyber',
+        
+        crypto: { btc: 0, eth: 0, prices: { btc: 9500000, eth: 340000 } },
 
         selectedStreetCarIndex: 0,
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
@@ -371,7 +373,7 @@ function t(key) {
 window.t = t;
 
 // ========================================================
-// ДИНАМИЧЕСКОЕ ПРИМЕНЕНИЕ ЦВЕТОВ HUD, АНИМАЦИЙ НИКА И АВАТАРКИ
+// ДИНАМИЧЕСКОЕ ПРИМЕНЕНИЕ ЦВЕТОВ HUD, АНИМАЦИИ НИКНЕЙМА И АВАТАРКИ
 // ========================================================
 function applyHudCustomization() {
     const root = document.documentElement;
@@ -800,14 +802,12 @@ function refreshDailyQuestsList() {
 // ========================================================
 function getMarketRefreshCost() {
     let lvl = state.player?.level || 1;
-    // Удорожание ленты рынка для вывода денег
     return 250 + (lvl * 450);
 }
 
 function getGarageSlotCost() {
     let bs = state.player?.baseSlots || 2;
     let extraSlots = Math.max(0, bs - 2);
-    // Удорожание боксов для вывода денег
     return Math.round(300000 * Math.pow(1.65, extraSlots));
 }
 
@@ -815,7 +815,6 @@ function getExpressTicketUpgradeCost() {
     let m = state.player?.maxExpressTickets || 25;
     let extra = Math.max(0, m - 25);
     const steps = Math.floor(extra / 25);
-    // Удорожание расширения талонов
     return Math.round(75000 * Math.pow(1.5, steps));
 }
 
@@ -1022,6 +1021,7 @@ function applyLoadedState(parsed) {
         if (parsed.player.stats) state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
         if (parsed.player.tools) state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
         if (parsed.player.toolsWear) state.player.toolsWear = { ...DEFAULT_STATE.player.toolsWear, ...parsed.player.toolsWear };
+        if (parsed.player.crypto) state.player.crypto = { ...DEFAULT_STATE.player.crypto, ...parsed.player.crypto };
         if (Array.isArray(parsed.player.phoneMessages)) state.player.phoneMessages = parsed.player.phoneMessages;
         if (Array.isArray(parsed.player.dailyQuests)) state.player.dailyQuests = parsed.player.dailyQuests;
         if (Array.isArray(parsed.player.bankHistory)) state.player.bankHistory = parsed.player.bankHistory;
@@ -1073,6 +1073,10 @@ function sanitizeState() {
     if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
     if (!Array.isArray(state.player.ownedAvatarEffects)) state.player.ownedAvatarEffects = ['none'];
     if (!state.player.soundProfile) state.player.soundProfile = 'cyber';
+
+    if (!state.player.crypto) {
+        state.player.crypto = { btc: 0, eth: 0, prices: { btc: 9500000, eth: 340000 } };
+    }
 
     if (!Array.isArray(state.player.furniture)) state.player.furniture = [];
     if (!Array.isArray(state.player.phoneMessages)) state.player.phoneMessages = [];
@@ -1138,7 +1142,6 @@ function sanitizeState() {
         state.marketFeed = [];
     }
 
-    // Инициализация модификаторов рынка
     if (!state.marketModifiers) {
         state.marketModifiers = { economy: 1, comfort: 1, premium: 1, hyper: 1, moto: 1, truck: 1, all: 1 };
     }
@@ -1318,7 +1321,6 @@ function executeDayCycleMidnight(currentDateObj) {
     if (typeof MARKET_NEWS_EVENTS !== 'undefined' && Math.random() < 0.35) {
         triggerMarketNewsEvent();
     } else {
-        // Постепенное возвращение рынка к норме (1.0)
         if (state.marketModifiers) {
             ['economy', 'comfort', 'premium', 'hyper', 'moto', 'truck', 'all'].forEach(k => {
                 if (state.marketModifiers[k]) {
@@ -1327,6 +1329,30 @@ function executeDayCycleMidnight(currentDateObj) {
                 }
             });
         }
+    }
+
+    // Начисление 2% на долг по кредиту
+    if (state.player.loanDebt > 0) {
+        state.player.loanDebt = Math.round(state.player.loanDebt * 1.02);
+        if (state.player.phoneMessages) {
+            state.player.phoneMessages.unshift({
+                id: "sms_bank_loan_" + Date.now(),
+                sender: "💳 Во-Банк Онлайн",
+                avatar: "🏦",
+                preview: `Начислен % по кредиту. Текущий долг: ${state.player.loanDebt.toLocaleString()} ₽`,
+                time: "00:00",
+                unread: true,
+                chatHistory: [{ from: "them", text: `Ежедневный процент (2%) по кредиту начислен. Просим своевременно вносить платежи.` }]
+            });
+        }
+    }
+
+    // Симуляция динамики крипторынка
+    if (state.player.crypto) {
+        let btcChange = 0.90 + Math.random() * 0.25; // от -10% до +15%
+        let ethChange = 0.85 + Math.random() * 0.35; // от -15% до +20%
+        state.player.crypto.prices.btc = Math.round((state.player.crypto.prices.btc || 9500000) * btcChange);
+        state.player.crypto.prices.eth = Math.round((state.player.crypto.prices.eth || 340000) * ethChange);
     }
 
     let curId = state.player?.housingId || 'trailer';
@@ -2036,6 +2062,22 @@ setInterval(() => {
         let bizUpdated = false;
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
+                // Полуавтоматическая закупка сырья для бизнеса 5+ уровня
+                if (b.level >= 5 && b.stock <= 10) {
+                    let cost = 15000;
+                    if (b.stored >= cost) {
+                        b.stored -= cost;
+                        b.stock += 50;
+                        showToast(`👨‍💼 Управляющий «${b.name}» закупил сырьё из кассы!`);
+                        bizUpdated = true;
+                    } else if (state.player.cash >= cost) {
+                        state.player.cash -= cost;
+                        b.stock += 50;
+                        showToast(`👨‍💼 Управляющий «${b.name}» закупил сырьё с вашего счёта!`);
+                        bizUpdated = true;
+                    }
+                }
+
                 if (b.stock > 0) {
                     b.stock = Math.max(0, b.stock - 2);
                     let tickIncome = Math.round((b.income * b.level) / 5);

@@ -1,9 +1,8 @@
 // ========================================================
 // js/phone.js — БАЗОВАЯ ОС СМАРТФОНА «PerekupOS» (v0.5.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Автономные экраны приложений, P2P биржа (Авто, Номера, Бизнес, Жильё),
-// Порт, Решала со скидками цеха, Блокнот карьеры, Во-Банк и чаты
-// Синхронизация UI смартфона с жесткой экономикой (инфляция цен v0.5.2).
+// Автономные экраны приложений, P2P биржа, Порт, Решала, Блокнот
+// НОВОЕ: Полноценное приложение Во-Банк с крипто-биржей и картами!
 // ========================================================
 
 const PhoneManager = {
@@ -19,12 +18,12 @@ const PhoneManager = {
             id: "sms_bank_welcome",
             sender: "💳 Во-Банк Онлайн",
             avatar: "🏦",
-            preview: "Добро пожаловать в Во-Банк! Сейф активен (+3% в день).",
+            preview: "Добро пожаловать в Во-Банк! Вклады и крипта доступны.",
             time: "10:00",
             unread: true,
             chatHistory: [
                 { from: "them", text: "Здравствуйте! Ваш сейф перекупа готов к приёму депозитов в приложении «Во-Банк». Каждый день вам начисляется +3% на остаток средств." },
-                { from: "them", text: "Деньги в сейфе застрахованы от рэкета и уличных нападений на трассе." }
+                { from: "them", text: "Также мы открыли для вас доступ к крипто-бирже. Инвестируйте в BTC и ETH с вашего смартфона!" }
             ]
         },
         {
@@ -81,6 +80,10 @@ const PhoneManager = {
                 refreshDailyQuestsList();
             }
         }
+        if (!state.player.crypto) {
+            state.player.crypto = { btc: 0, eth: 0, prices: { btc: 9500000, eth: 340000 } };
+        }
+
         this.updateUnreadBadge();
         this.updatePhoneClock();
         setInterval(() => this.updatePhoneClock(), 1000);
@@ -442,7 +445,7 @@ const PhoneManager = {
     },
 
     // ----------------------------------------------------
-    // УПРАВЛЕНИЕ БИЗНЕСОМ
+    // УПРАВЛЕНИЕ БИЗНЕСОМ (АВТОЗАКУПКА v0.5.2)
     // ----------------------------------------------------
     renderBusinessApp(container) {
         if (!state.businesses || state.businesses.length === 0) {
@@ -457,6 +460,15 @@ const PhoneManager = {
                 <button onclick="collectAllBusinessCash(); PhoneManager.renderOpenApp();" class="btn btn-green btn-auto btn-sm">Касса</button>
             </div>
             <div class="phone-app-body">
+                <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.12), rgba(9, 14, 24, 0.98));">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-green"><i class="fa-solid fa-robot"></i> Авто-закупка сырья</b>
+                        <span class="tag-badge bg-tag-green">Инновация</span>
+                    </div>
+                    <div class="sub-label" style="font-size:9.5px; line-height:1.4;">
+                        💡 При достижении бизнесом <b>5 уровня</b>, нанятый управляющий начинает <b>автоматически закупать сырьё</b> (за 15k ₽) при падении запасов ниже 10%. Средства списываются из кассы бизнеса или вашего кошелька.
+                    </div>
+                </div>
         `;
 
         state.businesses.forEach((biz, idx) => {
@@ -480,11 +492,15 @@ const PhoneManager = {
                         <button onclick="restockBusiness(${idx}); PhoneManager.renderOpenApp();" class="btn btn-amber btn-sm">Сырьё (15k)</button>
                     </div>
                     <div class="grid-2">
-                        <button onclick="PhoneManager.sellBusinessToNPC('${biz.id}', ${saleToNpcPrice})" class="btn btn-dark btn-sm">Продать (${saleToNpcPrice.toLocaleString()} ₽)</button>
+                        <button onclick="PhoneManager.sellBusinessToNPC('${biz.id}', ${saleToNpcPrice})" class="btn btn-dark btn-sm">Продать (${(saleToNpcPrice/1000000).toFixed(2)}M)</button>
                         <button onclick="PhoneManager.listBusinessOnP2P('${biz.id}')" class="btn btn-purple btn-sm">На P2P биржу</button>
                     </div>
                 `;
             }
+
+            let autoBadge = (isOwned && biz.level >= 5) 
+                ? `<span class="tag-badge bg-tag-green ml-1" style="font-size:8px;"><i class="fa-solid fa-robot"></i> АВТО</span>` 
+                : "";
 
             html += `
                 <div class="glass-card mb-3 p-2">
@@ -495,7 +511,10 @@ const PhoneManager = {
                         </div>
                     </div>
                     <div class="flex-between mb-1">
-                        <b class="text-xs color-green">${biz.name}</b>
+                        <div>
+                            <b class="text-xs color-green">${biz.name}</b>
+                            ${autoBadge}
+                        </div>
                         <span class="price-val text-xs">${((biz.income || 0) * (biz.level || 0)).toLocaleString()} ₽/д</span>
                     </div>
                     <div class="sub-label mb-2" style="font-size:10px;">⭐ Перк: ${biz.perk || 'Пассивный доход'} | Сырьё: <b>${biz.stock || 0}%</b></div>
@@ -639,12 +658,12 @@ const PhoneManager = {
                 <div class="glass-card mb-3 p-2 ${isCur ? 'personal-car-card' : ''}">
                     <div class="car-img-wrap mb-2" style="height:125px; position:relative;">
                         <img src="${imgSrc}" class="car-img" onerror="this.onerror=null; this.src='${fallbackSrc}';">
-                        <div class="badge-tag" style="bottom:6px; right:6px;">
+                        <div class="badge-tag badge-br">
                             <span class="tag-badge ${isPurchased ? 'bg-tag-green' : (isCur ? 'bg-tag-cyan' : 'bg-tag-amber')}">
                                 ${isPurchased ? 'Собственность' : (isCur ? 'Арендовано' : 'Доступно')}
                             </span>
                         </div>
-                        <div class="badge-tag bg-tag-cyan" style="top:6px; left:6px; right:auto;">${h.typeLabel || 'Объект'}</div>
+                        <div class="badge-tag badge-tl bg-tag-cyan">${h.typeLabel || 'Объект'}</div>
                     </div>
                     
                     <div class="flex-between mb-1">
@@ -797,7 +816,7 @@ const PhoneManager = {
     },
 
     // ----------------------------------------------------
-    // РЕШАЛА АРТУР (СИНХРОНИЗАЦИЯ ЦЕН v0.5.2)
+    // РЕШАЛА АРТУР
     // ----------------------------------------------------
     renderReshalaApp(container) {
         let conn = state.player?.connections || 0;
@@ -809,8 +828,8 @@ const PhoneManager = {
             ? `<span class="tag-badge bg-tag-green">Скидка цеха -${caps.reshalaDiscountPct}%</span>`
             : `<span class="tag-badge bg-tag-purple">Штаб</span>`;
 
-        let roofPrice = Math.round(450000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100))); // v0.5.2
-        let licPrice = Math.round(120000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100))); // v0.5.2
+        let roofPrice = Math.round(450000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100)));
+        let licPrice = Math.round(120000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100)));
 
         container.innerHTML = `
             <div class="phone-app-header">
@@ -870,399 +889,219 @@ const PhoneManager = {
         `;
     },
 
-    renderBarnApp(container) {
-        const pDay = state.player?.day || 1;
-        const lastDay = state.player?.lastBarnDay || 0;
-        const canScoutToday = lastDay < pDay;
-        const lvl = state.player?.level || 1;
-
-        let html = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-screwdriver-wrench color-amber mr-1"></i> Находки в сараях</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="glass-card mb-2 p-2 flex-between">
-                    <div>
-                        <b class="text-xs color-amber">Разведка заброшек</b>
-                        <div class="sub-label" style="font-size:10px;">Шанс найти ретро-классику и архивные номера!</div>
-                    </div>
-                    <span class="tag-badge bg-tag-amber">1 раз/сутки</span>
-                </div>
-        `;
-
-        (typeof BARN_TIERS_CONFIG !== 'undefined' ? BARN_TIERS_CONFIG : []).forEach(b => {
-            let isLvlLocked = lvl < b.reqLvl;
-            let isDoneToday = !canScoutToday;
-            let rareCar = (typeof BARN_FINDS !== 'undefined' && BARN_FINDS[b.rareIdx]) ? BARN_FINDS[b.rareIdx] : { name: "Раритет" };
-            let imgSrc = b.img || `assets/barns/barn_tier${b.tier}.jpg`;
-            let fallbackSrc = b.fallback || 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80';
-
-            let statusBadge = isLvlLocked 
-                ? `<span class='tag-badge bg-tag-red'><i class='fa-solid fa-lock'></i> С ${b.reqLvl} УР</span>`
-                : (isDoneToday ? "<span class='tag-badge bg-tag-amber'>Осмотрено</span>" : "<span class='tag-badge bg-tag-green'>Доступно</span>");
-
-            let btnDisabled = (isLvlLocked || isDoneToday) ? "disabled" : "";
-            let btnText = isLvlLocked ? `Требуется ${b.reqLvl} уровень` : (isDoneToday ? "Осмотрено (Сброс в 00:00 🌙)" : `Вскрыть ангар (${(b.cost / 1000).toFixed(0)}k ₽)`);
-
-            html += `
-                <div class="glass-card mb-3 p-2 ${b.classGrade}">
-                    <div class="car-img-wrap mb-2" style="height:120px; position:relative;">
-                        <img src="${imgSrc}" class="car-img" onerror="this.onerror=null; this.src='${fallbackSrc}';">
-                        <div class="badge-tag" style="bottom:6px; right:6px;">${statusBadge}</div>
-                    </div>
-                    <div class="flex-between mb-1">
-                        <b class="text-xs color-cyan">${b.title}</b>
-                        <span class="price-val text-xs color-amber">${b.cost.toLocaleString()} ₽</span>
-                    </div>
-                    <p class="sub-label mb-2" style="font-size:10px;">${b.desc}</p>
-                    <div class="text-xs mb-1 color-amber">⭐ Редкий дроп (5%): <b>${rareCar.name}</b></div>
-                    <div class="text-xs mb-2 color-purple">🏷️ Архивные номера: <b>15% шанс</b></div>
-                    <button onclick="scoutBarnTier(${b.tier})" class="btn btn-cyan btn-sm w-full" ${btnDisabled}>${btnText}</button>
-                </div>
-            `;
-        });
-
-        html += `</div>`;
-        container.innerHTML = html;
-    },
-
     // ----------------------------------------------------
-    // ГОСУСЛУГИ, БЛОКНОТ И СООБЩЕНИЯ
+    // ВО-БАНК ОНЛАЙН (NEW! ПОЛНОЦЕННОЕ ПРИЛОЖЕНИЕ v0.5.2)
     // ----------------------------------------------------
-    renderGosuslugiApp(container) {
-        let fines = state.player.trafficFines || 0;
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-building-columns color-cyan mr-1"></i> Госуслуги Авто</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="glass-card mb-2 p-2">
-                    <div class="flex-between mb-1">
-                        <b class="text-xs">Штрафы ГИБДД (со скидкой 50%)</b>
-                        <span class="tag-badge ${fines > 0 ? 'bg-tag-red' : 'bg-tag-green'}">${fines > 0 ? fines.toLocaleString() + ' ₽' : 'Штрафов нет'}</span>
-                    </div>
-                    <p class="sub-label mb-2" style="font-size:10px;">Проверка камер и просроченных ДКП на дорогах.</p>
-                    <button onclick="PhoneManager.payTrafficFines()" class="btn btn-cyan btn-sm w-full" ${fines <= 0 ? 'disabled' : ''}>Оплатить штрафы со скидкой 50%</button>
-                </div>
-                <div class="glass-card p-2">
-                    <b class="text-xs color-green mb-1 block">✓ Проверка запретов на рег. действия</b>
-                    <p class="sub-label" style="font-size:10px;">Все машины в гараже проверены по базам ФССП и реестру залогов.</p>
-                </div>
-            </div>
-        `;
-    },
+    renderBankApp(container) {
+        let cash = state.player?.cash || 0;
+        let safe = state.player?.safeDeposit || 0;
+        let debt = state.player?.loanDebt || 0;
+        let sub = this.bankSubTab || 'accounts';
 
-    payTrafficFines() {
-        let fines = state.player.trafficFines || 0;
-        let discountCost = Math.round(fines * 0.5);
-        if (state.player.cash < discountCost) return showToast("Не хватает денег!");
-        state.player.cash -= discountCost;
-        state.player.trafficFines = 0;
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast("Штрафы ГИБДД успешно оплачены!");
-        this.renderOpenApp();
-    },
+        let btcAmount = state.player?.crypto?.btc || 0;
+        let ethAmount = state.player?.crypto?.eth || 0;
+        let btcPrice = state.player?.crypto?.prices?.btc || 9500000;
+        let ethPrice = state.player?.crypto?.prices?.eth || 340000;
 
-    renderNotepadApp(container) {
-        let s = state.player?.stats || {};
-        let goals = typeof NOTEPAD_CAREER_GOALS !== 'undefined' ? NOTEPAD_CAREER_GOALS : [];
-        let netProfit = s.totalNetProfit || 0;
-        let soldCount = s.sold || 0;
-        let totalSlots = typeof getTotalGarageSlots === 'function' ? getTotalGarageSlots() : 2;
-        let ownedHouses = state.player?.ownedHouses || [];
-
-        let completedGoals = 0;
-        let goalsHtml = goals.map(g => {
-            let isDone = false;
-            let currentVal = 0;
-            let targetVal = 1;
-
-            if (g.targetProfit) {
-                currentVal = netProfit;
-                targetVal = g.targetProfit;
-                isDone = currentVal >= targetVal;
-            } else if (g.targetSales) {
-                currentVal = soldCount;
-                targetVal = g.targetSales;
-                isDone = currentVal >= targetVal;
-            } else if (g.targetSlots) {
-                currentVal = totalSlots;
-                targetVal = g.targetSlots;
-                isDone = currentVal >= targetVal;
-            } else if (g.targetCred) {
-                currentVal = state.player?.streetCred || 0;
-                targetVal = g.targetCred;
-                isDone = currentVal >= targetVal;
-            } else if (g.targetHousing) {
-                isDone = ownedHouses.includes(g.targetHousing);
-                currentVal = isDone ? 1 : 0;
-                targetVal = 1;
-            }
-
-            if (isDone) completedGoals++;
-            let progressPct = Math.min(100, Math.round((currentVal / targetVal) * 100));
-
-            return `
-            <div class="glass-card p-2 mb-2" style="border-left: 3px solid ${isDone ? 'var(--green)' : 'var(--amber)'};">
-                <div class="flex-between mb-1">
-                    <b class="text-xs ${isDone ? 'color-green' : 'color-cyan'}">${g.title}</b>
-                    <span class="tag-badge ${isDone ? 'bg-tag-green' : 'bg-tag-amber'}">${isDone ? 'ДОСТИГНУТО ✓' : g.category}</span>
-                </div>
-                <div class="sub-label mb-2" style="font-size:10px;">${g.desc}</div>
-                <div class="flex-between text-xs mb-1">
-                    <span>Прогресс:</span>
-                    <b class="${isDone ? 'color-green' : 'color-amber'}">${currentVal.toLocaleString()} / ${targetVal.toLocaleString()}</b>
-                </div>
-                <div class="biz-progress-track mb-2">
-                    <div class="biz-progress-fill ${isDone ? 'fill-biz-stock' : 'fill-biz-lvl'}" style="width:${progressPct}%;"></div>
-                </div>
-                <div class="text-xs color-amber" style="font-size:9.5px;">⭐ Награда: <b>${g.reward}</b></div>
-            </div>`;
-        }).join('');
-
-        let totalProgressPct = goals.length > 0 ? Math.round((completedGoals / goals.length) * 100) : 0;
-
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-note-sticky color-amber mr-1"></i> Блокнот Карьеры</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="glass-card mb-2" style="background:radial-gradient(circle at 50% 0%, rgba(0,242,254,0.15), rgba(9,14,24,0.98));">
-                    <div class="flex-between mb-1">
-                        <b class="text-xs color-cyan"><i class="fa-solid fa-route"></i> Карьерный путь перекупа</b>
-                        <span class="price-val text-xs color-green">${totalProgressPct}%</span>
-                    </div>
-                    <div class="sub-label mb-2" style="font-size:9.5px;">Закрыто этапов: <b>${completedGoals} из ${goals.length}</b>. Выполняйте цели для получения постоянных бонусов.</div>
-                    <div class="biz-progress-track">
-                        <div class="biz-progress-fill fill-biz-stock" style="width:${totalProgressPct}%;"></div>
-                    </div>
-                </div>
-
-                <div class="glass-card p-2 mb-2">
-                    <div class="flex-between mb-1">
-                        <b class="text-xs color-green"><i class="fa-solid fa-chart-line"></i> Сводка эффективности:</b>
-                        <span class="sub-label text-xs">Уровень: <b>${state.player?.level || 1}</b></span>
-                    </div>
-                    <div class="sub-label" style="font-size:10px;">
-                        • Куплено ТС: <b>${s.bought || 0}</b> шт.<br>
-                        • Продано в плюс: <b class="color-green">${s.profitableSales || 0}</b> сделок<br>
-                        • Чистая прибыль: <b class="color-green">${(s.totalNetProfit || 0).toLocaleString()} ₽</b>
-                    </div>
-                </div>
-                
-                <h4 class="font-bold text-xs color-cyan mb-2">🎯 Долгосрочные карьерные цели:</h4>
-                <div class="space-y-2 mb-3">
-                    ${goalsHtml}
-                </div>
-            </div>
-        `;
-    },
-
-    renderMessagesList(container) {
-        const messages = state.player?.phoneMessages || [];
-        let html = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-comment-dots color-cyan mr-1"></i> Сообщения</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="phone-messages-list">
-        `;
-
-        if (messages.length === 0) {
-            html += `<div class="sub-label text-center py-6">Нет входящих сообщений</div>`;
+        let depositsListHtml = "";
+        let deposits = state.player?.bankDeposits || [];
+        if (deposits.length === 0) {
+            depositsListHtml = "<div class='sub-label text-center py-2'>У вас нет активных вкладов.</div>";
         } else {
-            messages.forEach(msg => {
-                let unreadClass = msg.unread ? 'unread-msg' : '';
-                let unreadDot = msg.unread ? '<span class="phone-unread-dot"></span>' : '';
-                html += `
-                    <div class="phone-msg-item ${unreadClass}" onclick="PhoneManager.openChat('${msg.id}')">
-                        <div class="phone-msg-avatar">${msg.avatar || '👤'}</div>
-                        <div class="phone-msg-content">
-                            <div class="flex-between">
-                                <b class="text-xs">${msg.sender}</b>
-                                <span class="sub-label" style="font-size:9px;">${msg.time || 'Сейчас'}</span>
-                            </div>
-                            <div class="phone-msg-preview">${msg.preview}</div>
-                        </div>
-                        ${unreadDot}
+            deposits.forEach((dep, dIdx) => {
+                depositsListHtml += `
+                <div class="glass-card p-2 flex-between mb-2">
+                    <div>
+                        <b class="text-xs color-green">${dep.name}</b>
+                        <div class="sub-label" style="font-size:9.5px;">Сумма с процентами: <b class="color-green">${dep.amount.toLocaleString()} ₽</b> (+${(dep.dailyRate * 100).toFixed(0)}%/день)</div>
                     </div>
-                `;
+                    <button onclick="closeBankDepositAction(${dIdx}); PhoneManager.renderOpenApp();" class="btn btn-green btn-auto btn-sm">Забрать</button>
+                </div>`;
             });
         }
 
-        html += `</div></div>`;
-        container.innerHTML = html;
-    },
-
-    openChat(msgId) {
-        const msg = (state.player?.phoneMessages || []).find(m => m.id === msgId);
-        if (msg) {
-            msg.unread = false;
-            this.updateUnreadBadge();
-            saveState();
-        }
-        this.activeChatId = msgId;
-        this.renderPhoneScreen();
-    },
-
-    renderChatConversation(container, msgId) {
-        const msg = (state.player?.phoneMessages || []).find(m => m.id === msgId);
-        if (!msg) return this.goHome();
-
-        let historyHtml = '';
-        (msg.chatHistory || []).forEach(chat => {
-            let isMine = chat.from === 'me';
-            historyHtml += `
-                <div class="chat-msg ${isMine ? 'msg-player' : 'msg-seller'}">
-                    ${chat.text}
-                </div>
-            `;
-        });
-
-        let actionButtons = '';
-        if (msg.isScam) {
-            actionButtons = `
-                <div class="p-2 mb-2" style="background:rgba(255,51,102,0.1); border:1px solid var(--red); border-radius:8px;">
-                    <div class="text-xs color-red font-bold mb-1">Подозрение на мошенничество!</div>
-                    <div class="grid-2">
-                        <button onclick="PhoneManager.resolveScamMessage('${msg.id}', false)" class="btn btn-green btn-sm">Заблокировать 🛡️</button>
-                        <button onclick="PhoneManager.resolveScamMessage('${msg.id}', true)" class="btn btn-danger btn-sm">Перевести 50k 💸</button>
+        let historyHtml = "";
+        let history = state.player?.bankHistory || [];
+        if (history.length === 0) {
+            historyHtml = "<div class='sub-label text-center py-2'>История операций пуста.</div>";
+        } else {
+            history.forEach(tx => {
+                historyHtml += `
+                <div class="p-2 flex-between mb-1" style="background:#090e18; border-radius:6px; border:1px solid rgba(255,255,255,0.04);">
+                    <div>
+                        <div class="text-xs">${tx.title}</div>
+                        <div class="sub-label" style="font-size:8.5px;">${tx.time}</div>
                     </div>
-                </div>
-            `;
+                    <b class="text-xs ${tx.isIncome ? 'color-green' : 'color-red'}">${tx.isIncome ? '+' : '-'}${tx.amount.toLocaleString()} ₽</b>
+                </div>`;
+            });
         }
 
         container.innerHTML = `
             <div class="phone-app-header">
-                <button onclick="PhoneManager.activeChatId = null; PhoneManager.renderPhoneScreen();" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title">${msg.avatar || '👤'} ${msg.sender}</div>
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
+                <div class="phone-app-title"><i class="fa-solid fa-vault color-green mr-1"></i> Во-Банк Онлайн</div>
                 <div style="width:40px;"></div>
             </div>
-            <div class="phone-app-body" style="display:flex; flex-direction:column; justify-content:space-between;">
-                <div class="chat-thread-container" style="flex:1; max-height:none; margin-bottom:10px;">
-                    ${historyHtml}
+            <div class="phone-app-body">
+                
+                <div class="grid-4 mb-2">
+                    <button onclick="PhoneManager.switchBankSubTab('accounts')" class="btn ${sub === 'accounts' ? 'btn-green' : 'btn-dark'} btn-sm" style="padding: 6px 4px;">Счета</button>
+                    <button onclick="PhoneManager.switchBankSubTab('crypto')" class="btn ${sub === 'crypto' ? 'btn-green' : 'btn-dark'} btn-sm" style="padding: 6px 4px;">Крипта</button>
+                    <button onclick="PhoneManager.switchBankSubTab('deposits')" class="btn ${sub === 'deposits' ? 'btn-green' : 'btn-dark'} btn-sm" style="padding: 6px 4px;">Вклады</button>
+                    <button onclick="PhoneManager.switchBankSubTab('credit')" class="btn ${sub === 'credit' ? 'btn-green' : 'btn-dark'} btn-sm" style="padding: 6px 4px;">Кредит</button>
                 </div>
-                ${actionButtons}
-                <div class="chat-compose-box">
-                    <input type="text" id="phoneReplyInput" class="chat-input" placeholder="Ответить...">
-                    <button onclick="PhoneManager.sendReplyMessage('${msg.id}')" class="chat-send-btn"><i class="fa-solid fa-paper-plane"></i></button>
-                </div>
+
+                ${sub === 'accounts' ? `
+                    <div class="bank-credit-card">
+                        <div class="flex-between mb-2">
+                            <b style="font-size:14px; font-style:italic;">VO-BANK</b>
+                            <i class="fa-brands fa-cc-visa" style="font-size:20px;"></i>
+                        </div>
+                        <div class="bank-chip"></div>
+                        <div class="bank-balance">${cash.toLocaleString()} ₽</div>
+                        <div class="bank-card-num">**** **** **** 7777</div>
+                        <div class="flex-between mt-2 text-xs" style="opacity:0.8;">
+                            <span>${(state.player?.name || 'PEREKUP').toUpperCase()}</span>
+                            <span>12/29</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card mb-2 p-2">
+                        <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+                            <div class="flex-between">
+                                <div>
+                                    <div class="text-xs font-bold color-amber"><i class="fa-solid fa-lock"></i> Неприкосновенный Сейф</div>
+                                    <div class="sub-label" style="font-size:9px;">Начисление +3% в полночь | Защита от рэкета</div>
+                                </div>
+                                <b class="color-amber text-xs">${safe.toLocaleString()} ₽</b>
+                            </div>
+                        </div>
+
+                        <div class="grid-2 mb-2">
+                            <button onclick="depositToSafeAction(50000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">+50k в сейф</button>
+                            <button onclick="depositToSafeAction(200000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">+200k в сейф</button>
+                        </div>
+                        <button onclick="withdrawFromSafeAction(); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm w-full">Забрать всё из сейфа</button>
+                    </div>
+
+                    <div class="glass-card p-2">
+                        <b class="text-xs color-cyan mb-2 block">📋 Последние транзакции по счетам:</b>
+                        <div class="space-y-1" style="max-height: 180px; overflow-y: auto;">
+                            ${historyHtml}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${sub === 'crypto' ? `
+                    <div class="glass-card mb-2 p-2">
+                        <div class="flex-between mb-1">
+                            <b class="text-xs color-amber"><i class="fa-brands fa-bitcoin"></i> Bitcoin (BTC)</b>
+                            <span class="text-xs font-bold">${btcAmount.toFixed(4)} ₿</span>
+                        </div>
+                        <div class="price-val color-green mb-1">${btcPrice.toLocaleString()} ₽</div>
+                        <div class="crypto-chart-mockup"><div class="crypto-line"></div></div>
+                        <div class="grid-2 mt-2">
+                            <button onclick="PhoneManager.buyCrypto('btc')" class="btn btn-green btn-sm">Купить 0.01 ₿</button>
+                            <button onclick="PhoneManager.sellCrypto('btc')" class="btn btn-danger btn-sm">Продать всё</button>
+                        </div>
+                    </div>
+
+                    <div class="glass-card mb-2 p-2">
+                        <div class="flex-between mb-1">
+                            <b class="text-xs color-purple"><i class="fa-brands fa-ethereum"></i> Ethereum (ETH)</b>
+                            <span class="text-xs font-bold">${ethAmount.toFixed(2)} Ξ</span>
+                        </div>
+                        <div class="price-val color-green mb-1">${ethPrice.toLocaleString()} ₽</div>
+                        <div class="crypto-chart-mockup"><div class="crypto-line" style="filter: hue-rotate(90deg);"></div></div>
+                        <div class="grid-2 mt-2">
+                            <button onclick="PhoneManager.buyCrypto('eth')" class="btn btn-green btn-sm">Купить 1.0 Ξ</button>
+                            <button onclick="PhoneManager.sellCrypto('eth')" class="btn btn-danger btn-sm">Продать всё</button>
+                        </div>
+                    </div>
+                    <div class="sub-label text-center" style="font-size:9.5px;">💡 Курсы криптовалют меняются каждую игровую полночь (00:00). Инвестируйте свободную наличку!</div>
+                ` : ''}
+
+                ${sub === 'deposits' ? `
+                    <div class="glass-card mb-2 p-2">
+                        <b class="text-xs color-green mb-1 block">📈 Срочные депозиты с повышенной ставкой:</b>
+                        <div class="grid-2 mb-2">
+                            <button onclick="openBankDepositAction(100000, 7, 0.025); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">100k под 2.5%/д</button>
+                            <button onclick="openBankDepositAction(500000, 14, 0.035); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm">500k под 3.5%/д</button>
+                        </div>
+                        <div class="text-xs font-bold mb-1">Активные депозиты:</div>
+                        ${depositsListHtml}
+                    </div>
+                ` : ''}
+
+                ${sub === 'credit' ? `
+                    <div class="glass-card mb-2 p-2">
+                        <div class="flex-between mb-1">
+                            <b class="text-xs color-red"><i class="fa-solid fa-handholding-dollar"></i> Кредитная линия перекупа</b>
+                            <span class="sub-label text-xs">Долг: <b class="color-amber">${debt.toLocaleString()} ₽</b></span>
+                        </div>
+                        <div class="sub-label mb-2 color-red" style="font-size:9.5px;">Внимание: каждый день в 00:00 на сумму долга начисляется <b>2%</b>. Платите вовремя!</div>
+                        <div class="grid-2 mb-2">
+                            <button onclick="takeLoan(100000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">Взять 100k</button>
+                            <button onclick="takeLoan(500000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">Взять 500k</button>
+                        </div>
+                        <div class="grid-3">
+                            <button onclick="repayLoan(25); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">25%</button>
+                            <button onclick="repayLoan(50); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">50%</button>
+                            <button onclick="repayLoan(100); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm">Всё</button>
+                        </div>
+                    </div>
+                ` : ''}
             </div>
         `;
     },
 
-    sendReplyMessage(msgId) {
-        const input = document.getElementById('phoneReplyInput');
-        if (!input || !input.value.trim()) return;
-        const text = input.value.trim();
-
-        const msg = (state.player?.phoneMessages || []).find(m => m.id === msgId);
-        if (!msg) return;
-
-        if (!msg.chatHistory) msg.chatHistory = [];
-        msg.chatHistory.push({ from: 'me', text: text });
-        msg.preview = "Вы: " + text;
-        input.value = '';
-
-        setTimeout(() => {
-            let replyText = "Сообщение принято.";
-            if (msg.sender.includes("Во-Банк")) replyText = "Запрос зарегистрирован банковским сервисом.";
-            else if (msg.sender.includes("Артур")) replyText = "Добро. Будут вопросы — пиши.";
-            else if (msg.sender.includes("Влад")) replyText = "Красава, ждём твоих заездов на треке!";
-            else if (msg.isScam) replyText = "Оператор безопасности требует срочного перевода средств!";
-            else replyText = "Понял тебя. На связи!";
-
-            msg.chatHistory.push({ from: 'them', text: replyText });
-            msg.preview = replyText;
-            saveState();
-            if (PhoneManager.currentApp === 'messages' && PhoneManager.activeChatId === msgId) {
-                PhoneManager.renderPhoneScreen();
-            }
-            playSound('tick');
-            tgHaptic('light');
-        }, 1000);
-
-        saveState();
-        this.renderPhoneScreen();
+    switchBankSubTab(tab) {
+        playSound('tick');
+        tgHaptic('light');
+        this.bankSubTab = tab;
+        this.renderOpenApp();
     },
 
-    resolveScamMessage(msgId, fellForScam) {
-        const msg = (state.player?.phoneMessages || []).find(m => m.id === msgId);
-        if (!msg) return;
-
-        if (fellForScam) {
-            let loss = 50000;
-            state.player.cash = Math.max(0, (state.player.cash || 0) - loss);
-            state.player.mood = Math.max(0, (state.player.mood || 80) - 25);
-            msg.chatHistory.push({ from: 'them', text: "Спасибо за перевод, наивный перекуп!" });
-            msg.isScam = false;
-            openVerdictModal("РАЗВОД МОШЕННИКОВ! 💸", `Вы поддались на спам и перевели мошенникам ${loss.toLocaleString()} ₽!`, false);
-        } else {
-            msg.chatHistory.push({ from: 'them', text: "Номер добавлен в спам-фильтр." });
-            msg.isScam = false;
-            state.player.karma = Math.min(100, (state.player.karma || 50) + 3);
-            showToast("🛡️ Мошенник заблокирован! Карма (+3)");
-        }
-
+    buyCrypto(coin) {
+        if (!state.player.crypto) state.player.crypto = { btc: 0, eth: 0, prices: { btc: 9500000, eth: 340000 } };
+        let price = state.player.crypto.prices[coin];
+        let cost = coin === 'btc' ? price * 0.01 : price * 1.0;
+        
+        if (state.player.cash < cost) return showToast("Не хватает средств для покупки крипты!");
+        
+        state.player.cash -= cost;
+        if (coin === 'btc') state.player.crypto.btc += 0.01;
+        if (coin === 'eth') state.player.crypto.eth += 1.0;
+        
+        logBankTransaction(`Покупка ${coin.toUpperCase()}`, cost, false);
         saveState();
-        this.renderPhoneScreen();
-    },
-
-    pushBuyerFollowupSMS(carName, isScamDetected, buyerName) {
-        if (!state.player.phoneMessages) state.player.phoneMessages = [];
-
-        let msgId = "sms_buyer_" + Date.now();
-        let newSMS = null;
-
-        if (isScamDetected) {
-            newSMS = {
-                id: msgId,
-                sender: `😡 ${buyerName}`,
-                avatar: "🤬",
-                preview: `Ты что мне продал?! На ${carName} скрытый дефект!`,
-                time: "Только что",
-                unread: true,
-                chatHistory: [
-                    { from: "them", text: `Слышь, перекуп! Я доехал до дома на «${carName}», а мотор застучал! Сервис сказал, была залита загущающая присадка!` },
-                    { from: "them", text: `Жди гостей, я знаю твой гараж! Либо возвращай часть суммы, либо будут проблемы!` }
-                ]
-            };
-        } else {
-            newSMS = {
-                id: msgId,
-                sender: `🤝 ${buyerName}`,
-                avatar: "🙂",
-                preview: `Спасибо за ${carName}! Машина огонь, мотор шепчет.`,
-                time: "Только что",
-                unread: true,
-                chatHistory: [
-                    { from: "them", text: `Привет! Добрался отлично на «${carName}». Всё как ты и говорил — честный ухоженный аппарат.` },
-                    { from: "them", text: `Оставил отличный отзыв среди знакомых водителей. Респект!` }
-                ]
-            };
-        }
-
-        state.player.phoneMessages.unshift(newSMS);
-        this.updateUnreadBadge();
-        saveState();
-        showToast(`📲 Новое SMS от ${buyerName}!`);
         playSound('win');
         tgHaptic('success');
+        this.renderOpenApp();
+    },
+
+    sellCrypto(coin) {
+        if (!state.player.crypto) state.player.crypto = { btc: 0, eth: 0, prices: { btc: 9500000, eth: 340000 } };
+        let amount = state.player.crypto[coin];
+        if (amount <= 0) return showToast(`У вас нет ${coin.toUpperCase()} для продажи!`);
+        
+        let price = state.player.crypto.prices[coin];
+        let revenue = amount * price;
+        
+        state.player.cash += revenue;
+        state.player.crypto[coin] = 0;
+        
+        logBankTransaction(`Продажа ${coin.toUpperCase()}`, revenue, true);
+        saveState();
+        playSound('win');
+        tgHaptic('success');
+        showToast(`Продано за ${revenue.toLocaleString()} ₽!`);
+        this.renderOpenApp();
     },
 
     // ----------------------------------------------------
-    // AUTODROT P2P & ДПС РАДАР
+    // AUTODROT P2P & ДПС РАДАР & САРАИ
     // ----------------------------------------------------
     renderAutodrotApp(container) {
         let sub = this.autodrotSubTab || 'market';
@@ -1426,138 +1265,97 @@ const PhoneManager = {
         this.renderAutodrotSubScreen();
     },
 
-    // ----------------------------------------------------
-    // ВО-БАНК ОНЛАЙН
-    // ----------------------------------------------------
-    renderBankApp(container) {
-        let cash = state.player?.cash || 0;
-        let safe = state.player?.safeDeposit || 0;
-        let debt = state.player?.loanDebt || 0;
-        let sub = this.bankSubTab || 'accounts';
+    renderBarnApp(container) {
+        const pDay = state.player?.day || 1;
+        const lastDay = state.player?.lastBarnDay || 0;
+        const canScoutToday = lastDay < pDay;
+        const lvl = state.player?.level || 1;
 
-        let depositsListHtml = "";
-        let deposits = state.player?.bankDeposits || [];
-        if (deposits.length === 0) {
-            depositsListHtml = "<div class='sub-label text-center py-2'>У вас нет активных вкладов.</div>";
-        } else {
-            deposits.forEach((dep, dIdx) => {
-                depositsListHtml += `
-                <div class="glass-card p-2 flex-between mb-2">
+        let html = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
+                <div class="phone-app-title"><i class="fa-solid fa-screwdriver-wrench color-amber mr-1"></i> Находки в сараях</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body">
+                <div class="glass-card mb-2 p-2 flex-between">
                     <div>
-                        <b class="text-xs color-green">${dep.name}</b>
-                        <div class="sub-label" style="font-size:9.5px;">Сумма с процентами: <b class="color-green">${dep.amount.toLocaleString()} ₽</b> (+${(dep.dailyRate * 100).toFixed(0)}%/день)</div>
+                        <b class="text-xs color-amber">Разведка заброшек</b>
+                        <div class="sub-label" style="font-size:10px;">Шанс найти ретро-классику и архивные номера!</div>
                     </div>
-                    <button onclick="closeBankDepositAction(${dIdx}); PhoneManager.renderOpenApp();" class="btn btn-green btn-auto btn-sm">Забрать</button>
-                </div>`;
-            });
-        }
+                    <span class="tag-badge bg-tag-amber">1 раз/сутки</span>
+                </div>
+        `;
 
-        let historyHtml = "";
-        let history = state.player?.bankHistory || [];
-        if (history.length === 0) {
-            historyHtml = "<div class='sub-label text-center py-2'>История операций пуста.</div>";
-        } else {
-            history.forEach(tx => {
-                historyHtml += `
-                <div class="p-2 flex-between mb-1" style="background:#090e18; border-radius:6px; border:1px solid rgba(255,255,255,0.04);">
-                    <div>
-                        <div class="text-xs">${tx.title}</div>
-                        <div class="sub-label" style="font-size:8.5px;">${tx.time}</div>
+        (typeof BARN_TIERS_CONFIG !== 'undefined' ? BARN_TIERS_CONFIG : []).forEach(b => {
+            let isLvlLocked = lvl < b.reqLvl;
+            let isDoneToday = !canScoutToday;
+            let rareCar = (typeof BARN_FINDS !== 'undefined' && BARN_FINDS[b.rareIdx]) ? BARN_FINDS[b.rareIdx] : { name: "Раритет" };
+            let imgSrc = b.img || `assets/barns/barn_tier${b.tier}.jpg`;
+            let fallbackSrc = b.fallback || 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80';
+
+            let statusBadge = isLvlLocked 
+                ? `<span class='tag-badge bg-tag-red'><i class='fa-solid fa-lock'></i> С ${b.reqLvl} УР</span>`
+                : (isDoneToday ? "<span class='tag-badge bg-tag-amber'>Осмотрено</span>" : "<span class='tag-badge bg-tag-green'>Доступно</span>");
+
+            let btnDisabled = (isLvlLocked || isDoneToday) ? "disabled" : "";
+            let btnText = isLvlLocked ? `Требуется ${b.reqLvl} уровень` : (isDoneToday ? "Осмотрено (Сброс в 00:00 🌙)" : `Вскрыть ангар (${(b.cost / 1000).toFixed(0)}k ₽)`);
+
+            html += `
+                <div class="glass-card mb-3 p-2 ${b.classGrade}">
+                    <div class="car-img-wrap mb-2" style="height:120px; position:relative;">
+                        <img src="${imgSrc}" class="car-img" onerror="this.onerror=null; this.src='${fallbackSrc}';">
+                        <div class="badge-tag badge-br">${statusBadge}</div>
                     </div>
-                    <b class="text-xs ${tx.isIncome ? 'color-green' : 'color-red'}">${tx.isIncome ? '+' : '-'}${tx.amount.toLocaleString()} ₽</b>
-                </div>`;
-            });
-        }
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan">${b.title}</b>
+                        <span class="price-val text-xs color-amber">${b.cost.toLocaleString()} ₽</span>
+                    </div>
+                    <p class="sub-label mb-2" style="font-size:10px;">${b.desc}</p>
+                    <div class="text-xs mb-1 color-amber">⭐ Редкий дроп (5%): <b>${rareCar.name}</b></div>
+                    <div class="text-xs mb-2 color-purple">🏷️ Архивные номера: <b>15% шанс</b></div>
+                    <button onclick="scoutBarnTier(${b.tier})" class="btn btn-cyan btn-sm w-full" ${btnDisabled}>${btnText}</button>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+    },
+
+    renderRadarApp(container) {
+        let immunity = state.player?.policeImmunityDays || 0;
+        let races = state.player?.consecutiveRaces || 0;
+        let maxRaces = state.player?.maxRacesBeforeRaid || 12;
+
+        let statusText = immunity > 0 
+            ? `<span class="color-green font-bold">Иммунитет (${immunity} дн.)</span>` 
+            : `<span class="color-amber font-bold">Рейды активны</span>`;
 
         container.innerHTML = `
             <div class="phone-app-header">
                 <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-vault color-green mr-1"></i> Во-Банк Онлайн</div>
+                <div class="phone-app-title"><i class="fa-solid fa-tower-broadcast color-red mr-1"></i> ДПС Радар</div>
                 <div style="width:40px;"></div>
             </div>
             <div class="phone-app-body">
-                
-                <div class="grid-4 mb-2">
-                    <button onclick="PhoneManager.switchBankSubTab('accounts')" class="btn ${sub === 'accounts' ? 'btn-green' : 'btn-dark'} btn-sm">Счета</button>
-                    <button onclick="PhoneManager.switchBankSubTab('deposits')" class="btn ${sub === 'deposits' ? 'btn-green' : 'btn-dark'} btn-sm">Вклады</button>
-                    <button onclick="PhoneManager.switchBankSubTab('credit')" class="btn ${sub === 'credit' ? 'btn-green' : 'btn-dark'} btn-sm">Кредит</button>
-                    <button onclick="PhoneManager.switchBankSubTab('history')" class="btn ${sub === 'history' ? 'btn-green' : 'btn-dark'} btn-sm">Выписка</button>
+                <div class="glass-card mb-2 p-2">
+                    <div class="flex-between mb-2">
+                        <b class="text-xs">Статус рейдов:</b>
+                        ${statusText}
+                    </div>
+                    <div class="flex-between text-xs mb-1">
+                        <span class="sub-label">Внимание ДПС на 402м:</span>
+                        <b class="${races > 8 ? 'color-red' : 'color-green'}">${races} / ${maxRaces} заездов</b>
+                    </div>
+                    <div class="biz-progress-track mb-2">
+                        <div class="biz-progress-fill ${races > 8 ? 'risk-high' : 'fill-biz-stock'}" style="width:${Math.min(100, (races / maxRaces) * 100)}%;"></div>
+                    </div>
+                    <p class="sub-label mb-2" style="font-size:10px;">При превышении лимита экипаж ДПС устраивает облаву и конфискует корч на штрафстоянку!</p>
+                    <button onclick="PhoneManager.openApp('reshala')" class="btn btn-purple btn-sm w-full">Купить крышу у Решалы</button>
                 </div>
-
-                ${sub === 'accounts' ? `
-                    <div class="glass-card mb-2 p-2">
-                        <div class="flex-between mb-1">
-                            <span class="sub-label text-xs">Текущий счет перекупа:</span>
-                            <span class="tag-badge bg-tag-green">Основной</span>
-                        </div>
-                        <div class="price-val color-green mb-2">${cash.toLocaleString()} ₽</div>
-                        
-                        <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
-                            <div class="flex-between">
-                                <div>
-                                    <div class="text-xs font-bold color-amber"><i class="fa-solid fa-lock"></i> Неприкосновенный Сейф</div>
-                                    <div class="sub-label" style="font-size:9px;">Начисление +3% в полночь | Защита от рэкета</div>
-                                </div>
-                                <b class="color-amber text-xs">${safe.toLocaleString()} ₽</b>
-                            </div>
-                        </div>
-
-                        <div class="grid-2 mb-2">
-                            <button onclick="depositToSafeAction(50000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">+50k в сейф</button>
-                            <button onclick="depositToSafeAction(200000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">+200k в сейф</button>
-                        </div>
-                        <button onclick="withdrawFromSafeAction(); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm w-full">Забрать всё из сейфа</button>
-                    </div>
-                ` : ''}
-
-                ${sub === 'deposits' ? `
-                    <div class="glass-card mb-2 p-2">
-                        <b class="text-xs color-green mb-1 block">📈 Срочные депозиты с повышенной ставкой:</b>
-                        <div class="grid-2 mb-2">
-                            <button onclick="openBankDepositAction(100000, 7, 0.025); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">100k под 2.5%/д</button>
-                            <button onclick="openBankDepositAction(500000, 14, 0.035); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm">500k под 3.5%/д</button>
-                        </div>
-                        <div class="text-xs font-bold mb-1">Активные депозиты:</div>
-                        ${depositsListHtml}
-                    </div>
-                ` : ''}
-
-                ${sub === 'credit' ? `
-                    <div class="glass-card mb-2 p-2">
-                        <div class="flex-between mb-1">
-                            <b class="text-xs color-red"><i class="fa-solid fa-handholding-dollar"></i> Кредитная линия перекупа</b>
-                            <span class="sub-label text-xs">Долг: <b class="color-amber">${debt.toLocaleString()} ₽</b></span>
-                        </div>
-                        <div class="grid-2 mb-2">
-                            <button onclick="takeLoan(100000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">Взять 100k</button>
-                            <button onclick="takeLoan(500000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">Взять 500k</button>
-                        </div>
-                        <div class="grid-3">
-                            <button onclick="repayLoan(25); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">25%</button>
-                            <button onclick="repayLoan(50); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">50%</button>
-                            <button onclick="repayLoan(100); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm">Всё</button>
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${sub === 'history' ? `
-                    <div class="glass-card mb-2 p-2">
-                        <b class="text-xs color-cyan mb-2 block">📋 Последние транзакции по счетам:</b>
-                        <div class="space-y-1" style="max-height: 220px; overflow-y: auto;">
-                            ${historyHtml}
-                        </div>
-                    </div>
-                ` : ''}
-
             </div>
         `;
-    },
-
-    switchBankSubTab(tab) {
-        playSound('tick');
-        tgHaptic('light');
-        this.bankSubTab = tab;
-        this.renderOpenApp();
     }
 };
 
