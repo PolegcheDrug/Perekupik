@@ -1,11 +1,12 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.4.7)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.4.9)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Интерактивные неоновые жетоны наград, реальное время (00:00),
-// комбинированная экономика (₽ + ⭐), квесты и стабильный запуск
+// комбинированная экономика (₽ + ⭐), кастомизация цвета HUD,
+// анимированные никнеймы и аватарки, квесты и стабильный запуск
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.4.7";
+const CURRENT_GAME_VERSION = "v0.4.9";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -44,14 +45,28 @@ function playSound(type) {
         initAudio();
         if (!audioCtx) return;
         const now = audioCtx.currentTime;
+        const soundProfile = state.player?.soundProfile || 'cyber';
+
+        if (soundProfile === 'silent') return;
+
         if (type === 'tick') {
             const osc = audioCtx.createOscillator();
             const g = audioCtx.createGain();
             osc.connect(g); g.connect(audioCtx.destination);
-            osc.frequency.setValueAtTime(800, now);
-            g.gain.setValueAtTime(0.05, now);
-            g.gain.linearRampToValueAtTime(0, now + 0.03);
-            osc.start(now); osc.stop(now + 0.03);
+
+            if (soundProfile === 'relay') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(320, now);
+                g.gain.setValueAtTime(0.04, now);
+                g.gain.linearRampToValueAtTime(0, now + 0.015);
+                osc.start(now); osc.stop(now + 0.015);
+            } else {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                g.gain.setValueAtTime(0.05, now);
+                g.gain.linearRampToValueAtTime(0, now + 0.03);
+                osc.start(now); osc.stop(now + 0.03);
+            }
         } else if (type === 'win') {
             const osc = audioCtx.createOscillator();
             const g = audioCtx.createGain();
@@ -326,6 +341,16 @@ const DEFAULT_STATE = {
         housingId: 'trailer', // Стартуем в бытовке у обочины
         housingType: 'rent', 
         ownedHouses: [], 
+        
+        // Кастомизация интерфейса
+        hudColorId: 'cyan', // id из HUD_SOLID_COLORS или произвольный цвет
+        customHexColor: null,
+        nickEffect: 'none', // id из NICKNAME_EFFECTS_CATALOG
+        avatarEffect: 'none', // id из AVATAR_EFFECTS_CATALOG
+        ownedNickEffects: ['none'],
+        ownedAvatarEffects: ['none'],
+        soundProfile: 'cyber', // 'cyber' | 'relay' | 'silent'
+
         selectedStreetCarIndex: 0,
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
         hasRacingLicense: false, consecutiveRaces: 0, maxRacesBeforeRaid: 12,
@@ -360,6 +385,331 @@ function t(key) {
 window.t = t;
 
 // ========================================================
+// ДИНАМИЧЕСКОЕ ПРИМЕНЕНИЕ ЦВЕТОВ HUD, АНИМАЦИЙ НИКА И АВАТАРКИ
+// ========================================================
+function applyHudCustomization() {
+    const root = document.documentElement;
+    const curColorId = state.player?.hudColorId || 'cyan';
+    const customHex = state.player?.customHexColor;
+
+    let targetHex = "#00f2fe";
+    let targetGlow = "rgba(0, 242, 254, 0.45)";
+
+    if (customHex) {
+        targetHex = customHex;
+        targetGlow = hexToRgba(customHex, 0.45);
+    } else if (typeof HUD_SOLID_COLORS !== 'undefined') {
+        const found = HUD_SOLID_COLORS.find(c => c.id === curColorId) || HUD_SOLID_COLORS[0];
+        targetHex = found.hex;
+        targetGlow = found.glow;
+    }
+
+    root.style.setProperty('--cyan', targetHex);
+    root.style.setProperty('--cyan-glow', targetGlow);
+    root.style.setProperty('--border-glow', hexToRgba(targetHex, 0.35));
+
+    // Применение анимации ника
+    const nameEl = document.getElementById('playerName');
+    const nickFxId = state.player?.nickEffect || 'none';
+    if (nameEl && typeof NICKNAME_EFFECTS_CATALOG !== 'undefined') {
+        NICKNAME_EFFECTS_CATALOG.forEach(fx => {
+            if (fx.className) nameEl.classList.remove(fx.className);
+        });
+        const activeFx = NICKNAME_EFFECTS_CATALOG.find(fx => fx.id === nickFxId);
+        if (activeFx && activeFx.className) {
+            nameEl.classList.add(activeFx.className);
+        }
+    }
+
+    // Применение анимации аватарки
+    const ringEl = document.querySelector('.avatar-ring');
+    const avatarFxId = state.player?.avatarEffect || 'none';
+    if (ringEl && typeof AVATAR_EFFECTS_CATALOG !== 'undefined') {
+        AVATAR_EFFECTS_CATALOG.forEach(fx => {
+            if (fx.className) ringEl.classList.remove(fx.className);
+        });
+        const activeFx = AVATAR_EFFECTS_CATALOG.find(fx => fx.id === avatarFxId);
+        if (activeFx && activeFx.className) {
+            ringEl.classList.add(activeFx.className);
+        }
+    }
+}
+
+function hexToRgba(hex, alpha = 0.5) {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    const num = parseInt(c, 16);
+    return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+}
+
+// ========================================================
+// МОДАЛЬНОЕ ОКНО КАСТОМИЗАЦИИ HUD (ЦВЕТА, НИК, АВАТАРКА)
+// ========================================================
+let activeCustomizerTab = 'colors';
+
+function openHudCustomizerModal() {
+    let modal = document.getElementById('modalHudCustomizer');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalHudCustomizer';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    renderHudCustomizerContent();
+    modal.classList.add('active');
+    playSound('tick');
+}
+
+function switchCustomizerTab(tab) {
+    activeCustomizerTab = tab;
+    renderHudCustomizerContent();
+    playSound('tick');
+}
+
+function renderHudCustomizerContent() {
+    const modal = document.getElementById('modalHudCustomizer');
+    if (!modal) return;
+
+    const curColorId = state.player?.hudColorId || 'cyan';
+    const curNickFx = state.player?.nickEffect || 'none';
+    const curAvatarFx = state.player?.avatarEffect || 'none';
+    const ownedNicks = state.player?.ownedNickEffects || ['none'];
+    const ownedAvatars = state.player?.ownedAvatarEffects || ['none'];
+    const sProfile = state.player?.soundProfile || 'cyber';
+
+    let bodyHtml = "";
+
+    // 1. ВКЛАДКА: ЦВЕТ ПОДСВЕТКИ
+    if (activeCustomizerTab === 'colors') {
+        let colorsGrid = "";
+        (typeof HUD_SOLID_COLORS !== 'undefined' ? HUD_SOLID_COLORS : []).forEach(c => {
+            const isSel = curColorId === c.id && !state.player?.customHexColor;
+            colorsGrid += `
+                <div class="color-palette-tile ${isSel ? 'selected' : ''}" onclick="setHudSolidColor('${c.id}')" style="--tile-color:${c.hex};">
+                    <div class="color-palette-swatch" style="background:${c.hex}; box-shadow:0 0 10px ${c.glow};"></div>
+                    <span class="color-palette-name">${c.name}</span>
+                    ${isSel ? '<i class="fa-solid fa-check color-check"></i>' : ''}
+                </div>
+            `;
+        });
+
+        bodyHtml = `
+            <div class="sub-label mb-2" style="font-size:10px;">Выберите чистый неоновый цвет контуров, рамок и индикаторов:</div>
+            <div class="hud-colors-palette-grid mb-3">
+                ${colorsGrid}
+            </div>
+            <div class="glass-card p-2 flex-between mb-2">
+                <div>
+                    <b class="text-xs color-cyan"><i class="fa-solid fa-eye-dropper"></i> Свой оттенок (Color Picker)</b>
+                    <div class="sub-label" style="font-size:9px;">Установите любой желаемый цвет из палитры</div>
+                </div>
+                <input type="color" id="customColorPickerInput" value="${state.player?.customHexColor || '#00f2fe'}" onchange="setHudCustomHexColor(this.value)" style="width:36px; height:32px; border:none; background:transparent; cursor:pointer;">
+            </div>
+        `;
+    }
+
+    // 2. ВКЛАДКА: АНИМАЦИИ НИКНЕЙМА
+    else if (activeCustomizerTab === 'nick') {
+        let listHtml = "";
+        (typeof NICKNAME_EFFECTS_CATALOG !== 'undefined' ? NICKNAME_EFFECTS_CATALOG : []).forEach(fx => {
+            const isOwned = ownedNicks.includes(fx.id);
+            const isCur = curNickFx === fx.id;
+
+            let actionBtn = "";
+            if (isCur) {
+                actionBtn = `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Надето ✓</button>`;
+            } else if (isOwned) {
+                actionBtn = `<button onclick="setNickEffectAction('${fx.id}')" class="btn btn-cyan btn-sm btn-auto">Выбрать</button>`;
+            } else {
+                let starsTxt = fx.reqStars ? ` + ${fx.reqStars} ⭐` : "";
+                actionBtn = `<button onclick="buyNickEffectAction('${fx.id}', ${fx.cost}, ${fx.reqStars})" class="btn btn-green btn-sm btn-auto">${fx.cost.toLocaleString()} ₽${starsTxt}</button>`;
+            }
+
+            listHtml += `
+                <div class="glass-card p-2 flex-between mb-2 ${isCur ? 'personal-car-card' : ''}">
+                    <div style="flex:1; margin-right:8px;">
+                        <div class="flex-gap" style="align-items:center;">
+                            <span class="text-xs font-bold ${fx.className}" style="font-size:12px;">${fx.name}</span>
+                            ${isCur ? '<span class="tag-badge bg-tag-green" style="font-size:7.5px;">АКТИВНО</span>' : ''}
+                        </div>
+                        <div class="sub-label" style="font-size:9.5px;">${fx.desc}</div>
+                    </div>
+                    ${actionBtn}
+                </div>
+            `;
+        });
+        bodyHtml = `<div class="sub-label mb-2" style="font-size:10px;">Анимированные световые эффекты для имени перекупа:</div><div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto;">${listHtml}</div>`;
+    }
+
+    // 3. ВКЛАДКА: АНИМАЦИИ АВАТАРКИ
+    else if (activeCustomizerTab === 'avatar') {
+        let listHtml = "";
+        (typeof AVATAR_EFFECTS_CATALOG !== 'undefined' ? AVATAR_EFFECTS_CATALOG : []).forEach(fx => {
+            const isOwned = ownedAvatars.includes(fx.id);
+            const isCur = curAvatarFx === fx.id;
+
+            let actionBtn = "";
+            if (isCur) {
+                actionBtn = `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Надето ✓</button>`;
+            } else if (isOwned) {
+                actionBtn = `<button onclick="setAvatarEffectAction('${fx.id}')" class="btn btn-cyan btn-sm btn-auto">Выбрать</button>`;
+            } else {
+                let starsTxt = fx.reqStars ? ` + ${fx.reqStars} ⭐` : "";
+                actionBtn = `<button onclick="buyAvatarEffectAction('${fx.id}', ${fx.cost}, ${fx.reqStars})" class="btn btn-green btn-sm btn-auto">${fx.cost.toLocaleString()} ₽${starsTxt}</button>`;
+            }
+
+            listHtml += `
+                <div class="glass-card p-2 flex-between mb-2 ${isCur ? 'personal-car-card' : ''}">
+                    <div style="flex:1; margin-right:8px;">
+                        <div class="flex-gap" style="align-items:center;">
+                            <b class="text-xs color-cyan">${fx.name}</b>
+                            ${isCur ? '<span class="tag-badge bg-tag-green" style="font-size:7.5px;">АКТИВНО</span>' : ''}
+                        </div>
+                        <div class="sub-label" style="font-size:9.5px;">${fx.desc}</div>
+                    </div>
+                    ${actionBtn}
+                </div>
+            `;
+        });
+        bodyHtml = `<div class="sub-label mb-2" style="font-size:10px;">Анимированные ауры и рамки вокруг вашего аватара:</div><div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto;">${listHtml}</div>`;
+    }
+
+    modal.innerHTML = `
+        <div class="modal-box" style="max-width:430px;">
+            <div class="flex-between mb-2">
+                <div class="modal-glow-badge"><i class="fa-solid fa-wand-magic-sparkles"></i> КАСТОМИЗАЦИЯ ИНТЕРФЕЙСА</div>
+                <button onclick="closeModal('modalHudCustomizer')" class="btn btn-dark btn-auto btn-sm">✕</button>
+            </div>
+
+            <!-- ВКЛАДКИ -->
+            <div class="grid-3 mb-2">
+                <button onclick="switchCustomizerTab('colors')" class="btn ${activeCustomizerTab === 'colors' ? 'btn-cyan' : 'btn-dark'} btn-sm">🎨 Цвет</button>
+                <button onclick="switchCustomizerTab('nick')" class="btn ${activeCustomizerTab === 'nick' ? 'btn-cyan' : 'btn-dark'} btn-sm">✨ Ник</button>
+                <button onclick="switchCustomizerTab('avatar')" class="btn ${activeCustomizerTab === 'avatar' ? 'btn-cyan' : 'btn-dark'} btn-sm">👤 Аватар</button>
+            </div>
+
+            ${bodyHtml}
+
+            <!-- ЗВУКОВОЙ ПРОФИЛЬ -->
+            <div class="p-2 mb-2 flex-between" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
+                <div>
+                    <b class="text-xs color-amber"><i class="fa-solid fa-volume-high"></i> Звуки интерфейса</b>
+                    <div class="sub-label" style="font-size:9px;">Отклик кнопок</div>
+                </div>
+                <div class="flex-gap">
+                    <button onclick="setSoundProfileAction('cyber')" class="btn ${sProfile === 'cyber' ? 'btn-cyan' : 'btn-dark'} btn-sm btn-auto" style="padding:4px 8px; font-size:9px;">Кибер</button>
+                    <button onclick="setSoundProfileAction('relay')" class="btn ${sProfile === 'relay' ? 'btn-cyan' : 'btn-dark'} btn-sm btn-auto" style="padding:4px 8px; font-size:9px;">Реле</button>
+                    <button onclick="setSoundProfileAction('silent')" class="btn ${sProfile === 'silent' ? 'btn-cyan' : 'btn-dark'} btn-sm btn-auto" style="padding:4px 8px; font-size:9px;">Без звука</button>
+                </div>
+            </div>
+
+            <button onclick="closeModal('modalHudCustomizer')" class="btn btn-cyan w-full">Применить и закрыть ✓</button>
+        </div>
+    `;
+}
+
+function setHudSolidColor(colorId) {
+    state.player.hudColorId = colorId;
+    state.player.customHexColor = null;
+    saveState();
+    applyHudCustomization();
+    renderHudCustomizerContent();
+    playSound('tick');
+    tgHaptic('light');
+    showToast("Цвет подсветки применён!");
+}
+
+function setHudCustomHexColor(hexValue) {
+    state.player.customHexColor = hexValue;
+    saveState();
+    applyHudCustomization();
+    renderHudCustomizerContent();
+    playSound('tick');
+    tgHaptic('light');
+    showToast(`Установлен оттенок ${hexValue}!`);
+}
+
+function buyNickEffectAction(fxId, cost, reqStars = 0) {
+    let cash = state.player?.cash || 0;
+    let stars = state.player?.stars || 0;
+
+    if (cash < cost) return showToast("Не хватает рублей на покупку эффекта ника!");
+    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+
+    state.player.cash -= cost;
+    state.player.stars -= reqStars;
+
+    if (!state.player.ownedNickEffects) state.player.ownedNickEffects = ['none'];
+    if (!state.player.ownedNickEffects.includes(fxId)) {
+        state.player.ownedNickEffects.push(fxId);
+    }
+    state.player.nickEffect = fxId;
+
+    saveState();
+    updateHeaderUI();
+    applyHudCustomization();
+    renderHudCustomizerContent();
+    playSound('win');
+    tgHaptic('success');
+    showToast("Эффект никнейма приобретен и активирован!");
+}
+
+function setNickEffectAction(fxId) {
+    state.player.nickEffect = fxId;
+    saveState();
+    applyHudCustomization();
+    renderHudCustomizerContent();
+    playSound('tick');
+    tgHaptic('light');
+    showToast("Эффект ника установлен!");
+}
+
+function buyAvatarEffectAction(fxId, cost, reqStars = 0) {
+    let cash = state.player?.cash || 0;
+    let stars = state.player?.stars || 0;
+
+    if (cash < cost) return showToast("Не хватает рублей на покупку ауры аватарки!");
+    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+
+    state.player.cash -= cost;
+    state.player.stars -= reqStars;
+
+    if (!state.player.ownedAvatarEffects) state.player.ownedAvatarEffects = ['none'];
+    if (!state.player.ownedAvatarEffects.includes(fxId)) {
+        state.player.ownedAvatarEffects.push(fxId);
+    }
+    state.player.avatarEffect = fxId;
+
+    saveState();
+    updateHeaderUI();
+    applyHudCustomization();
+    renderHudCustomizerContent();
+    playSound('win');
+    tgHaptic('success');
+    showToast("Аура аватарки приобретена и активирована!");
+}
+
+function setAvatarEffectAction(fxId) {
+    state.player.avatarEffect = fxId;
+    saveState();
+    applyHudCustomization();
+    renderHudCustomizerContent();
+    playSound('tick');
+    tgHaptic('light');
+    showToast("Эффект аватарки установлен!");
+}
+
+function setSoundProfileAction(profile) {
+    state.player.soundProfile = profile;
+    saveState();
+    renderHudCustomizerContent();
+    playSound('tick');
+    tgHaptic('light');
+    showToast("Звуковой профиль обновлен!");
+}
+
+// ========================================================
 // 3. МУЛЬТИЯЗЫЧНОСТЬ (I18N)
 // ========================================================
 function toggleGameLanguage() {
@@ -386,7 +736,11 @@ function applyLanguageToDOM() {
     });
 
     const btnToggle = document.getElementById('btnLangToggle');
-    if (btnToggle) btnToggle.innerText = lang === 'ru' ? "🌐 RU" : "🌐 EN";
+    if (btnToggle) {
+        btnToggle.innerHTML = lang === 'ru' 
+            ? `<i class="fa-solid fa-globe"></i> <span>RU</span>` 
+            : `<i class="fa-solid fa-globe"></i> <span>EN</span>`;
+    }
 
     const btnRu = document.getElementById('btnLangRu');
     const btnEn = document.getElementById('btnLangEn');
@@ -490,12 +844,10 @@ function getExpressTicketUpgradeCost() {
 function getTotalGarageSlots() {
     let slots = state.player?.baseSlots || 2;
     if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
-        // Добавляем слоты текущего активного жилья
         if (state.player?.housingId) {
             const house = HOUSING_LIST.find(h => h.id === state.player.housingId);
             if (house) slots += (house.slots || 0);
         }
-        // Добавляем слоты всех остальных купленных объектов
         if (state.player?.ownedHouses && Array.isArray(state.player.ownedHouses)) {
             state.player.ownedHouses.forEach(hId => {
                 if (hId !== state.player.housingId) {
@@ -736,6 +1088,15 @@ function sanitizeState() {
     if (typeof state.player.superSpinTickets !== 'number') state.player.superSpinTickets = 1;
     if (typeof state.player.lastFreeSuperSpinDay !== 'number') state.player.lastFreeSuperSpinDay = 0;
     if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
+    
+    // Санитария кастомизации
+    if (!state.player.hudColorId) state.player.hudColorId = 'cyan';
+    if (!state.player.nickEffect) state.player.nickEffect = 'none';
+    if (!state.player.avatarEffect) state.player.avatarEffect = 'none';
+    if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
+    if (!Array.isArray(state.player.ownedAvatarEffects)) state.player.ownedAvatarEffects = ['none'];
+    if (!state.player.soundProfile) state.player.soundProfile = 'cyber';
+
     if (!Array.isArray(state.player.furniture)) state.player.furniture = [];
     if (!Array.isArray(state.player.phoneMessages)) state.player.phoneMessages = [];
     if (!Array.isArray(state.player.bankHistory)) state.player.bankHistory = [];
@@ -1055,7 +1416,7 @@ function executeDayCycleMidnight(currentDateObj) {
 }
 
 // ========================================================
-// 9. UI И РЕСУРСЫ
+// 9. UI И РЕСУРСЫ (С КАПСУЛЬНЫМ ОФОРМЛЕНИЕМ)
 // ========================================================
 function updateHeaderUI() {
     let cash = state.player?.cash || 0;
@@ -1120,6 +1481,9 @@ function updateHeaderUI() {
     const slotCost = getGarageSlotCost();
     const btnSlot = document.getElementById('btnBuyGarageSlot');
     if (btnSlot) btnSlot.innerText = "+1 Бокс (" + (slotCost / 1000).toFixed(0) + "k ₽)";
+
+    // Применение выбранных кастомных цветов и анимаций
+    applyHudCustomization();
 
     updateRaceHeatBadge();
     if (typeof PhoneManager !== 'undefined') PhoneManager.updateUnreadBadge();
@@ -1450,7 +1814,7 @@ function renderShopHomeItems() {
     let html = "";
     HOUSING_INTERIOR_CATALOG.forEach(item => {
         let isBought = state.player.furniture.includes(item.id);
-        let starsTxt = item.reqStars ? ` + ${item.reqStars} ⭐` : "";
+        let starsTxt = item.reqStars ? ` + ${reqStars} ⭐` : "";
         let btnContent = isBought 
             ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Куплено ✓</button>"
             : `<button onclick="buyHomeFurnitureShop('${item.id}', ${item.cost}, ${item.reqStars || 0})" class="btn btn-green btn-sm btn-auto">${(item.cost / 1000).toFixed(0)}k ₽${starsTxt}</button>`;
@@ -1540,7 +1904,6 @@ function switchTab(tabId) {
         if (tabId === 'tabLife') {
             if (typeof renderDiets === 'function') renderDiets();
             if (typeof renderLifeChat === 'function') renderLifeChat();
-            if (typeof renderHousing === 'function') renderHousing();
         }
         if (tabId === 'tabProfile') renderProfileAnalytics();
     } catch(err) {
@@ -1611,6 +1974,7 @@ function initApp() {
         updateHeaderUI();
         updateLevelGatesUI();
         applyLanguageToDOM();
+        applyHudCustomization();
         checkRealTimeDayChange();
         
         if (!state.marketFeed || state.marketFeed.length === 0 || !state.marketFeed.some(c => c && !c.unavailable)) {
@@ -1626,7 +1990,6 @@ function initApp() {
         if (typeof renderGarage === 'function') renderGarage();
         if (typeof renderSalesLot === 'function') renderSalesLot();
         if (typeof renderDiets === 'function') renderDiets();
-        if (typeof renderHousing === 'function') renderHousing();
         if (typeof renderContracts === 'function') renderContracts();
         if (typeof renderMarketFeed === 'function') renderMarketFeed();
         
@@ -1761,6 +2124,17 @@ window.openDailyBonusModal = openDailyBonusModal;
 window.claimDailyReward = claimDailyReward;
 window.toggleGameLanguage = toggleGameLanguage;
 window.setGameLanguage = setGameLanguage;
+window.applyHudCustomization = applyHudCustomization;
+window.openHudCustomizerModal = openHudCustomizerModal;
+window.switchCustomizerTab = switchCustomizerTab;
+window.renderHudCustomizerContent = renderHudCustomizerContent;
+window.setHudSolidColor = setHudSolidColor;
+window.setHudCustomHexColor = setHudCustomHexColor;
+window.buyNickEffectAction = buyNickEffectAction;
+window.setNickEffectAction = setNickEffectAction;
+window.buyAvatarEffectAction = buyAvatarEffectAction;
+window.setAvatarEffectAction = setAvatarEffectAction;
+window.setSoundProfileAction = setSoundProfileAction;
 window.trackQuestProgress = trackQuestProgress;
 window.refreshDailyQuestsList = refreshDailyQuestsList;
 window.checkSyndicateAccessDetails = checkSyndicateAccessDetails;

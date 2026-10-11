@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v0.4.7</title>
-    <link rel="stylesheet" href="style.css?v=171">
+    <title>Симулятор Перекупа v0.4.9</title>
+    <link rel="stylesheet" href="style.css?v=180">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -15,11 +15,15 @@
   <body class="notranslate" translate="no">
     <div class="app-shell">
       
-      <!-- ЕДИНЫЙ ИГРОВОЙ HUD -->
+      <!-- КАПСУЛЬНЫЙ НЕОНОВЫЙ HUD С ПОДДЕРЖКОЙ КАСТОМИЗАЦИИ -->
       <header class="hud-header">
-        <div class="hud-top-row">
+        <div class="hud-card hud-top-row">
+          
+          <!-- Левая зона: Аватар и капсула никнейма с опытом -->
           <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль">
             <div class="avatar-ring">
+              <div class="avatar-glow"></div>
+              <div class="avatar-fx-glow"></div>
               <div class="avatar" id="playerAvatarBox">
                 <i class="fa-solid fa-user-ninja" id="defaultAvatarIcon"></i>
                 <img id="playerTgPhoto" src="" style="display:none;" onerror="this.style.display='none'; document.getElementById('defaultAvatarIcon').style.display='block';">
@@ -28,47 +32,92 @@
             </div>
             
             <div class="user-details">
-              <div class="user-name-row">
-                <span id="playerName">Перекуп #777</span>
-                <span class="lvl-badge" id="playerLvl">Ур. 1</span>
+              <!-- Капсула никнейма и уровня -->
+              <div class="player-capsule-box">
+                <div class="user-name-row">
+                  <span id="playerName" class="player-name-text">Перекуп #777</span>
+                  <span class="lvl-badge" id="playerLvl">Ур. 1</span>
+                </div>
+                <div class="xp-bar-wrap" title="Прогресс опыта">
+                  <div class="xp-bar-fill" id="xpBar">
+                    <div class="xp-bar-shimmer"></div>
+                  </div>
+                </div>
               </div>
-              <div class="xp-bar-wrap"><div class="xp-bar-fill" id="xpBar"></div></div>
+
+              <!-- Мини-виджеты связей, кармы и гаража -->
               <div class="user-stats-row">
-                <div class="stat-pill"><i class="fa-solid fa-handshake color-purple"></i> <span id="connectionsText">1</span></div>
-                <div class="stat-pill"><i class="fa-solid fa-face-smile color-amber"></i> <span id="karmaText">50</span></div>
-                <div class="stat-pill"><i class="fa-solid fa-warehouse color-cyan"></i> <span id="garageHeaderSlots">0/2</span></div>
+                <div class="stat-pill stat-pill-conn" title="Теневые связи">
+                  <i class="fa-solid fa-handshake"></i> <span id="connectionsText">1</span>
+                </div>
+                <div class="stat-pill stat-pill-karma" title="Карма">
+                  <i class="fa-solid fa-face-smile"></i> <span id="karmaText">50</span>
+                </div>
+                <div class="stat-pill stat-pill-garage" title="Вместимость автопарка" onclick="event.stopPropagation(); switchTab('tabGarage');">
+                  <i class="fa-solid fa-warehouse"></i> <span id="garageHeaderSlots">0/2</span>
+                </div>
               </div>
             </div>
           </div>
 
+          <!-- Правая зона: Капсула кошелька и ресурсы -->
           <div class="wallet-dashboard">
-            <div class="wallet-main">
-              <div class="cash-val"><span id="cashAmount">150,000</span> ₽</div>
-              <div class="stars-val"><span id="starsAmount">15</span> ⭐</div>
+            <!-- Капсула баланса (Рубли + Звёзды) -->
+            <div class="wallet-capsule-box" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Открыть Во-Банк">
+              <div class="cash-val">
+                <span id="cashAmount">150,000</span> <span class="currency-sign">₽</span>
+              </div>
+              <div class="stars-val">
+                <span id="starsAmount">15</span> <i class="fa-solid fa-star star-icon-animated"></i>
+              </div>
             </div>
+
+            <!-- Ресурсные плашки (Бак + Талоны) -->
             <div class="wallet-sub">
-              <div class="resource-pill fuel-pill"><i class="fa-solid fa-gas-pump"></i> <span id="fuelAmount">100</span>/100</div>
-              <div class="resource-pill ticket-pill"><i class="fa-solid fa-ticket"></i> <span id="ticketsAmount">25/25</span></div>
+              <button type="button" class="resource-pill fuel-pill" onclick="refuelAction('cash')" title="Заправить бак">
+                <i class="fa-solid fa-gas-pump"></i> <span id="fuelAmount">100</span><span class="res-max">/100</span>
+              </button>
+              <button type="button" class="resource-pill ticket-pill" onclick="upgradeExpressCapacity()" title="Экспресс-талоны">
+                <i class="fa-solid fa-ticket"></i> <span id="ticketsAmount">25/25</span>
+              </button>
             </div>
           </div>
         </div>
 
-        <div class="hud-bottom-row">
+        <!-- Нижний ряд: Состояние потребностей и кнопки быстрых действий -->
+        <div class="hud-card hud-bottom-row">
           <div class="needs-container">
-            <div class="need-track">
-              <i class="fa-solid fa-drumstick-bite color-amber need-icon"></i>
-              <div class="rp-bar-bg"><div id="hungerFill" class="rp-bar-fill fill-hunger" style="width: 80%;"></div></div>
+            <div class="need-track" onclick="switchTab('tabLife')" title="Сытость (Нажмите, чтобы перекусить)">
+              <div class="need-icon-wrap hunger-wrap">
+                <i class="fa-solid fa-drumstick-bite"></i>
+              </div>
+              <div class="rp-bar-bg">
+                <div id="hungerFill" class="rp-bar-fill fill-hunger" style="width: 80%;"></div>
+              </div>
               <span id="hungerText" class="need-text">80%</span>
             </div>
-            <div class="need-track">
-              <i class="fa-solid fa-masks-theater color-cyan need-icon"></i>
-              <div class="rp-bar-bg"><div id="moodFill" class="rp-bar-fill fill-mood" style="width: 85%;"></div></div>
+            
+            <div class="need-track" onclick="switchTab('tabLife')" title="Настроение и кураж">
+              <div class="need-icon-wrap mood-wrap">
+                <i class="fa-solid fa-masks-theater"></i>
+              </div>
+              <div class="rp-bar-bg">
+                <div id="moodFill" class="rp-bar-fill fill-mood" style="width: 85%;"></div>
+              </div>
               <span id="moodText" class="need-text">85%</span>
             </div>
           </div>
-          <div class="flex-gap" style="align-items:center;">
-            <button onclick="toggleGameLanguage()" class="daily-bonus-btn" style="padding:5px 10px; font-size:10.5px;" id="btnLangToggle">🌐 RU</button>
-            <button onclick="openDailyBonusModal()" class="daily-bonus-btn">🎁 Бонус</button>
+
+          <div class="hud-actions-group">
+            <button onclick="openHudCustomizerModal()" class="hud-btn btn-theme-custom" title="Кастомизация цвета, ника и аватара">
+              <i class="fa-solid fa-palette"></i> <span>Скин</span>
+            </button>
+            <button onclick="toggleGameLanguage()" class="hud-btn btn-lang" id="btnLangToggle" title="Сменить язык">
+              <i class="fa-solid fa-globe"></i> <span>RU</span>
+            </button>
+            <button onclick="openDailyBonusModal()" class="hud-btn btn-bonus" title="Ежедневный подарок">
+              <i class="fa-solid fa-gift bonus-icon-pulse"></i> <span>Бонус</span>
+            </button>
           </div>
         </div>
       </header>
@@ -357,15 +406,16 @@
             <p class="sub-label mb-2" id="profPlayerRank">Статус: Гаражный Делец</p>
             
             <div class="p-2 mb-3 flex-between" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
-              <span class="text-xs font-bold"><i class="fa-solid fa-language color-cyan"></i> Язык игры / Language:</span>
+              <span class="text-xs font-bold"><i class="fa-solid fa-language color-cyan"></i> Скин / Язык:</span>
               <div class="flex-gap">
-                <button onclick="setGameLanguage('ru')" id="btnLangRu" class="btn btn-cyan btn-auto btn-sm">Русский</button>
-                <button onclick="setGameLanguage('en')" id="btnLangEn" class="btn btn-dark btn-auto btn-sm">English</button>
+                <button onclick="openHudCustomizerModal()" class="btn btn-purple btn-auto btn-sm">🎨 Скин HUD</button>
+                <button onclick="setGameLanguage('ru')" id="btnLangRu" class="btn btn-cyan btn-auto btn-sm">RU</button>
+                <button onclick="setGameLanguage('en')" id="btnLangEn" class="btn btn-dark btn-auto btn-sm">EN</button>
               </div>
             </div>
 
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-sparkles"></i> Список изменений v0.4.7 & Патчноут
+              <i class="fa-solid fa-sparkles"></i> Список изменений v0.4.9 & Патчноут
             </button>
             <div class="grid-2 mb-2">
               <div class="stat-box"><div class="sub-label">Плюс:</div><div id="statProfitable" class="stat-value color-green">0</div></div>
@@ -415,7 +465,7 @@
               <div class="flex-gap">
                 <button onclick="adjustResource('level', -1)" class="btn btn-dark btn-sm btn-auto">-1</button>
                 <button onclick="adjustResource('level', 1)" class="btn btn-cyan btn-sm btn-auto">+1</button>
-                <button onclick="adjustResource('level', 10)" class="btn btn-cyan btn-sm btn-auto">+10</button>
+                <button onclick="adjustResource('level', 10)" class="btn btn-cyan btn-auto">+10</button>
               </div>
             </div>
 
@@ -464,22 +514,23 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА -->
+    <div id="modalHudCustomizer" class="modal-overlay"></div>
     <div id="modalNeedGarage" class="modal-overlay"></div>
     <div id="modalImpoundLot" class="modal-overlay"></div>
 
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-code-merge"></i> ОБНОВЛЕНИЕ v0.4.7</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-code-merge"></i> ОБНОВЛЕНИЕ v0.4.9</div>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.7 (Сборка #171)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.9 (Сборка #180)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>🏠 Новая линейка Жилья и Боксов:</b> Недвижимость разделена на уличные стоянки, боксы ГСК с ямой, детейлинг-боксы, квартиры и загородные комплексы.</div>
-          <div class="patch-item"><b>🔧 Разделение доработок:</b> Для тюнинга и корчевания требуется смотровая яма, а для полировки и качественного облива — чистый бокс с водой.</div>
-          <div class="patch-item"><b>🎲 Суточные события недвижимости:</b> Затопление ямы грунтовыми водами, претензии соседей по шуму или редкие детали из дедовских запасов.</div>
-          <div class="patch-item"><b>🕵️‍♂️ Скидка у Решалы Артура:</b> Владение подготовленным боксом или ангаром снижает стоимость услуг легализации VIN и снятия 12.5.1.</div>
+          <div class="patch-item"><b>💎 Капсульный редизайн:</b> Никнейм, уровень и баланс упакованы в стильные аккуратные рамки-капсулы с неоновой окантовкой.</div>
+          <div class="patch-item"><b>🎨 Монохромный неоновый цвет:</b> Возможность выбрать чистый цвет подсветки (бирюзовый, лайм, золото, рубин, кобальт) или задать любой произвольный оттенок.</div>
+          <div class="patch-item"><b>✨ Анимации ника и аватарок:</b> Огненная аура, неоновый импульс, золотой блеск Олигарха и кибер-глитч.</div>
+          <div class="patch-item"><b>🏠 Новая система Жилья:</b> Четкое разделение на стоянки, боксы ГСК с ямой, мастерские и элитные апартаменты.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
       </div>
@@ -507,7 +558,6 @@
         <div class="sub-label font-bold mb-2 text-xs">Выберите пункты страхового покрытия:</div>
         
         <div class="space-y-2 mb-3">
-          <!-- 1. ОСАГО -->
           <div class="insurance-option-card selected" id="insCard_osago" onclick="toggleInsuranceOption('osago')">
             <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
             <div style="flex:1;">
@@ -519,7 +569,6 @@
             </div>
           </div>
 
-          <!-- 2. КАСКО УГОН -->
           <div class="insurance-option-card" id="insCard_theft" onclick="toggleInsuranceOption('theft')">
             <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
             <div style="flex:1;">
@@ -531,7 +580,6 @@
             </div>
           </div>
 
-          <!-- 3. КАСКО ТОТАЛ / ДТП -->
           <div class="insurance-option-card" id="insCard_totalLoss" onclick="toggleInsuranceOption('totalLoss')">
             <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
             <div style="flex:1;">
@@ -543,7 +591,6 @@
             </div>
           </div>
 
-          <!-- 4. АВТОПОМОЩЬ НА ДОРОГЕ -->
           <div class="insurance-option-card" id="insCard_roadside" onclick="toggleInsuranceOption('roadside')">
             <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
             <div style="flex:1;">
@@ -911,7 +958,6 @@
         <h3 class="font-bold mb-1" id="verdictTitle">Сделка закрыта</h3>
         <p class="sub-label mb-2" id="verdictText"></p>
         
-        <!-- КОНТЕЙНЕР ДЛЯ 3D-ЖЕТОНОВ НАГРАД -->
         <div id="verdictTokensContainer" class="reward-tokens-wrapper" style="display:none;"></div>
         
         <div class="price-val mb-1" id="verdictAmount">+0 ₽</div>
@@ -1098,12 +1144,12 @@
         function loadModule(name) {
           return new Promise((resolve) => {
             const s1 = document.createElement('script');
-            s1.src = name + '?v=171';
+            s1.src = name + '?v=180';
             s1.onload = () => resolve(true);
             s1.onerror = () => {
               s1.remove();
               const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=171';
+              s2.src = 'js/' + name + '?v=180';
               s2.onload = () => resolve(true);
               s2.onerror = () => {
                 console.warn('[Loader] Не удалось загрузить ' + name);
