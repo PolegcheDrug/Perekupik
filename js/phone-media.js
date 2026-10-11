@@ -1,8 +1,9 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО И ВИЛСПИНЫ PEREKUP OS (v0.5.1)
+// js/phone-media.js — МЕДИА, РАДИО И ВИЛСПИНЫ PEREKUP OS (v0.5.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Live-автомагнитола (17 потоков), VIP Колесо Фортуны,
-// Супер Вилспин с комбинированной оплатой (₽ + ⭐) и лавка обмена
+// Супер Вилспин с комбинированной оплатой (₽ + ⭐) и лавка обмена.
+// Экономика усложнена: инфляция цен на спины и обмен валют.
 // ========================================================
 
 const ELECTRONIC_RADIO_STATIONS = [
@@ -353,7 +354,7 @@ const PhoneMedia = {
                     </div>
 
                     <button id="btnLaunchSuperSpin" onclick="PhoneMedia.spinSuperWheelAction()" class="btn ${canFreeSuperSpin ? 'btn-green' : 'btn-purple'} btn-sm w-full mt-2">
-                        🎰 ${canFreeSuperSpin ? 'КРУТИТЬ БЕСПЛАТНО (Суточный бонус 🎁)' : (tickets > 0 ? 'КРУТИТЬ (1 Билет 🎟️)' : 'КРУТИТЬ (250,000 ₽ + 25 ⭐)')}
+                        🎰 ${canFreeSuperSpin ? 'КРУТИТЬ БЕСПЛАТНО (Суточный бонус 🎁)' : (tickets > 0 ? 'КРУТИТЬ (1 Билет 🎟️)' : 'КРУТИТЬ (300,000 ₽ + 30 ⭐)')}
                     </button>
                 </div>
 
@@ -368,7 +369,7 @@ const PhoneMedia = {
                     </div>
                     <div class="grid-2 mt-1">
                         <button id="btnWheelFree" onclick="spinWheelAction(true)" class="btn btn-green btn-sm">🎁 Бесплатно (00:00)</button>
-                        <button id="btnWheelPaid" onclick="spinWheelAction(false)" class="btn btn-amber btn-sm">⭐ 25 Stars</button>
+                        <button id="btnWheelPaid" onclick="spinWheelAction(false)" class="btn btn-amber btn-sm">⭐ 30 Stars</button>
                     </div>
                 </div>
 
@@ -384,7 +385,7 @@ const PhoneMedia = {
                                 <b class="text-xs color-amber">⭐ Пак 25 Stars за Деньги</b>
                                 <div class="sub-label" style="font-size:9.5px;">Конвертация оборотки в звёзды</div>
                             </div>
-                            <button onclick="PhoneMedia.exchangeForStars('cash', 250000, 25)" class="btn btn-amber btn-sm btn-auto">250,000 ₽</button>
+                            <button onclick="PhoneMedia.exchangeForStars('cash', 350000, 25)" class="btn btn-amber btn-sm btn-auto">350,000 ₽</button>
                         </div>
 
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
@@ -406,10 +407,10 @@ const PhoneMedia = {
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid rgba(0, 230, 118, 0.25);">
                             <div>
                                 <b class="text-xs color-green"><i class="fa-solid fa-ticket"></i> 1х Билет Супер Вилспина</b>
-                                <div class="sub-label" style="font-size:9.5px;">Комбинированная стоимость: <b>250k ₽ + 25 ⭐</b></div>
+                                <div class="sub-label" style="font-size:9.5px;">Комбинированная стоимость: <b>300k ₽ + 30 ⭐</b></div>
                             </div>
                             <button onclick="PhoneMedia.buySuperSpinTicket()" class="btn btn-green btn-sm btn-auto">
-                                Купить (250k ₽ + 25 ⭐)
+                                Купить (300k ₽ + 30 ⭐)
                             </button>
                         </div>
                     </div>
@@ -445,8 +446,8 @@ const PhoneMedia = {
     },
 
     buySuperSpinTicket() {
-        const costCash = 250000;
-        const costStars = 25;
+        const costCash = 300000;
+        const costStars = 30;
 
         let cash = state.player?.cash || 0;
         let stars = state.player?.stars || 0;
@@ -466,7 +467,7 @@ const PhoneMedia = {
         updateHeaderUI();
         playSound('win');
         tgHaptic('success');
-        showToast("Билет «Супер Вилспин» успешно приобретён за 250,000 ₽ + 25 ⭐!");
+        showToast("Билет «Супер Вилспин» успешно приобретён за 300,000 ₽ + 30 ⭐!");
         this.renderFortuneApp(document.getElementById('phoneAppContainer'));
     },
 
@@ -484,11 +485,11 @@ const PhoneMedia = {
             state.player.lastFreeSuperSpinDay = pDay;
         } else if (tickets > 0) {
             state.player.superSpinTickets -= 1;
-        } else if (cash >= 250000 && stars >= 25) {
-            state.player.cash -= 250000;
-            state.player.stars -= 25;
+        } else if (cash >= 300000 && stars >= 30) {
+            state.player.cash -= 300000;
+            state.player.stars -= 30;
         } else {
-            return showToast("Нужен 1 Билет или (250,000 ₽ + 25 ⭐ Stars)!");
+            return showToast("Нужен 1 Билет или (300,000 ₽ + 30 ⭐ Stars)!");
         }
 
         this.isSuperSpinning = true;

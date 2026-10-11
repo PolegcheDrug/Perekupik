@@ -1,8 +1,9 @@
 // ========================================================
-// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, НОМЕРА, ТОП (v0.5.1)
+// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, НОМЕРА, ТОП (v0.5.2)
 // Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
 // Доступ к Синдикату с 7 уровня при наличии эндоскопа, толщиномера,
-// Launch сканера и 5 Stars ⭐. Сбалансированные крупные выплаты.
+// Launch сканера и 5 Stars ⭐.
+// Экономика усложнена: снижены сверхприбыли по контрактам, выросли взносы.
 // ========================================================
 
 let p2pActiveFilter = 'cars';
@@ -58,7 +59,7 @@ const CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 380000,
+        rewardBonus: 250000, // Порезано с 380k
         rewardConn: 1,
         rewardXp: 110
     },
@@ -77,7 +78,7 @@ const CONTRACT_TEMPLATES = [
             noCriminal: false,
             noDefects: false
         },
-        rewardBonus: 240000,
+        rewardBonus: 180000, // Порезано с 240k
         rewardConn: 1,
         rewardXp: 85
     },
@@ -95,7 +96,7 @@ const CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 180000,
+        rewardBonus: 130000, // Порезано с 180k
         rewardConn: 0,
         rewardXp: 70
     },
@@ -113,7 +114,7 @@ const CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 1350000,
+        rewardBonus: 950000, // Порезано с 1.35M
         rewardConn: 3,
         rewardXp: 240
     },
@@ -130,7 +131,7 @@ const CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: false
         },
-        rewardBonus: 320000,
+        rewardBonus: 220000, // Порезано с 320k
         rewardConn: 1,
         rewardXp: 95
     }
@@ -153,16 +154,17 @@ function generateContracts() {
 
 function refreshContractsManual() {
     let cash = state.player?.cash || 0;
-    if (cash < 15000) return showToast("Нужно 15,000 ₽ на обновление базы контрактов!");
+    let cost = 25000; // Инфляция (было 15000)
+    if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ на обновление базы контрактов!`);
 
-    state.player.cash -= 15000;
+    state.player.cash -= cost;
     generateContracts();
     saveState();
     updateHeaderUI();
     renderContracts();
     playSound('tick');
     tgHaptic('success');
-    showToast("База заказов Синдиката обновлена (-15,000 ₽)");
+    showToast(`База заказов Синдиката обновлена (-${cost.toLocaleString()} ₽)`);
 }
 
 function renderContracts() {
@@ -962,9 +964,10 @@ function generateBlackMarketPlates() {
 
 function refreshBlackMarketPlates() {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 25000) return showToast("Нужно 25,000 ₽ за услуги связи с барыгой!");
+    let cost = 35000; // Инфляция
+    if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ за услуги связи с барыгой!`);
     
-    state.player.cash -= 25000;
+    state.player.cash -= cost;
     generateBlackMarketPlates();
     saveState();
     updateHeaderUI();
@@ -1038,11 +1041,12 @@ function renderClubsList() {
         myClubNameEl.innerText = myClub ? myClub.name : "Без автоклуба";
     }
 
+    // Инфляция цен на клубы (v0.5.2)
     const clubsPool = [
-        { id: "club_jdm", name: "JDM Legends Moscow", members: 42, perk: "+10% к оценке японских авто", fee: 100000 },
-        { id: "club_vaz", name: "Боевая Классика Клуб", members: 89, perk: "Бесплатный ремонт подвески на сходках", fee: 40000 },
-        { id: "club_m", name: "Bavarian Power M", members: 31, perk: "+15% к победе в заездах на 402м", fee: 250000 },
-        { id: "club_elite", name: "Синдикат Олигархов", members: 12, perk: "-25% ко всем налогам и проверкам ГИБДД", fee: 1000000 }
+        { id: "club_jdm", name: "JDM Legends Moscow", members: 42, perk: "+10% к оценке японских авто", fee: 150000 },
+        { id: "club_vaz", name: "Боевой Классика Клуб", members: 89, perk: "Бесплатный ремонт подвески на сходках", fee: 75000 },
+        { id: "club_m", name: "Bavarian Power M", members: 31, perk: "+15% к победе в заездах на 402м", fee: 350000 },
+        { id: "club_elite", name: "Синдикат Олигархов", members: 12, perk: "-25% ко всем налогам и проверкам ГИБДД", fee: 1500000 }
     ];
 
     let html = "";
@@ -1092,9 +1096,10 @@ function createClubPrompt() {
     if (!name || !name.trim()) return;
 
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 500000) return showToast("Нужно 500,000 ₽ на регистрацию клуба!");
+    let cost = 750000; // Подорожало с 500k
+    if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ на регистрацию клуба!`);
 
-    state.player.cash -= 500000;
+    state.player.cash -= cost;
     state.player.club = { id: "club_custom_" + Date.now(), name: name.trim() };
     saveState();
     updateHeaderUI();

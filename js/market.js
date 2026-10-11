@@ -1,7 +1,7 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.5.1)
+// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.5.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Сбалансированная перекупская экономика (реальная маржа 30-50%),
+// Сбалансированная перекупская экономика (реальная маржа 20-40%),
 // интерактивная диагностика у капота, отчёт Автотеки и обоснованный торг
 // ========================================================
 
@@ -95,7 +95,7 @@ let pendingMarketCar = null;
 let activePendingDKPDeal = null;
 
 function getDynamicPrice(basePrice, type) {
-    if (!state.marketModifiers) state.marketModifiers = { economy: 1, comfort: 1, premium: 1, all: 1 };
+    if (!state.marketModifiers) state.marketModifiers = { economy: 1, comfort: 1, premium: 1, hyper: 1, moto: 1, truck: 1, all: 1 };
     let mod = 1;
     if (state.marketModifiers && state.marketModifiers[type]) mod = state.marketModifiers[type];
     let globalMod = 1;
@@ -108,7 +108,8 @@ function getDynamicPrice(basePrice, type) {
 function getMarketRefreshCost() {
     let lvl = 1;
     if (state.player && state.player.level) lvl = state.player.level;
-    return 150 + (lvl * 350);
+    // Синхронизировано с удорожанием в app.js
+    return 250 + (lvl * 450);
 }
 
 const CATEGORY_META = {
@@ -138,7 +139,8 @@ function setCategory(cat) {
     
     if (cat === 'moto' && lvl < 5) return showToast("🔒 Мотоциклы доступны с 5 уровня!");
     if (cat === 'atv' && lvl < 8) return showToast("🔒 Квадроциклы доступны с 8 уровня!");
-    if (cat === 'comfort' && lvl < 30) return showToast("🔒 Нужен 30 ур!");
+    // Порог входа для Комфорта снижен с 30 до 20 уровня
+    if (cat === 'comfort' && lvl < 20) return showToast("🔒 Нужен 20 ур!");
     if (cat === 'premium' && lvl < 30) return showToast("🔒 Нужен 30 ур!");
     if (cat === 'hyper' && lvl < 50) return showToast("🔒 Нужен 50 ур!");
     if (cat === 'truck' && lvl < 50) return showToast("🔒 Нужен 50 ур!");
@@ -185,7 +187,7 @@ function refreshMarketFeedManual() {
 }
 
 // ----------------------------------------------------
-// ГЕНЕРАТОР ПРЕДЛОЖЕНИЙ (СБАЛАНСИРОВАННАЯ ЭКОНОМИКА)
+// ГЕНЕРАТОР ПРЕДЛОЖЕНИЙ (ЖЕСТКАЯ ЭКОНОМИКА v0.5.2)
 // ----------------------------------------------------
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
@@ -210,21 +212,21 @@ function populateMarketFeed() {
 
         let dealRoll = Math.random();
         let dealType = 'normal';
-        let priceMultiplier = 0.70;
+        let priceMultiplier = 0.80;
 
-        // ПЕРЕКУПСКАЯ ВИЛКА ЦЕН:
-        // urgent: продавец сливает тачку за 50-65% от рынка
-        // normal: продавец отдает за 65-78% от рынка (отличная точка входа)
-        // overprice: продавец хочет почти полный рынок (90-102%), требуется торг
-        if (dealRoll < 0.28) {
+        // ПЕРЕКУПСКАЯ ВИЛКА ЦЕН (ЖЕСТКАЯ ЭКОНОМИКА v0.5.2):
+        // urgent: продавец сливает тачку за 65-75% от рынка (было 50-65%)
+        // normal: продавец отдает за 78-88% от рынка (было 65-78%)
+        // overprice: продавец хочет почти полный рынок или выше 95-108% (было 90-104%)
+        if (dealRoll < 0.25) { 
             dealType = 'urgent';
-            priceMultiplier = 0.50 + Math.random() * 0.15;
-        } else if (dealRoll < 0.80) {
+            priceMultiplier = 0.65 + Math.random() * 0.10;
+        } else if (dealRoll < 0.75) {
             dealType = 'normal';
-            priceMultiplier = 0.65 + Math.random() * 0.13;
+            priceMultiplier = 0.78 + Math.random() * 0.10;
         } else {
             dealType = 'overprice';
-            priceMultiplier = 0.90 + Math.random() * 0.14;
+            priceMultiplier = 0.95 + Math.random() * 0.13;
         }
 
         let defectChance = 0.35;
@@ -246,6 +248,7 @@ function populateMarketFeed() {
 
         let baseP = template.basePrice ? template.basePrice : 100000;
         let tType = template.type ? template.type : cat;
+        // Учет динамических новостей рынка
         const dynPrice = getDynamicPrice(baseP, tType);
 
         // Реальная рыночная стоимость авто (с запасом для маржи перекупа)
@@ -258,11 +261,11 @@ function populateMarketFeed() {
 
         // Шанс купить машину с дорогими номерами без наценки продавца («дедушка не знает цену»)
         if (plateVal > 5000) {
-            if (Math.random() < 0.35) {
+            if (Math.random() < 0.30) { // Шанс халявных номеров тоже снижен (было 35%)
                 isLuckyFind = true;
                 sellerPrice = carOnlyPrice;
             } else {
-                let plateMarkup = Math.round(plateVal * 0.40);
+                let plateMarkup = Math.round(plateVal * 0.60); // Продавцы теперь просят 60% от цены номеров (было 40%)
                 sellerPrice = carOnlyPrice + plateMarkup;
             }
         }
@@ -339,7 +342,7 @@ function populateMarketFeed() {
             power: cPower,
             type: tType,
             drivetrain: template.drivetrain || 'rwd',
-            basePrice: baseP,
+            basePrice: baseP, // Базовая "идеальная" цена для истории
             mileage: Math.floor(Math.random() * (tType === 'premium' ? 75000 : 160000)) + 20000,
             price: sellerPrice,
             originalAskingPrice: sellerPrice,
@@ -437,7 +440,7 @@ function renderMarketFeed() {
 
         let dealBadge = "";
         if (car.dealType === 'urgent') {
-            dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🔥 СРОЧНО (-35%)</span>";
+            dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🔥 СРОЧНО</span>";
         } else if (car.dealType === 'overprice') {
             dealBadge = "<span class='tag-badge bg-tag-red ml-1'>⚠️ ВЫСОКАЯ ЦЕНА</span>";
         }
@@ -451,7 +454,6 @@ function renderMarketFeed() {
         let carPower = car.power ? car.power : 100;
         let carPlate = car.plate ? car.plate : "ТРАНЗИТ";
 
-        // Расчёт ориентировочной маржи прямо в карточке для удобства игрока
         let estimatedProfit = (car.marketValue || 0) - (car.price || 0);
         let profitBadge = estimatedProfit > 0 
             ? `<div class="sub-label text-right" style="font-size:9.5px; color:var(--green);">Потенциал: <b>+${estimatedProfit.toLocaleString()} ₽</b></div>` 

@@ -1,31 +1,32 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.5.1)
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.5.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Расширенная база автотехники, процедурная генерация,
-// поддержка внешних JSON-паков и обновлённая экономика
+// поддержка внешних JSON-паков и обновлённая экономика.
+// Внедрены "Динамические Тренды Авторынка" (Market News).
 // ========================================================
 
 const GAME_METADATA = {
-    version: "v0.5.1",
-    build: 205,
+    version: "v0.5.2",
+    build: 206,
     authors: "Tak Toje, Max, Sergo, gemini",
-    releaseDate: "2026-10-12",
+    releaseDate: "2026-10-15",
     patchNotes: [
         {
-            title: "💰 Полный ребаланс экономики перекупа (v0.5.1)",
-            text: "Рыночные предложения теперь генерируют реальные точки входа (дисконт от 25% до 45% от рынка). Покупатели на площадке продаж готовы платить справедливую надбавку за подготовленные автомобили."
+            title: "📉 Ребаланс экономики перекупа (v0.5.2)",
+            text: "Снижена излишняя маржинальность. Продавцы реже отдают авто за бесценок, а покупатели торгуются агрессивнее. Ожидаемая чистая прибыль приведена к реалистичным 20-40%."
         },
         {
-            title: "🚗 Масштабируемая база автопарка",
-            text: "Добавлена поддержка внешней загрузки JSON-паков техники, расширены линейки всех 9 категорий от классики до экзотики."
+            title: "📈 Динамические тренды авторынка",
+            text: "Внедрена система макроэкономики. Следите за SMS от «АвтоВестника»: сезонность, дефицит и налоги теперь меняют глобальные цены на классы авто до 35%!"
         },
         {
-            title: "🏁 Интерактивные заезды Street Underground",
-            text: "Полноценная 6-секундная арена дрифта, дрэг 402м с ланчем и стенс-шоу."
+            title: "🚗 Снижение порога входа",
+            text: "Класс автомобилей «Комфорт» теперь доступен с 20-го уровня авторитета (ранее с 30-го)."
         },
         {
-            title: "📑 Официальный чистый бланк ДКП",
-            text: "Устранено наложение штампов МРЭО, добавлена прозрачная фиксация налога и себестоимости."
+            title: "🔧 Инфляция услуг СТО",
+            text: "Стоимость предпродажной подготовки (детейлинг, скрутка, присадки) и ремонта двигателей слегка увеличена для баланса."
         }
     ]
 };
@@ -207,7 +208,7 @@ const CAR_FALLBACKS_BY_CATEGORY = {
 };
 
 // ========================================================
-// 3. БАЗА ДАННЫХ АВТОТЕХНИКИ (С ПОДДЕРЖКОЙ ВНЕШНИХ ПАКОВ)
+// 3. БАЗА ДАННЫХ АВТОТЕХНИКИ
 // ========================================================
 const CAR_DATABASE = {
     economy: [
@@ -243,7 +244,7 @@ const CAR_DATABASE = {
         { name: "Ford Focus I", power: 100, basePrice: 320000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/focus1.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
         { name: "Mitsubishi Carisma", power: 103, basePrice: 280000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/carisma.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
         { name: "Mitsubishi Lancer IX", power: 98, basePrice: 410000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/lancer9.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Toyota Mark II (JZX90 Самурай)", power: 180, basePrice: 490000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/mark2.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Toyota Mark II (JZX90)", power: 180, basePrice: 490000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/mark2.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
         { name: "Toyota Chaser (X100)", power: 200, basePrice: 590000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/chaser.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
         { name: "BMW E34 520i", power: 150, basePrice: 290000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/e34.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
         { name: "BMW E36 318i", power: 115, basePrice: 340000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/e36.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
@@ -333,7 +334,7 @@ const CAR_DATABASE = {
     ]
 };
 
-// Функция расширения каталога внешним JSON (из файла, CDN или GitHub)
+// Функция расширения каталога внешним JSON
 async function loadExternalCarDatabase(jsonUrl) {
     try {
         const response = await fetch(jsonUrl);
@@ -986,6 +987,22 @@ const NOTEPAD_CAREER_GOALS = [
     }
 ];
 
+// ========================================================
+// 7. ДИНАМИЧЕСКИЕ ТРЕНДЫ АВТОРЫНКА (MARKET NEWS)
+// ========================================================
+const MARKET_NEWS_EVENTS = [
+    { cat: 'economy', type: 'up', mod: 1.25, sender: "📈 АвтоВестник", title: "Бум на дешёвые авто!", text: "Из-за кризиса все скупают бюджетные машины. Цены на Эконом взлетели на 25%!" },
+    { cat: 'economy', type: 'down', mod: 0.85, sender: "📉 АвтоВестник", title: "Льготное кредитование", text: "Государство ввело льготы на новые авто. Старый Эконом на вторичке подешевел на 15%." },
+    { cat: 'comfort', type: 'up', mod: 1.20, sender: "📈 АвтоВестник", title: "Дефицит седанов", text: "Таксопарки массово скупают класс Комфорт для работы. Цены выросли на 20%!" },
+    { cat: 'premium', type: 'down', mod: 0.75, sender: "📉 АвтоВестник", title: "Налог на роскошь", text: "Введен жесткий налог на премиальные авто. Владельцы массово сливают Премиум, цены рухнули на 25%!" },
+    { cat: 'hyper', type: 'up', mod: 1.30, sender: "📈 АвтоВестник", title: "Мода на экзотику", text: "Известный блогер купил гиперкар, спрос среди бизнесменов взлетел. Цены на Гиперкары +30%!" },
+    { cat: 'moto', type: 'up', mod: 1.35, sender: "📈 АвтоВестник", title: "Мотосезон открыт!", text: "С потеплением цены на Мотоциклы традиционно подскочили на 35%." },
+    { cat: 'moto', type: 'down', mod: 0.70, sender: "📉 АвтоВестник", title: "Конец мотосезона", text: "Осень близко. Мотоциклы никому не нужны, цены упали на 30%." },
+    { cat: 'truck', type: 'up', mod: 1.25, sender: "📈 АвтоВестник", title: "Логистический бум", text: "Острая нехватка грузовиков на рынке логистики. Цены на тягачи выросли на 25%!" },
+    { cat: 'all', type: 'up', mod: 1.10, sender: "📈 АвтоВестник", title: "Инфляция на авторынке", text: "Ослабление курса рубля привело к общему подорожанию всех автомобилей на 10%!" },
+    { cat: 'all', type: 'down', mod: 0.90, sender: "📉 АвтоВестник", title: "Стагнация рынка", text: "Ключевая ставка ЦБ повышена, автокредиты недоступны. Весь рынок просел на 10%." }
+];
+
 // Экспорт в глобальный контекст
 window.GAME_METADATA = GAME_METADATA;
 window.HUD_SOLID_COLORS = HUD_SOLID_COLORS;
@@ -1014,3 +1031,4 @@ window.DAILY_REWARDS_CONFIG = DAILY_REWARDS_CONFIG;
 window.STREET_CHAT_LOG = STREET_CHAT_LOG;
 window.DAILY_QUESTS_POOL = DAILY_QUESTS_POOL;
 window.NOTEPAD_CAREER_GOALS = NOTEPAD_CAREER_GOALS;
+window.MARKET_NEWS_EVENTS = MARKET_NEWS_EVENTS;

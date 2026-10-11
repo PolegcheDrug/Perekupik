@@ -1,8 +1,9 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.5.1)
+// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.5.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Окупаемый детейлинг и тюнинг (x1.5 к марже), Launch OBD2,
-// конструктор страхового полиса, штрафстоянка ГИБДД
+// Окупаемый детейлинг и тюнинг, Launch OBD2,
+// конструктор страхового полиса, штрафстоянка ГИБДД.
+// Экономика усложнена: повышена стоимость предпродажной подготовки.
 // ========================================================
 
 let previewCarIndex = null;
@@ -211,7 +212,7 @@ function recalculateCarMarketValue(car) {
 
     // Предпродажная подготовка дает солидный чистый профит
     if (car.isPolished) currentVal = Math.round(currentVal * 1.12);
-    if (car.isRepainted) currentVal += 35000;
+    if (car.isRepainted) currentVal += 40000; // Повышено с 35к (т.к. услуга подорожала до 25к)
 
     let engWear = car.wear?.engine !== undefined ? car.wear.engine : 85;
     let transWear = car.wear?.transmission !== undefined ? car.wear.transmission : 85;
@@ -496,7 +497,7 @@ function buyGarageSlot() {
 }
 
 // ========================================================
-// 4. ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА
+// 4. ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (ИНФЛЯЦИЯ v0.5.2)
 // ========================================================
 function openPreSaleModal(idx) {
     const caps = getPlayerHousingCapabilities();
@@ -522,7 +523,7 @@ function openPreSaleModal(idx) {
             btnClean.className = "btn btn-dark btn-sm opacity-50";
         } else {
             btnClean.disabled = false;
-            btnClean.innerText = "4,000 ₽";
+            btnClean.innerText = "7,000 ₽";
             btnClean.className = "btn btn-cyan btn-sm";
         }
     }
@@ -539,7 +540,7 @@ function openPreSaleModal(idx) {
             btnPaint.className = "btn btn-dark btn-sm opacity-50";
         } else {
             btnPaint.disabled = false;
-            btnPaint.innerText = "12,000 ₽";
+            btnPaint.innerText = "25,000 ₽";
             btnPaint.className = "btn btn-dark btn-sm";
         }
     }
@@ -556,7 +557,7 @@ function openPreSaleModal(idx) {
             btnAdditive.className = "btn btn-dark btn-sm opacity-50";
         } else {
             btnAdditive.disabled = false;
-            btnAdditive.innerText = "6,000 ₽";
+            btnAdditive.innerText = "12,000 ₽";
             btnAdditive.className = "btn btn-amber btn-sm";
         }
     }
@@ -573,7 +574,7 @@ function openPreSaleModal(idx) {
             btnOdometer.className = "btn btn-dark btn-sm opacity-50";
         } else {
             btnOdometer.disabled = false;
-            btnOdometer.innerText = "8,000 ₽";
+            btnOdometer.innerText = "15,000 ₽";
             btnOdometer.className = "btn btn-danger btn-sm";
         }
     }
@@ -600,31 +601,31 @@ function applyPreSaleMod(type) {
 
     if (type === 'clean') {
         if (car.isPolished) return showToast("Машина уже отполирована до блеска!");
-        if (cash < 4000) return showToast("Нужно 4,000 ₽!");
-        state.player.cash -= 4000;
+        if (cash < 7000) return showToast("Нужно 7,000 ₽!");
+        state.player.cash -= 7000;
         car.isPolished = true;
         recalculateCarMarketValue(car);
         showToast("Кузов отполирован (+12% к рыночной цене)!");
     } else if (type === 'paint') {
         if (car.isRepainted) return showToast("Кузов уже был повторно окрашен!");
         if (car.condition >= 100) return showToast("Состояние кузова и так 100%!");
-        if (cash < 12000) return showToast("Нужно 12,000 ₽!");
-        state.player.cash -= 12000;
+        if (cash < 25000) return showToast("Нужно 25,000 ₽!");
+        state.player.cash -= 25000;
         car.isRepainted = true;
         car.condition = Math.min(100, (car.condition || 60) + 25);
         recalculateCarMarketValue(car);
-        showToast("Кузов полностью перекрашен (+25% состояния и +35k ₽ цены)!");
+        showToast("Кузов полностью перекрашен (+25% состояния и +40k ₽ цены)!");
     } else if (type === 'additive') {
         if (car.hasAdditive) return showToast("В масло уже залита присадка!");
-        if (cash < 6000) return showToast("Нужно 6,000 ₽!");
-        state.player.cash -= 6000;
+        if (cash < 12000) return showToast("Нужно 12,000 ₽!");
+        state.player.cash -= 12000;
         car.hasAdditive = true;
         recalculateCarMarketValue(car);
         showToast("Присадка залита! Стуки мотора скрыты (Опасно в торгах!)");
     } else if (type === 'odometer') {
         if (car.rolledOdometer) return showToast("Пробег уже скручивался на этой машине!");
-        if (cash < 8000) return showToast("Нужно 8,000 ₽!");
-        state.player.cash -= 8000;
+        if (cash < 15000) return showToast("Нужно 15,000 ₽!");
+        state.player.cash -= 15000;
         car.mileage = Math.round((car.mileage || 120000) * 0.5);
         car.rolledOdometer = true;
         showToast("Пробег смотан на 50%! Риск скандала у капота.");
@@ -1183,7 +1184,7 @@ function openImpoundLotModal(idx) {
                     </div>
                     <div class="sub-label mb-2" style="font-size:10px;">Решить вопрос через теневые связи Решалы или наличными инспектору.</div>
                     <div class="grid-2">
-                        <button onclick="resolveImpoundBribe('cash')" class="btn btn-dark btn-sm">Наличные (35k ₽)</button>
+                        <button onclick="resolveImpoundBribe('cash')" class="btn btn-dark btn-sm">Наличные (45k ₽)</button>
                         <button onclick="resolveImpoundBribe('conn')" class="btn btn-purple btn-sm">Решала (1 🤝)</button>
                     </div>
                 </div>
@@ -1194,7 +1195,7 @@ function openImpoundLotModal(idx) {
                         <span class="tag-badge bg-tag-green">МРЭО</span>
                     </div>
                     <div class="sub-label mb-2" style="font-size:10px;">Оплата протокола за нарушение и услуг городского эвакуатора.</div>
-                    <button onclick="resolveImpoundOfficialPay()" class="btn btn-green btn-sm w-full">Оплатить протокол (25,000 ₽)</button>
+                    <button onclick="resolveImpoundOfficialPay()" class="btn btn-green btn-sm w-full">Оплатить протокол (30,000 ₽)</button>
                 </div>
 
                 <div class="glass-card p-2">
@@ -1227,10 +1228,10 @@ function resolveImpoundBribe(type) {
     if (!car) return;
 
     if (type === 'cash') {
-        let cost = 35000;
+        let cost = 45000; // Инфляция взятки
         if ((state.player?.cash || 0) < cost) return showToast("Не хватает денег на взятку!");
         state.player.cash -= cost;
-        showToast("Вопрос урегулирован наличными (-35,000 ₽)!");
+        showToast("Вопрос урегулирован наличными (-45,000 ₽)!");
     } else {
         if ((state.player?.connections || 0) < 1) return showToast("У вас нет теневых связей 🤝!");
         state.player.connections -= 1;
@@ -1251,7 +1252,7 @@ function resolveImpoundOfficialPay() {
     const car = state.garage[activeImpoundCarIndex];
     if (!car) return;
 
-    let cost = 25000;
+    let cost = 30000; // Инфляция официального штрафа
     if ((state.player?.cash || 0) < cost) return showToast("Не хватает денег для оплаты квитанции!");
 
     state.player.cash -= cost;
@@ -1302,7 +1303,7 @@ function openPutOnLotModal(idx) {
 
     if (titleEl) titleEl.innerText = `${car.name} (${car.power || 100} л.с.)`;
     if (costEl) costEl.innerText = `Себестоимость выкупа: ${(car.purchaseCost || car.basePrice || 100000).toLocaleString()} ₽`;
-    // Рекомендуемая цена продажи с хорошей перекупской наценкой
+    // Рекомендуемая цена продажи (аппетиты перекупа)
     if (askInput) askInput.value = Math.round((car.marketValue || car.basePrice || 100000) * 1.25);
 
     window.currentLotPutIndex = idx;
@@ -1470,8 +1471,8 @@ function triggerGarageRandomEvent() {
             desc: "Соседский кот запрыгнул на капот и оставил следы когтей на лаке.",
             emoji: "🐱",
             badge: "ЛКП",
-            actionText: "Заполировать (3,000 ₽)",
-            cost: 3000,
+            actionText: "Заполировать (4,000 ₽)",
+            cost: 4000,
             onIgnore: () => { 
                 car.condition = Math.max(10, (car.condition || 80) - 5);
                 recalculateCarMarketValue(car);
@@ -1482,8 +1483,8 @@ function triggerGarageRandomEvent() {
             desc: "Ночью во дворе хулиганы пытались снять зеркальные элементы.",
             emoji: "🪞",
             badge: "ВАНДАЛИЗМ",
-            actionText: "Поставить защиту (5,000 ₽)",
-            cost: 5000,
+            actionText: "Поставить защиту (7,000 ₽)",
+            cost: 7000,
             onIgnore: () => { 
                 if (car.insurance && (car.insurance.type === 'comprehensive' || car.insurance === 'casco')) {
                     showToast("КАСКО полностью возместило ущерб!");
@@ -1498,8 +1499,8 @@ function triggerGarageRandomEvent() {
             desc: "Из-за минусовой температуры батарея ушла в глубокий разряд.",
             emoji: "🔋",
             badge: "ЭЛЕКТРИКА",
-            actionText: "Зарядить пусковым (1,500 ₽)",
-            cost: 1500,
+            actionText: "Зарядить пусковым (2,500 ₽)",
+            cost: 2500,
             onIgnore: () => { 
                 if (car.wear) car.wear.engine = Math.max(10, (car.wear.engine || 80) - 8);
                 recalculateCarMarketValue(car);

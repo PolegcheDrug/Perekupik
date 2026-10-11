@@ -1,8 +1,9 @@
 // ========================================================
-// js/phone.js — БАЗОВАЯ ОС СМАРТФОНА «PerekupOS» (v0.5.1)
+// js/phone.js — БАЗОВАЯ ОС СМАРТФОНА «PerekupOS» (v0.5.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Автономные экраны приложений, P2P биржа (Авто, Номера, Бизнес, Жильё),
 // Порт, Решала со скидками цеха, Блокнот карьеры, Во-Банк и чаты
+// Синхронизация UI смартфона с жесткой экономикой (инфляция цен v0.5.2).
 // ========================================================
 
 const PhoneManager = {
@@ -796,7 +797,7 @@ const PhoneManager = {
     },
 
     // ----------------------------------------------------
-    // РЕШАЛА АРТУР (С ДИНАМИЧЕСКИМИ СКИДКАМИ МАСТЕРСКОЙ)
+    // РЕШАЛА АРТУР (СИНХРОНИЗАЦИЯ ЦЕН v0.5.2)
     // ----------------------------------------------------
     renderReshalaApp(container) {
         let conn = state.player?.connections || 0;
@@ -808,8 +809,8 @@ const PhoneManager = {
             ? `<span class="tag-badge bg-tag-green">Скидка цеха -${caps.reshalaDiscountPct}%</span>`
             : `<span class="tag-badge bg-tag-purple">Штаб</span>`;
 
-        let roofPrice = Math.round(350000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100)));
-        let licPrice = Math.round(85000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100)));
+        let roofPrice = Math.round(450000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100))); // v0.5.2
+        let licPrice = Math.round(120000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100))); // v0.5.2
 
         container.innerHTML = `
             <div class="phone-app-header">
@@ -829,8 +830,8 @@ const PhoneManager = {
                 </div>
 
                 <div class="grid-2 mb-2">
-                    <button onclick="buyReshalaPack('pack1'); PhoneManager.renderOpenApp();" class="btn btn-purple btn-sm">1 Связь (150k)</button>
-                    <button onclick="buyReshalaPack('pack5'); PhoneManager.renderOpenApp();" class="btn btn-purple btn-sm">5 Связей (650k)</button>
+                    <button onclick="buyReshalaPack('pack1'); PhoneManager.renderOpenApp();" class="btn btn-purple btn-sm">1 Связь (200k)</button>
+                    <button onclick="buyReshalaPack('pack5'); PhoneManager.renderOpenApp();" class="btn btn-purple btn-sm">5 Связей (850k)</button>
                 </div>
 
                 <div class="reshala-deal-card mb-2 p-2">
@@ -862,7 +863,7 @@ const PhoneManager = {
                     </div>
                     <p class="sub-label my-1" style="font-size:10px;">Снимает статус «В розыске» и аннулирование 12.5.1 с проблемного авто.</p>
                     <button onclick="openLegalizeCarModal()" class="btn btn-dark btn-sm w-full">
-                        Выбрать авто (${caps.reshalaDiscountPct > 0 ? (200 * (1 - caps.reshalaDiscountPct / 100)).toFixed(0) + 'k' : '200k'} + 1 🤝)
+                        Выбрать авто (${caps.reshalaDiscountPct > 0 ? (300 * (1 - caps.reshalaDiscountPct / 100)).toFixed(0) + 'k' : '300k'} + 1 🤝)
                     </button>
                 </div>
             </div>
@@ -1557,128 +1558,6 @@ const PhoneManager = {
         tgHaptic('light');
         this.bankSubTab = tab;
         this.renderOpenApp();
-    },
-
-    renderSyndicateApp(container) {
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-globe color-purple mr-1"></i> Синдикат & Контракты</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="grid-4 mb-2">
-                    <button onclick="switchSyndicateTab('contracts')" id="synTabBtn-contracts" class="btn btn-cyan btn-sm">Заказы</button>
-                    <button onclick="switchSyndicateTab('blackmarket')" id="synTabBtn-blackmarket" class="btn btn-dark btn-sm">Тень</button>
-                    <button onclick="switchSyndicateTab('clubs')" id="synTabBtn-clubs" class="btn btn-dark btn-sm">Клубы</button>
-                    <button onclick="switchSyndicateTab('leaderboard')" id="synTabBtn-leaderboard" class="btn btn-dark btn-sm">Топ</button>
-                </div>
-
-                <div id="synScreen-contracts">
-                    <div class="glass-card mb-2 p-2">
-                        <div class="flex-between mb-1">
-                            <b class="text-xs color-cyan"><i class="fa-solid fa-file-contract"></i> Заказы Синдиката</b>
-                            <button onclick="refreshContractsManual()" class="btn btn-dark btn-auto btn-sm">Обновить (15k)</button>
-                        </div>
-                        <div class="sub-label" style="font-size:10px;">Поставка проверенных автомобилей клиентам под ключ.</div>
-                    </div>
-                    <div id="contractsList"></div>
-                    <div id="contractsLockCover" class="level-lock-cover" style="display:none;"></div>
-                </div>
-
-                <div id="synScreen-blackmarket" style="display:none;">
-                    <div class="glass-card mb-2 p-2">
-                        <div class="flex-between mb-1">
-                            <b class="text-xs color-purple"><i class="fa-solid fa-mask"></i> Теневой рынок номеров</b>
-                            <span class="tag-badge bg-tag-purple">VIP</span>
-                        </div>
-                        <p class="sub-label mb-2" style="font-size:10px;">Биржа редких госномеров (777, ЕКХ, АМР).</p>
-                        <button onclick="refreshBlackMarketPlates()" class="btn btn-dark btn-sm w-full mb-2">Обновить (25k ₽)</button>
-                        <div id="blackMarketPlatesList"></div>
-                    </div>
-                </div>
-
-                <div id="synScreen-clubs" style="display:none;">
-                    <div class="glass-card mb-2 p-2">
-                        <div class="flex-between mb-1">
-                            <div>
-                                <div class="sub-label" style="font-size:9px;">Ваш автоклуб:</div>
-                                <b class="color-cyan text-xs" id="synMyClubName">Без автоклуба</b>
-                            </div>
-                            <button onclick="createClubPrompt()" class="btn btn-amber btn-auto btn-sm">+ Создать</button>
-                        </div>
-                    </div>
-                    <div id="synClubsContainer"></div>
-                </div>
-
-                <div id="synScreen-leaderboard" style="display:none;">
-                    <div class="glass-card mb-2 p-2 flex-between">
-                        <b class="text-xs color-amber"><i class="fa-solid fa-trophy"></i> Топ Перекупов</b>
-                        <span class="sub-label" style="font-size:10px;">Топ-50</span>
-                    </div>
-                    <div id="leaderboardListContainer"></div>
-                </div>
-            </div>
-        `;
-        if (typeof renderContracts === 'function') renderContracts();
-    },
-
-    renderShopApp(container) {
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-cart-shopping color-amber mr-1"></i> Авто-Маркет</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="grid-4 mb-2">
-                    <button onclick="switchShopSection('tools')" id="shopTab-tools" class="btn btn-cyan btn-sm">Приборы</button>
-                    <button onclick="switchShopSection('consumables')" id="shopTab-consumables" class="btn btn-dark btn-sm">Сырьё</button>
-                    <button onclick="switchShopSection('tuningParts')" id="shopTab-tuningParts" class="btn btn-dark btn-sm">Тюнинг</button>
-                    <button onclick="switchShopSection('homeItems')" id="shopTab-homeItems" class="btn btn-dark btn-sm">Дом</button>
-                </div>
-                <div id="shopSec-tools"><div id="shopToolsList" class="space-y-2 mb-2"></div></div>
-                <div id="shopSec-consumables" style="display:none;"><div id="shopConsumablesList" class="space-y-2 mb-2"></div></div>
-                <div id="shopSec-tuningParts" style="display:none;"><div id="shopTuningPartsList" class="space-y-2 mb-2"></div></div>
-                <div id="shopSec-homeItems" style="display:none;"><div id="shopHomeItemsList" class="space-y-2 mb-2"></div></div>
-            </div>
-        `;
-        if (typeof switchShopSection === 'function') switchShopSection('tools');
-    },
-
-    renderRadarApp(container) {
-        let immunity = state.player?.policeImmunityDays || 0;
-        let races = state.player?.consecutiveRaces || 0;
-        let maxRaces = state.player?.maxRacesBeforeRaid || 12;
-
-        let statusText = immunity > 0 
-            ? `<span class="color-green font-bold">Иммунитет (${immunity} дн.)</span>` 
-            : `<span class="color-amber font-bold">Рейды активны</span>`;
-
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-tower-broadcast color-red mr-1"></i> ДПС Радар</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="glass-card mb-2 p-2">
-                    <div class="flex-between mb-2">
-                        <b class="text-xs">Статус рейдов:</b>
-                        ${statusText}
-                    </div>
-                    <div class="flex-between text-xs mb-1">
-                        <span class="sub-label">Внимание ДПС на 402м:</span>
-                        <b class="${races > 8 ? 'color-red' : 'color-green'}">${races} / ${maxRaces} заездов</b>
-                    </div>
-                    <div class="biz-progress-track mb-2">
-                        <div class="biz-progress-fill ${races > 8 ? 'risk-high' : 'fill-biz-stock'}" style="width:${Math.min(100, (races / maxRaces) * 100)}%;"></div>
-                    </div>
-                    <p class="sub-label mb-2" style="font-size:10px;">При превышении лимита экипаж ДПС устраивает облаву и конфискует корч на штрафстоянку!</p>
-                    <button onclick="PhoneManager.openApp('reshala')" class="btn btn-purple btn-sm w-full">Купить крышу у Решалы</button>
-                </div>
-            </div>
-        `;
     }
 };
 

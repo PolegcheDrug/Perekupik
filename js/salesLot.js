@@ -1,56 +1,57 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ЧЕСТНЫЙ ТОРГ (v0.5.1)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ЧЕСТНЫЙ ТОРГ (v0.5.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Честная реакция покупателей, гарантированная прибыль от перепродажи,
-// право отказаться от подписания ДКП, налог 13% только на учёт РФ
+// право отказаться от подписания ДКП, налог 13% только на учёт РФ.
+// Внедрена строгая экономика торга (урезанная маржа).
 // ========================================================
 
 const BUYERS_CATALOG = {
     economy: [
-        { name: "Студент Макс", avatar: "🧑‍🎓", rate: 1.12, type: "economy", meticulous: 0.15 },
-        { name: "Таксист Ашот", avatar: "🧔", rate: 1.18, type: "economy", meticulous: 0.40 },
-        { name: "Дед Михалыч", avatar: "👴", rate: 1.25, type: "economy", meticulous: 0.10 },
-        { name: "Перекуп Саня", avatar: "😎", rate: 1.06, type: "economy", meticulous: 0.75 },
-        { name: "Дачник Петрович", avatar: "👨‍🌾", rate: 1.20, type: "economy", meticulous: 0.20 },
-        { name: "Курьер Руслан", avatar: "🛵", rate: 1.14, type: "economy", meticulous: 0.25 },
-        { name: "Пацан с района Костян", avatar: "🧢", rate: 1.10, type: "economy", meticulous: 0.12 },
-        { name: "Новичок с правами Лера", avatar: "👩‍🦰", rate: 1.28, type: "economy", meticulous: 0.25 },
-        { name: "Гаражный мастер Толя", avatar: "👨‍🔧", rate: 1.08, type: "economy", meticulous: 0.65 },
-        { name: "Бригадир Валера", avatar: "👷‍♂️", rate: 1.22, type: "economy", meticulous: 0.30 }
+        { name: "Студент Макс", avatar: "🧑‍🎓", rate: 1.12, type: "economy", meticulous: 0.20 },
+        { name: "Таксист Ашот", avatar: "🧔", rate: 1.18, type: "economy", meticulous: 0.45 },
+        { name: "Дед Михалыч", avatar: "👴", rate: 1.25, type: "economy", meticulous: 0.15 },
+        { name: "Перекуп Саня", avatar: "😎", rate: 1.06, type: "economy", meticulous: 0.85 },
+        { name: "Дачник Петрович", avatar: "👨‍🌾", rate: 1.20, type: "economy", meticulous: 0.25 },
+        { name: "Курьер Руслан", avatar: "🛵", rate: 1.14, type: "economy", meticulous: 0.30 },
+        { name: "Пацан с района Костян", avatar: "🧢", rate: 1.10, type: "economy", meticulous: 0.18 },
+        { name: "Новичок с правами Лера", avatar: "👩‍🦰", rate: 1.28, type: "economy", meticulous: 0.30 },
+        { name: "Гаражный мастер Толя", avatar: "👨‍🔧", rate: 1.08, type: "economy", meticulous: 0.70 },
+        { name: "Бригадир Валера", avatar: "👷‍♂️", rate: 1.22, type: "economy", meticulous: 0.35 }
     ],
     comfort: [
-        { name: "Менеджер Олег", avatar: "👨‍💼", rate: 1.16, type: "comfort", meticulous: 0.35 },
-        { name: "Семейный Илья", avatar: "👨‍👩‍👦", rate: 1.24, type: "comfort", meticulous: 0.45 },
-        { name: "Блогерша Аня", avatar: "👩‍🎤", rate: 1.30, type: "comfort", meticulous: 0.20 },
-        { name: "Автоподборщик со сканером", avatar: "🕵️‍♂️", rate: 1.10, type: "comfort", meticulous: 0.85 },
-        { name: "IT-тимлид Денис", avatar: "👨‍💻", rate: 1.28, type: "comfort", meticulous: 0.55 },
-        { name: "Риелтор Кристина", avatar: "👩‍💼", rate: 1.22, type: "comfort", meticulous: 0.35 },
-        { name: "Фитнес-тренер Влад", avatar: "💪", rate: 1.18, type: "comfort", meticulous: 0.25 },
-        { name: "Врач-стоматолог Павел", avatar: "👨‍⚕️", rate: 1.32, type: "comfort", meticulous: 0.50 },
-        { name: "Торговый представитель Юра", avatar: "🚘", rate: 1.14, type: "comfort", meticulous: 0.45 },
-        { name: "Дизайнер интерьеров Соня", avatar: "🎨", rate: 1.26, type: "comfort", meticulous: 0.30 }
+        { name: "Менеджер Олег", avatar: "👨‍💼", rate: 1.16, type: "comfort", meticulous: 0.40 },
+        { name: "Семейный Илья", avatar: "👨‍👩‍👦", rate: 1.24, type: "comfort", meticulous: 0.50 },
+        { name: "Блогерша Аня", avatar: "👩‍🎤", rate: 1.30, type: "comfort", meticulous: 0.25 },
+        { name: "Автоподборщик со сканером", avatar: "🕵️‍♂️", rate: 1.10, type: "comfort", meticulous: 0.90 },
+        { name: "IT-тимлид Денис", avatar: "👨‍💻", rate: 1.28, type: "comfort", meticulous: 0.60 },
+        { name: "Риелтор Кристина", avatar: "👩‍💼", rate: 1.22, type: "comfort", meticulous: 0.40 },
+        { name: "Фитнес-тренер Влад", avatar: "💪", rate: 1.18, type: "comfort", meticulous: 0.30 },
+        { name: "Врач-стоматолог Павел", avatar: "👨‍⚕️", rate: 1.32, type: "comfort", meticulous: 0.55 },
+        { name: "Торговый представитель Юра", avatar: "🚘", rate: 1.14, type: "comfort", meticulous: 0.50 },
+        { name: "Дизайнер интерьеров Соня", avatar: "🎨", rate: 1.26, type: "comfort", meticulous: 0.35 }
     ],
     premium: [
-        { name: "Бизнесмен Игорь", avatar: "🤵", rate: 1.20, type: "premium", meticulous: 0.55 },
-        { name: "Мажор Артур", avatar: "🕺", rate: 1.35, type: "premium", meticulous: 0.15 },
-        { name: "Депутат Виталий", avatar: "🕴️", rate: 1.15, type: "premium", meticulous: 0.65 },
-        { name: "Владелец таксопарка", avatar: "🧔‍♂️", rate: 1.12, type: "premium", meticulous: 0.75 },
-        { name: "Застройщик Альберт", avatar: "🏗️", rate: 1.26, type: "premium", meticulous: 0.50 },
-        { name: "Продюсер Марк", avatar: "🎬", rate: 1.32, type: "premium", meticulous: 0.30 },
-        { name: "Ресторатор Карен", avatar: "🍽️", rate: 1.22, type: "premium", meticulous: 0.40 },
-        { name: "Юрист международник Яна", avatar: "⚖️", rate: 1.25, type: "premium", meticulous: 0.80 },
-        { name: "Владелец сети клиник Борис", avatar: "🩺", rate: 1.30, type: "premium", meticulous: 0.60 },
-        { name: "Инвестор Герман", avatar: "📈", rate: 1.18, type: "premium", meticulous: 0.70 }
+        { name: "Бизнесмен Игорь", avatar: "🤵", rate: 1.20, type: "premium", meticulous: 0.60 },
+        { name: "Мажор Артур", avatar: "🕺", rate: 1.35, type: "premium", meticulous: 0.20 },
+        { name: "Депутат Виталий", avatar: "🕴️", rate: 1.15, type: "premium", meticulous: 0.70 },
+        { name: "Владелец таксопарка", avatar: "🧔‍♂️", rate: 1.12, type: "premium", meticulous: 0.80 },
+        { name: "Застройщик Альберт", avatar: "🏗️", rate: 1.26, type: "premium", meticulous: 0.55 },
+        { name: "Продюсер Марк", avatar: "🎬", rate: 1.32, type: "premium", meticulous: 0.35 },
+        { name: "Ресторатор Карен", avatar: "🍽️", rate: 1.22, type: "premium", meticulous: 0.45 },
+        { name: "Юрист международник Яна", avatar: "⚖️", rate: 1.25, type: "premium", meticulous: 0.85 },
+        { name: "Владелец сети клиник Борис", avatar: "🩺", rate: 1.30, type: "premium", meticulous: 0.65 },
+        { name: "Инвестор Герман", avatar: "📈", rate: 1.18, type: "premium", meticulous: 0.75 }
     ],
     hyper: [
-        { name: "Шейх Мансур", avatar: "👳‍♂️", rate: 1.38, type: "hyper", meticulous: 0.30 },
-        { name: "Олигарх Роман", avatar: "🛥️", rate: 1.22, type: "hyper", meticulous: 0.75 },
-        { name: "Крипто-миллионер", avatar: "🤑", rate: 1.45, type: "hyper", meticulous: 0.20 },
-        { name: "Стример-хайпожор", avatar: "🎮", rate: 1.35, type: "hyper", meticulous: 0.25 },
-        { name: "Звезда футбола Алекс", avatar: "⚽", rate: 1.28, type: "hyper", meticulous: 0.35 },
-        { name: "Коллекционер редких авто", avatar: "🏛️", rate: 1.50, type: "hyper", meticulous: 0.90 },
-        { name: "IT-фаундер из Дубая", avatar: "🚀", rate: 1.30, type: "hyper", meticulous: 0.45 },
-        { name: "Наследник синдиката Тариэл", avatar: "🕶️", rate: 1.25, type: "hyper", meticulous: 0.65 }
+        { name: "Шейх Мансур", avatar: "👳‍♂️", rate: 1.38, type: "hyper", meticulous: 0.35 },
+        { name: "Олигарх Роман", avatar: "🛥️", rate: 1.22, type: "hyper", meticulous: 0.80 },
+        { name: "Крипто-миллионер", avatar: "🤑", rate: 1.45, type: "hyper", meticulous: 0.25 },
+        { name: "Стример-хайпожор", avatar: "🎮", rate: 1.35, type: "hyper", meticulous: 0.30 },
+        { name: "Звезда футбола Алекс", avatar: "⚽", rate: 1.28, type: "hyper", meticulous: 0.40 },
+        { name: "Коллекционер редких авто", avatar: "🏛️", rate: 1.50, type: "hyper", meticulous: 0.95 },
+        { name: "IT-фаундер из Дубая", avatar: "🚀", rate: 1.30, type: "hyper", meticulous: 0.50 },
+        { name: "Наследник синдиката Тариэл", avatar: "🕶️", rate: 1.25, type: "hyper", meticulous: 0.70 }
     ]
 };
 
@@ -58,7 +59,7 @@ let dkpAutoCloseTimer = null;
 let dealIsAborted = false;
 
 function calculateLotWaitTime() {
-    let baseTime = Math.floor(40 + Math.random() * 80); // 40-120 сек вместо 180
+    let baseTime = Math.floor(40 + Math.random() * 80);
     let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
 
     let karmaFactor = 1.0 - ((karma - 50) / 100) * 0.7;
@@ -206,30 +207,33 @@ function generateBuyerForSlot(slot) {
     // БОНУСЫ К ЦЕНЕ ПОКУПАТЕЛЯ ЗА ПОДГОТОВКУ МАШИНЫ
     let tuneBonus = 0;
     if (car.tuning) {
-        if (car.tuning.stance) tuneBonus += 0.06;
-        if (car.tuning.customWheels) tuneBonus += 0.05;
-        if (car.tuning.chip > 0) tuneBonus += 0.05;
-        if (car.tuning.weldedDiff) tuneBonus += 0.04;
+        if (car.tuning.stance) tuneBonus += 0.05;
+        if (car.tuning.customWheels) tuneBonus += 0.04;
+        if (car.tuning.chip > 0) tuneBonus += 0.04;
+        if (car.tuning.weldedDiff) tuneBonus += 0.03;
     }
-    if (car.isPolished) tuneBonus += 0.08;
-    if (car.isRepainted) tuneBonus += 0.05;
+    if (car.isPolished) tuneBonus += 0.06;
+    if (car.isRepainted) tuneBonus += 0.04;
 
     let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
-    let karmaBonus = ((karma - 50) / 100) * 0.10;
+    let karmaBonus = ((karma - 50) / 100) * 0.08;
 
     let plateBonus = 0;
     let cPlate = car.customPlate || car.plate;
     let pVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(cPlate) : 0;
     if (pVal >= 35000) {
-        plateBonus = 0.20 + Math.random() * 0.15;
+        plateBonus = 0.15 + Math.random() * 0.10;
     }
     
-    let rate = template.rate + tuneBonus + plateBonus + karmaBonus;
-    let offer = Math.round(baseVal * (rate + (Math.random() * 0.08 - 0.04)));
+    // ЖЕСТКАЯ ЭКОНОМИКА (v0.5.2) - Покупатели стали жаднее (снижен рейт на 0.15)
+    let rate = (template.rate - 0.15) + tuneBonus + plateBonus + karmaBonus;
+    let offer = Math.round(baseVal * (rate + (Math.random() * 0.06 - 0.03)));
     
-    // Покупатель готов дать до 115% от желаемой цены игрока
-    if (offer > asking * 1.15) offer = Math.round(asking * 1.05);
-    if (offer < baseVal * 0.90) offer = Math.round(baseVal * 0.95);
+    // Покупатель готов дать максимум до 108% от желаемой цены игрока (было 115%)
+    if (offer > asking * 1.08) offer = Math.round(asking * 1.02);
+    
+    // Покупатель может сильно сбить цену (до 80% от реального рынка вместо 90%)
+    if (offer < baseVal * 0.80) offer = Math.round(baseVal * 0.85);
 
     let calculatedMeticulous = template.meticulous || 0.3;
     if (karma < 40) calculatedMeticulous += 0.20;
@@ -241,11 +245,12 @@ function generateBuyerForSlot(slot) {
         type: template.type,
         offerPrice: offer,
         initialOfferPrice: offer,
-        maxOfferPrice: Math.round(offer * (1.10 + Math.random() * 0.12)),
+        // Снижен потолок торга (максимум +5-10% от текущего предложения, было 10-22%)
+        maxOfferPrice: Math.round(offer * (1.05 + Math.random() * 0.05)),
         patience: 100,
         meticulous: Math.min(0.95, calculatedMeticulous),
         successfulHagglesCount: 0,
-        maxAllowedHaggles: Math.floor(3 + Math.random() * 2)
+        maxAllowedHaggles: Math.floor(2 + Math.random() * 2)
     };
     
     slot.buyerTimerLeft = Math.floor(90 + Math.random() * 180);
@@ -271,7 +276,7 @@ function sendBackgroundNotification(title, body) {
 
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-        document.title = "Симулятор Перекупа v0.5.1";
+        document.title = "Симулятор Перекупа v0.5.2";
     }
 });
 
@@ -327,7 +332,7 @@ function cancelSalesLot(idx) {
 }
 
 // ========================================================
-// ЛОГИКА ТОРГА С ПРОВЕРКОЙ ЧЕСТНОСТИ
+// ЛОГИКА ТОРГА С ПРОВЕРКОЙ ЧЕСТНОСТИ (УСЛОЖНЕНА v0.5.2)
 // ========================================================
 let activeHaggleLotIndex = null;
 let currentSaleBuyer = null;
@@ -453,7 +458,7 @@ function attemptHaggleSale(type) {
         }
     }
 
-    // 2. ПРОВЕРКА НА УМЫШЛЕННЫЙ ОБМАН ИГРОКА (ТОЛЬКО ЕСЛИ СКРУТИЛ ОДОМЕТР ИЛИ ЗАЛИЛ ПРИСАДКУ)
+    // 2. ПРОВЕРКА НА УМЫШЛЕННЫЙ ОБМАН ИГРОКА
     let isIntentionalScam = !!car.rolledOdometer || !!car.hasAdditive;
     if (isIntentionalScam) {
         let scamRoll = Math.random();
@@ -535,18 +540,19 @@ function attemptHaggleSale(type) {
         return;
     }
 
-    // 5. БАЗОВЫЙ РАСЧЁТ ТОРГА
-    let baseSuccess = type === 'safe' ? 0.85 : 0.50;
+    // 5. БАЗОВЫЙ РАСЧЁТ ТОРГА (УСЛОЖНЕН v0.5.2)
+    let baseSuccess = type === 'safe' ? 0.75 : 0.40; // Шанс стал ниже
     let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    let statBonus = ((karma - 50) / 200) + (lvl / 250);
+    let statBonus = ((karma - 50) / 250) + (lvl / 300); // Бонус от лвл/кармы стал меньше
     
     let successChance = baseSuccess + statBonus;
     let success = Math.random() < successChance;
 
     if (success) {
         currentSaleBuyer.successfulHagglesCount += 1;
-        let increasePercent = type === 'safe' ? (0.04 + Math.random() * 0.03) : (0.08 + Math.random() * 0.05);
+        // Шаг торга снижен (теперь +2..5% за раз вместо 4..13%)
+        let increasePercent = type === 'safe' ? (0.02 + Math.random() * 0.03) : (0.05 + Math.random() * 0.04);
         let delta = Math.round(currentSaleBuyer.offerPrice * increasePercent);
         
         if (currentSaleBuyer.offerPrice + delta > currentSaleBuyer.maxOfferPrice) {
@@ -579,7 +585,7 @@ function attemptHaggleSale(type) {
         playSound('win');
         tgHaptic('success');
     } else {
-        let damage = type === 'safe' ? Math.floor(15 + Math.random() * 10) : Math.floor(30 + Math.random() * 15);
+        let damage = type === 'safe' ? Math.floor(20 + Math.random() * 15) : Math.floor(35 + Math.random() * 20); // Терпение кончается быстрее
         currentSaleBuyer.patience = Math.max(0, currentSaleBuyer.patience - damage);
         
         setTxt("saleBuyerPatienceText", currentSaleBuyer.patience + "%");

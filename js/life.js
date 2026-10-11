@@ -1,9 +1,10 @@
 // ========================================================
-// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, ФОРТУНА, САРАИ, ПОРТ (v0.5.1)
+// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, ФОРТУНА, САРАИ, ПОРТ (v0.5.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Комбинированная экономика (₽ + ⭐ Stars), выписка Во-Банка,
 // информативные карточки жилья с матрицей доработок,
-// скидки мастерской у Решалы и городские события
+// скидки мастерской у Решалы и городские события.
+// Баланс усложнён: инфляция теневых услуг и анти-фарм кредитов.
 // ========================================================
 
 // ========================================================
@@ -101,16 +102,17 @@ function takeLoan(amount) {
     let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
     if (debt >= 2500000) return showToast("Лимит кредитной линии в Во-Банке исчерпан!");
 
-    let received = Math.round(amount * 0.95);
+    // Инфляция комиссии банка (10% вместо 5%)
+    let received = Math.round(amount * 0.90);
     state.player.cash = (state.player.cash || 0) + received;
     state.player.loanDebt = debt + amount;
-    logBankTransaction(`Одобрен кредит Во-Банка (-5% комиссия)`, received, true);
+    logBankTransaction(`Одобрен кредит Во-Банка (-10% комиссия)`, received, true);
 
     saveState();
     updateHeaderUI();
     playSound('win');
     tgHaptic('success');
-    showToast("Во-Банк перевел: " + received.toLocaleString() + " ₽ (Комиссия за выдачу 5%)");
+    showToast("Во-Банк перевел: " + received.toLocaleString() + " ₽ (Комиссия за выдачу 10%)");
 }
 
 function repayLoan(percent) {
@@ -139,13 +141,13 @@ function buyReshalaPack(type) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
 
     if (type === 'pack1') {
-        if (cash < 150000) return showToast("Не хватает 150,000 ₽!");
-        state.player.cash -= 150000;
+        if (cash < 200000) return showToast("Не хватает 200,000 ₽!"); // Было 150к
+        state.player.cash -= 200000;
         state.player.connections = (state.player.connections || 0) + 1;
         showToast("Связи приобретены (+1 🤝)!");
     } else if (type === 'pack5') {
-        if (cash < 650000) return showToast("Не хватает 650,000 ₽!");
-        state.player.cash -= 650000;
+        if (cash < 850000) return showToast("Не хватает 850,000 ₽!"); // Было 650к
+        state.player.cash -= 850000;
         state.player.connections = (state.player.connections || 0) + 5;
         showToast("Оптовый пакет связей (+5 🤝) активирован!");
     }
@@ -161,7 +163,7 @@ function buyReshalaService(service) {
         let lvl = (state.player && state.player.level) ? state.player.level : 1;
         if (lvl < 10) return showToast("Услуга доступна с 10 уровня!");
 
-        let baseCost = 350000;
+        let baseCost = 450000; // Подорожало с 350к
         let finalCost = Math.round(baseCost * discountMultiplier);
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
         let stars = (state.player && state.player.stars) ? state.player.stars : 0;
@@ -182,7 +184,7 @@ function buyReshalaService(service) {
         openVerdictModal("🚨 КРЫША ОФОРМЛЕНА", `ГИБДД не тронет ваши авто следующие 3 дня!${discountNote}`, true);
     } else if (service === 'license') {
         if (state.player && state.player.hasRacingLicense) return showToast("Лицензия уже получена!");
-        let baseCost = 85000;
+        let baseCost = 120000; // Подорожало с 85к
         let finalCost = Math.round(baseCost * discountMultiplier);
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
         let stars = (state.player && state.player.stars) ? state.player.stars : 0;
@@ -212,7 +214,7 @@ function openLegalizeCarModal() {
 
     const caps = typeof getPlayerHousingCapabilities === 'function' ? getPlayerHousingCapabilities() : { reshalaDiscountPct: 0 };
     const discountMultiplier = Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100));
-    let basePrice = 200000;
+    let basePrice = 300000; // Легализация подорожала с 200к
     let finalCost = Math.round(basePrice * discountMultiplier);
 
     if (criminalCars.length === 0) {
@@ -240,7 +242,7 @@ function openLegalizeCarModal() {
     if (mod) mod.classList.add('active');
 }
 
-function confirmLegalizeCar(carId, finalCost = 200000) {
+function confirmLegalizeCar(carId, finalCost = 300000) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
     let conn = (state.player && state.player.connections) ? state.player.connections : 0;
 
@@ -1083,7 +1085,7 @@ function resolvePodstava(action) {
     closeModal('modalAutoPodstava');
     if (action === 'pay') {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-        let cost = Math.min(150000, cash);
+        let cost = Math.min(250000, cash); // Инфляция откупа
         state.player.cash -= cost;
         state.player.mood = Math.max(0, (state.player.mood || 80) - 20);
         saveState(); updateHeaderUI();
@@ -1238,9 +1240,9 @@ function roadAssistanceAction() {
 
 function donatePartsToMechanic() {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 35000) return showToast("Нужно 35,000 ₽ на закупку деталей!");
+    if (cash < 45000) return showToast("Нужно 45,000 ₽ на закупку деталей!");
 
-    state.player.cash -= 35000;
+    state.player.cash -= 45000;
     let conn = (state.player && state.player.connections) ? state.player.connections : 0;
     state.player.connections = conn + 1;
     let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
@@ -1253,9 +1255,9 @@ function donatePartsToMechanic() {
 
 function bigCharityDonate() {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 100000) return showToast("Нужно 100,000 ₽!");
+    if (cash < 150000) return showToast("Нужно 150,000 ₽!");
 
-    state.player.cash -= 100000;
+    state.player.cash -= 150000;
     let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     state.player.karma = Math.min(100, karma + 25);
 
@@ -1291,8 +1293,8 @@ function spinWheelAction(isFree) {
         state.player.lastFreeSpinDay = pDay;
     } else {
         let stars = (state.player && state.player.stars) ? state.player.stars : 0;
-        if (stars < 25) return showToast("Нужно 25 Stars ⭐!");
-        state.player.stars -= 25;
+        if (stars < 30) return showToast("Нужно 30 Stars ⭐!");
+        state.player.stars -= 30;
     }
 
     const cvs = document.getElementById('wheelCanvas');
@@ -1338,8 +1340,8 @@ function spinWheelAction(isFree) {
 function refuelAction(type) {
     if (type === 'cash') {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-        if (cash < 5000) return showToast("Нужно 5,000 ₽ на полный бак!");
-        state.player.cash -= 5000;
+        if (cash < 7500) return showToast("Нужно 7,500 ₽ на полный бак!"); // Инфляция бензина
+        state.player.cash -= 7500;
         state.player.fuel = 100;
         saveState();
         updateHeaderUI();

@@ -1,12 +1,12 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.5.1)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.5.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Интерактивные неоновые жетоны наград, реальное время (00:00),
 // комбинированная экономика (₽ + ⭐), кастомизация цвета HUD,
-// анимированные никнеймы и аватарки, квесты и стабильный запуск
+// динамические тренды авторынка (макроэкономика)
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.5.1";
+const CURRENT_GAME_VERSION = "v0.5.2";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -354,7 +354,7 @@ const DEFAULT_STATE = {
     ownedPlates: ["В777ВВ 77"], registeredPlates: ["В777ВВ 77"],
     activeCategory: 'economy', marketFeed: [], p2pMode: 'cars', syndicateSubTab: 'contracts',
     myP2PListings: [], p2pMarketListings: [], businesses: [], confiscatedLot: null, blackMarketPlates: [],
-    marketModifiers: { economy: 1, comfort: 1, premium: 1, all: 1 },
+    marketModifiers: { economy: 1, comfort: 1, premium: 1, hyper: 1, moto: 1, truck: 1, all: 1 },
     lifeChatMessages: [], friendsList: []
 };
 
@@ -800,20 +800,23 @@ function refreshDailyQuestsList() {
 // ========================================================
 function getMarketRefreshCost() {
     let lvl = state.player?.level || 1;
-    return 150 + (lvl * 350);
+    // Удорожание ленты рынка для вывода денег
+    return 250 + (lvl * 450);
 }
 
 function getGarageSlotCost() {
     let bs = state.player?.baseSlots || 2;
     let extraSlots = Math.max(0, bs - 2);
-    return Math.round(250000 * Math.pow(1.65, extraSlots));
+    // Удорожание боксов для вывода денег
+    return Math.round(300000 * Math.pow(1.65, extraSlots));
 }
 
 function getExpressTicketUpgradeCost() {
     let m = state.player?.maxExpressTickets || 25;
     let extra = Math.max(0, m - 25);
     const steps = Math.floor(extra / 25);
-    return Math.round(50000 * Math.pow(1.5, steps));
+    // Удорожание расширения талонов
+    return Math.round(75000 * Math.pow(1.5, steps));
 }
 
 function getTotalGarageSlots() {
@@ -1134,6 +1137,11 @@ function sanitizeState() {
     if (!Array.isArray(state.marketFeed) || state.marketFeed.length === 0 || !state.marketFeed.some(c => c && !c.unavailable)) {
         state.marketFeed = [];
     }
+
+    // Инициализация модификаторов рынка
+    if (!state.marketModifiers) {
+        state.marketModifiers = { economy: 1, comfort: 1, premium: 1, hyper: 1, moto: 1, truck: 1, all: 1 };
+    }
 }
 
 function saveState() {
@@ -1256,6 +1264,33 @@ function importSaveCodeAction() {
 }
 
 // ========================================================
+// ДИНАМИЧЕСКИЕ ТРЕНДЫ АВТОРЫНКА (MARKET NEWS)
+// ========================================================
+function triggerMarketNewsEvent() {
+    if (typeof MARKET_NEWS_EVENTS === 'undefined' || MARKET_NEWS_EVENTS.length === 0) return;
+    const ev = MARKET_NEWS_EVENTS[Math.floor(Math.random() * MARKET_NEWS_EVENTS.length)];
+    
+    if (!state.marketModifiers) state.marketModifiers = { economy: 1, comfort: 1, premium: 1, hyper: 1, moto: 1, truck: 1, all: 1 };
+    state.marketModifiers[ev.cat] = ev.mod;
+    
+    if (!state.player.phoneMessages) state.player.phoneMessages = [];
+    state.player.phoneMessages.unshift({
+        id: "sms_news_" + Date.now(),
+        sender: ev.sender,
+        avatar: ev.type === 'up' ? "📈" : "📉",
+        preview: ev.title,
+        time: "00:00",
+        unread: true,
+        chatHistory: [
+            { from: "them", text: ev.text }
+        ]
+    });
+    
+    if (typeof PhoneManager !== 'undefined') PhoneManager.updateUnreadBadge();
+    showToast(`📰 Свежие новости рынка: ${ev.title}`);
+}
+
+// ========================================================
 // 8. ПРИВЯЗКА К СМЕНЕ СУТОК В РЕАЛЬНОМ ВРЕМЕНИ (ПОЛНОЧЬ 00:00)
 // ========================================================
 function checkRealTimeDayChange() {
@@ -1278,6 +1313,21 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.lastRealDayTimestamp = currentDateObj.getTime();
     state.player.expressTickets = state.player.maxExpressTickets || 25;
     state.player.consecutiveRaces = 0;
+
+    // Логика Динамических Трендов Рынка (Market News)
+    if (typeof MARKET_NEWS_EVENTS !== 'undefined' && Math.random() < 0.35) {
+        triggerMarketNewsEvent();
+    } else {
+        // Постепенное возвращение рынка к норме (1.0)
+        if (state.marketModifiers) {
+            ['economy', 'comfort', 'premium', 'hyper', 'moto', 'truck', 'all'].forEach(k => {
+                if (state.marketModifiers[k]) {
+                    if (state.marketModifiers[k] > 1.0) state.marketModifiers[k] = Math.max(1.0, state.marketModifiers[k] - 0.05);
+                    if (state.marketModifiers[k] < 1.0) state.marketModifiers[k] = Math.min(1.0, state.marketModifiers[k] + 0.05);
+                }
+            });
+        }
+    }
 
     let curId = state.player?.housingId || 'trailer';
     let isOwn = state.player?.ownedHouses?.includes(curId);
@@ -1474,7 +1524,7 @@ function updateLevelGatesUI() {
     const gates = [
         { id: 'moto', lockId: 'lock-moto', minLvl: 5 },
         { id: 'atv', lockId: 'lock-atv', minLvl: 8 },
-        { id: 'comfort', lockId: 'lock-comfort', minLvl: 30 },
+        { id: 'comfort', lockId: 'lock-comfort', minLvl: 20 },
         { id: 'premium', lockId: 'lock-premium', minLvl: 30 },
         { id: 'hyper', lockId: 'lock-hyper', minLvl: 50 },
         { id: 'truck', lockId: 'lock-truck', minLvl: 50 },
@@ -2125,3 +2175,4 @@ window.buyConsumableAction = buyConsumableAction;
 window.buyShopDocAction = buyShopDocAction;
 window.buyHomeFurnitureShop = buyHomeFurnitureShop;
 window.renderProfileAnalytics = renderProfileAnalytics;
+window.triggerMarketNewsEvent = triggerMarketNewsEvent;
