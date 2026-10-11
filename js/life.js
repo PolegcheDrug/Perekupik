@@ -1,8 +1,9 @@
 // ========================================================
-// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, ФОРТУНА, САРАИ, ПОРТ (v0.4.6)
+// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, ФОРТУНА, САРАИ, ПОРТ (v0.4.7)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Комбинированная экономика (₽ + ⭐ Stars), выписка Во-Банка,
-// находки в сараях, обустройство дома и городские события
+// информативные карточки жилья с матрицей доработок,
+// скидки мастерской у Решалы и городские события
 // ========================================================
 
 // ========================================================
@@ -132,7 +133,7 @@ function repayLoan(percent) {
 }
 
 // ========================================================
-// 2. РЕШАЛА АРТУР (ТЕНЕВЫЕ СЕРВИСЫ)
+// 2. РЕШАЛА АРТУР (ТЕНЕВЫЕ СЕРВИСЫ СО СКИДКАМИ ОТ БОКСОВ)
 // ========================================================
 function buyReshalaPack(type) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -153,17 +154,23 @@ function buyReshalaPack(type) {
 }
 
 function buyReshalaService(service) {
+    // Расчет скидки от подготовленной мастерской/бокса
+    const caps = typeof getPlayerHousingCapabilities === 'function' ? getPlayerHousingCapabilities() : { reshalaDiscountPct: 0 };
+    const discountMultiplier = Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100));
+
     if (service === 'roof') {
         let lvl = (state.player && state.player.level) ? state.player.level : 1;
         if (lvl < 10) return showToast("Услуга доступна с 10 уровня!");
 
+        let baseCost = 350000;
+        let finalCost = Math.round(baseCost * discountMultiplier);
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
         let stars = (state.player && state.player.stars) ? state.player.stars : 0;
 
-        if (cash < 350000) return showToast("Нужно 350,000 ₽!");
+        if (cash < finalCost) return showToast(`Нужно ${finalCost.toLocaleString()} ₽!`);
         if (stars < 45) return showToast("Требуется ещё 45 Stars ⭐!");
 
-        state.player.cash -= 350000;
+        state.player.cash -= finalCost;
         state.player.stars -= 45;
 
         let d = (state.player && state.player.policeImmunityDays) ? state.player.policeImmunityDays : 0;
@@ -172,16 +179,19 @@ function buyReshalaService(service) {
         updateHeaderUI();
         playSound('win');
         tgHaptic('success');
-        openVerdictModal("🚨 КРЫША ОФОРМЛЕНА", "ГИБДД не тронет ваши авто следующие 3 дня!", true);
+        let discountNote = caps.reshalaDiscountPct > 0 ? ` (Скидка цеха: -${caps.reshalaDiscountPct}%)` : "";
+        openVerdictModal("🚨 КРЫША ОФОРМЛЕНА", `ГИБДД не тронет ваши авто следующие 3 дня!${discountNote}`, true);
     } else if (service === 'license') {
         if (state.player && state.player.hasRacingLicense) return showToast("Лицензия уже получена!");
+        let baseCost = 85000;
+        let finalCost = Math.round(baseCost * discountMultiplier);
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
         let stars = (state.player && state.player.stars) ? state.player.stars : 0;
 
-        if (cash < 85000) return showToast("Нужно 85,000 ₽!");
+        if (cash < finalCost) return showToast(`Нужно ${finalCost.toLocaleString()} ₽!`);
         if (stars < 15) return showToast("Требуется ещё 15 Stars ⭐!");
 
-        state.player.cash -= 85000;
+        state.player.cash -= finalCost;
         state.player.stars -= 15;
         state.player.hasRacingLicense = true;
         saveState();
@@ -201,6 +211,11 @@ function openLegalizeCarModal() {
     const list = document.getElementById('legalizeCarList');
     if (!list) return;
 
+    const caps = typeof getPlayerHousingCapabilities === 'function' ? getPlayerHousingCapabilities() : { reshalaDiscountPct: 0 };
+    const discountMultiplier = Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100));
+    let basePrice = 200000;
+    let finalCost = Math.round(basePrice * discountMultiplier);
+
     if (criminalCars.length === 0) {
         list.innerHTML = "<div class='sub-label text-center py-4'>У вас в гараже нет проблемных авто (в розыске или без учёта).</div>";
     } else {
@@ -209,14 +224,15 @@ function openLegalizeCarModal() {
             let cName = c.name ? c.name : "Авто";
             let cPlate = c.customPlate ? c.customPlate : (c.plate ? c.plate : "ТРАНЗИТ");
             let reason = c.isStolen ? "В розыске" : "Учёт аннулирован (12.5.1)";
+            let discountBadge = caps.reshalaDiscountPct > 0 ? `<span class="tag-badge bg-tag-green ml-1">-${caps.reshalaDiscountPct}% цех</span>` : "";
 
             html += `
             <div class='glass-card flex-between p-2 mb-1'>
                 <div>
-                    <b>${cName}</b>
+                    <b>${cName}</b> ${discountBadge}
                     <div class='sub-label color-red'>${reason} (${cPlate})</div>
                 </div>
-                <button onclick="confirmLegalizeCar('${c.id}')" class='btn btn-purple btn-auto btn-sm'>Отмыть VIN (200k + 1 🤝)</button>
+                <button onclick="confirmLegalizeCar('${c.id}', ${finalCost})" class='btn btn-purple btn-auto btn-sm'>Отмыть VIN (${(finalCost/1000).toFixed(0)}k + 1 🤝)</button>
             </div>`;
         });
         list.innerHTML = html;
@@ -225,13 +241,13 @@ function openLegalizeCarModal() {
     if (mod) mod.classList.add('active');
 }
 
-function confirmLegalizeCar(carId) {
+function confirmLegalizeCar(carId, finalCost = 200000) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
     let conn = (state.player && state.player.connections) ? state.player.connections : 0;
 
-    if (cash < 200000 || conn < 1) return showToast("Нужно 200,000 ₽ и 1 Связь 🤝!");
+    if (cash < finalCost || conn < 1) return showToast(`Нужно ${finalCost.toLocaleString()} ₽ и 1 Связь 🤝!`);
 
-    state.player.cash -= 200000;
+    state.player.cash -= finalCost;
     state.player.connections -= 1;
 
     if (state.garage) {
@@ -583,7 +599,7 @@ function scoutBarnTier(tier) {
 }
 
 // ========================================================
-// 5. НЕДВИЖИМОСТЬ
+// 5. НЕДВИЖИМОСТЬ: ИНФОРМАТИВНЫЙ РЕНДЕР И МАТРИЦА ДОРАБОТОК
 // ========================================================
 function renderHousing() {
     const list = document.getElementById('housingMarketList');
@@ -594,11 +610,11 @@ function renderHousing() {
         return;
     }
 
-    let curId = (state.player && state.player.housingId) ? state.player.housingId : 'room';
+    let curId = (state.player && state.player.housingId) ? state.player.housingId : 'trailer';
     let owned = (state.player && state.player.ownedHouses) ? state.player.ownedHouses : [];
 
     let currentHouse = HOUSING_LIST.find(h => h.id === curId);
-    let curTitle = currentHouse ? currentHouse.name : "Комната в общежитии";
+    let curTitle = currentHouse ? currentHouse.name : "Бытовка на стройплощадке";
     setTxt('currentHomeText', "Текущее: " + curTitle);
 
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
@@ -614,28 +630,49 @@ function renderHousing() {
 
         let statusTag = isPurchased 
             ? "<span class='tag-badge bg-tag-green'>В собственности</span>"
-            : "<span class='tag-badge bg-tag-amber'>Аренда</span>";
+            : (isCurrent ? "<span class='tag-badge bg-tag-cyan'>Арендовано (Активно)</span>" : "<span class='tag-badge bg-tag-amber'>Доступно в аренду</span>");
+
+        // Бейджи технических возможностей
+        let tuneBadge = h.canTune 
+            ? `<span class="tag-badge bg-tag-green" title="Слесарный пост со смотровой ямой и верстаком"><i class="fa-solid fa-screwdriver-wrench"></i> Тюнинг & Яма ✓</span>`
+            : `<span class="tag-badge bg-tag-red" title="Нет условий для сварки и слесарки"><i class="fa-solid fa-ban"></i> Тюнинг ✗</span>`;
+
+        let detailBadge = h.canDetail
+            ? `<span class="tag-badge bg-tag-cyan" title="Закрытый бокс с водой и освещением"><i class="fa-solid fa-wand-magic-sparkles"></i> Детейлинг ✓</span>`
+            : `<span class="tag-badge bg-tag-amber" title="На улице нельзя полировать кузов"><i class="fa-solid fa-xmark"></i> Детейлинг ✗</span>`;
+
+        let obdBadge = h.canOBDGarage
+            ? `<span class="tag-badge bg-tag-green" title="Сеть 220V для стационарной работы Launch"><i class="fa-solid fa-laptop-code"></i> Launch ЭБУ ✓</span>`
+            : `<span class="tag-badge bg-tag-red" title="Нет стационарного питания"><i class="fa-solid fa-xmark"></i> Launch ✗</span>`;
+
+        let personalBadge = h.hasPersonalSlot
+            ? `<span class="tag-badge bg-tag-purple" title="Охраняемый бокс под личный болид"><i class="fa-solid fa-crown"></i> Личный авто ✓</span>`
+            : `<span class="tag-badge bg-tag-red" title="Бросать на стройке рискованно"><i class="fa-solid fa-xmark"></i> Без лички</span>`;
+
+        // Калькулятор машиноместа
+        let slotPriceRent = h.slots > 0 ? Math.round((h.rent || 1000) / h.slots) : (h.rent || 1000);
+        let slotPriceBuy = h.slots > 0 ? Math.round((h.buyPrice || 1000000) / h.slots) : (h.buyPrice || 1000000);
 
         let actionBtns = "";
         if (isLvlLocked) {
-            actionBtns = "<button class='btn btn-dark btn-sm w-full opacity-50' disabled>Доступно с " + h.minLevel + " уровня</button>";
+            actionBtns = "<button class='btn btn-dark btn-sm w-full opacity-50' disabled>Доступно с " + h.minLevel + " уровня авторитета</button>";
         } else if (isCurrent && isPurchased) {
             actionBtns = `
             <div class='grid-2 mt-2'>
-                <button onclick="openHomeInteriorModal('${h.id}')" class='btn btn-cyan btn-sm'>🛋️ Обустройство дома</button>
-                <button class='btn btn-dark btn-sm opacity-50' disabled>Текущее жилье</button>
+                <button onclick="openHomeInteriorModal('${h.id}')" class='btn btn-cyan btn-sm'>🛋️ Обустройство объекта</button>
+                <button class='btn btn-dark btn-sm opacity-50' disabled>Текущая база ✓</button>
             </div>`;
         } else if (isCurrent && !isPurchased) {
             actionBtns = `
             <div class='grid-2 mt-2'>
-                <button onclick="buyHousingProperty('${h.id}')" class='btn btn-amber btn-sm'>Купить (${(h.buyPrice / 1000000).toFixed(1)}M ₽ + ${reqStars} ⭐)</button>
-                <button class='btn btn-dark btn-sm opacity-50' disabled>Арендовано</button>
+                <button onclick="buyHousingProperty('${h.id}')" class='btn btn-amber btn-sm'>Выкупить (${(h.buyPrice / 1000000).toFixed(1)}M + ${reqStars} ⭐)</button>
+                <button class='btn btn-dark btn-sm opacity-50' disabled>Активная аренда</button>
             </div>`;
         } else if (isPurchased) {
             actionBtns = `
             <div class='grid-2 mt-2'>
                 <button onclick="openHomeInteriorModal('${h.id}')" class='btn btn-cyan btn-sm'>🛋️ Обустройство</button>
-                <button onclick="moveIntoHousing('${h.id}')" class='btn btn-green btn-sm'>Переехать 🚚</button>
+                <button onclick="moveIntoHousing('${h.id}')" class='btn btn-green btn-sm'>Сделать основной базой 🚚</button>
             </div>`;
         } else {
             let rentVal = h.rent ? h.rent : 2000;
@@ -647,16 +684,37 @@ function renderHousing() {
         }
 
         html += `
-        <div class='glass-card mb-3'>
+        <div class='glass-card mb-3 ${isCurrent ? 'personal-car-card' : ''}'>
             <div class='car-img-wrap' style='height:140px; position:relative;'>
                 <img src='${imgSrc}' class='car-img' onerror="this.onerror=null; this.src='${fallbackSrc}';">
                 <div class='badge-tag' style='bottom:8px; right:8px;'>${statusTag}</div>
+                <div class='badge-tag bg-tag-cyan' style='top:8px; left:8px; right:auto;'>${h.typeLabel || 'Объект'}</div>
             </div>
+            
             <div class='flex-between mb-1'>
-                <h4 class='font-bold'>${h.name}</h4>
-                <div class='color-cyan font-bold text-xs'>+${h.slots} мест гаража</div>
+                <h4 class='font-bold color-cyan'>${h.name}</h4>
+                <div class='color-green font-bold text-xs'>+${h.slots} мест автопарка</div>
             </div>
-            <p class='sub-label mb-2'>${h.desc || "Комфортное жильё для отдыха перекупа."}</p>
+
+            <!-- МАТРИЦА ТЕХНИЧЕСКИХ ВОЗМОЖНОСТЕЙ -->
+            <div class="car-mods-badges-container my-2">
+                ${tuneBadge}
+                ${detailBadge}
+                ${obdBadge}
+                ${personalBadge}
+            </div>
+
+            <p class='sub-label mb-2' style='line-height:1.4;'>${h.desc || "Комфортное жильё для отдыха перекупа."}</p>
+            
+            <!-- ПЕРК И КАЛЬКУЛЯТОР МАШИНОМЕСТА -->
+            <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass); font-size:10px;">
+                <div class="color-amber font-bold mb-1">⭐ Особенность: ${h.perk || 'Стандартные условия'}</div>
+                <div class="flex-between text-xs sub-label">
+                    <span>Уют: <b class="${(h.moodBonus || 0) >= 0 ? 'color-green' : 'color-red'}">${(h.moodBonus || 0) >= 0 ? '+' : ''}${h.moodBonus || 0}% настроения/день</b></span>
+                    <span>1 машиноместо: <b class="color-cyan">${h.slots > 0 ? (slotPriceBuy / 1000).toFixed(0) + 'k ₽' : '—'}</b></span>
+                </div>
+            </div>
+
             ${actionBtns}
         </div>`;
     });
@@ -670,7 +728,8 @@ function rentHousing(hId) {
     saveState();
     renderHousing();
     updateHeaderUI();
-    showToast("Вы переехали в арендованное жилье!");
+    if (typeof renderGarage === 'function') renderGarage();
+    showToast("Вы переехали в арендованное жилье! Доступные возможности обновлены.");
 }
 
 function buyHousingProperty(hId) {
@@ -697,9 +756,10 @@ function buyHousingProperty(hId) {
     saveState();
     renderHousing();
     updateHeaderUI();
+    if (typeof renderGarage === 'function') renderGarage();
     playSound('win');
     tgHaptic('success');
-    openVerdictModal("НОВОСЕЛЬЕ! 🍾", "Вы выкупили «" + h.name + "» в собственность!", true);
+    openVerdictModal("НОВОСЕЛЬЕ! 🍾", "Вы выкупили «" + h.name + "» в собственность! Все технические возможности бокса теперь ваши навсегда.", true);
 }
 
 function moveIntoHousing(hId) {
@@ -708,6 +768,7 @@ function moveIntoHousing(hId) {
     saveState();
     renderHousing();
     updateHeaderUI();
+    if (typeof renderGarage === 'function') renderGarage();
     showToast("Вы переехали в собственное жилье!");
 }
 
@@ -765,10 +826,49 @@ function buyHomeFurniture(fId, cost, reqStars = 0) {
     updateHeaderUI();
     playSound('win');
     tgHaptic('success');
-    showToast("Куплено и установлено в вашем доме!");
+    showToast("Куплено и установлено в вашем объекте!");
 
-    let curId = (state.player && state.player.housingId) ? state.player.housingId : 'room';
+    let curId = (state.player && state.player.housingId) ? state.player.housingId : 'trailer';
     openHomeInteriorModal(curId);
+}
+
+/**
+ * Случайные события в жилье и боксах при наступлении полночи
+ */
+function triggerHousingRandomEvent() {
+    if (typeof HOUSING_RANDOM_EVENTS === 'undefined' || !Array.isArray(HOUSING_RANDOM_EVENTS)) return;
+    if (Math.random() > 0.28) return; // 28% шанс события в сутки
+
+    const caps = typeof getPlayerHousingCapabilities === 'function' ? getPlayerHousingCapabilities() : { category: 'street' };
+    const matchingEvents = HOUSING_RANDOM_EVENTS.filter(e => e.applicableCategories.includes(caps.category));
+    if (matchingEvents.length === 0) return;
+
+    const ev = matchingEvents[Math.floor(Math.random() * matchingEvents.length)];
+    
+    if (ev.penaltyCash) {
+        state.player.cash = Math.max(0, (state.player.cash || 0) - ev.penaltyCash);
+    }
+    if (ev.penaltyMood) {
+        state.player.mood = Math.max(10, (state.player.mood || 85) - ev.penaltyMood);
+    }
+    if (ev.bonusMood) {
+        state.player.mood = Math.min(100, (state.player.mood || 85) + ev.bonusMood);
+    }
+    if (ev.bonusKarma) {
+        state.player.karma = Math.min(100, (state.player.karma || 50) + ev.bonusKarma);
+    }
+    if (ev.bonusStock && state.businesses) {
+        state.businesses.forEach(b => {
+            b.stock = Math.min(100, (b.stock || 0) + ev.bonusStock);
+        });
+    }
+
+    saveState();
+    updateHeaderUI();
+
+    setTimeout(() => {
+        openVerdictModal(ev.title, `${ev.desc}\n\n${ev.resultMsg || ev.rewardDesc}`, !(ev.penaltyCash || ev.penaltyMood));
+    }, 1200);
 }
 
 // ========================================================
@@ -1325,6 +1425,7 @@ window.buyHousingProperty = buyHousingProperty;
 window.moveIntoHousing = moveIntoHousing;
 window.openHomeInteriorModal = openHomeInteriorModal;
 window.buyHomeFurniture = buyHomeFurniture;
+window.triggerHousingRandomEvent = triggerHousingRandomEvent;
 window.renderContainersList = renderContainersList;
 window.openPortContainerAction = openPortContainerAction;
 window.openBlindAuctionModal = openBlindAuctionModal;

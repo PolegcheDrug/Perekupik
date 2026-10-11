@@ -1,8 +1,8 @@
 // ========================================================
-// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, НОМЕРА, ТОП (v0.4.5)
+// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, НОМЕРА, ТОП (v0.4.7)
 // Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
 // Доступ к Синдикату с 7 уровня при наличии эндоскопа, толщиномера,
-// Launch сканера и 5 Stars ⭐. Динамическая оценка авто и номеров.
+// Launch сканера и 5 Stars ⭐. Динамическая оценка авто, номеров и боксов.
 // ========================================================
 
 let p2pActiveFilter = 'cars';
@@ -433,7 +433,7 @@ function fulfillContract(contractId, carIndex) {
 }
 
 // ----------------------------------------------------
-// 2. P2P БИРЖА ТЕХНИКИ И НОМЕРОВ
+// 2. P2P БИРЖА ТЕХНИКИ, НОМЕРОВ И НЕДВИЖИМОСТИ
 // ----------------------------------------------------
 function filterP2P(type) {
     p2pActiveFilter = type;
@@ -469,8 +469,12 @@ function renderP2PListings() {
                 bizId: "wash", bizLevel: 3, price: 320000, desc: "Готовая точка с доходностью 2,700 ₽/д."
             },
             {
-                id: "p2p_6", seller: "Maksim_Realtor", type: "housing", name: "Кирпичный гараж с ямой",
-                houseId: "garage", price: 2600000, desc: "В собственности, вместимость +3 машиноместа."
+                id: "p2p_6", seller: "Maksim_Realtor", type: "housing", name: "Стандартный бокс в ГСК-7",
+                houseId: "gsk_box", price: 1750000, desc: "В собственности, яма, верстак, +2 машиноместа."
+            },
+            {
+                id: "p2p_7", seller: "Pro_Tuning_MSK", type: "housing", name: "Тюнинг-Ангар с подъёмником",
+                houseId: "workshop_pro", price: 13500000, desc: "Подъёмник, малярка, скидка 20% у Решалы, +5 машиномест."
             }
         ];
     }
@@ -552,7 +556,7 @@ function renderP2PListings() {
             html +=
             "<div class='glass-card p-2 flex-between mb-2'>" +
                 "<div>" +
-                    "<b class='text-xs color-cyan'><i class='fa-solid fa-house'></i> " + item.name + "</b>" +
+                    "<b class='text-xs color-cyan'><i class='fa-solid fa-warehouse'></i> " + item.name + "</b>" +
                     "<div class='sub-label' style='font-size:10px;'>Продавец: <b>" + item.seller + "</b> | " + (item.desc || '') + "</div>" +
                 "</div>" +
                 "<div class='text-right'>" +
@@ -624,10 +628,10 @@ function selectP2PListingType(type) {
         if (owned.length > 0 && typeof HOUSING_LIST !== 'undefined') {
             owned.forEach(hId => {
                 const h = HOUSING_LIST.find(item => item.id === hId);
-                if (h) opts += "<option value='house_" + h.id + "'>" + h.name + "</option>";
+                if (h) opts += "<option value='house_" + h.id + "'>" + h.name + " (+" + h.slots + " мест)</option>";
             });
         }
-        if (!opts) opts = "<option value=''>Нет жилья в собственности</option>";
+        if (!opts) opts = "<option value=''>Нет объектов недвижимости в собственности</option>";
     }
 
     if (select) select.innerHTML = opts;
@@ -756,7 +760,7 @@ function confirmCreateP2PListing() {
             name: h.name,
             houseId: h.id,
             price: price,
-            desc: `Недвижимость в собственности. Гараж на +${h.slots} мест.`
+            desc: `Недвижимость в собственности. Вместимость: +${h.slots} мест.`
         });
 
         if (!state.myP2PListings) state.myP2PListings = [];
@@ -764,7 +768,7 @@ function confirmCreateP2PListing() {
 
         state.player.ownedHouses = (state.player.ownedHouses || []).filter(id => id !== hId);
         if (state.player.housingId === hId) {
-            state.player.housingId = 'room';
+            state.player.housingId = 'trailer';
             state.player.housingType = 'rent';
         }
     }

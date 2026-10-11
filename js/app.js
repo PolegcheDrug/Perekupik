@@ -1,11 +1,11 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.4.6)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.4.7)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Интерактивные неоновые жетоны наград, реальное время (00:00),
 // комбинированная экономика (₽ + ⭐), квесты и стабильный запуск
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.4.6";
+const CURRENT_GAME_VERSION = "v0.4.7";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -323,7 +323,7 @@ const DEFAULT_STATE = {
         hunger: 80, mood: 85, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
         lastRealDayTimestamp: Date.now(),
         diet: 'shaurma', 
-        housingId: 'trailer', // Стартуем в бытовке без гаражного бокса!
+        housingId: 'trailer', // Стартуем в бытовке у обочины
         housingType: 'rent', 
         ownedHouses: [], 
         selectedStreetCarIndex: 0,
@@ -467,7 +467,7 @@ function refreshDailyQuestsList() {
 }
 
 // ========================================================
-// 5. РАСЧЕТ ЗАТРАТ И СЛОТОВ
+// 5. РАСЧЕТ ЗАТРАТ И СЛОТОВ АВТОПАРКА
 // ========================================================
 function getMarketRefreshCost() {
     let lvl = state.player?.level || 1;
@@ -490,14 +490,18 @@ function getExpressTicketUpgradeCost() {
 function getTotalGarageSlots() {
     let slots = state.player?.baseSlots || 2;
     if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
+        // Добавляем слоты текущего активного жилья
         if (state.player?.housingId) {
             const house = HOUSING_LIST.find(h => h.id === state.player.housingId);
             if (house) slots += (house.slots || 0);
         }
+        // Добавляем слоты всех остальных купленных объектов
         if (state.player?.ownedHouses && Array.isArray(state.player.ownedHouses)) {
             state.player.ownedHouses.forEach(hId => {
-                const oh = HOUSING_LIST.find(h => h.id === hId);
-                if (oh) slots += (oh.slots || 0);
+                if (hId !== state.player.housingId) {
+                    const oh = HOUSING_LIST.find(h => h.id === hId);
+                    if (oh) slots += (oh.slots || 0);
+                }
             }); 
         }
     }
@@ -942,15 +946,31 @@ function executeDayCycleMidnight(currentDateObj) {
 
     let curId = state.player?.housingId || 'trailer';
     let isOwn = state.player?.ownedHouses?.includes(curId);
-    if (!isOwn && typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
-        const h = HOUSING_LIST.find(item => item.id === curId);
-        let rentVal = h ? (h.rent || 1000) : 1000;
-        state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
+    let activeHouseObj = null;
+
+    if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
+        activeHouseObj = HOUSING_LIST.find(item => item.id === curId);
+        // Списание аренды только если жильё съёмное
+        if (!isOwn) {
+            let rentVal = activeHouseObj ? (activeHouseObj.rent || 800) : 800;
+            state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
+        }
     }
+
+    // Восстановление куража от типа жилья и мебели
+    let baseHousingMoodBonus = activeHouseObj ? (activeHouseObj.moodBonus || 0) : 0;
+    state.player.mood = Math.max(10, Math.min(100, (state.player.mood || 85) + baseHousingMoodBonus));
 
     if (state.player.furniture?.includes('home_ps5')) {
         state.player.mood = Math.min(100, (state.player.mood || 85) + 25);
     }
+    if (state.player.furniture?.includes('home_cinema_audio')) {
+        state.player.mood = Math.min(100, (state.player.mood || 85) + 35);
+    }
+    if (state.player.furniture?.includes('home_leather_sofa')) {
+        state.player.hunger = Math.min(100, (state.player.hunger || 80) + 15);
+    }
+
     let hasPersonal = state.garage?.some(c => c && c.isPersonal);
     if (hasPersonal) {
         state.player.mood = Math.min(100, (state.player.mood || 85) + 15);
@@ -1013,6 +1033,14 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
     state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
     refreshDailyQuestsList();
+
+    // Запуск случайных событий недвижимости и гаража
+    if (typeof triggerHousingRandomEvent === 'function') {
+        triggerHousingRandomEvent();
+    }
+    if (typeof triggerGarageRandomEvent === 'function') {
+        triggerGarageRandomEvent();
+    }
 
     saveState();
     updateHeaderUI();
@@ -1081,10 +1109,10 @@ function updateHeaderUI() {
 
     let gLen = state.garage ? state.garage.length : 0;
     let totalSlots = getTotalGarageSlots();
-    let hasRealGarage = typeof playerHasGarageOrWorkshop === 'function' ? playerHasGarageOrWorkshop() : false;
+    let hasWorkshop = typeof checkPlayerCapability === 'function' ? checkPlayerCapability('tune') : false;
     
-    if (hasRealGarage) {
-        setTxt('garageHeaderSlots', gLen + "/" + totalSlots);
+    if (hasWorkshop) {
+        setTxt('garageHeaderSlots', `${gLen}/${totalSlots}`);
     } else {
         setTxt('garageHeaderSlots', `${gLen}/${totalSlots} ⛺`);
     }
@@ -1354,7 +1382,7 @@ function buyConsumableAction(cost, reqStars, val) {
     }
     saveState();
     playSound('win'); tgHaptic('success');
-    showToast("Склады предприятий успешно пополнены сырьём!");
+    showToast("Склады предприятий и гаража пополнены расходниками!");
 }
 
 function renderShopTuningParts() {
@@ -1383,7 +1411,7 @@ function renderShopTuningParts() {
 
     html += `
     <div class="glass-card p-2 text-center sub-label" style="font-size:10px;">
-        💡 Спортивные компоненты покупаются непосредственно в <b>Гараже</b> под конкретный кузов!
+        💡 Спортивные компоненты покупаются непосредственно в <b>Гараже</b> под конкретный кузов при наличии смотровой ямы!
     </div>`;
 
     box.innerHTML = html;
@@ -1512,6 +1540,7 @@ function switchTab(tabId) {
         if (tabId === 'tabLife') {
             if (typeof renderDiets === 'function') renderDiets();
             if (typeof renderLifeChat === 'function') renderLifeChat();
+            if (typeof renderHousing === 'function') renderHousing();
         }
         if (tabId === 'tabProfile') renderProfileAnalytics();
     } catch(err) {

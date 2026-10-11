@@ -1,8 +1,8 @@
 // ========================================================
-// js/phone.js — БАЗОВАЯ ОС СМАРТФОНА «PerekupOS» (v0.4.6)
+// js/phone.js — БАЗОВАЯ ОС СМАРТФОНА «PerekupOS» (v0.4.7)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Ядро ОС, домашний экран, план перекупа, бизнес-виджет,
-// SMS-диалоги с клиентами, Блокнот, Госуслуги, Решала, Autodrot P2P
+// Автономные экраны приложений, Порт с фиксом уровня,
+// Жильё, Решала, Бизнес, P2P, SMS и Блокнот
 // ========================================================
 
 const PhoneManager = {
@@ -47,7 +47,7 @@ const PhoneManager = {
             unread: true,
             chatHistory: [
                 { from: "them", text: "Привет. Номер мой в приложении есть. Любые вопросы с аннулированием учёта, крышей ГИБДД и лицензиями РАФ решаю за связи." },
-                { from: "them", text: "Если попадется угнанная тачка — сделаем чистый VIN, не переживай." }
+                { from: "them", text: "Если у тебя есть собственный гаражный бокс или ангар, сможем отмывать VIN и снимать 12.5.1 дешевле — со скидкой твоего цеха!" }
             ]
         },
         {
@@ -383,48 +383,65 @@ const PhoneManager = {
         const container = document.getElementById('phoneAppContainer');
         if (!container) return;
 
-        if (this.currentApp === 'street') {
-            if (typeof PhoneRacing !== 'undefined') PhoneRacing.renderStreetApp(container);
-        } else if (this.currentApp === 'radio') {
-            if (typeof PhoneMedia !== 'undefined') PhoneMedia.renderRadioApp(container);
-        } else if (this.currentApp === 'fortune') {
-            if (typeof PhoneMedia !== 'undefined') PhoneMedia.renderFortuneApp(container);
-        } else if (this.currentApp === 'autodrot') {
-            this.renderAutodrotApp(container);
-        } else if (this.currentApp === 'bank') {
-            this.renderBankApp(container);
-        } else if (this.currentApp === 'business') {
-            this.renderBusinessApp(container);
-        } else if (this.currentApp === 'housing') {
-            this.renderHousingApp(container);
-        } else if (this.currentApp === 'reshala') {
-            this.renderReshalaApp(container);
-        } else if (this.currentApp === 'syndicate') {
-            this.renderSyndicateApp(container);
-        } else if (this.currentApp === 'barn') {
-            this.renderBarnApp(container);
-        } else if (this.currentApp === 'containers') {
-            this.renderContainersApp(container);
-        } else if (this.currentApp === 'shop') {
-            this.renderShopApp(container);
-        } else if (this.currentApp === 'radar') {
-            this.renderRadarApp(container);
-        } else if (this.currentApp === 'gosuslugi') {
-            this.renderGosuslugiApp(container);
-        } else if (this.currentApp === 'notepad') {
-            this.renderNotepadApp(container);
-        } else if (this.currentApp === 'messages') {
-            this.markAllMessagesAsRead();
-            if (this.activeChatId) {
-                this.renderChatConversation(container, this.activeChatId);
-            } else {
-                this.renderMessagesList(container);
+        try {
+            if (this.currentApp === 'street') {
+                if (typeof PhoneRacing !== 'undefined') PhoneRacing.renderStreetApp(container);
+            } else if (this.currentApp === 'radio') {
+                if (typeof PhoneMedia !== 'undefined') PhoneMedia.renderRadioApp(container);
+            } else if (this.currentApp === 'fortune') {
+                if (typeof PhoneMedia !== 'undefined') PhoneMedia.renderFortuneApp(container);
+            } else if (this.currentApp === 'autodrot') {
+                this.renderAutodrotApp(container);
+            } else if (this.currentApp === 'bank') {
+                this.renderBankApp(container);
+            } else if (this.currentApp === 'business') {
+                this.renderBusinessApp(container);
+            } else if (this.currentApp === 'housing') {
+                this.renderHousingApp(container);
+            } else if (this.currentApp === 'reshala') {
+                this.renderReshalaApp(container);
+            } else if (this.currentApp === 'syndicate') {
+                this.renderSyndicateApp(container);
+            } else if (this.currentApp === 'barn') {
+                this.renderBarnApp(container);
+            } else if (this.currentApp === 'containers') {
+                this.renderContainersApp(container);
+            } else if (this.currentApp === 'shop') {
+                this.renderShopApp(container);
+            } else if (this.currentApp === 'radar') {
+                this.renderRadarApp(container);
+            } else if (this.currentApp === 'gosuslugi') {
+                this.renderGosuslugiApp(container);
+            } else if (this.currentApp === 'notepad') {
+                this.renderNotepadApp(container);
+            } else if (this.currentApp === 'messages') {
+                this.markAllMessagesAsRead();
+                if (this.activeChatId) {
+                    this.renderChatConversation(container, this.activeChatId);
+                } else {
+                    this.renderMessagesList(container);
+                }
             }
+        } catch(err) {
+            console.error("[PhoneManager] Ошибка запуска приложения " + this.currentApp + ":", err);
+            container.innerHTML = `
+                <div class="phone-app-header">
+                    <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Домой</button>
+                    <div class="phone-app-title">Ошибка приложения</div>
+                    <div style="width:40px;"></div>
+                </div>
+                <div class="phone-app-body p-3 text-center">
+                    <i class="fa-solid fa-triangle-exclamation color-amber mb-2" style="font-size:32px;"></i>
+                    <div class="font-bold text-xs mb-1">Сбой загрузки экрана</div>
+                    <div class="sub-label mb-3" style="font-size:10px;">${err.message || 'Неизвестная ошибка'}</div>
+                    <button onclick="PhoneManager.goHome()" class="btn btn-dark btn-sm">Вернуться на главный экран</button>
+                </div>
+            `;
         }
     },
 
     // ----------------------------------------------------
-    // УПРАВЛЕНИЕ БИЗНЕСОМ И ЖИЛЬЕМ
+    // УПРАВЛЕНИЕ БИЗНЕСОМ
     // ----------------------------------------------------
     renderBusinessApp(container) {
         if (!state.businesses || state.businesses.length === 0) {
@@ -436,7 +453,7 @@ const PhoneManager = {
             <div class="phone-app-header">
                 <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
                 <div class="phone-app-title"><i class="fa-solid fa-briefcase color-green mr-1"></i> Мой Бизнес</div>
-                <button onclick="collectAllBusinessCash(); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-auto btn-sm">Касса</button>
+                <button onclick="collectAllBusinessCash(); PhoneManager.renderOpenApp();" class="btn btn-green btn-auto btn-sm">Касса</button>
             </div>
             <div class="phone-app-body">
         `;
@@ -454,12 +471,12 @@ const PhoneManager = {
             if (isLocked) {
                 actionBlock = `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>С ${biz.minLevel} уровня</button>`;
             } else if (!isOwned) {
-                actionBlock = `<button onclick="upgradeBusiness(${idx}); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm w-full">Купить (${cost.toLocaleString()} ₽)</button>`;
+                actionBlock = `<button onclick="upgradeBusiness(${idx}); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm w-full">Купить (${cost.toLocaleString()} ₽)</button>`;
             } else {
                 actionBlock = `
                     <div class="grid-2 mb-1">
-                        <button onclick="upgradeBusiness(${idx}); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm">Апгрейд (${cost.toLocaleString()} ₽)</button>
-                        <button onclick="restockBusiness(${idx}); PhoneManager.renderBusinessApp(document.getElementById('phoneAppContainer'));" class="btn btn-amber btn-sm">Сырьё (15k)</button>
+                        <button onclick="upgradeBusiness(${idx}); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">Апгрейд (${cost.toLocaleString()} ₽)</button>
+                        <button onclick="restockBusiness(${idx}); PhoneManager.renderOpenApp();" class="btn btn-amber btn-sm">Сырьё (15k)</button>
                     </div>
                     <div class="grid-2">
                         <button onclick="PhoneManager.sellBusinessToNPC('${biz.id}', ${saleToNpcPrice})" class="btn btn-dark btn-sm">Продать (${saleToNpcPrice.toLocaleString()} ₽)</button>
@@ -505,7 +522,7 @@ const PhoneManager = {
         playSound('win');
         tgHaptic('success');
         showToast(`Бизнес продан инвестору (+${refundAmount.toLocaleString()} ₽)!`);
-        this.renderBusinessApp(document.getElementById('phoneAppContainer'));
+        this.renderOpenApp();
         this.renderBusinessWidget();
     },
 
@@ -538,9 +555,12 @@ const PhoneManager = {
         biz.stock = 0;
         saveState();
         showToast("Бизнес выставлен на онлайн P2P биржу Autodrot!");
-        this.renderBusinessApp(document.getElementById('phoneAppContainer'));
+        this.renderOpenApp();
     },
 
+    // ----------------------------------------------------
+    // ПРИЛОЖЕНИЕ «ЖИЛЬЁ & МАСТЕРСКИЕ»
+    // ----------------------------------------------------
     renderHousingApp(container) {
         let curId = state.player?.housingId || 'trailer';
         let owned = state.player?.ownedHouses || [];
@@ -549,10 +569,19 @@ const PhoneManager = {
         let html = `
             <div class="phone-app-header">
                 <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-house color-cyan mr-1"></i> Недвижимость & Боксы</div>
+                <div class="phone-app-title"><i class="fa-solid fa-warehouse color-cyan mr-1"></i> Жильё & Мастерские</div>
                 <div style="width:40px;"></div>
             </div>
             <div class="phone-app-body">
+                <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0,242,254,0.12), rgba(9,14,24,0.98));">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-circle-info"></i> База перекупа:</b>
+                        <span class="tag-badge bg-tag-green">Тех. паспорт</span>
+                    </div>
+                    <div class="sub-label" style="font-size:9.5px; line-height:1.4;">
+                        Слесарный тюнинг и корчевание требуют <b>смотровую яму</b>, а полировка кузова — <b>закрытый чистый бокс с водой</b>.
+                    </div>
+                </div>
         `;
 
         (typeof HOUSING_LIST !== 'undefined' ? HOUSING_LIST : []).forEach(h => {
@@ -562,15 +591,35 @@ const PhoneManager = {
             let refundPrice = Math.round((h.buyPrice || 1000000) * 0.8);
             let imgSrc = h.img || `assets/houses/${h.id}.jpg`;
             let fallbackSrc = h.fallback || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80';
+            let reqStars = h.reqStars || 5;
+
+            // Технические возможности объекта
+            let tuneBadge = h.canTune 
+                ? `<span class="tag-badge bg-tag-green" style="font-size:8px;"><i class="fa-solid fa-screwdriver-wrench"></i> Тюнинг ✓</span>`
+                : `<span class="tag-badge bg-tag-red" style="font-size:8px;"><i class="fa-solid fa-ban"></i> Тюнинг ✗</span>`;
+
+            let detailBadge = h.canDetail
+                ? `<span class="tag-badge bg-tag-cyan" style="font-size:8px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Детейлинг ✓</span>`
+                : `<span class="tag-badge bg-tag-amber" style="font-size:8px;"><i class="fa-solid fa-xmark"></i> Детейлинг ✗</span>`;
+
+            let obdBadge = h.canOBDGarage
+                ? `<span class="tag-badge bg-tag-green" style="font-size:8px;"><i class="fa-solid fa-laptop-code"></i> Launch ✓</span>`
+                : `<span class="tag-badge bg-tag-red" style="font-size:8px;"><i class="fa-solid fa-xmark"></i> Launch ✗</span>`;
+
+            let personalBadge = h.hasPersonalSlot
+                ? `<span class="tag-badge bg-tag-purple" style="font-size:8px;"><i class="fa-solid fa-crown"></i> Личка ✓</span>`
+                : `<span class="tag-badge bg-tag-red" style="font-size:8px;"><i class="fa-solid fa-xmark"></i> Без лички</span>`;
+
+            let slotCost = h.slots > 0 ? `~${((h.buyPrice || 1000000) / h.slots / 1000).toFixed(0)}k ₽/место` : '—';
 
             let actionBtns = "";
             if (isLvlLocked) {
-                actionBtns = `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>С ${h.minLevel} уровня</button>`;
+                actionBtns = `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>С ${h.minLevel} уровня авторитета</button>`;
             } else if (isPurchased) {
                 actionBtns = `
                     <div class="grid-2 mb-1">
                         <button onclick="openHomeInteriorModal('${h.id}')" class="btn btn-cyan btn-sm">🛋️ Интерьер</button>
-                        ${isCur ? '<button class="btn btn-dark btn-sm opacity-50" disabled>Живёте здесь</button>' : `<button onclick="moveIntoHousing('${h.id}'); PhoneManager.renderHousingApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-sm">Переехать</button>`}
+                        ${isCur ? '<button class="btn btn-dark btn-sm opacity-50" disabled>Текущая база</button>' : `<button onclick="moveIntoHousing('${h.id}'); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm">Переехать</button>`}
                     </div>
                     <div class="grid-2">
                         <button onclick="PhoneManager.sellHousingToNPC('${h.id}', ${refundPrice})" class="btn btn-dark btn-sm">Продать (${(refundPrice / 1000000).toFixed(1)}M)</button>
@@ -580,25 +629,46 @@ const PhoneManager = {
             } else {
                 actionBtns = `
                     <div class="grid-2">
-                        <button onclick="rentHousing('${h.id}'); PhoneManager.renderHousingApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm">Аренда (${(h.rent || 2000).toLocaleString()} ₽/д)</button>
-                        <button onclick="buyHousingProperty('${h.id}'); PhoneManager.renderHousingApp(document.getElementById('phoneAppContainer'));" class="btn btn-amber btn-sm">Купить (${(h.buyPrice / 1000000).toFixed(1)}M)</button>
+                        <button onclick="rentHousing('${h.id}'); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">Аренда (${(h.rent || 2000).toLocaleString()} ₽/д)</button>
+                        <button onclick="buyHousingProperty('${h.id}'); PhoneManager.renderOpenApp();" class="btn btn-amber btn-sm">Купить (${(h.buyPrice / 1000000).toFixed(1)}M + ${reqStars} ⭐)</button>
                     </div>
                 `;
             }
 
             html += `
-                <div class="glass-card mb-3 p-2">
+                <div class="glass-card mb-3 p-2 ${isCur ? 'personal-car-card' : ''}">
                     <div class="car-img-wrap mb-2" style="height:120px; position:relative;">
                         <img src="${imgSrc}" class="car-img" onerror="this.onerror=null; this.src='${fallbackSrc}';">
                         <div class="badge-tag" style="bottom:6px; right:6px;">
-                            <span class="tag-badge ${isPurchased ? 'bg-tag-green' : 'bg-tag-amber'}">${isPurchased ? 'Собственность' : 'Аренда'}</span>
+                            <span class="tag-badge ${isPurchased ? 'bg-tag-green' : (isCur ? 'bg-tag-cyan' : 'bg-tag-amber')}">
+                                ${isPurchased ? 'Собственность' : (isCur ? 'Арендовано' : 'Доступно')}
+                            </span>
                         </div>
+                        <div class="badge-tag bg-tag-cyan" style="top:6px; left:6px; right:auto;">${h.typeLabel || 'Объект'}</div>
                     </div>
+                    
                     <div class="flex-between mb-1">
                         <b class="text-xs color-cyan">${h.name}</b>
                         <span class="color-green font-bold text-xs">+${h.slots} мест гаража</span>
                     </div>
-                    <div class="sub-label mb-2" style="font-size:10px;">${h.desc || ''}</div>
+
+                    <div class="car-mods-badges-container my-1">
+                        ${tuneBadge}
+                        ${detailBadge}
+                        ${obdBadge}
+                        ${personalBadge}
+                    </div>
+
+                    <div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">${h.desc || ''}</div>
+                    
+                    <div class="p-1 mb-2" style="background:#090e18; border-radius:6px; font-size:9.5px;">
+                        <div class="color-amber font-bold mb-1">⭐ Перк: ${h.perk || 'Стандарт'}</div>
+                        <div class="flex-between sub-label">
+                            <span>Уют: <b class="${(h.moodBonus || 0) >= 0 ? 'color-green' : 'color-red'}">${(h.moodBonus || 0) >= 0 ? '+' : ''}${h.moodBonus || 0}% куража/д</b></span>
+                            <span>Место: <b class="color-cyan">${slotCost}</b></span>
+                        </div>
+                    </div>
+
                     ${actionBtns}
                 </div>
             `;
@@ -621,10 +691,11 @@ const PhoneManager = {
 
         saveState();
         updateHeaderUI();
+        if (typeof renderGarage === 'function') renderGarage();
         playSound('win');
         tgHaptic('success');
         showToast(`Недвижимость продана риелторам (+${refundAmount.toLocaleString()} ₽)!`);
-        this.renderHousingApp(document.getElementById('phoneAppContainer'));
+        this.renderOpenApp();
     },
 
     listHousingOnP2P(hId) {
@@ -658,8 +729,146 @@ const PhoneManager = {
         }
 
         saveState();
+        if (typeof renderGarage === 'function') renderGarage();
         showToast("Недвижимость выставлена на онлайн P2P биржу Autodrot!");
-        this.renderHousingApp(document.getElementById('phoneAppContainer'));
+        this.renderOpenApp();
+    },
+
+    // ----------------------------------------------------
+    // ПОРТ И КОНТЕЙНЕРЫ (С ФИКСОМ УРОВНЯ И СЛЕПЫМ АУКЦИОНОМ)
+    // ----------------------------------------------------
+    renderContainersApp(container) {
+        let lvl = state.player?.level || 1;
+        let isLocked = lvl < 12;
+
+        let html = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
+                <div class="phone-app-title"><i class="fa-solid fa-box-open color-purple mr-1"></i> Порт & Контейнеры</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body">
+        `;
+
+        if (isLocked) {
+            html += `
+                <div class="glass-card text-center p-4 my-auto">
+                    <div class="radar-spinner-ring mb-3" style="border-top-color: var(--purple); border-right-color: var(--cyan);">
+                        <div class="radar-spinner-center">🚢</div>
+                    </div>
+                    <div class="modal-glow-badge mb-2" style="color:var(--purple); border-color:rgba(192,132,252,0.4); background:rgba(192,132,252,0.1);">
+                        ТАМОЖНЯ ОПЕЧАТАНА
+                    </div>
+                    <h3 class="font-bold color-purple mb-1">Доступ с 12 Уровня!</h3>
+                    <p class="sub-label mb-3" style="font-size:10.5px; line-height:1.45;">
+                        Ваш текущий уровень авторитета: <b>${lvl} из 12</b>.<br>
+                        Контейнеры из Японии, Германии и аукционов США с раритетной техникой станут доступны после того, как вы наберёте авторитет на рынке!
+                    </p>
+                    <button onclick="PhoneManager.goHome()" class="btn btn-dark btn-sm w-full">Вернуться на домашний экран</button>
+                </div>
+            </div>`;
+            container.innerHTML = html;
+            return;
+        }
+
+        // Если уровень >= 12, выводим полный интерфейс
+        html += `
+            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle, rgba(220, 38, 38, 0.2) 0%, #0b101a 100%); border-color: rgba(220, 38, 38, 0.4);">
+                <div class="flex-between mb-1">
+                    <b class="color-red text-xs"><i class="fa-solid fa-gavel"></i> Слепой аукцион ФССП</b>
+                    <span class="tag-badge bg-tag-red">Слепой лот</span>
+                </div>
+                <p class="sub-label mb-2" style="font-size:10px;">Машина под чехлом. Неизвестен пробег и проблемы.</p>
+                <button onclick="openBlindAuctionModal()" class="btn btn-danger btn-sm w-full">Перейти к торгам</button>
+            </div>
+
+            <div class="glass-card p-2">
+                <div class="flex-between mb-2">
+                    <b class="text-xs color-purple"><i class="fa-solid fa-ship"></i> Портовые Контейнеры</b>
+                    <span class="sub-label" style="font-size:10px;">Таможня Кобе / Copart</span>
+                </div>
+                <div id="containersListRender"></div>
+            </div>
+        </div>`;
+
+        container.innerHTML = html;
+        if (typeof renderContainersList === 'function') {
+            renderContainersList();
+        }
+    },
+
+    // ----------------------------------------------------
+    // РЕШАЛА АРТУР (С ДИНАМИЧЕСКИМИ СКИДКАМИ МАСТЕРСКОЙ)
+    // ----------------------------------------------------
+    renderReshalaApp(container) {
+        let conn = state.player?.connections || 0;
+        let immunity = state.player?.policeImmunityDays || 0;
+        let hasLic = !!state.player?.hasRacingLicense;
+
+        const caps = typeof getPlayerHousingCapabilities === 'function' ? getPlayerHousingCapabilities() : { reshalaDiscountPct: 0 };
+        let discountBadge = caps.reshalaDiscountPct > 0 
+            ? `<span class="tag-badge bg-tag-green">Скидка цеха -${caps.reshalaDiscountPct}%</span>`
+            : `<span class="tag-badge bg-tag-purple">Штаб</span>`;
+
+        let roofPrice = Math.round(350000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100)));
+        let licPrice = Math.round(85000 * Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100)));
+
+        container.innerHTML = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
+                <div class="phone-app-title"><i class="fa-solid fa-user-secret color-purple mr-1"></i> Решала Артур</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body">
+                <div class="reshala-banner mb-2 p-2">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-purple">Теневые Связи: ${conn} 🤝</b>
+                        ${discountBadge}
+                    </div>
+                    <div class="sub-label" style="font-size:10px;">
+                        Отмена 12.5.1, снятие розыска с VIN и крыша ГИБДД.${caps.reshalaDiscountPct > 0 ? ` Действует скидка мастерской <b>${caps.reshalaDiscountPct}%</b>!` : ''}
+                    </div>
+                </div>
+
+                <div class="grid-2 mb-2">
+                    <button onclick="buyReshalaPack('pack1'); PhoneManager.renderOpenApp();" class="btn btn-purple btn-sm">1 Связь (150k)</button>
+                    <button onclick="buyReshalaPack('pack5'); PhoneManager.renderOpenApp();" class="btn btn-purple btn-sm">5 Связей (650k)</button>
+                </div>
+
+                <div class="reshala-deal-card mb-2 p-2">
+                    <div class="flex-between">
+                        <b class="text-xs">🚨 Крыша ГИБДД (3 дня)</b>
+                        <span class="tag-badge bg-tag-amber">${immunity > 0 ? immunity + ' дн.' : 'Иммунитет'}</span>
+                    </div>
+                    <p class="sub-label my-1" style="font-size:10px;">Защита от облав на заездах и штрафов за просроченный ДКП.</p>
+                    <button onclick="buyReshalaService('roof'); PhoneManager.renderOpenApp();" class="btn btn-amber btn-sm w-full" ${immunity > 0 ? 'disabled' : ''}>
+                        ${immunity > 0 ? 'Крыша активна' : `Оформить (${(roofPrice / 1000).toFixed(0)}k ₽ / 45 ⭐)`}
+                    </button>
+                </div>
+
+                <div class="reshala-deal-card mb-2 p-2">
+                    <div class="flex-between">
+                        <b class="text-xs">🏎️ Гоночная Лицензия РАФ</b>
+                        <span class="tag-badge bg-tag-cyan">402 метра</span>
+                    </div>
+                    <p class="sub-label my-1" style="font-size:10px;">Официальный регламентный допуск пилота к заездам.</p>
+                    <button onclick="buyReshalaService('license'); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm w-full" ${hasLic ? 'disabled' : ''}>
+                        ${hasLic ? 'Оформлено ✓' : `Оформить (${(licPrice / 1000).toFixed(0)}k ₽ / 15 ⭐)`}
+                    </button>
+                </div>
+
+                <div class="reshala-deal-card p-2">
+                    <div class="flex-between">
+                        <b class="text-xs">🔏 Легализация криминала</b>
+                        <span class="tag-badge bg-tag-cyan">Чистый VIN</span>
+                    </div>
+                    <p class="sub-label my-1" style="font-size:10px;">Снимает статус «В розыске» и аннулирование 12.5.1 с проблемного авто.</p>
+                    <button onclick="openLegalizeCarModal()" class="btn btn-dark btn-sm w-full">
+                        Выбрать авто (${caps.reshalaDiscountPct > 0 ? (200 * (1 - caps.reshalaDiscountPct / 100)).toFixed(0) + 'k' : '200k'} + 1 🤝)
+                    </button>
+                </div>
+            </div>
+        `;
     },
 
     renderBarnApp(container) {
@@ -759,7 +968,7 @@ const PhoneManager = {
         playSound('win');
         tgHaptic('success');
         showToast("Штрафы ГИБДД успешно оплачены!");
-        this.renderGosuslugiApp(document.getElementById('phoneAppContainer'));
+        this.renderOpenApp();
     },
 
     renderNotepadApp(container) {
@@ -1054,7 +1263,7 @@ const PhoneManager = {
     },
 
     // ----------------------------------------------------
-    // AUTODROT P2P & ДПС РАДАР & РЕШАЛА
+    // AUTODROT P2P & ДПС РАДАР
     // ----------------------------------------------------
     renderAutodrotApp(container) {
         let sub = this.autodrotSubTab || 'market';
@@ -1080,7 +1289,7 @@ const PhoneManager = {
         playSound('tick');
         tgHaptic('light');
         this.autodrotSubTab = tab;
-        this.renderAutodrotApp(document.getElementById('phoneAppContainer'));
+        this.renderOpenApp();
     },
 
     setAutodrotP2PFilter(filter) {
@@ -1212,6 +1421,7 @@ const PhoneManager = {
         state.p2pMarketListings.splice(idx, 1);
         saveState();
         updateHeaderUI();
+        if (typeof renderGarage === 'function') renderGarage();
         playSound('win');
         tgHaptic('success');
         this.renderAutodrotSubScreen();
@@ -1238,7 +1448,7 @@ const PhoneManager = {
                         <b class="text-xs color-green">${dep.name}</b>
                         <div class="sub-label" style="font-size:9.5px;">Сумма с процентами: <b class="color-green">${dep.amount.toLocaleString()} ₽</b> (+${(dep.dailyRate * 100).toFixed(0)}%/день)</div>
                     </div>
-                    <button onclick="closeBankDepositAction(${dIdx}); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-auto btn-sm">Забрать</button>
+                    <button onclick="closeBankDepositAction(${dIdx}); PhoneManager.renderOpenApp();" class="btn btn-green btn-auto btn-sm">Забрать</button>
                 </div>`;
             });
         }
@@ -1294,10 +1504,10 @@ const PhoneManager = {
                         </div>
 
                         <div class="grid-2 mb-2">
-                            <button onclick="depositToSafeAction(50000); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-dark btn-sm">+50k в сейф</button>
-                            <button onclick="depositToSafeAction(200000); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-dark btn-sm">+200k в сейф</button>
+                            <button onclick="depositToSafeAction(50000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">+50k в сейф</button>
+                            <button onclick="depositToSafeAction(200000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">+200k в сейф</button>
                         </div>
-                        <button onclick="withdrawFromSafeAction(); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-sm w-full">Забрать всё из сейфа</button>
+                        <button onclick="withdrawFromSafeAction(); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm w-full">Забрать всё из сейфа</button>
                     </div>
                 ` : ''}
 
@@ -1305,8 +1515,8 @@ const PhoneManager = {
                     <div class="glass-card mb-2 p-2">
                         <b class="text-xs color-green mb-1 block">📈 Срочные депозиты с повышенной ставкой:</b>
                         <div class="grid-2 mb-2">
-                            <button onclick="openBankDepositAction(100000, 7, 0.025); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm">100k под 2.5%/д</button>
-                            <button onclick="openBankDepositAction(500000, 14, 0.035); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-sm">500k под 3.5%/д</button>
+                            <button onclick="openBankDepositAction(100000, 7, 0.025); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">100k под 2.5%/д</button>
+                            <button onclick="openBankDepositAction(500000, 14, 0.035); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm">500k под 3.5%/д</button>
                         </div>
                         <div class="text-xs font-bold mb-1">Активные депозиты:</div>
                         ${depositsListHtml}
@@ -1320,13 +1530,13 @@ const PhoneManager = {
                             <span class="sub-label text-xs">Долг: <b class="color-amber">${debt.toLocaleString()} ₽</b></span>
                         </div>
                         <div class="grid-2 mb-2">
-                            <button onclick="takeLoan(100000); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-dark btn-sm">Взять 100k</button>
-                            <button onclick="takeLoan(500000); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-dark btn-sm">Взять 500k</button>
+                            <button onclick="takeLoan(100000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">Взять 100k</button>
+                            <button onclick="takeLoan(500000); PhoneManager.renderOpenApp();" class="btn btn-dark btn-sm">Взять 500k</button>
                         </div>
                         <div class="grid-3">
-                            <button onclick="repayLoan(25); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm">25%</button>
-                            <button onclick="repayLoan(50); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm">50%</button>
-                            <button onclick="repayLoan(100); PhoneManager.renderBankApp(document.getElementById('phoneAppContainer'));" class="btn btn-green btn-sm">Всё</button>
+                            <button onclick="repayLoan(25); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">25%</button>
+                            <button onclick="repayLoan(50); PhoneManager.renderOpenApp();" class="btn btn-cyan btn-sm">50%</button>
+                            <button onclick="repayLoan(100); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm">Всё</button>
                         </div>
                     </div>
                 ` : ''}
@@ -1348,66 +1558,7 @@ const PhoneManager = {
         playSound('tick');
         tgHaptic('light');
         this.bankSubTab = tab;
-        this.renderBankApp(document.getElementById('phoneAppContainer'));
-    },
-
-    renderReshalaApp(container) {
-        let conn = state.player?.connections || 0;
-        let immunity = state.player?.policeImmunityDays || 0;
-        let hasLic = !!state.player?.hasRacingLicense;
-
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-user-secret color-purple mr-1"></i> Решала Артур</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="reshala-banner mb-2 p-2">
-                    <div class="flex-between mb-1">
-                        <b class="text-xs color-purple">Теневые Связи: ${conn} 🤝</b>
-                        <span class="tag-badge bg-tag-purple">Штаб</span>
-                    </div>
-                    <div class="sub-label" style="font-size:10px;">Отмена 12.5.1, снятие розыска с VIN и крыша ГИБДД.</div>
-                </div>
-
-                <div class="grid-2 mb-2">
-                    <button onclick="buyReshalaPack('pack1'); PhoneManager.renderReshalaApp(document.getElementById('phoneAppContainer'));" class="btn btn-purple btn-sm">1 Связь (150k)</button>
-                    <button onclick="buyReshalaPack('pack5'); PhoneManager.renderReshalaApp(document.getElementById('phoneAppContainer'));" class="btn btn-purple btn-sm">5 Связей (650k)</button>
-                </div>
-
-                <div class="reshala-deal-card mb-2 p-2">
-                    <div class="flex-between">
-                        <b class="text-xs">🚨 Крыша ГИБДД (3 дня)</b>
-                        <span class="tag-badge bg-tag-amber">${immunity > 0 ? immunity + ' дн.' : 'Иммунитет'}</span>
-                    </div>
-                    <p class="sub-label my-1" style="font-size:10px;">Защита от облав на заездах и штрафов за просроченный ДКП.</p>
-                    <button onclick="buyReshalaService('roof'); PhoneManager.renderReshalaApp(document.getElementById('phoneAppContainer'));" class="btn btn-amber btn-sm w-full" ${immunity > 0 ? 'disabled' : ''}>
-                        ${immunity > 0 ? 'Крыша активна' : 'Оформить (350k ₽ / 45 ⭐)'}
-                    </button>
-                </div>
-
-                <div class="reshala-deal-card mb-2 p-2">
-                    <div class="flex-between">
-                        <b class="text-xs">🏎️ Гоночная Лицензия РАФ</b>
-                        <span class="tag-badge bg-tag-cyan">402 метра</span>
-                    </div>
-                    <p class="sub-label my-1" style="font-size:10px;">Официальный регламентный допуск пилота к заездам.</p>
-                    <button onclick="buyReshalaService('license'); PhoneManager.renderReshalaApp(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm w-full" ${hasLic ? 'disabled' : ''}>
-                        ${hasLic ? 'Оформлено ✓' : 'Оформить (85k ₽ / 1 🤝)'}
-                    </button>
-                </div>
-
-                <div class="reshala-deal-card p-2">
-                    <div class="flex-between">
-                        <b class="text-xs">🔏 Легализация криминала</b>
-                        <span class="tag-badge bg-tag-cyan">Чистый VIN</span>
-                    </div>
-                    <p class="sub-label my-1" style="font-size:10px;">Снимает статус «В розыске» с проблемного авто.</p>
-                    <button onclick="openLegalizeCarModal()" class="btn btn-dark btn-sm w-full">Выбрать авто (200k + 1 🤝)</button>
-                </div>
-            </div>
-        `;
+        this.renderOpenApp();
     },
 
     renderSyndicateApp(container) {
@@ -1472,39 +1623,6 @@ const PhoneManager = {
             </div>
         `;
         if (typeof renderContracts === 'function') renderContracts();
-    },
-
-    renderContainersApp(container) {
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-box-open color-purple mr-1"></i> Порт & Контейнеры</div>
-                <div style="width:40px;"></div>
-            </div>
-            <div class="phone-app-body">
-                <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle, rgba(220, 38, 38, 0.2) 0%, #0b101a 100%); border-color: rgba(220, 38, 38, 0.4);">
-                    <div class="flex-between mb-1">
-                        <b class="color-red text-xs"><i class="fa-solid fa-gavel"></i> Слепой аукцион ФССП</b>
-                        <span class="tag-badge bg-tag-red">Слепой лот</span>
-                    </div>
-                    <p class="sub-label mb-2" style="font-size:10px;">Машина под чехлом. Неизвестен пробег и проблемы.</p>
-                    <button onclick="openBlindAuctionModal()" class="btn btn-danger btn-sm w-full">Перейти к торгам</button>
-                </div>
-
-                <div class="glass-card p-2">
-                    <div class="flex-between mb-2">
-                        <b class="text-xs color-purple"><i class="fa-solid fa-ship"></i> Портовые Контейнеры</b>
-                        <span class="sub-label" style="font-size:10px;">Таможня Кобе / Copart</span>
-                    </div>
-                    <div id="containersListRender"></div>
-                    <div id="containersLockCover" class="level-lock-cover" style="display:none;">
-                        <h4 class="font-bold">Таможня закрыта</h4>
-                        <p class="sub-label">С 12 уровня!</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        if (typeof renderContainersList === 'function') renderContainersList();
     },
 
     renderShopApp(container) {

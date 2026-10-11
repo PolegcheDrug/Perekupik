@@ -1,5 +1,5 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.4.6)
+// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.4.7)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Условие гаража для тюнинга/детейлинга, интерактивный Launch OBD2,
 // конструктор страхового полиса, штрафстоянка ГИБДД
@@ -21,25 +21,93 @@ let insuranceOptions = {
 };
 
 // ========================================================
-// ПРОВЕРКА НАЛИЧИЯ КАПИТАЛЬНОГО ГАРАЖА / МАСТЕРСКОЙ
+// ПРОВЕРКА ВОЗМОЖНОСТЕЙ НЕДВИЖИМОСТИ И БОКСОВ
 // ========================================================
-function playerHasGarageOrWorkshop() {
+
+/**
+ * Получить суммарные технические возможности игрока по всем активным и выкупленным объектам.
+ */
+function getPlayerHousingCapabilities() {
+    let caps = {
+        canTune: false,
+        canDetail: false,
+        canService: false,
+        canOBDGarage: false,
+        hasPersonalSlot: false,
+        reshalaDiscountPct: 0,
+        activeHouseTitle: "Уличная стоянка",
+        category: "street"
+    };
+
+    if (typeof HOUSING_LIST === 'undefined' || !Array.isArray(HOUSING_LIST)) {
+        return {
+            canTune: true, canDetail: true, canService: true, canOBDGarage: true,
+            hasPersonalSlot: true, reshalaDiscountPct: 0, activeHouseTitle: "Гараж", category: "box"
+        };
+    }
+
+    // Если игрок докупил базовые слоты расширением бокса
     if (state.player && state.player.baseSlots && state.player.baseSlots > 2) {
-        return true;
+        caps.canTune = true;
+        caps.canDetail = true;
+        caps.canService = true;
+        caps.canOBDGarage = true;
+        caps.hasPersonalSlot = true;
+        caps.reshalaDiscountPct = Math.max(caps.reshalaDiscountPct, 10);
     }
 
-    const ownedHouses = state.player?.ownedHouses || [];
     const curHousingId = state.player?.housingId || 'trailer';
-    const garageProperties = ['garage', 'cottage', 'loft', 'penthouse', 'villa', 'island'];
-
-    if (garageProperties.includes(curHousingId)) {
-        return true;
+    const activeHouse = HOUSING_LIST.find(h => h.id === curHousingId);
+    if (activeHouse) {
+        caps.activeHouseTitle = activeHouse.name;
+        caps.category = activeHouse.category || 'street';
+        if (activeHouse.canTune) caps.canTune = true;
+        if (activeHouse.canDetail) caps.canDetail = true;
+        if (activeHouse.canService) caps.canService = true;
+        if (activeHouse.canOBDGarage) caps.canOBDGarage = true;
+        if (activeHouse.hasPersonalSlot) caps.hasPersonalSlot = true;
+        if (activeHouse.reshalaDiscountPct) caps.reshalaDiscountPct = Math.max(caps.reshalaDiscountPct, activeHouse.reshalaDiscountPct);
     }
 
-    return ownedHouses.some(hId => garageProperties.includes(hId));
+    // Добавляем возможности всех находящихся в собственности объектов
+    const ownedHouses = state.player?.ownedHouses || [];
+    ownedHouses.forEach(hId => {
+        const h = HOUSING_LIST.find(item => item.id === hId);
+        if (h) {
+            if (h.canTune) caps.canTune = true;
+            if (h.canDetail) caps.canDetail = true;
+            if (h.canService) caps.canService = true;
+            if (h.canOBDGarage) caps.canOBDGarage = true;
+            if (h.hasPersonalSlot) caps.hasPersonalSlot = true;
+            if (h.reshalaDiscountPct) caps.reshalaDiscountPct = Math.max(caps.reshalaDiscountPct, h.reshalaDiscountPct);
+        }
+    });
+
+    return caps;
 }
 
-function openNeedGarageModal(actionTitle = "Тюнинг и доработки") {
+/**
+ * Проверка конкретной возможности (tune, detail, service, obd, personal)
+ */
+function checkPlayerCapability(featureKey) {
+    const caps = getPlayerHousingCapabilities();
+    if (featureKey === 'tune') return caps.canTune;
+    if (featureKey === 'detail') return caps.canDetail;
+    if (featureKey === 'service') return caps.canService;
+    if (featureKey === 'obd') return caps.canOBDGarage;
+    if (featureKey === 'personal') return caps.hasPersonalSlot;
+    return caps.canTune;
+}
+
+// Обратная совместимость с вызовами в других скриптах
+function playerHasGarageOrWorkshop() {
+    return checkPlayerCapability('tune');
+}
+
+/**
+ * Универсальное модальное окно с объяснением причины отказа
+ */
+function openNeedCapabilityModal(type = 'tune', customTitle = null) {
     playSound('error');
     tgHaptic('warning');
 
@@ -51,23 +119,60 @@ function openNeedGarageModal(actionTitle = "Тюнинг и доработки")
         document.body.appendChild(modal);
     }
 
+    let title = "ТРЕБУЕТСЯ СПЕЦИАЛИЗИРОВАННЫЙ БОКС";
+    let heading = "Действие недоступно!";
+    let desc = "Вы находитесь на уличной парковке. Здесь нет условий для выполнения этих работ.";
+    let icon = "🔒";
+
+    if (type === 'tune') {
+        title = "ТРЕБУЕТСЯ СМОТРОВАЯ ЯМА И ВЕРСТАК";
+        heading = (customTitle || "Слесарные работы и тюнинг") + " заблокированы!";
+        desc = `Вы работаете на <b>уличной парковке</b> без смотровой ямы, верстака и сварочного аппарата.<br><br>
+                🔩 Для заварки редуктора, установки спортивных рычагов выворота, гидроручника и Big Turbo требуется <b>капитальный гаражный бокс (ГСК)</b> или мастерская с подъёмником.<br><br>
+                💡 Арендуйте или купите бокс в приложении <b>«Жильё & Боксы»</b>!`;
+        icon = "🔩";
+    } else if (type === 'detail') {
+        title = "ТРЕБУЕТСЯ ЧИСТЫЙ БОКС С ВОДОЙ И СВЕТОМ";
+        heading = (customTitle || "Детейлинг и покраска") + " недоступны!";
+        desc = `Полировка и покраска кузова <b>под открытым небом испортят ЛКП дорожной пылью</b>!<br><br>
+                ✨ Для качественного облива и нанесения защитных составов требуется закрытый сухой бокс с водопроводом и ярким светом (Двойной бокс, Новостройка с детейлингом, Коттедж или Вилла).`;
+        icon = "✨";
+    } else if (type === 'service') {
+        title = "ТРЕБУЕТСЯ МЕСТО ДЛЯ ОБСЛУЖИВАНИЯ";
+        heading = (customTitle || "Сервисные манипуляции") + " заблокированы!";
+        desc = `Управляющая компания стройплощадки запрещает сливать технические жидкости на открытом грунте.<br><br>
+                🧪 Снимите хотя бы комнату с парковочным местом во дворе или бокс в ГСК.`;
+        icon = "🧪";
+    } else if (type === 'obd') {
+        title = "ТРЕБУЕТСЯ ЗАКРЫТЫЙ БОКС ДЛЯ ДИАГНОСТИКИ";
+        heading = "Стационарная диагностика ЭБУ недоступна!";
+        desc = `Глубокая адаптация блоков управления требует стабильного бортового питания и защиты разъёмов от сырости.<br><br>
+                💻 Для работы с Launch в гараже арендуйте капитальный бокс с подключением к сети 220V.`;
+        icon = "💻";
+    } else if (type === 'personal') {
+        title = "ТРЕБУЕТСЯ ОХРАНЯЕМОЕ МАШИНОМЕСТО";
+        heading = "Назначение личного авто недоступно!";
+        desc = `Личный автомобиль нельзя бросать без присмотра на неохраняемой стройплощадке — высок риск кражи зеркал и вандализма.<br><br>
+                👑 Арендуйте жилье с закрепленным парковочным местом, бокс в ГСК или подземный паркинг.`;
+        icon = "👑";
+    }
+
     modal.innerHTML = `
         <div class="modal-box text-center" style="max-width: 410px; border-color: var(--amber);">
             <div class="radar-spinner-ring mb-2" style="border-top-color: var(--amber); border-right-color: var(--cyan);">
-                <div class="radar-spinner-center">🔒</div>
+                <div class="radar-spinner-center">${icon}</div>
             </div>
             <div class="modal-glow-badge mb-1" style="color:var(--amber); border-color:rgba(255,179,0,0.4); background:rgba(255,179,0,0.1);">
-                ТРЕБУЕТСЯ ГАРАЖ ИЛИ БОКС
+                ${title}
             </div>
-            <h3 class="font-bold mb-1 color-amber">${actionTitle} недоступны!</h3>
+            <h3 class="font-bold mb-1 color-amber">${heading}</h3>
             <p class="sub-label mb-3" style="font-size:10.5px; line-height:1.45;">
-                Вы работаете на <b>уличной стоянке у обочины</b>. Без собственного гаража, смотровой ямы и верстака невозможно заниматься тюнингом, полировкой и предпродажной подготовкой.<br><br>
-                💡 В начале карьеры вы можете только <b>покупать и продавать автомобили «как есть»</b>. Арендуйте или купите капитальный гараж в приложении <b>«Жильё»</b>!
+                ${desc}
             </p>
 
             <div class="space-y-2 mb-3">
                 <button onclick="closeModal('modalNeedGarage'); switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('housing'); }, 150);" class="btn btn-cyan btn-sm w-full">
-                    🏠 Открыть приложение «Жильё»
+                    🏠 Открыть каталог «Жильё & Боксы»
                 </button>
                 <button onclick="closeModal('modalNeedGarage')" class="btn btn-dark btn-sm w-full">
                     Понятно, буду копить кэш
@@ -77,6 +182,10 @@ function openNeedGarageModal(actionTitle = "Тюнинг и доработки")
     `;
 
     modal.classList.add('active');
+}
+
+function openNeedGarageModal(actionTitle = "Тюнинг и доработки") {
+    openNeedCapabilityModal('tune', actionTitle);
 }
 
 // ========================================================
@@ -141,13 +250,14 @@ function renderGarage() {
 
     const maxSlots = getTotalGarageSlots();
     const currentSlots = state.garage ? state.garage.length : 0;
-    const hasGarage = playerHasGarageOrWorkshop();
+    const caps = getPlayerHousingCapabilities();
     
-    let garageStatusText = hasGarage
-        ? `<b class="color-cyan">${currentSlots} из ${maxSlots}</b>`
-        : `<b class="color-amber">${currentSlots} из ${maxSlots} (Уличная стоянка)</b>`;
+    let statusPillClass = caps.canTune ? "color-green" : (caps.category === 'street' ? "color-red" : "color-amber");
+    let statusPillText = caps.canTune 
+        ? `<b class="${statusPillClass}">${currentSlots} из ${maxSlots} (Мастерская активна ✓)</b>`
+        : `<b class="${statusPillClass}">${currentSlots} из ${maxSlots} (${caps.activeHouseTitle})</b>`;
 
-    setTxt('garageDetailedSlots', garageStatusText);
+    setTxt('garageDetailedSlots', statusPillText);
     setTxt('garageHeaderSlots', `${currentSlots}/${maxSlots}`);
 
     if (!state.garage || state.garage.length === 0) {
@@ -238,8 +348,8 @@ function renderGarage() {
             actionControlBlock = `
                 <div class="grid-3 mb-2">
                     <button onclick="openCarPreviewModal(${idx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-circle-info"></i> Осмотр</button>
-                    <button onclick="openTuningModal(${idx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-screwdriver-wrench color-cyan"></i> Тюнинг</button>
-                    <button onclick="openPreSaleModal(${idx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-wand-magic-sparkles color-amber"></i> Детейлинг</button>
+                    <button onclick="openTuningModal(${idx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-screwdriver-wrench ${caps.canTune ? 'color-cyan' : ''}"></i> Тюнинг</button>
+                    <button onclick="openPreSaleModal(${idx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-wand-magic-sparkles ${caps.canDetail ? 'color-amber' : ''}"></i> Детейлинг</button>
                 </div>
 
                 <div class="grid-2 mb-2">
@@ -338,8 +448,8 @@ function togglePersonalCar(idx) {
     const car = state.garage[idx];
     if (!car) return;
 
-    if (!car.isPersonal && !playerHasGarageOrWorkshop()) {
-        return openNeedGarageModal("Назначение личного авто");
+    if (!car.isPersonal && !checkPlayerCapability('personal')) {
+        return openNeedCapabilityModal('personal', "Назначение личного автомобиля");
     }
 
     if (car.isPersonal) {
@@ -390,19 +500,24 @@ function buyGarageSlot() {
 // 4. ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА
 // ========================================================
 function openPreSaleModal(idx) {
-    if (!playerHasGarageOrWorkshop()) {
-        return openNeedGarageModal("Детейлинг и предпродажная подготовка");
+    const caps = getPlayerHousingCapabilities();
+    if (!caps.canDetail && !caps.canService) {
+        return openNeedCapabilityModal('detail', "Предпродажная подготовка и детейлинг");
     }
 
     activePreSaleCarIndex = idx;
     const car = state.garage[idx];
     if (!car) return;
 
-    setTxt('preSaleCarTitle', `Детейлинг: <b>${car.name}</b> (${car.power || 100} л.с.)`);
+    setTxt('preSaleCarTitle', `Детейлинг-зона: <b>${car.name}</b> (${car.power || 100} л.с.)`);
 
     const btnClean = document.getElementById('btnCleanPrice');
     if (btnClean) {
-        if (car.isPolished) {
+        if (!caps.canDetail) {
+            btnClean.disabled = true;
+            btnClean.innerText = "Нужен бокс 🔒";
+            btnClean.className = "btn btn-dark btn-sm opacity-50";
+        } else if (car.isPolished) {
             btnClean.disabled = true;
             btnClean.innerText = "Сделано ✓";
             btnClean.className = "btn btn-dark btn-sm opacity-50";
@@ -415,7 +530,11 @@ function openPreSaleModal(idx) {
 
     const btnPaint = document.getElementById('btnPaintPrice');
     if (btnPaint) {
-        if (car.isRepainted || car.condition >= 100) {
+        if (!caps.canDetail) {
+            btnPaint.disabled = true;
+            btnPaint.innerText = "Нужен бокс 🔒";
+            btnPaint.className = "btn btn-dark btn-sm opacity-50";
+        } else if (car.isRepainted || car.condition >= 100) {
             btnPaint.disabled = true;
             btnPaint.innerText = car.condition >= 100 ? "Идеал (100%) ✓" : "Окрашено ✓";
             btnPaint.className = "btn btn-dark btn-sm opacity-50";
@@ -428,7 +547,11 @@ function openPreSaleModal(idx) {
 
     const btnAdditive = document.getElementById('btnAdditivePrice');
     if (btnAdditive) {
-        if (car.hasAdditive) {
+        if (!caps.canService) {
+            btnAdditive.disabled = true;
+            btnAdditive.innerText = "Запрещено УК 🔒";
+            btnAdditive.className = "btn btn-dark btn-sm opacity-50";
+        } else if (car.hasAdditive) {
             btnAdditive.disabled = true;
             btnAdditive.innerText = "Залита ✓";
             btnAdditive.className = "btn btn-dark btn-sm opacity-50";
@@ -441,7 +564,11 @@ function openPreSaleModal(idx) {
 
     const btnOdometer = document.getElementById('btnOdometerPrice');
     if (btnOdometer) {
-        if (car.rolledOdometer) {
+        if (!caps.canService) {
+            btnOdometer.disabled = true;
+            btnOdometer.innerText = "Нет условий 🔒";
+            btnOdometer.className = "btn btn-dark btn-sm opacity-50";
+        } else if (car.rolledOdometer) {
             btnOdometer.disabled = true;
             btnOdometer.innerText = "Уже скручен ✓";
             btnOdometer.className = "btn btn-dark btn-sm opacity-50";
@@ -458,13 +585,17 @@ function openPreSaleModal(idx) {
 }
 
 function applyPreSaleMod(type) {
-    if (!playerHasGarageOrWorkshop()) {
-        return openNeedGarageModal("Предпродажные работы");
-    }
-
     if (activePreSaleCarIndex === null) return;
     const car = state.garage[activePreSaleCarIndex];
     if (!car) return;
+
+    if ((type === 'clean' || type === 'paint') && !checkPlayerCapability('detail')) {
+        return openNeedCapabilityModal('detail', "Полировка и покраска кузова");
+    }
+
+    if ((type === 'additive' || type === 'odometer') && !checkPlayerCapability('service')) {
+        return openNeedCapabilityModal('service', "Сервисные доработки");
+    }
 
     let cash = state.player?.cash || 0;
 
@@ -515,8 +646,8 @@ function applyPreSaleMod(type) {
 // 5. СПОРТИВНЫЙ ТЮНИНГ
 // ========================================================
 function openTuningModal(idx) {
-    if (!playerHasGarageOrWorkshop()) {
-        return openNeedGarageModal("Тюнинг и корчевание");
+    if (!checkPlayerCapability('tune')) {
+        return openNeedCapabilityModal('tune', "Спортивный тюнинг и корчевание");
     }
 
     activeTuningCarIndex = idx;
@@ -527,7 +658,7 @@ function openTuningModal(idx) {
         car.tuning = { chip: 0, exhaust: false, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 };
     }
 
-    setTxt('tuneCarTitle', `Корчевание: <b>${car.name}</b> (${car.power || 100} л.с.)`);
+    setTxt('tuneCarTitle', `Мастерская: <b>${car.name}</b> (${car.power || 100} л.с.)`);
     switchTuneTab(activeTuneTab || 'drift');
     
     const modal = document.getElementById('modalTuning');
@@ -628,8 +759,8 @@ function renderTuningItems() {
 }
 
 function buyTuningMod(modId, cost, powerGain, riskGain) {
-    if (!playerHasGarageOrWorkshop()) {
-        return openNeedGarageModal("Установка компонентов тюнинга");
+    if (!checkPlayerCapability('tune')) {
+        return openNeedCapabilityModal('tune', "Установка компонентов тюнинга");
     }
 
     if (activeTuningCarIndex === null) return;
@@ -657,8 +788,8 @@ function buyTuningMod(modId, cost, powerGain, riskGain) {
 }
 
 function buyChipStage(stage, cost, powerGain) {
-    if (!playerHasGarageOrWorkshop()) {
-        return openNeedGarageModal("Прошивка блока управления");
+    if (!checkPlayerCapability('tune')) {
+        return openNeedCapabilityModal('tune', "Прошивка блока управления ЭБУ");
     }
 
     if (activeTuningCarIndex === null) return;
@@ -727,7 +858,7 @@ function openTuningFromPreview() {
     openTuningModal(idx);
 }
 
-// Запуск OBD2: строгая проверка оборудования, гаража и скрытие окна осмотра
+// Запуск OBD2: строгая проверка оборудования, бокса и скрытие окна осмотра
 function openOBD2Modal() {
     if (previewCarIndex === null) return;
     const car = state.garage[previewCarIndex];
@@ -741,9 +872,9 @@ function openOBD2Modal() {
         return showToast("⚠️ У вас нет сканера OBD2! Купите ELM327 или Launch Pro в Маркете.");
     }
 
-    // 2. Проверка условий гаража
-    if (!playerHasGarageOrWorkshop()) {
-        return openNeedGarageModal("Компьютерная диагностика ЭБУ");
+    // 2. Проверка условий бокса для стационарной работы
+    if (!checkPlayerCapability('obd')) {
+        return openNeedCapabilityModal('obd', "Стационарная диагностика ЭБУ");
     }
 
     let isLaunch = !!state.player?.tools?.obd_launch;
@@ -1428,6 +1559,9 @@ function resolveGarageEvent(type) {
 }
 
 // Экспорт всех методов в window
+window.getPlayerHousingCapabilities = getPlayerHousingCapabilities;
+window.checkPlayerCapability = checkPlayerCapability;
+window.openNeedCapabilityModal = openNeedCapabilityModal;
 window.playerHasGarageOrWorkshop = playerHasGarageOrWorkshop;
 window.openNeedGarageModal = openNeedGarageModal;
 window.recalculateCarMarketValue = recalculateCarMarketValue;

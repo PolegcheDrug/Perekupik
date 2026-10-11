@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v0.4.6</title>
-    <link rel="stylesheet" href="style.css?v=167">
+    <title>Симулятор Перекупа v0.4.7</title>
+    <link rel="stylesheet" href="style.css?v=171">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -365,7 +365,7 @@
             </div>
 
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-sparkles"></i> Список изменений v0.4.6 & Патчноут
+              <i class="fa-solid fa-sparkles"></i> Список изменений v0.4.7 & Патчноут
             </button>
             <div class="grid-2 mb-2">
               <div class="stat-box"><div class="sub-label">Плюс:</div><div id="statProfitable" class="stat-value color-green">0</div></div>
@@ -470,16 +470,16 @@
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-code-merge"></i> ОБНОВЛЕНИЕ v0.4.6</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-code-merge"></i> ОБНОВЛЕНИЕ v0.4.7</div>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.6 (Сборка #167)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.7 (Сборка #171)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>⛺ Стартовое условие:</b> Вы начинаете на уличной стоянке у обочины. Тюнинг и детейлинг заблокированы, пока вы не купите капитальный гараж или жильё!</div>
-          <div class="patch-item"><b>📑 План перекупа и Блокнот:</b> Ежедневный план изолирован в аккуратные карточки и связан со шкалой карьерного роста.</div>
-          <div class="patch-item"><b>🚘 Штрафстоянка ГИБДД:</b> Возможность договориться через взятку/связи, выкупить по протоколу или сдать авто в утиль со снятием с учёта.</div>
-          <div class="patch-item"><b>📟 Цифровой Launch OBD2:</b> Тайминг сканирования блоков CAN-шины в реальном времени с кодами DTC.</div>
+          <div class="patch-item"><b>🏠 Новая линейка Жилья и Боксов:</b> Недвижимость разделена на уличные стоянки, боксы ГСК с ямой, детейлинг-боксы, квартиры и загородные комплексы.</div>
+          <div class="patch-item"><b>🔧 Разделение доработок:</b> Для тюнинга и корчевания требуется смотровая яма, а для полировки и качественного облива — чистый бокс с водой.</div>
+          <div class="patch-item"><b>🎲 Суточные события недвижимости:</b> Затопление ямы грунтовыми водами, претензии соседей по шуму или редкие детали из дедовских запасов.</div>
+          <div class="patch-item"><b>🕵️‍♂️ Скидка у Решалы Артура:</b> Владение подготовленным боксом или ангаром снижает стоимость услуг легализации VIN и снятия 12.5.1.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
       </div>
@@ -1076,7 +1076,7 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ (С РАЗДЕЛЁННЫМИ МОДУЛЯМИ ТЕЛЕФОНА) -->
+    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ -->
     <script>
       (function() {
         const modules = [
@@ -1098,12 +1098,12 @@
         function loadModule(name) {
           return new Promise((resolve) => {
             const s1 = document.createElement('script');
-            s1.src = name + '?v=167';
+            s1.src = name + '?v=171';
             s1.onload = () => resolve(true);
             s1.onerror = () => {
               s1.remove();
               const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=167';
+              s2.src = 'js/' + name + '?v=171';
               s2.onload = () => resolve(true);
               s2.onerror = () => {
                 console.warn('[Loader] Не удалось загрузить ' + name);
