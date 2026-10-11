@@ -1,6 +1,8 @@
 // ========================================================
 // js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.4.5)
-// Динамическая переоценка стоимости при установке госномеров
+// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
+// Динамическая переоценка стоимости при установке госномеров,
+// учет статуса регистрации (Учёт РФ vs ДКП), износ агрегатов и шин
 // ========================================================
 
 let previewCarIndex = null;
@@ -18,7 +20,7 @@ function recalculateCarMarketValue(car) {
     // 1. Базовая стоимость кузова
     let base = car.baseMarketValue || car.basePrice || 100000;
 
-    // 2. Влияние состояния кузова (от 40% до 100%)
+    // 2. Влияние состояния кузова (от 50% до 105%)
     let cond = (car.condition !== undefined) ? car.condition : 80;
     let condMultiplier = 0.55 + (cond / 100) * 0.50; // 100% сост = 1.05x, 50% = 0.80x
     let currentVal = Math.round(base * condMultiplier);
@@ -44,12 +46,21 @@ function recalculateCarMarketValue(car) {
     if (car.isPolished) currentVal = Math.round(currentVal * 1.05);
     if (car.isRepainted) currentVal += 15000;
 
-    // 5. Скрытый дефект (если не залит загуститель)
+    // 5. Износ агрегатов и шин
+    let engWear = car.wear?.engine !== undefined ? car.wear.engine : 85;
+    let transWear = car.wear?.transmission !== undefined ? car.wear.transmission : 85;
+    if (engWear < 50) currentVal = Math.round(currentVal * 0.85);
+    if (transWear < 50) currentVal = Math.round(currentVal * 0.90);
+    
+    let tires = car.tireWear !== undefined ? car.tireWear : 100;
+    if (tires < 30) currentVal = Math.max(10000, currentVal - 15000);
+
+    // 6. Скрытый дефект (если не залит загуститель)
     if (car.hiddenDefect && !car.hasAdditive) {
         currentVal = Math.max(10000, currentVal - Math.round((car.hiddenDefect.cost || 15000) * 1.15));
     }
 
-    // 6. ЦЕННОСТЬ ГОСНОМЕРА (БЛАТНЫЕ ЗНАКИ УВЕЛИЧИВАЮТ СТОИМОСТЬ МАШИНЫ)
+    // 7. ЦЕННОСТЬ ГОСНОМЕРА (БЛАТНЫЕ ЗНАКИ УВЕЛИЧИВАЮТ СТОИМОСТЬ МАШИНЫ)
     let plateStr = car.customPlate || car.plate || "ТРАНЗИТ";
     let plateBonus = 0;
     if (typeof calculatePlateValue === 'function') {
@@ -79,7 +90,7 @@ function renderGarage() {
             <div class="glass-card text-center sub-label py-8">
                 <i class="fa-solid fa-warehouse color-cyan mb-2" style="font-size:36px;"></i>
                 <div class="font-bold text-xs color-cyan mb-1">Ваш гараж пуст</div>
-                <div style="font-size:10px;">Отправляйтесь на авторынок или вытащите раритет из сарая!</div>
+                <div style="font-size:10px;">Отправляйтесь на авторынок, вскройте сарай или выкупите лот на P2P бирже!</div>
             </div>`;
         return;
     }
@@ -102,9 +113,18 @@ function renderGarage() {
             ? "<span class='tag-badge bg-tag-amber' style='box-shadow:0 0 10px rgba(255,179,0,0.5);'><i class='fa-solid fa-crown'></i> ЛИЧНЫЙ АВТО</span>" 
             : "";
 
-        let legalBadge = car.isStolen 
-            ? "<span class='tag-badge bg-tag-red'>🚨 В РОЗЫСКЕ</span>" 
-            : (car.unregistered ? "<span class='tag-badge bg-tag-amber'>12.5.1</span>" : "<span class='tag-badge bg-tag-green'>УЧЁТ РФ</span>");
+        let legalBadge = "";
+        if (car.isStolen) {
+            legalBadge = "<span class='tag-badge bg-tag-red'>🚨 В РОЗЫСКЕ</span>";
+        } else if (car.unregistered) {
+            legalBadge = "<span class='tag-badge bg-tag-red'>12.5.1 АННУЛИРОВАН</span>";
+        } else if (car.isRegisteredOnPlayer) {
+            legalBadge = "<span class='tag-badge bg-tag-green'>✓ УЧЁТ РФ (МРЭО)</span>";
+        } else {
+            let daysLeft = Math.max(0, 10 - (car.ownershipDays || 0));
+            let dkpClass = daysLeft === 0 ? "bg-tag-red" : "bg-tag-amber";
+            legalBadge = `<span class='tag-badge ${dkpClass}' title='Без постановки на учёт'>📄 НА ДКП (${daysLeft} дн. лимит)</span>`;
+        }
 
         let insuranceBadge = car.insurance === 'casco'
             ? "<span class='tag-badge bg-tag-green ml-1'>🛡️ КАСКО</span>"
@@ -113,6 +133,16 @@ function renderGarage() {
         let pVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(cPlate) : 0;
         let coolPlateBadge = pVal > 15000 
             ? `<span class='tag-badge bg-tag-purple ml-1' title='Блатной госномер (+${pVal.toLocaleString()} ₽ к стоимости)'><i class='fa-solid fa-gem'></i> БЛАТНОЙ</span>` 
+            : "";
+
+        let tempVal = car.engineTemp || 90;
+        let tempBadge = tempVal > 105 
+            ? `<span class='tag-badge bg-tag-red ml-1'><i class='fa-solid fa-temperature-high'></i> ПЕРЕГРЕВ ${tempVal}°C</span>`
+            : "";
+
+        let tireVal = car.tireWear !== undefined ? car.tireWear : 100;
+        let tireBadge = tireVal < 35 
+            ? `<span class='tag-badge bg-tag-red ml-1'><i class='fa-solid fa-circle-notch'></i> СЛИК ИЗНОШЕН (${tireVal}%)</span>`
             : "";
 
         let modsIconsHtml = renderCarModsBadges(car);
@@ -128,18 +158,20 @@ function renderGarage() {
                 <div class="plate-corner">
                     <div class="license-plate">${cPlate} <div class="license-flag">RUS</div></div>
                 </div>
-                <div class="badge-tag" style="bottom:8px; right:8px; display:flex; gap:4px; align-items:center;">
+                <div class="badge-tag" style="bottom:8px; right:8px; display:flex; gap:4px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
                     ${personalBadge}
                     ${legalBadge}
                     ${insuranceBadge}
                     ${coolPlateBadge}
+                    ${tempBadge}
+                    ${tireBadge}
                 </div>
             </div>
             
             <div class="flex-between mb-1">
                 <div>
                     <h4 class="font-bold">${cName}</h4>
-                    <div class="sub-label">${cPower} л.с. | Пробег: ${(car.mileage || 85000).toLocaleString()} км | Состояние: ${car.condition || 80}%</div>
+                    <div class="sub-label">${cPower} л.с. | Пробег: ${(car.mileage || 85000).toLocaleString()} км | Кузов: ${car.condition || 80}%</div>
                 </div>
                 <div class="text-right">
                     <span class="text-xs color-green font-bold">ОЦЕНКА:</span>
@@ -159,7 +191,7 @@ function renderGarage() {
 
             <div class="grid-2 mb-2">
                 ${personalBtn}
-                <button onclick="selectCarForStreetDirect(${idx})" class="btn btn-red btn-sm"><i class="fa-solid fa-flag-checkered"></i> В Стрит</button>
+                <button onclick="selectCarForStreetDirect(${idx})" class="btn btn-red btn-sm"><i class="fa-solid fa-flag-checkered"></i> В Стрит / Дрифт</button>
             </div>
 
             <div>
@@ -173,7 +205,9 @@ function renderGarage() {
     list.innerHTML = html;
 }
 
+// ========================================================
 // 2. ИКОНКИ МОДИФИКАЦИЙ В КАРТОЧКЕ ГАРАЖА
+// ========================================================
 function renderCarModsBadges(car) {
     if (!car) return "";
     let t = car.tuning || {};
@@ -183,23 +217,23 @@ function renderCarModsBadges(car) {
     else if (t.chip === 2) badges.push(`<span class="mod-pill color-amber" title="Stage 2 + Выхлоп"><i class="fa-solid fa-fire"></i> St2</span>`);
     else if (t.chip >= 3) badges.push(`<span class="mod-pill color-red" title="Stage 3 Big Turbo"><i class="fa-solid fa-rocket"></i> St3</span>`);
 
-    if (t.weldedDiff) badges.push(`<span class="mod-pill color-cyan" title="Заварка дифференциала"><i class="fa-solid fa-gear"></i></span>`);
-    if (t.steeringAngle) badges.push(`<span class="mod-pill color-green" title="Красноярский выворот"><i class="fa-solid fa-compass-drafting"></i></span>`);
-    if (t.hydroHandbrake) badges.push(`<span class="mod-pill color-red" title="Гидравлический ручник"><i class="fa-solid fa-gamepad"></i></span>`);
-    if (t.bucketSeats) badges.push(`<span class="mod-pill color-purple" title="Спортивные ковши"><i class="fa-solid fa-chair"></i></span>`);
+    if (t.weldedDiff) badges.push(`<span class="mod-pill color-cyan" title="Заварка дифференциала"><i class="fa-solid fa-gear"></i> Заварка</span>`);
+    if (t.steeringAngle) badges.push(`<span class="mod-pill color-green" title="Красноярский выворот"><i class="fa-solid fa-compass-drafting"></i> Выворот</span>`);
+    if (t.hydroHandbrake) badges.push(`<span class="mod-pill color-red" title="Гидравлический ручник"><i class="fa-solid fa-gamepad"></i> Гидроручник</span>`);
+    if (t.bucketSeats) badges.push(`<span class="mod-pill color-purple" title="Спортивные ковши"><i class="fa-solid fa-chair"></i> Ковши</span>`);
 
-    if (t.dragSlicks) badges.push(`<span class="mod-pill color-amber" title="Драговые полуслики"><i class="fa-solid fa-circle-notch"></i></span>`);
-    if (t.rollCage) badges.push(`<span class="mod-pill color-cyan" title="Вварной каркас безопасности"><i class="fa-solid fa-shield"></i></span>`);
-    if (t.exhaust) badges.push(`<span class="mod-pill color-amber" title="Прямоточный выхлоп"><i class="fa-solid fa-volume-high"></i></span>`);
+    if (t.dragSlicks) badges.push(`<span class="mod-pill color-amber" title="Драговые полуслики"><i class="fa-solid fa-circle-notch"></i> Слики</span>`);
+    if (t.rollCage) badges.push(`<span class="mod-pill color-cyan" title="Вварной каркас безопасности"><i class="fa-solid fa-shield"></i> Каркас</span>`);
+    if (t.exhaust) badges.push(`<span class="mod-pill color-amber" title="Прямоточный выхлоп"><i class="fa-solid fa-volume-high"></i> Выхлоп</span>`);
 
-    if (t.stance) badges.push(`<span class="mod-pill color-purple" title="Пневмоподвеска"><i class="fa-solid fa-arrows-down-to-line"></i></span>`);
-    if (t.customWheels) badges.push(`<span class="mod-pill color-green" title="Кованые диски"><i class="fa-solid fa-compact-disc"></i></span>`);
-    if (t.bodykit) badges.push(`<span class="mod-pill color-cyan" title="Кастомный обвес"><i class="fa-solid fa-car-side"></i></span>`);
+    if (t.stance) badges.push(`<span class="mod-pill color-purple" title="Пневмоподвеска"><i class="fa-solid fa-arrows-down-to-line"></i> Пневма</span>`);
+    if (t.customWheels) badges.push(`<span class="mod-pill color-green" title="Кованые диски"><i class="fa-solid fa-compact-disc"></i> Ковка</span>`);
+    if (t.bodykit) badges.push(`<span class="mod-pill color-cyan" title="Кастомный обвес"><i class="fa-solid fa-car-side"></i> Обвес</span>`);
 
-    if (car.isPolished) badges.push(`<span class="mod-pill color-cyan" title="Полировка кузова"><i class="fa-solid fa-sparkles"></i></span>`);
-    if (car.isRepainted) badges.push(`<span class="mod-pill color-green" title="Свежий облив"><i class="fa-solid fa-paint-roller"></i></span>`);
-    if (car.hasAdditive) badges.push(`<span class="mod-pill color-amber" title="Присадка в моторе"><i class="fa-solid fa-flask"></i></span>`);
-    if (car.rolledOdometer) badges.push(`<span class="mod-pill color-red" title="Скрученный одометр"><i class="fa-solid fa-clock-rotate-left"></i></span>`);
+    if (car.isPolished) badges.push(`<span class="mod-pill color-cyan" title="Полировка кузова"><i class="fa-solid fa-sparkles"></i> Блеск</span>`);
+    if (car.isRepainted) badges.push(`<span class="mod-pill color-green" title="Свежий облив"><i class="fa-solid fa-paint-roller"></i> Облив</span>`);
+    if (car.hasAdditive) badges.push(`<span class="mod-pill color-amber" title="Присадка в моторе"><i class="fa-solid fa-flask"></i> Присадка</span>`);
+    if (car.rolledOdometer) badges.push(`<span class="mod-pill color-red" title="Скрученный одометр"><i class="fa-solid fa-clock-rotate-left"></i> Скручен</span>`);
 
     if (badges.length === 0) {
         return `<span class="sub-label" style="font-size:9px; opacity:0.6;"><i class="fa-solid fa-car"></i> Заводской сток</span>`;
@@ -362,6 +396,10 @@ function applyPreSaleMod(type) {
         car.mileage = Math.round((car.mileage || 120000) * 0.5);
         car.rolledOdometer = true;
         showToast("Пробег смотан на 50%! Риск скандала у капота.");
+    }
+
+    if (typeof trackQuestProgress === 'function') {
+        trackQuestProgress('presale_mod', 1);
     }
 
     saveState();
@@ -549,7 +587,7 @@ function updateTuneRiskMeter(car) {
 }
 
 // ========================================================
-// 6. ОСМОТР, ЗВУК МОТОРА И OBD2 СКАНЕР
+// 6. ОСМОТР, ЗВУК МОТОРА, СЕРВИС ШИН И OBD2 СКАНЕР
 // ========================================================
 function openCarPreviewModal(idx) {
     previewCarIndex = idx;
@@ -596,6 +634,10 @@ function openOBD2Modal() {
     const modal = document.getElementById('modalOBD2');
     if (modal) modal.classList.add('active');
     playSound('tick');
+
+    if (typeof trackQuestProgress === 'function') {
+        trackQuestProgress('obd_scan', 1);
+    }
 
     setTimeout(() => {
         let eng = car.wear?.engine ? Math.round(car.wear.engine) : 85;
@@ -657,7 +699,6 @@ function openPutOnLotModal(idx) {
         return showToast("🚫 Это ваш личный авто! Снимите статус лички перед продажей.");
     }
 
-    // Пересчитываем рыночную цену с учетом номеров
     recalculateCarMarketValue(car);
 
     let askInput = document.getElementById('lotAskingPriceInput');
@@ -709,7 +750,7 @@ function confirmPutOnLot() {
 }
 
 // ========================================================
-// 8. ГОСНОМЕРА (ИСПРАВЛЕННАЯ ЛОГИКА ОЦЕНКИ)
+// 8. ГОСНОМЕРА (ДИНАМИЧЕСКИЙ РАСЧЕТ И ПЕРЕОЦЕНКА)
 // ========================================================
 function openChangePlateModal() {
     if (previewCarIndex === null) return;
@@ -758,7 +799,6 @@ function applyPlateToCar(plateStr) {
     car.plate = plateStr;
     state.ownedPlates = (state.ownedPlates || []).filter(p => p !== plateStr);
 
-    // ПЕРЕСЧЁТ СТОИМОСТИ АВТОМОБИЛЯ С НОВЫМ НОМЕРОМ
     let newVal = recalculateCarMarketValue(car);
     let diff = newVal - oldVal;
 
@@ -796,7 +836,6 @@ function removePlateFromCar() {
     car.customPlate = "ТРАНЗИТ";
     car.plate = "ТРАНЗИТ";
 
-    // ПЕРЕСЧЁТ СТОИМОСТИ (ВЫЧИТАЕТСЯ БЛАТНОЙ ЗНАК)
     let newVal = recalculateCarMarketValue(car);
     let diff = oldVal - newVal;
 
@@ -846,7 +885,7 @@ function confirmPurchaseInsurance(type) {
 }
 
 // ========================================================
-// 9. СОБЫТИЯ В ГАРАЖЕ ПРИ СМЕНЕ ДНЯ
+// 9. СОБЫТИЯ В ГАРАЖЕ ПРИ СМЕНЕ СУТОК
 // ========================================================
 function triggerGarageRandomEvent() {
     if (!state.garage || state.garage.length === 0) return;
