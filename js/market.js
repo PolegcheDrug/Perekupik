@@ -1,8 +1,8 @@
 // ========================================================
 // js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.4.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Учёт износа толщиномера ЛКП, честный диалог торга у капота,
-// оформление «МРЭО vs ДКП», трекинг заданий
+// Интерактивный отчёт Автотеки (ПТС, аватар владельца, юр. чистота),
+// компактный фикс торга у капота, цифровой Launch OBD2
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -48,7 +48,6 @@ function generateRawCoolPlate() {
     return letters.charAt(0) + num + letters.substring(1) + " " + reg;
 }
 
-// ГЕНЕРАТОР УНИКАЛЬНЫХ ГОСНОМЕРОВ (БЕЗ ДУБЛЕЙ)
 function getUniquePlate(preferCool = false) {
     if (!state.registeredPlates) state.registeredPlates = [];
     
@@ -320,6 +319,16 @@ function populateMarketFeed() {
         const sellerTypes = ['greedy', 'calm', 'hurried'];
         const currentSellerType = dealType === 'urgent' ? 'hurried' : (dealType === 'overprice' ? 'greedy' : sellerTypes[Math.floor(Math.random() * sellerTypes.length)]);
 
+        // Генерация персональных данных владельца для Автотеки и ПТС
+        const firstNames = ["Игорь", "Сергей", "Владимир", "Алексей", "Дмитрий", "Андрей", "Михаил", "Максим"];
+        const lastNames = ["Петров", "Кузнецов", "Смирнов", "Морозов", "Васильев", "Новиков", "Фёдоров"];
+        const ownerAvatars = ["🧔", "👨‍💼", "👴", "🧑‍🦱", "👨‍🔧", "🧢", "🤵"];
+        const ownerName = `${lastNames[Math.floor(Math.random() * lastNames.length)]} ${firstNames[Math.floor(Math.random() * firstNames.length)]}.`;
+        const ownerAvatar = ownerAvatars[Math.floor(Math.random() * ownerAvatars.length)];
+        const ownersCount = Math.floor(Math.random() * 3) + 1;
+        const ownershipYears = Math.floor(Math.random() * 4) + 1;
+        const vinNumber = "XTA" + Math.floor(10000000000000 + Math.random() * 90000000000000);
+
         state.marketFeed.push({
             id: carId,
             name: cName,
@@ -366,7 +375,18 @@ function populateMarketFeed() {
             ownershipDays: 0,
             engineTemp: 90,
             tireWear: 100,
-            viewed: false
+            viewed: false,
+            ptsData: {
+                ownerName: ownerName,
+                ownerAvatar: ownerAvatar,
+                ownersCount: ownersCount,
+                ownershipYears: ownershipYears,
+                vin: vinNumber,
+                ptsType: ownersCount <= 2 ? "Электронный (ЭПТС) ✓" : "Дубликат ПТС ⚠️",
+                pledgeBank: isStolen ? "В залоге у МФО ❌" : "Залогов нет ✓",
+                fsspRestrictions: isStolen ? "Запрет на регдействия ФССП ❌" : "Ограничений нет ✓",
+                taxiCheck: ownersCount > 2 && Math.random() < 0.4 ? "Лицензия такси найдена (Жёлтый)" : "В такси не использовалась ✓"
+            }
         });
     }
     saveState();
@@ -477,45 +497,161 @@ function renderMarketFeed() {
     if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
 }
 
+// ========================================================
+// АСИНХРОННОЕ СКАНИРОВАНИЕ LAUNCH OBD2 С ЦИФРОВЫМ ТЕРМИНАЛОМ
+// ========================================================
+let isOBDScanningInProgress = false;
+
 function quickOBDScanMarketCar(carId) {
+    if (isOBDScanningInProgress) return;
     const car = state.marketFeed.find(c => c && c.id === carId);
     if (!car) return;
-    car.viewed = true;
 
     let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
 
     if (!hasScanner) {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-        if (cash < 5000) return showToast("Нужно 5,000 ₽ на выездного диагноста или сканер из Маркета!");
+        if (cash < 5000) return showToast("Нужно 5,000 ₽ на выездного мастера со сканером!");
         state.player.cash -= 5000;
-        showToast("Выездной мастер подключил сканер (-5,000 ₽)");
+        showToast("Выездной диагност прибыл со сканером (-5,000 ₽)");
     } else {
         let toolKey = state.player?.tools?.obd_launch ? 'obd_launch' : 'obd';
         let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 50;
         if (wear <= 0) {
-            showToast("⚠️ Сканер разряжен! Зарядите прибор в Маркете.");
-        } else {
-            state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
-            showToast(`Диагностика собственным сканером (Остаток заряда: ${state.player.toolsWear[toolKey]}) ✓`);
+            return showToast("⚠️ Ваш диагностический сканер разряжен! Зарядите прибор в Маркете.");
         }
+        state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
     }
 
+    car.viewed = true;
     car.stoChecked = true;
+    isOBDScanningInProgress = true;
+    saveState();
 
-    if (typeof trackQuestProgress === 'function') {
-        trackQuestProgress('obd_scan', 1);
+    const modal = document.getElementById("modalOBD2");
+    const resBox = document.getElementById('obd2ResultBox');
+    const actBox = document.getElementById('obd2ActionBox');
+    setTxt('obd2CarTitle', `Диагностика: ${car.name}`);
+
+    if (modal) modal.classList.add('active');
+    playSound('tick');
+    tgHaptic('medium');
+
+    if (resBox) {
+        resBox.innerHTML = `
+            <div class="obd-cyber-display">
+                <div class="flex-between text-xs mb-2">
+                    <span class="color-cyan font-bold"><i class="fa-solid fa-satellite-dish"></i> CAN-BUS LINK: CONNECTING...</span>
+                    <span class="sub-label">ISO 15765-4</span>
+                </div>
+                <div class="obd-progress-track">
+                    <div class="obd-progress-bar" id="obdScanProgressFill"></div>
+                </div>
+                <div class="obd-scan-matrix-screen" id="obdTerminalLines">
+                    <div class="obd-terminal-line">> Инициализация протокола K-Line / CAN 500kbps...</div>
+                </div>
+            </div>
+        `;
     }
 
-    saveState();
-    renderMarketFeed();
+    if (actBox) {
+        actBox.innerHTML = `<button class="btn btn-dark w-full opacity-50" disabled><i class="fa-solid fa-spinner fa-spin"></i> СКАНИРОВАНИЕ БЛОКОВ УПРАВЛЕНИЯ...</button>`;
+    }
+
+    const terminalEl = document.getElementById('obdTerminalLines');
+    const progFill = document.getElementById('obdScanProgressFill');
+
+    const scanSteps = [
+        { pct: 25, msg: "> Подключение к ЭБУ Двигателя (DME/ECU)... Связь 100%", type: "success" },
+        { pct: 50, msg: "> Опрос трансмиссии (EGS), проверка адаптации соленоидов...", type: "" },
+        { pct: 75, msg: "> Сканирование тормозной системы ABS / ESP и SRS Airbag...", type: "" },
+        { pct: 100, msg: "> Чтение сохранённых и текущих кодов неисправностей DTC...", type: car.hiddenDefect ? "error" : "success" }
+    ];
+
+    let currentStep = 0;
+    const scanInterval = setInterval(() => {
+        if (currentStep < scanSteps.length) {
+            const step = scanSteps[currentStep];
+            if (progFill) progFill.style.width = step.pct + "%";
+            if (terminalEl) {
+                terminalEl.innerHTML += `<div class="obd-terminal-line ${step.type}">${step.msg}</div>`;
+                terminalEl.scrollTop = terminalEl.scrollHeight;
+            }
+            playSound('tick');
+            currentStep++;
+        } else {
+            clearInterval(scanInterval);
+            isOBDScanningInProgress = false;
+
+            if (typeof trackQuestProgress === 'function') {
+                trackQuestProgress('obd_scan', 1);
+            }
+
+            renderOBDFinalResults(car, resBox, actBox);
+        }
+    }, 650);
+}
+
+function renderOBDFinalResults(car, resBox, actBox) {
+    let eng = car.wear?.engine ? Math.round(car.wear.engine) : 90;
+    let trans = car.wear?.transmission ? Math.round(car.wear.transmission) : 90;
 
     if (car.hiddenDefect) {
-        let costStr = car.hiddenDefect.cost ? car.hiddenDefect.cost.toLocaleString() : "10 000";
-        openVerdictModal("ОШИБКИ В ЭБУ! ⚠️", `Код: ${car.hiddenDefect.code || 'P0300'} — ${car.hiddenDefect.text}. Затраты на ремонт: ~${costStr} ₽. Сбивайте цену у продавца!`, false);
+        playSound('error');
+        tgHaptic('error');
+        let def = car.hiddenDefect;
+
+        resBox.innerHTML = `
+            <div class="obd-cyber-display" style="border-color: var(--red);">
+                <div class="flex-between text-xs mb-2">
+                    <span class="color-red font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ОБНАРУЖЕН DTC КОД: ${def.code || 'P0300'}</span>
+                    <span class="tag-badge bg-tag-red">${def.severity || 'Критическая'}</span>
+                </div>
+                <div class="obd-scan-matrix-screen mb-2" style="border-color: rgba(255, 51, 102, 0.4);">
+                    <div class="obd-terminal-line error">> НЕИСПРАВНОСТЬ: ${def.text}</div>
+                    <div class="obd-terminal-line warn">> БЛОК: ${def.system || 'ЭБУ ДВС DME'}</div>
+                    <div class="obd-terminal-line">> СТОИМОСТЬ УСТРАНЕНИЯ: ~${(def.cost || 15000).toLocaleString()} ₽</div>
+                </div>
+                <div class="grid-3 text-xs p-2" style="background: rgba(0,0,0,0.6); border-radius: 8px;">
+                    <div>RPM: <b class="color-cyan">${def.rpm || 850}</b></div>
+                    <div>ОЖ: <b class="${car.engineTemp > 100 ? 'color-red' : 'color-green'}">${car.engineTemp || 90}°C</b></div>
+                    <div>Буст: <b class="color-amber">${def.boost || 0.0} bar</b></div>
+                </div>
+            </div>
+        `;
+
+        actBox.innerHTML = `
+            <button onclick="closeOBD2Modal()" class="btn btn-cyan w-full mt-2">
+                Понятно (Использовать в торгах!)
+            </button>
+        `;
     } else {
-        let eng = car.wear?.engine ? Math.round(car.wear.engine) : 90;
-        let trans = car.wear?.transmission ? Math.round(car.wear.transmission) : 90;
-        openVerdictModal("ОШИБОК НЕТ ✓", "ЭБУ чист. Ресурс двигателя: " + eng + "%, трансмиссии: " + trans + "%.", true);
+        playSound('win');
+        tgHaptic('success');
+
+        resBox.innerHTML = `
+            <div class="obd-cyber-display" style="border-color: var(--green);">
+                <div class="flex-between text-xs mb-2">
+                    <span class="color-green font-bold"><i class="fa-solid fa-circle-check"></i> ОШИБОК DTC НЕ НАЙДЕНО</span>
+                    <span class="tag-badge bg-tag-green">CAN: OK</span>
+                </div>
+                <div class="obd-scan-matrix-screen mb-2" style="border-color: rgba(0, 230, 118, 0.4);">
+                    <div class="obd-terminal-line success">> Блоки DME / EGS / ABS / SRS: Ошибки отсутствуют.</div>
+                    <div class="obd-terminal-line">> Топливные коррекции в допуске (LTFT 0.8%).</div>
+                    <div class="obd-terminal-line">> Пропусков зажигания не зафиксировано.</div>
+                </div>
+                <div class="flex-between text-xs p-2" style="background: rgba(0,0,0,0.6); border-radius: 8px;">
+                    <span>Ресурс ДВС: <b class="color-green">${eng}%</b></span>
+                    <span>Ресурс КПП: <b class="color-green">${trans}%</b></span>
+                </div>
+            </div>
+        `;
+
+        actBox.innerHTML = `
+            <button onclick="closeOBD2Modal()" class="btn btn-green w-full mt-2">
+                Завершить осмотр ✓
+            </button>
+        `;
     }
 }
 
@@ -608,7 +744,7 @@ function paidCallMarketCar(carId) {
 }
 
 // ----------------------------------------------------
-// ЛОГИКА ТОРГА ПРИ ПОКУПКЕ
+// ЛОГИКА ТОРГА ПРИ ПОКУПКЕ (С КОМПАКТНЫМ ПРЕВЬЮ БЕЗ РАСТЯГИВАНИЯ)
 // ----------------------------------------------------
 function openMarketDeal(carId) {
     const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
@@ -621,6 +757,10 @@ function openMarketDeal(carId) {
         let fallbackUrl = car.fallback || getCategoryFallback(car.type);
         imgEl.src = car.img ? car.img : fallbackUrl;
         imgEl.onerror = () => { imgEl.src = fallbackUrl; };
+        // Жёсткая защита от растягивания картинки
+        imgEl.style.width = "90px";
+        imgEl.style.height = "62px";
+        imgEl.style.objectFit = "cover";
     }
     
     let cName = car.name ? car.name : "Авто";
@@ -634,7 +774,7 @@ function openMarketDeal(carId) {
     setTxt("dealCarPrice", priceStr + " ₽");
     
     const avatars = ["👨‍💼", "🧔", "😎", "👨‍🔧", "🧑‍💻", "🕵️‍♂️"];
-    const names = ["Сергей", "Алексей", "Дмитрий", "Артем", "Михаил", "Игорь"];
+    const names = ["Сергей", "Алексей", "Дмитрий", "Артём", "Михаил", "Игорь"];
     let numSum = 0;
     for (let k = 0; k < carId.length; k++) numSum += carId.charCodeAt(k);
     const randIdx = numSum % avatars.length;
@@ -937,7 +1077,7 @@ function finishMarketCarBuyProcess(deal) {
 }
 
 // ----------------------------------------------------
-// ТОЛЩИНОМЕР ЛКП: УЧЁТ ИЗНОСА И КАЛИБРОВКИ
+// ТОЛЩИНОМЕР ЛКП: УДОБНАЯ ВЕРСТКА И ИЗНОС ДАТЧИКА
 // ----------------------------------------------------
 function openGaugeModal(carId) { 
     activeInspectCarId = carId;
@@ -1007,6 +1147,9 @@ function closeGaugeModal() {
     playSound('tick');
 }
 
+// ----------------------------------------------------
+// ИНТЕРАКТИВНЫЙ ОТЧЁТ АВТОТЕКИ И ЭЛЕКТРОННЫЙ ПТС (ЭПТС)
+// ----------------------------------------------------
 function openAutotekaModal(carId) {
     if (!state.marketFeed) return;
     const car = state.marketFeed.find(c => c && c.id === carId);
@@ -1028,7 +1171,7 @@ function openAutotekaModal(carId) {
     if (rep) {
         let cName = car.name ? car.name : "Автомобиль";
         let cPlate = car.plate ? car.plate : "ТРАНЗИТ";
-        let dtpCount = car.hiddenDefect ? "2 ДТП (В расчётах)" : "ДТП не найдены";
+        let dtpCount = car.hiddenDefect ? "2 ДТП (В расчётах СТО)" : "ДТП не зафиксированы";
         let dtpBadgeClass = car.hiddenDefect ? "bg-tag-red" : "bg-tag-green";
         
         let legalStatus = car.isStolen
@@ -1039,43 +1182,114 @@ function openAutotekaModal(carId) {
         let mileagePercent = Math.min(100, Math.round((mVal / 250000) * 100));
         let odoWarning = car.rolledOdometer
             ? "<span class='color-red text-xs font-bold'>⚠ Зафиксирована скрутка пробега!</span>"
-            : "<span class='color-green text-xs'>✓ Пробег подтвержден станциями ТО</span>";
+            : "<span class='color-green text-xs font-bold'>✓ Пробег подтвержден станциями ТО</span>";
 
         let engWear = car.wear?.engine ? Math.round(car.wear.engine) : 85;
         let transWear = car.wear?.transmission ? Math.round(car.wear.transmission) : 85;
         let avgTech = Math.round((engWear + transWear) / 2);
 
+        // Данные владельца и ПТС
+        let pts = car.ptsData || {
+            ownerName: "Иванов И.И.",
+            ownerAvatar: "🧔",
+            ownersCount: 2,
+            ownershipYears: 3,
+            vin: "XTA21070001234567",
+            ptsType: "Электронный (ЭПТС) ✓",
+            pledgeBank: "Залогов нет ✓",
+            fsspRestrictions: "Ограничений нет ✓",
+            taxiCheck: "В такси не использовалась ✓"
+        };
+
+        let overallScore = 10;
+        if (car.hiddenDefect) overallScore -= 3;
+        if (car.rolledOdometer) overallScore -= 3;
+        if (car.isStolen) overallScore -= 4;
+        overallScore = Math.max(1, overallScore);
+
+        let scoreColor = overallScore >= 8 ? "color-green" : (overallScore >= 5 ? "color-amber" : "color-red");
+
         rep.innerHTML = `
+            <!-- КАРТОЧКА АВТО И ГОСНОМЕР -->
             <div class='flex-between mb-2'>
                 <div>
-                    <b class='color-cyan' style='font-size:13px;'>${cName}</b>
-                    <div class='sub-label'>Госномер: <span class='license-plate text-xs notranslate' translate='no' style='padding:1px 4px;'>${cPlate}</span></div>
+                    <b class='color-cyan' style='font-size:13.5px;'>${cName}</b>
+                    <div class='sub-label mt-1'>Госномер: <span class='license-plate text-xs notranslate' translate='no' style='padding:2px 6px;'>${cPlate} <div class='license-flag'>RUS</div></span></div>
                 </div>
                 ${legalStatus}
             </div>
 
-            <div class='p-2 mb-2' style='background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);'>
+            <!-- ИНТЕРАКТИВНЫЙ БЛОК ВЛАДЕЛЬЦА И ПТС -->
+            <div class='autoteka-pts-card mb-2'>
+                <div class='autoteka-owner-row'>
+                    <div class='autoteka-owner-avatar'>${pts.ownerAvatar}</div>
+                    <div style='flex:1;'>
+                        <div class='flex-between'>
+                            <b class='text-xs color-amber'>Владелец по ПТС: ${pts.ownerName}</b>
+                            <span class='tag-badge bg-tag-cyan'>Физлицо</span>
+                        </div>
+                        <div class='sub-label mt-1' style='font-size:10px;'>Срок владения: <b>${pts.ownershipYears} г.</b> | Записей в ПТС: <b>${pts.ownersCount}</b></div>
+                        <div class='sub-label' style='font-size:9.5px;'>VIN: <b class='color-cyan'>${pts.vin}</b></div>
+                    </div>
+                </div>
+
+                <div class='grid-2 text-xs'>
+                    <div class='autoteka-stat-tile'>
+                        <span class='sub-label'>Тип документа:</span>
+                        <div class='font-bold mt-1'>${pts.ptsType}</div>
+                    </div>
+                    <div class='autoteka-stat-tile'>
+                        <span class='sub-label'>Залог в банках:</span>
+                        <div class='font-bold mt-1 ${pts.pledgeBank.includes("нет") ? "color-green" : "color-red"}'>${pts.pledgeBank}</div>
+                    </div>
+                    <div class='autoteka-stat-tile'>
+                        <span class='sub-label'>База ФССП:</span>
+                        <div class='font-bold mt-1 ${pts.fsspRestrictions.includes("нет") ? "color-green" : "color-red"}'>${pts.fsspRestrictions}</div>
+                    </div>
+                    <div class='autoteka-stat-tile'>
+                        <span class='sub-label'>Работа в такси:</span>
+                        <div class='font-bold mt-1 ${pts.taxiCheck.includes("не") ? "color-green" : "color-amber"}'>${pts.taxiCheck}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ПРОБЕГ -->
+            <div class='p-2 mb-2' style='background:#0d1424; border-radius:10px; border:1px solid rgba(255,255,255,0.06);'>
                 <div class='flex-between text-xs mb-1'>
-                    <span>Зафиксированный пробег:</span>
+                    <span>История показаний одометра:</span>
                     <b class='color-amber notranslate' translate='no'>${mVal.toLocaleString()} км</b>
                 </div>
                 <div class='biz-progress-track'><div class='biz-progress-fill fill-biz-stock' style='width:${mileagePercent}%;'></div></div>
                 <div class='text-right'>${odoWarning}</div>
             </div>
 
-            <div class='p-2 mb-2' style='background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);'>
+            <!-- СОСТОЯНИЕ АГРЕГАТОВ -->
+            <div class='p-2 mb-2' style='background:#0d1424; border-radius:10px; border:1px solid rgba(255,255,255,0.06);'>
                 <div class='flex-between text-xs mb-1'>
                     <span>Ресурс силовых агрегатов:</span>
                     <b class='color-green notranslate' translate='no'>${avgTech}%</b>
                 </div>
                 <div class='biz-progress-track'><div class='biz-progress-fill fill-biz-lvl' style='width:${avgTech}%;'></div></div>
-                <div class='sub-label text-xs notranslate' translate='no'>Мотор: ${engWear}% | КПП: ${transWear}%</div>
+                <div class='sub-label text-xs notranslate' translate='no'>Двигатель: ${engWear}% | Трансмиссия: ${transWear}%</div>
             </div>
 
-            <div class='flex-between text-xs p-2' style='background:#0d1424; border-radius:8px; border:1px solid rgba(255,255,255,0.06);'>
-                <span>История ДТП и расчёты ремонтов:</span>
-                <span class='tag-badge ${dtpBadgeClass}'>${dtpCount}</span>
-            </div>`;
+            <!-- ИСТОРИЯ ДТП И РЕЙТИНГ АВТОТЕКИ -->
+            <div class='flex-between text-xs p-2 mb-2' style='background:#0d1424; border-radius:10px; border:1px solid rgba(255,255,255,0.06);'>
+                <div>
+                    <span>История аварий и выплат:</span>
+                    <div class='sub-label mt-1'>${dtpCount}</div>
+                </div>
+                <span class='tag-badge ${dtpBadgeClass}'>${car.hiddenDefect ? "БЫЛО В ДТП" : "БЕЗ ДТП"}</span>
+            </div>
+
+            <div class='flex-between p-2' style='background:rgba(0,242,254,0.05); border:1px solid var(--border-glow); border-radius:10px;'>
+                <div>
+                    <b class='text-xs color-cyan'>Итоговый рейтинг Автотеки:</b>
+                    <div class='sub-label' style='font-size:9.5px;'>Оценка на основе баз ГИБДД, ФССП и страховых компаний</div>
+                </div>
+                <div class='price-val ${scoreColor}' style='font-size:20px;'>${overallScore}/10</div>
+            </div>
+        `;
     }
     
     const modal = document.getElementById("modalAutoteka");
@@ -1118,6 +1332,7 @@ window.openGaugeModal = openGaugeModal;
 window.checkBodyPart = checkBodyPart;
 window.closeGaugeModal = closeGaugeModal;
 window.quickOBDScanMarketCar = quickOBDScanMarketCar;
+window.renderOBDFinalResults = renderOBDFinalResults;
 window.openAutotekaModal = openAutotekaModal;
 window.initiateBuyMarketCar = initiateBuyMarketCar;
 window.paidCallMarketCar = paidCallMarketCar;

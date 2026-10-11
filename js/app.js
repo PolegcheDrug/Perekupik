@@ -2,7 +2,7 @@
 // js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.4.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Реальное время (00:00), комбинированная экономика (₽ + ⭐),
-// износ оборудования, квесты и стабильный запуск всех модулей PerekupOS
+// стартовое условие без гаража, квесты и связь с Блокнотом
 // ========================================================
 
 const CURRENT_GAME_VERSION = "v0.4.6";
@@ -192,7 +192,11 @@ const DEFAULT_STATE = {
         stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0, scandalsAvoided: 0 },
         hunger: 80, mood: 85, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
         lastRealDayTimestamp: Date.now(),
-        diet: 'shaurma', housingId: 'room', housingType: 'rent', ownedHouses: [], selectedStreetCarIndex: 0,
+        diet: 'shaurma', 
+        housingId: 'trailer', // Стартуем в бытовке без гаражного бокса!
+        housingType: 'rent', 
+        ownedHouses: [], 
+        selectedStreetCarIndex: 0,
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
         hasRacingLicense: false, consecutiveRaces: 0, maxRacesBeforeRaid: 12,
         safeDeposit: 0, trafficFines: 0,
@@ -201,6 +205,7 @@ const DEFAULT_STATE = {
         furniture: [],
         phoneMessages: [],
         dailyQuests: [],
+        dailyQuestsSuperClaimed: false,
         bankHistory: [],
         bankDeposits: []
     },
@@ -262,7 +267,7 @@ function applyLanguageToDOM() {
 }
 
 // ========================================================
-// 4. ТРЕКЕР ЕЖЕДНЕВНЫХ ЗАДАНИЙ (ПЛАН ПЕРЕКУПА)
+// 4. ТРЕКЕР ЗАДАНИЙ (ПЛАН ПЕРЕКУПА & СВЯЗКА С БЛОКНОТОМ)
 // ========================================================
 function trackQuestProgress(actionType, count = 1) {
     if (!state.player || !Array.isArray(state.player.dailyQuests)) return;
@@ -273,7 +278,7 @@ function trackQuestProgress(actionType, count = 1) {
             q.cur = Math.min(q.max || q.target || 1, (q.cur || 0) + count);
             questsUpdated = true;
             if (q.cur >= (q.max || q.target || 1)) {
-                showToast(`🎯 Задание выполнено: «${q.text}»! Заберите награду в телефоне.`);
+                showToast(`🎯 Выполнено задание: «${q.text}»! Заберите награду в телефоне.`);
                 tgHaptic('success');
             }
         }
@@ -285,9 +290,31 @@ function trackQuestProgress(actionType, count = 1) {
             PhoneManager.renderDailyQuestsWidget();
         }
     }
+
+    // Проверка глобальных целей Блокнота
+    checkNotepadMilestones();
+}
+
+function checkNotepadMilestones() {
+    if (typeof NOTEPAD_CAREER_GOALS === 'undefined') return;
+    const s = state.player?.stats || {};
+    const netProfit = s.totalNetProfit || 0;
+    const sold = s.sold || 0;
+
+    if (netProfit >= 1000000 && !state.player.milestoneMilClaimed) {
+        state.player.milestoneMilClaimed = true;
+        showToast("🏆 Веха в Блокноте: Первый 1,000,000 ₽ чистой прибыли!");
+        playSound('win');
+    }
+    if (sold >= 10 && !state.player.milestoneSalesClaimed) {
+        state.player.milestoneSalesClaimed = true;
+        showToast("🏆 Веха в Блокноте: Закрыто 10 успешных продаж!");
+        playSound('win');
+    }
 }
 
 function refreshDailyQuestsList() {
+    state.player.dailyQuestsSuperClaimed = false;
     if (typeof DAILY_QUESTS_POOL === 'undefined' || !Array.isArray(DAILY_QUESTS_POOL)) {
         state.player.dailyQuests = [
             { id: "q_inspect", text: "Осмотреть толщиномером 2 авто на рынке", cur: 0, max: 2, actionType: "gauge_check", reward: 35000, rewardXp: 40, done: false },
@@ -349,7 +376,7 @@ function getTotalGarageSlots() {
 }
 
 // ========================================================
-// 6. ПРОВЕРКА ДОСТУПА К СИНДИКАТУ (7 УРОВЕНЬ + ЭКИПИРОВКА + 5 ЗВЕЗД)
+// 6. ПРОВЕРКА ДОСТУПА К СИНДИКАТУ (7 УРОВЕНЬ + ПРИБОРЫ + 5 ЗВЁЗД)
 // ========================================================
 function checkSyndicateAccessDetails() {
     const lvl = state.player?.level || 1;
@@ -784,11 +811,11 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.expressTickets = state.player.maxExpressTickets || 25;
     state.player.consecutiveRaces = 0;
 
-    let curId = state.player?.housingId || 'room';
+    let curId = state.player?.housingId || 'trailer';
     let isOwn = state.player?.ownedHouses?.includes(curId);
     if (!isOwn && typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
         const h = HOUSING_LIST.find(item => item.id === curId);
-        let rentVal = h ? (h.rent || 2500) : 2500;
+        let rentVal = h ? (h.rent || 1000) : 1000;
         state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
     }
 
@@ -924,7 +951,14 @@ function updateHeaderUI() {
     if (vipBadge) vipBadge.style.display = state.player?.vipPro ? 'block' : 'none';
 
     let gLen = state.garage ? state.garage.length : 0;
-    setTxt('garageHeaderSlots', gLen + "/" + getTotalGarageSlots());
+    let totalSlots = getTotalGarageSlots();
+    let hasRealGarage = typeof playerHasGarageOrWorkshop === 'function' ? playerHasGarageOrWorkshop() : false;
+    
+    if (hasRealGarage) {
+        setTxt('garageHeaderSlots', gLen + "/" + totalSlots);
+    } else {
+        setTxt('garageHeaderSlots', `${gLen}/${totalSlots} ⛺`);
+    }
     
     const slotCost = getGarageSlotCost();
     const btnSlot = document.getElementById('btnBuyGarageSlot');

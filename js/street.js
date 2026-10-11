@@ -1,8 +1,8 @@
 // ========================================================
-// js/street.js — СТРИТ-РЕЙСИНГ, 402М И АВТОМЕРОПРИЯТИЯ (v0.4.5)
-// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
-// Реалистичный ланч-контроль, антифарм, перегрев ДВС,
-// износ шин/агрегатов и учет регламентов техкома РАФ
+// js/street.js — СТРИТ-РЕЙСИНГ, 402М И АВТОМЕРОПРИЯТИЯ (v0.4.6)
+// Разработчики: Tak Toje, Max, Sergo, gemini
+// Реалистичный ланч-контроль, эвакуация на Штрафстоянку ГИБДД,
+// автовыбор личного авто, антифарм, перегрев ДВС и износ шин
 // ========================================================
 
 let currentRaceBet = 25000;
@@ -17,6 +17,26 @@ window.streetRaceBet = currentRaceBet;
 window.currentRpm = currentRpm;
 window.tachoRpm = currentRpm;
 
+function getActiveStreetCarIndex() {
+    if (!state.garage || state.garage.length === 0) return -1;
+    
+    // 1. Приоритет личного авто
+    let personalIdx = state.garage.findIndex(c => c && c.isPersonal && !c.impounded);
+    if (personalIdx !== -1) {
+        state.player.selectedStreetCarIndex = personalIdx;
+        return personalIdx;
+    }
+
+    // 2. Текущий выбранный индекс
+    let selIdx = state.player.selectedStreetCarIndex || 0;
+    if (selIdx >= state.garage.length || !state.garage[selIdx] || state.garage[selIdx].impounded) {
+        let firstAvailable = state.garage.findIndex(c => c && !c.impounded);
+        selIdx = firstAvailable !== -1 ? firstAvailable : 0;
+        state.player.selectedStreetCarIndex = selIdx;
+    }
+    return selIdx;
+}
+
 function renderStreetScreen() {
     const picker = document.getElementById('streetCarPickerBox');
     const hpBadge = document.getElementById('streetSelectedCarHp');
@@ -28,9 +48,12 @@ function renderStreetScreen() {
         return;
     }
 
-    let selIdx = state.player.selectedStreetCarIndex || 0;
-    if (selIdx >= state.garage.length) selIdx = 0;
-    state.player.selectedStreetCarIndex = selIdx;
+    let selIdx = getActiveStreetCarIndex();
+    if (selIdx === -1) {
+        picker.innerHTML = "<div class='text-xs color-red text-center py-2'>Все авто арестованы на штрафстоянке!</div>";
+        if (hpBadge) hpBadge.innerText = "0 л.с.";
+        return;
+    }
 
     let car = state.garage[selIdx];
     let carHp = car.power || 100;
@@ -43,15 +66,18 @@ function renderStreetScreen() {
 
     let opts = "";
     state.garage.forEach((c, idx) => {
+        if (!c) return;
         let isSel = idx === selIdx ? "selected" : "";
         let tVal = c.engineTemp || 90;
-        opts += `<option value="${idx}" ${isSel}>${c.name} (${c.power || 100} л.с., ${tVal}°C)</option>`;
+        let impText = c.impounded ? " [Штрафстоянка]" : "";
+        let personalText = c.isPersonal ? " 👑" : "";
+        opts += `<option value="${idx}" ${isSel} ${c.impounded ? 'disabled' : ''}>${c.name}${personalText} (${c.power || 100} л.с., ${tVal}°C)${impText}</option>`;
     });
 
     picker.innerHTML = `
         <div class="flex-between">
-            <span class="text-xs sub-label">Боевой корч:</span>
-            <select onchange="selectStreetCar(this.value)" style="background:#111a2a; color:#fff; border:1px solid var(--border-glass); border-radius:6px; padding:4px 8px; font-size:11px; outline:none;">
+            <span class="text-xs sub-label">Боевой болид:</span>
+            <select onchange="selectStreetCar(this.value)" style="background:#111a2a; color:#fff; border:1px solid var(--border-glass); border-radius:6px; padding:6px 10px; font-size:11px; outline:none; max-width:65%;">
                 ${opts}
             </select>
         </div>
@@ -59,7 +85,11 @@ function renderStreetScreen() {
 }
 
 function selectStreetCar(idx) {
-    state.player.selectedStreetCarIndex = parseInt(idx);
+    let parsedIdx = parseInt(idx);
+    if (!state.garage[parsedIdx] || state.garage[parsedIdx].impounded) {
+        return showToast("Этот автомобиль арестован на спецстоянке!");
+    }
+    state.player.selectedStreetCarIndex = parsedIdx;
     saveState();
     renderStreetScreen();
     playSound('tick');
@@ -114,7 +144,7 @@ function updateTachometerUI() {
 }
 
 // ========================================================
-// ДРАГ-РЕЙСИНГ НА 402 МЕТРА (С АНТИФАРМОМ И ИЗНОСОМ)
+// ДРАГ-РЕЙСИНГ НА 402 МЕТРА (С АНТИФАРМОМ И ШТРАФСТОЯНКОЙ)
 // ========================================================
 function launchDragRace() {
     if (!state.player.hasRacingLicense) {
@@ -130,15 +160,22 @@ function launchDragRace() {
         return showToast("В гараже нет машин для гонки!");
     }
 
-    let car = state.garage[state.player.selectedStreetCarIndex || 0];
-    if (!car) return showToast("Выберите авто в гараже!");
+    let carIdx = getActiveStreetCarIndex();
+    if (carIdx === -1) {
+        return showToast("Все автомобили арестованы! Заберите транспорт со штрафстоянки.");
+    }
 
-    // 1. Проверка перегрева двигателя (антифарм)
+    let car = state.garage[carIdx];
+    if (!car || car.impounded) {
+        return showToast("Автомобиль на штрафстоянке ГИБДД!");
+    }
+
+    // 1. Проверка перегрева двигателя
     let temp = car.engineTemp || 90;
     if (temp > 105) {
         playSound('error');
         tgHaptic('error');
-        return showToast("⚠️ Перегрев мотора (" + temp + "°C)! Дайте остыть или остудите в гараже.");
+        return showToast("⚠️ Перегрев мотора (" + temp + "°C)! Остудите болид перед стартом.");
     }
 
     // 2. Проверка состояния шин
@@ -146,14 +183,14 @@ function launchDragRace() {
     if (tires < 20) {
         playSound('error');
         tgHaptic('error');
-        return showToast("🚫 Резина стёрта до корда! Замените комплект на СТО перед стартом.");
+        return showToast("🚫 Резина стёрта в ноль! Замените комплект на СТО перед заездом.");
     }
 
     // Списание ставки
     state.player.cash -= currentRaceBet;
     state.player.consecutiveRaces = (state.player.consecutiveRaces || 0) + 1;
 
-    // Нанесение механического износа и нагрева за заезд
+    // Износ и нагрев за боевой заезд
     car.engineTemp = (car.engineTemp || 90) + Math.floor(10 + Math.random() * 8);
     car.tireWear = Math.max(0, tires - (car.tuning?.dragSlicks ? 12 : 8));
     if (car.wear) {
@@ -171,7 +208,6 @@ function launchDragRace() {
 
     let playerPower = car.power || 100;
     
-    // Влияние привода на разгон с места
     let drive = car.drivetrain || 'rwd';
     if (drive === 'awd') playerPower *= 1.15;
     else if (drive === 'fwd') playerPower *= 0.92;
@@ -186,10 +222,10 @@ function launchDragRace() {
     let rivalPower = Math.floor(playerPower * (0.82 + Math.random() * 0.34));
 
     if (statusText) {
-        if (idealStart) statusText.innerText = "🔥 ИДЕАЛЬНЫЙ ЛАНЧ-СТАРТ! ЗАЦЕП НА СТАРТЕ!";
-        else if (cutOff) statusText.innerText = "❌ ОТСЕЧКА И БУКС НА МЕСТЕ!";
-        else if (bogged) statusText.innerText = "⚠️ ПРОВАЛ ОБОРОТОВ НА СТАРТЕ!";
-        else statusText.innerText = "🚦 Заезд начался...";
+        if (idealStart) statusText.innerText = "🔥 ИДЕАЛЬНЫЙ ЛАНЧ-СТАРТ! 100% ЗАЦЕП!";
+        else if (cutOff) statusText.innerText = "❌ ОТСЕЧКА И БУКС НА СТАРТЕ!";
+        else if (bogged) statusText.innerText = "⚠️ ПРОВАЛ ОБОРОТОВ ДВИГАТЕЛЯ!";
+        else statusText.innerText = "🚦 Заезд 402 метра начался...";
     }
 
     let pPos = 0;
@@ -249,29 +285,38 @@ function launchDragRace() {
                     openVerdictModal("ПОРАЖЕНИЕ НА 402М 💨", `Соперник оказался быстрее на финише!\nВаше время: ${myTime}с | Соперник: ${rivalTime}с\nСтавка -${currentRaceBet.toLocaleString()} ₽ потеряна.`, false);
                 }
 
-                checkPoliceRaid();
+                // Проверка внимания и эвакуации на штрафстоянку
+                checkPoliceRaid(carIdx);
             }, 600);
         }
     }, 60);
 }
 
-function checkPoliceRaid() {
+function checkPoliceRaid(carIdx) {
     let raids = state.player.consecutiveRaces || 0;
     let maxRaids = state.player.maxRacesBeforeRaid || 12;
 
-    if (state.player.policeImmunityDays > 0) return;
+    if (state.player.policeImmunityDays > 0) return; // Крыша ГИБДД защищает
 
     if (raids >= maxRaids) {
         state.player.consecutiveRaces = 0;
-        let fine = 45000;
-        state.player.cash = Math.max(0, (state.player.cash || 0) - fine);
-        state.player.trafficFines = (state.player.trafficFines || 0) + fine;
-        
+        let car = state.garage[carIdx];
+        if (car) {
+            car.impounded = true;
+        }
+
         playSound('error');
         tgHaptic('error');
-        showToast("🚨 ОБЛАВА ДПС НА ГОНКАХ! Выписан штраф 45,000 ₽.");
         saveState();
         updateHeaderUI();
+        if (typeof renderGarage === 'function') renderGarage();
+        
+        // Открытие интерфейса Штрафстоянки
+        if (typeof openImpoundLotModal === 'function') {
+            openImpoundLotModal(carIdx);
+        } else {
+            showToast("🚨 ОБЛАВА ДПС! Автомобиль арестован и отправлен на штрафстоянку!");
+        }
     }
 }
 
@@ -326,12 +371,13 @@ function renderStreetEvents() {
         return;
     }
 
-    let car = state.garage[state.player.selectedStreetCarIndex || 0];
-    if (!car) {
-        container.innerHTML = "<div class='text-xs sub-label text-center py-2'>Автомобиль не выбран.</div>";
+    let carIdx = getActiveStreetCarIndex();
+    if (carIdx === -1) {
+        container.innerHTML = "<div class='text-xs color-red text-center py-2'>Автомобиль на штрафстоянке.</div>";
         return;
     }
 
+    let car = state.garage[carIdx];
     let html = "";
     STREET_EVENTS_DATA.forEach(ev => {
         let isFit = ev.check(car);
@@ -362,7 +408,10 @@ function participateStreetEvent(eventId) {
     const ev = STREET_EVENTS_DATA.find(e => e.id === eventId);
     if (!ev) return;
 
-    let car = state.garage[state.player.selectedStreetCarIndex || 0];
+    let carIdx = getActiveStreetCarIndex();
+    if (carIdx === -1) return showToast("Автомобиль арестован на спецстоянке!");
+
+    let car = state.garage[carIdx];
     if (!car || !ev.check(car)) {
         return showToast("Автомобиль не прошел техкомиссию регламента!");
     }
@@ -385,6 +434,7 @@ function participateStreetEvent(eventId) {
 }
 
 // Экспорт функций в глобальный объект window
+window.getActiveStreetCarIndex = getActiveStreetCarIndex;
 window.renderStreetScreen = renderStreetScreen;
 window.selectStreetCar = selectStreetCar;
 window.setRaceBet = setRaceBet;

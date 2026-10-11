@@ -1,8 +1,8 @@
 // ========================================================
-// js/phone.js — ИНТЕРАКТИВНЫЙ СМАРТФОН «PerekupOS» (v0.4.5)
-// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
-// Автопрочтение сообщений при входе, ребаланс Супер Вилспина,
-// антифарм/износ в Дрифте и 402м, развитый Во-Банк, Блокнот
+// js/phone.js — ИНТЕРАКТИВНЫЙ СМАРТФОН «PerekupOS» (v0.4.6)
+// Разработчики: Tak Toje, Max, Sergo, gemini
+// Виджет бизнеса (по условию), изолированный План перекупа,
+// карьерный Блокнот, онлайн радио, чаты и P2P биржа
 // ========================================================
 
 const ELECTRONIC_RADIO_STATIONS = [
@@ -264,23 +264,35 @@ const PhoneManager = {
         return { totalIncomePerDay, totalStoredCash, activePoints, minStock };
     },
 
+    // ========================================================
+    // 1. ВИДЖЕТ СЕТИ ПРЕДПРИЯТИЙ (ТОЛЬКО ЕСЛИ КУПЛЕН ХОТЯ БЫ 1 БИЗНЕС)
+    // ========================================================
     renderBusinessWidget() {
         const widgetContainer = document.getElementById('phoneBizWidgetContainer');
         if (!widgetContainer) return;
 
+        const hasAnyBusiness = state.businesses && state.businesses.some(b => b && b.level > 0);
+
+        if (!hasAnyBusiness) {
+            widgetContainer.innerHTML = '';
+            widgetContainer.style.display = 'none';
+            return;
+        }
+
+        widgetContainer.style.display = 'block';
         const stats = this.getBusinessStats();
-        let statusBadge = stats.activePoints === 0 
-            ? "<span class='tag-badge bg-tag-amber'>Нет точек</span>" 
-            : (stats.minStock <= 15 ? "<span class='tag-badge bg-tag-red'>Мало сырья!</span>" : "<span class='tag-badge bg-tag-green'>Работает</span>");
+        let statusBadge = stats.minStock <= 15 
+            ? "<span class='tag-badge bg-tag-red'>Мало сырья!</span>" 
+            : "<span class='tag-badge bg-tag-green'>Работает</span>";
 
         widgetContainer.innerHTML = `
             <div class="phone-biz-widget">
                 <div class="flex-between mb-1">
                     <div class="flex-gap" style="align-items:center;">
-                        <div class="widget-icon-bubble"><i class="fa-solid fa-chart-pie color-green"></i></div>
+                        <div class="widget-icon-bubble"><i class="fa-solid fa-briefcase color-green"></i></div>
                         <div>
                             <div class="widget-title">Сеть предприятий</div>
-                            <div class="sub-label" style="font-size:9px;">Активно: <b>${stats.activePoints}</b> точек</div>
+                            <div class="sub-label" style="font-size:9.5px;">Активно: <b class="color-green">${stats.activePoints}</b> точек</div>
                         </div>
                     </div>
                     ${statusBadge}
@@ -309,6 +321,9 @@ const PhoneManager = {
         `;
     },
 
+    // ========================================================
+    // 2. ИЗОЛИРОВАННЫЙ ВИДЖЕТ «ПЛАН ПЕРЕКУПА НА ДЕНЬ»
+    // ========================================================
     renderDailyQuestsWidget() {
         const widget = document.getElementById('phoneDailyQuestsWidget');
         if (!widget) return;
@@ -317,38 +332,91 @@ const PhoneManager = {
             if (typeof refreshDailyQuestsList === 'function') refreshDailyQuestsList();
         }
 
-        let quests = state.player.dailyQuests;
-        let html = `
-            <div class="flex-between mb-1">
-                <div class="flex-gap" style="align-items:center;">
-                    <i class="fa-solid fa-list-check color-cyan" style="font-size:12px;"></i>
-                    <b class="text-xs" style="font-size:11px;">План перекупа на день</b>
-                </div>
-                <span class="sub-label" style="font-size:9px; color:var(--cyan);">Сброс в 00:00 🌙</span>
-            </div>
-        `;
+        let quests = state.player.dailyQuests || [];
+        let completedCount = 0;
+        let htmlQuests = "";
+
+        const iconsMap = {
+            gauge_check: 'fa-ruler-combined color-cyan',
+            win_drag: 'fa-flag-checkered color-red',
+            collect_biz: 'fa-briefcase color-green',
+            buy_car: 'fa-cart-shopping color-amber',
+            sell_car: 'fa-handshake color-green',
+            obd_scan: 'fa-tablet-screen-button color-cyan',
+            presale_mod: 'fa-wand-magic-sparkles color-purple',
+            drift_run: 'fa-compass-drafting color-red'
+        };
 
         quests.forEach((q, idx) => {
             let cur = q.cur || 0;
             let max = q.max || q.target || 1;
-            let pct = Math.min(100, Math.round((cur / max) * 100));
-            let btn = q.done
-                ? `<span class="tag-badge bg-tag-green">Выполнено ✓</span>`
-                : (cur >= max 
-                    ? `<button onclick="PhoneManager.claimQuestReward(${idx})" class="btn btn-green btn-auto btn-sm" style="padding:3px 8px; font-size:9px;">Забрать +${(q.reward/1000).toFixed(0)}k</button>`
-                    : `<span class="sub-label" style="font-size:9px;">${cur}/${max}</span>`);
+            let isDone = q.done || cur >= max;
+            let isClaimed = !!q.done;
+            if (isDone) completedCount++;
 
-            html += `
-            <div class="quest-item-row">
-                <div style="flex:1; margin-right:8px;">
-                    <div style="font-size:10px; color:#e2e8f0;">${q.text}</div>
-                    <div class="quest-progress-mini"><div class="quest-progress-fill" style="width:${pct}%;"></div></div>
+            let pct = Math.min(100, Math.round((cur / max) * 100));
+            let iconClass = iconsMap[q.actionType] || 'fa-list-check color-cyan';
+
+            let actionBtn = "";
+            if (isClaimed) {
+                actionBtn = `<span class="quest-done-badge"><i class="fa-solid fa-check"></i> Получено</span>`;
+            } else if (cur >= max) {
+                actionBtn = `
+                    <button onclick="PhoneManager.claimQuestReward(${idx})" class="quest-claim-btn">
+                        <i class="fa-solid fa-gift"></i> Забрать +${(q.reward / 1000).toFixed(0)}k
+                    </button>`;
+            } else {
+                actionBtn = `<span class="sub-label font-bold" style="font-size:10px;">${cur}/${max}</span>`;
+            }
+
+            htmlQuests += `
+                <div class="quest-card-item ${isClaimed ? 'quest-completed' : ''}">
+                    <div style="font-size:16px; min-width:22px; text-align:center;">
+                        <i class="fa-solid ${iconClass}"></i>
+                    </div>
+                    <div class="quest-card-info">
+                        <div class="quest-card-title">${q.text}</div>
+                        <div class="quest-card-sub">
+                            <span class="sub-label">Награда: <b class="color-amber">+${q.reward.toLocaleString()} ₽</b></span>
+                            <div class="quest-progress-track">
+                                <div class="quest-progress-bar" style="width:${pct}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="quest-action-btn-wrap">
+                        ${actionBtn}
+                    </div>
                 </div>
-                ${btn}
-            </div>`;
+            `;
         });
 
-        widget.innerHTML = html;
+        let superRewardBlock = "";
+        let allDone = completedCount >= quests.length;
+        if (allDone && !state.player.dailyQuestsSuperClaimed) {
+            superRewardBlock = `
+                <div class="quest-super-reward-banner">
+                    <div>
+                        <div class="font-bold text-xs color-amber"><i class="fa-solid fa-crown"></i> План дня перевыполнен 3/3!</div>
+                        <div class="sub-label" style="font-size:9.5px;">+50,000 ₽, +10 ⭐ Stars, +1 🤝 Связь</div>
+                    </div>
+                    <button onclick="PhoneManager.claimSuperDailyReward()" class="btn btn-amber btn-sm btn-auto" style="min-height:30px; padding:4px 10px;">
+                        Забрать Супербонус!
+                    </button>
+                </div>
+            `;
+        }
+
+        widget.innerHTML = `
+            <div class="quest-widget-header">
+                <div class="flex-gap" style="align-items:center;">
+                    <i class="fa-solid fa-list-check color-cyan"></i>
+                    <b class="text-xs color-cyan">План перекупа на день:</b>
+                </div>
+                <span class="sub-label" style="font-size:9.5px;">Сброс в 00:00 🌙</span>
+            </div>
+            ${htmlQuests}
+            ${superRewardBlock}
+        `;
     },
 
     claimQuestReward(idx) {
@@ -364,6 +432,23 @@ const PhoneManager = {
         playSound('win');
         tgHaptic('success');
         showToast(`Цель выполнена! Получено +${q.reward.toLocaleString()} ₽!`);
+        this.renderDailyQuestsWidget();
+    },
+
+    claimSuperDailyReward() {
+        if (state.player.dailyQuestsSuperClaimed) return;
+        state.player.dailyQuestsSuperClaimed = true;
+
+        state.player.cash = (state.player.cash || 0) + 50000;
+        state.player.stars = (state.player.stars || 0) + 10;
+        state.player.connections = (state.player.connections || 0) + 1;
+        state.player.mood = 100;
+
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        openVerdictModal("СУПЕРБОНУС ДНЯ! 🌟", "Вы закрыли весь ежедневный план перекупа!\nНачислено: +50,000 ₽, +10 ⭐ Stars, +1 🤝 Связь и статус «Ударник Авторынка»!", true);
         this.renderDailyQuestsWidget();
     },
 
@@ -754,7 +839,7 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // 4. ФОРТУНА: СУПЕР ВИЛСПИН (БЕСПЛАТНЫЙ 1 РАЗ/СУТКИ) & ОБМЕН
+    // 4. ФОРТУНА: СУПЕР ВИЛСПИН & ОБМЕН
     // ========================================================
     renderFortuneApp(container) {
         let tickets = state.player?.superSpinTickets || 0;
@@ -1059,7 +1144,7 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // 5. ГОСУСЛУГИ, МАГНИТОЛА, БЛОКНОТ ДЕЛЬЦА
+    // 5. ГОСУСЛУГИ, МАГНИТОЛА, БЛОКНОТ КАРЬЕРЫ
     // ========================================================
     renderGosuslugiApp(container) {
         let fines = state.player.trafficFines || 0;
@@ -1291,17 +1376,47 @@ const PhoneManager = {
         if (disp) disp.innerText = `${Math.round(radioVolume * 100)}%`;
     },
 
+    // ----------------------------------------------------
+    // БЛОКНОТ КАРЬЕРЫ ПЕРЕКУПА (СЮЖЕТНЫЕ ВЕХИ И ПРОГРЕСС)
+    // ----------------------------------------------------
     renderNotepadApp(container) {
         let s = state.player?.stats || {};
         let goals = typeof NOTEPAD_CAREER_GOALS !== 'undefined' ? NOTEPAD_CAREER_GOALS : [];
+        let netProfit = s.totalNetProfit || 0;
+        let soldCount = s.sold || 0;
+        let totalSlots = typeof getTotalGarageSlots === 'function' ? getTotalGarageSlots() : 2;
+        let ownedHouses = state.player?.ownedHouses || [];
 
+        let completedGoals = 0;
         let goalsHtml = goals.map(g => {
             let isDone = false;
-            if (g.targetProfit && (s.totalNetProfit || 0) >= g.targetProfit) isDone = true;
-            if (g.targetSales && (s.profitableSales || 0) >= g.targetSales) isDone = true;
-            if (g.targetSlots && getTotalGarageSlots() >= g.targetSlots) isDone = true;
-            if (g.targetCred && (state.player?.streetCred || 0) >= g.targetCred) isDone = true;
-            if (g.targetHousing && (state.player?.ownedHouses || []).includes(g.targetHousing)) isDone = true;
+            let currentVal = 0;
+            let targetVal = 1;
+
+            if (g.targetProfit) {
+                currentVal = netProfit;
+                targetVal = g.targetProfit;
+                isDone = currentVal >= targetVal;
+            } else if (g.targetSales) {
+                currentVal = soldCount;
+                targetVal = g.targetSales;
+                isDone = currentVal >= targetVal;
+            } else if (g.targetSlots) {
+                currentVal = totalSlots;
+                targetVal = g.targetSlots;
+                isDone = currentVal >= targetVal;
+            } else if (g.targetCred) {
+                currentVal = state.player?.streetCred || 0;
+                targetVal = g.targetCred;
+                isDone = currentVal >= targetVal;
+            } else if (g.targetHousing) {
+                isDone = ownedHouses.includes(g.targetHousing);
+                currentVal = isDone ? 1 : 0;
+                targetVal = 1;
+            }
+
+            if (isDone) completedGoals++;
+            let progressPct = Math.min(100, Math.round((currentVal / targetVal) * 100));
 
             return `
             <div class="glass-card p-2 mb-2" style="border-left: 3px solid ${isDone ? 'var(--green)' : 'var(--amber)'};">
@@ -1309,18 +1424,38 @@ const PhoneManager = {
                     <b class="text-xs ${isDone ? 'color-green' : 'color-cyan'}">${g.title}</b>
                     <span class="tag-badge ${isDone ? 'bg-tag-green' : 'bg-tag-amber'}">${isDone ? 'ДОСТИГНУТО ✓' : g.category}</span>
                 </div>
-                <div class="sub-label mb-1" style="font-size:10px;">${g.desc}</div>
+                <div class="sub-label mb-2" style="font-size:10px;">${g.desc}</div>
+                <div class="flex-between text-xs mb-1">
+                    <span>Прогресс:</span>
+                    <b class="${isDone ? 'color-green' : 'color-amber'}">${currentVal.toLocaleString()} / ${targetVal.toLocaleString()}</b>
+                </div>
+                <div class="biz-progress-track mb-2">
+                    <div class="biz-progress-fill ${isDone ? 'fill-biz-stock' : 'fill-biz-lvl'}" style="width:${progressPct}%;"></div>
+                </div>
                 <div class="text-xs color-amber" style="font-size:9.5px;">⭐ Награда: <b>${g.reward}</b></div>
             </div>`;
         }).join('');
 
+        let totalProgressPct = goals.length > 0 ? Math.round((completedGoals / goals.length) * 100) : 0;
+
         container.innerHTML = `
             <div class="phone-app-header">
                 <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Меню</button>
-                <div class="phone-app-title"><i class="fa-solid fa-note-sticky color-amber"></i> Блокнот Дельца</div>
+                <div class="phone-app-title"><i class="fa-solid fa-note-sticky color-amber"></i> Блокнот Карьеры</div>
                 <div style="width:40px;"></div>
             </div>
             <div class="phone-app-body">
+                <div class="glass-card mb-2" style="background:radial-gradient(circle at 50% 0%, rgba(0,242,254,0.15), rgba(9,14,24,0.98));">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-route"></i> Карьерный путь перекупа</b>
+                        <span class="price-val text-xs color-green">${totalProgressPct}%</span>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:9.5px;">Закрыто этапов: <b>${completedGoals} из ${goals.length}</b>. Выполняйте цели для получения постоянных бонусов.</div>
+                    <div class="biz-progress-track">
+                        <div class="biz-progress-fill fill-biz-stock" style="width:${totalProgressPct}%;"></div>
+                    </div>
+                </div>
+
                 <div class="glass-card p-2 mb-2">
                     <div class="flex-between mb-1">
                         <b class="text-xs color-green"><i class="fa-solid fa-chart-line"></i> Сводка эффективности:</b>
@@ -1342,7 +1477,7 @@ const PhoneManager = {
     },
 
     // ========================================================
-    // 6. STREET UNDERGROUND (АНТИФАРМ, ИЗНОС ШИН И ПЕРЕГРЕВ)
+    // 6. STREET UNDERGROUND
     // ========================================================
     renderStreetApp(container) {
         let sub = this.streetSubTab || 'drift';

@@ -169,7 +169,7 @@
             <div class="flex-between mb-1">
               <div>
                 <h3><i class="fa-solid fa-warehouse color-green"></i> <span data-i18n="garage_title">Мой Автопарк</span></h3>
-                <p class="sub-label"><span data-i18n="garage_capacity">Вместимость</span>: <b class="color-cyan" id="garageDetailedSlots">0 из 2</b></p>
+                <p class="sub-label"><span data-i18n="garage_capacity">Вместимость</span>: <span id="garageDetailedSlots">0 из 2</span></p>
               </div>
               <button onclick="buyGarageSlot()" class="btn btn-dark btn-auto border-green color-green" id="btnBuyGarageSlot">+1 Бокс (250k ₽)</button>
             </div>
@@ -214,9 +214,13 @@
             <div class="phone-screen-content">
               <!-- ДОМАШНИЙ ЭКРАН -->
               <div id="phoneHomeScreen">
-                <div id="phoneBizWidgetContainer" class="mb-2"></div>
+                <!-- 1. ВИДЖЕТ СЕТИ ПРЕДПРИЯТИЙ (СКРЫТ ЕСЛИ НЕТ БИЗНЕСА) -->
+                <div id="phoneBizWidgetContainer" class="mb-2" style="display:none;"></div>
 
-                <!-- 16 ИКОНОК ПРИЛОЖЕНИЙ -->
+                <!-- 2. ПЛАН ПЕРЕКУПА НА ДЕНЬ (ПРЯМО ПОД БИЗНЕСОМ/СТАТУС-БАРОМ) -->
+                <div id="phoneDailyQuestsWidget" class="phone-quests-widget mb-3"></div>
+
+                <!-- 3. СЕТКА 16 ПРИЛОЖЕНИЙ -->
                 <div class="phone-home-grid mb-2">
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('autodrot')">
                     <div class="phone-app-icon bg-cyan"><i class="fa-solid fa-bolt"></i></div>
@@ -301,8 +305,6 @@
                     <span class="phone-app-label">Блокнот</span>
                   </div>
                 </div>
-
-                <div id="phoneDailyQuestsWidget" class="phone-quests-widget"></div>
               </div>
 
               <!-- КОНТЕЙНЕР ЗАПУЩЕННОГО ПРИЛОЖЕНИЯ -->
@@ -465,7 +467,14 @@
       </nav>
     </div>
 
-    <!-- МОДАЛЬНЫЕ ОКНА С ИНТЕРАКТИВНЫМ НЕОНОВЫМ ДИЗАЙНОМ -->
+    <!-- МОДАЛЬНЫЕ ОКНА -->
+    
+    <!-- 1. МОДАЛКА: ТРЕБУЕТСЯ ГАРАЖ -->
+    <div id="modalNeedGarage" class="modal-overlay"></div>
+
+    <!-- 2. МОДАЛКА: ШТРАФСТОЯНКА ГИБДД -->
+    <div id="modalImpoundLot" class="modal-overlay"></div>
+
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
@@ -475,10 +484,10 @@
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini</div>
         <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.6 (Сборка #165)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>💰 Экономика (₽ + ⭐):</b> Для покупки топовых машин, бизнеса и недвижимости теперь требуются и рубли, и звёзды!</div>
-          <div class="patch-item"><b>🛠️ Износ приборов:</b> Толщиномеры и сканеры расходуют батарею и калибровку при замерах.</div>
-          <div class="patch-item"><b>📑 Отказ от ДКП:</b> Появилась возможность разорвать договор, если цена или условия не подошли.</div>
-          <div class="patch-item"><b>🏎️ Синхронизация личного авто:</b> Личный автомобиль всегда готов к заездам в Стрите без ручного переключения.</div>
+          <div class="patch-item"><b>⛺ Стартовое условие:</b> Вы начинаете на уличной стоянке у обочины. Тюнинг и детейлинг заблокированы, пока вы не купите капитальный гараж или жильё!</div>
+          <div class="patch-item"><b>📑 План перекупа и Блокнот:</b> Ежедневный план изолирован в аккуратные карточки и связан со шкалой карьерного роста.</div>
+          <div class="patch-item"><b>🚘 Штрафстоянка ГИБДД:</b> Возможность договориться через взятку/связи, выкупить по протоколу или сдать авто в утиль со снятием с учёта.</div>
+          <div class="patch-item"><b>📟 Цифровой Launch OBD2:</b> Тайминг сканирования блоков CAN-шины в реальном времени с кодами DTC.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
       </div>
