@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v0.4.6</title>
-    <link rel="stylesheet" href="style.css?v=165">
+    <link rel="stylesheet" href="style.css?v=166">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -214,13 +214,9 @@
             <div class="phone-screen-content">
               <!-- ДОМАШНИЙ ЭКРАН -->
               <div id="phoneHomeScreen">
-                <!-- 1. ВИДЖЕТ СЕТИ ПРЕДПРИЯТИЙ (СКРЫТ ЕСЛИ НЕТ БИЗНЕСА) -->
                 <div id="phoneBizWidgetContainer" class="mb-2" style="display:none;"></div>
-
-                <!-- 2. ПЛАН ПЕРЕКУПА НА ДЕНЬ (ПРЯМО ПОД БИЗНЕСОМ/СТАТУС-БАРОМ) -->
                 <div id="phoneDailyQuestsWidget" class="phone-quests-widget mb-3"></div>
 
-                <!-- 3. СЕТКА 16 ПРИЛОЖЕНИЙ -->
                 <div class="phone-home-grid mb-2">
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('autodrot')">
                     <div class="phone-app-icon bg-cyan"><i class="fa-solid fa-bolt"></i></div>
@@ -468,11 +464,7 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА -->
-    
-    <!-- 1. МОДАЛКА: ТРЕБУЕТСЯ ГАРАЖ -->
     <div id="modalNeedGarage" class="modal-overlay"></div>
-
-    <!-- 2. МОДАЛКА: ШТРАФСТОЯНКА ГИБДД -->
     <div id="modalImpoundLot" class="modal-overlay"></div>
 
     <div id="modalPatchNotes" class="modal-overlay">
@@ -482,7 +474,7 @@
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.6 (Сборка #165)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.6 (Сборка #166)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
           <div class="patch-item"><b>⛺ Стартовое условие:</b> Вы начинаете на уличной стоянке у обочины. Тюнинг и детейлинг заблокированы, пока вы не купите капитальный гараж или жильё!</div>
           <div class="patch-item"><b>📑 План перекупа и Блокнот:</b> Ежедневный план изолирован в аккуратные карточки и связан со шкалой карьерного роста.</div>
@@ -490,6 +482,95 @@
           <div class="patch-item"><b>📟 Цифровой Launch OBD2:</b> Тайминг сканирования блоков CAN-шины в реальном времени с кодами DTC.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
+      </div>
+    </div>
+
+    <!-- ДЕТАЛЬНЫЙ СТРАХОВОЙ ДОГОВОР-КОНСТРУКТОР -->
+    <div id="modalInsurance" class="modal-overlay">
+      <div class="modal-box insurance-contract-blank" style="max-width: 420px;">
+        <div class="flex-between mb-2 pb-2" style="border-bottom: 1px solid var(--border-glass);">
+          <div class="flex-gap" style="align-items:center;">
+            <i class="fa-solid fa-shield-halved color-green" style="font-size:18px;"></i>
+            <div>
+              <b class="text-xs color-green">АО «РОСГОССТРАХ ПЕРЕКУП»</b>
+              <div class="sub-label" style="font-size:8.5px;">Единый реестр страховщиков РФ</div>
+            </div>
+          </div>
+          <button onclick="closeInsuranceModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+
+        <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+          <div class="sub-label text-xs">Объект страхования:</div>
+          <b class="color-cyan text-xs" id="insureCarTitle">-</b>
+        </div>
+
+        <div class="sub-label font-bold mb-2 text-xs">Выберите пункты страхового покрытия:</div>
+        
+        <div class="space-y-2 mb-3">
+          <!-- 1. ОСАГО -->
+          <div class="insurance-option-card selected" id="insCard_osago" onclick="toggleInsuranceOption('osago')">
+            <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
+            <div style="flex:1;">
+              <div class="flex-between">
+                <b class="text-xs color-cyan">📋 Базовое ОСАГО (Обязательное)</b>
+                <span class="text-xs font-bold">8,500 ₽ + 2 ⭐</span>
+              </div>
+              <div class="sub-label" style="font-size:9.5px;">Защита от штрафов ГИБДД за езду без страховки. Базовый допуск.</div>
+            </div>
+          </div>
+
+          <!-- 2. КАСКО УГОН -->
+          <div class="insurance-option-card" id="insCard_theft" onclick="toggleInsuranceOption('theft')">
+            <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
+            <div style="flex:1;">
+              <div class="flex-between">
+                <b class="text-xs color-amber">🚨 КАСКО: Защита от угона и кражи</b>
+                <span class="text-xs font-bold">+14,000 ₽ + 4 ⭐</span>
+              </div>
+              <div class="sub-label" style="font-size:9.5px;">100% выплата стоимости авто при ночном угоне хулиганами.</div>
+            </div>
+          </div>
+
+          <!-- 3. КАСКО ТОТАЛ / ДТП -->
+          <div class="insurance-option-card" id="insCard_totalLoss" onclick="toggleInsuranceOption('totalLoss')">
+            <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
+            <div style="flex:1;">
+              <div class="flex-between">
+                <b class="text-xs color-red">💥 КАСКО: Ущерб и Тотал в ДТП</b>
+                <span class="text-xs font-bold">+18,000 ₽ + 5 ⭐</span>
+              </div>
+              <div class="sub-label" style="font-size:9.5px;">Полная компенсация кузовного ремонта при автоподставах и авариях.</div>
+            </div>
+          </div>
+
+          <!-- 4. АВТОПОМОЩЬ НА ДОРОГЕ -->
+          <div class="insurance-option-card" id="insCard_roadside" onclick="toggleInsuranceOption('roadside')">
+            <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
+            <div style="flex:1;">
+              <div class="flex-between">
+                <b class="text-xs color-purple">🛞 Помощь на дороге 24/7</b>
+                <span class="text-xs font-bold">+4,500 ₽ + 1 ⭐</span>
+              </div>
+              <div class="sub-label" style="font-size:9.5px;">Бесплатный эвакуатор и подвоз бензина при заглохшем моторе.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="insurance-stamp-badge">
+          <span>ЛИЦЕНЗИЯ</span>
+          <span>ЦБ РФ</span>
+          <span>ОДОБРЕНО</span>
+        </div>
+
+        <div class="flex-between p-2 mb-3" style="background:#090e18; border-radius:8px; border:1px solid rgba(0,230,118,0.3);">
+          <span class="text-xs font-bold">ИТОГОВАЯ ПРЕМИЯ:</span>
+          <b class="price-val text-xs color-green" id="insuranceTotalCostText">8,500 ₽ + 2 ⭐</b>
+        </div>
+
+        <div class="grid-2">
+          <button onclick="confirmSignInsurancePolicy()" class="btn btn-green">✍️ Подписать полис</button>
+          <button onclick="closeInsuranceModal()" class="btn btn-dark">Отмена</button>
+        </div>
       </div>
     </div>
 
@@ -577,23 +658,6 @@
           Автомобиль: <b class="color-cyan" id="garageEventCarName">-</b>
         </div>
         <div id="garageEventActions" class="space-y-2"></div>
-      </div>
-    </div>
-
-    <div id="modalInsurance" class="modal-overlay">
-      <div class="modal-box">
-        <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-shield-halved"></i> СТРАХОВОЙ ПОЛИС</div>
-          <button onclick="closeModal('modalInsurance')" class="btn btn-dark btn-auto btn-sm">✕</button>
-        </div>
-        <div class="p-2 mb-3" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
-          <b class="color-cyan text-xs" id="insureCarTitle">-</b>
-        </div>
-        <div class="space-y-2 mb-3">
-          <button onclick="confirmPurchaseInsurance('casco')" class="btn btn-green w-full">🛡️ КАСКО (18,000 ₽ + 5 ⭐)</button>
-          <button onclick="confirmPurchaseInsurance('osago')" class="btn btn-cyan w-full">📋 ОСАГО (7,500 ₽ + 2 ⭐)</button>
-        </div>
-        <button onclick="closeModal('modalInsurance')" class="btn btn-dark w-full">Отмена</button>
       </div>
     </div>
 
@@ -1007,13 +1071,15 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ -->
+    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ (С РАЗДЕЛЁННЫМИ МОДУЛЯМИ ТЕЛЕФОНА) -->
     <script>
       (function() {
         const modules = [
           'data.js',
           'app.js',
           'phone.js',
+          'phone-media.js',
+          'phone-racing.js',
           'market.js',
           'garage.js',
           'salesLot.js',
@@ -1027,12 +1093,12 @@
         function loadModule(name) {
           return new Promise((resolve) => {
             const s1 = document.createElement('script');
-            s1.src = name + '?v=165';
+            s1.src = name + '?v=166';
             s1.onload = () => resolve(true);
             s1.onerror = () => {
               s1.remove();
               const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=165';
+              s2.src = 'js/' + name + '?v=166';
               s2.onload = () => resolve(true);
               s2.onerror = () => {
                 console.warn('[Loader] Не удалось загрузить ' + name);

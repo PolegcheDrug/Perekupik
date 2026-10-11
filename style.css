@@ -32,7 +32,6 @@
   user-select: none;
 }
 
-/* НЕОНОВЫЙ СКРОЛЛБАР */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -371,9 +370,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ========================================================
-   3. КАРБОНОВЫЕ КАРТОЧКИ И ПЛАШКИ
-   ======================================================== */
 .glass-card {
   position: relative;
   background: 
@@ -426,9 +422,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .mod-pill.color-red { border-color: rgba(255, 51, 102, 0.4); background: rgba(255, 51, 102, 0.1); }
 .mod-pill.color-purple { border-color: rgba(192, 132, 252, 0.4); background: rgba(192, 132, 252, 0.1); }
 
-/* ========================================================
-   4. ОВЕРЛЕЙ КУЛДАУНА И ПЛАТНОГО ДОЗВОНА
-   ======================================================== */
 .glass-card.busy > *:not(.cooldown-timer) {
   filter: blur(2px) grayscale(0.8);
   opacity: 0.3;
@@ -470,9 +463,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   letter-spacing: 0.5px;
 }
 
-/* ========================================================
-   5. СЕТКА КЛАССОВ АВТОРЫНКА
-   ======================================================== */
 .market-filter-card {
   padding: 13px;
   background: radial-gradient(circle at 50% 0%, #151f33 0%, #090e18 100%);
@@ -571,9 +561,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   padding: 8px 10px;
 }
 
-/* ========================================================
-   6. КНОПКИ (УДОБНЫЕ, РАСШИРЕННЫЕ, БЕЗ НАЕЗДОВ)
-   ======================================================== */
 .btn {
   width: 100%;
   min-height: 42px;
@@ -629,7 +616,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .flex-gap { display: flex; gap: 7px; }
 
 /* ========================================================
-   7. СТИЛИ МОДАЛЬНЫХ ОКОН И ИНТЕРАКТИВНЫХ ДАТЧИКОВ
+   7. СТИЛИ МОДАЛЬНЫХ ОКОН И ИЕРАРХИЯ Z-INDEX
    ======================================================== */
 .modal-overlay {
   display: none !important;
@@ -648,6 +635,11 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   overscroll-behavior: contain;
 }
 .modal-overlay.active { display: flex !important; }
+
+/* Дочерние модалки поверх modalPreview */
+#modalOBD2, #modalInsurance, #modalChangePlate, #modalTuning, #modalNeedGarage {
+  z-index: 5500 !important;
+}
 
 .modal-box {
   background: 
@@ -716,9 +708,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   100% { transform: rotate(-360deg); }
 }
 
-/* ========================================================
-   ИСПРАВЛЕННЫЙ ТОЛЩИНОМЕР (БЕЗ НАЕЗДОВ КНОПОК)
-   ======================================================== */
 .gauge-interactive-meter {
   display: flex;
   flex-direction: column;
@@ -758,8 +747,78 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   НОВЫЙ ЦИФРОВОЙ ДИСПЛЕЙ-ТЕРМИНАЛ СКАНЕРА LAUNCH OBD2
+   ОФИЦИАЛЬНЫЙ СТРАХОВОЙ ПОЛИС (ДОГОВОР)
    ======================================================== */
+.insurance-contract-blank {
+  background: linear-gradient(165deg, #0e172a 0%, #060b14 100%) !important;
+  border: 2px solid rgba(0, 230, 118, 0.45) !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 25px rgba(0, 230, 118, 0.15) !important;
+  padding: 16px !important;
+  position: relative;
+}
+
+.insurance-stamp-badge {
+  position: absolute;
+  bottom: 80px;
+  right: 25px;
+  border: 2px dashed #00e676;
+  border-radius: 50%;
+  width: 85px;
+  height: 85px;
+  color: #00e676;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 8px;
+  font-weight: 900;
+  transform: rotate(-15deg);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.insurance-option-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.insurance-option-card:hover {
+  background: rgba(0, 230, 118, 0.05);
+  border-color: rgba(0, 230, 118, 0.3);
+}
+.insurance-option-card.selected {
+  background: rgba(0, 230, 118, 0.1);
+  border-color: var(--green);
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.2);
+}
+
+.insurance-check-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--text-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: transparent;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.insurance-option-card.selected .insurance-check-circle {
+  border-color: var(--green);
+  background: var(--green);
+  color: #000;
+  font-weight: 900;
+}
+
 .obd-cyber-display {
   background: #020408 !important;
   border: 2px solid #00f2fe !important;
@@ -812,9 +871,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   transition: width 0.15s ease-out;
 }
 
-/* ========================================================
-   ИСПРАВЛЕНИЕ И РЕДИЗАЙН ОКНА ТОРГА (modalMarketDeal & modalHaggleSale)
-   ======================================================== */
 .chat-deal-box {
   padding: 14px !important;
   background: 
@@ -832,7 +888,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   overflow-y: auto !important;
 }
 
-/* Компактная карточка авто в шапке торга */
 .deal-car-preview-card {
   display: flex !important;
   align-items: center !important;
@@ -862,7 +917,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   flex-shrink: 0 !important;
 }
 
-/* Окно сообщений с продавцом/покупателем */
 .chat-thread-container {
   display: flex !important;
   flex-direction: column !important;
@@ -902,9 +956,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border-bottom-right-radius: 2px !important;
 }
 
-/* ========================================================
-   ИНТЕРАКТИВНЫЙ ДИЗАЙН АВТОТЕКИ И ЭЛЕКТРОННОГО ПТС
-   ======================================================== */
 .autoteka-pts-card {
   background: linear-gradient(145deg, #090e18 0%, #060a12 100%);
   border: 1px solid rgba(0, 242, 254, 0.25);
@@ -1013,6 +1064,116 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* ШАПКА ПРИЛОЖЕНИЙ В ТЕЛЕФОНЕ И КНОПКА «НАЗАД» */
+.phone-app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 4px 10px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.phone-back-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: 1px solid var(--border-glass);
+  padding: 6px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.1s ease;
+}
+.phone-back-btn:active {
+  transform: scale(0.95);
+  background: rgba(0, 242, 254, 0.2);
+  border-color: var(--cyan);
+}
+
+.phone-app-title {
+  font-size: 13px;
+  font-weight: 900;
+  color: #fff;
+  display: flex;
+  align-items: center;
+}
+
+.phone-app-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* СПИСОК СООБЩЕНИЙ */
+.phone-messages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.phone-msg-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+.phone-msg-item:active {
+  background: rgba(0, 242, 254, 0.08);
+  border-color: rgba(0, 242, 254, 0.3);
+}
+.phone-msg-item.unread-msg {
+  border-color: rgba(0, 242, 254, 0.4);
+  background: rgba(0, 242, 254, 0.04);
+}
+
+.phone-msg-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #111a2a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  border: 1px solid var(--border-glass);
+  flex-shrink: 0;
+}
+
+.phone-msg-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.phone-msg-preview {
+  font-size: 10px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.phone-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 6px var(--cyan);
+  flex-shrink: 0;
 }
 
 /* ВИДЖЕТ СЕТИ ПРЕДПРИЯТИЙ (ПОЯВЛЯЕТСЯ ТОЛЬКО ПРИ НАЛИЧИИ БИЗНЕСА) */
@@ -1182,7 +1343,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   margin-top: 4px;
 }
 
-/* СЕТКА ПРИЛОЖЕНИЙ */
 .phone-home-grid {
   display: grid !important;
   grid-template-columns: repeat(4, 1fr) !important;
@@ -1216,7 +1376,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Градиенты 16 приложений */
 .phone-app-icon.bg-cyan { background: linear-gradient(135deg, #00f2fe, #0284c7) !important; }
 .phone-app-icon.bg-green { background: linear-gradient(135deg, #00e676, #059669) !important; }
 .phone-app-icon.bg-emerald { background: linear-gradient(135deg, #10b981, #047857) !important; }
@@ -1271,9 +1430,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 .phone-home-bar-area:active .phone-home-indicator { background: var(--cyan); transform: scaleX(1.1); }
 
-/* ========================================================
-   9. ОФИЦИАЛЬНЫЙ БЛАНК ДКП
-   ======================================================== */
 .dkp-official-blank {
   background: linear-gradient(145deg, #101624 0%, #080d16 100%) !important;
   border: 2px solid rgba(0, 242, 254, 0.4) !important;
@@ -1368,9 +1524,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   text-transform: uppercase;
 }
 
-/* ========================================================
-   10. КАРТОЧКА АВТОМОБИЛЯ И ПРЕДПРОДАЖКА
-   ======================================================== */
 .car-img-wrap {
   position: relative;
   width: 100%;
@@ -1491,9 +1644,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border-color: rgba(255, 51, 102, 0.3);
 }
 
-/* ========================================================
-   11. СТРИТ, ДРАГ & ВИЛСПИН
-   ======================================================== */
 .race-panel {
   background: #080d16;
   border: 1px solid var(--border-glass);
@@ -1635,9 +1785,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   50% { transform: translateX(-50%) translateY(-3px); }
 }
 
-/* ========================================================
-   12. САРАИ, БИЗНЕС И КОНТЕЙНЕРЫ
-   ======================================================== */
 .barn-tier-card {
   width: 100%;
   background: #0d131f;
@@ -1727,9 +1874,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   transition: width 0.2s linear;
 }
 
-/* ========================================================
-   13. НИЖНИЙ БАР НАВИГАЦИИ
-   ======================================================== */
 .bottom-nav {
   flex-shrink: 0;
   height: calc(56px + env(safe-area-inset-bottom, 0px));
@@ -1779,9 +1923,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   line-height: 1;
 }
 
-/* ========================================================
-   14. РЕШАЛА, ЭФИР И УТИЛИТЫ
-   ======================================================== */
 .reshala-banner {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(30, 15, 50, 0.9));
   border: 1px solid rgba(192, 132, 252, 0.35);
@@ -1979,4 +2120,62 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 
 .level-lock-cover {
   width: 100%;
+}
+
+/* ========================================================
+   ИСПРАВЛЕНИЕ РАЗМЕТКИ ЭКРАНА ПРИЛОЖЕНИЙ В СМАРТФОНЕ
+   ======================================================== */
+#phoneAppContainer,
+.phone-opened-app-view {
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important; /* Выстраивает шапку сверху, а тело под ней */
+  overflow: hidden !important;
+}
+
+.phone-app-header {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+  padding: 6px 4px 10px 4px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  margin-bottom: 8px !important;
+}
+
+.phone-app-body {
+  width: 100% !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+/* Гарантирует нормальную сетку вкладок внутри приложений */
+.phone-app-body .grid-4 {
+  display: grid !important;
+  grid-template-columns: repeat(4, 1fr) !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+.phone-app-body .grid-3 {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+.phone-app-body .grid-2 {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  width: 100% !important;
 }

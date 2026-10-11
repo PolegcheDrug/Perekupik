@@ -2,7 +2,7 @@
 // js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.4.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Условие гаража для тюнинга/детейлинга, интерактивный Launch OBD2,
-// штрафстоянка ГИБДД (договориться / выкупить / утиль), синхронизация
+// конструктор страхового полиса, штрафстоянка ГИБДД
 // ========================================================
 
 let previewCarIndex = null;
@@ -12,28 +12,31 @@ let activeGarageEventCar = null;
 let activeTuneTab = 'drift';
 let activeImpoundCarIndex = null;
 
+// Настройки конструктора страхового полиса
+let insuranceOptions = {
+    osago: true,
+    totalLoss: false,
+    theft: false,
+    roadside: false
+};
+
 // ========================================================
 // ПРОВЕРКА НАЛИЧИЯ КАПИТАЛЬНОГО ГАРАЖА / МАСТЕРСКОЙ
 // ========================================================
 function playerHasGarageOrWorkshop() {
-    // 1. Проверяем купленные слоты гаража (если больше базовых стартовых 2)
     if (state.player && state.player.baseSlots && state.player.baseSlots > 2) {
         return true;
     }
 
-    // 2. Проверяем текущее жильё и собственность
     const ownedHouses = state.player?.ownedHouses || [];
-    const curHousingId = state.player?.housingId || 'room';
-
-    // Список недвижимости, где есть бокс, верстак или яма
+    const curHousingId = state.player?.housingId || 'trailer';
     const garageProperties = ['garage', 'cottage', 'loft', 'penthouse', 'villa', 'island'];
 
     if (garageProperties.includes(curHousingId)) {
         return true;
     }
 
-    const hasAnyGarageProperty = ownedHouses.some(hId => garageProperties.includes(hId));
-    return hasAnyGarageProperty;
+    return ownedHouses.some(hId => garageProperties.includes(hId));
 }
 
 function openNeedGarageModal(actionTitle = "Тюнинг и доработки") {
@@ -83,7 +86,6 @@ function recalculateCarMarketValue(car) {
     if (!car) return 0;
 
     let base = car.baseMarketValue || car.basePrice || 100000;
-
     let cond = (car.condition !== undefined) ? car.condition : 80;
     let condMultiplier = 0.55 + (cond / 100) * 0.50;
     let currentVal = Math.round(base * condMultiplier);
@@ -179,7 +181,7 @@ function renderGarage() {
 
         let legalBadge = "";
         if (isImpounded) {
-            legalBadge = "<span class='tag-badge bg-tag-red'>🚔 НА ШТРАФСТОЯНКЕ</span>";
+            legalBadge = "<span class='tag-badge bg-red'>🚔 НА ШТРАФСТОЯНКЕ</span>";
         } else if (car.isStolen) {
             legalBadge = "<span class='tag-badge bg-tag-red'>🚨 В РОЗЫСКЕ</span>";
         } else if (car.unregistered) {
@@ -192,9 +194,14 @@ function renderGarage() {
             legalBadge = `<span class='tag-badge ${dkpClass}' title='Без постановки на учёт'>📄 НА ДКП (${daysLeft} дн. лимит)</span>`;
         }
 
-        let insuranceBadge = car.insurance === 'casco'
-            ? "<span class='tag-badge bg-tag-green ml-1'>🛡️ КАСКО</span>"
-            : (car.insurance === 'osago' ? "<span class='tag-badge bg-tag-cyan ml-1'>📋 ОСАГО</span>" : "");
+        let insuranceBadge = "";
+        if (car.insurance) {
+            if (car.insurance.type === 'comprehensive' || car.insurance === 'casco') {
+                insuranceBadge = "<span class='tag-badge bg-tag-green ml-1'>🛡️ КАСКО</span>";
+            } else {
+                insuranceBadge = "<span class='tag-badge bg-tag-cyan ml-1'>📋 ОСАГО</span>";
+            }
+        }
 
         let pVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(cPlate) : 0;
         let coolPlateBadge = pVal > 15000 
@@ -288,7 +295,7 @@ function renderGarage() {
 }
 
 // ========================================================
-// 2. ИКОНКИ МОДИФИКАЦИЙ В КАРТОЧКЕ ГАРАЖА
+// 2. ИКОНКИ МОДИФИКАЦИЙ
 // ========================================================
 function renderCarModsBadges(car) {
     if (!car) return "";
@@ -380,7 +387,7 @@ function buyGarageSlot() {
 }
 
 // ========================================================
-// 4. ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (БЛОКИРОВКА БЕЗ ГАРАЖА)
+// 4. ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА
 // ========================================================
 function openPreSaleModal(idx) {
     if (!playerHasGarageOrWorkshop()) {
@@ -505,7 +512,7 @@ function applyPreSaleMod(type) {
 }
 
 // ========================================================
-// 5. СПОРТИВНЫЙ ТЮНИНГ (БЛОКИРОВКА БЕЗ ГАРАЖА)
+// 5. СПОРТИВНЫЙ ТЮНИНГ
 // ========================================================
 function openTuningModal(idx) {
     if (!playerHasGarageOrWorkshop()) {
@@ -689,7 +696,7 @@ function updateTuneRiskMeter(car) {
 }
 
 // ========================================================
-// 6. ОСМОТР, ЗВУК МОТОРА, ИНТЕРАКТИВНЫЙ OBD2-ПЛАНШЕТ
+// 6. ОСМОТР, ИНТЕРАКТИВНЫЙ OBD2 И СТРАХОВОЙ ПОЛИС
 // ========================================================
 function openCarPreviewModal(idx) {
     previewCarIndex = idx;
@@ -720,21 +727,40 @@ function openTuningFromPreview() {
     openTuningModal(idx);
 }
 
+// Запуск OBD2: строгая проверка оборудования, гаража и скрытие окна осмотра
 function openOBD2Modal() {
     if (previewCarIndex === null) return;
     const car = state.garage[previewCarIndex];
     if (!car) return;
+
+    // 1. Проверка наличия диагностического оборудования
+    const hasScanner = !!(state.player?.tools && (state.player.tools.obd || state.player.tools.obd_launch));
+    if (!hasScanner) {
+        playSound('error');
+        tgHaptic('warning');
+        return showToast("⚠️ У вас нет сканера OBD2! Купите ELM327 или Launch Pro в Маркете.");
+    }
+
+    // 2. Проверка условий гаража
+    if (!playerHasGarageOrWorkshop()) {
+        return openNeedGarageModal("Компьютерная диагностика ЭБУ");
+    }
 
     let isLaunch = !!state.player?.tools?.obd_launch;
     let toolKey = isLaunch ? 'obd_launch' : 'obd';
     let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 50;
 
     if (wear <= 0) {
-        showToast("⚠️ Сканер разряжен! Откалибруйте его в Маркете.");
-    } else {
-        state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
-        saveState();
+        playSound('error');
+        tgHaptic('warning');
+        return showToast("⚠️ Диагностический сканер разряжен! Откалибруйте его в Маркете.");
     }
+
+    state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
+    saveState();
+
+    // Скрываем окно осмотра, чтобы не было наложения
+    closeModal('modalPreview');
 
     setTxt('obd2CarTitle', `Диагностика CAN-шины: ${car.name}`);
     const resBox = document.getElementById('obd2ResultBox');
@@ -896,6 +922,103 @@ function repairDefectInGarage() {
 
 function closeOBD2Modal() {
     closeModal('modalOBD2');
+    if (previewCarIndex !== null) {
+        openCarPreviewModal(previewCarIndex);
+    }
+}
+
+// ========================================================
+// ДЕТАЛЬНЫЙ СТРАХОВОЙ ДОГОВОР-КОНСТРУКТОР
+// ========================================================
+function openInsuranceModalFromPreview() {
+    if (previewCarIndex === null) return;
+    const car = state.garage[previewCarIndex];
+    if (!car) return;
+
+    closeModal('modalPreview');
+    renderInsuranceContractUI(car);
+
+    const modal = document.getElementById('modalInsurance');
+    if (modal) modal.classList.add('active');
+    playSound('tick');
+}
+
+function renderInsuranceContractUI(car) {
+    setTxt('insureCarTitle', `${car.name} (${car.customPlate || car.plate || "ТРАНЗИТ"})`);
+    
+    let totalCash = 0;
+    let totalStars = 0;
+
+    if (insuranceOptions.osago) { totalCash += 8500; totalStars += 2; }
+    if (insuranceOptions.theft) { totalCash += 14000; totalStars += 4; }
+    if (insuranceOptions.totalLoss) { totalCash += 18000; totalStars += 5; }
+    if (insuranceOptions.roadside) { totalCash += 4500; totalStars += 1; }
+
+    setTxt('insuranceTotalCostText', `${totalCash.toLocaleString()} ₽ + ${totalStars} ⭐`);
+
+    ['osago', 'theft', 'totalLoss', 'roadside'].forEach(opt => {
+        const card = document.getElementById(`insCard_${opt}`);
+        if (card) {
+            if (insuranceOptions[opt]) card.classList.add('selected');
+            else card.classList.remove('selected');
+        }
+    });
+
+    window.currentInsuranceCalculated = { totalCash, totalStars };
+}
+
+function toggleInsuranceOption(optionKey) {
+    if (optionKey === 'osago') {
+        insuranceOptions.osago = true;
+        showToast("ОСАГО является базовой обязательной частью полиса!");
+    } else {
+        insuranceOptions[optionKey] = !insuranceOptions[optionKey];
+        playSound('tick');
+        tgHaptic('light');
+    }
+
+    if (previewCarIndex !== null) {
+        renderInsuranceContractUI(state.garage[previewCarIndex]);
+    }
+}
+
+function confirmSignInsurancePolicy() {
+    if (previewCarIndex === null) return;
+    const car = state.garage[previewCarIndex];
+    if (!car) return;
+
+    const calc = window.currentInsuranceCalculated || { totalCash: 8500, totalStars: 2 };
+    let cash = state.player?.cash || 0;
+    let stars = state.player?.stars || 0;
+
+    if (cash < calc.totalCash) return showToast("Не хватает рублей на оплату страховой премии!");
+    if (stars < calc.totalStars) return showToast(`Не хватает ${calc.totalStars} Stars ⭐!`);
+
+    state.player.cash -= calc.totalCash;
+    state.player.stars -= calc.totalStars;
+
+    let isCasco = insuranceOptions.totalLoss || insuranceOptions.theft;
+    car.insurance = {
+        type: isCasco ? 'comprehensive' : 'osago',
+        options: { ...insuranceOptions },
+        cost: calc.totalCash,
+        date: Date.now()
+    };
+
+    closeModal('modalInsurance');
+    saveState();
+    renderGarage();
+    playSound('win');
+    tgHaptic('success');
+    showToast("Договор страхования зарегистрирован в РСА ✓");
+    openCarPreviewModal(previewCarIndex);
+}
+
+function closeInsuranceModal() {
+    closeModal('modalInsurance');
+    if (previewCarIndex !== null) {
+        openCarPreviewModal(previewCarIndex);
+    }
 }
 
 // ========================================================
@@ -1096,12 +1219,14 @@ function confirmPutOnLot() {
 }
 
 // ========================================================
-// 9. ГОСНОМЕРА (ДИНАМИЧЕСКИЙ РАСЧЕТ И ПЕРЕОЦЕНКА)
+// 9. ГОСНОМЕРА
 // ========================================================
 function openChangePlateModal() {
     if (previewCarIndex === null) return;
     const car = state.garage[previewCarIndex];
     if (!car) return;
+
+    closeModal('modalPreview');
 
     const list = document.getElementById('changePlateList');
     if (!list) return;
@@ -1199,42 +1324,6 @@ function removePlateFromCar() {
     showToast(`Госномер ${curPlate} снят и убран в инвентарь! Оценка машины вернулась к базе.`);
 }
 
-function openInsuranceModalFromPreview() {
-    if (previewCarIndex === null) return;
-    const car = state.garage[previewCarIndex];
-    if (!car) return;
-
-    setTxt('insureCarTitle', `${car.name} (${car.customPlate || car.plate || "ТРАНЗИТ"})`);
-    const modal = document.getElementById('modalInsurance');
-    if (modal) modal.classList.add('active');
-}
-
-function confirmPurchaseInsurance(type) {
-    if (previewCarIndex === null) return;
-    const car = state.garage[previewCarIndex];
-    if (!car) return;
-
-    let cost = type === 'casco' ? 18000 : 7500;
-    let reqStars = type === 'casco' ? 5 : 2;
-    let cash = state.player?.cash || 0;
-    let stars = state.player?.stars || 0;
-
-    if (cash < cost) return showToast("Не хватает рублей на полис страхования!");
-    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
-
-    state.player.cash -= cost;
-    state.player.stars -= reqStars;
-    car.insurance = type;
-
-    closeModal('modalInsurance');
-    saveState();
-    renderGarage();
-    openCarPreviewModal(previewCarIndex);
-    playSound('win');
-    tgHaptic('success');
-    showToast(`Полис ${type === 'casco' ? 'КАСКО' : 'ОСАГО'} оформлен!`);
-}
-
 // ========================================================
 // 10. СОБЫТИЯ В ГАРАЖЕ ПРИ СМЕНЕ СУТОК
 // ========================================================
@@ -1269,8 +1358,9 @@ function triggerGarageRandomEvent() {
             actionText: "Поставить защиту (5,000 ₽)",
             cost: 5000,
             onIgnore: () => { 
-                if (car.insurance === 'casco') showToast("КАСКО полностью возместило ущерб!");
-                else {
+                if (car.insurance && (car.insurance.type === 'comprehensive' || car.insurance === 'casco')) {
+                    showToast("КАСКО полностью возместило ущерб!");
+                } else {
                     car.condition = Math.max(10, (car.condition || 80) - 10);
                     recalculateCarMarketValue(car);
                 }
@@ -1360,6 +1450,10 @@ window.renderGarageOBDFinal = renderGarageOBDFinal;
 window.clearOBDCodesQuick = clearOBDCodesQuick;
 window.repairDefectInGarage = repairDefectInGarage;
 window.closeOBD2Modal = closeOBD2Modal;
+window.openInsuranceModalFromPreview = openInsuranceModalFromPreview;
+window.toggleInsuranceOption = toggleInsuranceOption;
+window.confirmSignInsurancePolicy = confirmSignInsurancePolicy;
+window.closeInsuranceModal = closeInsuranceModal;
 window.openImpoundLotModal = openImpoundLotModal;
 window.resolveImpoundBribe = resolveImpoundBribe;
 window.resolveImpoundOfficialPay = resolveImpoundOfficialPay;
@@ -1369,7 +1463,5 @@ window.confirmPutOnLot = confirmPutOnLot;
 window.openChangePlateModal = openChangePlateModal;
 window.applyPlateToCar = applyPlateToCar;
 window.removePlateFromCar = removePlateFromCar;
-window.openInsuranceModalFromPreview = openInsuranceModalFromPreview;
-window.confirmPurchaseInsurance = confirmPurchaseInsurance;
 window.triggerGarageRandomEvent = triggerGarageRandomEvent;
 window.resolveGarageEvent = resolveGarageEvent;
