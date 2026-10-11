@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v0.4.6</title>
-    <link rel="stylesheet" href="style.css?v=166">
+    <link rel="stylesheet" href="style.css?v=167">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -474,7 +474,7 @@
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.6 (Сборка #166)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.6 (Сборка #167)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
           <div class="patch-item"><b>⛺ Стартовое условие:</b> Вы начинаете на уличной стоянке у обочины. Тюнинг и детейлинг заблокированы, пока вы не купите капитальный гараж или жильё!</div>
           <div class="patch-item"><b>📑 План перекупа и Блокнот:</b> Ежедневный план изолирован в аккуратные карточки и связан со шкалой карьерного роста.</div>
@@ -901,17 +901,22 @@
       </div>
     </div>
 
+    <!-- ИНТЕРАКТИВНОЕ ОКНО ПОЛУЧЕНИЯ НАГРАД (С ЖЕТОНАМИ) -->
     <div id="modalDealVerdict" class="modal-overlay">
       <div class="modal-box text-center">
         <div class="radar-spinner-ring mb-2" id="verdictRingAnim">
-          <div class="radar-spinner-center" id="verdictEmoji">🤝</div>
+          <div class="radar-spinner-center" id="verdictEmoji">🎉</div>
         </div>
         <div class="modal-glow-badge mb-1" id="verdictBadgeText">ИТОГИ СДЕЛКИ</div>
         <h3 class="font-bold mb-1" id="verdictTitle">Сделка закрыта</h3>
         <p class="sub-label mb-2" id="verdictText"></p>
+        
+        <!-- КОНТЕЙНЕР ДЛЯ 3D-ЖЕТОНОВ НАГРАД -->
+        <div id="verdictTokensContainer" class="reward-tokens-wrapper" style="display:none;"></div>
+        
         <div class="price-val mb-1" id="verdictAmount">+0 ₽</div>
         <div id="verdictProfitBadge" class="text-xs font-bold mb-3" style="display:none;"></div>
-        <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Отлично, далее</button>
+        <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Забрать награды ✓</button>
       </div>
     </div>
 
@@ -1093,12 +1098,12 @@
         function loadModule(name) {
           return new Promise((resolve) => {
             const s1 = document.createElement('script');
-            s1.src = name + '?v=166';
+            s1.src = name + '?v=167';
             s1.onload = () => resolve(true);
             s1.onerror = () => {
               s1.remove();
               const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=166';
+              s2.src = 'js/' + name + '?v=167';
               s2.onload = () => resolve(true);
               s2.onerror = () => {
                 console.warn('[Loader] Не удалось загрузить ' + name);

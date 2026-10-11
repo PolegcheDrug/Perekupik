@@ -1,8 +1,8 @@
 // ========================================================
 // js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.4.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Реальное время (00:00), комбинированная экономика (₽ + ⭐),
-// стартовое условие без гаража, квесты и связь с Блокнотом
+// Интерактивные неоновые жетоны наград, реальное время (00:00),
+// комбинированная экономика (₽ + ⭐), квесты и стабильный запуск
 // ========================================================
 
 const CURRENT_GAME_VERSION = "v0.4.6";
@@ -125,18 +125,148 @@ function closeModal(id) {
     if (el) el.classList.remove('active');
 }
 
-function openVerdictModal(title, text, isSuccess, amount, profit) {
+// ========================================================
+// ИНТЕРАКТИВНЫЙ РЕНДЕР НАГРАД И ЖЕТОНОВ (ВЕРДИКТ)
+// ========================================================
+function renderPrizeTokensHTML(items) {
+    if (!Array.isArray(items) || items.length === 0) return "";
+    let html = `<div class="reward-tokens-grid my-2">`;
+    items.forEach(it => {
+        let borderClass = it.rarity || 'token-cyan';
+        html += `
+            <div class="reward-token-card ${borderClass}">
+                <div class="reward-token-icon">${it.icon || '🎁'}</div>
+                <div class="reward-token-details">
+                    <div class="reward-token-title">${it.title}</div>
+                    <div class="reward-token-value">${it.value}</div>
+                    ${it.desc ? `<div class="reward-token-desc">${it.desc}</div>` : ''}
+                </div>
+            </div>
+        `;
+    });
+    html += `</div>`;
+    return html;
+}
+
+function extractPrizesFromText(text) {
+    let tokens = [];
+    if (!text || typeof text !== 'string') return tokens;
+
+    let lines = text.split('\n');
+    lines.forEach(line => {
+        let trimLine = line.trim();
+        if (!trimLine) return;
+
+        // Рубли
+        if (trimLine.includes('₽')) {
+            let match = trimLine.match(/([+\-]?\d[\d\s,.]*)\s*₽/);
+            tokens.push({
+                icon: '💰',
+                title: 'Денежные средства',
+                value: match ? match[1].trim() + ' ₽' : trimLine,
+                desc: 'Зачислено на баланс игрока',
+                rarity: 'token-green'
+            });
+        }
+        // Stars
+        else if (trimLine.includes('⭐') || trimLine.toLowerCase().includes('stars')) {
+            let match = trimLine.match(/([+\-]?\d+)\s*(⭐|stars)/i);
+            tokens.push({
+                icon: '⭐',
+                title: 'Звёзды Stars',
+                value: match ? '+' + match[1] + ' ⭐' : trimLine,
+                desc: 'Премиальная валюта перекупа',
+                rarity: 'token-amber'
+            });
+        }
+        // Автомобили
+        else if (trimLine.includes('🚗') || trimLine.toLowerCase().includes('получен в гараж')) {
+            tokens.push({
+                icon: '🏎️',
+                title: 'Транспортное средство',
+                value: trimLine.replace(/^[0-9.\s]+/, '').replace('🚗', '').trim(),
+                desc: 'Добавлено в ваш автопарк',
+                rarity: 'token-cyan'
+            });
+        }
+        // Госномера
+        else if (trimLine.includes('🏷️') || trimLine.toLowerCase().includes('номер')) {
+            tokens.push({
+                icon: '🏷️',
+                title: 'Госномер РФ',
+                value: trimLine.replace('🏷️', '').trim(),
+                desc: 'Архивный номер в инвентаре',
+                rarity: 'token-purple'
+            });
+        }
+        // Связи
+        else if (trimLine.includes('🤝') || trimLine.toLowerCase().includes('связь')) {
+            tokens.push({
+                icon: '🤝',
+                title: 'Связи Синдиката',
+                value: trimLine.replace('🤝', '').trim(),
+                desc: 'Решение вопросов с ГИБДД и ДКП',
+                rarity: 'token-purple'
+            });
+        }
+        // Топливо
+        else if (trimLine.includes('⛽') || trimLine.toLowerCase().includes('топлив')) {
+            tokens.push({
+                icon: '⛽',
+                title: 'Топливный запас',
+                value: trimLine.replace('⛽', '').trim(),
+                desc: 'Заправка в бензобак',
+                rarity: 'token-cyan'
+            });
+        }
+        // Талоны
+        else if (trimLine.includes('🎟️') || trimLine.toLowerCase().includes('талон')) {
+            tokens.push({
+                icon: '🎟️',
+                title: 'Экспресс-талоны',
+                value: trimLine.replace('🎟️', '').trim(),
+                desc: 'Мгновенный поиск покупателя',
+                rarity: 'token-purple'
+            });
+        }
+    });
+
+    return tokens;
+}
+
+function openVerdictModal(title, text, isSuccess, amount, profit, customTokens = null) {
     tgHaptic(isSuccess ? 'success' : 'error');
     if (isSuccess) playSound('win');
     else playSound('error');
 
     setTxt('verdictEmoji', isSuccess ? '🎉' : '❌');
     setTxt('verdictTitle', title);
-    setTxt('verdictText', text);
+
+    const descEl = document.getElementById('verdictText');
+    const tokensBox = document.getElementById('verdictTokensContainer');
+
+    let tokensToRender = customTokens;
+    if (!tokensToRender && isSuccess) {
+        tokensToRender = extractPrizesFromText(text);
+    }
+
+    if (tokensBox) {
+        if (tokensToRender && tokensToRender.length > 0) {
+            tokensBox.style.display = 'block';
+            tokensBox.innerHTML = renderPrizeTokensHTML(tokensToRender);
+            if (descEl) descEl.innerText = text.split('\n')[0] || "";
+        } else {
+            tokensBox.style.display = 'none';
+            tokensBox.innerHTML = '';
+            if (descEl) descEl.innerText = text || "";
+        }
+    } else if (descEl) {
+        descEl.innerText = text || "";
+    }
 
     const amtEl = document.getElementById('verdictAmount');
     if (amtEl) {
-        if (amount) {
+        if (amount && (!tokensToRender || tokensToRender.length === 0)) {
             amtEl.style.display = 'block';
             amtEl.innerText = (amount > 0 ? "+" : "") + amount.toLocaleString() + " ₽";
         } else {
@@ -291,7 +421,6 @@ function trackQuestProgress(actionType, count = 1) {
         }
     }
 
-    // Проверка глобальных целей Блокнота
     checkNotepadMilestones();
 }
 
@@ -1092,7 +1221,7 @@ function claimDailyReward() {
     saveState();
     closeModal('modalDailyBonus');
     playSound('win'); tgHaptic('success');
-    openVerdictModal("БОНУС ПОЛУЧЕН! 🎁", "Вам начислено: " + currentReward.title, true);
+    openVerdictModal("БОНУС ПОЛУЧЕН! 🎁", "Вам начислено:\n" + currentReward.title, true);
 }
 
 // ========================================================
@@ -1311,8 +1440,8 @@ function renderShopHomeItems() {
 }
 
 function buyHomeFurnitureShop(fId, cost, reqStars = 0) {
-    let cash = state.player.cash || 0;
-    let stars = state.player.stars || 0;
+    let cash = state.player?.cash || 0;
+    let stars = state.player?.stars || 0;
     if (cash < cost) return showToast("Не хватает рублей!");
     if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
 
@@ -1593,6 +1722,8 @@ window.updateHeaderUI = updateHeaderUI;
 window.showToast = showToast;
 window.closeModal = closeModal;
 window.openVerdictModal = openVerdictModal;
+window.renderPrizeTokensHTML = renderPrizeTokensHTML;
+window.extractPrizesFromText = extractPrizesFromText;
 window.playSound = playSound;
 window.tgHaptic = tgHaptic;
 window.addXp = addXp;
