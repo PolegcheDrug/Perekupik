@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v0.4.5</title>
-    <link rel="stylesheet" href="style.css?v=156">
+    <link rel="stylesheet" href="style.css?v=157">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -214,11 +214,9 @@
             <div class="phone-screen-content">
               <!-- ДОМАШНИЙ ЭКРАН -->
               <div id="phoneHomeScreen">
-                
-                <!-- ИНТЕРАКТИВНЫЙ ВИДЖЕТ ПРИБЫЛИ БИЗНЕСА -->
                 <div id="phoneBizWidgetContainer" class="mb-2"></div>
 
-                <!-- ПОЛНАЯ СЕТКА ПРИЛОЖЕНИЙ СМАРТФОНА (4х4 = 16 ИКОНОК) -->
+                <!-- 16 ИКОНОК ПРИЛОЖЕНИЙ -->
                 <div class="phone-home-grid mb-2">
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('autodrot')">
                     <div class="phone-app-icon bg-cyan"><i class="fa-solid fa-bolt"></i></div>
@@ -304,7 +302,6 @@
                   </div>
                 </div>
 
-                <!-- ВИДЖЕТ ЕЖЕДНЕВНЫХ ЗАДАНИЙ -->
                 <div id="phoneDailyQuestsWidget" class="phone-quests-widget"></div>
               </div>
 
@@ -312,7 +309,7 @@
               <div id="phoneAppContainer" style="display:none;" class="phone-opened-app-view"></div>
             </div>
 
-            <!-- HOME BAR («ДОМОЙ») -->
+            <!-- HOME BAR -->
             <div class="phone-home-bar-area" onclick="PhoneManager.goHome()">
               <div class="phone-home-indicator"></div>
             </div>
@@ -454,9 +451,7 @@
       </nav>
     </div>
 
-    <!-- МОДАЛЬНЫЕ ОКНА ИГРЫ -->
-
-    <!-- МОДАЛЬНОЕ ОКНО: СПИСОК ИЗМЕНЕНИЙ (PATCH NOTES v0.4.5) -->
+    <!-- МОДАЛЬНЫЕ ОКНА -->
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
@@ -464,114 +459,52 @@
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Илья Чепиль (DXF) & Perekup Dev Team</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10px;">Версия клиента: v0.4.5 (Сборка #156)</div>
-        
-        <div class="space-y-2 mb-3" style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
-          <div class="patch-item">
-            <b class="text-xs color-green">🏷️ Динамическая стоимость госномеров:</b>
-            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Установка красивых, архивных и спецсерийных знаков (777, ЕКХ, АМР, 001-007, одинаковые буквы) моментально повышает рыночную оценку авто на точную стоимость знака. Снятие на транзиты возвращает базовую цену кузова[span_6](start_span)[span_6](end_span).
-            </div>
-          </div>
-
-          <div class="patch-item">
-            <b class="text-xs color-amber">🤝 Учёт в МРЭО vs Перепродажа по ДКП:</b>
-            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              После покупки перекуп выбирает: чистый учёт РФ в МРЭО (госпошлина 2,850 ₽, но 13% налог с прибыли при быстрой перепродаже) или режим перекупа на ДКП (без налогов, но с риском штрафа за просроченные 10 дней).
-            </div>
-          </div>
-
-          <div class="patch-item">
-            <b class="text-xs color-purple">🕵️‍♂️ Синдикат с 7 уровня и диагностика:</b>
-            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Доступ открывается с 7 уровня, но требует жесткой экипировки: видеоэндоскоп, любой толщиномер, сканер Launch и не менее 5 Stars ⭐ на балансе[span_7](start_span)[span_7](end_span).
-            </div>
-          </div>
-
-          <div class="patch-item">
-            <b class="text-xs color-cyan">🎰 Супер Вилспин & Антифарм в Дрифте:</b>
-            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Супер Вилспин получил 1 бесплатный запуск в реальные сутки и сбалансированный лут[span_8](start_span)[span_8](end_span). Заезды на треке получили физический износ шин, сцепления и перегрев ДВС с кулдауном.
-            </div>
-          </div>
-
-          <div class="patch-item">
-            <b class="text-xs color-red">🚨 Проверка криминала и розыска:</b>
-            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Продажа авто с перебитым VIN или аннулированным учётом 12.5.1 дотошным покупателям приводит к вызову полиции, штрафу и конфискации кузова на штрафстоянку.
-            </div>
-          </div>
-        </div>
-
+        <div class="sub-label mb-2 color-green" style="font-size:10px;">Версия клиента: v0.4.5 (Сборка #157)</div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
       </div>
     </div>
 
-    <!-- ВЫБОР РЕГИСТРАЦИИ АВТО: МРЭО vs ДКП -->
     <div id="modalRegistrationChoice" class="modal-overlay">
       <div class="modal-box text-center" style="max-width: 410px;">
         <div style="font-size: 36px; margin-bottom: 6px;">📑</div>
         <h3 class="font-bold mb-1 color-cyan">Способ оформления автомобиля</h3>
         <p class="sub-label mb-3">Выберите форму владения для выкупленного авто:</p>
-
         <div class="glass-card text-left p-2 mb-2" style="border-left: 3px solid var(--green);">
           <b class="text-xs color-green">1. Поставить на чистый учёт в МРЭО</b>
-          <div class="sub-label my-1" style="font-size:10px;">
-            • Оплата госпошлины: <b>2,850 ₽</b><br>
-            • Юридическая чистота: 0 рисков при проверках ДПС.<br>
-            • ⚠️ <b>Налог 13%</b> с чистой прибыли при быстрой перепродаже (до 30 дней владения)!
-          </div>
+          <div class="sub-label my-1" style="font-size:10px;">• Оплата госпошлины: <b>2,850 ₽</b><br>• ⚠️ <b>Налог 13%</b> с чистой прибыли при быстрой перепродаже!</div>
           <button onclick="confirmRegistrationChoice(true)" class="btn btn-green btn-sm w-full mt-1">Оформить в МРЭО (-2,850 ₽)</button>
         </div>
-
         <div class="glass-card text-left p-2 mb-3" style="border-left: 3px solid var(--amber);">
           <b class="text-xs color-amber">2. Оставить на ДКП (Перекупский режим)</b>
-          <div class="sub-label my-1" style="font-size:10px;">
-            • Пошлина: <b>0 ₽</b> (Экономия)<br>
-            • Налог 13%: <b>Не платится</b> (Вся маржа ваша)<br>
-            • 🚨 <b>Лимит 10 дней:</b> если вас остановят ДПС с просроченным ДКП — крупный штраф!
-          </div>
-          <button onclick="confirmRegistrationChoice(false)" class="btn btn-amber btn-sm w-full mt-1">Оставить на ДКП (Без налога)</button>
+          <div class="sub-label my-1" style="font-size:10px;">• Пошлина: <b>0 ₽</b><br>• Налог 13%: <b>Не платится</b><br>• 🚨 <b>Лимит 10 дней!</b></div>
+          <button onclick="confirmRegistrationChoice(false)" class="btn btn-amber btn-sm w-full mt-1">Оставить на ДКП</button>
         </div>
       </div>
     </div>
 
-    <!-- ДКП -->
     <div id="modalDKP" class="modal-overlay">
       <div class="modal-box dkp-official-blank">
         <div class="dkp-blank-border">
           <div class="dkp-header text-center mb-2">
-            <div class="text-xs color-sub tracking-wider">РОССИЙСКАЯ ФЕДЕРАЦИЯ</div>
             <h4 class="font-bold dkp-title">ДОГОВОР КУПЛИ-ПРОДАЖИ</h4>
-            <div class="text-xs color-sub">ТРАНСПОРТНОГО СРЕДСТВА</div>
-            <div class="flex-between text-xs mt-1 border-b pb-1" style="border-color: rgba(0, 242, 254, 0.2);">
-              <span id="dkpCityText">г. Москва</span>
-              <span id="dkpDateText">11 октября 2026 г.</span>
-            </div>
           </div>
-
           <div class="dkp-body-text mb-3">
             <div class="dkp-row mb-1"><span class="sub-label">Продавец:</span> <b class="text-xs" id="dkpSellerName">Иванов И.И.</b></div>
             <div class="dkp-row mb-2"><span class="sub-label">Покупатель:</span> <b class="text-xs" id="dkpBuyerName">Перекуп #777</b></div>
-            
             <div class="p-2 mb-2 dkp-car-spec-box">
-              <div class="sub-label text-xs mb-1">Транспортное средство (ТС):</div>
               <div class="font-bold text-xs color-cyan" id="dkpCarTitle">ВАЗ-2107</div>
-              <div class="text-xs" id="dkpCarSpecs">Мощность: 74 л.с. | Пробег: 85,000 км</div>
+              <div class="text-xs" id="dkpCarSpecs">Мощность: 74 л.с.</div>
               <div class="flex-between mt-1 text-xs">
-                <span>Госномер / VIN:</span>
+                <span>Госномер:</span>
                 <span class="license-plate" style="font-size:10px; padding:1px 4px;" id="dkpCarPlate">В777ВВ 77</span>
               </div>
             </div>
-
             <div class="flex-between p-2 mb-2 dkp-price-line">
-              <span class="font-bold text-xs">СУММА СДЕЛКИ:</span>
+              <span class="font-bold text-xs">СУММА:</span>
               <b class="price-val" id="dkpPriceAmount">150,000 ₽</b>
             </div>
-
             <div id="dkpNetProfitBadge" class="text-xs text-center font-bold mb-2" style="display:none;"></div>
           </div>
-
           <div class="dkp-signatures-area">
             <div class="dkp-sig-col">
               <span class="text-xs sub-label">Продавец:</span>
@@ -582,78 +515,50 @@
               <div class="dkp-handwrite" id="dkpBuyerSig">✍️ Ожидание...</div>
             </div>
             <div id="dkpOfficialStamp" class="official-mreo-stamp">
-              <div class="stamp-inner">
-                <span>МРЭО ГИБДД</span>
-                <b>СДЕЛКА</b>
-                <b>ЗАРЕГИСТРИРОВАНА</b>
-                <span style="font-size:7px;">АРХИВ 77</span>
-              </div>
+              <div class="stamp-inner"><b>МРЭО</b><b>ЗАРЕГИСТРИРОВАНО</b></div>
             </div>
           </div>
-
           <div class="mt-3">
-            <button id="btnSignDKP" onclick="confirmSignDKP()" class="btn btn-green w-full">
-              ✍️ Подписать ДКП и закрыть сделку
-            </button>
-            <button id="btnCloseDKP" onclick="closeModal('modalDKP')" class="btn btn-dark w-full mt-2" style="display:none;">
-              Готово
-            </button>
+            <button id="btnSignDKP" onclick="confirmSignDKP()" class="btn btn-green w-full">✍️ Подписать ДКП</button>
+            <button id="btnCloseDKP" onclick="closeModal('modalDKP')" class="btn btn-dark w-full mt-2" style="display:none;">Готово</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО: СЛУЧАЙНОЕ СОБЫТИЕ В ГАРАЖЕ -->
     <div id="modalGarageEvent" class="modal-overlay">
       <div class="modal-box text-center">
         <div style="font-size:46px; margin-bottom:8px;" id="garageEventEmoji">⚠️</div>
-        <span class="tag-badge bg-tag-red mb-2" id="garageEventBadge">СОБЫТИЕ</span>
-        <h3 class="font-bold mb-2" id="garageEventTitle">Происшествие во дворе</h3>
-        <p class="sub-label mb-3" id="garageEventDesc">Описание события...</p>
-        <div class="p-2 mb-3 text-xs" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);" id="garageEventCarInfo">
+        <h3 class="font-bold mb-2" id="garageEventTitle">Происшествие</h3>
+        <p class="sub-label mb-3" id="garageEventDesc">Описание...</p>
+        <div class="p-2 mb-3 text-xs" style="background:#090e18; border-radius:8px;" id="garageEventCarInfo">
           Автомобиль: <b class="color-cyan" id="garageEventCarName">-</b>
         </div>
         <div id="garageEventActions" class="space-y-2"></div>
       </div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО: СТРАХОВАНИЕ АВТО (ОСАГО / КАСКО) -->
     <div id="modalInsurance" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold"><i class="fa-solid fa-shield-halved"></i> Автострахование</h4>
+          <h4 class="color-cyan font-bold"><i class="fa-solid fa-shield-halved"></i> Страхование</h4>
           <button onclick="closeModal('modalInsurance')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
-        <p class="sub-label mb-2">Защитите авто от ночных ударов на парковке, подстав и попыток угона[span_9](start_span)[span_9](end_span).</p>
-        <div class="p-2 mb-3" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
-          <div class="text-xs sub-label">Автомобиль:</div>
+        <div class="p-2 mb-3" style="background:#090e18; border-radius:8px;">
           <b class="color-cyan text-xs" id="insureCarTitle">-</b>
         </div>
         <div class="space-y-2 mb-3">
-          <div class="glass-card p-2 flex-between">
-            <div>
-              <b class="text-xs color-green">🛡️ Полис КАСКО (Полный)</b>
-              <div class="sub-label" style="font-size:10px;">100% покрытие ущерба при ДТП и угоне</div>
-            </div>
-            <button onclick="confirmPurchaseInsurance('casco')" class="btn btn-green btn-auto btn-sm">18,000 ₽</button>
-          </div>
-          <div class="glass-card p-2 flex-between">
-            <div>
-              <b class="text-xs color-cyan">📋 Полис ОСАГО (Базовый)</b>
-              <div class="sub-label" style="font-size:10px;">Снижает штрафы ДПС и покрывает 50% ДТП</div>
-            </div>
-            <button onclick="confirmPurchaseInsurance('osago')" class="btn btn-cyan btn-auto btn-sm">7,500 ₽</button>
-          </div>
+          <button onclick="confirmPurchaseInsurance('casco')" class="btn btn-green w-full">КАСКО (18,000 ₽)</button>
+          <button onclick="confirmPurchaseInsurance('osago')" class="btn btn-cyan w-full">ОСАГО (7,500 ₽)</button>
         </div>
         <button onclick="closeModal('modalInsurance')" class="btn btn-dark w-full">Отмена</button>
       </div>
     </div>
 
-    <!-- ВЫБОР АВТО ПОД ЗАКАЗ СИНДИКАТА -->
     <div id="modalSelectContractCar" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold"><i class="fa-solid fa-file-signature"></i> Выбор авто под контракт</h4>
+          <h4 class="color-cyan font-bold">Выбор авто под контракт</h4>
           <button onclick="closeModal('modalSelectContractCar')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div id="contractTargetInfo" class="text-xs color-amber mb-2"></div>
@@ -662,16 +567,10 @@
       </div>
     </div>
 
-    <!-- СЛЕПОЙ АУКЦИОН -->
     <div id="modalBlindAuction" class="modal-overlay">
       <div class="modal-box text-center">
         <h4 class="color-red font-bold mb-2">Секретный Лот #<span id="blindAuctionLotNum">404</span></h4>
-        <div class="car-img-wrap mb-2" style="filter: brightness(0.2) contrast(1.2);">
-          <img src="assets/cars/hyper/gtr.jpg" class="car-img" id="blindAuctionImg" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80';">
-          <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:42px;">❓</div>
-        </div>
-        <p class="sub-label mb-2">Класс авто: <b class="color-cyan" id="blindAuctionClassText">ПРЕМИУМ</b></p>
-        <p class="text-xs color-amber mb-3">Состояние, тюнинг и номера неизвестны. Рискуем?</p>
+        <p class="sub-label mb-2">Класс: <b class="color-cyan" id="blindAuctionClassText">ПРЕМИУМ</b></p>
         <div class="grid-2">
           <button onclick="placeBlindBid()" class="btn btn-danger" id="btnBlindBid">Ставка 1M ₽</button>
           <button onclick="closeModal('modalBlindAuction')" class="btn btn-dark">Пас</button>
@@ -679,83 +578,64 @@
       </div>
     </div>
 
-    <!-- АВТО-ПОДСТАВА -->
     <div id="modalAutoPodstava" class="modal-overlay">
       <div class="modal-box text-center">
         <div style="font-size:48px; margin-bottom:10px;">💥</div>
         <h3 class="color-red font-bold mb-2">АВТО-ПОДСТАВА!</h3>
-        <p class="sub-label mb-3">Вас намеренно притер черный седан без номеров. Из машины вышли агрессивные люди и требуют возместить ущерб на месте[span_10](start_span)[span_10](end_span).</p>
+        <p class="sub-label mb-3">Вас притер черный седан без номеров. Требуют денег на месте.</p>
         <div class="space-y-2 mb-3">
-          <button onclick="resolvePodstava('pay')" class="btn btn-dark w-full" id="podstavaBtnPay">Заплатить 150,000 ₽ на месте</button>
-          <button onclick="resolvePodstava('reshala')" class="btn btn-purple w-full">Звонок Решале (1 🤝 Связь)</button>
-          <button onclick="resolvePodstava('fight')" class="btn btn-danger w-full">Грубо отказать (Риск травм)</button>
+          <button onclick="resolvePodstava('pay')" class="btn btn-dark w-full">Заплатить</button>
+          <button onclick="resolvePodstava('reshala')" class="btn btn-purple w-full">Звонок Решале (1 🤝)</button>
+          <button onclick="resolvePodstava('fight')" class="btn btn-danger w-full">Отказать (Драка)</button>
         </div>
       </div>
     </div>
 
-    <!-- СОХРАНЕНИЯ -->
     <div id="modalSaveManager" class="modal-overlay">
       <div class="modal-box">
-        <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold"><i class="fa-solid fa-cloud-arrow-up"></i> Резервные копии сейва</h4>
-          <button onclick="closeModal('modalSaveManager')" class="btn btn-dark btn-auto btn-sm">✕</button>
-        </div>
-        <p class="sub-label mb-2">Сейвы синхронизируются с серверами Telegram автоматически. Также вы можете скопировать или загрузить код сохранения вручную:</p>
-        <textarea id="saveExportArea" style="width:100%; height:90px; background:#090e18; border:1px solid var(--border-glass); border-radius:8px; color:#fff; font-size:10px; font-family:monospace; padding:8px; outline:none; resize:none; margin-bottom:10px;" placeholder="Код сохранения..."></textarea>
+        <h4 class="color-cyan font-bold mb-2">Резервная копия сейва</h4>
+        <textarea id="saveExportArea" style="width:100%; height:80px; background:#090e18; color:#fff; font-size:10px; padding:6px; margin-bottom:8px;"></textarea>
         <div class="grid-2 mb-2">
-          <button onclick="exportSaveCodeAction()" class="btn btn-cyan btn-sm"><i class="fa-solid fa-copy"></i> Экспорт кода</button>
-          <button onclick="importSaveCodeAction()" class="btn btn-amber btn-sm"><i class="fa-solid fa-file-import"></i> Импорт кода</button>
+          <button onclick="exportSaveCodeAction()" class="btn btn-cyan btn-sm">Экспорт</button>
+          <button onclick="importSaveCodeAction()" class="btn btn-amber btn-sm">Импорт</button>
         </div>
         <button onclick="closeModal('modalSaveManager')" class="btn btn-dark w-full">Закрыть</button>
       </div>
     </div>
 
-    <!-- ИНТЕРЬЕР ДОМА -->
     <div id="modalHomeInterior" class="modal-overlay">
       <div class="modal-box">
-        <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold"><i class="fa-solid fa-couch"></i> Обустройство дома</h4>
-          <button onclick="closeModal('modalHomeInterior')" class="btn btn-dark btn-auto btn-sm">✕</button>
-        </div>
-        <div id="homeInteriorHeader" class="text-xs color-amber mb-2">Собственная недвижимость</div>
+        <h4 class="color-cyan font-bold mb-2">Обустройство дома</h4>
+        <div id="homeInteriorHeader" class="text-xs color-amber mb-2"></div>
         <div id="homeInteriorItemsList" class="space-y-2 mb-3"></div>
         <button onclick="closeModal('modalHomeInterior')" class="btn btn-dark w-full">Закрыть</button>
       </div>
     </div>
 
-    <!-- ТЮНИНГ -->
     <div id="modalTuning" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold"><i class="fa-solid fa-screwdriver-wrench"></i> Спортивный Тюнинг</h4>
+          <h4 class="color-cyan font-bold">Тюнинг</h4>
           <button onclick="closeModal('modalTuning')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
-        
-        <div id="tuneCarTitle" class="text-xs color-amber mb-2 font-bold">Автомобиль</div>
-        
+        <div id="tuneCarTitle" class="text-xs color-amber mb-2 font-bold"></div>
         <div class="risk-meter-box mb-2">
           <div class="flex-between text-xs">
-            <span>Риск по ст. 12.5.1 КоАП:</span>
+            <span>Риск по ст. 12.5.1:</span>
             <b id="tuneRiskValue" class="color-amber">0%</b>
           </div>
-          <div class="risk-track">
-            <div id="tuneRiskFill" class="risk-fill risk-low" style="width: 0%;"></div>
-          </div>
+          <div class="risk-track"><div id="tuneRiskFill" class="risk-fill risk-low" style="width: 0%;"></div></div>
         </div>
-
         <div class="grid-3 mb-2">
           <button onclick="switchTuneTab('drag')" id="tuneTab-drag" class="btn btn-cyan btn-sm">🏁 Драг</button>
           <button onclick="switchTuneTab('drift')" id="tuneTab-drift" class="btn btn-dark btn-sm">💨 Дрифт</button>
-          <button onclick="switchTuneTab('style')" id="tuneTab-style" class="btn btn-dark btn-sm">✨ Стенс/Шоу</button>
+          <button onclick="switchTuneTab('style')" id="tuneTab-style" class="btn btn-dark btn-sm">✨ Стенс</button>
         </div>
-
         <div id="tuningItemsContainer" class="space-y-2 mb-3" style="max-height: 240px; overflow-y: auto;"></div>
-        
         <button onclick="closeModal('modalTuning')" class="btn btn-cyan w-full">Готово</button>
       </div>
     </div>
 
-    <!-- ПОКУПКА / ТОРГ С ПРОДАВЦОМ -->
     <div id="modalMarketDeal" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -763,22 +643,20 @@
             <div class="chat-avatar-circle" id="dealSellerAvatar">👤</div>
             <div>
               <div class="font-bold text-xs" id="dealSellerName">Продавец</div>
-              <div class="text-xs color-green">● В сети (на связи у капота)</div>
+              <div class="text-xs color-green">● У капота</div>
             </div>
           </div>
           <button onclick="closeModal('modalMarketDeal')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="deal-car-preview-card mb-2">
-          <img id="dealCarImg" src="" class="deal-car-thumb" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80';">
+          <img id="dealCarImg" src="" class="deal-car-thumb">
           <div style="flex:1;">
             <div class="font-bold text-xs" id="dealCarTitle">Автомобиль</div>
-            <div class="text-xs sub-label" id="dealCarMileageInfo">Пробег: 85,000 км</div>
+            <div class="text-xs sub-label" id="dealCarMileageInfo">Пробег</div>
             <div class="price-val text-xs" id="dealCarPrice">0 ₽</div>
           </div>
         </div>
-        <div class="chat-thread-container mb-2" id="dealChatThread">
-          <div class="chat-msg msg-seller" id="dealSellerMessage">«Алло, да, продаю. Машина в порядке, сел и поехал.»[span_11](start_span)[span_11](end_span)</div>
-        </div>
+        <div class="chat-thread-container mb-2" id="dealChatThread"></div>
         <div id="dealHaggleArea" class="mb-2"></div>
         <div class="grid-2">
           <button onclick="closeModal('modalMarketDeal')" class="btn btn-dark">Отбой 📵</button>
@@ -787,7 +665,6 @@
       </div>
     </div>
 
-    <!-- ПРОДАЖА / ТОРГ С ПОКУПАТЕЛЕМ -->
     <div id="modalHaggleSale" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -795,167 +672,127 @@
             <div class="chat-avatar-circle" id="saleBuyerAvatar">🧑‍💼</div>
             <div>
               <div class="font-bold text-xs" id="saleBuyerName">Покупатель</div>
-              <div class="text-xs color-green">● Осматривает ваш авто у капота</div>
+              <div class="text-xs color-green">● Осматривает авто</div>
             </div>
           </div>
           <button onclick="closeModal('modalHaggleSale')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="deal-car-preview-card mb-2">
-          <img id="saleCarImg" src="" class="deal-car-thumb" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80';">
+          <img id="saleCarImg" src="" class="deal-car-thumb">
           <div style="flex:1;">
             <div class="font-bold text-xs" id="saleCarTitle">Автомобиль</div>
-            <div class="text-xs sub-label">Текущее предложение:</div>
             <div class="price-val text-xs color-green" id="saleBuyerOfferVal">0 ₽</div>
           </div>
         </div>
-        <div class="chat-thread-container mb-2" id="saleHaggleChatThread">
-          <div class="chat-msg msg-seller" id="saleBuyerGreetingMsg">«Машина интересная. Но цену надо обсудить...»[span_12](start_span)[span_12](end_span)</div>
-        </div>
+        <div class="chat-thread-container mb-2" id="saleHaggleChatThread"></div>
         <div class="risk-meter-box mb-2">
-          <div class="flex-between text-xs">
-            <span>Терпение покупателя:</span>
-            <b id="saleBuyerPatienceText" class="color-green">100%</b>
-          </div>
-          <div class="risk-track">
-            <div id="saleBuyerPatienceFill" class="risk-fill risk-low" style="width: 100%;"></div>
-          </div>
+          <div class="flex-between text-xs"><span>Терпение:</span><b id="saleBuyerPatienceText" class="color-green">100%</b></div>
+          <div class="risk-track"><div id="saleBuyerPatienceFill" class="risk-fill risk-low" style="width: 100%;"></div></div>
         </div>
         <div class="space-y-2 mb-3">
-          <button onclick="attemptHaggleSale('safe')" class="btn btn-dark w-full">🛡 Обосновать по кузову (+2% | Риск 20%)[span_13](start_span)[span_13](end_span)</button>
-          <button onclick="attemptHaggleSale('firm')" class="btn btn-dark w-full">🔥 Давить на эксклюзив (+6% | Риск 50%)[span_14](start_span)[span_14](end_span)</button>
+          <button onclick="attemptHaggleSale('safe')" class="btn btn-dark w-full">🛡 Обосновать по кузову (+2%)</button>
+          <button onclick="attemptHaggleSale('firm')" class="btn btn-dark w-full">🔥 Давить на эксклюзив (+6%)</button>
         </div>
         <div class="grid-2">
-          <button onclick="confirmSaleFromHaggleModal()" class="btn btn-green">Продать по текущей 🤝</button>
-          <button onclick="closeModal('modalHaggleSale')" class="btn btn-dark">Назад к лоту</button>
+          <button onclick="confirmSaleFromHaggleModal()" class="btn btn-green">Продать 🤝</button>
+          <button onclick="closeModal('modalHaggleSale')" class="btn btn-dark">Назад</button>
         </div>
       </div>
     </div>
 
-    <!-- АВТОТЕКА -->
     <div id="modalAutoteka" class="modal-overlay">
       <div class="modal-box">
-        <div class="flex-between mb-2">
-          <h4 class="color-green font-bold"><i class="fa-solid fa-shield-halved"></i> Полный отчёт «Автотека»</h4>
-          <button onclick="closeModal('modalAutoteka')" class="btn btn-dark btn-auto btn-sm">✕</button>
-        </div>
-        <div id="autotekaReportContent" class="report-box p-3 mb-3" style="border-radius:12px;"></div>
-        <button onclick="closeModal('modalAutoteka')" class="btn btn-green w-full">Закрыть отчёт</button>
+        <h4 class="color-green font-bold mb-2">Автотека</h4>
+        <div id="autotekaReportContent" class="report-box p-3 mb-3"></div>
+        <button onclick="closeModal('modalAutoteka')" class="btn btn-green w-full">Закрыть</button>
       </div>
     </div>
 
-    <!-- ДЕТЕЙЛИНГ -->
     <div id="modalPreSale" class="modal-overlay">
       <div class="modal-box">
-        <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold"><i class="fa-solid fa-wand-magic-sparkles"></i> Предпродажная подготовка</h4>
-          <button onclick="closeModal('modalPreSale')" class="btn btn-dark btn-auto btn-sm">✕</button>
-        </div>
-        <div id="preSaleCarTitle" class="text-xs color-amber mb-3">Автомобиль</div>
+        <h4 class="color-cyan font-bold mb-2">Детейлинг</h4>
+        <div id="preSaleCarTitle" class="text-xs color-amber mb-3"></div>
         <div class="presale-grid mb-3">
           <div class="presale-card">
-            <div class="presale-card-icon color-cyan">✨</div>
-            <div class="font-bold text-xs">Полировка & Хим</div>
-            <div class="sub-label mb-2">+5% к рынку</div>
-            <button onclick="applyPreSaleMod('clean')" class="btn btn-cyan btn-sm" id="btnCleanPrice">4,000 ₽</button>
+            <div>✨ Полировка</div>
+            <button onclick="applyPreSaleMod('clean')" class="btn btn-cyan btn-sm mt-1" id="btnCleanPrice">4,000 ₽</button>
           </div>
           <div class="presale-card">
-            <div class="presale-card-icon color-amber">🎨</div>
-            <div class="font-bold text-xs">Облив в круг</div>
-            <div class="sub-label mb-2">+20% состояния</div>
-            <button onclick="applyPreSaleMod('paint')" class="btn btn-dark btn-sm" id="btnPaintPrice">12,000 ₽</button>
+            <div>🎨 Облив</div>
+            <button onclick="applyPreSaleMod('paint')" class="btn btn-dark btn-sm mt-1" id="btnPaintPrice">12,000 ₽</button>
           </div>
           <div class="presale-card">
-            <div class="presale-card-icon color-purple">🧪</div>
-            <div class="font-bold text-xs">Присадка в мотор</div>
-            <div class="sub-label mb-2">Скрывает стуки (Риск!)</div>
-            <button onclick="applyPreSaleMod('additive')" class="btn btn-amber btn-sm" id="btnAdditivePrice">6,000 ₽</button>
+            <div>🧪 Присадка</div>
+            <button onclick="applyPreSaleMod('additive')" class="btn btn-amber btn-sm mt-1" id="btnAdditivePrice">6,000 ₽</button>
           </div>
-          <div class="presale-card card-risk">
-            <div class="presale-card-icon color-red">⏳</div>
-            <div class="font-bold text-xs">Скрутка пробега</div>
-            <div class="sub-label color-red mb-2">-50% км (Опасно!)</div>
-            <button onclick="applyPreSaleMod('odometer')" class="btn btn-danger btn-sm" id="btnOdometerPrice">8,000 ₽</button>
+          <div class="presale-card">
+            <div>⏳ Скрутка</div>
+            <button onclick="applyPreSaleMod('odometer')" class="btn btn-danger btn-sm mt-1" id="btnOdometerPrice">8,000 ₽</button>
           </div>
         </div>
         <button onclick="closeModal('modalPreSale')" class="btn btn-dark w-full">Готово</button>
       </div>
     </div>
 
-    <!-- БАРТЕР -->
     <div id="modalBarterDeal" class="modal-overlay">
       <div class="modal-box text-center">
-        <h4 class="color-amber font-bold mb-2">🔄 Предложение обмена на улице!</h4>
-        <p class="sub-label mb-3">Знакомый перекуп предлагает махнуться автомобилями ключ в ключ:</p>
-        <div class="barter-compare-box mb-3">
-          <div class="barter-card">
-            <div class="sub-label">Ваша машина:</div>
-            <b class="text-xs" id="barterMyCarName">-</b>
-            <div class="price-val text-xs color-green" id="barterMyCarVal">0 ₽</div>
-          </div>
-          <div style="font-size:20px; align-self:center;">⇄</div>
-          <div class="barter-card border-cyan">
-            <div class="sub-label">Предлагают:</div>
-            <b class="text-xs color-cyan" id="barterNpcCarName">-</b>
-            <div class="price-val text-xs color-amber" id="barterNpcCarVal">0 ₽</div>
-          </div>
+        <h4 class="color-amber font-bold mb-2">Предложение обмена!</h4>
+        <div class="grid-2 mb-3">
+          <div>Ваша: <b class="text-xs" id="barterMyCarName">-</b></div>
+          <div>Их: <b class="text-xs color-cyan" id="barterNpcCarName">-</b></div>
         </div>
         <div class="grid-2">
-          <button onclick="confirmBarterExchange()" class="btn btn-green">Согласен 🤝</button>
-          <button onclick="closeModal('modalBarterDeal')" class="btn btn-dark">Отказаться</button>
+          <button onclick="confirmBarterExchange()" class="btn btn-green">Обмен 🤝</button>
+          <button onclick="closeModal('modalBarterDeal')" class="btn btn-dark">Отмена</button>
         </div>
       </div>
     </div>
 
-    <!-- ЗВОНОК -->
     <div id="modalBuyCall" class="modal-overlay">
       <div class="modal-box text-center">
         <div style="font-size:36px; margin-bottom:6px;" id="buyCallEmoji">📞</div>
-        <h3 class="font-bold mb-1" id="buyCallTitle">Звонок продавцу...</h3>
+        <h3 class="font-bold mb-1" id="buyCallTitle">Звонок...</h3>
         <p class="sub-label mb-3" id="buyCallDesc">Идут гудки...</p>
         <div id="buyCallActionBtnBox"></div>
       </div>
     </div>
 
-    <!-- БОНУС -->
     <div id="modalDailyBonus" class="modal-overlay">
       <div class="modal-box text-center">
-        <h3 class="font-bold mb-2">🎁 Ежедневный подарок</h3>
+        <h3 class="font-bold mb-2">🎁 Подарок дня</h3>
         <div class="daily-streak-grid" id="dailyBonusGrid"></div>
         <button id="btnClaimDaily" onclick="claimDailyReward()" class="btn btn-green mb-2">Забрать</button>
         <button onclick="closeModal('modalDailyBonus')" class="btn btn-dark w-full">Закрыть</button>
       </div>
     </div>
 
-    <!-- ВЕРДИКТ -->
     <div id="modalDealVerdict" class="modal-overlay">
       <div class="modal-box text-center">
         <div style="font-size:38px; margin-bottom:6px;" id="verdictEmoji">🤝</div>
-        <h3 class="font-bold mb-1" id="verdictTitle">Сделка закрыта</h3>
-        <p class="sub-label mb-2" id="verdictText">Покупатель согласен!</p>
+        <h3 class="font-bold mb-1" id="verdictTitle">Сделка</h3>
+        <p class="sub-label mb-2" id="verdictText"></p>
         <div class="price-val mb-1" id="verdictAmount">+0 ₽</div>
         <div id="verdictProfitBadge" class="text-xs font-bold mb-3" style="display:none;"></div>
-        <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Понятно 👍</button>
+        <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Понятно</button>
       </div>
     </div>
 
-    <!-- OBD2 -->
     <div id="modalOBD2" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2 color-cyan"><i class="fa-solid fa-laptop-code"></i> OBD2 Сканер</h4>
-        <div id="obd2CarTitle" class="text-xs color-cyan text-center font-bold mb-2">Чтение...</div>
-        <div id="obd2ResultBox" class="p-2 mb-2" style="background:#090e18; border-radius:8px; font-family:monospace; font-size:11px;"></div>
+        <h4 class="text-center mb-2 color-cyan">OBD2 Сканер</h4>
+        <div id="obd2CarTitle" class="text-xs color-cyan text-center font-bold mb-2"></div>
+        <div id="obd2ResultBox" class="p-2 mb-2" style="background:#090e18; font-family:monospace; font-size:11px;"></div>
         <div id="obd2ActionBox"></div>
         <button onclick="closeOBD2Modal()" class="btn btn-dark w-full mt-2">Закрыть</button>
       </div>
     </div>
 
-    <!-- ВЫСТАВЛЕНИЕ НА ПРОДАЖУ -->
     <div id="modalPutOnLot" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2">🏪 Выставить на продажу</h4>
-        <div id="lotPutCarTitle" class="text-xs color-cyan text-center font-bold mb-1">Автомобиль</div>
-        <div id="lotCostInfo" class="text-xs color-amber text-center mb-3">Себестоимость: 0 ₽</div>
-        <input type="number" id="lotAskingPriceInput" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; font-weight:bold; outline:none; margin-bottom:12px;" min="1">
+        <h4 class="text-center mb-2">Выставить на продажу</h4>
+        <div id="lotPutCarTitle" class="text-xs color-cyan text-center font-bold mb-1"></div>
+        <div id="lotCostInfo" class="text-xs color-amber text-center mb-3"></div>
+        <input type="number" id="lotAskingPriceInput" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;" min="1">
         <div class="grid-2">
           <button onclick="confirmPutOnLot()" class="btn btn-green">Выставить</button>
           <button onclick="closeModal('modalPutOnLot')" class="btn btn-dark">Отмена</button>
@@ -963,15 +800,13 @@
       </div>
     </div>
 
-    <!-- ПРЕВЬЮ В ГАРАЖЕ -->
     <div id="modalPreview" class="modal-overlay">
       <div class="modal-box">
         <div class="car-img-wrap mb-2" style="height: 125px;">
-          <img id="prevImg" src="" class="car-img" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80';">
-          <div id="prevTypeBadge" class="badge-tag">АВТО</div>
+          <img id="prevImg" src="" class="car-img">
           <div class="plate-corner"><div id="prevPlate" class="license-plate"></div></div>
         </div>
-        <h3 id="prevTitle" class="font-bold mb-1">Название Авто</h3>
+        <h3 id="prevTitle" class="font-bold mb-1">Авто</h3>
         <div id="prevSpecs" class="sub-label mb-2"></div>
         <div class="price-box mb-2">
           <span class="text-xs color-green font-bold">ОЦЕНКА:</span>
@@ -983,58 +818,54 @@
         </div>
         <div class="grid-2 mb-2">
           <button onclick="openTuningFromPreview()" class="btn btn-dark">Тюнинг</button>
-          <button onclick="openOBD2Modal()" class="btn btn-cyan" id="btnPreviewObdScan">OBD2</button>
+          <button onclick="openOBD2Modal()" class="btn btn-cyan">OBD2</button>
         </div>
-        <button onclick="openInsuranceModalFromPreview()" class="btn btn-dark w-full mb-2">🛡️ Оформить КАСКО / ОСАГО</button>
+        <button onclick="openInsuranceModalFromPreview()" class="btn btn-dark w-full mb-2">Страховка</button>
         <button onclick="closeModal('modalPreview')" class="btn btn-dark w-full">Закрыть</button>
       </div>
     </div>
 
-    <!-- НОМЕРА -->
     <div id="modalChangePlate" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2">🏷️ Номера</h4>
+        <h4 class="text-center mb-2">Госномера</h4>
         <button onclick="removePlateFromCar()" class="btn btn-amber mb-2 w-full">Снять номер (-2,000 ₽)</button>
         <div id="changePlateList" class="space-y-2 mb-2"></div>
         <button onclick="closeModal('modalChangePlate')" class="btn btn-dark w-full">Отмена</button>
       </div>
     </div>
 
-    <!-- ТОЛЩИНОМЕР (ИСПРАВЛЕННЫЙ ВЫХОД БЕЗ ЗАВИСАНИЙ) -->
     <div id="modalGauge" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2">Замер ЛКП кузова</h4>
+        <h4 class="text-center mb-2">Замер ЛКП</h4>
         <div class="grid-2 mb-3">
-          <button onclick="checkBodyPart('hood')" class="btn btn-dark"><span class="sub-label">Капот</span> <span id="part-hood" class="font-bold">Замерить</span></button>
-          <button onclick="checkBodyPart('roof')" class="btn btn-dark"><span class="sub-label">Крыша</span> <span id="part-roof" class="font-bold">Замерить</span></button>
-          <button onclick="checkBodyPart('doors')" class="btn btn-dark"><span class="sub-label">Двери</span> <span id="part-doors" class="font-bold">Замерить</span></button>
-          <button onclick="checkBodyPart('wings')" class="btn btn-dark"><span class="sub-label">Крылья</span> <span id="part-wings" class="font-bold">Замерить</span></button>
+          <button onclick="checkBodyPart('hood')" class="btn btn-dark"><span class="sub-label">Капот:</span> <span id="part-hood" class="font-bold">Замерить</span></button>
+          <button onclick="checkBodyPart('roof')" class="btn btn-dark"><span class="sub-label">Крыша:</span> <span id="part-roof" class="font-bold">Замерить</span></button>
+          <button onclick="checkBodyPart('doors')" class="btn btn-dark"><span class="sub-label">Двери:</span> <span id="part-doors" class="font-bold">Замерить</span></button>
+          <button onclick="checkBodyPart('wings')" class="btn btn-dark"><span class="sub-label">Крылья:</span> <span id="part-wings" class="font-bold">Замерить</span></button>
         </div>
         <button onclick="closeGaugeModal()" class="btn btn-cyan w-full">Готово ✓</button>
       </div>
     </div>
 
-    <!-- ЛЕГАЛИЗАЦИЯ -->
     <div id="modalLegalizeCar" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2 color-purple">🔏 Легализация</h4>
+        <h4 class="text-center mb-2 color-purple">Легализация</h4>
         <div id="legalizeCarList" class="space-y-2 mb-3"></div>
         <button onclick="closeModal('modalLegalizeCar')" class="btn btn-dark w-full">Отмена</button>
       </div>
     </div>
 
-    <!-- СОЗДАНИЕ ЛОТА НА БИРЖЕ AUTODROT -->
     <div id="modalCreateP2P" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2"><i class="fa-solid fa-handshake color-green"></i> Выставить на Autodrot</h4>
+        <h4 class="text-center mb-2">Выставить на биржу</h4>
         <div class="grid-4 mb-2">
           <button type="button" onclick="selectP2PListingType('car')" id="btnP2PTypeCar" class="btn btn-cyan btn-sm">Авто</button>
           <button type="button" onclick="selectP2PListingType('plate')" id="btnP2PTypePlate" class="btn btn-dark btn-sm">Номер</button>
           <button type="button" onclick="selectP2PListingType('business')" id="btnP2PTypeBiz" class="btn btn-dark btn-sm">Бизнес</button>
           <button type="button" onclick="selectP2PListingType('housing')" id="btnP2PTypeHouse" class="btn btn-dark btn-sm">Жильё</button>
         </div>
-        <select id="p2pItemSelect" onchange="onP2PItemSelected(this.value)" style="width:100%; background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; color:#fff; font-size:12px; outline:none; margin-bottom:8px;"></select>
-        <input type="number" id="p2pPriceInput" placeholder="Цена ₽" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; font-weight:bold; outline:none; margin-bottom:12px;">
+        <select id="p2pItemSelect" onchange="onP2PItemSelected(this.value)" style="width:100%; background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; color:#fff; font-size:12px; margin-bottom:8px;"></select>
+        <input type="number" id="p2pPriceInput" placeholder="Цена ₽" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;">
         <div class="grid-2">
           <button onclick="confirmCreateP2PListing()" class="btn btn-green">Выставить</button>
           <button onclick="closeModal('modalCreateP2P')" class="btn btn-dark">Отмена</button>
@@ -1042,7 +873,6 @@
       </div>
     </div>
 
-    <!-- ЛИЧНЫЕ ДИАЛОГИ В СЕТИ -->
     <div id="modalDirectChat" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -1059,18 +889,58 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- ПОСЛЕДОВАТЕЛЬНОЕ ПОДКЛЮЧЕНИЕ ВСЕХ МОДУЛЕЙ -->
-    <script src="data.js?v=156"></script>
-    <script src="firebase-bridge.js?v=156"></script>
-    <script src="js/street.js?v=156"></script>
-    <script src="js/garage.js?v=156"></script>
-    <script src="js/market.js?v=156"></script>
-    <script src="js/salesLot.js?v=156"></script>
-    <script src="js/life.js?v=156"></script>
-    <script src="js/syndicate.js?v=156"></script>
-    <script src="js/phone.js?v=156"></script>
-    <script src="js/network.js?v=156"></script>
-    <script src="js/app.js?v=156"></script>
+    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ (РАБОТАЕТ И ИЗ КОРНЯ, И ИЗ /js/) -->
+    <script>
+      (function() {
+        const modules = [
+          'data.js',
+          'app.js',
+          'phone.js',
+          'market.js',
+          'garage.js',
+          'salesLot.js',
+          'life.js',
+          'street.js',
+          'syndicate.js',
+          'firebase-bridge.js',
+          'network.js'
+        ];
 
+        function loadModule(name) {
+          return new Promise((resolve) => {
+            const s1 = document.createElement('script');
+            s1.src = name + '?v=157';
+            s1.onload = () => resolve(true);
+            s1.onerror = () => {
+              s1.remove();
+              const s2 = document.createElement('script');
+              s2.src = 'js/' + name + '?v=157';
+              s2.onload = () => resolve(true);
+              s2.onerror = () => {
+                console.warn('[Loader] Не удалось загрузить ' + name);
+                resolve(false);
+              };
+              document.body.appendChild(s2);
+            };
+            document.body.appendChild(s1);
+          });
+        }
+
+        async function initAllModules() {
+          for (const mod of modules) {
+            await loadModule(mod);
+          }
+          if (typeof initApp === 'function') {
+            initApp();
+          }
+        }
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initAllModules);
+        } else {
+          initAllModules();
+        }
+      })();
+    </script>
   </body>
 </html>
