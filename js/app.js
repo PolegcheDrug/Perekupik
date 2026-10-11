@@ -1,6 +1,7 @@
 // ========================================================
 // js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & FIREBASE (v0.4.5)
-// Полная переоценка гаража, синхронизация и патчноут
+// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
+// Реальное время (00:00), квесты, синдикат-гейт, мультиязычность
 // ========================================================
 
 const CURRENT_GAME_VERSION = "v0.4.5";
@@ -9,13 +10,13 @@ let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
 let tgUserId = "guest_777";
-let tgUserData = null; // Реальные данные пользователя Telegram
+let tgUserData = null;
 let SAVE_KEY_PREFIX = "perekup_v4_";
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
 
 // ========================================================
-// ЗВУК И ТАКТИЛЬНЫЙ ОТКЛИК (HAPTICS)
+// 1. ЗВУК И ТАКТИЛЬНЫЙ ОТКЛИК (HAPTICS)
 // ========================================================
 function tgHaptic(type = 'light') {
     try { 
@@ -41,7 +42,7 @@ function playSound(type) {
         const now = audioCtx.currentTime;
         if (type === 'tick') {
             const osc = audioCtx.createOscillator();
-            const g = audioGain = audioCtx.createGain();
+            const g = audioCtx.createGain();
             osc.connect(g); g.connect(audioCtx.destination);
             osc.frequency.setValueAtTime(800, now);
             g.gain.setValueAtTime(0.05, now);
@@ -129,7 +130,7 @@ function openVerdictModal(title, text, isSuccess, amount, profit) {
     if (amtEl) {
         if (amount) {
             amtEl.style.display = 'block';
-            amtEl.innerText = "+" + amount.toLocaleString() + " ₽";
+            amtEl.innerText = (amount > 0 ? "+" : "") + amount.toLocaleString() + " ₽";
         } else {
             amtEl.style.display = 'none';
         }
@@ -171,23 +172,28 @@ function dismissPatchNotesModal() {
 }
 
 // ========================================================
-// ИГРОВОЙ STATE
+// 2. ИГРОВОЙ STATE & ДЕФОЛТНЫЕ ДАННЫЕ
 // ========================================================
 const DEFAULT_STATE = {
+    lang: 'ru',
     player: { 
         name: "Перекуп #777", avatarUrl: null, cash: 150000, stars: 15, connections: 1, 
         expressTickets: 25, maxExpressTickets: 25, fuel: 100, level: 1, xp: 0, maxXp: 120, 
-        baseSlots: 2, vip: false, vipPro: false, lastFreeSpinDay: 0, club: null, karma: 50, 
-        streetCred: 100,
+        baseSlots: 2, vip: false, vipPro: false, lastFreeSpinDay: 0, lastFreeSuperSpinDay: 0,
+        club: null, karma: 50, streetCred: 100, superSpinTickets: 1,
         stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0, scandalsAvoided: 0 }, 
-        hunger: 80, mood: 85, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0, 
+        hunger: 80, mood: 85, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
+        lastRealDayTimestamp: Date.now(),
         diet: 'shaurma', housingId: 'room', housingType: 'rent', ownedHouses: [], selectedStreetCarIndex: 0, 
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
         hasRacingLicense: false, consecutiveRaces: 0, maxRacesBeforeRaid: 12,
         safeDeposit: 0, trafficFines: 0,
         tools: { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false },
         furniture: [],
-        phoneMessages: []
+        phoneMessages: [],
+        dailyQuests: [],
+        bankHistory: [],
+        bankDeposits: []
     },
     garage: [], salesLot: [], contracts: [], plateCatalog: [], 
     ownedPlates: ["В777ВВ 77"], registeredPlates: ["В777ВВ 77"],
@@ -199,6 +205,95 @@ const DEFAULT_STATE = {
 
 let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 
+// ========================================================
+// 3. МУЛЬТИЯЗЫЧНОСТЬ (I18N)
+// ========================================================
+function toggleGameLanguage() {
+    let nextLang = state.lang === 'ru' ? 'en' : 'ru';
+    setGameLanguage(nextLang);
+}
+
+function setGameLanguage(lang) {
+    state.lang = lang;
+    applyLanguageToDOM();
+    saveState();
+    playSound('tick');
+    tgHaptic('light');
+    showToast(lang === 'ru' ? "Язык: Русский 🇷🇺" : "Language: English 🇬🇧");
+}
+
+function applyLanguageToDOM() {
+    const lang = state.lang || 'ru';
+    const dict = (typeof I18N_TRANSLATIONS !== 'undefined' && I18N_TRANSLATIONS[lang]) ? I18N_TRANSLATIONS[lang] : {};
+
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) el.innerHTML = dict[key];
+    });
+
+    const btnToggle = document.getElementById('btnLangToggle');
+    if (btnToggle) btnToggle.innerText = lang === 'ru' ? "🌐 RU" : "🌐 EN";
+
+    const btnRu = document.getElementById('btnLangRu');
+    const btnEn = document.getElementById('btnLangEn');
+    if (btnRu && btnEn) {
+        btnRu.className = lang === 'ru' ? 'btn btn-cyan btn-auto btn-sm' : 'btn btn-dark btn-auto btn-sm';
+        btnEn.className = lang === 'en' ? 'btn btn-cyan btn-auto btn-sm' : 'btn btn-dark btn-auto btn-sm';
+    }
+}
+
+// ========================================================
+// 4. ТРЕКЕР ЕЖЕДНЕВНЫХ ЗАДАНИЙ (ПЛАН ПЕРЕКУПА)
+// ========================================================
+function trackQuestProgress(actionType, count = 1) {
+    if (!state.player || !Array.isArray(state.player.dailyQuests)) return;
+    let questsUpdated = false;
+
+    state.player.dailyQuests.forEach(q => {
+        if (!q.done && (q.actionType === actionType || q.id === actionType)) {
+            q.cur = Math.min(q.max || q.target || 1, (q.cur || 0) + count);
+            questsUpdated = true;
+            if (q.cur >= (q.max || q.target || 1)) {
+                showToast(`🎯 Задание выполнено: «${q.text}»! Заберите награду в телефоне.`);
+                tgHaptic('success');
+            }
+        }
+    });
+
+    if (questsUpdated) {
+        saveState();
+        if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.renderDailyQuestsWidget === 'function') {
+            PhoneManager.renderDailyQuestsWidget();
+        }
+    }
+}
+
+function refreshDailyQuestsList() {
+    if (typeof DAILY_QUESTS_POOL === 'undefined' || !Array.isArray(DAILY_QUESTS_POOL)) {
+        state.player.dailyQuests = [
+            { id: "q_inspect", text: "Осмотреть толщиномером 2 авто на рынке", cur: 0, max: 2, actionType: "gauge_check", reward: 35000, rewardXp: 40, done: false },
+            { id: "q_race", text: "Выиграть заезд 402м в Стрите", cur: 0, max: 1, actionType: "win_drag", reward: 50000, rewardXp: 45, done: false },
+            { id: "q_biz", text: "Собрать кассу с предприятий", cur: 0, max: 1, actionType: "collect_biz", reward: 25000, rewardXp: 30, done: false }
+        ];
+        return;
+    }
+
+    const shuffled = [...DAILY_QUESTS_POOL].sort(() => 0.5 - Math.random());
+    state.player.dailyQuests = shuffled.slice(0, 3).map(q => ({
+        id: q.id,
+        text: q.text,
+        cur: 0,
+        max: q.target || 1,
+        actionType: q.actionType,
+        reward: q.reward,
+        rewardXp: q.rewardXp || 35,
+        done: false
+    }));
+}
+
+// ========================================================
+// 5. РАСЧЕТ ЗАТРАТ И СЛОТОВ
+// ========================================================
 function getGarageSlotCost() {
     let bs = state.player?.baseSlots || 2;
     let extraSlots = Math.max(0, bs - 2);
@@ -230,9 +325,37 @@ function getTotalGarageSlots() {
 }
 
 // ========================================================
-// TELEGRAM CLOUD STORAGE ЧАНКИНГ
+// 6. ПРОВЕРКА ДОСТУПА К СИНДИКАТУ (7 УРОВЕНЬ + ЭКИПИРОВКА + 5 ЗВЕЗД)
 // ========================================================
-const CHUNK_SIZE = 3600;
+function checkSyndicateAccessDetails() {
+    const lvl = state.player?.level || 1;
+    const tools = state.player?.tools || {};
+    const stars = state.player?.stars || 0;
+
+    const hasLvl = lvl >= 7;
+    const hasEndoscope = !!tools.endoscope;
+    const hasGauge = !!(tools.gauge || tools.gauge_pro);
+    const hasLaunch = !!tools.obd_launch;
+    const hasStars = stars >= 5;
+
+    const isFullAccess = hasLvl && hasEndoscope && hasGauge && hasLaunch && hasStars;
+
+    return {
+        isFullAccess,
+        hasLvl,
+        hasEndoscope,
+        hasGauge,
+        hasLaunch,
+        hasStars,
+        lvl,
+        stars
+    };
+}
+
+// ========================================================
+// 7. TELEGRAM CLOUD STORAGE ЧАНКИНГ (БЕЗОПАСНЫЙ ЛИМИТ 2048)
+// ========================================================
+const CHUNK_SIZE = 2048;
 
 function prepareStateForCloud() {
     const copy = JSON.parse(JSON.stringify(state));
@@ -381,11 +504,15 @@ function loadFromLocalStorage() {
 
 function applyLoadedState(parsed) {
     if (!parsed) parsed = {};
+    if (parsed.lang) state.lang = parsed.lang;
     if (parsed.player) {
         state.player = { ...DEFAULT_STATE.player, ...parsed.player };
         if (parsed.player.stats) state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
         if (parsed.player.tools) state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
         if (Array.isArray(parsed.player.phoneMessages)) state.player.phoneMessages = parsed.player.phoneMessages;
+        if (Array.isArray(parsed.player.dailyQuests)) state.player.dailyQuests = parsed.player.dailyQuests;
+        if (Array.isArray(parsed.player.bankHistory)) state.player.bankHistory = parsed.player.bankHistory;
+        if (Array.isArray(parsed.player.bankDeposits)) state.player.bankDeposits = parsed.player.bankDeposits;
     }
     if (Array.isArray(parsed.garage)) state.garage = parsed.garage;
     if (Array.isArray(parsed.salesLot)) state.salesLot = parsed.salesLot;
@@ -422,9 +549,13 @@ function sanitizeState() {
     if (typeof state.player.consecutiveRaces !== 'number') state.player.consecutiveRaces = 0;
     if (typeof state.player.maxRacesBeforeRaid !== 'number') state.player.maxRacesBeforeRaid = Math.floor(10 + Math.random() * 5);
     if (typeof state.player.streetCred !== 'number') state.player.streetCred = 100;
+    if (typeof state.player.superSpinTickets !== 'number') state.player.superSpinTickets = 1;
+    if (typeof state.player.lastFreeSuperSpinDay !== 'number') state.player.lastFreeSuperSpinDay = 0;
     if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
     if (!Array.isArray(state.player.furniture)) state.player.furniture = [];
     if (!Array.isArray(state.player.phoneMessages)) state.player.phoneMessages = [];
+    if (!Array.isArray(state.player.bankHistory)) state.player.bankHistory = [];
+    if (!Array.isArray(state.player.bankDeposits)) state.player.bankDeposits = [];
     if (!Array.isArray(state.registeredPlates)) state.registeredPlates = ["В777ВВ 77"];
     if (!Array.isArray(state.p2pMarketListings)) state.p2pMarketListings = [];
     if (typeof state.player.cash !== 'number' || state.player.cash < 0) state.player.cash = 150000;
@@ -432,7 +563,15 @@ function sanitizeState() {
     if (typeof state.player.safeDeposit !== 'number') state.player.safeDeposit = 0;
     if (typeof state.player.fuel !== 'number') state.player.fuel = 100;
     if (typeof state.player.karma !== 'number') state.player.karma = 50;
-    if (!state.player.tools) state.player.tools = { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false };
+    if (typeof state.player.lastRealDayTimestamp !== 'number') state.player.lastRealDayTimestamp = Date.now();
+    
+    if (!state.player.dailyQuests || state.player.dailyQuests.length === 0) {
+        refreshDailyQuestsList();
+    }
+
+    if (!state.player.tools) {
+        state.player.tools = { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false };
+    }
     
     if (state.businesses && typeof BUSINESS_DATA !== 'undefined') {
         state.businesses.forEach(b => {
@@ -451,8 +590,11 @@ function sanitizeState() {
             }
             if (car && car.insurance === undefined) car.insurance = null;
             if (car && car.isPersonal === undefined) car.isPersonal = false;
+            if (car && car.isRegisteredOnPlayer === undefined) car.isRegisteredOnPlayer = true;
+            if (car && car.ownershipDays === undefined) car.ownershipDays = 0;
+            if (car && car.engineTemp === undefined) car.engineTemp = 90;
+            if (car && car.tireWear === undefined) car.tireWear = 100;
 
-            // Автоматическая переоценка всех машин в гараже при загрузке v0.4.5
             if (typeof recalculateCarMarketValue === 'function') {
                 recalculateCarMarketValue(car);
             }
@@ -586,7 +728,125 @@ function importSaveCodeAction() {
 }
 
 // ========================================================
-// UI И РЕСУРСЫ
+// 8. ПРИВЯЗКА К СМЕНЕ СУТОК В РЕАЛЬНОМ ВРЕМЕНИ (ПОЛНОЧЬ 00:00)
+// ========================================================
+function checkRealTimeDayChange() {
+    const now = new Date();
+    const lastDate = new Date(state.player.lastRealDayTimestamp || Date.now());
+
+    const isDifferentDay = (
+        now.getFullYear() !== lastDate.getFullYear() ||
+        now.getMonth() !== lastDate.getMonth() ||
+        now.getDate() !== lastDate.getDate()
+    );
+
+    if (isDifferentDay) {
+        executeDayCycleMidnight(now);
+    }
+}
+
+function executeDayCycleMidnight(currentDateObj) {
+    state.player.day = (state.player.day || 1) + 1;
+    state.player.lastRealDayTimestamp = currentDateObj.getTime();
+    state.player.expressTickets = state.player.maxExpressTickets || 25;
+    state.player.consecutiveRaces = 0;
+
+    // 1. Арендная плата за жилье
+    let curId = state.player?.housingId || 'room';
+    let isOwn = state.player?.ownedHouses?.includes(curId);
+    if (!isOwn && typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
+        const h = HOUSING_LIST.find(item => item.id === curId);
+        let rentVal = h ? (h.rent || 2500) : 2500;
+        state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
+    }
+
+    // 2. Мебель и кураж
+    if (state.player.furniture?.includes('home_ps5')) {
+        state.player.mood = Math.min(100, (state.player.mood || 85) + 25);
+    }
+    let hasPersonal = state.garage?.some(c => c && c.isPersonal);
+    if (hasPersonal) {
+        state.player.mood = Math.min(100, (state.player.mood || 85) + 15);
+    }
+
+    // 3. Иммунитет полиции
+    if (state.player.policeImmunityDays > 0) {
+        state.player.policeImmunityDays -= 1;
+    }
+
+    // 4. Банковский сейф (+3% капитализация)
+    if (state.player.safeDeposit > 0) {
+        let percentEarned = Math.round(state.player.safeDeposit * 0.03);
+        state.player.safeDeposit += percentEarned;
+        spawnFloatingReward(`+${percentEarned.toLocaleString()} ₽ в сейфе`);
+
+        if (state.player.phoneMessages) {
+            state.player.phoneMessages.unshift({
+                id: "sms_bank_" + Date.now(),
+                sender: "💳 Во-Банк Онлайн",
+                avatar: "🏦",
+                preview: `Капитализация сейфа: +${percentEarned.toLocaleString()} ₽!`,
+                time: "00:01",
+                unread: true,
+                chatHistory: [
+                    { from: "them", text: `Начислен ежедневный процент на сейф перекупа: +${percentEarned.toLocaleString()} ₽. Баланс сейфа: ${state.player.safeDeposit.toLocaleString()} ₽.` }
+                ]
+            });
+        }
+    }
+
+    // 5. Банковские вклады
+    if (Array.isArray(state.player.bankDeposits)) {
+        state.player.bankDeposits.forEach(dep => {
+            if (dep.active) {
+                let gain = Math.round(dep.amount * (dep.dailyRate || 0.02));
+                dep.amount += gain;
+            }
+        });
+    }
+
+    // 6. Доход предприятий
+    if (state.businesses) {
+        state.businesses.forEach(b => {
+            if (b && b.level > 0) {
+                if (b.stock > 0) {
+                    b.stock = Math.max(0, b.stock - 20);
+                    let inc = b.income || 0;
+                    b.stored = (b.stored || 0) + (inc * b.level);
+                }
+            }
+        });
+    }
+
+    // 7. Счётчик дней владения машинами (для налога)
+    if (state.garage) {
+        state.garage.forEach(car => {
+            if (car) {
+                car.ownershipDays = (car.ownershipDays || 0) + 1;
+                car.engineTemp = 90;
+            }
+        });
+    }
+
+    // 8. Голод, настроение и сброс дейликов
+    state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
+    state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
+    refreshDailyQuestsList();
+
+    saveState();
+    updateHeaderUI();
+    if (typeof PhoneManager !== 'undefined') {
+        PhoneManager.renderDailyQuestsWidget();
+        PhoneManager.renderBusinessWidget();
+        PhoneManager.updateUnreadBadge();
+    }
+    showToast("Наступил новый календарный день 🌙 Суточные лимиты и начисления обновлены!");
+    playSound('win');
+    tgHaptic('success');
+}
+
+// ========================================================
+// 9. UI И РЕСУРСЫ
 // ========================================================
 function updateHeaderUI() {
     let cash = state.player?.cash || 0;
@@ -777,7 +1037,7 @@ function claimDailyReward() {
 }
 
 // ========================================================
-// МАГАЗИН ПЕРЕКУПА
+// 10. МАГАЗИН ПЕРЕКУПА
 // ========================================================
 function switchShopSection(section) {
     ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
@@ -953,7 +1213,7 @@ function buyHomeFurnitureShop(fId, cost) {
 }
 
 // ========================================================
-// АНАЛИТИКА ПРОФИЛЯ
+// 11. АНАЛИТИКА ПРОФИЛЯ
 // ========================================================
 function renderProfileAnalytics() {
     let s = state.player?.stats || { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
@@ -971,7 +1231,7 @@ function renderProfileAnalytics() {
 }
 
 // ========================================================
-// НАВИГАЦИЯ И ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
+// 12. НАВИГАЦИЯ И ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
 // ========================================================
 function switchTab(tabId) {
     initAudio(); 
@@ -1021,7 +1281,7 @@ function checkAutoShowPatchNotes() {
 }
 
 // ========================================================
-// СВАЙП-ЛИСТЕНЕР РЫНКА
+// 13. СВАЙП-ЛИСТЕНЕР РЫНКА
 // ========================================================
 function initMarketScrollListener() {
     const mainContent = document.querySelector('.main-content');
@@ -1067,12 +1327,14 @@ function initMarketScrollListener() {
 }
 
 // ========================================================
-// ИНИЦИАЛИЗАЦИЯ И ТАЙМЕРЫ
+// 14. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ
 // ========================================================
 function initApp() {
     initTelegramAuthAndStorage(() => {
         updateHeaderUI();
         updateLevelGatesUI();
+        applyLanguageToDOM();
+        checkRealTimeDayChange();
         
         if (!state.marketFeed || state.marketFeed.length === 0) {
             if (typeof populateMarketFeed === 'function') populateMarketFeed();
@@ -1106,7 +1368,12 @@ setInterval(() => {
     gameCycleSeconds++;
     let lotChanged = false;
 
-    // 1. ФОНОВЫЙ ТАЙМЕР БИЗНЕСА И РАСХОДА СЫРЬЯ (каждые 30 секунд)
+    // 0. Ежеминутная проверка наступления реальной полуночи 00:00
+    if (gameCycleSeconds % 60 === 0) {
+        checkRealTimeDayChange();
+    }
+
+    // 1. Фоновый цикл бизнеса и расхода сырья (каждые 30 секунд)
     if (gameCycleSeconds % 30 === 0 && state.businesses) {
         let bizUpdated = false;
         state.businesses.forEach(b => {
@@ -1125,14 +1392,23 @@ setInterval(() => {
         }
     }
 
-    // 2. РАСХОД ГОЛОДА И НАСТРОЕНИЯ (каждые 45 секунд)
+    // 2. Расход голода и настроения (каждые 45 секунд)
     if (gameCycleSeconds % 45 === 0 && state.player) {
         state.player.hunger = Math.max(0, (state.player.hunger || 80) - 1);
         state.player.mood = Math.max(0, (state.player.mood || 85) - 1);
         updateHeaderUI();
     }
 
-    // 3. ОБРАБОТКА ТАЙМЕРОВ ПЛОЩАДКИ ПРОДАЖ
+    // 3. Остывание двигателей в гараже после драга/дрифта
+    if (gameCycleSeconds % 10 === 0 && state.garage) {
+        state.garage.forEach(car => {
+            if (car && car.engineTemp && car.engineTemp > 90) {
+                car.engineTemp = Math.max(90, car.engineTemp - 5);
+            }
+        });
+    }
+
+    // 4. Обработка площадки продаж
     if (state.salesLot && state.salesLot.length > 0) {
         for (let i = 0; i < state.salesLot.length; i++) {
             let slot = state.salesLot[i];
@@ -1177,7 +1453,7 @@ setInterval(() => {
                     slot.maxTimer = t;
                     slot.timer = t;
                     lotChanged = true;
-                    showToast("🚶‍♂️ Клиент не дождался вас и ушел. Слот ищет следующего...");
+                    showToast("🚶‍♂️ Клиент не дождался вас и ушел. Площадка ищет следующего...");
                 }
             }
         }
