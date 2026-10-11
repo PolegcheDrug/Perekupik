@@ -1,8 +1,8 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ФОНОВЫЕ ПУШИ (v0.4.5)
-// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
-// Проверка криминала (угон / перебитый VIN / 12.5.1),
-// расчет налога 13% при быстрой продаже и трекинг заданий
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ЧЕСТНЫЙ ТОРГ (v0.4.6)
+// Разработчики: Tak Toje, Max, Sergo, gemini
+// Честная реакция покупателей без ложных обвинений в обмане,
+// право отказаться от подписания ДКП, налог 13% при быстрой продаже
 // ========================================================
 
 const BUYERS_CATALOG = {
@@ -127,7 +127,7 @@ function renderSalesLot() {
                 <div class='flex-between mb-1'>
                     <div class='flex-gap' style='align-items:center;'>
                         <span style='font-size:20px;'>${buyer.avatar}</span>
-                        <div><b class='text-xs color-green'>${buyer.name}</b><div class='sub-label' style='font-size:9px;'>Осматривает авто у капота</div></div>
+                        <div><b class='text-xs color-green' style='font-size:11px;'>${buyer.name}</b><div class='sub-label' style='font-size:9px;'>Осматривает авто у капота</div></div>
                     </div>
                     <span class='tag-badge bg-tag-amber' id='lot_buyer_timer_${idx}'>⏳ ${timeLeft}с</span>
                 </div>
@@ -250,7 +250,7 @@ function sendBackgroundNotification(title, body) {
 
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-        document.title = "Симулятор Перекупа v0.4.5";
+        document.title = "Симулятор Перекупа v0.4.6";
     }
 });
 
@@ -306,7 +306,7 @@ function cancelSalesLot(idx) {
 }
 
 // ========================================================
-// ЛОГИКА ТОРГА С ПРОВЕРКОЙ КРИМИНАЛА (УГОН, 12.5.1, ОБМАН)
+// ЛОГИКА ТОРГА С ПРОВЕРКОЙ ЧЕСТНОСТИ
 // ========================================================
 let activeHaggleLotIndex = null;
 let currentSaleBuyer = null;
@@ -359,6 +359,23 @@ function openSaleHaggleModal(idx) {
     playSound('tick');
 }
 
+function rejectBuyerHaggle() {
+    if (activeHaggleLotIndex === null) return;
+    const slot = state.salesLot[activeHaggleLotIndex];
+    if (!slot) return;
+
+    dealIsAborted = true;
+    closeModal("modalHaggleSale");
+    slot.currentBuyer = null;
+    slot.maxTimer = calculateLotWaitTime();
+    slot.timer = slot.maxTimer;
+    saveState();
+    renderSalesLot();
+    updateHeaderUI();
+    playSound('tick');
+    showToast("Вы отказали клиенту: «Не сошлись по цене». Площадка ищет следующего!");
+}
+
 function attemptHaggleSale(type) {
     if (dealIsAborted || activeHaggleLotIndex === null || !currentSaleBuyer) return;
     
@@ -367,62 +384,69 @@ function attemptHaggleSale(type) {
     const car = slot.car;
     const thread = document.getElementById("saleHaggleChatThread");
 
-    // 1. ПРОВЕРКА НА КРИМИНАЛ (УГОН, 12.5.1, СКРУТКА, ПРИСАДКА)
+    // 1. ПРОВЕРКА НА КРИМИНАЛ (УГОН, 12.5.1)
     let isCriminal = car.isStolen || car.unregistered;
-    let isDeceitful = car.rolledOdometer || car.hasAdditive || (car.hiddenDefect && !car.hasAdditive) || isCriminal;
-    
-    if (isDeceitful) {
+    if (isCriminal) {
         let bustRoll = Math.random();
         if (bustRoll < currentSaleBuyer.meticulous) {
             dealIsAborted = true;
-
             const modalButtons = document.querySelectorAll('#modalHaggleSale button');
             modalButtons.forEach(b => { 
                 b.disabled = true;
                 b.style.pointerEvents = 'none';
             });
 
-            // Если криминал (угон или 12.5.1) -> Вызов полиции и конфискация
-            if (isCriminal) {
-                let crimReason = car.isStolen ? "перебитый VIN и розыск в базе МВД!" : "аннулированный учёт по ст. 12.5.1!";
-                if (thread) {
-                    thread.innerHTML += `
-                        <div class="chat-msg msg-player">«Брат, документы в полном порядке, мамой клянусь!»</div>
-                        <div class="chat-msg msg-seller" style="background:#3b050d; border-color:var(--red);">
-                            «Ты кого вздумал обмануть?! Я пробил базы: тут ${crimReason} Я вызываю наряд полиции!»
-                        </div>`;
-                    thread.scrollTop = thread.scrollHeight;
-                }
-
-                tgHaptic('error');
-                playSound('error');
-
-                setTimeout(() => {
-                    closeModal("modalHaggleSale");
-                    state.salesLot.splice(activeHaggleLotIndex, 1);
-                    
-                    let fine = 45000;
-                    state.player.cash = Math.max(0, (state.player.cash || 0) - fine);
-                    state.player.karma = Math.max(0, (state.player.karma || 50) - 30);
-                    state.player.mood = Math.max(0, (state.player.mood || 80) - 35);
-                    
-                    saveState();
-                    renderSalesLot();
-                    updateHeaderUI();
-                    
-                    openVerdictModal(
-                        "ПОЛИЦЕЙСКАЯ ОБЛАВА НА ПЛОЩАДКЕ! 🚨",
-                        `Клиент вызвал наряд ДПС из-за криминального прошлого авто (${crimReason}). Автомобиль конфискован на спецстоянку!\nШтраф: -${fine.toLocaleString()} ₽ | Карма: -30`,
-                        false
-                    );
-                }, 1900);
-                return;
+            let crimReason = car.isStolen ? "перебитый VIN и розыск в базе МВД!" : "аннулированный учёт по ст. 12.5.1!";
+            if (thread) {
+                thread.innerHTML += `
+                    <div class="chat-msg msg-player">«Документы чистые, брат, забирай!»</div>
+                    <div class="chat-msg msg-seller" style="background:#3b050d; border-color:var(--red);">
+                        «Ты кого вздумал обмануть?! Я пробил базы: тут ${crimReason} Я вызываю наряд полиции!»
+                    </div>`;
+                thread.scrollTop = thread.scrollHeight;
             }
 
-            // Бытовой обман (одометр, присадка, дефект)
+            tgHaptic('error');
+            playSound('error');
+
+            setTimeout(() => {
+                closeModal("modalHaggleSale");
+                state.salesLot.splice(activeHaggleLotIndex, 1);
+                
+                let fine = 45000;
+                state.player.cash = Math.max(0, (state.player.cash || 0) - fine);
+                state.player.karma = Math.max(0, (state.player.karma || 50) - 25);
+                state.player.mood = Math.max(0, (state.player.mood || 80) - 30);
+                
+                saveState();
+                renderSalesLot();
+                updateHeaderUI();
+                
+                openVerdictModal(
+                    "ПОЛИЦЕЙСКАЯ ОБЛАВА НА ПЛОЩАДКЕ! 🚨",
+                    `Клиент вызвал наряд ДПС из-за криминального прошлого авто (${crimReason}). Автомобиль конфискован на спецстоянку!\nШтраф: -${fine.toLocaleString()} ₽ | Карма: -25`,
+                    false
+                );
+            }, 1900);
+            return;
+        }
+    }
+
+    // 2. ПРОВЕРКА НА УМЫШЛЕННЫЙ ОБМАН ИГРОКА (ТОЛЬКО ЕСЛИ САМ СКРУТИЛ ИЛИ ЗАЛИЛ ПРИСАДКУ)
+    let isIntentionalScam = !!car.rolledOdometer || !!car.hasAdditive;
+    if (isIntentionalScam) {
+        let scamRoll = Math.random();
+        if (scamRoll < currentSaleBuyer.meticulous) {
+            dealIsAborted = true;
+            const modalButtons = document.querySelectorAll('#modalHaggleSale button');
+            modalButtons.forEach(b => { 
+                b.disabled = true;
+                b.style.pointerEvents = 'none';
+            });
+
             let scamReason = car.rolledOdometer
                 ? "скрученный пробег!"
-                : (car.hasAdditive ? "залитую загущающую присадку в мотор!" : "скрытый дефект агрегатов!");
+                : "залитую загущающую присадку в мотор!";
 
             if (thread) {
                 thread.innerHTML += `
@@ -433,7 +457,7 @@ function attemptHaggleSale(type) {
                 thread.scrollTop = thread.scrollHeight;
             }
 
-            let karmaLoss = 20;
+            let karmaLoss = 15;
             state.player.karma = Math.max(0, (state.player.karma || 50) - karmaLoss);
             saveState();
             updateHeaderUI();
@@ -457,7 +481,28 @@ function attemptHaggleSale(type) {
         }
     }
 
-    // 2. ПРОВЕРКА ЛИМИТА ТОРГА
+    // 3. ЕСТЕСТВЕННЫЙ ИЗНОС (НЕ СЧИТАЕТСЯ ОБМАНОМ — ПОКУПАТЕЛЬ ПРОСТО СБИВАЕТ ЦЕНУ НА РЕМОНТ)
+    if (car.hiddenDefect && !car.hasAdditive) {
+        if (Math.random() < 0.40) {
+            let repairDiscount = Math.round((car.hiddenDefect.cost || 15000) * 0.85);
+            currentSaleBuyer.offerPrice = Math.max(10000, currentSaleBuyer.offerPrice - repairDiscount);
+            setTxt("saleBuyerOfferVal", currentSaleBuyer.offerPrice.toLocaleString() + " ₽");
+
+            if (thread) {
+                thread.innerHTML += `
+                    <div class="chat-msg msg-seller">
+                        «Слушай, я прислушался к мотору: тут явно проблема (${car.hiddenDefect.text}). Либо скидываешь ${repairDiscount.toLocaleString()} ₽ на сервис, либо я пошёл.»
+                    </div>`;
+                thread.scrollTop = thread.scrollHeight;
+            }
+            tgHaptic('warning');
+            playSound('tick');
+            showToast("Покупатель заметил стук мотора и сбил цену на ремонт!");
+            return;
+        }
+    }
+
+    // 4. ПРОВЕРКА ЛИМИТА ТОРГА
     if (currentSaleBuyer.successfulHagglesCount >= currentSaleBuyer.maxAllowedHaggles) {
         if (thread) {
             thread.innerHTML += `
@@ -469,7 +514,7 @@ function attemptHaggleSale(type) {
         return;
     }
 
-    // 3. БАЗОВЫЙ РАСЧЁТ
+    // 5. БАЗОВЫЙ РАСЧЁТ ТОРГА
     let baseSuccess = type === 'safe' ? 0.80 : 0.40;
     let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
@@ -513,7 +558,7 @@ function attemptHaggleSale(type) {
         playSound('win');
         tgHaptic('success');
     } else {
-        let damage = type === 'safe' ? Math.floor(20 + Math.random() * 15) : Math.floor(40 + Math.random() * 25);
+        let damage = type === 'safe' ? Math.floor(18 + Math.random() * 12) : Math.floor(35 + Math.random() * 20);
         currentSaleBuyer.patience = Math.max(0, currentSaleBuyer.patience - damage);
         
         if (type === 'firm' && Math.random() < 0.35) {
@@ -556,7 +601,7 @@ function attemptHaggleSale(type) {
                 saveState();
                 renderSalesLot();
                 updateHeaderUI();
-                openVerdictModal("ПОКУПАТЕЛЬ УШЁЛ 🚶‍♂️", "Из-за излишней наглости в торгах покупатель развернулся и ушел. Площадка ищет следующего клиента.", false);
+                openVerdictModal("ПОКУПАТЕЛЬ УШЁЛ 🚶‍♂️", "Покупатель устал от долгих споров и развернулся. Площадка ищет следующего клиента.", false);
             }, 1200);
         }
     }
@@ -664,15 +709,31 @@ function openDKPModal(dealData) {
 
     const btnSign = document.getElementById('btnSignDKP');
     const btnClose = document.getElementById('btnCloseDKP');
+    const btnAbort = document.getElementById('btnAbortDKP');
+
     if (btnSign) {
         btnSign.style.display = 'block';
         btnSign.innerText = dealData.type === 'buy' ? "✍️ Подписать ДКП и выкупить ТС" : "✍️ Подписать ДКП и забрать деньги";
+    }
+    if (btnAbort) {
+        btnAbort.style.display = 'block';
     }
     if (btnClose) btnClose.style.display = 'none';
 
     const modal = document.getElementById('modalDKP');
     if (modal) modal.classList.add('active');
     playSound('tick');
+}
+
+function abortDKPDeal() {
+    if (dkpAutoCloseTimer) {
+        clearInterval(dkpAutoCloseTimer);
+        dkpAutoCloseTimer = null;
+    }
+    closeModal('modalDKP');
+    activePendingDKPDeal = null;
+    playSound('tick');
+    showToast("Сделка расторгнута. Автомобиль остался у вас!");
 }
 
 function confirmSignDKP() {
@@ -687,8 +748,11 @@ function confirmSignDKP() {
     tgHaptic('success');
 
     const btnSign = document.getElementById('btnSignDKP');
+    const btnAbort = document.getElementById('btnAbortDKP');
     const btnClose = document.getElementById('btnCloseDKP');
+
     if (btnSign) btnSign.style.display = 'none';
+    if (btnAbort) btnAbort.style.display = 'none';
     if (btnClose) {
         btnClose.style.display = 'block';
         btnClose.innerText = "Готово (автозакрытие через 5с...)";
@@ -778,8 +842,10 @@ window.useExpressTicket = useExpressTicket;
 window.upgradeExpressCapacity = upgradeExpressCapacity;
 window.cancelSalesLot = cancelSalesLot;
 window.openSaleHaggleModal = openSaleHaggleModal;
+window.rejectBuyerHaggle = rejectBuyerHaggle;
 window.attemptHaggleSale = attemptHaggleSale;
 window.acceptBuyerOffer = acceptBuyerOffer;
 window.openDKPModal = openDKPModal;
+window.abortDKPDeal = abortDKPDeal;
 window.confirmSignDKP = confirmSignDKP;
 window.confirmSaleFromHaggleModal = confirmSaleFromHaggleModal;

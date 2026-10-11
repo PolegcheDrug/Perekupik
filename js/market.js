@@ -1,8 +1,8 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.4.5)
-// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
-// Устранение бага зависания толщиномера ЛКП, диалог выбора
-// «Учёт РФ в МРЭО vs Перепродажа по ДКП», трекинг заданий
+// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.4.6)
+// Разработчики: Tak Toje, Max, Sergo, gemini
+// Учёт износа толщиномера ЛКП, честный диалог торга у капота,
+// оформление «МРЭО vs ДКП», трекинг заданий
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -266,7 +266,16 @@ function populateMarketFeed() {
         let defectObj = null;
         if (hasHiddenDefect && typeof OBD_ERRORS !== 'undefined') {
             const errItem = OBD_ERRORS[Math.floor(Math.random() * OBD_ERRORS.length)];
-            defectObj = { text: errItem.text, cost: errItem.cost };
+            defectObj = { 
+                code: errItem.code || "P0300",
+                system: errItem.system || "ДВС",
+                text: errItem.text, 
+                cost: errItem.cost,
+                severity: errItem.severity || "Средняя",
+                rpm: errItem.rpm || 850,
+                temp: errItem.temp || 92,
+                boost: errItem.boost || 0.0
+            };
         }
 
         let sNote = "Машина в порядке, сел и поехал.";
@@ -481,7 +490,14 @@ function quickOBDScanMarketCar(carId) {
         state.player.cash -= 5000;
         showToast("Выездной мастер подключил сканер (-5,000 ₽)");
     } else {
-        showToast("Подключен ваш собственный диагностический сканер ✓");
+        let toolKey = state.player?.tools?.obd_launch ? 'obd_launch' : 'obd';
+        let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 50;
+        if (wear <= 0) {
+            showToast("⚠️ Сканер разряжен! Зарядите прибор в Маркете.");
+        } else {
+            state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
+            showToast(`Диагностика собственным сканером (Остаток заряда: ${state.player.toolsWear[toolKey]}) ✓`);
+        }
     }
 
     car.stoChecked = true;
@@ -495,7 +511,7 @@ function quickOBDScanMarketCar(carId) {
 
     if (car.hiddenDefect) {
         let costStr = car.hiddenDefect.cost ? car.hiddenDefect.cost.toLocaleString() : "10 000";
-        openVerdictModal("ОШИБКИ В ЭБУ! ⚠️", "Сканер считал неисправность: " + car.hiddenDefect.text + ". Затраты на ремонт: ~" + costStr + " ₽. Используйте это в торгах!", false);
+        openVerdictModal("ОШИБКИ В ЭБУ! ⚠️", `Код: ${car.hiddenDefect.code || 'P0300'} — ${car.hiddenDefect.text}. Затраты на ремонт: ~${costStr} ₽. Сбивайте цену у продавца!`, false);
     } else {
         let eng = car.wear?.engine ? Math.round(car.wear.engine) : 90;
         let trans = car.wear?.transmission ? Math.round(car.wear.transmission) : 90;
@@ -656,7 +672,7 @@ function renderMarketHaggleControls() {
     if (car.stoChecked && car.hiddenDefect) {
         inspectionBonusBtn = `
         <button onclick="attemptDefectArgueHaggle()" class="btn btn-purple btn-sm w-full mb-2">
-            🔍 Ткнуть в ошибку ЭБУ: «${car.hiddenDefect.text.slice(0, 32)}...» (-10%)
+            🔍 Ткнуть в ошибку ${car.hiddenDefect.code || 'DTC'}: «${car.hiddenDefect.text.slice(0, 32)}...» (-10%)
         </button>`;
     } else if (car.gaugeChecked && (car.bodyThickness.doors > 200 || car.bodyThickness.hood > 200)) {
         inspectionBonusBtn = `
@@ -921,7 +937,7 @@ function finishMarketCarBuyProcess(deal) {
 }
 
 // ----------------------------------------------------
-// ТОЛЩИНОМЕР ЛКП (ИСПРАВЛЕННЫЙ ВЫХОД БЕЗ ЗАВИСАНИЙ)
+// ТОЛЩИНОМЕР ЛКП: УЧЁТ ИЗНОСА И КАЛИБРОВКИ
 // ----------------------------------------------------
 function openGaugeModal(carId) { 
     activeInspectCarId = carId;
@@ -938,7 +954,16 @@ function openGaugeModal(carId) {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
         if (cash < 3000) return showToast("Купите толщиномер в Маркете или отдайте 3,000 ₽ за выездной замер!");
         state.player.cash -= 3000;
-        showToast("Услуга замера оплачена: -3,000 ₽");
+        showToast("Услуга выездного замера оплачена: -3,000 ₽");
+    } else {
+        let toolKey = state.player?.tools?.gauge_pro ? 'gauge_pro' : 'gauge';
+        let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 60;
+        if (wear <= 0) {
+            showToast("⚠️ Толщиномер разряжен/раскалиброван! Обслужите в Маркете.");
+        } else {
+            state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
+            showToast(`Замер прибором (Остаток калибровки: ${state.player.toolsWear[toolKey]}) ✓`);
+        }
     }
 
     ['hood', 'roof', 'doors', 'wings'].forEach(part => {

@@ -1,39 +1,39 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.4.5)
-// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.4.6)
+// Разработчики: Tak Toje, Max, Sergo, gemini
 // Полный каталог автотехники, тюнинга, недвижимости,
-// бизнеса, товаров маркета и алгоритм оценки номеров.
+// бизнеса, товаров маркета, износа оборудования и алгоритм оценки номеров.
 // ========================================================
 
 const GAME_METADATA = {
-    version: "v0.4.5",
-    build: 155,
-    authors: "Илья Чепиль (DXF) & Perekup Dev Team",
+    version: "v0.4.6",
+    build: 160,
+    authors: "Tak Toje, Max, Sergo, gemini",
     releaseDate: "2026-10-11",
     patchNotes: [
         {
-            title: "🏷️ Динамическая стоимость госномеров",
-            text: "Рыночная стоимость автомобиля мгновенно пересчитывается при установке архивных, красивых и спецсерийных госномеров (777, ЕКХ, АМР, зеркалки, три одинаковые буквы)."
+            title: "💰 Комбинированная экономика (₽ + ⭐ Stars)",
+            text: "Для приобретения ключевой недвижимости, бизнеса, лицензий и премиальных услуг теперь требуется одновременная оплата в рублях и звёздах."
         },
         {
-            title: "🤝 Учёт на себя vs Перепродажа по ДКП",
-            text: "Выбор между чистым учётом РФ в МРЭО (с удержанием 13% НДФЛ при быстрой продаже) и режимом перекупа на ДКП (без налогов, но с риском штрафа за 10 дней)."
+            title: "🛠️ Износ и калибровка оборудования",
+            text: "Толщиномеры, OBD2 сканеры и видеоэндоскопы теперь имеют длительный ресурс работы. Требуется калибровка и замена батарей."
         },
         {
-            title: "🕵️‍♂️ Доступ к Синдикату с 7 уровня",
-            text: "Требуется уровень 7+, наличие видеоэндоскопа, любого толщиномера, сканера Launch и не менее 5 Stars ⭐ на балансе."
+            title: "📑 Право отказаться от ДКП",
+            text: "В бланке договора купли-продажи появилась возможность разорвать сделку и отказаться от продажи, если условия не устроили."
         },
         {
-            title: "🎰 Ребаланс Супер Вилспина",
-            text: "Супер Вилспин получил 1 бесплатное вращение в реальные сутки (сброс в 00:00). Сбалансирован призовой фонд."
+            title: "🧠 Новый интерактивный сканер ЭБУ",
+            text: "Полностью переработан интерфейс диагностики: чтение блоков DTC, статус датчиков, Freeze Frame и честное устранение поломок."
         },
         {
-            title: "🏎️ Антифарм и износ в Стрите",
-            text: "Введены нагрев ДВС, износ резины Toyo и сцепления с кулдауном на остывание."
+            title: "🤝 Честный торг у капота",
+            text: "Покупатели больше не обвиняют в мухлеже за заводской износ авто, если вы лично не скрывали пробег и не заливали присадки."
         },
         {
-            title: "🕒 Переход на реальное время",
-            text: "Календарный цикл, начисление капитализации депозитов в банке и сброс дейликов привязаны к реальной полночи 00:00."
+            title: "🏎️ Стабильный выбор авто в гонках",
+            text: "Личный автомобиль теперь автоматически и бесшовно синхронизируется с заездами Street Underground."
         }
     ]
 };
@@ -294,7 +294,7 @@ const CAR_DATABASE = {
         { name: "Mercedes E-Class (W213)", power: 197, basePrice: 3800000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/w213.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
         { name: "Audi A6 (C8)", power: 245, basePrice: 4000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/a6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
         { name: "BMW X7", power: 340, basePrice: 8800000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/bmwx7.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Mercedes C63s AMG", power: 510, basePrice: 5200000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/mercedes_c_с63_w205_sedan.jpeg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes C63s AMG", power: 510, basePrice: 5200000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/mercedes_c_c63_w205_sedan.jpeg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
         { name: "BMW M340i", power: 387, basePrice: 4800000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/bmw_m_340i.jpeg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
         { name: "Lexus RX 350", power: 300, basePrice: 5500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/rx350.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
         { name: "Porsche Macan S", power: 354, basePrice: 6500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/macan.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
@@ -357,71 +357,71 @@ const CAR_DATABASE = {
 };
 
 // ========================================================
-// 5. НЕДВИЖИМОСТЬ
+// 5. НЕДВИЖИМОСТЬ С КОМБИНИРОВАННОЙ ОПЛАТОЙ (₽ + ⭐)
 // ========================================================
 const HOUSING_LIST = [
     { 
-        id: 'trailer', name: 'Бытовка на стройплощадке', rent: 800, buyPrice: 450000, slots: 0, moodBonus: -5, minLevel: 1, 
+        id: 'trailer', name: 'Бытовка на стройплощадке', rent: 800, buyPrice: 450000, reqStars: 5, slots: 0, moodBonus: -5, minLevel: 1, 
         desc: 'Временный вагончик. Сквозняки, запах мазута, но крыша над головой.', 
         img: 'assets/houses/trailer.jpg',
         fallback: 'https://images.unsplash.com/photo-1590725140246-201552a488c9?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'room', name: 'Комната в общежитии', rent: 2500, buyPrice: 1800000, slots: 1, moodBonus: 5, minLevel: 2, 
+        id: 'room', name: 'Комната в общежитии', rent: 2500, buyPrice: 1800000, reqStars: 10, slots: 1, moodBonus: 5, minLevel: 2, 
         desc: 'Угол в спальном районе. Одно парковочное место под окном во дворе.', 
         img: 'assets/houses/room.jpg',
         fallback: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'khrusch', name: 'Убитая "Хрущевка"', rent: 15000, buyPrice: 4500000, slots: 1, moodBonus: 10, minLevel: 6, 
+        id: 'khrusch', name: 'Убитая "Хрущевка"', rent: 15000, buyPrice: 4500000, reqStars: 15, slots: 1, moodBonus: 10, minLevel: 6, 
         desc: 'Бабушкин ремонт, старый паркет, зато своя кухня.', 
         img: 'assets/houses/khrusch.jpg',
         fallback: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'garage', name: 'Кирпичный гараж с ямой', rent: 18000, buyPrice: 3000000, slots: 3, moodBonus: 12, minLevel: 10, 
+        id: 'garage', name: 'Кирпичный гараж с ямой', rent: 18000, buyPrice: 3000000, reqStars: 20, slots: 3, moodBonus: 12, minLevel: 10, 
         desc: 'Капитальный бокс с верстаком, печкой и смотровой ямой.', 
         img: 'assets/houses/garage.jpg',
         fallback: 'https://images.unsplash.com/photo-1616423640778-28d1b53229bd?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'dvushka', name: 'Двушка в спальном районе', rent: 25000, buyPrice: 8500000, slots: 2, moodBonus: 15, minLevel: 15, 
+        id: 'dvushka', name: 'Двушка в спальном районе', rent: 25000, buyPrice: 8500000, reqStars: 25, slots: 2, moodBonus: 15, minLevel: 15, 
         desc: 'Хороший кирпичный дом, стеклопакеты и парковка во дворе.', 
         img: 'assets/houses/dvushka.jpg',
         fallback: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'euro_treshka', name: 'Евро-трешка (Новостройка)', rent: 45000, buyPrice: 15000000, slots: 3, moodBonus: 25, minLevel: 22, 
+        id: 'euro_treshka', name: 'Евро-трешка (Новостройка)', rent: 45000, buyPrice: 15000000, reqStars: 35, slots: 3, moodBonus: 25, minLevel: 22, 
         desc: 'Свежий ремонт, закрытый двор без машин и консьерж.', 
         img: 'assets/houses/treshka.jpg',
         fallback: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'cottage', name: 'Коттедж за городом', rent: 65000, buyPrice: 22000000, slots: 6, moodBonus: 30, minLevel: 30, 
+        id: 'cottage', name: 'Коттедж за городом', rent: 65000, buyPrice: 22000000, reqStars: 50, slots: 6, moodBonus: 30, minLevel: 30, 
         desc: 'Собственный участок, просторный гараж и мангальная зона.', 
         img: 'assets/houses/cottage.jpg',
         fallback: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'loft', name: 'Дизайнерский Лофт в центре', rent: 80000, buyPrice: 35000000, slots: 4, moodBonus: 35, minLevel: 45, 
+        id: 'loft', name: 'Дизайнерский Лофт в центре', rent: 80000, buyPrice: 35000000, reqStars: 70, slots: 4, moodBonus: 35, minLevel: 45, 
         desc: 'Красный кирпич, панорамные окна и вид на набережную.', 
         img: 'assets/houses/loft.jpg',
         fallback: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'penthouse', name: 'Пентхаус в Москва-Сити', rent: 250000, buyPrice: 140000000, slots: 6, moodBonus: 50, minLevel: 65, 
+        id: 'penthouse', name: 'Пентхаус в Москва-Сити', rent: 250000, buyPrice: 140000000, reqStars: 100, slots: 6, moodBonus: 50, minLevel: 65, 
         desc: 'Панорамный вид с 65 этажа и доступ в подземный VIP-паркинг.', 
         img: 'assets/houses/penthouse.jpg',
         fallback: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'villa', name: 'Особняк на Рублёвке', rent: 600000, buyPrice: 450000000, slots: 15, moodBonus: 80, minLevel: 85, 
+        id: 'villa', name: 'Особняк на Рублёвке', rent: 600000, buyPrice: 450000000, reqStars: 150, slots: 15, moodBonus: 80, minLevel: 85, 
         desc: 'Гектар сосен, вертолетная площадка и гаражный комплекс.', 
         img: 'assets/houses/villa.jpg',
         fallback: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'island', name: 'Частный остров с виллой', rent: 2000000, buyPrice: 1500000000, slots: 30, moodBonus: 100, minLevel: 100, 
+        id: 'island', name: 'Частный остров с виллой', rent: 2000000, buyPrice: 1500000000, reqStars: 300, slots: 30, moodBonus: 100, minLevel: 100, 
         desc: 'Абсолютная автономия, личный пирс для яхт и ангар для спорткаров.', 
         img: 'assets/houses/island.jpg',
         fallback: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'
@@ -429,41 +429,41 @@ const HOUSING_LIST = [
 ];
 
 // ========================================================
-// 6. ПРЕДПРИЯТИЯ И БИЗНЕС
+// 6. ПРЕДПРИЯТИЯ И БИЗНЕС С КОМБИНИРОВАННОЙ ОПЛАТОЙ (₽ + ⭐)
 // ========================================================
 const BUSINESS_DATA = [
     { 
-        id: 'wash', name: 'Автомойка 24/7', minLevel: 5, income: 900, level: 0, cost: 90000, stored: 0, stock: 100, 
+        id: 'wash', name: 'Автомойка 24/7', minLevel: 5, income: 900, level: 0, cost: 90000, reqStars: 5, stored: 0, stock: 100, 
         perk: 'Скидка 50% на полировку и химчистку', 
         img: 'assets/business/wash.jpg',
         fallback: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 8, income: 1500, level: 0, cost: 150000, stored: 0, stock: 100, 
+        id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 8, income: 1500, level: 0, cost: 150000, reqStars: 10, stored: 0, stock: 100, 
         perk: '+10% к стоимости авто на правильных дисках', 
         img: 'assets/business/shina.jpg',
         fallback: 'https://images.unsplash.com/photo-1578844251758-2f71da64c96f?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'sto', name: 'СТО дяди Вани', minLevel: 12, income: 2200, level: 0, cost: 300000, stored: 0, stock: 100, 
+        id: 'sto', name: 'СТО дяди Вани', minLevel: 12, income: 2200, level: 0, cost: 300000, reqStars: 15, stored: 0, stock: 100, 
         perk: 'Скидка 40% на ремонт мотора', 
         img: 'assets/business/sto.jpg',
         fallback: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'detailing', name: 'Детейлинг Студия', minLevel: 20, income: 6500, level: 0, cost: 950000, stored: 0, stock: 100, 
+        id: 'detailing', name: 'Детейлинг Студия', minLevel: 20, income: 6500, level: 0, cost: 950000, reqStars: 25, stored: 0, stock: 100, 
         perk: '+35% к баллам на Автошоу', 
         img: 'assets/business/detailing.jpg',
         fallback: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 8000, level: 0, cost: 1200000, stored: 0, stock: 100, 
+        id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 8000, level: 0, cost: 1200000, reqStars: 30, stored: 0, stock: 100, 
         perk: 'Детали на ремонт обходятся дешевле на 30%', 
         img: 'assets/business/razborka.jpg',
         fallback: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?auto=format&fit=crop&w=600&q=80'
     },
     { 
-        id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, stored: 0, stock: 100, 
+        id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, reqStars: 50, stored: 0, stock: 100, 
         perk: 'Пассивный доход и +1 🤝 связь каждый день', 
         img: 'assets/business/taxi.jpg',
         fallback: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80'
@@ -475,28 +475,28 @@ const BUSINESS_DATA = [
 // ========================================================
 const BARN_TIERS_CONFIG = [
     { 
-        tier: 1, reqLvl: 1, cost: 35000, title: "🏚️ Сарай в СНТ «Заря»", 
+        tier: 1, reqLvl: 1, cost: 35000, reqStars: 2, title: "🏚️ Сарай в СНТ «Заря»", 
         desc: "Дачный кооператив. Старый деревянный сарай среди яблонь. Советская классика.", 
         classGrade: "barn-grade-1", rareIdx: 0,
         img: "assets/barns/barn_tier1.jpg",
         fallback: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80"
     },
     { 
-        tier: 2, reqLvl: 7, cost: 120000, title: "🏢 Заброшенный бокс ГСК-4", 
+        tier: 2, reqLvl: 7, cost: 120000, reqStars: 5, title: "🏢 Заброшенный бокс ГСК-4", 
         desc: "Кооператив возле промзоны. Ржавые ворота, но сухой бетон внутри.", 
         classGrade: "barn-grade-2", rareIdx: 1,
         img: "assets/barns/barn_tier2.jpg",
         fallback: "https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?auto=format&fit=crop&w=600&q=80"
     },
     { 
-        tier: 3, reqLvl: 15, cost: 350000, title: "🏭 Ангар механического завода", 
+        tier: 3, reqLvl: 15, cost: 350000, reqStars: 10, title: "🏭 Ангар механического завода", 
         desc: "Закрытый цех советского завода. Высокие потолки, пыльные чехлы и JDM янгтаймеры.", 
         classGrade: "barn-grade-3", rareIdx: 2,
         img: "assets/barns/barn_tier3.jpg",
         fallback: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=600&q=80"
     },
     { 
-        tier: 4, reqLvl: 25, cost: 850000, title: "🏛️ Подземный коллекционный бункер", 
+        tier: 4, reqLvl: 25, cost: 850000, reqStars: 20, title: "🏛️ Подземный коллекционный бункер", 
         desc: "Опечатанный подземный паркинг обанкротившегося банка. Настоящая сокровищница!", 
         classGrade: "barn-grade-4", rareIdx: 4,
         img: "assets/barns/barn_tier4.jpg",
@@ -508,89 +508,14 @@ const BARN_FINDS = [
     { name: "ВАЗ-2101 «Копейка» (Дрифт-Спек)", power: 160, type: 'economy', basePrice: 850000, marketValue: 1250000, img: "assets/cars/barn/vaz2101_drift.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
     { name: "BMW E30 Coupe", power: 170, type: 'comfort', basePrice: 650000, marketValue: 1300000, img: "assets/cars/barn/e30.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
     { name: "Nissan Silvia S13", power: 200, type: 'comfort', basePrice: 900000, marketValue: 1800000, img: "assets/cars/barn/silvia.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-    { name: "VW Golf VI GTI (Stage 2 Project)", power: 280, type: 'comfort', basePrice: 1100000, marketValue: 1900000, img: "assets/cars/barn/golf6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+    { name: "VW Golf VI GTI (Stage 2 Project)", power: 280, type: 'comfort', basePrice: 1100000, marketValue: 1900000, img: "assets/cars/comfort/golf6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
     { name: "ГАЗ-24 «Волга» V8", power: 220, type: 'economy', basePrice: 700000, marketValue: 1500000, img: "assets/cars/barn/volga24.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
     { name: "Nissan Skyline GT-R R34 (В пыли)", power: 280, type: 'premium', basePrice: 4500000, marketValue: 9500000, img: "assets/cars/barn/r34.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
     { name: "Toyota Supra A80 (Без мотора)", power: 0, type: 'premium', basePrice: 3200000, marketValue: 7000000, img: "assets/cars/barn/supra.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium }
 ];
 
 // ========================================================
-// 8. ЛАВКА ФОРТУНЫ & ВАЛЮТНЫЙ ОБМЕН
-// ========================================================
-const FORTUNE_SHOP_CATALOG = [
-    {
-        id: "super_spin_ticket_1",
-        title: "🎫 1х Билет «Супер Вилспин»",
-        desc: "Запуск барабана Forza: Дроп авто + Ресурсы + Эксклюзивы.",
-        costStars: 30,
-        costCash: 300000,
-        type: "superspin",
-        count: 1
-    },
-    {
-        id: "super_spin_ticket_3",
-        title: "🎟️ 3х Билета «Супер Вилспин» (Пак)",
-        desc: "Выгодный пакет со скидкой! Три попытки сорвать куш.",
-        costStars: 75,
-        costCash: 750000,
-        type: "superspin",
-        count: 3
-    },
-    {
-        id: "fuel_canister_max",
-        title: "⛽ Канистра Экстра 100 ⛽",
-        desc: "Полная заправка бака без ожидания и очередей на АЗС.",
-        costStars: 5,
-        costCash: 5000,
-        type: "fuel",
-        amount: 100
-    },
-    {
-        id: "express_tickets_pack",
-        title: "⚡ Экспресс-Талоны (25 шт)",
-        desc: "25 мгновенных призывов покупателей на площадку продаж.",
-        costStars: 10,
-        costCash: 50000,
-        type: "express",
-        amount: 25
-    },
-    {
-        id: "connection_token",
-        title: "🤝 Теневая Связь Синдиката",
-        desc: "+1 Связь для Решалы Артура (чистый VIN, крыша ГИБДД, заказы).",
-        costStars: 18,
-        costCash: 150000,
-        type: "connection",
-        amount: 1
-    },
-    {
-        id: "buy_stars_with_cash",
-        title: "⭐ 25 Stars за Наличные",
-        desc: "Конвертация оборотных денег в звёзды Синдиката.",
-        costCash: 250000,
-        type: "exchange_cash",
-        rewardStars: 25
-    },
-    {
-        id: "buy_stars_with_fuel",
-        title: "⭐ 10 Stars за Топливо (60 ⛽)",
-        desc: "Слив бензина из бака в звёзды.",
-        costFuel: 60,
-        type: "exchange_fuel",
-        rewardStars: 10
-    },
-    {
-        id: "buy_stars_with_tickets",
-        title: "⭐ 15 Stars за 20 Талонов 🎟️",
-        desc: "Обмен экспресс-пропусков на премиальную валюту.",
-        costTickets: 20,
-        type: "exchange_tickets",
-        rewardStars: 15
-    }
-];
-
-// ========================================================
-// 8.1. СУПЕР ВИЛСПИН: СБАЛАНСИРОВАННЫЙ ЛУТ-ПУЛ
+// 8. СУПЕР ВИЛСПИН: ЛУТ-ПУЛ
 // ========================================================
 const SUPER_SPIN_TIERS = {
     reelCars: [
@@ -633,48 +558,48 @@ const SUPER_SPIN_TIERS = {
 };
 
 // ========================================================
-// 9. КАТАЛОГ МАГАЗИНА (ПРИБОРЫ, СЫРЬЁ, ТЮНИНГ, ДОМ)
+// 9. КАТАЛОГ МАГАЗИНА: ИЗНОС ОБОРУДОВАНИЯ И КОМБИНИРОВАННЫЕ ЦЕНЫ
 // ========================================================
 const SHOP_CATALOG = {
     tools: [
-        { id: "gauge", name: "Магнитный толщиномер ЛКП (Базовый)", cost: 35000, desc: "Проверяет шпаклёвку и вторичные окрасы на рынке без оплаты эксперта.", icon: "fa-ruler-combined" },
-        { id: "gauge_pro", name: "Ультразвуковой толщиномер Pro (Цветмет)", cost: 75000, desc: "Точность до 1 мкм. Моментально находит переходы на алюминии и шпаклю.", icon: "fa-microchip" },
-        { id: "obd", name: "Диагностический автосканер ELM327 Bluetooth", cost: 65000, desc: "Считывает коды DTC в ЭБУ.", icon: "fa-laptop-code" },
-        { id: "obd_launch", name: "Профессиональный сканер Launch Pro", cost: 180000, desc: "Обязателен для Синдиката! Глубокая адаптация блоков, чтение ошибок и реального пробега.", icon: "fa-tablet-screen-button" },
-        { id: "endoscope", name: "HD Видеоэндоскоп мотора с поворотной камерой", cost: 95000, desc: "Обязателен для Синдиката! Осмотр цилиндров, выявление задиров и нагара на клапанах.", icon: "fa-video" },
-        { id: "compressor", name: "Профессиональный компрессометр", cost: 45000, desc: "Замер компрессии в цилиндрах: предупреждает о прогаре поршня и залегших кольцах.", icon: "fa-gauge-high" },
-        { id: "battery_tester", name: "Нагрузочная вилка аккумулятора", cost: 25000, desc: "Быстрая проверка емкости и пускового тока АКБ перед зимним сезоном.", icon: "fa-car-battery" }
+        { id: "gauge", name: "Магнитный толщиномер ЛКП (Базовый)", cost: 35000, reqStars: 0, maxUses: 60, serviceCost: 3500, desc: "Проверяет шпаклёвку и вторичные окрасы. Ресурс калибровки: 60 замеров.", icon: "fa-ruler-combined" },
+        { id: "gauge_pro", name: "Ультразвуковой толщиномер Pro (Цветмет)", cost: 75000, reqStars: 5, maxUses: 100, serviceCost: 7000, desc: "Точность до 1 мкм. Ресурс батареи и датчика: 100 замеров.", icon: "fa-microchip" },
+        { id: "obd", name: "Диагностический автосканер ELM327 Bluetooth", cost: 65000, reqStars: 3, maxUses: 50, serviceCost: 5000, desc: "Считывает коды DTC в ЭБУ. Ресурс адаптера: 50 сканирований.", icon: "fa-laptop-code" },
+        { id: "obd_launch", name: "Профессиональный сканер Launch Pro", cost: 180000, reqStars: 10, maxUses: 80, serviceCost: 15000, desc: "Обязателен для Синдиката! Адаптация и глубокий анализ. Ресурс: 80 циклов.", icon: "fa-tablet-screen-button" },
+        { id: "endoscope", name: "HD Видеоэндоскоп мотора с поворотной камерой", cost: 95000, reqStars: 5, maxUses: 40, serviceCost: 9000, desc: "Обязателен для Синдиката! Осмотр цилиндров на задиры. Ресурс оптики: 40 проверок.", icon: "fa-video" },
+        { id: "compressor", name: "Профессиональный компрессометр", cost: 45000, reqStars: 2, maxUses: 50, serviceCost: 4000, desc: "Замер компрессии цилиндров. Ресурс манометра: 50 замеров.", icon: "fa-gauge-high" },
+        { id: "battery_tester", name: "Нагрузочная вилка аккумулятора", cost: 25000, reqStars: 0, maxUses: 60, serviceCost: 2000, desc: "Проверка емкости и пускового тока АКБ. Ресурс: 60 проверок.", icon: "fa-car-battery" }
     ],
     consumables: [
-        { id: "oil_pack", name: "Партия синтетического масла и фильтров", cost: 25000, value: 30, desc: "+30% сырья на СТО дяди Вани. Обеспечивает бесперебойную работу подъемников." },
-        { id: "chem_pack", name: "Бочка премиальной автохимии и шампуней", cost: 45000, value: 50, desc: "+50% сырья для Автомойки и Детейлинга. Поддерживает идеальный блеск." },
-        { id: "tires_stock", name: "Комплект полусликов и жгутов для шиномонтажа", cost: 35000, value: 40, desc: "+40% сырья на Шиномонтаж «У Алика». Устраняет дефицит расходников." },
-        { id: "brake_pack", name: "Оптовая партия тормозных колодок и дисков", cost: 55000, value: 50, desc: "+50% запаса деталей на Авторазборку. Увеличивает доходность контрактов." },
-        { id: "full_stock", name: "Генеральный оптовый запас (100% на все точки)", cost: 140000, value: 100, desc: "Мгновенно заполняет склады всех имеющихся предприятий до 100%!" }
+        { id: "oil_pack", name: "Партия синтетического масла и фильтров", cost: 25000, reqStars: 0, value: 30, desc: "+30% сырья на СТО дяди Вани. Обеспечивает бесперебойную работу подъемников." },
+        { id: "chem_pack", name: "Бочка премиальной автохимии и шампуней", cost: 45000, reqStars: 1, value: 50, desc: "+50% сырья для Автомойки и Детейлинга. Поддерживает идеальный блеск." },
+        { id: "tires_stock", name: "Комплект полусликов и жгутов для шиномонтажа", cost: 35000, reqStars: 1, value: 40, desc: "+40% сырья на Шиномонтаж «У Алика». Устраняет дефицит расходников." },
+        { id: "brake_pack", name: "Оптовая партия тормозных колодок и дисков", cost: 55000, reqStars: 2, value: 50, desc: "+50% запаса деталей на Авторазборку. Увеличивает доходность контрактов." },
+        { id: "full_stock", name: "Генеральный оптовый запас (100% на все точки)", cost: 140000, reqStars: 5, value: 100, desc: "Мгновенно заполняет склады всех имеющихся предприятий до 100%!" }
     ],
     tuningParts: [
-        { id: "raf_license", name: "Гоночная Лицензия пилота РАФ", cost: 85000, desc: "Официальный регламентный допуск к ночным заездам на 402м (покупается 1 раз на аккаунт).", icon: "fa-id-card" },
-        { id: "insurance_osago", name: "Годовой полис «КАСКО / Анти-Угон»", cost: 45000, desc: "100% защита от случайных повреждений на парковке, подстав и попыток угона авто в гараже.", icon: "fa-shield-halved" },
-        { id: "gps_tracker", name: "Скрытый поисковый GPS/ГЛОНАСС маяк", cost: 30000, desc: "Позволяет моментально найти и вернуть угнанную машину без помощи полиции и Решалы.", icon: "fa-satellite-dish" }
+        { id: "raf_license", name: "Гоночная Лицензия пилота РАФ", cost: 85000, reqStars: 15, desc: "Официальный регламентный допуск к ночным заездам на 402м (требуется 85k ₽ + 15 ⭐).", icon: "fa-id-card" },
+        { id: "insurance_osago", name: "Годовой полис «КАСКО / Анти-Угон»", cost: 45000, reqStars: 5, desc: "100% защита от случайных повреждений на парковке, подстав и попыток угона.", icon: "fa-shield-halved" },
+        { id: "gps_tracker", name: "Скрытый поисковый GPS/ГЛОНАСС маяк", cost: 30000, reqStars: 3, desc: "Позволяет моментально найти и вернуть угнанную машину без помощи полиции и Решалы.", icon: "fa-satellite-dish" }
     ]
 };
 
 const HOUSING_INTERIOR_CATALOG = [
-    { id: "home_ps5", name: "🎮 Игровая консоль PlayStation 5", cost: 75000, perk: "+25% настроения и куража каждый день" },
-    { id: "home_leather_sofa", name: "🛋️ Кожаный итальянский диван", cost: 120000, perk: "+15% к восстановлению сил и сытости" },
-    { id: "home_cinema_audio", name: "🍿 Домашний кинотеатр 4K", cost: 250000, perk: "+35% настроения и статус перед гостями" },
-    { id: "home_safe_valberg", name: "🔒 Огнеупорный сейф перекупа", cost: 180000, perk: "Защита заначки от проверок и облав" },
-    { id: "home_garage_lift", name: "🏗️ Гидравлический автоподъёмник в гараж", cost: 320000, perk: "Ускоряет ремонт скрытых дефектов авто на 50%" },
-    { id: "home_cctv", name: "📹 Система видеонаблюдения периметра", cost: 140000, perk: "Снижает шанс ночного угона авто из гаража до 0%" }
+    { id: "home_ps5", name: "🎮 Игровая консоль PlayStation 5", cost: 75000, reqStars: 5, perk: "+25% настроения и куража каждый день" },
+    { id: "home_leather_sofa", name: "🛋️ Кожаный итальянский диван", cost: 120000, reqStars: 8, perk: "+15% к восстановлению сил и сытости" },
+    { id: "home_cinema_audio", name: "🍿 Домашний кинотеатр 4K", cost: 250000, reqStars: 15, perk: "+35% настроения и статус перед гостями" },
+    { id: "home_safe_valberg", name: "🔒 Огнеупорный сейф перекупа", cost: 180000, reqStars: 10, perk: "Защита заначки от проверок и облав" },
+    { id: "home_garage_lift", name: "🏗️ Гидравлический автоподъёмник в гараж", cost: 320000, reqStars: 20, perk: "Ускоряет ремонт скрытых дефектов авто на 50%" },
+    { id: "home_cctv", name: "📹 Система видеонаблюдения периметра", cost: 140000, reqStars: 8, perk: "Снижает шанс ночного угона авто из гаража до 0%" }
 ];
 
 const CONTAINER_ITEMS = [
-    { id: 'japan', name: 'Японский Контейнер', cost: 150000, timer: 30, minLevel: 12, badge: 'JDM & Мото', desc: 'Прямые поставки из порта Кобе.', img: 'assets/containers/japan.jpg', fallback: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80' },
-    { id: 'europe', name: 'Европейский Автовоз', cost: 450000, timer: 35, minLevel: 15, badge: 'Комфорт & Премиум', desc: 'Автомобили из Германии без пробега по РФ.', img: 'assets/containers/europe.jpg', fallback: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80' },
-    { id: 'usa_auction', name: 'Американский Аукцион', cost: 750000, timer: 40, minLevel: 18, badge: 'Битые & Маслкары', desc: 'Контейнер с Copart. Кот в мешке.', img: 'assets/containers/usa.jpg', fallback: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80' },
-    { id: 'china_ship', name: 'Китайский Сухогруз', cost: 950000, timer: 38, minLevel: 22, badge: 'Электрички & Новые', desc: 'Свежие Lixiang и Zeekr прямиком из Гуанчжоу.', img: 'assets/containers/china.jpg', fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80' },
-    { id: 'dubai', name: 'Эмиратский Контейнер', cost: 1200000, timer: 45, minLevel: 25, badge: 'Катера & Суперкары', desc: 'Аукционная роскошь шейхов.', img: 'assets/containers/dubai.jpg', fallback: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80' },
-    { id: 'hangar', name: 'Заброшенный Ангар', cost: 5000000, timer: 60, minLevel: 30, badge: 'Тягачи & Гиперкары', desc: 'Списанное имущество логистического хаба!', img: 'assets/containers/hangar.jpg', fallback: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80' }
+    { id: 'japan', name: 'Японский Контейнер', cost: 150000, reqStars: 5, timer: 30, minLevel: 12, badge: 'JDM & Мото', desc: 'Прямые поставки из порта Кобе.', img: 'assets/containers/japan.jpg', fallback: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80' },
+    { id: 'europe', name: 'Европейский Автовоз', cost: 450000, reqStars: 10, timer: 35, minLevel: 15, badge: 'Комфорт & Премиум', desc: 'Автомобили из Германии без пробега по РФ.', img: 'assets/containers/europe.jpg', fallback: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80' },
+    { id: 'usa_auction', name: 'Американский Аукцион', cost: 750000, reqStars: 15, timer: 40, minLevel: 18, badge: 'Битые & Маслкары', desc: 'Контейнер с Copart. Кот в мешке.', img: 'assets/containers/usa.jpg', fallback: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80' },
+    { id: 'china_ship', name: 'Китайский Сухогруз', cost: 950000, reqStars: 20, timer: 38, minLevel: 22, badge: 'Электрички & Новые', desc: 'Свежие Lixiang и Zeekr прямиком из Гуанчжоу.', img: 'assets/containers/china.jpg', fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80' },
+    { id: 'dubai', name: 'Эмиратский Контейнер', cost: 1200000, reqStars: 25, timer: 45, minLevel: 25, badge: 'Катера & Суперкары', desc: 'Аукционная роскошь шейхов.', img: 'assets/containers/dubai.jpg', fallback: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80' },
+    { id: 'hangar', name: 'Заброшенный Ангар', cost: 5000000, reqStars: 50, timer: 60, minLevel: 30, badge: 'Тягачи & Гиперкары', desc: 'Списанное имущество логистического хаба!', img: 'assets/containers/hangar.jpg', fallback: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80' }
 ];
 
 const SELLER_ADS_PHRASES = [
@@ -706,15 +631,15 @@ const DIETS = [
 ];
 
 const OBD_ERRORS = [
-    { text: "P0101: Выход сигнала ДМРВ из допустимого диапазона", cost: 5000, severity: "Низкая" },
-    { text: "P0171: Слишком бедная смесь (Подсос воздуха)", cost: 4000, severity: "Средняя" },
-    { text: "P0299: Недодув турбины (Утечка или хана улитке)", cost: 45000, severity: "Критическая" },
-    { text: "P0300: Множественные пропуски зажигания", cost: 11000, severity: "Средняя" },
-    { text: "P0420: Эффективность катализатора ниже порога", cost: 25000, severity: "Средняя" },
-    { text: "P0700: Неисправность системы управления АКПП", cost: 8000, severity: "Высокая" },
-    { text: "P0016: Рассинхронизация распредвала и коленвала", cost: 85000, severity: "Критическая (Цепь ГРМ)" },
-    { text: "P0404: Неисправность клапана EGR (Засорен)", cost: 12000, severity: "Средняя" },
-    { text: "P0340: Ошибка датчика положения распредвала", cost: 6500, severity: "Низкая" }
+    { code: "P0101", system: "ДВС / Впуск", text: "Выход сигнала ДМРВ из допустимого диапазона", cost: 5000, severity: "Низкая", rpm: 820, temp: 92, boost: 0.0 },
+    { code: "P0171", system: "Топливная система", text: "Слишком бедная смесь (Подсос воздуха)", cost: 4000, severity: "Средняя", rpm: 900, temp: 94, boost: 0.1 },
+    { code: "P0299", system: "Турбонаддув", text: "Недодув турбокомпрессора (Утечка давления)", cost: 45000, severity: "Критическая", rpm: 2400, temp: 98, boost: 0.4 },
+    { code: "P0300", system: "Зажигание", text: "Случайные/множественные пропуски зажигания", cost: 11000, severity: "Средняя", rpm: 1100, temp: 90, boost: 0.0 },
+    { code: "P0420", system: "Выхлоп / Экология", text: "Эффективность катализатора ниже порога", cost: 25000, severity: "Средняя", rpm: 1800, temp: 95, boost: 0.2 },
+    { code: "P0700", system: "АКПП / Гидроблок", text: "Неисправность системы управления АКПП", cost: 38000, severity: "Высокая", rpm: 2100, temp: 96, boost: 0.3 },
+    { code: "P0016", system: "ГРМ / Фазорегулятор", text: "Рассинхронизация распредвала и коленвала (Растянута цепь)", cost: 85000, severity: "Критическая", rpm: 780, temp: 91, boost: 0.0 },
+    { code: "P0404", system: "Клапан EGR", text: "Неисправность цепи управления клапаном рециркуляции", cost: 12000, severity: "Средняя", rpm: 1400, temp: 88, boost: 0.0 },
+    { code: "P0340", system: "Датчик фаз", text: "Ошибка датчика положения распредвала", cost: 6500, severity: "Низкая", rpm: 850, temp: 90, boost: 0.0 }
 ];
 
 const DAILY_REWARDS_CONFIG = [
@@ -741,7 +666,7 @@ const STREET_CHAT_LOG = [
 ];
 
 // ========================================================
-// 10. РАСШИРЕННЫЙ ПУЛ ЕЖЕДНЕВНЫХ ЗАДАНИЙ (ПЛАН ПЕРЕКУПА)
+// 10. РАСШИРЕННЫЙ ПУЛ ЕЖЕДНЕВНЫХ ЗАДАНИЙ
 // ========================================================
 const DAILY_QUESTS_POOL = [
     { id: "q_inspect", text: "Осмотреть толщиномером 2 авто на рынке", target: 2, actionType: "gauge_check", reward: 35000, rewardXp: 40 },
@@ -755,7 +680,7 @@ const DAILY_QUESTS_POOL = [
 ];
 
 // ========================================================
-// 11. РАСШИРЕННЫЕ ЦЕЛИ И КАРЬЕРНЫЕ ВЕХИ (БЛОКНОТ ДЕЛЬЦА)
+// 11. РАСШИРЕННЫЕ ЦЕЛИ И КАРЬЕРНЫЕ ВЕХИ
 // ========================================================
 const NOTEPAD_CAREER_GOALS = [
     {
@@ -815,3 +740,25 @@ const NOTEPAD_CAREER_GOALS = [
         reward: "Золотой статус перекупа #1 в рейтинге"
     }
 ];
+
+// Экспорт базы в глобальный контекст
+window.GAME_METADATA = GAME_METADATA;
+window.calculatePlateValue = calculatePlateValue;
+window.I18N_TRANSLATIONS = I18N_TRANSLATIONS;
+window.CAR_FALLBACKS_BY_CATEGORY = CAR_FALLBACKS_BY_CATEGORY;
+window.CAR_DATABASE = CAR_DATABASE;
+window.HOUSING_LIST = HOUSING_LIST;
+window.BUSINESS_DATA = BUSINESS_DATA;
+window.BARN_TIERS_CONFIG = BARN_TIERS_CONFIG;
+window.BARN_FINDS = BARN_FINDS;
+window.SUPER_SPIN_TIERS = SUPER_SPIN_TIERS;
+window.SHOP_CATALOG = SHOP_CATALOG;
+window.HOUSING_INTERIOR_CATALOG = HOUSING_INTERIOR_CATALOG;
+window.CONTAINER_ITEMS = CONTAINER_ITEMS;
+window.SELLER_ADS_PHRASES = SELLER_ADS_PHRASES;
+window.DIETS = DIETS;
+window.OBD_ERRORS = OBD_ERRORS;
+window.DAILY_REWARDS_CONFIG = DAILY_REWARDS_CONFIG;
+window.STREET_CHAT_LOG = STREET_CHAT_LOG;
+window.DAILY_QUESTS_POOL = DAILY_QUESTS_POOL;
+window.NOTEPAD_CAREER_GOALS = NOTEPAD_CAREER_GOALS;

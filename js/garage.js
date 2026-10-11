@@ -1,8 +1,8 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.4.5)
-// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
-// Динамическая переоценка стоимости при установке госномеров,
-// учет статуса регистрации (Учёт РФ vs ДКП), износ агрегатов и шин
+// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.4.6)
+// Разработчики: Tak Toje, Max, Sergo, gemini
+// Интерактивный сканер ЭБУ, синхронизация личного авто с гонками,
+// динамическая переоценка стоимости и расход ресурса оборудования
 // ========================================================
 
 let previewCarIndex = null;
@@ -153,7 +153,7 @@ function renderGarage() {
         html += `
         <div class="glass-card mb-3 ${isPersonal ? 'personal-car-card' : ''}">
             <div class="car-img-wrap" style="height:145px;">
-                <img src="${cImg}" class="car-img" onerror="this.src='assets/cars/economy/vaz-2107.jpg'">
+                <img src="${cImg}" class="car-img" onerror="this.src='${car.fallback || 'assets/cars/economy/vaz-2107.jpg'}';">
                 <div class="plate-corner">
                     <div class="license-plate">${cPlate} <div class="license-flag">RUS</div></div>
                 </div>
@@ -242,7 +242,7 @@ function renderCarModsBadges(car) {
 }
 
 // ========================================================
-// 3. СТАТУС ЛИЧНОГО АВТОМОБИЛЯ
+// 3. СТАТУС ЛИЧНОГО АВТОМОБИЛЯ И СВЯЗКА СО СТРИТОМ
 // ========================================================
 function togglePersonalCar(idx) {
     const car = state.garage[idx];
@@ -266,6 +266,7 @@ function togglePersonalCar(idx) {
 }
 
 function selectCarForStreetDirect(idx) {
+    if (!state.garage[idx]) return;
     state.player.selectedStreetCarIndex = idx;
     saveState();
     switchTab('tabPhone');
@@ -273,7 +274,7 @@ function selectCarForStreetDirect(idx) {
         if (typeof PhoneManager !== 'undefined') {
             PhoneManager.openApp('street');
         }
-    }, 150);
+    }, 120);
 }
 
 function buyGarageSlot() {
@@ -447,7 +448,6 @@ function renderTuningItems() {
 
     let html = "";
 
-    // 1. ДРИФТ
     if (activeTuneTab === 'drift') {
         const driftMods = [
             { id: 'weldedDiff', name: '🔩 Заварка редуктора', cost: 12000, desc: 'Блокировка задней оси. Базовый допуск в Matsuri/Зимний дрифт.', bought: !!t.weldedDiff, risk: 5 },
@@ -470,9 +470,7 @@ function renderTuningItems() {
                 ${btn}
             </div>`;
         });
-    } 
-    // 2. ДРАГ
-    else if (activeTuneTab === 'drag') {
+    } else if (activeTuneTab === 'drag') {
         const dragMods = [
             { id: 'chip_stage1', name: '⚡ Чип-тюнинг Stage 1', cost: 30000, desc: '+25 л.с., сдвиг отсечки и активация ланч-контроля.', bought: t.chip >= 1, power: 25, risk: 5, action: "buyChipStage(1, 30000, 25)" },
             { id: 'chip_stage2', name: '🔥 Чип-тюнинг Stage 2 + Даунпайп', cost: 65000, desc: '+60 л.с., прямоточный выхлоп, попкорн и буст-ап.', bought: t.chip >= 2, power: 60, risk: 15, action: "buyChipStage(2, 65000, 60)" },
@@ -495,9 +493,7 @@ function renderTuningItems() {
                 ${btn}
             </div>`;
         });
-    }
-    // 3. СТЕНС И СТИЛЬ
-    else if (activeTuneTab === 'style') {
+    } else if (activeTuneTab === 'style') {
         const styleMods = [
             { id: 'stance', name: '🏎️ 4-контурная пневмоподвеска', cost: 75000, desc: 'Экстремальный дроп кузова в пол на парковке ТЦ (+35 к стенсу).', bought: !!t.stance, risk: 15 },
             { id: 'customWheels', name: '✨ Кованые диски Work Meister с полкой', cost: 60000, desc: 'Широкий вылет и правильный натяг резины домиком (+25 к стилю).', bought: !!t.customWheels, risk: 5 },
@@ -586,7 +582,7 @@ function updateTuneRiskMeter(car) {
 }
 
 // ========================================================
-// 6. ОСМОТР, ЗВУК МОТОРА, СЕРВИС ШИН И OBD2 СКАНЕР
+// 6. ОСМОТР, ЗВУК МОТОРА, ИНТЕРАКТИВНЫЙ OBD2-ПЛАНШЕТ
 // ========================================================
 function openCarPreviewModal(idx) {
     previewCarIndex = idx;
@@ -622,12 +618,29 @@ function openOBD2Modal() {
     const car = state.garage[previewCarIndex];
     if (!car) return;
 
-    setTxt('obd2CarTitle', `Диагностика: ${car.name}`);
+    // Проверка ресурса сканера
+    let isLaunch = !!state.player?.tools?.obd_launch;
+    let toolKey = isLaunch ? 'obd_launch' : 'obd';
+    let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 50;
+
+    if (wear <= 0) {
+        showToast("⚠️ Сканер разряжен! Откалибруйте его в Маркете.");
+    } else {
+        state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
+        saveState();
+    }
+
+    setTxt('obd2CarTitle', `Диагностика CAN-шины: ${car.name}`);
     const resBox = document.getElementById('obd2ResultBox');
     const actBox = document.getElementById('obd2ActionBox');
     if (!resBox || !actBox) return;
 
-    resBox.innerHTML = "Подключение адаптера ELM327 / Launch...<br>Чтение протоколов CAN-шины...";
+    resBox.innerHTML = `
+        <div class="text-center py-3">
+            <i class="fa-solid fa-rotate fa-spin color-cyan mb-2" style="font-size:24px;"></i>
+            <div class="sub-label">Чтение протоколов ISO 15765-4 (CAN)... Опрос блоков ЭБУ DME/EGS/ABS...</div>
+        </div>
+    `;
     actBox.innerHTML = "";
 
     const modal = document.getElementById('modalOBD2');
@@ -643,22 +656,80 @@ function openOBD2Modal() {
         let trans = car.wear?.transmission ? Math.round(car.wear.transmission) : 85;
 
         if (car.hiddenDefect) {
+            let def = car.hiddenDefect;
             resBox.innerHTML = `
-                <div class="color-red font-bold mb-1">⚠ ОБНАРУЖЕНА КРИТИЧЕСКАЯ ОШИБКА:</div>
-                <div>Код: P0300 / Неисправность: <b>${car.hiddenDefect.text}</b></div>
-                <div class="sub-label mt-1">Ориентировочная стоимость устранения: ~${(car.hiddenDefect.cost || 15000).toLocaleString()} ₽</div>
-                <div class="mt-2 text-xs">Ресурс ДВС: ${eng}% | Ресурс КПП: ${trans}%</div>
+                <div class="p-2 mb-2" style="background:#2a0a14; border:1px solid var(--red); border-radius:8px;">
+                    <div class="flex-between mb-1">
+                        <b class="color-red text-xs"><i class="fa-solid fa-triangle-exclamation"></i> ОБНАРУЖЕН DTC КОД: ${def.code || 'P0300'}</b>
+                        <span class="tag-badge bg-tag-red">${def.severity || 'Критическая'}</span>
+                    </div>
+                    <div class="text-xs font-bold">${def.text}</div>
+                    <div class="sub-label mt-1">Блок: <b>${def.system || 'ЭБУ Двигателя DME'}</b> | Оценочный ремонт: ~${(def.cost || 15000).toLocaleString()} ₽</div>
+                </div>
+
+                <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+                    <div class="text-xs font-bold color-cyan mb-1"><i class="fa-solid fa-snowflake"></i> Стоп-кадр параметров (Freeze Frame):</div>
+                    <div class="grid-3 text-xs sub-label">
+                        <div>RPM: <b class="color-cyan">${def.rpm || 850}</b></div>
+                        <div>ОЖ: <b class="${car.engineTemp > 100 ? 'color-red' : 'color-green'}">${car.engineTemp || 90}°C</b></div>
+                        <div>Наддув: <b class="color-amber">${def.boost || 0.0} bar</b></div>
+                    </div>
+                    <div class="flex-between text-xs mt-2">
+                        <span>Ресурс ДВС: <b class="${eng < 50 ? 'color-red' : 'color-green'}">${eng}%</b></span>
+                        <span>Ресурс КПП: <b class="${trans < 50 ? 'color-red' : 'color-green'}">${trans}%</b></span>
+                    </div>
+                </div>
             `;
-            actBox.innerHTML = `<button onclick="repairDefectInGarage()" class="btn btn-purple btn-sm w-full mt-2">Устранить неисправность (${(car.hiddenDefect.cost || 15000).toLocaleString()} ₽)</button>`;
+            actBox.innerHTML = `
+                <div class="grid-2">
+                    <button onclick="clearOBDCodesQuick()" class="btn btn-dark btn-sm">Стереть ошибки DTC ⚠️</button>
+                    <button onclick="repairDefectInGarage()" class="btn btn-purple btn-sm">Капитальный ремонт (${(def.cost || 15000).toLocaleString()} ₽)</button>
+                </div>
+            `;
         } else {
             resBox.innerHTML = `
-                <div class="color-green font-bold mb-1">✓ ОШИБОК В ЭБУ НЕ ОБНАРУЖЕНО</div>
-                <div>Все блоки управления (DME/EGS/ABS) работают штатно.</div>
-                <div class="mt-2 text-xs">Ресурс ДВС: <b class="color-green">${eng}%</b> | Ресурс КПП: <b class="color-green">${trans}%</b></div>
+                <div class="p-2 mb-2" style="background:rgba(0,230,118,0.1); border:1px solid var(--green); border-radius:8px;">
+                    <div class="flex-between mb-1">
+                        <b class="color-green text-xs"><i class="fa-solid fa-circle-check"></i> ОШИБОК DTC НЕ НАЙДЕНО</b>
+                        <span class="tag-badge bg-tag-green">CAN: OK</span>
+                    </div>
+                    <div class="sub-label text-xs">Все блоки управления (DME, EGS, ABS, SRS) работают в штатном режиме без сбоев.</div>
+                </div>
+
+                <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+                    <div class="text-xs font-bold color-cyan mb-1">Телеметрия агрегатов:</div>
+                    <div class="flex-between text-xs mb-1">
+                        <span>Двигатель:</span> <b class="color-green">${eng}%</b>
+                    </div>
+                    <div class="flex-between text-xs mb-1">
+                        <span>Трансмиссия:</span> <b class="color-green">${trans}%</b>
+                    </div>
+                    <div class="flex-between text-xs">
+                        <span>Температура антифриза:</span> <b class="${car.engineTemp > 100 ? 'color-red' : 'color-green'}">${car.engineTemp || 90}°C</b>
+                    </div>
+                </div>
             `;
-            actBox.innerHTML = `<button onclick="closeOBD2Modal()" class="btn btn-green btn-sm w-full mt-2">Всё в порядке</button>`;
+            actBox.innerHTML = `<button onclick="closeOBD2Modal()" class="btn btn-green btn-sm w-full">Завершить диагностику</button>`;
         }
-    }, 600);
+    }, 550);
+}
+
+function clearOBDCodesQuick() {
+    if (previewCarIndex === null) return;
+    const car = state.garage[previewCarIndex];
+    if (!car || !car.hiddenDefect) return;
+
+    // Временный сброс чека (перекупский трюк)
+    playSound('tick');
+    tgHaptic('medium');
+    showToast("Память ошибок DTC очищена! Лампа Check Engine временно погасла.");
+    
+    // С шансом 50% ошибка возвращается при следующей поездке
+    if (Math.random() < 0.5) {
+        car.hasAdditive = true;
+    }
+    saveState();
+    openOBD2Modal();
 }
 
 function repairDefectInGarage() {
@@ -672,6 +743,7 @@ function repairDefectInGarage() {
 
     state.player.cash -= cost;
     car.hiddenDefect = null;
+    car.hasAdditive = false;
     car.condition = Math.min(100, (car.condition || 70) + 15);
     recalculateCarMarketValue(car);
 
@@ -679,7 +751,7 @@ function repairDefectInGarage() {
     renderGarage();
     playSound('win');
     tgHaptic('success');
-    showToast("Неисправность устранена! Ошибки из памяти ЭБУ удалены.");
+    showToast("Неисправность полностью устранена! Ошибки из памяти ЭБУ удалены.");
     openOBD2Modal();
 }
 
@@ -868,10 +940,15 @@ function confirmPurchaseInsurance(type) {
     if (!car) return;
 
     let cost = type === 'casco' ? 18000 : 7500;
+    let reqStars = type === 'casco' ? 5 : 2;
     let cash = state.player?.cash || 0;
-    if (cash < cost) return showToast("Не хватает денег на полис страхования!");
+    let stars = state.player?.stars || 0;
+
+    if (cash < cost) return showToast("Не хватает рублей на полис страхования!");
+    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
 
     state.player.cash -= cost;
+    state.player.stars -= reqStars;
     car.insurance = type;
 
     closeModal('modalInsurance');
@@ -1002,6 +1079,7 @@ window.buyChipStage = buyChipStage;
 window.openCarPreviewModal = openCarPreviewModal;
 window.openTuningFromPreview = openTuningFromPreview;
 window.openOBD2Modal = openOBD2Modal;
+window.clearOBDCodesQuick = clearOBDCodesQuick;
 window.repairDefectInGarage = repairDefectInGarage;
 window.closeOBD2Modal = closeOBD2Modal;
 window.openPutOnLotModal = openPutOnLotModal;

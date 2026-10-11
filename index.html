@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v0.4.5</title>
-    <link rel="stylesheet" href="style.css?v=157">
+    <title>Симулятор Перекупа v0.4.6</title>
+    <link rel="stylesheet" href="style.css?v=165">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -67,7 +67,7 @@
             </div>
           </div>
           <div class="flex-gap" style="align-items:center;">
-            <button onclick="toggleGameLanguage()" class="daily-bonus-btn" style="padding:4px 8px; font-size:10px;" id="btnLangToggle">🌐 RU</button>
+            <button onclick="toggleGameLanguage()" class="daily-bonus-btn" style="padding:5px 10px; font-size:10.5px;" id="btnLangToggle">🌐 RU</button>
             <button onclick="openDailyBonusModal()" class="daily-bonus-btn">🎁 Бонус</button>
           </div>
         </div>
@@ -331,14 +331,6 @@
             <button onclick="bigCharityDonate()" class="btn btn-green w-full">🕊 Меценатство 100,000 ₽ (+25 Кармы)</button>
           </div>
 
-          <div class="glass-card flex-between mb-3">
-            <div>
-              <h3 class="font-bold color-cyan"><i class="fa-solid fa-clock"></i> Суточный цикл (Реальное время)</h3>
-              <p class="sub-label">Списание аренды, капитализация депозитов и сброс дейликов происходят автоматически в 00:00.</p>
-            </div>
-            <span class="tag-badge bg-tag-green">Синхронно</span>
-          </div>
-
           <div class="live-chat-card mb-3">
             <div class="flex-between mb-2">
               <div style="display:flex; align-items:center; gap:6px;">
@@ -375,7 +367,7 @@
             </div>
 
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-sparkles"></i> Список изменений v0.4.5 & Патчноут
+              <i class="fa-solid fa-sparkles"></i> Список изменений v0.4.6 & Патчноут
             </button>
             <div class="grid-2 mb-2">
               <div class="stat-box"><div class="sub-label">Плюс:</div><div id="statProfitable" class="stat-value color-green">0</div></div>
@@ -398,23 +390,45 @@
           </div>
 
           <div class="glass-card mb-3">
-            <h4 class="color-amber font-bold mb-2"><i class="fa-solid fa-sliders"></i> Управление балансом (DEV)</h4>
+            <h4 class="color-amber font-bold mb-2"><i class="fa-solid fa-sliders"></i> Управление балансом (DEV-панель)</h4>
+            
             <div class="cheat-adjust-row">
               <span class="text-xs">💰 Наличные:</span>
               <div class="flex-gap">
                 <button onclick="adjustResource('cash', -100000)" class="btn btn-dark btn-sm btn-auto">-100k</button>
                 <button onclick="adjustResource('cash', 100000)" class="btn btn-green btn-sm btn-auto">+100k</button>
+                <button onclick="adjustResource('cash', 500000)" class="btn btn-green btn-sm btn-auto">+500k</button>
                 <button onclick="adjustResource('cash', 5000000)" class="btn btn-green btn-sm btn-auto">+5M</button>
               </div>
             </div>
+
             <div class="cheat-adjust-row">
-              <span class="text-xs">⭐ Уровень:</span>
+              <span class="text-xs">⭐ Звёзды (Stars):</span>
+              <div class="flex-gap">
+                <button onclick="adjustResource('stars', -10)" class="btn btn-dark btn-sm btn-auto">-10</button>
+                <button onclick="adjustResource('stars', 10)" class="btn btn-amber btn-sm btn-auto">+10</button>
+                <button onclick="adjustResource('stars', 50)" class="btn btn-amber btn-sm btn-auto">+50</button>
+                <button onclick="adjustResource('stars', 250)" class="btn btn-amber btn-sm btn-auto">+250</button>
+              </div>
+            </div>
+
+            <div class="cheat-adjust-row">
+              <span class="text-xs">🎖️ Уровень:</span>
               <div class="flex-gap">
                 <button onclick="adjustResource('level', -1)" class="btn btn-dark btn-sm btn-auto">-1</button>
                 <button onclick="adjustResource('level', 1)" class="btn btn-cyan btn-sm btn-auto">+1</button>
                 <button onclick="adjustResource('level', 10)" class="btn btn-cyan btn-sm btn-auto">+10</button>
               </div>
             </div>
+
+            <div class="cheat-adjust-row">
+              <span class="text-xs">🤝 Связи / 🎟️ Талоны:</span>
+              <div class="flex-gap">
+                <button onclick="adjustResource('connections', 1)" class="btn btn-purple btn-sm btn-auto">+1 🤝</button>
+                <button onclick="adjustResource('tickets', 10)" class="btn btn-purple btn-sm btn-auto">+10 🎟️</button>
+              </div>
+            </div>
+
             <div class="grid-2 mt-2">
               <button onclick="resetGameData()" class="btn btn-danger btn-sm">Сброс данных</button>
               <button onclick="switchTab('tabMarket')" class="btn btn-dark btn-sm">В игру</button>
@@ -451,33 +465,47 @@
       </nav>
     </div>
 
-    <!-- МОДАЛЬНЫЕ ОКНА -->
+    <!-- МОДАЛЬНЫЕ ОКНА С ИНТЕРАКТИВНЫМ НЕОНОВЫМ ДИЗАЙНОМ -->
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold"><i class="fa-solid fa-code-merge"></i> Обновление v0.4.5</h4>
+          <div class="modal-glow-badge"><i class="fa-solid fa-code-merge"></i> ОБНОВЛЕНИЕ v0.4.6</div>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
-        <div class="sub-label mb-1 color-amber font-bold">Разработчики: Илья Чепиль (DXF) & Perekup Dev Team</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10px;">Версия клиента: v0.4.5 (Сборка #157)</div>
+        <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.6 (Сборка #165)</div>
+        <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
+          <div class="patch-item"><b>💰 Экономика (₽ + ⭐):</b> Для покупки топовых машин, бизнеса и недвижимости теперь требуются и рубли, и звёзды!</div>
+          <div class="patch-item"><b>🛠️ Износ приборов:</b> Толщиномеры и сканеры расходуют батарею и калибровку при замерах.</div>
+          <div class="patch-item"><b>📑 Отказ от ДКП:</b> Появилась возможность разорвать договор, если цена или условия не подошли.</div>
+          <div class="patch-item"><b>🏎️ Синхронизация личного авто:</b> Личный автомобиль всегда готов к заездам в Стрите без ручного переключения.</div>
+        </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
       </div>
     </div>
 
     <div id="modalRegistrationChoice" class="modal-overlay">
       <div class="modal-box text-center" style="max-width: 410px;">
-        <div style="font-size: 36px; margin-bottom: 6px;">📑</div>
+        <div class="radar-spinner-ring mb-2">
+          <div class="radar-spinner-center">📑</div>
+        </div>
         <h3 class="font-bold mb-1 color-cyan">Способ оформления автомобиля</h3>
         <p class="sub-label mb-3">Выберите форму владения для выкупленного авто:</p>
         <div class="glass-card text-left p-2 mb-2" style="border-left: 3px solid var(--green);">
-          <b class="text-xs color-green">1. Поставить на чистый учёт в МРЭО</b>
+          <div class="flex-between">
+            <b class="text-xs color-green">1. Поставить на чистый учёт в МРЭО</b>
+            <span class="tag-badge bg-tag-green">ЧИСТЫЙ VIN</span>
+          </div>
           <div class="sub-label my-1" style="font-size:10px;">• Оплата госпошлины: <b>2,850 ₽</b><br>• ⚠️ <b>Налог 13%</b> с чистой прибыли при быстрой перепродаже!</div>
-          <button onclick="confirmRegistrationChoice(true)" class="btn btn-green btn-sm w-full mt-1">Оформить в МРЭО (-2,850 ₽)</button>
+          <button onclick="confirmRegistrationChoice(true)" class="btn btn-green btn-sm w-full mt-2">Оформить в МРЭО (-2,850 ₽)</button>
         </div>
         <div class="glass-card text-left p-2 mb-3" style="border-left: 3px solid var(--amber);">
-          <b class="text-xs color-amber">2. Оставить на ДКП (Перекупский режим)</b>
+          <div class="flex-between">
+            <b class="text-xs color-amber">2. Оставить на ДКП (Перекупский режим)</b>
+            <span class="tag-badge bg-tag-amber">ПЕРЕКУП</span>
+          </div>
           <div class="sub-label my-1" style="font-size:10px;">• Пошлина: <b>0 ₽</b><br>• Налог 13%: <b>Не платится</b><br>• 🚨 <b>Лимит 10 дней!</b></div>
-          <button onclick="confirmRegistrationChoice(false)" class="btn btn-amber btn-sm w-full mt-1">Оставить на ДКП</button>
+          <button onclick="confirmRegistrationChoice(false)" class="btn btn-amber btn-sm w-full mt-2">Оставить на ДКП</button>
         </div>
       </div>
     </div>
@@ -486,7 +514,8 @@
       <div class="modal-box dkp-official-blank">
         <div class="dkp-blank-border">
           <div class="dkp-header text-center mb-2">
-            <h4 class="font-bold dkp-title">ДОГОВОР КУПЛИ-ПРОДАЖИ</h4>
+            <div class="modal-glow-badge mb-1"><i class="fa-solid fa-file-contract"></i> ГОСУСЛУГИ АВТОКОД</div>
+            <h4 class="font-bold dkp-title">ДОГОВОР КУПЛИ-ПРОДАЖИ ТРАНСПОРТНОГО СРЕДСТВА</h4>
           </div>
           <div class="dkp-body-text mb-3">
             <div class="dkp-row mb-1"><span class="sub-label">Продавец:</span> <b class="text-xs" id="dkpSellerName">Иванов И.И.</b></div>
@@ -496,11 +525,11 @@
               <div class="text-xs" id="dkpCarSpecs">Мощность: 74 л.с.</div>
               <div class="flex-between mt-1 text-xs">
                 <span>Госномер:</span>
-                <span class="license-plate" style="font-size:10px; padding:1px 4px;" id="dkpCarPlate">В777ВВ 77</span>
+                <span class="license-plate" style="font-size:10.5px; padding:2px 6px;" id="dkpCarPlate">В777ВВ 77</span>
               </div>
             </div>
             <div class="flex-between p-2 mb-2 dkp-price-line">
-              <span class="font-bold text-xs">СУММА:</span>
+              <span class="font-bold text-xs">ИТОГОВАЯ СУММА:</span>
               <b class="price-val" id="dkpPriceAmount">150,000 ₽</b>
             </div>
             <div id="dkpNetProfitBadge" class="text-xs text-center font-bold mb-2" style="display:none;"></div>
@@ -518,8 +547,9 @@
               <div class="stamp-inner"><b>МРЭО</b><b>ЗАРЕГИСТРИРОВАНО</b></div>
             </div>
           </div>
-          <div class="mt-3">
-            <button id="btnSignDKP" onclick="confirmSignDKP()" class="btn btn-green w-full">✍️ Подписать ДКП</button>
+          <div class="mt-3 space-y-2">
+            <button id="btnSignDKP" onclick="confirmSignDKP()" class="btn btn-green w-full">✍️ Подписать ДКП и забрать деньги</button>
+            <button id="btnAbortDKP" onclick="abortDKPDeal()" class="btn btn-danger btn-sm w-full">❌ Разорвать сделку / Отказаться</button>
             <button id="btnCloseDKP" onclick="closeModal('modalDKP')" class="btn btn-dark w-full mt-2" style="display:none;">Готово</button>
           </div>
         </div>
@@ -528,10 +558,13 @@
 
     <div id="modalGarageEvent" class="modal-overlay">
       <div class="modal-box text-center">
-        <div style="font-size:46px; margin-bottom:8px;" id="garageEventEmoji">⚠️</div>
-        <h3 class="font-bold mb-2" id="garageEventTitle">Происшествие</h3>
+        <div class="radar-spinner-ring mb-2">
+          <div class="radar-spinner-center" id="garageEventEmoji">⚠️</div>
+        </div>
+        <div class="modal-glow-badge mb-1" id="garageEventBadge">ИНЦИДЕНТ</div>
+        <h3 class="font-bold mb-1" id="garageEventTitle">Происшествие</h3>
         <p class="sub-label mb-3" id="garageEventDesc">Описание...</p>
-        <div class="p-2 mb-3 text-xs" style="background:#090e18; border-radius:8px;" id="garageEventCarInfo">
+        <div class="p-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);" id="garageEventCarInfo">
           Автомобиль: <b class="color-cyan" id="garageEventCarName">-</b>
         </div>
         <div id="garageEventActions" class="space-y-2"></div>
@@ -541,15 +574,15 @@
     <div id="modalInsurance" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold"><i class="fa-solid fa-shield-halved"></i> Страхование</h4>
+          <div class="modal-glow-badge"><i class="fa-solid fa-shield-halved"></i> СТРАХОВОЙ ПОЛИС</div>
           <button onclick="closeModal('modalInsurance')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
-        <div class="p-2 mb-3" style="background:#090e18; border-radius:8px;">
+        <div class="p-2 mb-3" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
           <b class="color-cyan text-xs" id="insureCarTitle">-</b>
         </div>
         <div class="space-y-2 mb-3">
-          <button onclick="confirmPurchaseInsurance('casco')" class="btn btn-green w-full">КАСКО (18,000 ₽)</button>
-          <button onclick="confirmPurchaseInsurance('osago')" class="btn btn-cyan w-full">ОСАГО (7,500 ₽)</button>
+          <button onclick="confirmPurchaseInsurance('casco')" class="btn btn-green w-full">🛡️ КАСКО (18,000 ₽ + 5 ⭐)</button>
+          <button onclick="confirmPurchaseInsurance('osago')" class="btn btn-cyan w-full">📋 ОСАГО (7,500 ₽ + 2 ⭐)</button>
         </div>
         <button onclick="closeModal('modalInsurance')" class="btn btn-dark w-full">Отмена</button>
       </div>
@@ -558,10 +591,10 @@
     <div id="modalSelectContractCar" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold">Выбор авто под контракт</h4>
+          <div class="modal-glow-badge"><i class="fa-solid fa-car-side"></i> СИНДИКАТ ПОД КЛЮЧ</div>
           <button onclick="closeModal('modalSelectContractCar')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
-        <div id="contractTargetInfo" class="text-xs color-amber mb-2"></div>
+        <div id="contractTargetInfo" class="text-xs color-amber mb-2 font-bold"></div>
         <div id="contractCarsSelectList" class="space-y-2 mb-3" style="max-height: 280px; overflow-y: auto;"></div>
         <button onclick="closeModal('modalSelectContractCar')" class="btn btn-dark w-full">Отмена</button>
       </div>
@@ -569,8 +602,14 @@
 
     <div id="modalBlindAuction" class="modal-overlay">
       <div class="modal-box text-center">
-        <h4 class="color-red font-bold mb-2">Секретный Лот #<span id="blindAuctionLotNum">404</span></h4>
-        <p class="sub-label mb-2">Класс: <b class="color-cyan" id="blindAuctionClassText">ПРЕМИУМ</b></p>
+        <div class="radar-spinner-ring mb-2" style="border-top-color: var(--red); border-right-color: var(--amber);">
+          <div class="radar-spinner-center">🎲</div>
+        </div>
+        <div class="modal-glow-badge mb-1" style="border-color: rgba(255, 51, 102, 0.4); background: rgba(255, 51, 102, 0.1); color: var(--red);">
+          СЛЕПОЙ ЛОТ ФССП
+        </div>
+        <h4 class="color-red font-bold mb-2">Контейнер #<span id="blindAuctionLotNum">404</span></h4>
+        <p class="sub-label mb-3">Категория: <b class="color-cyan" id="blindAuctionClassText">ПРЕМИУМ / СЮРПРИЗ</b></p>
         <div class="grid-2">
           <button onclick="placeBlindBid()" class="btn btn-danger" id="btnBlindBid">Ставка 1M ₽</button>
           <button onclick="closeModal('modalBlindAuction')" class="btn btn-dark">Пас</button>
@@ -580,24 +619,31 @@
 
     <div id="modalAutoPodstava" class="modal-overlay">
       <div class="modal-box text-center">
-        <div style="font-size:48px; margin-bottom:10px;">💥</div>
-        <h3 class="color-red font-bold mb-2">АВТО-ПОДСТАВА!</h3>
-        <p class="sub-label mb-3">Вас притер черный седан без номеров. Требуют денег на месте.</p>
+        <div class="radar-spinner-ring mb-2" style="border-top-color: var(--red);">
+          <div class="radar-spinner-center">💥</div>
+        </div>
+        <div class="modal-glow-badge mb-1" style="color: var(--red); border-color: rgba(255, 51, 102, 0.4);">ДОРОЖНЫЙ ИНЦИДЕНТ</div>
+        <h3 class="color-red font-bold mb-1">АВТО-ПОДСТАВА НА ТРАССЕ!</h3>
+        <p class="sub-label mb-3">Вас притёр тонированный седан без номеров. Из машины вышли крепкие парни и требуют компенсацию.</p>
         <div class="space-y-2 mb-3">
-          <button onclick="resolvePodstava('pay')" class="btn btn-dark w-full">Заплатить</button>
-          <button onclick="resolvePodstava('reshala')" class="btn btn-purple w-full">Звонок Решале (1 🤝)</button>
-          <button onclick="resolvePodstava('fight')" class="btn btn-danger w-full">Отказать (Драка)</button>
+          <button onclick="resolvePodstava('pay')" class="btn btn-dark w-full">Заплатить наличными</button>
+          <button onclick="resolvePodstava('reshala')" class="btn btn-purple w-full">Звонок Решале Артуру (1 🤝)</button>
+          <button onclick="resolvePodstava('fight')" class="btn btn-danger w-full">Достать монтировку (Драка)</button>
         </div>
       </div>
     </div>
 
     <div id="modalSaveManager" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="color-cyan font-bold mb-2">Резервная копия сейва</h4>
-        <textarea id="saveExportArea" style="width:100%; height:80px; background:#090e18; color:#fff; font-size:10px; padding:6px; margin-bottom:8px;"></textarea>
+        <div class="flex-between mb-2">
+          <div class="modal-glow-badge"><i class="fa-solid fa-file-export"></i> РЕЗЕРВНОЕ ХРАНИЛИЩЕ</div>
+          <button onclick="closeModal('modalSaveManager')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <p class="sub-label mb-2">Скопируйте зашифрованный код сохранения для переноса на другое устройство:</p>
+        <textarea id="saveExportArea" style="width:100%; height:90px; background:#090e18; color:#fff; font-size:10px; padding:8px; border-radius:8px; border:1px solid var(--border-glass); margin-bottom:10px;"></textarea>
         <div class="grid-2 mb-2">
-          <button onclick="exportSaveCodeAction()" class="btn btn-cyan btn-sm">Экспорт</button>
-          <button onclick="importSaveCodeAction()" class="btn btn-amber btn-sm">Импорт</button>
+          <button onclick="exportSaveCodeAction()" class="btn btn-cyan btn-sm">Экспорт в буфер</button>
+          <button onclick="importSaveCodeAction()" class="btn btn-amber btn-sm">Импорт кода</button>
         </div>
         <button onclick="closeModal('modalSaveManager')" class="btn btn-dark w-full">Закрыть</button>
       </div>
@@ -605,9 +651,12 @@
 
     <div id="modalHomeInterior" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="color-cyan font-bold mb-2">Обустройство дома</h4>
-        <div id="homeInteriorHeader" class="text-xs color-amber mb-2"></div>
-        <div id="homeInteriorItemsList" class="space-y-2 mb-3"></div>
+        <div class="flex-between mb-2">
+          <div class="modal-glow-badge"><i class="fa-solid fa-couch"></i> ИНТЕРЬЕР И ПЕРКИ</div>
+          <button onclick="closeModal('modalHomeInterior')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div id="homeInteriorHeader" class="text-xs color-amber mb-2 font-bold"></div>
+        <div id="homeInteriorItemsList" class="space-y-2 mb-3" style="max-height: 280px; overflow-y: auto;"></div>
         <button onclick="closeModal('modalHomeInterior')" class="btn btn-dark w-full">Закрыть</button>
       </div>
     </div>
@@ -615,13 +664,13 @@
     <div id="modalTuning" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold">Тюнинг</h4>
+          <div class="modal-glow-badge"><i class="fa-solid fa-screwdriver-wrench"></i> СПОРТИВНОЕ АТЕЛЬЕ</div>
           <button onclick="closeModal('modalTuning')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div id="tuneCarTitle" class="text-xs color-amber mb-2 font-bold"></div>
         <div class="risk-meter-box mb-2">
           <div class="flex-between text-xs">
-            <span>Риск по ст. 12.5.1:</span>
+            <span>Риск аннулирования учёта по 12.5.1:</span>
             <b id="tuneRiskValue" class="color-amber">0%</b>
           </div>
           <div class="risk-track"><div id="tuneRiskFill" class="risk-fill risk-low" style="width: 0%;"></div></div>
@@ -631,7 +680,7 @@
           <button onclick="switchTuneTab('drift')" id="tuneTab-drift" class="btn btn-dark btn-sm">💨 Дрифт</button>
           <button onclick="switchTuneTab('style')" id="tuneTab-style" class="btn btn-dark btn-sm">✨ Стенс</button>
         </div>
-        <div id="tuningItemsContainer" class="space-y-2 mb-3" style="max-height: 240px; overflow-y: auto;"></div>
+        <div id="tuningItemsContainer" class="space-y-2 mb-3" style="max-height: 250px; overflow-y: auto;"></div>
         <button onclick="closeModal('modalTuning')" class="btn btn-cyan w-full">Готово</button>
       </div>
     </div>
@@ -672,7 +721,7 @@
             <div class="chat-avatar-circle" id="saleBuyerAvatar">🧑‍💼</div>
             <div>
               <div class="font-bold text-xs" id="saleBuyerName">Покупатель</div>
-              <div class="text-xs color-green">● Осматривает авто</div>
+              <div class="text-xs color-green">● Осматривает авто у капота</div>
             </div>
           </div>
           <button onclick="closeModal('modalHaggleSale')" class="btn btn-dark btn-auto btn-sm">✕</button>
@@ -686,7 +735,7 @@
         </div>
         <div class="chat-thread-container mb-2" id="saleHaggleChatThread"></div>
         <div class="risk-meter-box mb-2">
-          <div class="flex-between text-xs"><span>Терпение:</span><b id="saleBuyerPatienceText" class="color-green">100%</b></div>
+          <div class="flex-between text-xs"><span>Терпение покупателя:</span><b id="saleBuyerPatienceText" class="color-green">100%</b></div>
           <div class="risk-track"><div id="saleBuyerPatienceFill" class="risk-fill risk-low" style="width: 100%;"></div></div>
         </div>
         <div class="space-y-2 mb-3">
@@ -695,14 +744,17 @@
         </div>
         <div class="grid-2">
           <button onclick="confirmSaleFromHaggleModal()" class="btn btn-green">Продать 🤝</button>
-          <button onclick="closeModal('modalHaggleSale')" class="btn btn-dark">Назад</button>
+          <button onclick="rejectBuyerHaggle()" class="btn btn-danger">Отказать клиенту ✕</button>
         </div>
       </div>
     </div>
 
     <div id="modalAutoteka" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="color-green font-bold mb-2">Автотека</h4>
+        <div class="flex-between mb-2">
+          <div class="modal-glow-badge" style="color:var(--green); border-color:rgba(0,230,118,0.4); background:rgba(0,230,118,0.1);"><i class="fa-solid fa-file-waveform"></i> АВТОТЕКА ОФИЦИАЛЬНЫЙ ОТЧЁТ</div>
+          <button onclick="closeModal('modalAutoteka')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
         <div id="autotekaReportContent" class="report-box p-3 mb-3"></div>
         <button onclick="closeModal('modalAutoteka')" class="btn btn-green w-full">Закрыть</button>
       </div>
@@ -710,8 +762,11 @@
 
     <div id="modalPreSale" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="color-cyan font-bold mb-2">Детейлинг</h4>
-        <div id="preSaleCarTitle" class="text-xs color-amber mb-3"></div>
+        <div class="flex-between mb-2">
+          <div class="modal-glow-badge"><i class="fa-solid fa-wand-magic-sparkles"></i> ДЕТЕЙЛИНГ БОКС</div>
+          <button onclick="closeModal('modalPreSale')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div id="preSaleCarTitle" class="text-xs color-amber mb-3 font-bold"></div>
         <div class="presale-grid mb-3">
           <div class="presale-card">
             <div>✨ Полировка</div>
@@ -736,10 +791,13 @@
 
     <div id="modalBarterDeal" class="modal-overlay">
       <div class="modal-box text-center">
-        <h4 class="color-amber font-bold mb-2">Предложение обмена!</h4>
-        <div class="grid-2 mb-3">
-          <div>Ваша: <b class="text-xs" id="barterMyCarName">-</b></div>
-          <div>Их: <b class="text-xs color-cyan" id="barterNpcCarName">-</b></div>
+        <div class="radar-spinner-ring mb-2">
+          <div class="radar-spinner-center">🤝</div>
+        </div>
+        <div class="modal-glow-badge mb-1">ПРЕДЛОЖЕНИЕ ОБМЕНА</div>
+        <div class="grid-2 my-3 p-2" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
+          <div>Ваша тачка: <br><b class="text-xs color-amber" id="barterMyCarName">-</b></div>
+          <div>Предлагают: <br><b class="text-xs color-cyan" id="barterNpcCarName">-</b></div>
         </div>
         <div class="grid-2">
           <button onclick="confirmBarterExchange()" class="btn btn-green">Обмен 🤝</button>
@@ -750,7 +808,10 @@
 
     <div id="modalBuyCall" class="modal-overlay">
       <div class="modal-box text-center">
-        <div style="font-size:36px; margin-bottom:6px;" id="buyCallEmoji">📞</div>
+        <div class="radar-spinner-ring mb-2">
+          <div class="radar-spinner-center" id="buyCallEmoji">📞</div>
+        </div>
+        <div class="modal-glow-badge mb-1">ТЕЛЕФОННЫЙ ВЫЗОВ</div>
         <h3 class="font-bold mb-1" id="buyCallTitle">Звонок...</h3>
         <p class="sub-label mb-3" id="buyCallDesc">Идут гудки...</p>
         <div id="buyCallActionBtnBox"></div>
@@ -759,37 +820,48 @@
 
     <div id="modalDailyBonus" class="modal-overlay">
       <div class="modal-box text-center">
-        <h3 class="font-bold mb-2">🎁 Подарок дня</h3>
+        <div class="modal-glow-badge mb-1" style="color:#ffd700; border-color:rgba(255,179,0,0.4);"><i class="fa-solid fa-gift"></i> ЕЖЕДНЕВНЫЙ ПОДАРОК</div>
+        <h3 class="font-bold mb-2">Календарь наград перекупа</h3>
         <div class="daily-streak-grid" id="dailyBonusGrid"></div>
-        <button id="btnClaimDaily" onclick="claimDailyReward()" class="btn btn-green mb-2">Забрать</button>
+        <button id="btnClaimDaily" onclick="claimDailyReward()" class="btn btn-green mb-2">Забрать награду</button>
         <button onclick="closeModal('modalDailyBonus')" class="btn btn-dark w-full">Закрыть</button>
       </div>
     </div>
 
     <div id="modalDealVerdict" class="modal-overlay">
       <div class="modal-box text-center">
-        <div style="font-size:38px; margin-bottom:6px;" id="verdictEmoji">🤝</div>
-        <h3 class="font-bold mb-1" id="verdictTitle">Сделка</h3>
+        <div class="radar-spinner-ring mb-2" id="verdictRingAnim">
+          <div class="radar-spinner-center" id="verdictEmoji">🤝</div>
+        </div>
+        <div class="modal-glow-badge mb-1" id="verdictBadgeText">ИТОГИ СДЕЛКИ</div>
+        <h3 class="font-bold mb-1" id="verdictTitle">Сделка закрыта</h3>
         <p class="sub-label mb-2" id="verdictText"></p>
         <div class="price-val mb-1" id="verdictAmount">+0 ₽</div>
         <div id="verdictProfitBadge" class="text-xs font-bold mb-3" style="display:none;"></div>
-        <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Понятно</button>
+        <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Отлично, далее</button>
       </div>
     </div>
 
     <div id="modalOBD2" class="modal-overlay">
-      <div class="modal-box">
-        <h4 class="text-center mb-2 color-cyan">OBD2 Сканер</h4>
-        <div id="obd2CarTitle" class="text-xs color-cyan text-center font-bold mb-2"></div>
-        <div id="obd2ResultBox" class="p-2 mb-2" style="background:#090e18; font-family:monospace; font-size:11px;"></div>
+      <div class="modal-box" style="max-width:440px;">
+        <div class="flex-between mb-2 border-b pb-2" style="border-bottom: 1px solid var(--border-glass);">
+          <div class="flex-gap" style="align-items:center;">
+            <i class="fa-solid fa-tablet-screen-button color-cyan" style="font-size:18px;"></i>
+            <b class="text-xs color-cyan" id="obd2CarTitle">Launch Diagnostic Pad</b>
+          </div>
+          <button onclick="closeOBD2Modal()" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div id="obd2ResultBox" class="mb-2" style="font-size:11px;"></div>
         <div id="obd2ActionBox"></div>
-        <button onclick="closeOBD2Modal()" class="btn btn-dark w-full mt-2">Закрыть</button>
       </div>
     </div>
 
     <div id="modalPutOnLot" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2">Выставить на продажу</h4>
+        <div class="flex-between mb-2">
+          <div class="modal-glow-badge"><i class="fa-solid fa-store"></i> ПЛОЩАДКА ПРОДАЖ</div>
+          <button onclick="closeModal('modalPutOnLot')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
         <div id="lotPutCarTitle" class="text-xs color-cyan text-center font-bold mb-1"></div>
         <div id="lotCostInfo" class="text-xs color-amber text-center mb-3"></div>
         <input type="number" id="lotAskingPriceInput" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;" min="1">
@@ -802,7 +874,7 @@
 
     <div id="modalPreview" class="modal-overlay">
       <div class="modal-box">
-        <div class="car-img-wrap mb-2" style="height: 125px;">
+        <div class="car-img-wrap mb-2" style="height: 135px;">
           <img id="prevImg" src="" class="car-img">
           <div class="plate-corner"><div id="prevPlate" class="license-plate"></div></div>
         </div>
@@ -827,21 +899,51 @@
 
     <div id="modalChangePlate" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2">Госномера</h4>
-        <button onclick="removePlateFromCar()" class="btn btn-amber mb-2 w-full">Снять номер (-2,000 ₽)</button>
-        <div id="changePlateList" class="space-y-2 mb-2"></div>
+        <div class="flex-between mb-2">
+          <div class="modal-glow-badge"><i class="fa-solid fa-id-card"></i> РЕГИСТРАЦИОННЫЕ ЗНАКИ</div>
+          <button onclick="closeModal('modalChangePlate')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <button onclick="removePlateFromCar()" class="btn btn-amber mb-2 w-full">Снять номер на транзиты (-2,000 ₽)</button>
+        <div id="changePlateList" class="space-y-2 mb-2" style="max-height: 240px; overflow-y: auto;"></div>
         <button onclick="closeModal('modalChangePlate')" class="btn btn-dark w-full">Отмена</button>
       </div>
     </div>
 
     <div id="modalGauge" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2">Замер ЛКП</h4>
-        <div class="grid-2 mb-3">
-          <button onclick="checkBodyPart('hood')" class="btn btn-dark"><span class="sub-label">Капот:</span> <span id="part-hood" class="font-bold">Замерить</span></button>
-          <button onclick="checkBodyPart('roof')" class="btn btn-dark"><span class="sub-label">Крыша:</span> <span id="part-roof" class="font-bold">Замерить</span></button>
-          <button onclick="checkBodyPart('doors')" class="btn btn-dark"><span class="sub-label">Двери:</span> <span id="part-doors" class="font-bold">Замерить</span></button>
-          <button onclick="checkBodyPart('wings')" class="btn btn-dark"><span class="sub-label">Крылья:</span> <span id="part-wings" class="font-bold">Замерить</span></button>
+        <div class="flex-between mb-2">
+          <div class="modal-glow-badge"><i class="fa-solid fa-microchip"></i> ТОЛЩИНОМЕР ЛКП</div>
+          <button onclick="closeGaugeModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div class="gauge-interactive-meter mb-3">
+          <div class="dial-sensor-bar">
+            <div>
+              <b class="text-xs">Капот:</b>
+              <div class="sub-label" style="font-size:9.5px;">Завод: 90-130 мкм</div>
+            </div>
+            <button onclick="checkBodyPart('hood')" class="btn btn-dark btn-sm dial-sensor-btn" id="part-hood">Замерить</button>
+          </div>
+          <div class="dial-sensor-bar">
+            <div>
+              <b class="text-xs">Крыша:</b>
+              <div class="sub-label" style="font-size:9.5px;">Завод: 80-120 мкм</div>
+            </div>
+            <button onclick="checkBodyPart('roof')" class="btn btn-dark btn-sm dial-sensor-btn" id="part-roof">Замерить</button>
+          </div>
+          <div class="dial-sensor-bar">
+            <div>
+              <b class="text-xs">Двери:</b>
+              <div class="sub-label" style="font-size:9.5px;">Завод: 90-140 мкм</div>
+            </div>
+            <button onclick="checkBodyPart('doors')" class="btn btn-dark btn-sm dial-sensor-btn" id="part-doors">Замерить</button>
+          </div>
+          <div class="dial-sensor-bar">
+            <div>
+              <b class="text-xs">Крылья:</b>
+              <div class="sub-label" style="font-size:9.5px;">Завод: 95-135 мкм</div>
+            </div>
+            <button onclick="checkBodyPart('wings')" class="btn btn-dark btn-sm dial-sensor-btn" id="part-wings">Замерить</button>
+          </div>
         </div>
         <button onclick="closeGaugeModal()" class="btn btn-cyan w-full">Готово ✓</button>
       </div>
@@ -849,15 +951,21 @@
 
     <div id="modalLegalizeCar" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2 color-purple">Легализация</h4>
-        <div id="legalizeCarList" class="space-y-2 mb-3"></div>
+        <div class="flex-between mb-2">
+          <div class="modal-glow-badge" style="color:var(--purple); border-color:rgba(192,132,252,0.4);"><i class="fa-solid fa-user-secret"></i> ЛЕГАЛИЗАЦИЯ VIN</div>
+          <button onclick="closeModal('modalLegalizeCar')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div id="legalizeCarList" class="space-y-2 mb-3" style="max-height: 240px; overflow-y: auto;"></div>
         <button onclick="closeModal('modalLegalizeCar')" class="btn btn-dark w-full">Отмена</button>
       </div>
     </div>
 
     <div id="modalCreateP2P" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2">Выставить на биржу</h4>
+        <div class="flex-between mb-2">
+          <div class="modal-glow-badge"><i class="fa-solid fa-handshake"></i> ВЫСТАВИТЬ НА P2P</div>
+          <button onclick="closeModal('modalCreateP2P')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
         <div class="grid-4 mb-2">
           <button type="button" onclick="selectP2PListingType('car')" id="btnP2PTypeCar" class="btn btn-cyan btn-sm">Авто</button>
           <button type="button" onclick="selectP2PListingType('plate')" id="btnP2PTypePlate" class="btn btn-dark btn-sm">Номер</button>
@@ -865,7 +973,7 @@
           <button type="button" onclick="selectP2PListingType('housing')" id="btnP2PTypeHouse" class="btn btn-dark btn-sm">Жильё</button>
         </div>
         <select id="p2pItemSelect" onchange="onP2PItemSelected(this.value)" style="width:100%; background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; color:#fff; font-size:12px; margin-bottom:8px;"></select>
-        <input type="number" id="p2pPriceInput" placeholder="Цена ₽" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;">
+        <input type="number" id="p2pPriceInput" placeholder="Цена в рублях ₽" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;">
         <div class="grid-2">
           <button onclick="confirmCreateP2PListing()" class="btn btn-green">Выставить</button>
           <button onclick="closeModal('modalCreateP2P')" class="btn btn-dark">Отмена</button>
@@ -876,12 +984,13 @@
     <div id="modalDirectChat" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <h4 class="color-cyan font-bold" id="dmModalTitle">Чат</h4>
+          <div class="modal-glow-badge"><i class="fa-solid fa-comments"></i> ЛИЧНЫЙ ЧАТ</div>
           <button onclick="closeModal('modalDirectChat')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
+        <div class="font-bold text-xs color-cyan mb-2" id="dmModalTitle">Диалог</div>
         <div id="dmMessagesBox" class="chat-messages-container mb-2" style="max-height: 220px;"></div>
         <div class="chat-compose-box">
-          <input type="text" id="dmInputText" class="chat-input" placeholder="Написать..." maxlength="150">
+          <input type="text" id="dmInputText" class="chat-input" placeholder="Написать сообщение..." maxlength="150">
           <button onclick="NetworkManager.sendDirectMessage()" class="chat-send-btn"><i class="fa-solid fa-paper-plane"></i></button>
         </div>
       </div>
@@ -889,7 +998,7 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ (РАБОТАЕТ И ИЗ КОРНЯ, И ИЗ /js/) -->
+    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ -->
     <script>
       (function() {
         const modules = [
@@ -909,12 +1018,12 @@
         function loadModule(name) {
           return new Promise((resolve) => {
             const s1 = document.createElement('script');
-            s1.src = name + '?v=157';
+            s1.src = name + '?v=165';
             s1.onload = () => resolve(true);
             s1.onerror = () => {
               s1.remove();
               const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=157';
+              s2.src = 'js/' + name + '?v=165';
               s2.onload = () => resolve(true);
               s2.onerror = () => {
                 console.warn('[Loader] Не удалось загрузить ' + name);

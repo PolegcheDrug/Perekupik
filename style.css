@@ -18,9 +18,9 @@
   --purple-glow: rgba(192, 132, 252, 0.4);
   --text-main: #f8fafc;
   --text-sub: #94a3b8;
-  --radius-xl: 18px;
-  --radius-lg: 14px;
-  --radius-md: 10px;
+  --radius-xl: 20px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
 }
 
 * {
@@ -32,18 +32,18 @@
   user-select: none;
 }
 
-/* НЕОНОВЫЙ СКРОЛЛБАР[span_0](start_span)[span_0](end_span) */
+/* НЕОНОВЫЙ СКРОЛЛБАР */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(5, 8, 15, 0.6);
+  background: rgba(5, 8, 15, 0.7);
 }
 ::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, var(--cyan), #0284c7);
   border-radius: 8px;
-  box-shadow: 0 0 8px var(--cyan-glow);
+  box-shadow: 0 0 10px var(--cyan-glow);
 }
 
 html, body {
@@ -73,14 +73,14 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   margin: 0 auto;
   position: relative;
   background: 
-    radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.08) 0%, transparent 60%),
-    radial-gradient(circle at 80% 90%, rgba(192, 132, 252, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.09) 0%, transparent 60%),
+    radial-gradient(circle at 80% 90%, rgba(192, 132, 252, 0.06) 0%, transparent 50%),
     linear-gradient(180deg, #0f1728 0%, var(--bg-body) 100%);
   overflow: hidden;
 }
 
 /* ========================================================
-   1. ЕДИНЫЙ ИГРОВОЙ HUD[span_1](start_span)[span_1](end_span)
+   1. ЕДИНЫЙ ИГРОВОЙ HUD[cite: 1]
    ======================================================== */
 .hud-header {
   flex-shrink: 0;
@@ -120,12 +120,9 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 .avatar {
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  max-width: 40px;
-  min-height: 40px;
-  max-height: 40px;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--cyan), #3b82f6);
   display: flex;
@@ -142,8 +139,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .avatar img {
   width: 100%;
   height: 100%;
-  max-width: 100%;
-  max-height: 100%;
   object-fit: cover;
   display: block;
 }
@@ -185,14 +180,14 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   font-size: 9px;
   background: rgba(0, 242, 254, 0.15);
   color: var(--cyan);
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: 5px;
   font-weight: 800;
   border: 1px solid var(--border-glow);
 }
 
 .xp-bar-wrap {
-  width: 90px;
+  width: 95px;
   height: 5px;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 10px;
@@ -222,10 +217,10 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(255, 255, 255, 0.04);
-  padding: 1px 5px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .wallet-dashboard {
@@ -267,7 +262,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .resource-pill {
   font-size: 10px;
   font-weight: 800;
-  padding: 2px 6px;
+  padding: 3px 7px;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
@@ -277,12 +272,12 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 
 .fuel-pill {
   color: #38bdf8;
-  border: 1px solid rgba(56, 189, 248, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.25);
 }
 
 .ticket-pill {
   color: var(--purple);
-  border: 1px solid rgba(192, 132, 252, 0.2);
+  border: 1px solid rgba(192, 132, 252, 0.25);
 }
 
 .hud-bottom-row {
@@ -321,7 +316,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   background: linear-gradient(135deg, rgba(255, 179, 0, 0.15), rgba(255, 179, 0, 0.35));
   color: #ffd700;
   border: 1px solid rgba(255, 179, 0, 0.45);
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 8px;
   font-size: 11px;
   font-weight: 800;
@@ -333,7 +328,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 
 .rp-bar-bg {
   flex: 1;
-  height: 5px;
+  height: 6px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   overflow: hidden;
@@ -348,7 +343,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .fill-mood { background: linear-gradient(90deg, #ec4899, #38bdf8); }
 
 /* ========================================================
-   2. ОСНОВНОЙ КОНТЕЙНЕР[span_2](start_span)[span_2](end_span)
+   2. ОСНОВНОЙ КОНТЕЙНЕР
    ======================================================== */
 .main-content {
   flex: 1 1 0%;
@@ -377,7 +372,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   3. КАРБОНОВЫЕ КАРТОЧКИ И ПЛАШКИ[span_3](start_span)[span_3](end_span)
+   3. КАРБОНОВЫЕ КАРТОЧКИ И ПЛАШКИ
    ======================================================== */
 .glass-card {
   position: relative;
@@ -388,7 +383,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border: 1px solid var(--border-glass);
   border-top: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-xl);
-  padding: 14px;
+  padding: 15px;
   margin-bottom: 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
   overflow: hidden;
@@ -432,20 +427,20 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .car-mods-badges-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
   align-items: center;
-  min-height: 22px;
+  min-height: 24px;
 }
 
 .mod-pill {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 3px 6px;
+  padding: 4px 8px;
   border-radius: 6px;
   font-size: 10px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   line-height: 1;
   transition: transform 0.12s ease;
 }
@@ -457,7 +452,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .mod-pill.color-purple { border-color: rgba(192, 132, 252, 0.4); background: rgba(192, 132, 252, 0.1); }
 
 /* ========================================================
-   4. ОВЕРЛЕЙ КУЛДАУНА И ПЛАТНОГО ДОЗВОНА[span_4](start_span)[span_4](end_span)
+   4. ОВЕРЛЕЙ КУЛДАУНА И ПЛАТНОГО ДОЗВОНА
    ======================================================== */
 .glass-card.busy > *:not(.cooldown-timer) {
   filter: blur(2px) grayscale(0.8);
@@ -484,11 +479,11 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 .timer-clock {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 900;
   color: var(--amber);
   margin-bottom: 6px;
-  text-shadow: 0 0 12px rgba(255, 179, 0, 0.4);
+  text-shadow: 0 0 14px rgba(255, 179, 0, 0.4);
 }
 
 .timer-text {
@@ -501,30 +496,30 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   5. СЕТКА КЛАССОВ АВТОРЫНКА[span_5](start_span)[span_5](end_span)
+   5. СЕТКА КЛАССОВ АВТОРЫНКА
    ======================================================== */
 .market-filter-card {
-  padding: 12px;
+  padding: 13px;
   background: radial-gradient(circle at 50% 0%, #151f33 0%, #090e18 100%);
   border: 1px solid rgba(0, 242, 254, 0.2);
 }
 
 .category-header-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
   background: rgba(0, 242, 254, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   border: 1px solid rgba(0, 242, 254, 0.25);
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .market-categories-grid {
   display: grid !important;
   grid-template-columns: repeat(3, 1fr) !important;
-  gap: 8px !important;
+  gap: 9px !important;
   margin-top: 6px;
   transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out, margin 0.25s ease;
   max-height: 500px;
@@ -544,12 +539,12 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   background: #0d1424;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
-  padding: 10px 4px 8px 4px;
+  padding: 11px 4px 9px 4px;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 4px;
+  gap: 5px;
   cursor: pointer;
   transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   position: relative;
@@ -559,7 +554,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .cat-tile:active { transform: scale(0.96); }
 
 .cat-tile-icon {
-  font-size: 18px;
+  font-size: 19px;
   color: var(--text-sub);
   transition: color 0.2s ease, transform 0.2s ease;
 }
@@ -602,7 +597,179 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   6. СМАРТФОН «PEREKUP OS» (СЕТКА 4x4)[span_6](start_span)[span_6](end_span)
+   6. КНОПКИ (БОЛЕЕ ШИРОКИЕ, УДОБНЫЕ И ИНТЕРАКТИВНЫЕ)
+   ======================================================== */
+.btn {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  border: none;
+  font-weight: 800;
+  font-size: 11.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  line-height: 1.25;
+  text-align: center;
+  word-break: break-word;
+  transition: transform 0.1s ease, opacity 0.2s ease, filter 0.1s ease, box-shadow 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn:active { transform: scale(0.97); filter: brightness(1.2); }
+.btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
+
+.btn-cyan { background: linear-gradient(135deg, var(--cyan), #0284c7); color: #000; box-shadow: 0 0 12px rgba(0, 242, 254, 0.3); }
+.btn-green { background: linear-gradient(135deg, var(--green), #059669); color: #000; box-shadow: 0 0 12px rgba(0, 230, 118, 0.3); }
+.btn-amber { background: linear-gradient(135deg, #ffd700, var(--amber)); color: #000; box-shadow: 0 0 12px rgba(255, 179, 0, 0.3); }
+.btn-purple { background: linear-gradient(135deg, #c084fc, #9333ea); color: #fff; box-shadow: 0 0 14px rgba(192, 132, 252, 0.4); }
+.btn-red { background: linear-gradient(135deg, var(--red), #dc2626); color: #fff; box-shadow: 0 0 12px rgba(255, 51, 102, 0.4); }
+.btn-dark { background: rgba(255, 255, 255, 0.08); color: #e2e8f0; border: 1px solid var(--border-glass); }
+.btn-danger { background: #dc2626; color: #fff; box-shadow: 0 0 12px rgba(220, 38, 38, 0.4); }
+
+.btn-sm { 
+  min-height: 35px;
+  font-size: 10.5px; 
+  padding: 8px 12px; 
+}
+
+.btn-auto { 
+  width: auto; 
+  min-width: max-content;
+  padding: 8px 14px; 
+  font-size: 11px; 
+  white-space: nowrap; 
+  flex-shrink: 0; 
+}
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; flex-shrink: 0; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; flex-shrink: 0; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; flex-shrink: 0; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.flex-gap { display: flex; gap: 7px; }
+
+/* ========================================================
+   7. НОВЫЙ ДИЗАЙН МОДАЛЬНЫХ ОКОН С КРУТИЛКАМИ И ИНДИКАТОРАМИ
+   ======================================================== */
+.modal-overlay {
+  display: none !important;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  background: rgba(3, 6, 12, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 5000;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px calc(env(safe-area-inset-bottom, 0px) + 12px) 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.modal-overlay.active { display: flex !important; }
+
+.modal-box {
+  background: 
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0px, rgba(255, 255, 255, 0.015) 2px, transparent 2px, transparent 4px),
+    radial-gradient(circle at 50% 0%, rgba(26, 38, 64, 0.98) 0%, rgba(9, 14, 24, 0.98) 100%);
+  border: 1px solid var(--border-glow);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 242, 254, 0.15);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 430px;
+  padding: 18px;
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  margin: auto;
+  animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleIn {
+  from { opacity: 0; transform: scale(0.93) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ИНТЕРАКТИВНЫЕ ИНДИКАТОРЫ И КРУТИЛКИ В МОДАЛКАХ */
+.modal-glow-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(0, 242, 254, 0.1);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  color: var(--cyan);
+}
+
+.radar-spinner-ring {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 3px solid rgba(0, 242, 254, 0.15);
+  border-top-color: var(--cyan);
+  border-right-color: var(--green);
+  animation: spinRing 1.2s infinite linear;
+  margin: 0 auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes spinRing {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.radar-spinner-center {
+  font-size: 20px;
+  animation: counterRotate 1.2s infinite linear;
+}
+
+@keyframes counterRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+.gauge-interactive-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #090e18;
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 10px;
+}
+
+.dial-sensor-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dial-sensor-btn {
+  min-width: 110px;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+/* ========================================================
+   8. СМАРТФОН «PEREKUP OS»[cite: 5]
    ======================================================== */
 .phone-device-wrapper {
   background: 
@@ -731,7 +898,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Градиенты 16 приложений[span_7](start_span)[span_7](end_span) */
+/* Градиенты 16 приложений */
 .phone-app-icon.bg-cyan { background: linear-gradient(135deg, #00f2fe, #0284c7) !important; }
 .phone-app-icon.bg-green { background: linear-gradient(135deg, #00e676, #059669) !important; }
 .phone-app-icon.bg-emerald { background: linear-gradient(135deg, #10b981, #047857) !important; }
@@ -786,341 +953,8 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 .phone-home-bar-area:active .phone-home-indicator { background: var(--cyan); transform: scaleX(1.1); }
 
-/* ВИДЖЕТ ЕЖЕДНЕВНЫХ ЗАДАНИЙ[span_8](start_span)[span_8](end_span) */
-.phone-quests-widget {
-  background: 
-    radial-gradient(circle at 100% 0%, rgba(0, 242, 254, 0.08) 0%, transparent 60%),
-    linear-gradient(145deg, rgba(16, 24, 38, 0.95), rgba(9, 14, 24, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-left: 3px solid var(--cyan);
-  border-radius: 16px;
-  padding: 10px 12px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
-}
-
-.quest-item-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-}
-.quest-item-row:last-child { border-bottom: none; }
-
-.quest-progress-mini {
-  width: 50px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 3px;
-}
-.quest-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--cyan), var(--green));
-  transition: width 0.3s ease;
-}
-
 /* ========================================================
-   7. SMS / ЧАТ СООБЩЕНИЯ[span_9](start_span)[span_9](end_span)
-   ======================================================== */
-.phone-opened-app-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  animation: fadeIn 0.15s ease-out;
-}
-
-.phone-app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 4px 10px 4px;
-  border-bottom: 1px solid var(--border-glass);
-  margin-bottom: 10px;
-  flex-shrink: 0;
-}
-
-.phone-back-btn {
-  background: transparent;
-  border: none;
-  color: var(--cyan);
-  font-size: 12px;
-  font-weight: 800;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.phone-app-title {
-  font-size: 13px;
-  font-weight: 900;
-  color: #fff;
-}
-
-.phone-app-body {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.phone-messages-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.phone-msg-item {
-  background: #090e18;
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  gap: 12px !important;
-  cursor: pointer;
-  position: relative;
-  transition: transform 0.1s ease, border-color 0.2s ease;
-}
-.phone-msg-item:active { transform: scale(0.98); }
-.phone-msg-item.unread-msg {
-  border-color: rgba(0, 242, 254, 0.4);
-  background: linear-gradient(145deg, #10192a 0%, #090e18 100%);
-}
-
-.phone-msg-avatar {
-  font-size: 26px !important;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0 !important;
-}
-
-.phone-msg-content {
-  flex: 1 1 auto !important;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.phone-msg-preview {
-  font-size: 10px;
-  color: var(--text-sub);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.phone-unread-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--cyan);
-  box-shadow: 0 0 6px var(--cyan-glow);
-  flex-shrink: 0;
-}
-
-/* ========================================================
-   8. МОДАЛЬНЫЕ ОКНА И ДИАЛОГ ТОРГА[span_10](start_span)[span_10](end_span)
-   ======================================================== */
-.modal-overlay {
-  display: none !important;
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100dvh;
-  background: rgba(3, 6, 12, 0.88);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  z-index: 5000;
-  align-items: center;
-  justify-content: center;
-  padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px calc(env(safe-area-inset-bottom, 0px) + 12px) 12px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.modal-overlay.active { display: flex !important; }
-
-.modal-box {
-  background: 
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.01) 0px, rgba(255, 255, 255, 0.01) 2px, transparent 2px, transparent 4px),
-    radial-gradient(circle at 50% 0%, rgba(20, 29, 48, 0.98) 0%, rgba(9, 14, 24, 0.98) 100%);
-  border: 1px solid var(--border-glow);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
-  border-radius: var(--radius-xl);
-  width: 100%;
-  max-width: 410px;
-  padding: 16px;
-  max-height: calc(100dvh - 32px);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  margin: auto;
-}
-
-.chat-deal-box {
-  padding: 14px;
-  background: radial-gradient(circle at 50% 0%, #151e30 0%, #080d16 100%) !important;
-  max-width: 420px;
-}
-
-.chat-header-bar {
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border-glass);
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-}
-
-.chat-avatar-circle {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  border-radius: 50%;
-  background: #1e293b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  border: 1px solid var(--border-glass);
-  flex-shrink: 0;
-}
-
-.deal-car-preview-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: #090e18;
-  border: 1px solid var(--border-glass);
-  border-radius: var(--radius-md);
-  padding: 8px 10px;
-  flex-shrink: 0;
-}
-
-.deal-car-thumb {
-  width: 72px;
-  height: 50px;
-  min-width: 72px;
-  max-width: 72px;
-  border-radius: 6px;
-  object-fit: cover;
-  flex-shrink: 0;
-  display: block;
-}
-
-.chat-thread-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 90px;
-  max-height: 155px;
-  overflow-y: auto;
-  padding: 4px;
-  flex: 1 1 auto;
-  overscroll-behavior: contain;
-}
-
-.chat-msg {
-  padding: 8px 12px;
-  border-radius: 12px;
-  font-size: 11px;
-  line-height: 1.4;
-  max-width: 90%;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  animation: fadeIn 0.15s ease-out;
-}
-
-.msg-seller {
-  align-self: flex-start;
-  background: #111a2a;
-  border-left: 3px solid var(--cyan);
-  color: #e2e8f0;
-  border-bottom-left-radius: 2px;
-}
-
-.msg-player {
-  align-self: flex-end;
-  background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(2, 132, 199, 0.3));
-  border-right: 3px solid var(--green);
-  color: #fff;
-  border-bottom-right-radius: 2px;
-}
-
-.risk-meter-box {
-  background: #090e18;
-  border: 1px solid var(--border-glass);
-  border-radius: 8px;
-  padding: 8px 10px;
-  flex-shrink: 0;
-}
-
-.risk-track {
-  width: 100%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-top: 4px;
-}
-
-.risk-fill {
-  height: 100%;
-  transition: width 0.3s ease, background 0.3s ease;
-}
-.risk-low { background: var(--green); }
-.risk-mid { background: var(--amber); }
-.risk-high { background: var(--red); }
-
-/* ========================================================
-   9. КНОПКИ[span_11](start_span)[span_11](end_span)
-   ======================================================== */
-.btn {
-  width: 100%;
-  padding: 10px 10px;
-  border-radius: var(--radius-md);
-  border: none;
-  font-weight: 800;
-  font-size: 11px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  line-height: 1.25;
-  text-align: center;
-  word-break: break-word;
-  transition: transform 0.1s ease, opacity 0.2s ease, filter 0.1s ease;
-  flex-shrink: 0;
-}
-
-.btn:active { transform: scale(0.97); filter: brightness(1.2); }
-.btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
-
-.btn-cyan { background: linear-gradient(135deg, var(--cyan), #0284c7); color: #000; box-shadow: 0 0 10px rgba(0, 242, 254, 0.25); }
-.btn-green { background: linear-gradient(135deg, var(--green), #059669); color: #000; box-shadow: 0 0 10px rgba(0, 230, 118, 0.25); }
-.btn-amber { background: linear-gradient(135deg, #ffd700, var(--amber)); color: #000; box-shadow: 0 0 10px rgba(255, 179, 0, 0.25); }
-.btn-purple { background: linear-gradient(135deg, #c084fc, #9333ea); color: #fff; box-shadow: 0 0 12px rgba(192, 132, 252, 0.35); }
-.btn-red { background: linear-gradient(135deg, var(--red), #dc2626); color: #fff; box-shadow: 0 0 10px rgba(255, 51, 102, 0.35); }
-.btn-dark { background: rgba(255, 255, 255, 0.06); color: #e2e8f0; border: 1px solid var(--border-glass); }
-.btn-danger { background: #dc2626; color: #fff; }
-.btn-sm { font-size: 10px; padding: 7px 8px; }
-.btn-auto { width: auto; padding: 7px 12px; font-size: 10.5px; white-space: nowrap; flex-shrink: 0; }
-
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-shrink: 0; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; flex-shrink: 0; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; flex-shrink: 0; }
-.flex-between { display: flex; justify-content: space-between; align-items: center; }
-.flex-gap { display: flex; gap: 6px; }
-
-/* ========================================================
-   10. ОФИЦИАЛЬНЫЙ БЛАНК ДКП[span_12](start_span)[span_12](end_span)
+   9. ОФИЦИАЛЬНЫЙ БЛАНК ДКП[cite: 6]
    ======================================================== */
 .dkp-official-blank {
   background: linear-gradient(145deg, #101624 0%, #080d16 100%) !important;
@@ -1217,7 +1051,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   11. КАРТОЧКА АВТОМОБИЛЯ И ПРЕДПРОДАЖКА[span_13](start_span)[span_13](end_span)
+   10. КАРТОЧКА АВТОМОБИЛЯ И ПРЕДПРОДАЖКА
    ======================================================== */
 .car-img-wrap {
   position: relative;
@@ -1340,7 +1174,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   12. СТРИТ, ДРАГ & ВИЛСПИН[span_14](start_span)[span_14](end_span)
+   11. СТРИТ, ДРАГ & ВИЛСПИН[cite: 7]
    ======================================================== */
 .race-panel {
   background: #080d16;
@@ -1484,7 +1318,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   13. САРАИ, БИЗНЕС И КОНТЕЙНЕРЫ[span_15](start_span)[span_15](end_span)
+   12. САРАИ, БИЗНЕС И КОНТЕЙНЕРЫ[cite: 3]
    ======================================================== */
 .barn-tier-card {
   width: 100%;
@@ -1576,7 +1410,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   14. НИЖНИЙ БАР НАВИГАЦИИ[span_16](start_span)[span_16](end_span)
+   13. НИЖНИЙ БАР НАВИГАЦИИ
    ======================================================== */
 .bottom-nav {
   flex-shrink: 0;
@@ -1628,7 +1462,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   15. РЕШАЛА, ЭФИР И УТИЛИТЫ[span_17](start_span)[span_17](end_span)
+   14. РЕШАЛА, ЭФИР И УТИЛИТЫ
    ======================================================== */
 .reshala-banner {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(30, 15, 50, 0.9));
@@ -1811,11 +1645,11 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: #090e18;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--border-glass);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .patch-item {
@@ -1823,70 +1657,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   padding: 8px 10px;
   border-radius: 8px;
   border-left: 3px solid var(--cyan);
-}
-
-/* ========================================================
-   16. ОНЛАЙН РАДИО: МАГНИТОЛА И ЭКВАЛАЙЗЕР[span_18](start_span)[span_18](end_span)
-   ======================================================== */
-.radio-cassette-glow {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.radio-brand-badge {
-  background: linear-gradient(135deg, #ff0055, #ff5500);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 1.5px;
-  padding: 3px 10px;
-  border-radius: 4px;
-  box-shadow: 0 0 12px rgba(255, 0, 85, 0.5);
-  display: inline-block;
-}
-
-.radio-equalizer-bars {
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 4px;
-  height: 28px;
-}
-
-.radio-equalizer-bars span {
-  width: 4px;
-  height: 6px;
-  background: var(--cyan);
-  border-radius: 2px;
-  transition: height 0.2s ease;
-}
-
-.radio-equalizer-bars.playing span:nth-child(1) { animation: eqAnim 0.7s infinite alternate ease-in-out; }
-.radio-equalizer-bars.playing span:nth-child(2) { animation: eqAnim 0.5s infinite alternate ease-in-out 0.1s; }
-.radio-equalizer-bars.playing span:nth-child(3) { animation: eqAnim 0.9s infinite alternate ease-in-out 0.2s; }
-.radio-equalizer-bars.playing span:nth-child(4) { animation: eqAnim 0.6s infinite alternate ease-in-out 0.3s; }
-.radio-equalizer-bars.playing span:nth-child(5) { animation: eqAnim 0.8s infinite alternate ease-in-out 0.15s; }
-.radio-equalizer-bars.playing span:nth-child(6) { animation: eqAnim 0.55s infinite alternate ease-in-out 0.25s; }
-.radio-equalizer-bars.playing span:nth-child(7) { animation: eqAnim 0.75s infinite alternate ease-in-out 0.05s; }
-
-@keyframes eqAnim {
-  0% { height: 4px; background: var(--cyan); }
-  50% { height: 26px; background: var(--purple); }
-  100% { height: 12px; background: var(--green); }
-}
-
-.station-row {
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.1s ease;
-}
-.station-row:active {
-  transform: scale(0.98);
-}
-.station-row.active-station {
-  border-color: var(--cyan) !important;
-  background: linear-gradient(135deg, rgba(0, 242, 254, 0.12), rgba(15, 23, 42, 0.95)) !important;
 }
 
 .level-lock-cover {

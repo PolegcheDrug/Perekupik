@@ -1,11 +1,11 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.4.5)
-// Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
-// Реальное время (00:00), квесты, синдикат-гейт, мультиязычность,
-// надежный запуск всех модулей PerekupOS без зависаний
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.4.6)
+// Разработчики: Tak Toje, Max, Sergo, gemini
+// Реальное время (00:00), комбинированная экономика (₽ + ⭐),
+// износ оборудования, квесты и стабильный запуск всех модулей PerekupOS
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.4.5";
+const CURRENT_GAME_VERSION = "v0.4.6";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -197,6 +197,7 @@ const DEFAULT_STATE = {
         hasRacingLicense: false, consecutiveRaces: 0, maxRacesBeforeRaid: 12,
         safeDeposit: 0, trafficFines: 0,
         tools: { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false },
+        toolsWear: { gauge: 60, gauge_pro: 100, obd: 50, obd_launch: 80, endoscope: 40, compressor: 50, battery_tester: 60 },
         furniture: [],
         phoneMessages: [],
         dailyQuests: [],
@@ -530,6 +531,7 @@ function applyLoadedState(parsed) {
         state.player = { ...DEFAULT_STATE.player, ...parsed.player };
         if (parsed.player.stats) state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
         if (parsed.player.tools) state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
+        if (parsed.player.toolsWear) state.player.toolsWear = { ...DEFAULT_STATE.player.toolsWear, ...parsed.player.toolsWear };
         if (Array.isArray(parsed.player.phoneMessages)) state.player.phoneMessages = parsed.player.phoneMessages;
         if (Array.isArray(parsed.player.dailyQuests)) state.player.dailyQuests = parsed.player.dailyQuests;
         if (Array.isArray(parsed.player.bankHistory)) state.player.bankHistory = parsed.player.bankHistory;
@@ -581,6 +583,7 @@ function sanitizeState() {
     if (!Array.isArray(state.registeredPlates)) state.registeredPlates = ["В777ВВ 77"];
     if (!Array.isArray(state.p2pMarketListings)) state.p2pMarketListings = [];
     if (typeof state.player.cash !== 'number' || state.player.cash < 0) state.player.cash = 150000;
+    if (typeof state.player.stars !== 'number' || state.player.stars < 0) state.player.stars = 15;
     if (typeof state.player.loanDebt !== 'number' || state.player.loanDebt < 0) state.player.loanDebt = 0;
     if (typeof state.player.safeDeposit !== 'number') state.player.safeDeposit = 0;
     if (typeof state.player.fuel !== 'number') state.player.fuel = 100;
@@ -593,6 +596,10 @@ function sanitizeState() {
 
     if (!state.player.tools) {
         state.player.tools = { gauge: false, gauge_pro: false, obd: false, obd_launch: false, endoscope: false, compressor: false, battery_tester: false };
+    }
+
+    if (!state.player.toolsWear) {
+        state.player.toolsWear = { gauge: 60, gauge_pro: 100, obd: 50, obd_launch: 80, endoscope: 40, compressor: 50, battery_tester: 60 };
     }
     
     if (state.businesses && typeof BUSINESS_DATA !== 'undefined') {
@@ -1055,7 +1062,7 @@ function claimDailyReward() {
 }
 
 // ========================================================
-// 10. МАГАЗИН ПЕРЕКУПА
+// 10. МАГАЗИН ПЕРЕКУПА: КОМБИНИРОВАННАЯ ОПЛАТА И РЕСУРС
 // ========================================================
 function switchShopSection(section) {
     ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
@@ -1081,32 +1088,72 @@ function renderShopTools() {
     let html = "";
     tools.forEach(t => {
         let isOwned = !!(state.player.tools && state.player.tools[t.id]);
-        let btn = isOwned 
-            ? `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Куплено ✓</button>`
-            : `<button onclick="buyToolAction('${t.id}', ${t.cost})" class="btn btn-cyan btn-sm btn-auto">${t.cost.toLocaleString()} ₽</button>`;
+        let wear = (state.player.toolsWear && state.player.toolsWear[t.id] !== undefined) ? state.player.toolsWear[t.id] : (t.maxUses || 50);
+        let maxUses = t.maxUses || 50;
+
+        let actionBlock = "";
+        if (!isOwned) {
+            let starsTxt = t.reqStars ? ` + ${t.reqStars} ⭐` : "";
+            actionBlock = `<button onclick="buyToolAction('${t.id}', ${t.cost}, ${t.reqStars || 0})" class="btn btn-cyan btn-sm btn-auto">${t.cost.toLocaleString()} ₽${starsTxt}</button>`;
+        } else {
+            let wearClass = wear < 15 ? "color-red" : "color-green";
+            actionBlock = `
+                <div style="text-align:right;">
+                    <div class="sub-label mb-1" style="font-size:9.5px;">Ресурс: <b class="${wearClass}">${wear} / ${maxUses}</b></div>
+                    <button onclick="calibrateToolAction('${t.id}', ${t.serviceCost || 3000})" class="btn btn-dark btn-sm btn-auto" ${wear >= maxUses ? 'disabled' : ''}>
+                        Калибровка (${(t.serviceCost || 3000).toLocaleString()} ₽)
+                    </button>
+                </div>
+            `;
+        }
+
         html += `
         <div class="glass-card flex-between p-2 mb-2">
             <div style="flex:1; margin-right:8px;">
                 <b class="text-xs color-cyan"><i class="fa-solid ${t.icon || 'fa-wrench'} mr-1"></i> ${t.name}</b>
                 <div class="sub-label" style="font-size:10px;">${t.desc}</div>
             </div>
-            ${btn}
+            ${actionBlock}
         </div>`;
     });
     box.innerHTML = html;
 }
 
-function buyToolAction(toolId, cost) {
+function buyToolAction(toolId, cost, reqStars = 0) {
     let cash = state.player.cash || 0;
-    if (cash < cost) return showToast("Не хватает денег на прибор!");
+    let stars = state.player.stars || 0;
+    if (cash < cost) return showToast("Не хватает рублей на покупку прибора!");
+    if (stars < reqStars) return showToast(`Требуется ещё ${reqStars} Stars ⭐!`);
+
     state.player.cash -= cost;
+    state.player.stars -= reqStars;
     if (!state.player.tools) state.player.tools = {};
+    if (!state.player.toolsWear) state.player.toolsWear = {};
+
     state.player.tools[toolId] = true;
+    const template = (SHOP_CATALOG.tools || []).find(t => t.id === toolId);
+    state.player.toolsWear[toolId] = template ? template.maxUses : 50;
+
     saveState();
     renderShopTools();
     if (typeof renderContracts === 'function') renderContracts();
     playSound('win'); tgHaptic('success');
-    showToast("Прибор куплен и добавлен в диагностический арсенал!");
+    showToast("Прибор куплен и готов к диагностике!");
+}
+
+function calibrateToolAction(toolId, cost) {
+    let cash = state.player.cash || 0;
+    if (cash < cost) return showToast("Не хватает денег на обслуживание прибора!");
+    
+    state.player.cash -= cost;
+    const template = (SHOP_CATALOG.tools || []).find(t => t.id === toolId);
+    if (!state.player.toolsWear) state.player.toolsWear = {};
+    state.player.toolsWear[toolId] = template ? template.maxUses : 50;
+
+    saveState();
+    renderShopTools();
+    playSound('win'); tgHaptic('success');
+    showToast("Прибор откалиброван, батарея заряжена до 100%!");
 }
 
 function renderShopConsumables() {
@@ -1116,22 +1163,27 @@ function renderShopConsumables() {
 
     let html = "";
     packs.forEach(p => {
+        let starsTxt = p.reqStars ? ` + ${p.reqStars} ⭐` : "";
         html += `
         <div class="glass-card flex-between p-2 mb-2">
             <div style="flex:1; margin-right:8px;">
                 <b class="text-xs color-amber">${p.name}</b>
                 <div class="sub-label" style="font-size:10px;">${p.desc}</div>
             </div>
-            <button onclick="buyConsumableAction(${p.cost}, ${p.value})" class="btn btn-amber btn-sm btn-auto">${p.cost.toLocaleString()} ₽</button>
+            <button onclick="buyConsumableAction(${p.cost}, ${p.reqStars || 0}, ${p.value})" class="btn btn-amber btn-sm btn-auto">${p.cost.toLocaleString()} ₽${starsTxt}</button>
         </div>`;
     });
     box.innerHTML = html;
 }
 
-function buyConsumableAction(cost, val) {
+function buyConsumableAction(cost, reqStars, val) {
     let cash = state.player.cash || 0;
-    if (cash < cost) return showToast("Не хватает денег на партию сырья!");
+    let stars = state.player.stars || 0;
+    if (cash < cost) return showToast("Не хватает рублей на сырьё!");
+    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+
     state.player.cash -= cost;
+    state.player.stars -= reqStars;
     if (state.businesses) {
         state.businesses.forEach(b => {
             b.stock = Math.min(100, (b.stock || 0) + val);
@@ -1151,9 +1203,10 @@ function renderShopTuningParts() {
     parts.forEach(p => {
         let isBought = false;
         if (p.id === 'raf_license') isBought = !!state.player.hasRacingLicense;
+        let starsTxt = p.reqStars ? ` + ${p.reqStars} ⭐` : "";
         let btn = isBought
             ? `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Оформлено ✓</button>`
-            : `<button onclick="buyShopDocAction('${p.id}', ${p.cost})" class="btn btn-red btn-sm btn-auto">${p.cost.toLocaleString()} ₽</button>`;
+            : `<button onclick="buyShopDocAction('${p.id}', ${p.cost}, ${p.reqStars || 0})" class="btn btn-red btn-sm btn-auto">${p.cost.toLocaleString()} ₽${starsTxt}</button>`;
 
         html += `
         <div class="glass-card flex-between p-2 mb-2">
@@ -1173,10 +1226,14 @@ function renderShopTuningParts() {
     box.innerHTML = html;
 }
 
-function buyShopDocAction(docId, cost) {
+function buyShopDocAction(docId, cost, reqStars = 0) {
     let cash = state.player.cash || 0;
-    if (cash < cost) return showToast("Не хватает денег!");
+    let stars = state.player.stars || 0;
+    if (cash < cost) return showToast("Не хватает рублей!");
+    if (stars < reqStars) return showToast(`Требуется ${reqStars} Stars ⭐!`);
+
     state.player.cash -= cost;
+    state.player.stars -= reqStars;
 
     if (docId === 'raf_license') {
         state.player.hasRacingLicense = true;
@@ -1202,9 +1259,10 @@ function renderShopHomeItems() {
     let html = "";
     HOUSING_INTERIOR_CATALOG.forEach(item => {
         let isBought = state.player.furniture.includes(item.id);
+        let starsTxt = item.reqStars ? ` + ${item.reqStars} ⭐` : "";
         let btnContent = isBought 
             ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Куплено ✓</button>"
-            : `<button onclick="buyHomeFurnitureShop('${item.id}', ${item.cost})" class="btn btn-green btn-sm btn-auto">${(item.cost / 1000).toFixed(0)}k ₽</button>`;
+            : `<button onclick="buyHomeFurnitureShop('${item.id}', ${item.cost}, ${item.reqStars || 0})" class="btn btn-green btn-sm btn-auto">${(item.cost / 1000).toFixed(0)}k ₽${starsTxt}</button>`;
 
         html += `
         <div class="glass-card p-2 flex-between mb-2">
@@ -1218,10 +1276,14 @@ function renderShopHomeItems() {
     box.innerHTML = html;
 }
 
-function buyHomeFurnitureShop(fId, cost) {
+function buyHomeFurnitureShop(fId, cost, reqStars = 0) {
     let cash = state.player.cash || 0;
-    if (cash < cost) return showToast("Не хватает денег!");
+    let stars = state.player.stars || 0;
+    if (cash < cost) return showToast("Не хватает рублей!");
+    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+
     state.player.cash -= cost;
+    state.player.stars -= reqStars;
     if (!state.player.furniture) state.player.furniture = [];
     state.player.furniture.push(fId);
     saveState();
@@ -1359,7 +1421,6 @@ function initApp() {
         applyLanguageToDOM();
         checkRealTimeDayChange();
         
-        // Гарантированное наполнение базы при первом запуске
         if (!state.marketFeed || state.marketFeed.length === 0 || !state.marketFeed.some(c => c && !c.unavailable)) {
             if (typeof populateMarketFeed === 'function') populateMarketFeed();
         }
@@ -1522,6 +1583,7 @@ window.openPatchNotesModal = openPatchNotesModal;
 window.dismissPatchNotesModal = dismissPatchNotesModal;
 window.switchShopSection = switchShopSection;
 window.buyToolAction = buyToolAction;
+window.calibrateToolAction = calibrateToolAction;
 window.buyConsumableAction = buyConsumableAction;
 window.buyShopDocAction = buyShopDocAction;
 window.buyHomeFurnitureShop = buyHomeFurnitureShop;
