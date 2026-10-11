@@ -32,7 +32,7 @@
   user-select: none;
 }
 
-/* НЕОНОВЫЙ СКРОЛЛБАР */
+/* НЕОНОВЫЙ СКРОЛЛБАР[span_0](start_span)[span_0](end_span) */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -80,7 +80,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   1. ЕДИНЫЙ ИГРОВОЙ HUD
+   1. ЕДИНЫЙ ИГРОВОЙ HUD[span_1](start_span)[span_1](end_span)
    ======================================================== */
 .hud-header {
   flex-shrink: 0;
@@ -348,7 +348,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .fill-mood { background: linear-gradient(90deg, #ec4899, #38bdf8); }
 
 /* ========================================================
-   2. ОСНОВНОЙ КОНТЕЙНЕР
+   2. ОСНОВНОЙ КОНТЕЙНЕР[span_2](start_span)[span_2](end_span)
    ======================================================== */
 .main-content {
   flex: 1 1 0%;
@@ -377,7 +377,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   3. КАРБОНОВЫЕ КАРТОЧКИ И ПЛАШКИ
+   3. КАРБОНОВЫЕ КАРТОЧКИ И ПЛАШКИ[span_3](start_span)[span_3](end_span)
    ======================================================== */
 .glass-card {
   position: relative;
@@ -449,7 +449,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   line-height: 1;
   transition: transform 0.12s ease;
 }
-.mod-pill:hover, .mod-pill:active { transform: scale(1.1); }
+.mod-pill:hover, .mod-pill:active { transform: scale(1.05); }
 .mod-pill.color-cyan { border-color: rgba(0, 242, 254, 0.4); background: rgba(0, 242, 254, 0.1); }
 .mod-pill.color-green { border-color: rgba(0, 230, 118, 0.4); background: rgba(0, 230, 118, 0.1); }
 .mod-pill.color-amber { border-color: rgba(255, 179, 0, 0.4); background: rgba(255, 179, 0, 0.1); }
@@ -457,7 +457,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .mod-pill.color-purple { border-color: rgba(192, 132, 252, 0.4); background: rgba(192, 132, 252, 0.1); }
 
 /* ========================================================
-   4. ОВЕРЛЕЙ КУЛДАУНА И ПЛАТНОГО ДОЗВОНА
+   4. ОВЕРЛЕЙ КУЛДАУНА И ПЛАТНОГО ДОЗВОНА[span_4](start_span)[span_4](end_span)
    ======================================================== */
 .glass-card.busy > *:not(.cooldown-timer) {
   filter: blur(2px) grayscale(0.8);
@@ -501,7 +501,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   5. СЕТКА КЛАССОВ АВТОРЫНКА
+   5. СЕТКА КЛАССОВ АВТОРЫНКА[span_5](start_span)[span_5](end_span)
    ======================================================== */
 .market-filter-card {
   padding: 12px;
@@ -602,7 +602,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   6. СМАРТФОН «PEREKUP OS» (СЕТКА 4x4)
+   6. СМАРТФОН «PEREKUP OS» (СЕТКА 4x4)[span_6](start_span)[span_6](end_span)
    ======================================================== */
 .phone-device-wrapper {
   background: 
@@ -731,7 +731,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Градиенты 16 приложений */
+/* Градиенты 16 приложений[span_7](start_span)[span_7](end_span) */
 .phone-app-icon.bg-cyan { background: linear-gradient(135deg, #00f2fe, #0284c7) !important; }
 .phone-app-icon.bg-green { background: linear-gradient(135deg, #00e676, #059669) !important; }
 .phone-app-icon.bg-emerald { background: linear-gradient(135deg, #10b981, #047857) !important; }
@@ -786,7 +786,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 .phone-home-bar-area:active .phone-home-indicator { background: var(--cyan); transform: scaleX(1.1); }
 
-/* ВИДЖЕТ ЕЖЕДНЕВНЫХ ЗАДАНИЙ ВНИЗУ */
+/* ВИДЖЕТ ЕЖЕДНЕВНЫХ ЗАДАНИЙ[span_8](start_span)[span_8](end_span) */
 .phone-quests-widget {
   background: 
     radial-gradient(circle at 100% 0%, rgba(0, 242, 254, 0.08) 0%, transparent 60%),
@@ -822,7 +822,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   7. SMS / ЧАТ СООБЩЕНИЯ
+   7. SMS / ЧАТ СООБЩЕНИЯ[span_9](start_span)[span_9](end_span)
    ======================================================== */
 .phone-opened-app-view {
   display: flex;
@@ -925,7 +925,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   8. МОДАЛЬНЫЕ ОКНА И ДИАЛОГ ТОРГА
+   8. МОДАЛЬНЫЕ ОКНА И ДИАЛОГ ТОРГА[span_10](start_span)[span_10](end_span)
    ======================================================== */
 .modal-overlay {
   display: none !important;
@@ -1077,7 +1077,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .risk-high { background: var(--red); }
 
 /* ========================================================
-   9. КНОПКИ
+   9. КНОПКИ[span_11](start_span)[span_11](end_span)
    ======================================================== */
 .btn {
   width: 100%;
@@ -1120,7 +1120,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .flex-gap { display: flex; gap: 6px; }
 
 /* ========================================================
-   10. ОФИЦИАЛЬНЫЙ БЛАНК ДКП
+   10. ОФИЦИАЛЬНЫЙ БЛАНК ДКП[span_12](start_span)[span_12](end_span)
    ======================================================== */
 .dkp-official-blank {
   background: linear-gradient(145deg, #101624 0%, #080d16 100%) !important;
@@ -1217,7 +1217,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   11. КАРТОЧКА АВТОМОБИЛЯ И ПРЕДПРОДАЖКА
+   11. КАРТОЧКА АВТОМОБИЛЯ И ПРЕДПРОДАЖКА[span_13](start_span)[span_13](end_span)
    ======================================================== */
 .car-img-wrap {
   position: relative;
@@ -1340,7 +1340,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   12. СТРИТ, ДРАГ & ВИЛСПИН
+   12. СТРИТ, ДРАГ & ВИЛСПИН[span_14](start_span)[span_14](end_span)
    ======================================================== */
 .race-panel {
   background: #080d16;
@@ -1484,7 +1484,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   13. САРАИ, БИЗНЕС И КОНТЕЙНЕРЫ
+   13. САРАИ, БИЗНЕС И КОНТЕЙНЕРЫ[span_15](start_span)[span_15](end_span)
    ======================================================== */
 .barn-tier-card {
   width: 100%;
@@ -1576,7 +1576,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   14. НИЖНИЙ БАР НАВИГАЦИИ
+   14. НИЖНИЙ БАР НАВИГАЦИИ[span_16](start_span)[span_16](end_span)
    ======================================================== */
 .bottom-nav {
   flex-shrink: 0;
@@ -1612,8 +1612,23 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 #bnav-tabLife.active i { color: #fb7185; }
 #bnav-tabPhone.active i { color: #c084fc; text-shadow: 0 0 12px var(--purple-glow); }
 
+.phone-nav-item { position: relative; }
+.phone-nav-icon-wrap { position: relative; display: inline-flex; }
+.phone-nav-counter {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  background: var(--red);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  border-radius: 10px;
+  padding: 1px 4px;
+  line-height: 1;
+}
+
 /* ========================================================
-   15. РЕШАЛА, ЭФИР И УТИЛИТЫ
+   15. РЕШАЛА, ЭФИР И УТИЛИТЫ[span_17](start_span)[span_17](end_span)
    ======================================================== */
 .reshala-banner {
   background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(30, 15, 50, 0.9));
@@ -1768,6 +1783,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .text-xs { font-size: 10px; }
 .w-full { width: 100%; }
 .block { display: block; }
+.space-y-1 > * + * { margin-top: 4px; }
 .space-y-2 > * + * { margin-top: 8px; }
 
 .tag-badge {
@@ -1809,18 +1825,8 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border-left: 3px solid var(--cyan);
 }
 
-.credits-grid { display: flex; flex-direction: column; gap: 4px; }
-
-.credit-pill {
-  background: rgba(255, 255, 255, 0.03);
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 11px;
-  border: 1px solid rgba(255, 255, 255, 0.04);
-}
-
 /* ========================================================
-   16. ОНЛАЙН РАДИО RECORD: СТИЛИ МАГНИТОЛЫ И ЭКВАЛАЙЗЕРА
+   16. ОНЛАЙН РАДИО: МАГНИТОЛА И ЭКВАЛАЙЗЕР[span_18](start_span)[span_18](end_span)
    ======================================================== */
 .radio-cassette-glow {
   display: flex;
@@ -1881,4 +1887,8 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .station-row.active-station {
   border-color: var(--cyan) !important;
   background: linear-gradient(135deg, rgba(0, 242, 254, 0.12), rgba(15, 23, 42, 0.95)) !important;
+}
+
+.level-lock-cover {
+  width: 100%;
 }
