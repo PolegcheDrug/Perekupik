@@ -5,20 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v0.4.5</title>
-    <link rel="stylesheet" href="style.css?v=153">
+    <link rel="stylesheet" href="style.css?v=154">
     
-    <!-- Базы данных и внешние библиотеки -->
-    <script src="data.js?v=153"></script>
+    <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-    <script src="js/network.js?v=153"></script>
-    <script src="firebase-bridge.js?v=153"></script>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
   <body class="notranslate" translate="no">
     <div class="app-shell">
       
-      <!-- ЕДИНЫЙ ИГРОВОЙ HUD -->
+      <!-- ЕДИНЫЙ ИГРОВОЙ HUD[span_0](start_span)[span_0](end_span) -->
       <header class="hud-header">
         <div class="hud-top-row">
           <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль">
@@ -76,9 +73,9 @@
         </div>
       </header>
       
-      <!-- ОСНОВНОЙ КОНТЕЙНЕР -->
+      <!-- ОСНОВНОЙ КОНТЕЙНЕР[span_1](start_span)[span_1](end_span) -->
       <main class="main-content">
-        <!-- 1. TAB: РЫНОК -->
+        <!-- 1. TAB: РЫНОК[span_2](start_span)[span_2](end_span) -->
         <section id="tabMarket" class="tab-screen active">
           <div class="glass-card market-filter-card mb-3">
             <div class="flex-between mb-2">
@@ -94,7 +91,7 @@
               </button>
             </div>
 
-            <!-- СЕТКА КЛАССОВ -->
+            <!-- СЕТКА КЛАССОВ[span_3](start_span)[span_3](end_span) -->
             <div class="market-categories-grid" id="marketCatListContainer">
               <button onclick="setCategory('economy')" id="catBtn-economy" class="cat-tile active">
                 <div class="cat-tile-icon"><i class="fa-solid fa-car"></i></div>
@@ -166,7 +163,7 @@
           <div id="marketCardContainer"></div>
         </section>
         
-        <!-- 2. TAB: ГАРАЖ -->
+        <!-- 2. TAB: ГАРАЖ[span_4](start_span)[span_4](end_span) -->
         <section id="tabGarage" class="tab-screen">
           <div class="glass-card mb-2">
             <div class="flex-between mb-1">
@@ -180,7 +177,7 @@
           <div id="garageList"></div>
         </section>
         
-        <!-- 3. TAB: ПЛОЩАДКА ПРОДАЖ -->
+        <!-- 3. TAB: ПЛОЩАДКА ПРОДАЖ[span_5](start_span)[span_5](end_span) -->
         <section id="tabSalesLot" class="tab-screen">
           <div class="glass-card mb-2">
             <div class="flex-between mb-1">
@@ -199,10 +196,10 @@
           <div id="salesLotList"></div>
         </section>
 
-        <!-- 4. TAB: ИНТЕРАКТИВНЫЙ СМАРТФОН «PEREKUP OS» -->
+        <!-- 4. TAB: ИНТЕРАКТИВНЫЙ СМАРТФОН «PEREKUP OS»[span_6](start_span)[span_6](end_span) -->
         <section id="tabPhone" class="tab-screen">
           <div class="phone-device-wrapper">
-            <!-- СТАТУС-БАР -->
+            <!-- СТАТУС-БАР[span_7](start_span)[span_7](end_span) -->
             <div class="phone-status-bar">
               <span id="phoneStatusBarClock" class="phone-status-time">12:00</span>
               <div class="phone-notch"></div>
@@ -213,15 +210,15 @@
               </div>
             </div>
 
-            <!-- ЭКРАН ТЕЛЕФОНА -->
+            <!-- ЭКРАН ТЕЛЕФОНА[span_8](start_span)[span_8](end_span) -->
             <div class="phone-screen-content">
-              <!-- ДОМАШНИЙ ЭКРАН -->
+              <!-- ДОМАШНИЙ ЭКРАН[span_9](start_span)[span_9](end_span) -->
               <div id="phoneHomeScreen">
                 
-                <!-- ИНТЕРАКТИВНЫЙ ВИДЖЕТ ПРИБЫЛИ БИЗНЕСА -->
+                <!-- ИНТЕРАКТИВНЫЙ ВИДЖЕТ ПРИБЫЛИ БИЗНЕСА[span_10](start_span)[span_10](end_span) -->
                 <div id="phoneBizWidgetContainer" class="mb-2"></div>
 
-                <!-- ПОЛНАЯ СЕТКА ПРИЛОЖЕНИЙ СМАРТФОНА (4х4 = 16 ИКОНОК) -->
+                <!-- ПОЛНАЯ СЕТКА ПРИЛОЖЕНИЙ СМАРТФОНА (4х4 = 16 ИКОНОК)[span_11](start_span)[span_11](end_span) -->
                 <div class="phone-home-grid mb-2">
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('autodrot')">
                     <div class="phone-app-icon bg-cyan"><i class="fa-solid fa-bolt"></i></div>
@@ -307,22 +304,22 @@
                   </div>
                 </div>
 
-                <!-- ВИДЖЕТ ЕЖЕДНЕВНЫХ ЗАДАНИЙ -->
+                <!-- ВИДЖЕТ ЕЖЕДНЕВНЫХ ЗАДАНИЙ[span_12](start_span)[span_12](end_span) -->
                 <div id="phoneDailyQuestsWidget" class="phone-quests-widget"></div>
               </div>
 
-              <!-- КОНТЕЙНЕР ЗАПУЩЕННОГО ПРИЛОЖЕНИЯ -->
+              <!-- КОНТЕЙНЕР ЗАПУЩЕННОГО ПРИЛОЖЕНИЯ[span_13](start_span)[span_13](end_span) -->
               <div id="phoneAppContainer" style="display:none;" class="phone-opened-app-view"></div>
             </div>
 
-            <!-- HOME BAR («ДОМОЙ») -->
+            <!-- HOME BAR («ДОМОЙ»)[span_14](start_span)[span_14](end_span) -->
             <div class="phone-home-bar-area" onclick="PhoneManager.goHome()">
               <div class="phone-home-indicator"></div>
             </div>
           </div>
         </section>
         
-        <!-- 5. TAB: ЖИЗНЬ -->
+        <!-- 5. TAB: ЖИЗНЬ[span_15](start_span)[span_15](end_span) -->
         <section id="tabLife" class="tab-screen">
           <div class="glass-card mb-3">
             <div class="flex-between mb-2">
@@ -337,12 +334,13 @@
             <button onclick="bigCharityDonate()" class="btn btn-green w-full">🕊 Меценатство 100,000 ₽ (+25 Кармы)</button>
           </div>
 
+          <!-- СУТОЧНЫЙ ЦИКЛ РЕАЛЬНОГО ВРЕМЕНИ -->
           <div class="glass-card flex-between mb-3">
             <div>
-              <h3 class="font-bold color-amber"><i class="fa-solid fa-calendar-day"></i> Смена дня</h3>
-              <p class="sub-label">Списать аренду, начислить процент по сейфу в Во-Банке.</p>
+              <h3 class="font-bold color-cyan"><i class="fa-solid fa-clock"></i> Суточный цикл (Реальное время)</h3>
+              <p class="sub-label">Списание аренды, капитализация депозитов и сброс дейликов происходят автоматически в 00:00.</p>
             </div>
-            <button onclick="nextDayAction()" class="btn btn-amber btn-auto">Завершить 🌙</button>
+            <span class="tag-badge bg-tag-green">Синхронно</span>
           </div>
 
           <div class="live-chat-card mb-3">
@@ -366,13 +364,13 @@
           </div>
         </section>
 
-        <!-- 6. TAB: ПРОФИЛЬ -->
+        <!-- 6. TAB: ПРОФИЛЬ[span_16](start_span)[span_16](end_span) -->
         <section id="tabProfile" class="tab-screen">
           <div class="glass-card text-center mb-3">
             <h3 id="profileTgUsername">Перекуп #777</h3>
             <p class="sub-label mb-2" id="profPlayerRank">Статус: Гаражный Делец</p>
             
-            <!-- ВЫБОР ЯЗЫКА В ПРОФИЛЕ -->
+            <!-- ВЫБОР ЯЗЫКА В ПРОФИЛЕ[span_17](start_span)[span_17](end_span) -->
             <div class="p-2 mb-3 flex-between" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
               <span class="text-xs font-bold"><i class="fa-solid fa-language color-cyan"></i> Язык игры / Language:</span>
               <div class="flex-gap">
@@ -430,7 +428,7 @@
         </section>
       </main>
       
-      <!-- НИЖНИЙ БАР НАВИГАЦИИ -->
+      <!-- НИЖНИЙ БАР НАВИГАЦИИ[span_18](start_span)[span_18](end_span) -->
       <nav class="bottom-nav">
         <div class="b-nav-item active" onclick="switchTab('tabMarket')" id="bnav-tabMarket">
           <i class="fa-solid fa-store"></i>
@@ -458,43 +456,51 @@
       </nav>
     </div>
 
-    <!-- МОДАЛЬНЫЕ ОКНА ИГРЫ -->
+    <!-- МОДАЛЬНЫЕ ОКНА ИГРЫ[span_19](start_span)[span_19](end_span) -->
 
-    <!-- МОДАЛЬНОЕ ОКНО: СПИСОК ИЗМЕНЕНИЙ (PATCH NOTES v0.4.5) -->
+    <!-- МОДАЛЬНОЕ ОКНО: СПИСОК ИЗМЕНЕНИЙ (PATCH NOTES v0.4.5)[span_20](start_span)[span_20](end_span) -->
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
           <h4 class="color-cyan font-bold"><i class="fa-solid fa-code-merge"></i> Обновление v0.4.5</h4>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
-        <div class="sub-label mb-2 color-amber font-bold">Официальный патчноут глобального ребаланса:</div>
+        <div class="sub-label mb-1 color-amber font-bold">Разработчики: Илья Чепиль (DXF) & Perekup Dev Team</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10px;">Версия клиента: v0.4.5 (Сборка #154)</div>
         
         <div class="space-y-2 mb-3" style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
           <div class="patch-item">
             <b class="text-xs color-green">🏷️ Динамическая стоимость госномеров:</b>
             <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Полностью исправлена логика установки блатных номеров! Теперь при установке красивых, редких или спецсерийных знаков (777, ЕКХ, АМР, 001-007, одинаковые буквы) рыночная стоимость авто мгновенно пересчитывается и вырастает на точную стоимость номера. При снятии номера на «ТРАНЗИТ» базовая цена корректно возвращается.
+              Установка красивых, архивных и спецсерийных знаков (777, ЕКХ, АМР, 001-007, одинаковые буквы) моментально повышает рыночную оценку авто на точную стоимость знака. Снятие на транзиты возвращает базовую цену кузова.
             </div>
           </div>
 
           <div class="patch-item">
-            <b class="text-xs color-cyan">🤝 Влияние номеров на покупателей:</b>
+            <b class="text-xs color-amber">🤝 Учёт в МРЭО vs Перепродажа по ДКП:</b>
             <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Клиенты на площадке продаж и заказчики Синдиката теперь напрямую учитывают дорогие архивные номера при формировании щедрых офферов, готовые переплачивать за эксклюзивный статус на дороге.
+              После покупки перекуп выбирает: чистый учёт РФ в МРЭО (госпошлина 2,850 ₽, но 13% налог с прибыли при быстрой перепродаже) или режим перекупа на ДКП (без налогов, но с риском штрафа за просроченные 10 дней).
             </div>
           </div>
 
           <div class="patch-item">
-            <b class="text-xs color-purple">🏁 Доработка Драг-рейсинга и RDS Дрифта:</b>
+            <b class="text-xs color-purple">🕵️‍♂️ Синдикат с 7 уровня и диагностика:</b>
             <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Введены строгие регламенты допуска техкома RDS (заварка, выворот, гидроручник, каркас, ковши). Динамика квотера 402м теперь комплексно учитывает тип привода (FWD/RWD/AWD), полуслики Toyo и ланч-контроль.
+              Доступ открывается с 7 уровня, но требует жесткой экипировки: видеоэндоскоп, любой толщиномер, сканер Launch и не менее 5 Stars ⭐ на балансе.
             </div>
           </div>
 
           <div class="patch-item">
-            <b class="text-xs color-amber">💼 Баланс P2P биржи, Контейнеров и Сараев:</b>
+            <b class="text-xs color-cyan">🎰 Супер Вилспин & Антифарм в Дрифте:</b>
             <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Любой найденный или выкупленный автомобиль из сараев или с контейнеров автоматически рассчитывается по единой формуле рыночной оценки с сохранением всех модификаций.
+              Супер Вилспин получил 1 бесплатный запуск в реальные сутки и сбалансированный лут. Заезды на треке получили физический износ шин, сцепления и перегрев ДВС с кулдауном.
+            </div>
+          </div>
+
+          <div class="patch-item">
+            <b class="text-xs color-red">🚨 Проверка криминала и розыска:</b>
+            <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
+              Продажа авто с перебитым VIN или аннулированным учётом 12.5.1 дотошным покупателям приводит к вызову полиции, штрафу и конфискации кузова на штрафстоянку.
             </div>
           </div>
         </div>
@@ -503,7 +509,36 @@
       </div>
     </div>
 
-    <!-- ДКП -->
+    <!-- ВЫБОР РЕГИСТРАЦИИ АВТО: МРЭО vs ДКП -->
+    <div id="modalRegistrationChoice" class="modal-overlay">
+      <div class="modal-box text-center" style="max-width: 410px;">
+        <div style="font-size: 36px; margin-bottom: 6px;">📑</div>
+        <h3 class="font-bold mb-1 color-cyan">Способ оформления автомобиля</h3>
+        <p class="sub-label mb-3">Выберите форму владения для выкупленного авто:</p>
+
+        <div class="glass-card text-left p-2 mb-2" style="border-left: 3px solid var(--green);">
+          <b class="text-xs color-green">1. Поставить на чистый учёт в МРЭО</b>
+          <div class="sub-label my-1" style="font-size:10px;">
+            • Оплата госпошлины: <b>2,850 ₽</b><br>
+            • Юридическая чистота: 0 рисков при проверках ДПС.<br>
+            • ⚠️ <b>Налог 13%</b> с чистой прибыли при быстрой перепродаже (до 30 дней владения)!
+          </div>
+          <button onclick="confirmRegistrationChoice(true)" class="btn btn-green btn-sm w-full mt-1">Оформить в МРЭО (-2,850 ₽)</button>
+        </div>
+
+        <div class="glass-card text-left p-2 mb-3" style="border-left: 3px solid var(--amber);">
+          <b class="text-xs color-amber">2. Оставить на ДКП (Перекупский режим)</b>
+          <div class="sub-label my-1" style="font-size:10px;">
+            • Пошлина: <b>0 ₽</b> (Экономия)<br>
+            • Налог 13%: <b>Не платится</b> (Вся маржа ваша)<br>
+            • 🚨 <b>Лимит 10 дней:</b> если вас остановят ДПС с просроченным ДКП — крупный штраф!
+          </div>
+          <button onclick="confirmRegistrationChoice(false)" class="btn btn-amber btn-sm w-full mt-1">Оставить на ДКП (Без налога)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ДКП[span_21](start_span)[span_21](end_span) -->
     <div id="modalDKP" class="modal-overlay">
       <div class="modal-box dkp-official-blank">
         <div class="dkp-blank-border">
@@ -513,7 +548,7 @@
             <div class="text-xs color-sub">ТРАНСПОРТНОГО СРЕДСТВА</div>
             <div class="flex-between text-xs mt-1 border-b pb-1" style="border-color: rgba(0, 242, 254, 0.2);">
               <span id="dkpCityText">г. Москва</span>
-              <span id="dkpDateText">10 октября 2026 г.</span>
+              <span id="dkpDateText">11 октября 2026 г.</span>
             </div>
           </div>
 
@@ -570,7 +605,7 @@
       </div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО: СЛУЧАЙНОЕ СОБЫТИЕ В ГАРАЖЕ -->
+    <!-- МОДАЛЬНОЕ ОКНО: СЛУЧАЙНОЕ СОБЫТИЕ В ГАРАЖЕ[span_22](start_span)[span_22](end_span) -->
     <div id="modalGarageEvent" class="modal-overlay">
       <div class="modal-box text-center">
         <div style="font-size:46px; margin-bottom:8px;" id="garageEventEmoji">⚠️</div>
@@ -584,7 +619,7 @@
       </div>
     </div>
 
-    <!-- МОДАЛЬНОЕ ОКНО: СТРАХОВАНИЕ АВТО (ОСАГО / КАСКО) -->
+    <!-- МОДАЛЬНОЕ ОКНО: СТРАХОВАНИЕ АВТО (ОСАГО / КАСКО)[span_23](start_span)[span_23](end_span) -->
     <div id="modalInsurance" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -616,7 +651,7 @@
       </div>
     </div>
 
-    <!-- ВЫБОР АВТО ПОД ЗАКАЗ СИНДИКАТА -->
+    <!-- ВЫБОР АВТО ПОД ЗАКАЗ СИНДИКАТА[span_24](start_span)[span_24](end_span) -->
     <div id="modalSelectContractCar" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -629,7 +664,7 @@
       </div>
     </div>
 
-    <!-- СЛЕПОЙ АУКЦИОН -->
+    <!-- СЛЕПОЙ АУКЦИОН[span_25](start_span)[span_25](end_span) -->
     <div id="modalBlindAuction" class="modal-overlay">
       <div class="modal-box text-center">
         <h4 class="color-red font-bold mb-2">Секретный Лот #<span id="blindAuctionLotNum">404</span></h4>
@@ -646,12 +681,12 @@
       </div>
     </div>
 
-    <!-- АВТО-ПОДСТАВА -->
+    <!-- АВТО-ПОДСТАВА[span_26](start_span)[span_26](end_span) -->
     <div id="modalAutoPodstava" class="modal-overlay">
       <div class="modal-box text-center">
         <div style="font-size:48px; margin-bottom:10px;">💥</div>
         <h3 class="color-red font-bold mb-2">АВТО-ПОДСТАВА!</h3>
-        <p class="sub-label mb-3">Вас намеренно притер черный седан без номеров. Из машины вышли агрессивные люди и требуют возместить "ущерб" на месте.</p>
+        <p class="sub-label mb-3">Вас намеренно притер черный седан без номеров. Из машины вышли агрессивные люди и требуют возместить ущерб на месте.</p>
         <div class="space-y-2 mb-3">
           <button onclick="resolvePodstava('pay')" class="btn btn-dark w-full" id="podstavaBtnPay">Заплатить 150,000 ₽ на месте</button>
           <button onclick="resolvePodstava('reshala')" class="btn btn-purple w-full">Звонок Решале (1 🤝 Связь)</button>
@@ -660,6 +695,7 @@
       </div>
     </div>
 
+    <!-- СОХРАНЕНИЯ[span_27](start_span)[span_27](end_span) -->
     <div id="modalSaveManager" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -676,7 +712,7 @@
       </div>
     </div>
 
-    <!-- ИНТЕРЬЕР ДОМА -->
+    <!-- ИНТЕРЬЕР ДОМА[span_28](start_span)[span_28](end_span) -->
     <div id="modalHomeInterior" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -689,7 +725,7 @@
       </div>
     </div>
 
-    <!-- ТЮНИНГ -->
+    <!-- ТЮНИНГ[span_29](start_span)[span_29](end_span) -->
     <div id="modalTuning" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
@@ -721,7 +757,7 @@
       </div>
     </div>
 
-    <!-- ПОКУПКА / ТОРГ С ПРОДАВЦОМ -->
+    <!-- ПОКУПКА / ТОРГ С ПРОДАВЦОМ[span_30](start_span)[span_30](end_span) -->
     <div id="modalMarketDeal" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -753,7 +789,7 @@
       </div>
     </div>
 
-    <!-- ПРОДАЖА / ТОРГ С ПОКУПАТЕЛЕМ -->
+    <!-- ПРОДАЖА / ТОРГ С ПОКУПАТЕЛЕМ[span_31](start_span)[span_31](end_span) -->
     <div id="modalHaggleSale" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -797,7 +833,7 @@
       </div>
     </div>
 
-    <!-- АВТОТЕКА -->
+    <!-- АВТОТЕКА[span_32](start_span)[span_32](end_span) -->
     <div id="modalAutoteka" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -809,7 +845,7 @@
       </div>
     </div>
 
-    <!-- ДЕТЕЙЛИНГ -->
+    <!-- ДЕТЕЙЛИНГ[span_33](start_span)[span_33](end_span) -->
     <div id="modalPreSale" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -847,7 +883,7 @@
       </div>
     </div>
 
-    <!-- БАРТЕР -->
+    <!-- БАРТЕР[span_34](start_span)[span_34](end_span) -->
     <div id="modalBarterDeal" class="modal-overlay">
       <div class="modal-box text-center">
         <h4 class="color-amber font-bold mb-2">🔄 Предложение обмена на улице!</h4>
@@ -872,7 +908,7 @@
       </div>
     </div>
 
-    <!-- ЗВОНОК -->
+    <!-- ЗВОНОК[span_35](start_span)[span_35](end_span) -->
     <div id="modalBuyCall" class="modal-overlay">
       <div class="modal-box text-center">
         <div style="font-size:36px; margin-bottom:6px;" id="buyCallEmoji">📞</div>
@@ -882,7 +918,7 @@
       </div>
     </div>
 
-    <!-- БОНУС -->
+    <!-- БОНУС[span_36](start_span)[span_36](end_span) -->
     <div id="modalDailyBonus" class="modal-overlay">
       <div class="modal-box text-center">
         <h3 class="font-bold mb-2">🎁 Ежедневный подарок</h3>
@@ -892,7 +928,7 @@
       </div>
     </div>
 
-    <!-- ВЕРДИКТ -->
+    <!-- ВЕРДИКТ[span_37](start_span)[span_37](end_span) -->
     <div id="modalDealVerdict" class="modal-overlay">
       <div class="modal-box text-center">
         <div style="font-size:38px; margin-bottom:6px;" id="verdictEmoji">🤝</div>
@@ -904,7 +940,7 @@
       </div>
     </div>
 
-    <!-- OBD2 -->
+    <!-- OBD2[span_38](start_span)[span_38](end_span) -->
     <div id="modalOBD2" class="modal-overlay">
       <div class="modal-box">
         <h4 class="text-center mb-2 color-cyan"><i class="fa-solid fa-laptop-code"></i> OBD2 Сканер</h4>
@@ -915,7 +951,7 @@
       </div>
     </div>
 
-    <!-- ВЫСТАВЛЕНИЕ НА ПРОДАЖУ -->
+    <!-- ВЫСТАВЛЕНИЕ НА ПРОДАЖУ[span_39](start_span)[span_39](end_span) -->
     <div id="modalPutOnLot" class="modal-overlay">
       <div class="modal-box">
         <h4 class="text-center mb-2">🏪 Выставить на продажу</h4>
@@ -929,7 +965,7 @@
       </div>
     </div>
 
-    <!-- ПРЕВЬЮ В ГАРАЖЕ -->
+    <!-- ПРЕВЬЮ В ГАРАЖЕ[span_40](start_span)[span_40](end_span) -->
     <div id="modalPreview" class="modal-overlay">
       <div class="modal-box">
         <div class="car-img-wrap mb-2" style="height: 125px;">
@@ -956,7 +992,7 @@
       </div>
     </div>
 
-    <!-- НОМЕРА -->
+    <!-- НОМЕРА[span_41](start_span)[span_41](end_span) -->
     <div id="modalChangePlate" class="modal-overlay">
       <div class="modal-box">
         <h4 class="text-center mb-2">🏷️ Номера</h4>
@@ -966,21 +1002,21 @@
       </div>
     </div>
 
-    <!-- ТОЛЩИНОМЕР -->
+    <!-- ТОЛЩИНОМЕР (ИСПРАВЛЕННЫЙ ВЫХОД БЕЗ ЗАВИСАНИЙ)[span_42](start_span)[span_42](end_span) -->
     <div id="modalGauge" class="modal-overlay">
       <div class="modal-box">
-        <h4 class="text-center mb-2">Замер ЛКП</h4>
+        <h4 class="text-center mb-2">Замер ЛКП кузова</h4>
         <div class="grid-2 mb-3">
           <button onclick="checkBodyPart('hood')" class="btn btn-dark"><span class="sub-label">Капот</span> <span id="part-hood" class="font-bold">Замерить</span></button>
           <button onclick="checkBodyPart('roof')" class="btn btn-dark"><span class="sub-label">Крыша</span> <span id="part-roof" class="font-bold">Замерить</span></button>
           <button onclick="checkBodyPart('doors')" class="btn btn-dark"><span class="sub-label">Двери</span> <span id="part-doors" class="font-bold">Замерить</span></button>
           <button onclick="checkBodyPart('wings')" class="btn btn-dark"><span class="sub-label">Крылья</span> <span id="part-wings" class="font-bold">Замерить</span></button>
         </div>
-        <button onclick="closeModal('modalGauge')" class="btn btn-cyan w-full">Готово</button>
+        <button onclick="closeGaugeModal()" class="btn btn-cyan w-full">Готово ✓</button>
       </div>
     </div>
 
-    <!-- ЛЕГАЛИЗАЦИЯ -->
+    <!-- ЛЕГАЛИЗАЦИЯ[span_43](start_span)[span_43](end_span) -->
     <div id="modalLegalizeCar" class="modal-overlay">
       <div class="modal-box">
         <h4 class="text-center mb-2 color-purple">🔏 Легализация</h4>
@@ -989,7 +1025,7 @@
       </div>
     </div>
 
-    <!-- СОЗДАНИЕ ЛОТА НА БИРЖЕ AUTODROT -->
+    <!-- СОЗДАНИЕ ЛОТА НА БИРЖЕ AUTODROT[span_44](start_span)[span_44](end_span) -->
     <div id="modalCreateP2P" class="modal-overlay">
       <div class="modal-box">
         <h4 class="text-center mb-2"><i class="fa-solid fa-handshake color-green"></i> Выставить на Autodrot</h4>
@@ -1008,16 +1044,35 @@
       </div>
     </div>
 
+    <!-- ЛИЧНЫЕ ДИАЛОГИ В СЕТИ -->
+    <div id="modalDirectChat" class="modal-overlay">
+      <div class="modal-box">
+        <div class="flex-between mb-2">
+          <h4 class="color-cyan font-bold" id="dmModalTitle">Чат</h4>
+          <button onclick="closeModal('modalDirectChat')" class="btn btn-dark btn-auto btn-sm">✕</button>
+        </div>
+        <div id="dmMessagesBox" class="chat-messages-container mb-2" style="max-height: 220px;"></div>
+        <div class="chat-compose-box">
+          <input type="text" id="dmInputText" class="chat-input" placeholder="Написать..." maxlength="150">
+          <button onclick="NetworkManager.sendDirectMessage()" class="chat-send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- СКРИПТЫ -->
-    <script src="js/phone.js?v=153"></script>
-    <script src="js/market.js?v=153"></script>
-    <script src="js/garage.js?v=153"></script>
-    <script src="js/salesLot.js?v=153"></script>
-    <script src="js/life.js?v=153"></script>
-    <script src="js/syndicate.js?v=153"></script>
-    <script src="js/app.js?v=153"></script>
+    <!-- ПОСЛЕДОВАТЕЛЬНОЕ ПОДКЛЮЧЕНИЕ СКРИПТОВ (ПОЛНАЯ СВЯЗКА)[span_45](start_span)[span_45](end_span) -->
+    <script src="data.js?v=154"></script>
+    <script src="js/app.js?v=154"></script>
+    <script src="js/phone.js?v=154"></script>
+    <script src="js/market.js?v=154"></script>
+    <script src="js/garage.js?v=154"></script>
+    <script src="js/salesLot.js?v=154"></script>
+    <script src="js/life.js?v=154"></script>
+    <script src="js/street.js?v=154"></script>
+    <script src="js/syndicate.js?v=154"></script>
+    <script src="firebase-bridge.js?v=154"></script>
+    <script src="js/network.js?v=154"></script>
 
   </body>
 </html>
