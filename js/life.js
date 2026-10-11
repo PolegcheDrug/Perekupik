@@ -1148,11 +1148,11 @@ function renderDiets() {
         html += `
         <div class='glass-card flex-between p-2 mb-2'>
             <div>
-                <b class='text-xs color-green'>{d.name}</b>
-                <div class='sub-label' style='font-size:10px;'>{d.desc || "Питание перекупа"} (+{d.hunger}% сытости)</div>
+                <b class='text-xs color-green'>${d.name}</b>
+                <div class='sub-label' style='font-size:10px;'>${d.desc || "Питание перекупа"} (+${d.hunger}% сытости)</div>
             </div>
-            <button onclick="eatMeal('{d.id}', {d.cost}, {d.hunger}, {d.mood})" class='btn btn-dark btn-auto btn-sm'>{d.cost.toLocaleString()} ₽</button>
-        </div>`.replace(/{d.name}/g, d.name).replace(/{d.desc}/g, d.desc).replace(/{d.hunger}/g, d.hunger).replace(/{d.id}/g, d.id).replace(/{d.cost}/g, d.cost).replace(/{d.mood}/g, d.mood);
+            <button onclick="eatMeal('${d.id}', ${d.cost}, ${d.hunger}, ${d.mood})" class='btn btn-dark btn-auto btn-sm'>${d.cost.toLocaleString()} ₽</button>
+        </div>`;
     });
     list.innerHTML = html;
 }
