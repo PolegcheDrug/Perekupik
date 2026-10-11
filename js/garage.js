@@ -1,8 +1,8 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.5.0)
+// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.5.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Условие гаража для тюнинга/детейлинга, интерактивный Launch OBD2,
-// конструктор страхового полиса, штрафстоянка ГИБДД, улучшенная типографика
+// Окупаемый детейлинг и тюнинг (x1.5 к марже), Launch OBD2,
+// конструктор страхового полиса, штрафстоянка ГИБДД
 // ========================================================
 
 let previewCarIndex = null;
@@ -46,7 +46,6 @@ function getPlayerHousingCapabilities() {
         };
     }
 
-    // Если игрок докупил базовые слоты расширением бокса
     if (state.player && state.player.baseSlots && state.player.baseSlots > 2) {
         caps.canTune = true;
         caps.canDetail = true;
@@ -69,7 +68,6 @@ function getPlayerHousingCapabilities() {
         if (activeHouse.reshalaDiscountPct) caps.reshalaDiscountPct = Math.max(caps.reshalaDiscountPct, activeHouse.reshalaDiscountPct);
     }
 
-    // Добавляем возможности всех находящихся в собственности объектов
     const ownedHouses = state.player?.ownedHouses || [];
     ownedHouses.forEach(hId => {
         const h = HOUSING_LIST.find(item => item.id === hId);
@@ -86,9 +84,6 @@ function getPlayerHousingCapabilities() {
     return caps;
 }
 
-/**
- * Проверка конкретной возможности (tune, detail, service, obd, personal)
- */
 function checkPlayerCapability(featureKey) {
     const caps = getPlayerHousingCapabilities();
     if (featureKey === 'tune') return caps.canTune;
@@ -99,14 +94,10 @@ function checkPlayerCapability(featureKey) {
     return caps.canTune;
 }
 
-// Обратная совместимость с вызовами в других скриптах
 function playerHasGarageOrWorkshop() {
     return checkPlayerCapability('tune');
 }
 
-/**
- * Универсальное модальное окно с объяснением причины отказа
- */
 function openNeedCapabilityModal(type = 'tune', customTitle = null) {
     playSound('error');
     tgHaptic('warning');
@@ -175,7 +166,7 @@ function openNeedCapabilityModal(type = 'tune', customTitle = null) {
                     🏠 Открыть каталог «Жильё & Боксы»
                 </button>
                 <button onclick="closeModal('modalNeedGarage')" class="btn btn-dark btn-sm w-full">
-                    Понятно, буду копить кэш
+                    Понятно
                 </button>
             </div>
         </div>
@@ -189,45 +180,49 @@ function openNeedGarageModal(actionTitle = "Тюнинг и доработки")
 }
 
 // ========================================================
-// 0. ФОРМУЛА ДИНАМИЧЕСКОГО ПЕРЕРАСЧЕТА РЫНОЧНОЙ СТОИМОСТИ
+// 0. ФОРМУЛА ДИНАМИЧЕСКОГО ПЕРЕРАСЧЕТА РЫНОЧНОЙ СТОИМОСТИ (ОКУПАЕМЫЙ ТЮНИНГ)
 // ========================================================
 function recalculateCarMarketValue(car) {
     if (!car) return 0;
 
     let base = car.baseMarketValue || car.basePrice || 100000;
     let cond = (car.condition !== undefined) ? car.condition : 80;
-    let condMultiplier = 0.55 + (cond / 100) * 0.50;
+    
+    // Мягкий коэффициент состояния (от 70% до 120% от базы)
+    let condMultiplier = 0.70 + (cond / 100) * 0.45;
     let currentVal = Math.round(base * condMultiplier);
 
     let t = car.tuning || {};
-    if (t.chip === 1) currentVal += 35000;
-    else if (t.chip === 2) currentVal += 85000;
-    else if (t.chip >= 3) currentVal += 220000;
+    // Тюнинг окупается с наценкой x1.4 - x1.6 к рынку
+    if (t.chip === 1) currentVal += 50000;
+    else if (t.chip === 2) currentVal += 115000;
+    else if (t.chip >= 3) currentVal += 290000;
 
-    if (t.weldedDiff) currentVal += 15000;
-    if (t.steeringAngle) currentVal += 30000;
-    if (t.hydroHandbrake) currentVal += 40000;
-    if (t.bucketSeats) currentVal += 50000;
-    if (t.dragSlicks) currentVal += 50000;
-    if (t.rollCage) currentVal += 95000;
-    if (t.exhaust) currentVal += 40000;
-    if (t.stance) currentVal += 85000;
-    if (t.customWheels) currentVal += 70000;
-    if (t.bodykit) currentVal += 60000;
+    if (t.weldedDiff) currentVal += 22000;
+    if (t.steeringAngle) currentVal += 45000;
+    if (t.hydroHandbrake) currentVal += 60000;
+    if (t.bucketSeats) currentVal += 75000;
+    if (t.dragSlicks) currentVal += 70000;
+    if (t.rollCage) currentVal += 140000;
+    if (t.exhaust) currentVal += 55000;
+    if (t.stance) currentVal += 120000;
+    if (t.customWheels) currentVal += 95000;
+    if (t.bodykit) currentVal += 85000;
 
-    if (car.isPolished) currentVal = Math.round(currentVal * 1.05);
-    if (car.isRepainted) currentVal += 15000;
+    // Предпродажная подготовка дает солидный чистый профит
+    if (car.isPolished) currentVal = Math.round(currentVal * 1.12);
+    if (car.isRepainted) currentVal += 35000;
 
     let engWear = car.wear?.engine !== undefined ? car.wear.engine : 85;
     let transWear = car.wear?.transmission !== undefined ? car.wear.transmission : 85;
-    if (engWear < 50) currentVal = Math.round(currentVal * 0.85);
-    if (transWear < 50) currentVal = Math.round(currentVal * 0.90);
+    if (engWear < 40) currentVal = Math.round(currentVal * 0.88);
+    if (transWear < 40) currentVal = Math.round(currentVal * 0.92);
     
     let tires = car.tireWear !== undefined ? car.tireWear : 100;
-    if (tires < 30) currentVal = Math.max(10000, currentVal - 15000);
+    if (tires < 25) currentVal = Math.max(10000, currentVal - 15000);
 
     if (car.hiddenDefect && !car.hasAdditive) {
-        currentVal = Math.max(10000, currentVal - Math.round((car.hiddenDefect.cost || 15000) * 1.15));
+        currentVal = Math.max(10000, currentVal - Math.round((car.hiddenDefect.cost || 15000) * 0.8));
     }
 
     let plateStr = car.customPlate || car.plate || "ТРАНЗИТ";
@@ -391,7 +386,6 @@ function renderGarage() {
                 </div>
             </div>
 
-            <!-- МИКРО-ПЛИТКИ ПАРАМЕТРОВ (SPEC GRID) -->
             <div class="car-spec-chips-row mb-2">
                 <div class="car-spec-chip"><i class="fa-solid fa-bolt color-amber"></i> <b>${cPower}</b> л.с.</div>
                 <div class="car-spec-chip"><i class="fa-solid fa-road color-cyan"></i> <b>${(car.mileage || 85000).toLocaleString()}</b> км</div>
@@ -610,16 +604,16 @@ function applyPreSaleMod(type) {
         state.player.cash -= 4000;
         car.isPolished = true;
         recalculateCarMarketValue(car);
-        showToast("Кузов отполирован (+5% к рыночной цене)!");
+        showToast("Кузов отполирован (+12% к рыночной цене)!");
     } else if (type === 'paint') {
         if (car.isRepainted) return showToast("Кузов уже был повторно окрашен!");
         if (car.condition >= 100) return showToast("Состояние кузова и так 100%!");
         if (cash < 12000) return showToast("Нужно 12,000 ₽!");
         state.player.cash -= 12000;
         car.isRepainted = true;
-        car.condition = Math.min(100, (car.condition || 60) + 20);
+        car.condition = Math.min(100, (car.condition || 60) + 25);
         recalculateCarMarketValue(car);
-        showToast("Кузов полностью перекрашен (+20% состояния)!");
+        showToast("Кузов полностью перекрашен (+25% состояния и +35k ₽ цены)!");
     } else if (type === 'additive') {
         if (car.hasAdditive) return showToast("В масло уже залита присадка!");
         if (cash < 6000) return showToast("Нужно 6,000 ₽!");
@@ -692,10 +686,10 @@ function renderTuningItems() {
 
     if (activeTuneTab === 'drift') {
         const driftMods = [
-            { id: 'weldedDiff', name: '🔩 Заварка редуктора', cost: 12000, desc: 'Блокировка задней оси. Базовый допуск в Matsuri/Зимний дрифт.', bought: !!t.weldedDiff, risk: 5 },
-            { id: 'steeringAngle', name: '📐 Красноярский выворот', cost: 25000, desc: 'Сошки и рычаги. Увеличенный выворот для глубокого угла постановки.', bought: !!t.steeringAngle, risk: 10 },
-            { id: 'hydroHandbrake', name: '🕹️ Гидроручник с цилиндром Wilwood', cost: 35000, desc: 'Мгновенный срыв задней оси в занос. Обязателен для регламента RDS Europe/GP.', bought: !!t.hydroHandbrake, risk: 15 },
-            { id: 'bucketSeats', name: '💺 Спортивные ковши с омологацией', cost: 45000, desc: 'Жёсткая фиксация пилота в перегрузках. Обязателен в высшей лиге RDS GP.', bought: !!t.bucketSeats, risk: 5 }
+            { id: 'weldedDiff', name: '🔩 Заварка редуктора', cost: 12000, desc: 'Блокировка задней оси. Базовый допуск в Matsuri (+22k ₽ к цене авто).', bought: !!t.weldedDiff, risk: 5 },
+            { id: 'steeringAngle', name: '📐 Красноярский выворот', cost: 25000, desc: 'Сошки и рычаги для глубокого угла постановки (+45k ₽ к цене).', bought: !!t.steeringAngle, risk: 10 },
+            { id: 'hydroHandbrake', name: '🕹️ Гидроручник с цилиндром Wilwood', cost: 35000, desc: 'Мгновенный срыв задней оси в занос. Допуск в RDS Europe (+60k ₽ к цене).', bought: !!t.hydroHandbrake, risk: 15 },
+            { id: 'bucketSeats', name: '💺 Спортивные ковши с омологацией', cost: 45000, desc: 'Жёсткая фиксация в перегрузках. Обязателен в RDS GP (+75k ₽ к цене).', bought: !!t.bucketSeats, risk: 5 }
         ];
 
         driftMods.forEach(m => {
@@ -714,11 +708,11 @@ function renderTuningItems() {
         });
     } else if (activeTuneTab === 'drag') {
         const dragMods = [
-            { id: 'chip_stage1', name: '⚡ Чип-тюнинг Stage 1', cost: 30000, desc: '+25 л.с., сдвиг отсечки и активация ланч-контроля.', bought: t.chip >= 1, power: 25, risk: 5, action: "buyChipStage(1, 30000, 25)" },
-            { id: 'chip_stage2', name: '🔥 Чип-тюнинг Stage 2 + Даунпайп', cost: 65000, desc: '+60 л.с., прямоточный выхлоп, попкорн и буст-ап.', bought: t.chip >= 2, power: 60, risk: 15, action: "buyChipStage(2, 65000, 60)" },
-            { id: 'chip_stage3', name: '🚀 Stage 3 Big Turbo / Турбо-кит', cost: 180000, desc: '+150 л.с. Входной билет в лигу гиперкаров на 402м.', bought: t.chip >= 3, power: 150, risk: 25, action: "buyChipStage(3, 180000, 150)" },
-            { id: 'dragSlicks', name: '🛞 Драговые полуслики Toyo R888R', cost: 45000, desc: 'Максимальный зацеп на старте (-0.6с к времени квотера).', bought: !!t.dragSlicks, power: 0, risk: 5, action: "buyTuningMod('dragSlicks', 45000, 0, 5)" },
-            { id: 'rollCage', name: '🛡️ Вварной каркас безопасности', cost: 85000, desc: 'Обязателен по регламенту для заездов быстрее 10с и высшей лиги RDS GP.', bought: !!t.rollCage, power: 0, risk: 20, action: "buyTuningMod('rollCage', 85000, 0, 20)" }
+            { id: 'chip_stage1', name: '⚡ Чип-тюнинг Stage 1', cost: 30000, desc: '+25 л.с., сдвиг отсечки (+50k ₽ к цене авто).', bought: t.chip >= 1, power: 25, risk: 5, action: "buyChipStage(1, 30000, 25)" },
+            { id: 'chip_stage2', name: '🔥 Stage 2 + Даунпайп', cost: 65000, desc: '+60 л.с., прямоток, попкорн (+115k ₽ к цене авто).', bought: t.chip >= 2, power: 60, risk: 15, action: "buyChipStage(2, 65000, 60)" },
+            { id: 'chip_stage3', name: '🚀 Stage 3 Big Turbo Kit', cost: 180000, desc: '+150 л.с. Вход в высшую лигу 402м (+290k ₽ к цене авто).', bought: t.chip >= 3, power: 150, risk: 25, action: "buyChipStage(3, 180000, 150)" },
+            { id: 'dragSlicks', name: '🛞 Драговые полуслики Toyo R888R', cost: 45000, desc: 'Максимальный зацеп на старте (-0.6с к квотеру, +70k ₽ к цене).', bought: !!t.dragSlicks, power: 0, risk: 5, action: "buyTuningMod('dragSlicks', 45000, 0, 5)" },
+            { id: 'rollCage', name: '🛡️ Вварной каркас безопасности', cost: 85000, desc: 'Допуск в высшую лигу 402м и RDS GP (+140k ₽ к цене).', bought: !!t.rollCage, power: 0, risk: 20, action: "buyTuningMod('rollCage', 85000, 0, 20)" }
         ];
 
         dragMods.forEach(m => {
@@ -737,10 +731,10 @@ function renderTuningItems() {
         });
     } else if (activeTuneTab === 'style') {
         const styleMods = [
-            { id: 'stance', name: '🏎️ 4-контурная пневмоподвеска', cost: 75000, desc: 'Экстремальный дроп кузова в пол на парковке ТЦ (+35 к стенсу).', bought: !!t.stance, risk: 15 },
-            { id: 'customWheels', name: '✨ Кованые диски Work Meister с полкой', cost: 60000, desc: 'Широкий вылет и правильный натяг резины домиком (+25 к стилю).', bought: !!t.customWheels, risk: 5 },
-            { id: 'bodykit', name: '🌪️ Кастомный обвес / Расширение Rocket Bunny', cost: 50000, desc: 'Агрессивные фендеры и дактейл на багажник (+15 к стилю).', bought: !!t.bodykit, risk: 10 },
-            { id: 'exhaust', name: '💨 Спортивная выхлопная трасса 76мм', cost: 35000, desc: 'Басистый звук выхлопа и отстрелы пламенем при переключениях.', bought: !!t.exhaust, risk: 10 }
+            { id: 'stance', name: '🏎️ 4-контурная пневмоподвеска', cost: 75000, desc: 'Дроп кузова в пол на сходках (+35 к стилю, +120k ₽ к цене).', bought: !!t.stance, risk: 15 },
+            { id: 'customWheels', name: '✨ Кованые диски Work Meister', cost: 60000, desc: 'Широкая полка и правильный натяг (+25 к стилю, +95k ₽ к цене).', bought: !!t.customWheels, risk: 5 },
+            { id: 'bodykit', name: '🌪️ Кастомный обвес Rocket Bunny', cost: 50000, desc: 'Фендеры и дактейл (+15 к стилю, +85k ₽ к цене).', bought: !!t.bodykit, risk: 10 },
+            { id: 'exhaust', name: '💨 Спортивная трасса 76мм', cost: 35000, desc: 'Басистый выхлоп и отстрелы (+55k ₽ к цене).', bought: !!t.exhaust, risk: 10 }
         ];
 
         styleMods.forEach(m => {
@@ -789,7 +783,7 @@ function buyTuningMod(modId, cost, powerGain, riskGain) {
     renderTuningItems();
     playSound('win');
     tgHaptic('success');
-    showToast("Деталь установлена на автомобиль!");
+    showToast("Деталь установлена! Оценка авто значительно выросла.");
 }
 
 function buyChipStage(stage, cost, powerGain) {
@@ -863,13 +857,11 @@ function openTuningFromPreview() {
     openTuningModal(idx);
 }
 
-// Запуск OBD2: строгая проверка оборудования, бокса и скрытие окна осмотра
 function openOBD2Modal() {
     if (previewCarIndex === null) return;
     const car = state.garage[previewCarIndex];
     if (!car) return;
 
-    // 1. Проверка наличия диагностического оборудования
     const hasScanner = !!(state.player?.tools && (state.player.tools.obd || state.player.tools.obd_launch));
     if (!hasScanner) {
         playSound('error');
@@ -877,7 +869,6 @@ function openOBD2Modal() {
         return showToast("⚠️ У вас нет сканера OBD2! Купите ELM327 или Launch Pro в Маркете.");
     }
 
-    // 2. Проверка условий бокса для стационарной работы
     if (!checkPlayerCapability('obd')) {
         return openNeedCapabilityModal('obd', "Стационарная диагностика ЭБУ");
     }
@@ -895,7 +886,6 @@ function openOBD2Modal() {
     state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
     saveState();
 
-    // Скрываем окно осмотра, чтобы не было наложения
     closeModal('modalPreview');
 
     setTxt('obd2CarTitle', `Диагностика CAN-шины: ${car.name}`);
@@ -931,10 +921,10 @@ function openOBD2Modal() {
     const progFill = document.getElementById('garageObdProgressFill');
 
     const scanSteps = [
-        { pct: 25, msg: "> Подключение к ЭБУ Двигателя (DME/ECU)... Связь 100%", type: "success" },
-        { pct: 50, msg: "> Опрос трансмиссии (EGS), проверка адаптации соленоидов...", type: "" },
-        { pct: 75, msg: "> Сканирование тормозной системы ABS / ESP и SRS Airbag...", type: "" },
-        { pct: 100, msg: "> Чтение сохранённых и текущих кодов неисправностей DTC...", type: car.hiddenDefect ? "error" : "success" }
+        { pct: 25, msg: "> Подключение к ЭБУ ДВС (DME/ECU)... Связь 100%", type: "success" },
+        { pct: 50, msg: "> Опрос трансмиссии (EGS), соленоиды давления...", type: "" },
+        { pct: 75, msg: "> Сканирование ABS/ESP и подушек SRS...", type: "" },
+        { pct: 100, msg: "> Чтение сохранённых ошибок в памяти DTC...", type: car.hiddenDefect ? "error" : "success" }
     ];
 
     let stepIdx = 0;
@@ -952,7 +942,7 @@ function openOBD2Modal() {
             clearInterval(scanInterval);
             renderGarageOBDFinal(car, resBox, actBox);
         }
-    }, 600);
+    }, 500);
 }
 
 function renderGarageOBDFinal(car, resBox, actBox) {
@@ -1004,7 +994,7 @@ function renderGarageOBDFinal(car, resBox, actBox) {
                 </div>
                 <div class="obd-scan-matrix-screen mb-2" style="border-color: rgba(0, 230, 118, 0.4);">
                     <div class="obd-terminal-line success">> Блоки DME / EGS / ABS / SRS: Ошибки отсутствуют.</div>
-                    <div class="obd-terminal-line">> Топливные коррекции в допуске (LTFT 0.8%).</div>
+                    <div class="obd-terminal-line">> Топливные коррекции в норме.</div>
                     <div class="obd-terminal-line">> Пропусков зажигания не зафиксировано.</div>
                 </div>
                 <div class="flex-between text-xs p-2" style="background: rgba(0,0,0,0.6); border-radius: 8px;">
@@ -1024,7 +1014,7 @@ function clearOBDCodesQuick() {
 
     playSound('tick');
     tgHaptic('medium');
-    showToast("Память ошибок DTC очищена! Лампа Check Engine временно погасла.");
+    showToast("Память ошибок DTC очищена! Check Engine временно погас.");
     
     if (Math.random() < 0.5) {
         car.hasAdditive = true;
@@ -1045,14 +1035,14 @@ function repairDefectInGarage() {
     state.player.cash -= cost;
     car.hiddenDefect = null;
     car.hasAdditive = false;
-    car.condition = Math.min(100, (car.condition || 70) + 15);
+    car.condition = Math.min(100, (car.condition || 70) + 20);
     recalculateCarMarketValue(car);
 
     saveState();
     renderGarage();
     playSound('win');
     tgHaptic('success');
-    showToast("Неисправность полностью устранена! Ошибки из памяти ЭБУ удалены.");
+    showToast("Неисправность устранена! Оценка машины выросла.");
     openOBD2Modal();
 }
 
@@ -1127,7 +1117,7 @@ function confirmSignInsurancePolicy() {
     let cash = state.player?.cash || 0;
     let stars = state.player?.stars || 0;
 
-    if (cash < calc.totalCash) return showToast("Не хватает рублей на оплату страховой премии!");
+    if (cash < calc.totalCash) return showToast("Не хватает рублей на оплату полиса!");
     if (stars < calc.totalStars) return showToast(`Не хватает ${calc.totalStars} Stars ⭐!`);
 
     state.player.cash -= calc.totalCash;
@@ -1174,7 +1164,7 @@ function openImpoundLotModal(idx) {
     }
 
     let isRegistered = !!car.isRegisteredOnPlayer;
-    let scrapReward = Math.round((car.basePrice || 100000) * 0.35);
+    let scrapReward = Math.round((car.basePrice || 100000) * 0.45);
 
     modal.innerHTML = `
         <div class="modal-box text-center" style="max-width: 420px;">
@@ -1189,9 +1179,9 @@ function openImpoundLotModal(idx) {
                 <div class="glass-card p-2">
                     <div class="flex-between mb-1">
                         <b class="text-xs color-amber"><i class="fa-solid fa-handshake"></i> 1. Договориться на месте</b>
-                        <span class="tag-badge bg-tag-amber">ВЗЯТКА / СВЯЗИ</span>
+                        <span class="tag-badge bg-tag-amber">СВЯЗИ</span>
                     </div>
-                    <div class="sub-label mb-2" style="font-size:10px;">Решить вопрос через связи Решалы или наличные инспектору спецстоянки.</div>
+                    <div class="sub-label mb-2" style="font-size:10px;">Решить вопрос через теневые связи Решалы или наличными инспектору.</div>
                     <div class="grid-2">
                         <button onclick="resolveImpoundBribe('cash')" class="btn btn-dark btn-sm">Наличные (35k ₽)</button>
                         <button onclick="resolveImpoundBribe('conn')" class="btn btn-purple btn-sm">Решала (1 🤝)</button>
@@ -1203,7 +1193,7 @@ function openImpoundLotModal(idx) {
                         <b class="text-xs color-green"><i class="fa-solid fa-receipt"></i> 2. Официальный выкуп</b>
                         <span class="tag-badge bg-tag-green">МРЭО</span>
                     </div>
-                    <div class="sub-label mb-2" style="font-size:10px;">Оплата штрафа за нарушение и услуг городского эвакуатора.</div>
+                    <div class="sub-label mb-2" style="font-size:10px;">Оплата протокола за нарушение и услуг городского эвакуатора.</div>
                     <button onclick="resolveImpoundOfficialPay()" class="btn btn-green btn-sm w-full">Оплатить протокол (25,000 ₽)</button>
                 </div>
 
@@ -1244,7 +1234,7 @@ function resolveImpoundBribe(type) {
     } else {
         if ((state.player?.connections || 0) < 1) return showToast("У вас нет теневых связей 🤝!");
         state.player.connections -= 1;
-        showToast("Решала Артур забрал ключи со спецстоянки (-1 🤝)!");
+        showToast("Решала забрал ключи со спецстоянки (-1 🤝)!");
     }
 
     car.impounded = false;
@@ -1272,7 +1262,7 @@ function resolveImpoundOfficialPay() {
     renderGarage();
     playSound('win');
     tgHaptic('success');
-    showToast("Штраф и эвакуация оплачены! Автомобиль возвращён в гараж.");
+    showToast("Штраф и эвакуация оплачены! Автомобиль возвращён.");
 }
 
 function resolveImpoundScrap(reward) {
@@ -1280,7 +1270,7 @@ function resolveImpoundScrap(reward) {
     const car = state.garage[activeImpoundCarIndex];
     if (!car || !car.isRegisteredOnPlayer) return;
 
-    if (!confirm(`Вы действительно хотите сдать «${car.name}» в утиль? Автомобиль будет списан из гаража.`)) return;
+    if (!confirm(`Сдать «${car.name}» в утиль? Автомобиль будет списан из гаража.`)) return;
 
     state.player.cash = (state.player.cash || 0) + reward;
     state.garage.splice(activeImpoundCarIndex, 1);
@@ -1290,7 +1280,7 @@ function resolveImpoundScrap(reward) {
     renderGarage();
     playSound('win');
     tgHaptic('success');
-    openVerdictModal("УТИЛИЗАЦИЯ ЗАВЕРШЕНА ♻️", `Автомобиль снят с государственного учёта и сдан в металлолом.\nВыплачено: +${reward.toLocaleString()} ₽`, true);
+    openVerdictModal("УТИЛИЗАЦИЯ ЗАВЕРШЕНА ♻️", `Автомобиль снят с государственного учёта.\nВыплачено: +${reward.toLocaleString()} ₽`, true);
 }
 
 // ========================================================
@@ -1312,7 +1302,8 @@ function openPutOnLotModal(idx) {
 
     if (titleEl) titleEl.innerText = `${car.name} (${car.power || 100} л.с.)`;
     if (costEl) costEl.innerText = `Себестоимость выкупа: ${(car.purchaseCost || car.basePrice || 100000).toLocaleString()} ₽`;
-    if (askInput) askInput.value = Math.round((car.marketValue || car.basePrice || 100000) * 1.15);
+    // Рекомендуемая цена продажи с хорошей перекупской наценкой
+    if (askInput) askInput.value = Math.round((car.marketValue || car.basePrice || 100000) * 1.25);
 
     window.currentLotPutIndex = idx;
     const modal = document.getElementById('modalPutOnLot');
@@ -1333,7 +1324,7 @@ function confirmPutOnLot() {
     state.garage.splice(idx, 1);
     if (!state.salesLot) state.salesLot = [];
 
-    let waitTime = (typeof calculateLotWaitTime === 'function') ? calculateLotWaitTime() : Math.floor(60 + Math.random() * 180);
+    let waitTime = (typeof calculateLotWaitTime === 'function') ? calculateLotWaitTime() : Math.floor(40 + Math.random() * 80);
 
     state.salesLot.push({
         car: car,
@@ -1417,7 +1408,7 @@ function applyPlateToCar(plateStr) {
     tgHaptic('success');
 
     if (diff > 0) {
-        spawnFloatingReward(`+${diff.toLocaleString()} ₽ к цене авто!`);
+        spawnFloatingReward(`+${diff.toLocaleString()} ₽ к оценке авто!`);
         showToast(`Блатные номера ${plateStr} установлены! Оценка авто выросла на +${diff.toLocaleString()} ₽ 🔥`);
     } else {
         showToast(`Номера ${plateStr} успешно установлены на автомобиль!`);
@@ -1457,7 +1448,7 @@ function removePlateFromCar() {
     if (diff > 0) {
         spawnFloatingReward(`-${diff.toLocaleString()} ₽`);
     }
-    showToast(`Госномер ${curPlate} снят и убран в инвентарь! Оценка машины вернулась к базе.`);
+    showToast(`Госномер ${curPlate} снят и убран в инвентарь!`);
 }
 
 // ========================================================
@@ -1465,7 +1456,7 @@ function removePlateFromCar() {
 // ========================================================
 function triggerGarageRandomEvent() {
     if (!state.garage || state.garage.length === 0) return;
-    if (Math.random() > 0.22) return;
+    if (Math.random() > 0.20) return;
 
     const randIdx = Math.floor(Math.random() * state.garage.length);
     const car = state.garage[randIdx];
@@ -1476,7 +1467,7 @@ function triggerGarageRandomEvent() {
     const events = [
         {
             title: "Кошка поцарапала капот",
-            desc: "Соседский кот прыгнул на капот и оставил следы когтей на лаке.",
+            desc: "Соседский кот запрыгнул на капот и оставил следы когтей на лаке.",
             emoji: "🐱",
             badge: "ЛКП",
             actionText: "Заполировать (3,000 ₽)",

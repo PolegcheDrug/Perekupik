@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v0.4.9</title>
-    <link rel="stylesheet" href="style.css?v=180">
+    <title>Симулятор Перекупа v0.5.1</title>
+    <link rel="stylesheet" href="style.css?v=205">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -200,7 +200,7 @@
             <div class="cat-info-banner mt-2" id="catInfoBanner">
               <div class="flex-between text-xs">
                 <span class="color-cyan font-bold" id="catInfoTitle"><i class="fa-solid fa-chart-line"></i> Сегмент Эконом:</span>
-                <span class="sub-label" id="catInfoPrice">Капитал: от 50 000 ₽</span>
+                <span class="sub-label" id="catInfoPrice">Капитал: от 40 000 ₽</span>
               </div>
               <div class="sub-label mt-1" id="catInfoDesc">Высокий оборот, быстрый торг у капота и минимальные риски на старте.</div>
             </div>
@@ -415,7 +415,7 @@
             </div>
 
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-sparkles"></i> Список изменений v0.4.9 & Патчноут
+              <i class="fa-solid fa-sparkles"></i> Список изменений v0.5.1 & Патчноут
             </button>
             <div class="grid-2 mb-2">
               <div class="stat-box"><div class="sub-label">Плюс:</div><div id="statProfitable" class="stat-value color-green">0</div></div>
@@ -521,16 +521,18 @@
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-code-merge"></i> ОБНОВЛЕНИЕ v0.4.9</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-code-merge"></i> ОБНОВЛЕНИЕ v0.5.1</div>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.4.9 (Сборка #180)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.5.1 (Сборка #205)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>💎 Капсульный редизайн:</b> Никнейм, уровень и баланс упакованы в стильные аккуратные рамки-капсулы с неоновой окантовкой.</div>
-          <div class="patch-item"><b>🎨 Монохромный неоновый цвет:</b> Возможность выбрать чистый цвет подсветки (бирюзовый, лайм, золото, рубин, кобальт) или задать любой произвольный оттенок.</div>
-          <div class="patch-item"><b>✨ Анимации ника и аватарок:</b> Огненная аура, неоновый импульс, золотой блеск Олигарха и кибер-глитч.</div>
-          <div class="patch-item"><b>🏠 Новая система Жилья:</b> Четкое разделение на стоянки, боксы ГСК с ямой, мастерские и элитные апартаменты.</div>
+          <div class="patch-item"><b>💰 Честная маржинальность перекупа:</b> Предложения рынка скорректированы на дисконт до 35-50%, а покупатели на площадке продаж предлагают реальные надбавки за подготовленные автомобили.</div>
+          <div class="patch-item"><b>🏁 Интерактивные зрелищные заезды:</b> 6-секундный дрифт по восьмерке со следами резины и дымом, дрэг с ёлкой старта и стравливание пневмы в пол на стенс-сходке.</div>
+          <div class="patch-item"><b>🤝 Реалистичная встреча у капота:</b> Толщиномер и сканер Launch OBD2 теперь используются прямо перед продавцом, открывая козыри для торга.</div>
+          <div class="patch-item"><b>📑 Чистый официальный бланк ДКП:</b> Устранено наложение штампа МРЭО на подписи. Выверенная табличная структура полей.</div>
+          <div class="patch-item"><b>🚘 Премиум-типографика карточек:</b> Характеристики вынесены в микро-плитки, госномер зафиксирован на фото, аккуратный заводской сток.</div>
+          <div class="patch-item"><b>📱 Сквозная тема PerekupOS:</b> Выбранный цвет оформления теперь полностью преображает интерфейс смартфона и его приложения.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
       </div>
@@ -642,11 +644,12 @@
             <span class="tag-badge bg-tag-amber">ПЕРЕКУП</span>
           </div>
           <div class="sub-label my-1" style="font-size:10px;">• Пошлина: <b>0 ₽</b><br>• Налог 13%: <b>Не платится</b><br>• 🚨 <b>Лимит 10 дней!</b></div>
-          <button onclick="confirmRegistrationChoice(false)" class="btn btn-amber btn-sm w-full mt-2">Оставить на ДКП</button>
+          <button onclick="confirmRegistrationChoice(false)" class="btn btn-amber btn-sm w-full mt-2">Оставить на ДКП (Без налога)</button>
         </div>
       </div>
     </div>
 
+    <!-- ОФИЦИАЛЬНЫЙ БЛАНК ДКП (БЕЗ НАЛОЖЕНИЯ ШТАМПА МРЭО) -->
     <div id="modalDKP" class="modal-overlay">
       <div class="modal-box dkp-official-blank">
         <div class="dkp-blank-border">
@@ -659,33 +662,40 @@
             <div class="dkp-row mb-2"><span class="sub-label">Покупатель:</span> <b class="text-xs" id="dkpBuyerName">Перекуп #777</b></div>
             <div class="p-2 mb-2 dkp-car-spec-box">
               <div class="font-bold text-xs color-cyan" id="dkpCarTitle">ВАЗ-2107</div>
-              <div class="text-xs" id="dkpCarSpecs">Мощность: 74 л.с.</div>
+              <div class="text-xs my-1" id="dkpCarSpecs">Мощность: 74 л.с. | Пробег: 85,000 км</div>
               <div class="flex-between mt-1 text-xs">
-                <span>Госномер:</span>
+                <span class="sub-label">Госномер:</span>
                 <span class="license-plate" style="font-size:10.5px; padding:2px 6px;" id="dkpCarPlate">В777ВВ 77</span>
               </div>
             </div>
             <div class="flex-between p-2 mb-2 dkp-price-line">
               <span class="font-bold text-xs">ИТОГОВАЯ СУММА:</span>
-              <b class="price-val" id="dkpPriceAmount">150,000 ₽</b>
+              <b class="price-val text-xs color-green" id="dkpPriceAmount">150,000 ₽</b>
             </div>
             <div id="dkpNetProfitBadge" class="text-xs text-center font-bold mb-2" style="display:none;"></div>
           </div>
+          
+          <!-- ЗОНА ПОДПИСЕЙ И ДИАГОНАЛЬНОГО ШТАМПА -->
           <div class="dkp-signatures-area">
             <div class="dkp-sig-col">
               <span class="text-xs sub-label">Продавец:</span>
               <div class="dkp-handwrite" id="dkpSellerSig">✓ Подписано</div>
             </div>
-            <div class="dkp-sig-col">
+            <div class="dkp-sig-col text-right">
               <span class="text-xs sub-label">Покупатель:</span>
-              <div class="dkp-handwrite" id="dkpBuyerSig">✍️ Ожидание...</div>
+              <div class="dkp-handwrite" id="dkpBuyerSig">✍️ Ожидает подписи...</div>
             </div>
             <div id="dkpOfficialStamp" class="official-mreo-stamp">
-              <div class="stamp-inner"><b>МРЭО</b><b>ЗАРЕГИСТРИРОВАНО</b></div>
+              <div class="stamp-inner">
+                <span>МРЭО ГИБДД</span>
+                <span>ЗАРЕГИСТРИРОВАНО</span>
+                <span>РФ</span>
+              </div>
             </div>
           </div>
+
           <div class="mt-3 space-y-2">
-            <button id="btnSignDKP" onclick="confirmSignDKP()" class="btn btn-green w-full">✍️ Подписать ДКП и забрать деньги</button>
+            <button id="btnSignDKP" onclick="confirmSignDKP()" class="btn btn-green w-full">✍️ Подписать ДКП и выкупить ТС</button>
             <button id="btnAbortDKP" onclick="abortDKPDeal()" class="btn btn-danger btn-sm w-full">❌ Разорвать сделку / Отказаться</button>
             <button id="btnCloseDKP" onclick="closeModal('modalDKP')" class="btn btn-dark w-full mt-2" style="display:none;">Готово</button>
           </div>
@@ -805,6 +815,7 @@
       </div>
     </div>
 
+    <!-- ВСТРЕЧА У КАПОТА: ПРОВЕРКА OBD2 И ТОЛЩИНОМЕРА НА МЕСТЕ -->
     <div id="modalMarketDeal" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -812,11 +823,12 @@
             <div class="chat-avatar-circle" id="dealSellerAvatar">👤</div>
             <div>
               <div class="font-bold text-xs" id="dealSellerName">Продавец</div>
-              <div class="text-xs color-green">● У капота</div>
+              <div class="text-xs color-green">● Личная встреча у капота</div>
             </div>
           </div>
           <button onclick="closeModal('modalMarketDeal')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
+
         <div class="deal-car-preview-card mb-2">
           <img id="dealCarImg" src="" class="deal-car-thumb">
           <div style="flex:1;">
@@ -825,11 +837,15 @@
             <div class="price-val text-xs" id="dealCarPrice">0 ₽</div>
           </div>
         </div>
+
         <div class="chat-thread-container mb-2" id="dealChatThread"></div>
+        
+        <!-- ДИАГНОСТИКА У КАПОТА И КНОПКИ ТОРГА -->
         <div id="dealHaggleArea" class="mb-2"></div>
+        
         <div class="grid-2">
-          <button onclick="closeModal('modalMarketDeal')" class="btn btn-dark">Отбой 📵</button>
-          <button id="dealBuyBtn" onclick="confirmMarketPurchaseSuccess()" class="btn btn-green">Выкупить 🤝</button>
+          <button onclick="closeModal('modalMarketDeal')" class="btn btn-dark">Уехать со встречи 🚗</button>
+          <button id="dealBuyBtn" onclick="confirmMarketPurchaseSuccess()" class="btn btn-green">Оформить ДКП 🤝</button>
         </div>
       </div>
     </div>
@@ -1144,12 +1160,12 @@
         function loadModule(name) {
           return new Promise((resolve) => {
             const s1 = document.createElement('script');
-            s1.src = name + '?v=180';
+            s1.src = name + '?v=205';
             s1.onload = () => resolve(true);
             s1.onerror = () => {
               s1.remove();
               const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=180';
+              s2.src = 'js/' + name + '?v=205';
               s2.onload = () => resolve(true);
               s2.onerror = () => {
                 console.warn('[Loader] Не удалось загрузить ' + name);

@@ -1,8 +1,8 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.5.0)
+// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.5.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Интерактивный отчёт Автотеки (ПТС, аватар владельца, юр. чистота),
-// компактный фикс торга у капота, цифровой Launch OBD2, микро-сетка параметров
+// Сбалансированная перекупская экономика (реальная маржа 30-50%),
+// интерактивная диагностика у капота, отчёт Автотеки и обоснованный торг
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -112,12 +112,12 @@ function getMarketRefreshCost() {
 }
 
 const CATEGORY_META = {
-    economy: { name: "ЭКОНОМ", title: "Сегмент Эконом", capital: "от 50 000 ₽", desc: "Быстрый оборот, минимальные риски на старте и высокий спрос перекупов." },
-    scooter: { name: "СКУТЕРЫ", title: "Городские Скутеры", capital: "от 25 000 ₽", desc: "Дешёвый порог входа, моментальные сделки без заморочек с документами." },
-    moto: { name: "МОТО", title: "Спортбайки & Классика", capital: "от 120 000 ₽", desc: "Высокая сезонная маржа, проверка состояния вилки и геометрии рамы." },
-    atv: { name: "КВАДРО", title: "Квадроциклы 4x4", capital: "от 180 000 ₽", desc: "Техника для бездорожья. Частые скрытые дефекты ходовой и приводов." },
-    comfort: { name: "КОМФОРТ", title: "Сегмент Комфорт", capital: "от 450 000 ₽", desc: "Городские седаны и кроссоверы. Идеально под выкуп для таксопарков." },
-    premium: { name: "ПРЕМИУМ", title: "Премиум & Люкс", capital: "от 1 200 000 ₽", desc: "Высокая чистая прибыль с одной сделки, но капризные и дотошные клиенты." },
+    economy: { name: "ЭКОНОМ", title: "Сегмент Эконом", capital: "от 40 000 ₽", desc: "Быстрый оборот, легкий торг и моментальная ликвидность." },
+    scooter: { name: "СКУТЕРЫ", title: "Городские Скутеры", capital: "от 25 000 ₽", desc: "Дешёвый вход, быстрые сделки и сезонный спрос молодёжи." },
+    moto: { name: "МОТО", title: "Спортбайки & Классика", capital: "от 120 000 ₽", desc: "Высокая сезонная маржа, проверка геометрии рамы и вилки." },
+    atv: { name: "КВАДРО", title: "Квадроциклы 4x4", capital: "от 180 000 ₽", desc: "Техника для бездорожья. Частые скрытые дефекты ходовой." },
+    comfort: { name: "КОМФОРТ", title: "Сегмент Комфорт", capital: "от 450 000 ₽", desc: "Седаны и кроссоверы. Идеально под выкуп для семей и таксопарков." },
+    premium: { name: "ПРЕМИУМ", title: "Премиум & Люкс", capital: "от 1 200 000 ₽", desc: "Высокая чистая прибыль с одной сделки, статус и требовательные клиенты." },
     hyper: { name: "ГИПЕРКАРЫ", title: "Спорт & Экзотика", capital: "от 5 000 000 ₽", desc: "Огромная маржа, эксклюзивные клиенты и дорогие комплектующие." },
     truck: { name: "ГРУЗОВИКИ", title: "Коммерческий транспорт", capital: "от 2 500 000 ₽", desc: "Тягачи и фургоны для крупных заказов Синдиката под ключ." },
     yacht: { name: "ЯХТЫ", title: "Морской сегмент", capital: "от 15 000 000 ₽", desc: "Элитная морская техника для настоящих автомобильных олигархов." }
@@ -185,7 +185,7 @@ function refreshMarketFeedManual() {
 }
 
 // ----------------------------------------------------
-// ГЕНЕРАТОР ПРЕДЛОЖЕНИЙ
+// ГЕНЕРАТОР ПРЕДЛОЖЕНИЙ (СБАЛАНСИРОВАННАЯ ЭКОНОМИКА)
 // ----------------------------------------------------
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
@@ -202,7 +202,6 @@ function populateMarketFeed() {
 
     state.marketFeed = [];
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    
     const feedCount = Math.min(8, Math.max(6, shuffledPool.length));
 
     for (let i = 0; i < feedCount; i++) {
@@ -211,23 +210,27 @@ function populateMarketFeed() {
 
         let dealRoll = Math.random();
         let dealType = 'normal';
-        let priceMultiplier = 0.85;
+        let priceMultiplier = 0.70;
 
-        if (dealRoll < 0.22) {
+        // ПЕРЕКУПСКАЯ ВИЛКА ЦЕН:
+        // urgent: продавец сливает тачку за 50-65% от рынка
+        // normal: продавец отдает за 65-78% от рынка (отличная точка входа)
+        // overprice: продавец хочет почти полный рынок (90-102%), требуется торг
+        if (dealRoll < 0.28) {
             dealType = 'urgent';
-            priceMultiplier = 0.68 + Math.random() * 0.10;
-        } else if (dealRoll < 0.68) {
+            priceMultiplier = 0.50 + Math.random() * 0.15;
+        } else if (dealRoll < 0.80) {
             dealType = 'normal';
-            priceMultiplier = 0.82 + Math.random() * 0.12;
+            priceMultiplier = 0.65 + Math.random() * 0.13;
         } else {
             dealType = 'overprice';
-            priceMultiplier = 1.05 + Math.random() * 0.18;
+            priceMultiplier = 0.90 + Math.random() * 0.14;
         }
 
-        let defectChance = 0.38;
-        if (dealType === 'urgent') defectChance = 0.55;
-        if (lvl <= 5) defectChance = 0.28;
-        else if (lvl >= 20) defectChance = 0.48;
+        let defectChance = 0.35;
+        if (dealType === 'urgent') defectChance = 0.50;
+        if (lvl <= 5) defectChance = 0.25;
+        else if (lvl >= 20) defectChance = 0.45;
         if (cat === 'premium' || cat === 'hyper') defectChance -= 0.10;
 
         let hasHiddenDefect = false;
@@ -235,29 +238,31 @@ function populateMarketFeed() {
             if (Math.random() < defectChance) hasHiddenDefect = true;
         }
 
-        let isStolen = Math.random() < (dealType === 'urgent' ? 0.20 : 0.10);
+        let isStolen = Math.random() < (dealType === 'urgent' ? 0.15 : 0.07);
         const carId = "m_" + Date.now() + "_" + i;
         
-        let isCoolNumber = Math.random() < 0.08;
+        let isCoolNumber = Math.random() < 0.10;
         let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
 
         let baseP = template.basePrice ? template.basePrice : 100000;
         let tType = template.type ? template.type : cat;
         const dynPrice = getDynamicPrice(baseP, tType);
 
-        let carOnlyPrice = Math.round(dynPrice * priceMultiplier);
-        const baseVal = Math.round(dynPrice * 1.05);
+        // Реальная рыночная стоимость авто (с запасом для маржи перекупа)
+        const baseVal = Math.round(dynPrice * 1.15);
         const plateVal = evaluatePlate(genPlate);
 
+        let carOnlyPrice = Math.round(dynPrice * priceMultiplier);
         let sellerPrice = carOnlyPrice;
         let isLuckyFind = false;
 
+        // Шанс купить машину с дорогими номерами без наценки продавца («дедушка не знает цену»)
         if (plateVal > 5000) {
-            if (Math.random() < 0.14) {
+            if (Math.random() < 0.35) {
                 isLuckyFind = true;
                 sellerPrice = carOnlyPrice;
             } else {
-                let plateMarkup = Math.round(plateVal * (0.75 + Math.random() * 0.20));
+                let plateMarkup = Math.round(plateVal * 0.40);
                 sellerPrice = carOnlyPrice + plateMarkup;
             }
         }
@@ -277,25 +282,25 @@ function populateMarketFeed() {
             };
         }
 
-        let sNote = "Машина в порядке, сел и поехал.";
+        let sNote = "Машина на бодром ходу, сел и поехал.";
         if (isLuckyFind) {
-            sNote = "«Отдаю дедовский аппарат как есть, в ценах на номера не разбираюсь.» (🔥 Продавец не знает цену номеров!)";
+            sNote = "«Отдаю дедовский аппарат как есть, в этих ваших номерах ничего не понимаю.» (🔥 Продавец не знает цену номеров!)";
         } else if (dealType === 'overprice') {
             const overpriceNotes = [
-                "«Цена окончательная, знаю что продаю. Свои цены не предлагать!»",
-                "«Вложено в два раза больше стоимости. Отдам только истинному ценителю.»",
-                "«Рынок видел, хлам за копейки покупайте в другом месте.»"
+                "«Цена окончательная, знаю рынок. Свои цены не предлагать!»",
+                "«Вложено в два раза больше стоимости. Отдам только ценителю.»",
+                "«Машина выходного дня, торга нет совсем.»"
             ];
             sNote = overpriceNotes[Math.floor(Math.random() * overpriceNotes.length)];
         } else if (dealType === 'urgent') {
-            sNote = "«Срочно нужны деньги до вечера, отдам с хорошим дисконтом!»";
+            sNote = "«Срочно нужны деньги до вечера, отдам с хорошей скидкой первому, кто приедет!»";
         } else if (plateVal > 15000) {
-            sNote = "«Продаю только вместе с красивым госномером " + genPlate + ", торга нет!»";
+            sNote = "«Продаю только вместе с красивым госномером " + genPlate + ".»";
         } else if (hasHiddenDefect) {
             const riskyPhrases = [
-                "«Есть мелкие недочеты, на езду не влияет.»",
-                "«Продаю срочно, перекупам не звонить.»",
-                "«Двигатель работает ровно, но чек горит (датчик кислорода).»"
+                "«Есть пара мелких нюансов, на езду вообще не влияет.»",
+                "«Продаю как есть, перекупам просьба не беспокоить.»",
+                "«Мотор шепчет, чек иногда загорается из-за бензина.»"
             ];
             sNote = riskyPhrases[Math.floor(Math.random() * riskyPhrases.length)];
         } else if (typeof SELLER_ADS_PHRASES !== 'undefined' && SELLER_ADS_PHRASES.length > 0) {
@@ -307,19 +312,18 @@ function populateMarketFeed() {
         let cImg = template.img ? template.img : "";
         let cFallback = template.fallback || getCategoryFallback(tType);
 
-        let cCond = hasHiddenDefect ? Math.floor(40 + Math.random() * 30) : Math.floor(75 + Math.random() * 20);
-        if (cat === 'premium' || cat === 'hyper') cCond = Math.max(65, cCond);
+        let cCond = hasHiddenDefect ? Math.floor(45 + Math.random() * 25) : Math.floor(75 + Math.random() * 20);
+        if (cat === 'premium' || cat === 'hyper') cCond = Math.max(70, cCond);
 
-        let isThick1 = (Math.random() > 0.55) ? Math.floor(220 + Math.random() * 350) : 110;
-        let isThick2 = (Math.random() > 0.45) ? Math.floor(260 + Math.random() * 450) : 115;
+        let isThick1 = (Math.random() > 0.55) ? Math.floor(220 + Math.random() * 300) : 110;
+        let isThick2 = (Math.random() > 0.45) ? Math.floor(240 + Math.random() * 350) : 115;
         
-        let engWear = hasHiddenDefect ? (35 + Math.random() * 35) : (75 + Math.random() * 20);
-        let transWear = hasHiddenDefect ? (40 + Math.random() * 30) : (80 + Math.random() * 15);
+        let engWear = hasHiddenDefect ? (40 + Math.random() * 30) : (78 + Math.random() * 18);
+        let transWear = hasHiddenDefect ? (45 + Math.random() * 25) : (80 + Math.random() * 15);
 
         const sellerTypes = ['greedy', 'calm', 'hurried'];
         const currentSellerType = dealType === 'urgent' ? 'hurried' : (dealType === 'overprice' ? 'greedy' : sellerTypes[Math.floor(Math.random() * sellerTypes.length)]);
 
-        // Генерация персональных данных владельца для Автотеки и ПТС
         const firstNames = ["Игорь", "Сергей", "Владимир", "Алексей", "Дмитрий", "Андрей", "Михаил", "Максим"];
         const lastNames = ["Петров", "Кузнецов", "Смирнов", "Морозов", "Васильев", "Новиков", "Фёдоров"];
         const ownerAvatars = ["🧔", "👨‍💼", "👴", "🧑‍🦱", "👨‍🔧", "🧢", "🤵"];
@@ -336,7 +340,7 @@ function populateMarketFeed() {
             type: tType,
             drivetrain: template.drivetrain || 'rwd',
             basePrice: baseP,
-            mileage: Math.floor(Math.random() * (tType === 'premium' ? 80000 : 180000)) + 15000,
+            mileage: Math.floor(Math.random() * (tType === 'premium' ? 75000 : 160000)) + 20000,
             price: sellerPrice,
             originalAskingPrice: sellerPrice,
             baseMarketValue: baseVal,
@@ -350,7 +354,7 @@ function populateMarketFeed() {
             stoChecked: false,
             gaugeChecked: false,
             haggled: false,
-            hagglePatience: currentSellerType === 'greedy' ? 2 : (currentSellerType === 'hurried' ? 5 : 3),
+            hagglePatience: currentSellerType === 'greedy' ? 3 : (currentSellerType === 'hurried' ? 5 : 4),
             sellerPersonality: currentSellerType,
             dealType: dealType,
             unavailable: false,
@@ -385,7 +389,7 @@ function populateMarketFeed() {
                 ptsType: ownersCount <= 2 ? "Электронный (ЭПТС) ✓" : "Дубликат ПТС ⚠️",
                 pledgeBank: isStolen ? "В залоге у МФО ❌" : "Залогов нет ✓",
                 fsspRestrictions: isStolen ? "Запрет на регдействия ФССП ❌" : "Ограничений нет ✓",
-                taxiCheck: ownersCount > 2 && Math.random() < 0.4 ? "Лицензия такси найдена (Жёлтый)" : "В такси не использовалась ✓"
+                taxiCheck: ownersCount > 2 && Math.random() < 0.35 ? "Лицензия такси найдена (Жёлтый)" : "В такси не использовалась ✓"
             }
         });
     }
@@ -416,7 +420,6 @@ function renderMarketFeed() {
         
         let isBusy = (car.cooldownUntil && car.cooldownUntil > now);
         let timeLeft = isBusy ? Math.ceil((car.cooldownUntil - now) / 1000) : 0;
-        let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
         
         let carMileage = (typeof car.mileage === 'number') ? car.mileage.toLocaleString() : "85 000";
         let carPrice = (typeof car.price === 'number') ? car.price.toLocaleString() : "100 000";
@@ -430,26 +433,29 @@ function renderMarketFeed() {
         let busyClass = isBusy ? "busy" : "";
         let viewedClass = car.viewed ? "viewed-card" : "";
         let sellerNoteBlock = car.sellerNote ? "<div class='seller-note-card'>" + car.sellerNote + "</div>" : "";
-        
-        let toolIcon = (state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_pro)) ? "✓" : "(3k)";
-        let obdIcon = hasScanner ? "OBD2 ✓" : "OBD2 (5k)";
-        let autoIcon = car.autotekaChecked ? "0" : "5k";
+        let autoIcon = car.autotekaChecked ? "Проверено ✓" : "5,000 ₽";
 
         let dealBadge = "";
         if (car.dealType === 'urgent') {
-            dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🔥 URGENT</span>";
+            dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🔥 СРОЧНО (-35%)</span>";
         } else if (car.dealType === 'overprice') {
-            dealBadge = "<span class='tag-badge bg-tag-red ml-1'>⚠️ OVERPRICE</span>";
+            dealBadge = "<span class='tag-badge bg-tag-red ml-1'>⚠️ ВЫСОКАЯ ЦЕНА</span>";
         }
 
         let pVal = evaluatePlate(car.plate);
         let coolPlateBadge = pVal > 15000
-            ? "<span class='tag-badge bg-tag-purple ml-1'>🏷️ БЛАТНЫЕ НОМЕРА</span>"
+            ? "<span class='tag-badge bg-tag-purple ml-1'>🏷️ БЛАТНОЙ НОМЕР</span>"
             : "";
 
         let carName = car.name ? car.name : "Автомобиль";
         let carPower = car.power ? car.power : 100;
         let carPlate = car.plate ? car.plate : "ТРАНЗИТ";
+
+        // Расчёт ориентировочной маржи прямо в карточке для удобства игрока
+        let estimatedProfit = (car.marketValue || 0) - (car.price || 0);
+        let profitBadge = estimatedProfit > 0 
+            ? `<div class="sub-label text-right" style="font-size:9.5px; color:var(--green);">Потенциал: <b>+${estimatedProfit.toLocaleString()} ₽</b></div>` 
+            : "";
 
         htmlContent += `
         <div class='glass-card mb-3 ${busyClass} ${viewedClass}' id='card_${car.id}'>
@@ -475,7 +481,6 @@ function renderMarketFeed() {
                 <h4 class='font-bold text-xs color-cyan' style='font-size:14px;'>${carName}</h4>
             </div>
 
-            <!-- МИКРО-ПЛИТКИ ПАРАМЕТРОВ (SPEC GRID) -->
             <div class='car-spec-chips-row mb-2'>
                 <div class='car-spec-chip'><i class='fa-solid fa-bolt color-amber'></i> <b>${carPower}</b> л.с.</div>
                 <div class='car-spec-chip'><i class='fa-solid fa-road color-cyan'></i> <b>${carMileage}</b> км</div>
@@ -492,17 +497,18 @@ function renderMarketFeed() {
                 <div class='sub-label text-right'>
                     <span class='sub-label text-xs'>${t('market_estimate')}:</span>
                     <div class='font-bold color-cyan text-xs'>~${carMarketVal} ₽</div>
+                    ${profitBadge}
                 </div>
             </div>
 
-            <div class='grid-3 mb-2'>
-                <button onclick="openGaugeModal('${car.id}')" class='btn btn-dark btn-sm'>${t('thickness_gauge')} ${toolIcon}</button>
-                <button onclick="quickOBDScanMarketCar('${car.id}')" class='btn btn-dark btn-sm'>${obdIcon}</button>
-                <button onclick="openAutotekaModal('${car.id}')" class='btn btn-dark btn-sm'>${t('autoteka')} (${autoIcon})</button>
+            <div class='mb-2'>
+                <button onclick="openAutotekaModal('${car.id}')" class='btn btn-dark btn-sm w-full'>
+                    <i class='fa-solid fa-file-waveform color-green mr-1'></i> ${t('autoteka')} (${autoIcon})
+                </button>
             </div>
 
-            <button onclick="initiateBuyMarketCar('${car.id}')" class='btn btn-cyan w-full'>
-                <i class='fa-solid fa-phone'></i> ${t('call_seller')}
+            <button onclick="initiateBuyMarketCar('${car.id}')" class="btn btn-cyan w-full">
+                <i class="fa-solid fa-phone mr-1"></i> Позвонить и назначить встречу
             </button>
         </div>`;
     });
@@ -511,9 +517,9 @@ function renderMarketFeed() {
     if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
 }
 
-// ========================================================
-// АСИНХРОННОЕ СКАНИРОВАНИЕ LAUNCH OBD2 С ЦИФРОВЫМ ТЕРМИНАЛОМ
-// ========================================================
+// ----------------------------------------------------
+// ДИАГНОСТИКА LAUNCH OBD2 У КАПОТА
+// ----------------------------------------------------
 let isOBDScanningInProgress = false;
 
 function quickOBDScanMarketCar(carId) {
@@ -525,19 +531,18 @@ function quickOBDScanMarketCar(carId) {
 
     if (!hasScanner) {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-        if (cash < 5000) return showToast("Нужно 5,000 ₽ на выездного мастера со сканером!");
+        if (cash < 5000) return showToast("Нужно 5,000 ₽ на выезд автоподборщика со сканером!");
         state.player.cash -= 5000;
-        showToast("Выездной диагност прибыл со сканером (-5,000 ₽)");
+        showToast("Выездной диагност прибыл к автомобилю (-5,000 ₽)");
     } else {
         let toolKey = state.player?.tools?.obd_launch ? 'obd_launch' : 'obd';
         let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 50;
         if (wear <= 0) {
-            return showToast("⚠️ Ваш диагностический сканер разряжен! Зарядите прибор в Маркете.");
+            return showToast("⚠️ Сканер разряжен! Откалибруйте его в Маркете.");
         }
         state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
     }
 
-    car.viewed = true;
     car.stoChecked = true;
     isOBDScanningInProgress = true;
     saveState();
@@ -545,7 +550,7 @@ function quickOBDScanMarketCar(carId) {
     const modal = document.getElementById("modalOBD2");
     const resBox = document.getElementById('obd2ResultBox');
     const actBox = document.getElementById('obd2ActionBox');
-    setTxt('obd2CarTitle', `Диагностика: ${car.name}`);
+    setTxt('obd2CarTitle', `Диагностика CAN-шины: ${car.name}`);
 
     if (modal) modal.classList.add('active');
     playSound('tick');
@@ -555,14 +560,14 @@ function quickOBDScanMarketCar(carId) {
         resBox.innerHTML = `
             <div class="obd-cyber-display">
                 <div class="flex-between text-xs mb-2">
-                    <span class="color-cyan font-bold"><i class="fa-solid fa-satellite-dish"></i> CAN-BUS LINK: CONNECTING...</span>
+                    <span class="color-cyan font-bold"><i class="fa-solid fa-satellite-dish"></i> ПОДКЛЮЧЕНИЕ К РАЗЪЕМУ OBD2...</span>
                     <span class="sub-label">ISO 15765-4</span>
                 </div>
                 <div class="obd-progress-track">
                     <div class="obd-progress-bar" id="obdScanProgressFill"></div>
                 </div>
                 <div class="obd-scan-matrix-screen" id="obdTerminalLines">
-                    <div class="obd-terminal-line">> Инициализация протокола K-Line / CAN 500kbps...</div>
+                    <div class="obd-terminal-line">> Чтение блоков управления ДВС, АКПП и SRS...</div>
                 </div>
             </div>
         `;
@@ -576,10 +581,10 @@ function quickOBDScanMarketCar(carId) {
     const progFill = document.getElementById('obdScanProgressFill');
 
     const scanSteps = [
-        { pct: 25, msg: "> Подключение к ЭБУ Двигателя (DME/ECU)... Связь 100%", type: "success" },
-        { pct: 50, msg: "> Опрос трансмиссии (EGS), проверка адаптации соленоидов...", type: "" },
-        { pct: 75, msg: "> Сканирование тормозной системы ABS / ESP и SRS Airbag...", type: "" },
-        { pct: 100, msg: "> Чтение сохранённых и текущих кодов неисправностей DTC...", type: car.hiddenDefect ? "error" : "success" }
+        { pct: 25, msg: "> Опрос ЭБУ Двигателя (DME/ECU)... Связь 100%", type: "success" },
+        { pct: 50, msg: "> Диагностика трансмиссии (EGS), соленоиды давления...", type: "" },
+        { pct: 75, msg: "> Тормозная система ABS/ESP и подушки Airbag...", type: "" },
+        { pct: 100, msg: "> Чтение сохранённых ошибок в памяти DTC...", type: car.hiddenDefect ? "error" : "success" }
     ];
 
     let currentStep = 0;
@@ -603,7 +608,7 @@ function quickOBDScanMarketCar(carId) {
 
             renderOBDFinalResults(car, resBox, actBox);
         }
-    }, 650);
+    }, 500);
 }
 
 function renderOBDFinalResults(car, resBox, actBox) {
@@ -618,13 +623,13 @@ function renderOBDFinalResults(car, resBox, actBox) {
         resBox.innerHTML = `
             <div class="obd-cyber-display" style="border-color: var(--red);">
                 <div class="flex-between text-xs mb-2">
-                    <span class="color-red font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ОБНАРУЖЕН DTC КОД: ${def.code || 'P0300'}</span>
+                    <span class="color-red font-bold"><i class="fa-solid fa-triangle-exclamation"></i> НАЙДЕН DTC КОД: ${def.code || 'P0300'}</span>
                     <span class="tag-badge bg-tag-red">${def.severity || 'Критическая'}</span>
                 </div>
                 <div class="obd-scan-matrix-screen mb-2" style="border-color: rgba(255, 51, 102, 0.4);">
                     <div class="obd-terminal-line error">> НЕИСПРАВНОСТЬ: ${def.text}</div>
                     <div class="obd-terminal-line warn">> БЛОК: ${def.system || 'ЭБУ ДВС DME'}</div>
-                    <div class="obd-terminal-line">> СТОИМОСТЬ УСТРАНЕНИЯ: ~${(def.cost || 15000).toLocaleString()} ₽</div>
+                    <div class="obd-terminal-line">> ЦЕНА РЕМОНТА: ~${(def.cost || 15000).toLocaleString()} ₽</div>
                 </div>
                 <div class="grid-3 text-xs p-2" style="background: rgba(0,0,0,0.6); border-radius: 8px;">
                     <div>RPM: <b class="color-cyan">${def.rpm || 850}</b></div>
@@ -635,8 +640,8 @@ function renderOBDFinalResults(car, resBox, actBox) {
         `;
 
         actBox.innerHTML = `
-            <button onclick="closeOBD2Modal()" class="btn btn-cyan w-full mt-2">
-                Понятно (Использовать в торгах!)
+            <button onclick="closeOBD2Modal(); renderMarketHaggleControls();" class="btn btn-cyan w-full mt-2">
+                Понятно (Ткнуть продавца носом в ошибку!)
             </button>
         `;
     } else {
@@ -651,7 +656,7 @@ function renderOBDFinalResults(car, resBox, actBox) {
                 </div>
                 <div class="obd-scan-matrix-screen mb-2" style="border-color: rgba(0, 230, 118, 0.4);">
                     <div class="obd-terminal-line success">> Блоки DME / EGS / ABS / SRS: Ошибки отсутствуют.</div>
-                    <div class="obd-terminal-line">> Топливные коррекции в допуске (LTFT 0.8%).</div>
+                    <div class="obd-terminal-line">> Топливные коррекции в норме.</div>
                     <div class="obd-terminal-line">> Пропусков зажигания не зафиксировано.</div>
                 </div>
                 <div class="flex-between text-xs p-2" style="background: rgba(0,0,0,0.6); border-radius: 8px;">
@@ -662,11 +667,15 @@ function renderOBDFinalResults(car, resBox, actBox) {
         `;
 
         actBox.innerHTML = `
-            <button onclick="closeOBD2Modal()" class="btn btn-green w-full mt-2">
-                Завершить осмотр ✓
+            <button onclick="closeOBD2Modal(); renderMarketHaggleControls();" class="btn btn-green w-full mt-2">
+                Завершить проверку ✓
             </button>
         `;
     }
+}
+
+function closeOBD2Modal() {
+    closeModal("modalOBD2");
 }
 
 function initiateBuyMarketCar(carId) {
@@ -683,7 +692,7 @@ function initiateBuyMarketCar(carId) {
     
     setTxt("buyCallEmoji", "📞");
     setTxt("buyCallTitle", "Звонок продавцу...");
-    setTxt("buyCallDesc", "Соединение с абонентом... Идут гудки...");
+    setTxt("buyCallDesc", "Набираем номер продавца... Идут гудки в трубке...");
     const btnBox = document.getElementById("buyCallActionBtnBox");
     if (btnBox) btnBox.innerHTML = "<button class='btn btn-dark w-full' disabled>Гудки в трубке...</button>";
     
@@ -693,72 +702,58 @@ function initiateBuyMarketCar(carId) {
 
     setTimeout(() => {
         let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
-        let callSuccessChance = 60;
+        let callSuccessChance = 75;
         if (karma > 65) callSuccessChance += 15;
         if (karma < 35) callSuccessChance -= 15;
-        if (car.type === 'premium' || car.type === 'hyper') callSuccessChance -= 15;
         if (car.dealType === 'urgent') callSuccessChance += 20;
         
         const roll = Math.random() * 100;
 
         if (roll < callSuccessChance) {
             closeModal("modalBuyCall");
+            showToast("🚗 Вы приехали по адресу и осматриваете машину у капота!");
             openMarketDeal(carId);
-        } else if (roll < 88) {
-            const waitSec = Math.floor(20 + Math.random() * 25);
+        } else if (roll < 92) {
+            const waitSec = Math.floor(15 + Math.random() * 20);
             car.cooldownUntil = Date.now() + (waitSec * 1000);
             setTxt("buyCallEmoji", "📵");
-            setTxt("buyCallTitle", "Абонент сбросил");
-            setTxt("buyCallDesc", "«Не могу говорить, перезвоните через " + waitSec + " сек!»");
+            setTxt("buyCallTitle", "Продавец занят");
+            setTxt("buyCallDesc", "«Сейчас на работе, перезвоните через " + waitSec + " сек, всё покажу!»");
             if (btnBox) btnBox.innerHTML = "<button onclick=\"closeModal('modalBuyCall')\" class='btn btn-dark w-full'>Понятно</button>";
             saveState();
             renderMarketFeed();
         } else { 
             setTxt("buyCallEmoji", "❌");
-            setTxt("buyCallTitle", "Объявление снято");
-            setTxt("buyCallDesc", "«Только что внесли задаток, машина ушла!»");
+            setTxt("buyCallTitle", "Лот продан");
+            setTxt("buyCallDesc", "«Только что приехали с задатком, машина ушла!»");
             car.unavailable = true;
             saveState();
             renderMarketFeed();
             if (btnBox) btnBox.innerHTML = "<button onclick=\"closeModal('modalBuyCall')\" class='btn btn-dark w-full'>Закрыть</button>";
         }
-    }, 1100);
+    }, 800);
 }
 
 function paidCallMarketCar(carId) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < 1000) return showToast("Не хватает 1000 ₽ на платный дозвон!");
+    if (cash < 1000) return showToast("Не хватает 1,000 ₽ на приоритетный дозвон!");
     state.player.cash -= 1000;
     
     const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
     if (carIndex === -1) return;
     const car = state.marketFeed[carIndex];
 
-    let successChance = 0.75;
-    let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    if (lvl >= 10 || (state.player && state.player.policeImmunityDays > 0)) {
-        successChance = 0.90;
-    }
-
-    if (Math.random() < successChance) {
-        car.cooldownUntil = 0;
-        saveState();
-        renderMarketFeed();
-        playSound('win');
-        tgHaptic('success');
-        showToast("Успешный дозвон по приоритетной линии!");
-        openMarketDeal(carId);
-    } else {
-        car.cooldownUntil = Date.now() + 8000;
-        saveState();
-        renderMarketFeed();
-        tgHaptic('error');
-        showToast("📵 Абонент отклонил второй вызов! Попробуйте позже.");
-    }
+    car.cooldownUntil = 0;
+    saveState();
+    renderMarketFeed();
+    playSound('win');
+    tgHaptic('success');
+    showToast("Приоритетный вызов успешен! Встреча назначена.");
+    openMarketDeal(carId);
 }
 
 // ----------------------------------------------------
-// ЛОГИКА ТОРГА ПРИ ПОКУПКЕ (С КОМПАКТНЫМ ПРЕВЬЮ БЕЗ РАСТЯГИВАНИЯ)
+// ВСТРЕЧА У КАПОТА: ПРОВЕРКИ И ТОРГ
 // ----------------------------------------------------
 function openMarketDeal(carId) {
     const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
@@ -786,7 +781,7 @@ function openMarketDeal(carId) {
     let priceStr = car.price ? car.price.toLocaleString() : "0";
     setTxt("dealCarPrice", priceStr + " ₽");
     
-    const avatars = ["👨‍💼", "🧔", "😎", "👨‍🔧", "🧑‍💻", "🕵️‍♂️"];
+    const avatars = ["👨‍💼", "🧔", "😎", "👨‍🔧", "🧑‍💻", "👴"];
     const names = ["Сергей", "Алексей", "Дмитрий", "Артём", "Михаил", "Игорь"];
     let numSum = 0;
     for (let k = 0; k < carId.length; k++) numSum += carId.charCodeAt(k);
@@ -795,13 +790,13 @@ function openMarketDeal(carId) {
     const sellerTitle = names[randIdx];
     pendingMarketCar.sellerName = sellerTitle;
     setTxt("dealSellerAvatar", avatars[randIdx]);
-    setTxt("dealSellerName", sellerTitle + " (Продавец)");
+    setTxt("dealSellerName", sellerTitle + " (Продавец у капота)");
 
     const thread = document.getElementById("dealChatThread");
     if (thread) {
-        let greeting = "«Алло, да, продаю. Машина в порядке, сел и поехал. Что интересует?»";
-        if (car.dealType === 'urgent') greeting = "«Привет! Отдаю срочно, если заберёшь быстро — выслушаю адекватные предложения.»";
-        if (car.dealType === 'overprice') greeting = "«Слушаю. Машина в идеале, торга почти нет, перекупам просьба не беспокоить.»";
+        let greeting = "«Привет! Вот машина, осматривай кузов, проверяй сканером. Если всё устроит — оформим ДКП.»";
+        if (car.dealType === 'urgent') greeting = "«Здорово! Мне срочно нужны деньги до вечера, готов хорошо уступить реальному покупателю!»";
+        if (car.dealType === 'overprice') greeting = "«Добрый день. Машина ухоженная, состояние отличное. Сильно сбивать цену не позволю.»";
         thread.innerHTML = "<div class='chat-msg msg-seller'>" + greeting + "</div>";
     }
 
@@ -816,21 +811,38 @@ function renderMarketHaggleControls() {
     if (!haggleArea || !pendingMarketCar) return;
 
     const car = pendingMarketCar.car;
+    let hasGauge = !!(state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_pro));
+    let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
+
+    let toolIcon = hasGauge ? "✓" : "(3k)";
+    let obdIcon = hasScanner ? "Launch OBD2 ✓" : "Launch (5k)";
+
     if (car.hagglePatience <= 0) {
-        haggleArea.innerHTML = "<div class='text-center sub-label color-red font-bold py-2'>🚫 Продавец категорически отказался продолжать торг!</div>";
+        haggleArea.innerHTML = "<div class='text-center sub-label color-red font-bold py-2'>🚫 Продавец устал от торга и зафиксировал цену!</div>";
         return;
     }
+
+    let inspectionToolsBlock = `
+        <div class="grid-2 mb-2">
+            <button onclick="openGaugeModal('${car.id}')" class="btn btn-dark btn-sm">
+                <i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер ${toolIcon}
+            </button>
+            <button onclick="quickOBDScanMarketCar('${car.id}')" class="btn btn-dark btn-sm">
+                <i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> ${obdIcon}
+            </button>
+        </div>
+    `;
 
     let inspectionBonusBtn = "";
     if (car.stoChecked && car.hiddenDefect) {
         inspectionBonusBtn = `
         <button onclick="attemptDefectArgueHaggle()" class="btn btn-purple btn-sm w-full mb-2">
-            🔍 Ткнуть в ошибку ${car.hiddenDefect.code || 'DTC'}: «${car.hiddenDefect.text.slice(0, 32)}...» (-10%)
+            🔍 Ткнуть в ошибку ${car.hiddenDefect.code || 'DTC'}: «${car.hiddenDefect.text.slice(0, 30)}...» (-15%)
         </button>`;
     } else if (car.gaugeChecked && (car.bodyThickness.doors > 200 || car.bodyThickness.hood > 200)) {
         inspectionBonusBtn = `
         <button onclick="attemptPaintArgueHaggle()" class="btn btn-amber btn-sm w-full mb-2">
-            🎨 Указать на шпаклёвку кузова прибором (-7%)
+            🎨 Показать слой шпаклёвки на приборе (>200 мкм) (-10%)
         </button>`;
     }
 
@@ -838,19 +850,20 @@ function renderMarketHaggleControls() {
         <div class="risk-meter-box mb-2">
             <div class="flex-between text-xs">
                 <span>Терпение продавца:</span>
-                <b class="${car.hagglePatience > 2 ? 'color-green' : 'color-red'}">${car.hagglePatience} попытки</b>
+                <b class="${car.hagglePatience > 2 ? 'color-green' : 'color-red'}">${car.hagglePatience} попыток</b>
             </div>
         </div>
+        ${inspectionToolsBlock}
         ${inspectionBonusBtn}
         <div class="grid-3">
-            <button onclick="attemptMarketHaggle(3)" class="btn btn-dark btn-sm">
-                -3%<br><span class="color-green text-xs">Мягко</span>
+            <button onclick="attemptMarketHaggle(5)" class="btn btn-dark btn-sm">
+                -5%<br><span class="color-green text-xs">Мягко</span>
             </button>
-            <button onclick="attemptMarketHaggle(6)" class="btn btn-dark btn-sm">
-                -6%<br><span class="color-amber text-xs">Аргумент</span>
+            <button onclick="attemptMarketHaggle(10)" class="btn btn-dark btn-sm">
+                -10%<br><span class="color-amber text-xs">По факту</span>
             </button>
-            <button onclick="attemptMarketHaggle(12)" class="btn btn-dark btn-sm">
-                -12%<br><span class="color-red text-xs">Нагло</span>
+            <button onclick="attemptMarketHaggle(18)" class="btn btn-dark btn-sm">
+                -18%<br><span class="color-red text-xs">Жёстко</span>
             </button>
         </div>`;
 }
@@ -860,7 +873,7 @@ function attemptDefectArgueHaggle() {
     const car = pendingMarketCar.car;
     const thread = document.getElementById("dealChatThread");
 
-    let discount = Math.round(car.price * 0.10);
+    let discount = Math.round(car.price * 0.15);
     car.price = Math.max(10000, car.price - discount);
     car.hagglePatience -= 1;
     car.stoChecked = false;
@@ -869,8 +882,8 @@ function attemptDefectArgueHaggle() {
 
     if (thread) {
         thread.innerHTML += `
-            <div class="chat-msg msg-player">«Я сканером прочитал ЭБУ: тут висит ${car.hiddenDefect.text}. Ремонт влетит в копеечку, скидывай!»</div>
-            <div class="chat-msg msg-seller">«Чёрт, спалил... Ладно, скину ${discount.toLocaleString()} ₽ на ремонт в сервисе.»</div>`;
+            <div class="chat-msg msg-player">«Я Launch подключил: в блоке висит ${car.hiddenDefect.text}. Тут работы на круглую сумму, скидывай!»</div>
+            <div class="chat-msg msg-seller">«Да уж, спалил ты меня... Ладно, уступаю ${discount.toLocaleString()} ₽ на сервис!»</div>`;
         thread.scrollTop = thread.scrollHeight;
     }
 
@@ -885,7 +898,7 @@ function attemptPaintArgueHaggle() {
     const car = pendingMarketCar.car;
     const thread = document.getElementById("dealChatThread");
 
-    let discount = Math.round(car.price * 0.07);
+    let discount = Math.round(car.price * 0.10);
     car.price = Math.max(10000, car.price - discount);
     car.hagglePatience -= 1;
     car.gaugeChecked = false;
@@ -894,8 +907,8 @@ function attemptPaintArgueHaggle() {
 
     if (thread) {
         thread.innerHTML += `
-            <div class="chat-msg msg-player">«Тут шпакля под 400 микрон звенит, не надо заливать про заводской окрас!»</div>
-            <div class="chat-msg msg-seller">«Ладно-ладно, уступлю ${discount.toLocaleString()} ₽ на полировку и косяки.»</div>`;
+            <div class="chat-msg msg-player">«Вот, смотри на толщиномер: здесь слой шпакли звенит за 300 мкм! Скидывай за неродной окрас.»</div>
+            <div class="chat-msg msg-seller">«Ладно, твоя взяла. Скидываю ${discount.toLocaleString()} ₽ за вторичный окрас.»</div>`;
         thread.scrollTop = thread.scrollHeight;
     }
 
@@ -912,14 +925,14 @@ function attemptMarketHaggle(percent) {
 
     car.hagglePatience -= 1;
 
-    let baseChance = percent === 3 ? 80 : (percent === 6 ? 50 : 20);
+    let baseChance = percent === 5 ? 85 : (percent === 10 ? 60 : 35);
     if (car.sellerPersonality === 'hurried') baseChance += 25;
-    if (car.sellerPersonality === 'greedy') baseChance -= 25;
+    if (car.sellerPersonality === 'greedy') baseChance -= 20;
 
     let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
     
-    let finalChance = baseChance + (lvl * 0.4) + ((karma - 50) * 0.3);
+    let finalChance = baseChance + (lvl * 0.5) + ((karma - 50) * 0.3);
     const thread = document.getElementById("dealChatThread");
 
     if (Math.random() * 100 <= finalChance) {
@@ -990,9 +1003,6 @@ function confirmMarketPurchaseSuccess() {
     }
 }
 
-// ----------------------------------------------------
-// ВЫБОР РЕГИСТРАЦИИ: УЧЁТ РФ В МРЭО vs ПЕРЕПРОДАЖА НА ДКП
-// ----------------------------------------------------
 function openRegistrationChoiceModal(deal) {
     activePendingDKPDeal = deal;
     let modal = document.getElementById('modalRegistrationChoice');
@@ -1013,7 +1023,7 @@ function confirmRegistrationChoice(registerOnPlayer) {
         let duty = 2850;
         let cash = state.player?.cash || 0;
         if (cash < duty) {
-            showToast("Не хватает 2,850 ₽ на госпошлину МРЭО! Авто оформлено по ДКП.");
+            showToast("Не хватает 2,850 ₽ на госпошлину МРЭО! Оформлено по ДКП.");
             activePendingDKPDeal.isRegisteredOnPlayer = false;
         } else {
             state.player.cash -= duty;
@@ -1090,32 +1100,28 @@ function finishMarketCarBuyProcess(deal) {
 }
 
 // ----------------------------------------------------
-// ТОЛЩИНОМЕР ЛКП: УДОБНАЯ ВЕРСТКА И ИЗНОС ДАТЧИКА
+// ТОЛЩИНОМЕР ЛКП
 // ----------------------------------------------------
 function openGaugeModal(carId) { 
     activeInspectCarId = carId;
     if (!state.marketFeed) return;
     const car = state.marketFeed.find(c => c && c.id === carId);
-    if (car) {
-        car.viewed = true;
-        car.gaugeChecked = true;
-    }
+    if (car) car.gaugeChecked = true;
 
     let hasGauge = !!(state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_pro));
 
     if (!hasGauge) {
         let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-        if (cash < 3000) return showToast("Купите толщиномер в Маркете или отдайте 3,000 ₽ за выездной замер!");
+        if (cash < 3000) return showToast("Купите толщиномер в Маркете или заплатите 3,000 ₽ за замер!");
         state.player.cash -= 3000;
-        showToast("Услуга выездного замера оплачена: -3,000 ₽");
+        showToast("Замер кузова толщиномером: -3,000 ₽");
     } else {
         let toolKey = state.player?.tools?.gauge_pro ? 'gauge_pro' : 'gauge';
         let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 60;
         if (wear <= 0) {
-            showToast("⚠️ Толщиномер разряжен/раскалиброван! Обслужите в Маркете.");
+            showToast("⚠️ Толщиномер разряжен! Откалибруйте в Маркете.");
         } else {
             state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
-            showToast(`Замер прибором (Остаток калибровки: ${state.player.toolsWear[toolKey]}) ✓`);
         }
     }
 
@@ -1131,7 +1137,6 @@ function openGaugeModal(carId) {
     saveState();
     const modal = document.getElementById("modalGauge");
     if (modal) modal.classList.add('active');
-    renderMarketFeed();
 }
 
 function checkBodyPart(part) { 
@@ -1142,8 +1147,7 @@ function checkBodyPart(part) {
     playSound('tick');
     tgHaptic('light');
     
-    let val = car.bodyThickness[part] ? car.bodyThickness[part] : 100;
-
+    let val = car.bodyThickness[part] ? car.bodyThickness[part] : 110;
     const el = document.getElementById("part-" + part);
     if (el) {
         if (val > 200) {
@@ -1158,10 +1162,11 @@ function closeGaugeModal() {
     closeModal("modalGauge");
     activeInspectCarId = null;
     playSound('tick');
+    renderMarketHaggleControls();
 }
 
 // ----------------------------------------------------
-// ИНТЕРАКТИВНЫЙ ОТЧЁТ АВТОТЕКИ И ЭЛЕКТРОННЫЙ ПТС (ЭПТС)
+// ОТЧЁТ АВТОТЕКИ
 // ----------------------------------------------------
 function openAutotekaModal(carId) {
     if (!state.marketFeed) return;
@@ -1201,7 +1206,6 @@ function openAutotekaModal(carId) {
         let transWear = car.wear?.transmission ? Math.round(car.wear.transmission) : 85;
         let avgTech = Math.round((engWear + transWear) / 2);
 
-        // Данные владельца и ПТС
         let pts = car.ptsData || {
             ownerName: "Иванов И.И.",
             ownerAvatar: "🧔",
@@ -1223,7 +1227,6 @@ function openAutotekaModal(carId) {
         let scoreColor = overallScore >= 8 ? "color-green" : (overallScore >= 5 ? "color-amber" : "color-red");
 
         rep.innerHTML = `
-            <!-- КАРТОЧКА АВТО И ГОСНОМЕР -->
             <div class='flex-between mb-2'>
                 <div>
                     <b class='color-cyan' style='font-size:13.5px;'>${cName}</b>
@@ -1232,7 +1235,6 @@ function openAutotekaModal(carId) {
                 ${legalStatus}
             </div>
 
-            <!-- ИНТЕРАКТИВНЫЙ БЛОК ВЛАДЕЛЬЦА И ПТС -->
             <div class='autoteka-pts-card mb-2'>
                 <div class='autoteka-owner-row'>
                     <div class='autoteka-owner-avatar'>${pts.ownerAvatar}</div>
@@ -1266,7 +1268,6 @@ function openAutotekaModal(carId) {
                 </div>
             </div>
 
-            <!-- ПРОБЕГ -->
             <div class='p-2 mb-2' style='background:#0d1424; border-radius:10px; border:1px solid rgba(255,255,255,0.06);'>
                 <div class='flex-between text-xs mb-1'>
                     <span>История показаний одометра:</span>
@@ -1276,7 +1277,6 @@ function openAutotekaModal(carId) {
                 <div class='text-right'>${odoWarning}</div>
             </div>
 
-            <!-- СОСТОЯНИЕ АГРЕГАТОВ -->
             <div class='p-2 mb-2' style='background:#0d1424; border-radius:10px; border:1px solid rgba(255,255,255,0.06);'>
                 <div class='flex-between text-xs mb-1'>
                     <span>Ресурс силовых агрегатов:</span>
@@ -1286,7 +1286,6 @@ function openAutotekaModal(carId) {
                 <div class='sub-label text-xs notranslate' translate='no'>Двигатель: ${engWear}% | Трансмиссия: ${transWear}%</div>
             </div>
 
-            <!-- ИСТОРИЯ ДТП И РЕЙТИНГ АВТОТЕКИ -->
             <div class='flex-between text-xs p-2 mb-2' style='background:#0d1424; border-radius:10px; border:1px solid rgba(255,255,255,0.06);'>
                 <div>
                     <span>История аварий и выплат:</span>
@@ -1335,7 +1334,7 @@ function updateMarketTimers() {
     if (needFullReRender) renderMarketFeed();
 }
 
-// Экспорт функций в window
+// Экспорт функций в глобальный объект window
 window.setCategory = setCategory;
 window.toggleMarketCategories = toggleMarketCategories;
 window.refreshMarketFeedManual = refreshMarketFeedManual;
@@ -1346,10 +1345,12 @@ window.checkBodyPart = checkBodyPart;
 window.closeGaugeModal = closeGaugeModal;
 window.quickOBDScanMarketCar = quickOBDScanMarketCar;
 window.renderOBDFinalResults = renderOBDFinalResults;
+window.closeOBD2Modal = closeOBD2Modal;
 window.openAutotekaModal = openAutotekaModal;
 window.initiateBuyMarketCar = initiateBuyMarketCar;
 window.paidCallMarketCar = paidCallMarketCar;
 window.openMarketDeal = openMarketDeal;
+window.renderMarketHaggleControls = renderMarketHaggleControls;
 window.attemptMarketHaggle = attemptMarketHaggle;
 window.attemptDefectArgueHaggle = attemptDefectArgueHaggle;
 window.attemptPaintArgueHaggle = attemptPaintArgueHaggle;

@@ -1,5 +1,5 @@
 // ========================================================
-// js/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.5.0)
+// js/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.5.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Интерактивные зрелищные заезды (6 секунд):
 // Арена дрифта (восьмёрка с дымом), Драг 402м с ёлкой старта,
@@ -93,10 +93,10 @@ const PhoneRacing = {
             isTiresDead,
             matsuriReady: hasDiff && hasAngle && power >= 75 && !isOverheated && !isTiresDead,
             matsuriReason: isOverheated ? "Двигатель перегрет (>105°C)!" : (isTiresDead ? "Резина стёрта в ноль!" : (!hasDiff ? "Нужна заварка редуктора" : (!hasAngle ? "Нужен Красноярский выворот" : (power < 75 ? "Нужно минимум 75 л.с." : "Готов")))),
-            europeReady: hasDiff && hasAngle && hasHydro && power >= 220 && !isOverheated && !isTiresDead,
-            europeReason: isOverheated ? "Перегрев мотора!" : (isTiresDead ? "Требуется замена резины на СТО!" : (power < 220 ? `Нехватка мощности: ${power}/220 л.с.` : (!hasHydro ? "Нужен гидроручник" : "Готов"))),
-            gpReady: hasDiff && hasAngle && hasHydro && hasCage && hasSeats && power >= 450 && !isOverheated && !isTiresDead,
-            gpReason: isOverheated ? "Остудите болид!" : (isTiresDead ? "Слики взорвутся на разгоне!" : (power < 450 ? `Слабый мотор: ${power}/450 л.с.` : (!hasCage ? "Нужен вварной каркас" : (!hasSeats ? "Нужны ковши" : "Готов"))))
+            europeReady: hasDiff && hasAngle && hasHydro && power >= 200 && !isOverheated && !isTiresDead,
+            europeReason: isOverheated ? "Перегрев мотора!" : (isTiresDead ? "Требуется замена резины на СТО!" : (power < 200 ? `Нехватка мощности: ${power}/200 л.с.` : (!hasHydro ? "Нужен гидроручник" : "Готов"))),
+            gpReady: hasDiff && hasAngle && hasHydro && hasCage && hasSeats && power >= 420 && !isOverheated && !isTiresDead,
+            gpReason: isOverheated ? "Остудите болид!" : (isTiresDead ? "Слики взорвутся на разгоне!" : (power < 420 ? `Слабый мотор: ${power}/420 л.с.` : (!hasCage ? "Нужен вварной каркас" : (!hasSeats ? "Нужны ковши" : "Готов"))))
         };
     },
 
@@ -165,7 +165,7 @@ const PhoneRacing = {
                         <span class="tag-badge ${spec.europeReady ? 'bg-tag-green' : 'bg-tag-red'}">${spec.europeReady ? 'ДОПУЩЕН' : 'ОТКАЗ'}</span>
                     </div>
                     <div class="sub-label mb-2" style="font-size:10px;">
-                        Регламент: Мин. 220 л.с., гидроручник, заварка, выворот.<br>
+                        Регламент: Мин. 200 л.с., гидроручник, заварка, выворот.<br>
                         ${!spec.europeReady ? `<b class="color-red">${spec.europeReason}</b>` : `<span class="color-green">Техком пройден!</span>`}
                     </div>
                     <button onclick="PhoneRacing.runDriftChallenge('europe', 60000)" class="btn btn-amber btn-sm w-full" ${!spec.europeReady ? 'disabled' : ''}>
@@ -182,7 +182,7 @@ const PhoneRacing = {
                         <span class="tag-badge ${spec.gpReady ? 'bg-tag-green' : 'bg-tag-red'}">${spec.gpReady ? 'ДОПУЩЕН' : 'ОТКАЗ'}</span>
                     </div>
                     <div class="sub-label mb-2" style="font-size:10px;">
-                        Регламент: Мин. 450 л.с., вварной каркас, ковши, гидроручник.<br>
+                        Регламент: Мин. 420 л.с., вварной каркас, ковши, гидроручник.<br>
                         ${!spec.gpReady ? `<b class="color-red">${spec.gpReason}</b>` : `<span class="color-green">Болид готов к ТОП-32!</span>`}
                     </div>
                     <button onclick="PhoneRacing.runDriftChallenge('gp', 200000)" class="btn btn-red btn-sm w-full" ${!spec.gpReady ? 'disabled' : ''}>
@@ -229,7 +229,6 @@ const PhoneRacing = {
         this.renderStreetSubScreen();
     },
 
-    // ЗАПУСК ИНТЕРАКТИВНОЙ 6-СЕКУНДНОЙ ВОСЬМЕРКИ
     runDriftChallenge(league, cost) {
         let cash = state.player?.cash || 0;
         if (cash < cost) return showToast("Не хватает денег на стартовый взнос!");
@@ -240,9 +239,9 @@ const PhoneRacing = {
 
         state.player.cash -= cost;
         car.engineTemp = (car.engineTemp || 90) + Math.floor(12 + Math.random() * 8);
-        car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - Math.floor(18 + Math.random() * 12));
+        car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - Math.floor(16 + Math.random() * 10));
         if (car.wear) {
-            car.wear.transmission = Math.max(10, (car.wear.transmission || 85) - 3);
+            car.wear.transmission = Math.max(10, (car.wear.transmission || 85) - 2.5);
         }
 
         playSound('tick');
@@ -289,7 +288,6 @@ const PhoneRacing = {
         let smokeParticles = [];
 
         let power = car.power || 100;
-        let t = car.tuning || {};
 
         let angleBase = league === 'gp' ? 78 : (league === 'europe' ? 68 : 58);
         let speedBase = league === 'gp' ? 125 : (league === 'europe' ? 95 : 65);
@@ -311,7 +309,6 @@ const PhoneRacing = {
 
             if (timerBadge) timerBadge.innerText = `${timeLeft}с`;
 
-            // Траектория лемнискаты Бернулли (восьмёрка)
             let tParam = progress * 4 * Math.PI;
             let scaleX = 140;
             let scaleY = 70;
@@ -321,10 +318,9 @@ const PhoneRacing = {
             let carX = cx + (scaleX * Math.cos(tParam)) / (1 + Math.sin(tParam) * Math.sin(tParam));
             let carY = cy + (scaleY * Math.sin(tParam) * Math.cos(tParam)) / (1 + Math.sin(tParam) * Math.sin(tParam));
 
-            // Расчет угла заноса
             let currentAngle = Math.round(angleBase + Math.sin(tParam * 2) * 14);
             let currentSpeed = Math.round(speedBase + Math.cos(tParam) * 12);
-            let currentScore = Math.round(progress * (league === 'gp' ? 94 : (league === 'europe' ? 88 : 82)));
+            let currentScore = Math.round(progress * (league === 'gp' ? 96 : (league === 'europe' ? 90 : 84)));
 
             if (angleEl) angleEl.innerText = `${currentAngle}°`;
             if (speedEl) speedEl.innerText = `${currentSpeed} км/ч`;
@@ -337,11 +333,9 @@ const PhoneRacing = {
                 else hintEl.innerText = "Финишный выход в базу под овации зрителей!";
             }
 
-            // Добавляем следы шин
             tireMarks.push({ x: carX, y: carY, alpha: 0.7 });
             if (tireMarks.length > 90) tireMarks.shift();
 
-            // Дым из-под задней оси
             smokeParticles.push({
                 x: carX + (Math.random() * 8 - 4),
                 y: carY + (Math.random() * 8 - 4),
@@ -350,10 +344,8 @@ const PhoneRacing = {
             });
             if (smokeParticles.length > 40) smokeParticles.shift();
 
-            // Отрисовка кадра
             ctx.clearRect(0, 0, W, H);
 
-            // Асфальтовое покрытие парковки с сеткой
             ctx.fillStyle = "#070c14";
             ctx.fillRect(0, 0, W, H);
             
@@ -366,7 +358,6 @@ const PhoneRacing = {
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
             }
 
-            // Столбы/Конусы парковки
             ctx.fillStyle = "#ffb300";
             ctx.beginPath(); ctx.arc(cx - 70, cy, 7, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(cx + 70, cy, 7, 0, Math.PI * 2); ctx.fill();
@@ -374,7 +365,6 @@ const PhoneRacing = {
             ctx.beginPath(); ctx.arc(cx - 70, cy, 3, 0, Math.PI * 2); ctx.fill();
             ctx.beginPath(); ctx.arc(cx + 70, cy, 3, 0, Math.PI * 2); ctx.fill();
 
-            // Следы жженой резины
             ctx.strokeStyle = "rgba(20, 20, 20, 0.85)";
             ctx.lineWidth = 4;
             ctx.beginPath();
@@ -385,7 +375,6 @@ const PhoneRacing = {
             }
             ctx.stroke();
 
-            // Дым
             for (let i = 0; i < smokeParticles.length; i++) {
                 let sp = smokeParticles[i];
                 ctx.fillStyle = `rgba(220, 230, 242, ${sp.alpha})`;
@@ -396,23 +385,19 @@ const PhoneRacing = {
                 sp.alpha = Math.max(0, sp.alpha - 0.02);
             }
 
-            // Машина (красный/бирюзовый болид под углом)
             ctx.save();
             ctx.translate(carX, carY);
             let headingAngle = Math.atan2(scaleY * Math.cos(tParam * 2), -scaleX * Math.sin(tParam)) + (currentAngle * Math.PI / 180 * 0.45);
             ctx.rotate(headingAngle);
 
-            // Кузов авто
             ctx.fillStyle = "#ff3366";
             ctx.shadowColor = "#ff3366";
             ctx.shadowBlur = 8;
             ctx.fillRect(-12, -7, 24, 14);
 
-            // Стекла и крыша
             ctx.fillStyle = "#0b101a";
             ctx.fillRect(-5, -5, 11, 10);
 
-            // Фары
             ctx.fillStyle = "#00f2fe";
             ctx.fillRect(10, -6, 3, 3);
             ctx.fillRect(10, 3, 3, 3);
@@ -428,8 +413,8 @@ const PhoneRacing = {
 
     finishDriftChallenge(league, cost, score, car) {
         let isWin = score >= 75;
-        let reward = Math.round(cost * (league === 'gp' ? 2.5 : (league === 'europe' ? 2.3 : 2.0)));
-        let repBonus = league === 'gp' ? 70 : (league === 'europe' ? 35 : 15);
+        let reward = Math.round(cost * (league === 'gp' ? 2.6 : (league === 'europe' ? 2.3 : 2.0)));
+        let repBonus = league === 'gp' ? 75 : (league === 'europe' ? 40 : 20);
 
         if (typeof trackQuestProgress === 'function') {
             trackQuestProgress('drift_run', 1);
@@ -510,7 +495,6 @@ const PhoneRacing = {
                     <span class="tag-badge bg-tag-amber" id="raceHeatBadge">Внимание ДПС: ${state.player?.consecutiveRaces || 0}/12</span>
                 </div>
                 
-                <!-- РОЖДЕСТВЕНСКАЯ ЕЛКА СВЕТОФОРА (CHRISTMAS TREE) -->
                 <div class="drag-christmas-tree-box my-2">
                     <div class="tree-light" id="treePreStage">⚪</div>
                     <div class="tree-light" id="treeStage">⚪</div>
@@ -562,22 +546,22 @@ const PhoneRacing = {
         const car = state.garage[carIdx];
         const t = car.tuning || {};
 
-        let score = 15;
+        let score = 20;
         let penaltyText = "";
 
         if (t.stance) score += 35;
         if (t.customWheels) score += 25;
         if (t.bodykit) score += 15;
-        if (car.isPolished) score += 10;
+        if (car.isPolished) score += 12;
 
         let cond = car.condition || 100;
         if (cond < 60) {
-            score -= 25;
-            penaltyText += "• Вмятины и сколы на кузове (-25 баллов)<br>";
+            score -= 20;
+            penaltyText += "• Вмятины и сколы на кузове (-20 баллов)<br>";
         }
         if (car.bodyThickness?.doors > 250 || car.bodyThickness?.wings > 250) {
             score -= 15;
-            penaltyText += "• Шпаклёвка звенит под толщиномером (-15 баллов)<br>";
+            penaltyText += "• Шпаклёвка на кузове (-15 баллов)<br>";
         }
 
         score = Math.max(5, Math.min(100, score));
@@ -591,7 +575,6 @@ const PhoneRacing = {
                 </div>
                 <div class="sub-label mb-2" style="font-size:10px;">Проект: <b>${car.name}</b> (${rankName})</div>
 
-                <!-- ПОДИУМ УЧАСТНИКА С АНИМАЦИЕЙ ДРОПА ПНЕВМЫ -->
                 <div class="stance-stage-podium mb-2" id="stancePodiumBox">
                     <div class="stance-camera-flashes" id="cameraFlashOverlay"></div>
                     <div class="stance-car-chassis" id="stanceCarChassis">
@@ -616,7 +599,7 @@ const PhoneRacing = {
                     </div>
                     <div class="flex-between text-xs">
                         <span>Полировка кузова:</span>
-                        <b class="${car.isPolished ? 'color-green' : 'color-amber'}">${car.isPolished ? '+10 баллов ✓' : '0'}</b>
+                        <b class="${car.isPolished ? 'color-green' : 'color-amber'}">${car.isPolished ? '+12 баллов ✓' : '0'}</b>
                     </div>
                     ${penaltyText ? `<div class="sub-label color-red mt-1" style="font-size:9px;">Штрафы жюри:<br>${penaltyText}</div>` : ''}
                 </div>
@@ -646,11 +629,9 @@ const PhoneRacing = {
 
         if (btn) btn.disabled = true;
 
-        // 1. Анимация заезда на подиум
         if (chassis) chassis.classList.add('entering-podium');
 
         setTimeout(() => {
-            // 2. Стравливание пневмы в пол (Пш-ш-ш)
             if (chassis) chassis.classList.add('slammed-drop');
             if (hissText) hissText.classList.add('show-hiss');
             playSound('tick');
@@ -658,17 +639,15 @@ const PhoneRacing = {
         }, 1800);
 
         setTimeout(() => {
-            // 3. Вспышки фотокамер зрителей
             if (flashes) flashes.classList.add('flashing-active');
             playSound('win');
         }, 3400);
 
         setTimeout(() => {
-            // 4. Судейский замер клиренса и вердикт
-            if (score >= 75) {
-                let prize = Math.round(cost * (score / 35));
+            if (score >= 70) {
+                let prize = Math.round(cost * (score / 32));
                 state.player.cash += prize;
-                state.player.streetCred = (state.player.streetCred || 100) + 35;
+                state.player.streetCred = (state.player.streetCred || 100) + 40;
                 playSound('win');
                 tgHaptic('success');
 
@@ -676,7 +655,7 @@ const PhoneRacing = {
                     resBox.innerHTML = `
                         <div class="glass-card p-2 text-center" style="border-color:var(--amber);">
                             <div class="font-bold text-xs color-amber mb-1">🥇 ПОБЕДИТЕЛЬ НОМИНАЦИИ «BEST FITMENT»!</div>
-                            <div class="sub-label mb-2" style="font-size:10px;">Кубок ваш! Судьи в восторге от посадки дисков в арки.<br>Награда: <b class="color-green">+${prize.toLocaleString()} ₽</b> (+35 Респекта)</div>
+                            <div class="sub-label mb-2" style="font-size:10px;">Кубок ваш! Судьи в восторге от посадки дисков в арки.<br>Награда: <b class="color-green">+${prize.toLocaleString()} ₽</b> (+40 Респекта)</div>
                             <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-amber btn-sm w-full">Забрать кубок 🏆</button>
                         </div>
                     `;
@@ -700,7 +679,7 @@ const PhoneRacing = {
     },
 
     // ----------------------------------------------------
-    // 4. ШАШКИ В ПОТОКЕ ПО МКАД (ИНТЕРАКТИВНЫЙ ПРОСТРЕЛ)
+    // 4. ШАШКИ В ПОТОКЕ ПО МКАД
     // ----------------------------------------------------
     renderSprintDiscipline(container) {
         let carIdx = state.player?.selectedStreetCarIndex || 0;
@@ -714,7 +693,7 @@ const PhoneRacing = {
                     <b class="text-xs color-red"><i class="fa-solid fa-car-burst"></i> Шашки в потоке по МКАД</b>
                     <span class="tag-badge bg-tag-red">Макс: ${maxSpeed} км/ч</span>
                 </div>
-                <p class="sub-label mb-2" style="font-size:10px;">Агрессивный прострел в ночном трафике. Чем мощнее двигатель, тем выше шанс оторваться от потока и заработать куш!</p>
+                <p class="sub-label mb-2" style="font-size:10px;">Агрессивный прострел в ночном трафике. Чем мощнее двигатель, тем выше шанс оторваться от потока и сорвать банк!</p>
 
                 <div class="grid-2 mb-2">
                     <button onclick="PhoneRacing.startCitySprint('normal', ${maxSpeed})" class="btn btn-dark btn-sm">Поток 140 км/ч (Ставка 40k)</button>
@@ -759,7 +738,7 @@ const PhoneRacing = {
         setTimeout(() => {
             clearInterval(speedTimer);
             let immunity = state.player?.policeImmunityDays || 0;
-            let policeRaidChance = immunity > 0 ? 0 : (mode === 'insane' ? 0.35 : 0.18);
+            let policeRaidChance = immunity > 0 ? 0 : (mode === 'insane' ? 0.32 : 0.16);
 
             if (Math.random() < policeRaidChance) {
                 let fine = Math.round(bet * 1.5);
@@ -775,16 +754,16 @@ const PhoneRacing = {
                     </div>
                 `;
             } else {
-                let win = Math.round(bet * (mode === 'insane' ? 2.6 : 2.1));
+                let win = Math.round(bet * (mode === 'insane' ? 2.7 : 2.2));
                 state.player.cash += win;
-                state.player.streetCred = (state.player.streetCred || 100) + (mode === 'insane' ? 50 : 20);
+                state.player.streetCred = (state.player.streetCred || 100) + (mode === 'insane' ? 55 : 25);
                 playSound('win');
                 tgHaptic('success');
 
                 resBox.innerHTML = `
                     <div class="glass-card p-2 text-center" style="border-color:var(--green);">
                         <div class="font-bold text-xs color-green mb-1">⚡ ЧИСТЫЙ ПРОСТРЕЛ БЕЗ КАМЕР!</div>
-                        <div class="sub-label mb-2" style="font-size:10px;">Вы оторвались от преследователей на скорости ${maxSpeed} км/ч!<br>Выигрыш: <b class="color-green">+${win.toLocaleString()} ₽</b> (+${mode === 'insane' ? 50 : 20} Респекта)</div>
+                        <div class="sub-label mb-2" style="font-size:10px;">Вы оторвались от преследователей на скорости ${maxSpeed} км/ч!<br>Выигрыш: <b class="color-green">+${win.toLocaleString()} ₽</b> (+${mode === 'insane' ? 55 : 25} Респекта)</div>
                         <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-green btn-sm w-full">Забрать кэш</button>
                     </div>
                 `;

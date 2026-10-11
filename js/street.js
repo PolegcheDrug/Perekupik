@@ -1,5 +1,5 @@
 // ========================================================
-// js/street.js — СТРИТ-РЕЙСИНГ, 402М И АВТОМЕРОПРИЯТИЯ (v0.4.6)
+// js/street.js — СТРИТ-РЕЙСИНГ, 402М И АВТОМЕРОПРИЯТИЯ (v0.5.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Реалистичный ланч-контроль, эвакуация на Штрафстоянку ГИБДД,
 // автовыбор личного авто, антифарм, перегрев ДВС и износ шин
@@ -11,7 +11,6 @@ let currentRpm = 800;
 let gasRpmInterval = null;
 let raceAnimationTimer = null;
 
-// Глобальные алиасы для синхронизации со всеми экранами
 window.currentRaceBet = currentRaceBet;
 window.streetRaceBet = currentRaceBet;
 window.currentRpm = currentRpm;

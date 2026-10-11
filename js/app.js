@@ -1,19 +1,19 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.4.9)
+// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.5.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Интерактивные неоновые жетоны наград, реальное время (00:00),
 // комбинированная экономика (₽ + ⭐), кастомизация цвета HUD,
 // анимированные никнеймы и аватарки, квесты и стабильный запуск
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.4.9";
+const CURRENT_GAME_VERSION = "v0.5.1";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
 let tgUserId = "guest_777";
 let tgUserData = null;
-let SAVE_KEY_PREFIX = "perekup_v4_";
+let SAVE_KEY_PREFIX = "perekup_v5_";
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
 
@@ -172,7 +172,6 @@ function extractPrizesFromText(text) {
         let trimLine = line.trim();
         if (!trimLine) return;
 
-        // Рубли
         if (trimLine.includes('₽')) {
             let match = trimLine.match(/([+\-]?\d[\d\s,.]*)\s*₽/);
             tokens.push({
@@ -182,9 +181,7 @@ function extractPrizesFromText(text) {
                 desc: 'Зачислено на баланс игрока',
                 rarity: 'token-green'
             });
-        }
-        // Stars
-        else if (trimLine.includes('⭐') || trimLine.toLowerCase().includes('stars')) {
+        } else if (trimLine.includes('⭐') || trimLine.toLowerCase().includes('stars')) {
             let match = trimLine.match(/([+\-]?\d+)\s*(⭐|stars)/i);
             tokens.push({
                 icon: '⭐',
@@ -193,9 +190,7 @@ function extractPrizesFromText(text) {
                 desc: 'Премиальная валюта перекупа',
                 rarity: 'token-amber'
             });
-        }
-        // Автомобили
-        else if (trimLine.includes('🚗') || trimLine.toLowerCase().includes('получен в гараж')) {
+        } else if (trimLine.includes('🚗') || trimLine.toLowerCase().includes('получен в гараж')) {
             tokens.push({
                 icon: '🏎️',
                 title: 'Транспортное средство',
@@ -203,9 +198,7 @@ function extractPrizesFromText(text) {
                 desc: 'Добавлено в ваш автопарк',
                 rarity: 'token-cyan'
             });
-        }
-        // Госномера
-        else if (trimLine.includes('🏷️') || trimLine.toLowerCase().includes('номер')) {
+        } else if (trimLine.includes('🏷️') || trimLine.toLowerCase().includes('номер')) {
             tokens.push({
                 icon: '🏷️',
                 title: 'Госномер РФ',
@@ -213,9 +206,7 @@ function extractPrizesFromText(text) {
                 desc: 'Архивный номер в инвентаре',
                 rarity: 'token-purple'
             });
-        }
-        // Связи
-        else if (trimLine.includes('🤝') || trimLine.toLowerCase().includes('связь')) {
+        } else if (trimLine.includes('🤝') || trimLine.toLowerCase().includes('связь')) {
             tokens.push({
                 icon: '🤝',
                 title: 'Связи Синдиката',
@@ -223,9 +214,7 @@ function extractPrizesFromText(text) {
                 desc: 'Решение вопросов с ГИБДД и ДКП',
                 rarity: 'token-purple'
             });
-        }
-        // Топливо
-        else if (trimLine.includes('⛽') || trimLine.toLowerCase().includes('топлив')) {
+        } else if (trimLine.includes('⛽') || trimLine.toLowerCase().includes('топлив')) {
             tokens.push({
                 icon: '⛽',
                 title: 'Топливный запас',
@@ -233,9 +222,7 @@ function extractPrizesFromText(text) {
                 desc: 'Заправка в бензобак',
                 rarity: 'token-cyan'
             });
-        }
-        // Талоны
-        else if (trimLine.includes('🎟️') || trimLine.toLowerCase().includes('талон')) {
+        } else if (trimLine.includes('🎟️') || trimLine.toLowerCase().includes('талон')) {
             tokens.push({
                 icon: '🎟️',
                 title: 'Экспресс-талоны',
@@ -338,18 +325,17 @@ const DEFAULT_STATE = {
         hunger: 80, mood: 85, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
         lastRealDayTimestamp: Date.now(),
         diet: 'shaurma', 
-        housingId: 'trailer', // Стартуем в бытовке у обочины
+        housingId: 'trailer',
         housingType: 'rent', 
         ownedHouses: [], 
         
-        // Кастомизация интерфейса
-        hudColorId: 'cyan', // id из HUD_SOLID_COLORS или произвольный цвет
+        hudColorId: 'cyan',
         customHexColor: null,
-        nickEffect: 'none', // id из NICKNAME_EFFECTS_CATALOG
-        avatarEffect: 'none', // id из AVATAR_EFFECTS_CATALOG
+        nickEffect: 'none',
+        avatarEffect: 'none',
         ownedNickEffects: ['none'],
         ownedAvatarEffects: ['none'],
-        soundProfile: 'cyber', // 'cyber' | 'relay' | 'silent'
+        soundProfile: 'cyber',
 
         selectedStreetCarIndex: 0,
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
@@ -408,7 +394,6 @@ function applyHudCustomization() {
     root.style.setProperty('--cyan-glow', targetGlow);
     root.style.setProperty('--border-glow', hexToRgba(targetHex, 0.35));
 
-    // Применение анимации ника
     const nameEl = document.getElementById('playerName');
     const nickFxId = state.player?.nickEffect || 'none';
     if (nameEl && typeof NICKNAME_EFFECTS_CATALOG !== 'undefined') {
@@ -421,7 +406,6 @@ function applyHudCustomization() {
         }
     }
 
-    // Применение анимации аватарки
     const ringEl = document.querySelector('.avatar-ring');
     const avatarFxId = state.player?.avatarEffect || 'none';
     if (ringEl && typeof AVATAR_EFFECTS_CATALOG !== 'undefined') {
@@ -480,7 +464,6 @@ function renderHudCustomizerContent() {
 
     let bodyHtml = "";
 
-    // 1. ВКЛАДКА: ЦВЕТ ПОДСВЕТКИ
     if (activeCustomizerTab === 'colors') {
         let colorsGrid = "";
         (typeof HUD_SOLID_COLORS !== 'undefined' ? HUD_SOLID_COLORS : []).forEach(c => {
@@ -507,10 +490,7 @@ function renderHudCustomizerContent() {
                 <input type="color" id="customColorPickerInput" value="${state.player?.customHexColor || '#00f2fe'}" onchange="setHudCustomHexColor(this.value)" style="width:36px; height:32px; border:none; background:transparent; cursor:pointer;">
             </div>
         `;
-    }
-
-    // 2. ВКЛАДКА: АНИМАЦИИ НИКНЕЙМА
-    else if (activeCustomizerTab === 'nick') {
+    } else if (activeCustomizerTab === 'nick') {
         let listHtml = "";
         (typeof NICKNAME_EFFECTS_CATALOG !== 'undefined' ? NICKNAME_EFFECTS_CATALOG : []).forEach(fx => {
             const isOwned = ownedNicks.includes(fx.id);
@@ -539,11 +519,8 @@ function renderHudCustomizerContent() {
                 </div>
             `;
         });
-        bodyHtml = `<div class="sub-label mb-2" style="font-size:10px;">Анимированные световые эффекты для имени перекупа:</div><div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto;">${listHtml}</div>`;
-    }
-
-    // 3. ВКЛАДКА: АНИМАЦИИ АВАТАРКИ
-    else if (activeCustomizerTab === 'avatar') {
+        bodyHtml = `<div class="sub-label mb-2" style="font-size:10px;">Анимированные эффекты для имени перекупа:</div><div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto;">${listHtml}</div>`;
+    } else if (activeCustomizerTab === 'avatar') {
         let listHtml = "";
         (typeof AVATAR_EFFECTS_CATALOG !== 'undefined' ? AVATAR_EFFECTS_CATALOG : []).forEach(fx => {
             const isOwned = ownedAvatars.includes(fx.id);
@@ -582,7 +559,6 @@ function renderHudCustomizerContent() {
                 <button onclick="closeModal('modalHudCustomizer')" class="btn btn-dark btn-auto btn-sm">✕</button>
             </div>
 
-            <!-- ВКЛАДКИ -->
             <div class="grid-3 mb-2">
                 <button onclick="switchCustomizerTab('colors')" class="btn ${activeCustomizerTab === 'colors' ? 'btn-cyan' : 'btn-dark'} btn-sm">🎨 Цвет</button>
                 <button onclick="switchCustomizerTab('nick')" class="btn ${activeCustomizerTab === 'nick' ? 'btn-cyan' : 'btn-dark'} btn-sm">✨ Ник</button>
@@ -591,7 +567,6 @@ function renderHudCustomizerContent() {
 
             ${bodyHtml}
 
-            <!-- ЗВУКОВОЙ ПРОФИЛЬ -->
             <div class="p-2 mb-2 flex-between" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
                 <div>
                     <b class="text-xs color-amber"><i class="fa-solid fa-volume-high"></i> Звуки интерфейса</b>
@@ -800,9 +775,9 @@ function refreshDailyQuestsList() {
     state.player.dailyQuestsSuperClaimed = false;
     if (typeof DAILY_QUESTS_POOL === 'undefined' || !Array.isArray(DAILY_QUESTS_POOL)) {
         state.player.dailyQuests = [
-            { id: "q_inspect", text: "Осмотреть толщиномером 2 авто на рынке", cur: 0, max: 2, actionType: "gauge_check", reward: 35000, rewardXp: 40, done: false },
-            { id: "q_race", text: "Выиграть заезд 402м в Стрите", cur: 0, max: 1, actionType: "win_drag", reward: 50000, rewardXp: 45, done: false },
-            { id: "q_biz", text: "Собрать кассу с предприятий", cur: 0, max: 1, actionType: "collect_biz", reward: 25000, rewardXp: 30, done: false }
+            { id: "q_inspect", text: "Осмотреть толщиномером 2 авто на рынке", cur: 0, max: 2, actionType: "gauge_check", reward: 40000, rewardXp: 40, done: false },
+            { id: "q_race", text: "Выиграть заезд 402м в Стрите", cur: 0, max: 1, actionType: "win_drag", reward: 60000, rewardXp: 45, done: false },
+            { id: "q_biz", text: "Собрать кассу с предприятий", cur: 0, max: 1, actionType: "collect_biz", reward: 30000, rewardXp: 30, done: false }
         ];
         return;
     }
@@ -1089,7 +1064,6 @@ function sanitizeState() {
     if (typeof state.player.lastFreeSuperSpinDay !== 'number') state.player.lastFreeSuperSpinDay = 0;
     if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
     
-    // Санитария кастомизации
     if (!state.player.hudColorId) state.player.hudColorId = 'cyan';
     if (!state.player.nickEffect) state.player.nickEffect = 'none';
     if (!state.player.avatarEffect) state.player.avatarEffect = 'none';
@@ -1311,14 +1285,12 @@ function executeDayCycleMidnight(currentDateObj) {
 
     if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
         activeHouseObj = HOUSING_LIST.find(item => item.id === curId);
-        // Списание аренды только если жильё съёмное
         if (!isOwn) {
             let rentVal = activeHouseObj ? (activeHouseObj.rent || 800) : 800;
             state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
         }
     }
 
-    // Восстановление куража от типа жилья и мебели
     let baseHousingMoodBonus = activeHouseObj ? (activeHouseObj.moodBonus || 0) : 0;
     state.player.mood = Math.max(10, Math.min(100, (state.player.mood || 85) + baseHousingMoodBonus));
 
@@ -1395,7 +1367,6 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
     refreshDailyQuestsList();
 
-    // Запуск случайных событий недвижимости и гаража
     if (typeof triggerHousingRandomEvent === 'function') {
         triggerHousingRandomEvent();
     }
@@ -1416,7 +1387,7 @@ function executeDayCycleMidnight(currentDateObj) {
 }
 
 // ========================================================
-// 9. UI И РЕСУРСЫ (С КАПСУЛЬНЫМ ОФОРМЛЕНИЕМ)
+// 9. UI И РЕСУРСЫ
 // ========================================================
 function updateHeaderUI() {
     let cash = state.player?.cash || 0;
@@ -1482,9 +1453,7 @@ function updateHeaderUI() {
     const btnSlot = document.getElementById('btnBuyGarageSlot');
     if (btnSlot) btnSlot.innerText = "+1 Бокс (" + (slotCost / 1000).toFixed(0) + "k ₽)";
 
-    // Применение выбранных кастомных цветов и анимаций
     applyHudCustomization();
-
     updateRaceHeatBadge();
     if (typeof PhoneManager !== 'undefined') PhoneManager.updateUnreadBadge();
 }
@@ -1617,7 +1586,7 @@ function claimDailyReward() {
 }
 
 // ========================================================
-// 10. МАГАЗИН ПЕРЕКУПА: КОМБИНИРОВАННАЯ ОПЛАТА И РЕСУРС
+// 10. МАГАЗИН ПЕРЕКУПА
 // ========================================================
 function switchShopSection(section) {
     ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
@@ -1814,7 +1783,7 @@ function renderShopHomeItems() {
     let html = "";
     HOUSING_INTERIOR_CATALOG.forEach(item => {
         let isBought = state.player.furniture.includes(item.id);
-        let starsTxt = item.reqStars ? ` + ${reqStars} ⭐` : "";
+        let starsTxt = item.reqStars ? ` + ${item.reqStars} ⭐` : "";
         let btnContent = isBought 
             ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Куплено ✓</button>"
             : `<button onclick="buyHomeFurnitureShop('${item.id}', ${item.cost}, ${item.reqStars || 0})" class="btn btn-green btn-sm btn-auto">${(item.cost / 1000).toFixed(0)}k ₽${starsTxt}</button>`;
@@ -2052,7 +2021,7 @@ setInterval(() => {
 
             if (!slot.currentBuyer) {
                 if (slot.timer === undefined || isNaN(slot.timer) || slot.maxTimer === undefined || isNaN(slot.maxTimer)) {
-                    let t = (typeof calculateLotWaitTime === 'function') ? calculateLotWaitTime() : 120;
+                    let t = (typeof calculateLotWaitTime === 'function') ? calculateLotWaitTime() : 60;
                     slot.maxTimer = t;
                     slot.timer = t;
                 }
@@ -2085,7 +2054,7 @@ setInterval(() => {
 
                 if (slot.buyerTimerLeft <= 0) {
                     slot.currentBuyer = null;
-                    let t = (typeof calculateLotWaitTime === 'function') ? calculateLotWaitTime() : 120;
+                    let t = (typeof calculateLotWaitTime === 'function') ? calculateLotWaitTime() : 60;
                     slot.maxTimer = t;
                     slot.timer = t;
                     lotChanged = true;

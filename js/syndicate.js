@@ -1,8 +1,8 @@
 // ========================================================
-// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, НОМЕРА, ТОП (v0.4.7)
+// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, НОМЕРА, ТОП (v0.5.1)
 // Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
 // Доступ к Синдикату с 7 уровня при наличии эндоскопа, толщиномера,
-// Launch сканера и 5 Stars ⭐. Динамическая оценка авто, номеров и боксов.
+// Launch сканера и 5 Stars ⭐. Сбалансированные крупные выплаты.
 // ========================================================
 
 let p2pActiveFilter = 'cars';
@@ -58,9 +58,9 @@ const CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 280000,
+        rewardBonus: 380000,
         rewardConn: 1,
-        rewardXp: 90
+        rewardXp: 110
     },
     {
         type: 'drift_spec',
@@ -77,9 +77,9 @@ const CONTRACT_TEMPLATES = [
             noCriminal: false,
             noDefects: false
         },
-        rewardBonus: 160000,
-        rewardConn: 0,
-        rewardXp: 70
+        rewardBonus: 240000,
+        rewardConn: 1,
+        rewardXp: 85
     },
     {
         type: 'taxi_fleet',
@@ -95,9 +95,9 @@ const CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 120000,
+        rewardBonus: 180000,
         rewardConn: 0,
-        rewardXp: 55
+        rewardXp: 70
     },
     {
         type: 'arab_export',
@@ -113,9 +113,9 @@ const CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 950000,
-        rewardConn: 2,
-        rewardXp: 180
+        rewardBonus: 1350000,
+        rewardConn: 3,
+        rewardXp: 240
     },
     {
         type: 'chop_guard',
@@ -130,9 +130,9 @@ const CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: false
         },
-        rewardBonus: 240000,
+        rewardBonus: 320000,
         rewardConn: 1,
-        rewardXp: 80
+        rewardXp: 95
     }
 ];
 
@@ -170,7 +170,6 @@ function renderContracts() {
     const lock = document.getElementById('contractsLockCover');
     if (!list) return;
 
-    // Проверка доступа к Синдикату (7 уровень + приборы + 5 звёзд)
     const access = (typeof checkSyndicateAccessDetails === 'function') 
         ? checkSyndicateAccessDetails() 
         : { isFullAccess: ((state.player?.level || 1) >= 7), hasLvl: ((state.player?.level || 1) >= 7), hasEndoscope: true, hasGauge: true, hasLaunch: true, hasStars: true, lvl: state.player?.level || 1, stars: state.player?.stars || 0 };
@@ -949,7 +948,7 @@ function generateBlackMarketPlates() {
             ? calculatePlateValue(plateStr)
             : 450000;
 
-        let marketPrice = Math.round(calculatedValue * (1.10 + Math.random() * 0.15));
+        let marketPrice = Math.round(calculatedValue * (1.05 + Math.random() * 0.12));
 
         generated.push({
             id: "bm_plate_" + Date.now() + "_" + i,

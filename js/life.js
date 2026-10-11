@@ -1,5 +1,5 @@
 // ========================================================
-// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, ФОРТУНА, САРАИ, ПОРТ (v0.4.7)
+// js/life.js — ЖИЗНЬ, РЕПУТАЦИЯ, ФОРТУНА, САРАИ, ПОРТ (v0.5.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Комбинированная экономика (₽ + ⭐ Stars), выписка Во-Банка,
 // информативные карточки жилья с матрицей доработок,
@@ -56,7 +56,7 @@ function withdrawFromSafeAction() {
     showToast(`Вы забрали всю заначку из сейфа: +${safeCash.toLocaleString()} ₽!`);
 }
 
-function openBankDepositAction(amount, days = 7, dailyRate = 0.02) {
+function openBankDepositAction(amount, days = 7, dailyRate = 0.025) {
     let cash = state.player?.cash || 0;
     if (cash < amount) return showToast("Не хватает денег для открытия целевого депозита!");
 
@@ -99,7 +99,7 @@ function closeBankDepositAction(index) {
 
 function takeLoan(amount) {
     let debt = (state.player && state.player.loanDebt) ? state.player.loanDebt : 0;
-    if (debt >= 1500000) return showToast("Лимит кредитной линии в Во-Банке исчерпан!");
+    if (debt >= 2500000) return showToast("Лимит кредитной линии в Во-Банке исчерпан!");
 
     let received = Math.round(amount * 0.95);
     state.player.cash = (state.player.cash || 0) + received;
@@ -154,7 +154,6 @@ function buyReshalaPack(type) {
 }
 
 function buyReshalaService(service) {
-    // Расчет скидки от подготовленной мастерской/бокса
     const caps = typeof getPlayerHousingCapabilities === 'function' ? getPlayerHousingCapabilities() : { reshalaDiscountPct: 0 };
     const discountMultiplier = Math.max(0.5, 1 - (caps.reshalaDiscountPct / 100));
 
@@ -505,7 +504,7 @@ function renderBarnFind() {
             </div>
             <p class='sub-label mb-2'>${b.desc}</p>
             <div class='text-xs mb-1 color-amber'>⭐ Редкий дроп (5%): <b>${rareCar.name}</b></div>
-            <div class='text-xs mb-2 color-purple'>🏷️ Шанс на архивные госномера: <b>18%</b></div>
+            <div class='text-xs mb-2 color-purple'>🏷️ Шанс на архивные госномера: <b>25%</b></div>
             <button onclick='scoutBarnTier(${b.tier})' class='btn btn-cyan btn-sm w-full' ${btnDisabled}>${btnText}</button>
         </div>`;
     });
@@ -536,7 +535,7 @@ function scoutBarnTier(tier) {
     state.player.stars -= reqStars;
     state.player.lastBarnDay = pDay;
 
-    let isRare = Math.random() < 0.06;
+    let isRare = Math.random() < 0.12;
     let foundCar = null;
 
     if (isRare && typeof BARN_FINDS !== 'undefined' && BARN_FINDS[config.rareIdx]) {
@@ -544,16 +543,18 @@ function scoutBarnTier(tier) {
     } else if (typeof CAR_DATABASE !== 'undefined' && CAR_DATABASE.economy) {
         foundCar = CAR_DATABASE.economy[Math.floor(Math.random() * CAR_DATABASE.economy.length)];
     } else {
-        foundCar = { name: "ВАЗ-2101 «Копейка»", power: 64, basePrice: 65000, img: "assets/cars/economy/vaz-2101.jpg" };
+        foundCar = { name: "ВАЗ-2101 «Копейка»", power: 64, basePrice: 75000, img: "assets/cars/economy/vaz-2101.jpg" };
     }
 
     let genPlate = "ТРАНЗИТ";
-    let isCoolPlate = Math.random() < 0.18;
+    let isCoolPlate = Math.random() < 0.25;
     if (isCoolPlate && typeof generateCoolPlate === 'function') {
         genPlate = generateCoolPlate();
     } else if (typeof generateNormalPlate === 'function') {
         genPlate = generateNormalPlate();
     }
+
+    let calculatedMarket = Math.round((foundCar.marketValue || foundCar.basePrice || config.cost * 2.2) * 1.35);
 
     let newCar = {
         id: "barn_" + Date.now(),
@@ -562,14 +563,14 @@ function scoutBarnTier(tier) {
         power: foundCar.power || 75,
         basePrice: foundCar.basePrice || config.cost * 2,
         price: foundCar.basePrice || config.cost * 2,
-        baseMarketValue: foundCar.marketValue || foundCar.basePrice * 1.3,
-        marketValue: foundCar.marketValue || foundCar.basePrice * 1.3,
+        baseMarketValue: calculatedMarket,
+        marketValue: calculatedMarket,
         img: foundCar.img || "assets/cars/economy/vaz-2107.jpg",
         plate: genPlate,
         customPlate: genPlate,
-        condition: Math.floor(40 + Math.random() * 25),
-        wear: { engine: 50, transmission: 50 },
-        hiddenDefect: { text: "Залегшие кольца и старое масло", cost: 15000, code: "P0171", severity: "Средняя" },
+        condition: Math.floor(45 + Math.random() * 25),
+        wear: { engine: 55, transmission: 55 },
+        hiddenDefect: { text: "Залегшие кольца и старое масло", cost: 12000, code: "P0171", severity: "Средняя" },
         insurance: null,
         isRegisteredOnPlayer: false,
         ownershipDays: 0,
@@ -599,7 +600,7 @@ function scoutBarnTier(tier) {
 }
 
 // ========================================================
-// 5. НЕДВИЖИМОСТЬ: ИНФОРМАТИВНЫЙ РЕНДЕР И МАТРИЦА ДОРАБОТОК
+// 5. НЕДВИЖИМОСТЬ
 // ========================================================
 function renderHousing() {
     const list = document.getElementById('housingMarketList');
@@ -632,7 +633,6 @@ function renderHousing() {
             ? "<span class='tag-badge bg-tag-green'>В собственности</span>"
             : (isCurrent ? "<span class='tag-badge bg-tag-cyan'>Арендовано (Активно)</span>" : "<span class='tag-badge bg-tag-amber'>Доступно в аренду</span>");
 
-        // Бейджи технических возможностей
         let tuneBadge = h.canTune 
             ? `<span class="tag-badge bg-tag-green" title="Слесарный пост со смотровой ямой и верстаком"><i class="fa-solid fa-screwdriver-wrench"></i> Тюнинг & Яма ✓</span>`
             : `<span class="tag-badge bg-tag-red" title="Нет условий для сварки и слесарки"><i class="fa-solid fa-ban"></i> Тюнинг ✗</span>`;
@@ -649,7 +649,6 @@ function renderHousing() {
             ? `<span class="tag-badge bg-tag-purple" title="Охраняемый бокс под личный болид"><i class="fa-solid fa-crown"></i> Личный авто ✓</span>`
             : `<span class="tag-badge bg-tag-red" title="Бросать на стройке рискованно"><i class="fa-solid fa-xmark"></i> Без лички</span>`;
 
-        // Калькулятор машиноместа
         let slotPriceRent = h.slots > 0 ? Math.round((h.rent || 1000) / h.slots) : (h.rent || 1000);
         let slotPriceBuy = h.slots > 0 ? Math.round((h.buyPrice || 1000000) / h.slots) : (h.buyPrice || 1000000);
 
@@ -696,7 +695,6 @@ function renderHousing() {
                 <div class='color-green font-bold text-xs'>+${h.slots} мест автопарка</div>
             </div>
 
-            <!-- МАТРИЦА ТЕХНИЧЕСКИХ ВОЗМОЖНОСТЕЙ -->
             <div class="car-mods-badges-container my-2">
                 ${tuneBadge}
                 ${detailBadge}
@@ -706,7 +704,6 @@ function renderHousing() {
 
             <p class='sub-label mb-2' style='line-height:1.4;'>${h.desc || "Комфортное жильё для отдыха перекупа."}</p>
             
-            <!-- ПЕРК И КАЛЬКУЛЯТОР МАШИНОМЕСТА -->
             <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass); font-size:10px;">
                 <div class="color-amber font-bold mb-1">⭐ Особенность: ${h.perk || 'Стандартные условия'}</div>
                 <div class="flex-between text-xs sub-label">
@@ -832,12 +829,9 @@ function buyHomeFurniture(fId, cost, reqStars = 0) {
     openHomeInteriorModal(curId);
 }
 
-/**
- * Случайные события в жилье и боксах при наступлении полночи
- */
 function triggerHousingRandomEvent() {
     if (typeof HOUSING_RANDOM_EVENTS === 'undefined' || !Array.isArray(HOUSING_RANDOM_EVENTS)) return;
-    if (Math.random() > 0.28) return; // 28% шанс события в сутки
+    if (Math.random() > 0.28) return;
 
     const caps = typeof getPlayerHousingCapabilities === 'function' ? getPlayerHousingCapabilities() : { category: 'street' };
     const matchingEvents = HOUSING_RANDOM_EVENTS.filter(e => e.applicableCategories.includes(caps.category));
@@ -941,16 +935,16 @@ function openPortContainerAction(boxId, cost, reqStars = 0) {
     state.player.stars -= reqStars;
 
     let roll = Math.random();
-    if (roll < 0.40) {
-        let winPrize = Math.round(cost * (1.35 + Math.random() * 0.65));
+    if (roll < 0.45) {
+        let winPrize = Math.round(cost * (1.45 + Math.random() * 0.75));
         state.player.cash += winPrize;
         saveState();
         updateHeaderUI();
         playSound('win');
         tgHaptic('success');
         openVerdictModal("ТАМОЖЕННЫЙ ДЖЕКПОТ! 🚢", "В контейнере найден ценный зарубежный лот! Выручка: +" + winPrize.toLocaleString() + " ₽", true, winPrize);
-    } else if (roll < 0.75) {
-        let partValue = Math.round(cost * 0.75);
+    } else if (roll < 0.80) {
+        let partValue = Math.round(cost * 0.85);
         state.player.cash += partValue;
         saveState();
         updateHeaderUI();
@@ -970,12 +964,12 @@ function openBlindAuctionModal() {
     if (lvl < 20) return showToast("Теневой аукцион ФССП доступен с 20 уровня!");
 
     let isPremium = Math.random() > 0.5;
-    let bidPrice = isPremium ? Math.floor(1500000 + Math.random() * 3000000) : Math.floor(200000 + Math.random() * 500000);
+    let bidPrice = isPremium ? Math.floor(1500000 + Math.random() * 2500000) : Math.floor(250000 + Math.random() * 450000);
 
     currentBlindLot = { bid: bidPrice, isPremium: isPremium };
 
     setTxt('blindAuctionLotNum', Math.floor(100 + Math.random() * 899));
-    setTxt('blindAuctionClassText', isPremium ? "ПРЕМИУМ / ГИПЕР" : "СЮРПРИЗ (Может быть всё)");
+    setTxt('blindAuctionClassText', isPremium ? "ПРЕМИУМ / ГИПЕР" : "СЮРПРИЗ (Любой класс)");
     
     const btn = document.getElementById('btnBlindBid');
     if (btn) btn.innerText = "Ставка " + bidPrice.toLocaleString() + " ₽";
@@ -1002,11 +996,12 @@ function placeBlindBid() {
     let pool = CAR_DATABASE[poolType];
     let template = pool[Math.floor(Math.random() * pool.length)];
 
-    let isTrash = Math.random() < 0.3;
-    let isStolen = Math.random() < 0.2;
+    let isTrash = Math.random() < 0.20;
+    let isStolen = Math.random() < 0.15;
 
-    let plate = isStolen ? "ТРАНЗИТ" : (typeof generateCoolPlate === 'function' && Math.random() < 0.25 ? generateCoolPlate() : generateNormalPlate());
+    let plate = isStolen ? "ТРАНЗИТ" : (typeof generateCoolPlate === 'function' && Math.random() < 0.30 ? generateCoolPlate() : generateNormalPlate());
     let baseVal = template.basePrice || 100000;
+    let marketVal = Math.round(baseVal * (isTrash ? 0.6 : 1.35));
     
     let car = {
         id: "blind_" + Date.now(),
@@ -1015,14 +1010,14 @@ function placeBlindBid() {
         power: template.power || 100,
         basePrice: baseVal,
         price: currentBlindLot.bid,
-        baseMarketValue: baseVal * (isTrash ? 0.4 : 1.1),
-        marketValue: baseVal * (isTrash ? 0.4 : 1.1),
+        baseMarketValue: marketVal,
+        marketValue: marketVal,
         img: template.img || "assets/cars/economy/vaz-2107.jpg",
         plate: plate,
         customPlate: plate,
-        condition: isTrash ? Math.floor(10 + Math.random() * 30) : Math.floor(70 + Math.random() * 30),
-        wear: { engine: isTrash ? 20 : 80, transmission: isTrash ? 30 : 80 },
-        hiddenDefect: isTrash ? { text: "Двигатель заклинило, блок пробит!", cost: baseVal * 0.4, code: "P0016", severity: "Критическая" } : null,
+        condition: isTrash ? Math.floor(25 + Math.random() * 25) : Math.floor(75 + Math.random() * 25),
+        wear: { engine: isTrash ? 35 : 85, transmission: isTrash ? 40 : 85 },
+        hiddenDefect: isTrash ? { text: "Трещина в блоке цилиндров", cost: Math.round(baseVal * 0.3), code: "P0016", severity: "Критическая" } : null,
         isStolen: isStolen,
         unregistered: false,
         impounded: false,
@@ -1031,7 +1026,7 @@ function placeBlindBid() {
         isRegisteredOnPlayer: false,
         ownershipDays: 0,
         engineTemp: 90,
-        tireWear: 75,
+        tireWear: 85,
         tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 },
         purchaseCost: currentBlindLot.bid
     };
@@ -1051,15 +1046,15 @@ function placeBlindBid() {
     let title = isTrash ? "КОТ В МЕШКЕ! 🗑️" : "ОТЛИЧНЫЙ ЛОТ! 🎉";
     let msg = "Под чехлом оказался «" + car.name + "». ";
     if (isTrash) {
-        msg += "Машина в ужасном состоянии, требует капремонта!";
+        msg += "Машина требует капремонта!";
         playSound('error');
         tgHaptic('error');
     } else if (isStolen) {
-        msg += "Тачка пушка, но числится в угоне! Придется отмывать VIN у Решалы.";
+        msg += "Машина огонь, но числится в розыске! Отмойте VIN у Решалы.";
         playSound('win');
         tgHaptic('warning');
     } else {
-        msg += `Машина в идеале, вы сорвали куш! Номера ${car.plate}.`;
+        msg += `Состояние отличное, номера ${car.plate}. Чистая прибыль гарантирована!`;
         playSound('win');
         tgHaptic('success');
     }
@@ -1102,7 +1097,7 @@ function resolvePodstava(action) {
         }
         state.player.connections -= 1;
         saveState(); updateHeaderUI();
-        openVerdictModal("РЕШАЛА РАЗРУЛИЛ", "Один звонок Артуру, и «братки» с извинениями уехали. Связь потрачена.", true);
+        openVerdictModal("РЕШАЛА РАЗРУЛИЛ", "Один звонок Артуру, и рэкетиры ретировались. Связь потрачена.", true);
     } else if (action === 'fight') {
         let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
         let winChance = karma > 70 ? 0.75 : (karma < 35 ? 0.25 : 0.45);
@@ -1111,19 +1106,19 @@ function resolvePodstava(action) {
             state.player.karma = Math.min(100, karma + 10);
             state.player.mood = Math.min(100, (state.player.mood || 50) + 20);
             saveState(); updateHeaderUI();
-            openVerdictModal("ВЫ ДАЛИ ОТПОР!", "Вы достали монтировку и отстояли свою правоту. Мошенники сбежали! Карма и кураж выросли.", true);
+            openVerdictModal("ВЫ ДАЛИ ОТПОР!", "Вы достали монтировку и отстояли свою правоту. Мошенники сбежали! Карма выросла.", true);
         } else {
             state.player.mood = Math.max(0, (state.player.mood || 50) - 40);
             state.player.hunger = Math.max(0, (state.player.hunger || 50) - 30);
             if (state.garage && state.garage.length > 0) {
                 let car = state.garage[0];
-                car.condition = Math.max(10, car.condition - 30);
+                car.condition = Math.max(10, car.condition - 25);
                 if (car.bodyThickness) { car.bodyThickness.doors = 300; car.bodyThickness.wings = 250; }
                 if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
             }
             saveState(); updateHeaderUI();
             if (typeof renderGarage === 'function') renderGarage();
-            openVerdictModal("ВАС ИЗБИЛИ И РАЗБИЛИ АВТО", "Численный перевес был не на вашей стороне. Ваша машина сильно помята.", false);
+            openVerdictModal("ВАС ИЗБИЛИ И ПОВРЕДИЛИ АВТО", "Численный перевес был не в вашу пользу. Машина помята.", false);
         }
     }
 }
@@ -1137,13 +1132,13 @@ function renderDiets() {
 
     const catalog = (typeof DIETS !== 'undefined' && Array.isArray(DIETS)) ? DIETS : [
         { id: 'water', name: 'Вода из-под крана', cost: 0, hunger: 5, mood: -30, desc: 'Живот крутит, жить не хочется' },
-        { id: 'doshik', name: 'Бич-пакет и сухари', cost: 150, hunger: 20, mood: -15, desc: 'Желудок ноет, депрессия, тяжело торговаться' },
-        { id: 'home_sandwich', name: 'Бутерброд из дома', cost: 250, hunger: 30, mood: -5, desc: 'Майонез, колбаса "Красная цена", терпимо' },
-        { id: 'pelmeni', name: 'Пельмени по акции', cost: 400, hunger: 45, mood: 0, desc: 'Дешево и сердито, главное сварить' },
-        { id: 'shaurma', name: 'Шаурма на вокзале', cost: 800, hunger: 50, mood: -5, desc: 'Сытно, но жирно и тоскливо' },
-        { id: 'fastfood', name: 'Фастфуд комбо', cost: 1200, hunger: 60, mood: 10, desc: 'Бургер, картошка, кола. Классика.' },
-        { id: 'stolovka', name: 'Обед в столовой', cost: 2200, hunger: 70, mood: 15, desc: 'Нормальное первое, второе и компот' },
-        { id: 'cafe', name: 'Бизнес-ланч в ресторане', cost: 6500, hunger: 90, mood: 25, desc: 'Свежий стейк, кофе и уверенность в себе' }
+        { id: 'doshik', name: 'Бич-пакет и сухари', cost: 150, hunger: 20, mood: -15, desc: 'Желудок ноет, депрессия' },
+        { id: 'home_sandwich', name: 'Бутерброд из дома', cost: 250, hunger: 30, mood: -5, desc: 'Майонез, колбаса, терпимо' },
+        { id: 'pelmeni', name: 'Пельмени по акции', cost: 400, hunger: 45, mood: 0, desc: 'Дешево и сытно' },
+        { id: 'shaurma', name: 'Шаурма на вокзале', cost: 800, hunger: 50, mood: -5, desc: 'Сытно, но жирно' },
+        { id: 'fastfood', name: 'Фастфуд комбо', cost: 1200, hunger: 60, mood: 10, desc: 'Бургер, картошка, кола' },
+        { id: 'stolovka', name: 'Обед в столовой', cost: 2200, hunger: 70, mood: 15, desc: 'Первое, второе и компот' },
+        { id: 'cafe', name: 'Бизнес-ланч в ресторане', cost: 6500, hunger: 90, mood: 25, desc: 'Стейк, кофе и уверенность в себе' }
     ];
 
     let html = "";
@@ -1151,11 +1146,11 @@ function renderDiets() {
         html += `
         <div class='glass-card flex-between p-2 mb-2'>
             <div>
-                <b class='text-xs color-green'>${d.name}</b>
-                <div class='sub-label' style='font-size:10px;'>${d.desc || "Питание перекупа"} (+${d.hunger}% сытости)</div>
+                <b class='text-xs color-green'>{d.name}</b>
+                <div class='sub-label' style='font-size:10px;'>{d.desc || "Питание перекупа"} (+{d.hunger}% сытости)</div>
             </div>
-            <button onclick="eatMeal('${d.id}', ${d.cost}, ${d.hunger}, ${d.mood})" class='btn btn-dark btn-auto btn-sm'>${d.cost.toLocaleString()} ₽</button>
-        </div>`;
+            <button onclick="eatMeal('{d.id}', {d.cost}, {d.hunger}, {d.mood})" class='btn btn-dark btn-auto btn-sm'>{d.cost.toLocaleString()} ₽</button>
+        </div>`.replace(/{d.name}/g, d.name).replace(/{d.desc}/g, d.desc).replace(/{d.hunger}/g, d.hunger).replace(/{d.id}/g, d.id).replace(/{d.cost}/g, d.cost).replace(/{d.mood}/g, d.mood);
     });
     list.innerHTML = html;
 }
@@ -1275,56 +1270,16 @@ function bigCharityDonate() {
 const WHEEL_SECTORS = [
     { label: "150,000 ₽", color: "#00e676", textColor: "#000", reward: { cash: 150000 } },
     { label: "15 ⭐", color: "#ffb300", textColor: "#000", reward: { stars: 15 } },
-    { label: "25,000 ₽", color: "#1e293b", textColor: "#fff", reward: { cash: 25000 } },
+    { label: "50,000 ₽", color: "#1e293b", textColor: "#fff", reward: { cash: 50000 } },
     { label: "+1 🤝 Связь", color: "#c084fc", textColor: "#000", reward: { connections: 1 } },
     { label: "350,000 ₽", color: "#00f2fe", textColor: "#000", reward: { cash: 350000 } },
     { label: "50 ⛽ Бак", color: "#0284c7", textColor: "#fff", reward: { fuel: 50 } },
-    { label: "50,000 ₽", color: "#334155", textColor: "#fff", reward: { cash: 50000 } },
+    { label: "100,000 ₽", color: "#334155", textColor: "#fff", reward: { cash: 100000 } },
     { label: "JACKPOT 1M", color: "#ff3366", textColor: "#fff", reward: { cash: 1000000 } }
 ];
 
 let isWheelSpinning = false;
 let currentWheelRotation = 0;
-
-function initWheelModule() {
-    const cvs = document.getElementById('wheelCanvas');
-    if (!cvs) return;
-    const ctx = cvs.getContext('2d');
-    const totalSectors = WHEEL_SECTORS.length;
-    const arc = (2 * Math.PI) / totalSectors;
-    const cx = 280;
-    const cy = 280;
-    const radius = 270;
-
-    ctx.clearRect(0, 0, 560, 560);
-
-    for (let i = 0; i < totalSectors; i++) {
-        const angle = i * arc;
-        const sec = WHEEL_SECTORS[i];
-
-        ctx.beginPath();
-        ctx.fillStyle = sec.color;
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, radius, angle, angle + arc);
-        ctx.lineTo(cx, cy);
-        ctx.fill();
-
-        ctx.strokeStyle = "rgba(255, 215, 0, 0.4)";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle + arc / 2);
-        ctx.textAlign = "right";
-        ctx.fillStyle = sec.textColor;
-        ctx.font = "900 18px sans-serif";
-        ctx.shadowColor = "rgba(0,0,0,0.7)";
-        ctx.shadowBlur = 4;
-        ctx.fillText(sec.label, radius - 24, 6);
-        ctx.restore();
-    }
-}
 
 function spinWheelAction(isFree) {
     if (isWheelSpinning) return;
@@ -1395,7 +1350,7 @@ function refuelAction(type) {
         saveState();
         updateHeaderUI();
         playSound('win');
-        showToast("Заправка за рекламу завершена: 100 ⛽!");
+        showToast("Заправка завершена: 100 ⛽!");
     }
 }
 
@@ -1439,6 +1394,5 @@ window.sendChatMessageFromInput = sendChatMessageFromInput;
 window.roadAssistanceAction = roadAssistanceAction;
 window.donatePartsToMechanic = donatePartsToMechanic;
 window.bigCharityDonate = bigCharityDonate;
-window.initWheelModule = initWheelModule;
 window.spinWheelAction = spinWheelAction;
 window.refuelAction = refuelAction;

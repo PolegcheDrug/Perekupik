@@ -1,8 +1,7 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО И ВИЛСПИНЫ PEREKUP OS (v0.5.0)
+// js/phone-media.js — МЕДИА, РАДИО И ВИЛСПИНЫ PEREKUP OS (v0.5.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Live-автомагнитола (17 потоков), VIP Колесо Фортуны
-// с исправленной ориентацией текста секторов (без переворота вверх ногами),
+// Live-автомагнитола (17 потоков), VIP Колесо Фортуны,
 // Супер Вилспин с комбинированной оплатой (₽ + ⭐) и лавка обмена
 // ========================================================
 
@@ -383,7 +382,7 @@ const PhoneMedia = {
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
                             <div>
                                 <b class="text-xs color-amber">⭐ Пак 25 Stars за Деньги</b>
-                                <div class="sub-label" style="font-size:9.5px;">Конвертация оборотки в звезды</div>
+                                <div class="sub-label" style="font-size:9.5px;">Конвертация оборотки в звёзды</div>
                             </div>
                             <button onclick="PhoneMedia.exchangeForStars('cash', 250000, 25)" class="btn btn-amber btn-sm btn-auto">250,000 ₽</button>
                         </div>
@@ -391,7 +390,7 @@ const PhoneMedia = {
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
                             <div>
                                 <b class="text-xs color-cyan">⛽ Обмен 60 Бензина на 10 Stars</b>
-                                <div class="sub-label" style="font-size:9.5px;">Слив топлива перекупа в валюту</div>
+                                <div class="sub-label" style="font-size:9.5px;">Слив излишков топлива</div>
                             </div>
                             <button onclick="PhoneMedia.exchangeForStars('fuel', 60, 10)" class="btn btn-cyan btn-sm btn-auto">-60 ⛽</button>
                         </div>
@@ -529,33 +528,42 @@ const PhoneMedia = {
                 let maxSlots = getTotalGarageSlots();
                 let curSlots = state.garage ? state.garage.length : 0;
                 let wonPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "ТРАНЗИТ";
+                let baseP = drop1.basePrice || 100000;
+                let marketP = Math.round(baseP * 1.35);
+
                 let wonCar = {
                     id: "super_car_" + Date.now(),
                     name: drop1.name,
                     type: drop1.category || 'economy',
                     power: drop1.power || 75,
-                    basePrice: drop1.basePrice || 100000,
-                    price: drop1.basePrice || 100000,
-                    marketValue: Math.round((drop1.basePrice || 100000) * 1.1),
+                    basePrice: baseP,
+                    price: baseP,
+                    baseMarketValue: marketP,
+                    marketValue: marketP,
                     img: `assets/cars/${drop1.category || 'economy'}/car.jpg`,
                     plate: wonPlate,
                     customPlate: wonPlate,
-                    condition: 85,
-                    wear: { engine: 85, transmission: 85 },
+                    condition: 90,
+                    wear: { engine: 90, transmission: 90 },
                     isRegisteredOnPlayer: false,
                     ownershipDays: 0,
                     engineTemp: 90,
-                    tireWear: 90,
+                    tireWear: 95,
                     tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 }
                 };
+
+                if (typeof recalculateCarMarketValue === 'function') {
+                    recalculateCarMarketValue(wonCar);
+                }
 
                 if (curSlots < maxSlots) {
                     if (!state.garage) state.garage = [];
                     state.garage.push(wonCar);
                     resText1 = `🚗 ${wonCar.name} получен в гараж!`;
                 } else {
-                    state.player.cash = (state.player.cash || 0) + wonCar.basePrice;
-                    resText1 = `🚗 ${wonCar.name} (Гараж полон: компенсация +${wonCar.basePrice.toLocaleString()} ₽)`;
+                    let compensation = Math.round(wonCar.marketValue * 0.9);
+                    state.player.cash = (state.player.cash || 0) + compensation;
+                    resText1 = `🚗 ${wonCar.name} (Гараж полон: компенсация +${compensation.toLocaleString()} ₽)`;
                 }
             } else if (drop1.type === 'part') {
                 state.player.cash = (state.player.cash || 0) + drop1.cashValue;
@@ -613,7 +621,7 @@ const PhoneMedia = {
             );
 
             PhoneMedia.renderFortuneApp(document.getElementById('phoneAppContainer'));
-        }, 2600);
+        }, 2400);
     }
 };
 
@@ -637,7 +645,6 @@ function initWheelModule() {
         const endAngle = startAngle + arc;
         const sec = WHEEL_SECTORS[i];
 
-        // 1. Отрисовка сектора
         ctx.beginPath();
         ctx.fillStyle = sec.color;
         ctx.moveTo(cx, cy);
@@ -649,18 +656,13 @@ function initWheelModule() {
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        // 2. Радиальный угол середины сектора
         const midAngle = startAngle + arc / 2;
-        // Нормализация угла в диапазон [0, 2PI]
         const normAngle = (midAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
 
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(midAngle);
 
-        // 3. Исправление переворота текста:
-        // Если угол направлен влево (от PI/2 до 3PI/2), разворачиваем текст на 180°,
-        // чтобы буквы не рисовались вверх тормашками
         const isFlipped = normAngle > Math.PI / 2 && normAngle < (3 * Math.PI) / 2;
 
         ctx.font = "900 17px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";

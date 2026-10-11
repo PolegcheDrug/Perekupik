@@ -1,8 +1,8 @@
 // ========================================================
-// js/phone.js — БАЗОВАЯ ОС СМАРТФОНА «PerekupOS» (v0.4.7)
+// js/phone.js — БАЗОВАЯ ОС СМАРТФОНА «PerekupOS» (v0.5.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Автономные экраны приложений, Порт с фиксом уровня,
-// Жильё, Решала, Бизнес, P2P, SMS и Блокнот
+// Автономные экраны приложений, P2P биржа (Авто, Номера, Бизнес, Жильё),
+// Порт, Решала со скидками цеха, Блокнот карьеры, Во-Банк и чаты
 // ========================================================
 
 const PhoneManager = {
@@ -593,22 +593,21 @@ const PhoneManager = {
             let fallbackSrc = h.fallback || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80';
             let reqStars = h.reqStars || 5;
 
-            // Технические возможности объекта
             let tuneBadge = h.canTune 
-                ? `<span class="tag-badge bg-tag-green" style="font-size:8px;"><i class="fa-solid fa-screwdriver-wrench"></i> Тюнинг ✓</span>`
-                : `<span class="tag-badge bg-tag-red" style="font-size:8px;"><i class="fa-solid fa-ban"></i> Тюнинг ✗</span>`;
+                ? `<span class="tag-badge bg-tag-green" style="font-size:8.5px;"><i class="fa-solid fa-screwdriver-wrench"></i> Тюнинг ✓</span>`
+                : `<span class="tag-badge bg-tag-red" style="font-size:8.5px;"><i class="fa-solid fa-ban"></i> Тюнинг ✗</span>`;
 
             let detailBadge = h.canDetail
-                ? `<span class="tag-badge bg-tag-cyan" style="font-size:8px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Детейлинг ✓</span>`
-                : `<span class="tag-badge bg-tag-amber" style="font-size:8px;"><i class="fa-solid fa-xmark"></i> Детейлинг ✗</span>`;
+                ? `<span class="tag-badge bg-tag-cyan" style="font-size:8.5px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Детейлинг ✓</span>`
+                : `<span class="tag-badge bg-tag-amber" style="font-size:8.5px;"><i class="fa-solid fa-xmark"></i> Детейлинг ✗</span>`;
 
             let obdBadge = h.canOBDGarage
-                ? `<span class="tag-badge bg-tag-green" style="font-size:8px;"><i class="fa-solid fa-laptop-code"></i> Launch ✓</span>`
-                : `<span class="tag-badge bg-tag-red" style="font-size:8px;"><i class="fa-solid fa-xmark"></i> Launch ✗</span>`;
+                ? `<span class="tag-badge bg-tag-green" style="font-size:8.5px;"><i class="fa-solid fa-laptop-code"></i> Launch ✓</span>`
+                : `<span class="tag-badge bg-tag-red" style="font-size:8.5px;"><i class="fa-solid fa-xmark"></i> Launch ✗</span>`;
 
             let personalBadge = h.hasPersonalSlot
-                ? `<span class="tag-badge bg-tag-purple" style="font-size:8px;"><i class="fa-solid fa-crown"></i> Личка ✓</span>`
-                : `<span class="tag-badge bg-tag-red" style="font-size:8px;"><i class="fa-solid fa-xmark"></i> Без лички</span>`;
+                ? `<span class="tag-badge bg-tag-purple" style="font-size:8.5px;"><i class="fa-solid fa-crown"></i> Личка ✓</span>`
+                : `<span class="tag-badge bg-tag-red" style="font-size:8.5px;"><i class="fa-solid fa-xmark"></i> Без лички</span>`;
 
             let slotCost = h.slots > 0 ? `~${((h.buyPrice || 1000000) / h.slots / 1000).toFixed(0)}k ₽/место` : '—';
 
@@ -637,7 +636,7 @@ const PhoneManager = {
 
             html += `
                 <div class="glass-card mb-3 p-2 ${isCur ? 'personal-car-card' : ''}">
-                    <div class="car-img-wrap mb-2" style="height:120px; position:relative;">
+                    <div class="car-img-wrap mb-2" style="height:125px; position:relative;">
                         <img src="${imgSrc}" class="car-img" onerror="this.onerror=null; this.src='${fallbackSrc}';">
                         <div class="badge-tag" style="bottom:6px; right:6px;">
                             <span class="tag-badge ${isPurchased ? 'bg-tag-green' : (isCur ? 'bg-tag-cyan' : 'bg-tag-amber')}">
@@ -735,7 +734,7 @@ const PhoneManager = {
     },
 
     // ----------------------------------------------------
-    // ПОРТ И КОНТЕЙНЕРЫ (С ФИКСОМ УРОВНЯ И СЛЕПЫМ АУКЦИОНОМ)
+    // ПОРТ И КОНТЕЙНЕРЫ
     // ----------------------------------------------------
     renderContainersApp(container) {
         let lvl = state.player?.level || 1;
@@ -771,7 +770,6 @@ const PhoneManager = {
             return;
         }
 
-        // Если уровень >= 12, выводим полный интерфейс
         html += `
             <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle, rgba(220, 38, 38, 0.2) 0%, #0b101a 100%); border-color: rgba(220, 38, 38, 0.4);">
                 <div class="flex-between mb-1">
@@ -1231,7 +1229,7 @@ const PhoneManager = {
                 id: msgId,
                 sender: `😡 ${buyerName}`,
                 avatar: "🤬",
-                preview: `Ты что мне впарил?! На ${carName} скрытый дефект!`,
+                preview: `Ты что мне продал?! На ${carName} скрытый дефект!`,
                 time: "Только что",
                 unread: true,
                 chatHistory: [
@@ -1349,7 +1347,7 @@ const PhoneManager = {
                         <b class="text-xs">Toyota Mark II JZX90 (Срочно)</b>
                         <span class="tag-badge bg-tag-red">Осталось: 55с</span>
                     </div>
-                    <div class="sub-label mb-2" style="font-size:10px;">Цена продавца: <b class="color-green">290,000 ₽</b> (Рынок: 450,000 ₽)</div>
+                    <div class="sub-label mb-2" style="font-size:10px;">Цена продавца: <b class="color-green">290,000 ₽</b> (Рынок: 490,000 ₽)</div>
                     <button onclick="showToast('Лот выкуплен другим игроком в сети!');" class="btn btn-amber btn-sm w-full">Перехватить сделку ⚡</button>
                 </div>
             `;
@@ -1363,7 +1361,7 @@ const PhoneManager = {
         let filter = this.autodrotP2PFilter || 'cars';
         if (!state.p2pMarketListings) state.p2pMarketListings = [];
 
-        let filtered = state.p2pMarketListings.filter(item => item.type === filter);
+        let filtered = state.p2pMarketListings.filter(item => item.type === filter || (filter === 'cars' && item.type === 'car') || (filter === 'plates' && item.type === 'plate'));
 
         if (filtered.length === 0) {
             list.innerHTML = "<div class='glass-card text-center sub-label py-6'>В этой категории биржи пока нет лотов.</div>";
