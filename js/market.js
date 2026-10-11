@@ -1,8 +1,8 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.4.6)
+// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Интерактивный отчёт Автотеки (ПТС, аватар владельца, юр. чистота),
-// компактный фикс торга у капота, цифровой Launch OBD2
+// компактный фикс торга у капота, цифровой Launch OBD2, микро-сетка параметров
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -463,22 +463,36 @@ function renderMarketFeed() {
 
             <div class='car-img-wrap'>
                 <img src='${carImg}' class='car-img' onerror="this.onerror=null; this.src='${fallbackUrl}';">
-                <div class='badge-tag' style='bottom: 8px; right: 8px;'>${carType} ${dealBadge} ${coolPlateBadge}</div>
                 <div class='plate-corner'><div class='license-plate notranslate' translate='no'>${carPlate} <div class='license-flag'>RUS</div></div></div>
+                <div class='badge-tag'>
+                    <span class='tag-badge bg-tag-cyan'>${carType}</span>
+                    ${dealBadge}
+                    ${coolPlateBadge}
+                </div>
             </div>
 
-            <div class='mb-2'>
-                <h4 class='font-bold'>${carName}</h4>
-                <div class='sub-label mb-2'>${carPower} л.с. / Пробег: ${carMileage} км</div>
-                ${sellerNoteBlock}
+            <div class='flex-between mb-2'>
+                <h4 class='font-bold text-xs color-cyan' style='font-size:14px;'>${carName}</h4>
             </div>
+
+            <!-- МИКРО-ПЛИТКИ ПАРАМЕТРОВ (SPEC GRID) -->
+            <div class='car-spec-chips-row mb-2'>
+                <div class='car-spec-chip'><i class='fa-solid fa-bolt color-amber'></i> <b>${carPower}</b> л.с.</div>
+                <div class='car-spec-chip'><i class='fa-solid fa-road color-cyan'></i> <b>${carMileage}</b> км</div>
+                <div class='car-spec-chip'><i class='fa-solid fa-shield color-green'></i> <b>${car.condition || 80}%</b> кузов</div>
+            </div>
+
+            ${sellerNoteBlock}
 
             <div class='price-box'>
                 <div>
                     <span class='text-xs color-green font-bold'>${t('price')}:</span>
                     <div class='price-val notranslate' translate='no' id='price_txt_${car.id}'>${carPrice} ₽</div>
                 </div>
-                <div class='sub-label'>${t('market_estimate')}: ~${carMarketVal} ₽</div>
+                <div class='sub-label text-right'>
+                    <span class='sub-label text-xs'>${t('market_estimate')}:</span>
+                    <div class='font-bold color-cyan text-xs'>~${carMarketVal} ₽</div>
+                </div>
             </div>
 
             <div class='grid-3 mb-2'>
@@ -757,7 +771,6 @@ function openMarketDeal(carId) {
         let fallbackUrl = car.fallback || getCategoryFallback(car.type);
         imgEl.src = car.img ? car.img : fallbackUrl;
         imgEl.onerror = () => { imgEl.src = fallbackUrl; };
-        // Жёсткая защита от растягивания картинки
         imgEl.style.width = "90px";
         imgEl.style.height = "62px";
         imgEl.style.objectFit = "cover";

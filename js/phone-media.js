@@ -1,7 +1,8 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО И ВИЛСПИНЫ PEREKUP OS (v0.4.6)
+// js/phone-media.js — МЕДИА, РАДИО И ВИЛСПИНЫ PEREKUP OS (v0.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Live-автомагнитола (17 потоков), VIP Колесо Фортуны,
+// Live-автомагнитола (17 потоков), VIP Колесо Фортуны
+// с исправленной ориентацией текста секторов (без переворота вверх ногами),
 // Супер Вилспин с комбинированной оплатой (₽ + ⭐) и лавка обмена
 // ========================================================
 
@@ -403,7 +404,6 @@ const PhoneMedia = {
                             <button onclick="PhoneMedia.exchangeForStars('tickets', 20, 15)" class="btn btn-purple btn-sm btn-auto">-20 🎟️</button>
                         </div>
 
-                        <!-- ЕДИНАЯ КОМБИНИРОВАННАЯ ПОКУПКА БИЛЕТА (РУБЛИ + ЗВЁЗДЫ) -->
                         <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid rgba(0, 230, 118, 0.25);">
                             <div>
                                 <b class="text-xs color-green"><i class="fa-solid fa-ticket"></i> 1х Билет Супер Вилспина</b>
@@ -445,7 +445,6 @@ const PhoneMedia = {
         this.renderFortuneApp(document.getElementById('phoneAppContainer'));
     },
 
-    // КОМБИНИРОВАННАЯ ПОКУПКА БИЛЕТА (250,000 ₽ + 25 ⭐)
     buySuperSpinTicket() {
         const costCash = 250000;
         const costStars = 25;
@@ -618,4 +617,71 @@ const PhoneMedia = {
     }
 };
 
+// ========================================================
+// ИСПРАВЛЕННАЯ ОТРИСОВКА КОЛЕСА ФОРТУНЫ БЕЗ ПЕРЕВЁРНУТОГО ТЕКСТА
+// ========================================================
+function initWheelModule() {
+    const cvs = document.getElementById('wheelCanvas');
+    if (!cvs || typeof WHEEL_SECTORS === 'undefined') return;
+    const ctx = cvs.getContext('2d');
+    const totalSectors = WHEEL_SECTORS.length;
+    const arc = (2 * Math.PI) / totalSectors;
+    const cx = 280;
+    const cy = 280;
+    const radius = 270;
+
+    ctx.clearRect(0, 0, 560, 560);
+
+    for (let i = 0; i < totalSectors; i++) {
+        const startAngle = i * arc;
+        const endAngle = startAngle + arc;
+        const sec = WHEEL_SECTORS[i];
+
+        // 1. Отрисовка сектора
+        ctx.beginPath();
+        ctx.fillStyle = sec.color;
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, startAngle, endAngle);
+        ctx.lineTo(cx, cy);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255, 215, 0, 0.45)";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // 2. Радиальный угол середины сектора
+        const midAngle = startAngle + arc / 2;
+        // Нормализация угла в диапазон [0, 2PI]
+        const normAngle = (midAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(midAngle);
+
+        // 3. Исправление переворота текста:
+        // Если угол направлен влево (от PI/2 до 3PI/2), разворачиваем текст на 180°,
+        // чтобы буквы не рисовались вверх тормашками
+        const isFlipped = normAngle > Math.PI / 2 && normAngle < (3 * Math.PI) / 2;
+
+        ctx.font = "900 17px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        ctx.fillStyle = sec.textColor;
+        ctx.shadowColor = "rgba(0, 0, 0, 0.85)";
+        ctx.shadowBlur = 4;
+
+        if (isFlipped) {
+            ctx.rotate(Math.PI);
+            ctx.textAlign = "left";
+            ctx.textBaseline = "middle";
+            ctx.fillText(sec.label, -radius + 28, 0);
+        } else {
+            ctx.textAlign = "right";
+            ctx.textBaseline = "middle";
+            ctx.fillText(sec.label, radius - 28, 0);
+        }
+
+        ctx.restore();
+    }
+}
+
 window.PhoneMedia = PhoneMedia;
+window.initWheelModule = initWheelModule;

@@ -1,12 +1,14 @@
 // ========================================================
-// js/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.4.6)
+// js/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini
-// Дрифт (Matsuri, RDS Europe, RDS GP), Драг 402м с ланчем,
-// Стенс-выставка на парковке ТЦ, шашки на МКАД и авторитет
+// Интерактивные зрелищные заезды (6 секунд):
+// Арена дрифта (восьмёрка с дымом), Драг 402м с ёлкой старта,
+// Стенс-шоу со стравливанием пневмы кузова в пол, шашки по МКАД
 // ========================================================
 
 const PhoneRacing = {
     streetSubTab: 'drift',
+    activeAnimTimer: null,
 
     renderStreetApp(container) {
         let sub = this.streetSubTab || 'drift';
@@ -45,6 +47,7 @@ const PhoneRacing = {
     },
 
     switchStreetSubTab(tab) {
+        if (this.activeAnimTimer) clearInterval(this.activeAnimTimer);
         playSound('tick');
         tgHaptic('light');
         this.streetSubTab = tab;
@@ -98,7 +101,7 @@ const PhoneRacing = {
     },
 
     // ----------------------------------------------------
-    // 1. ДРИФТ
+    // 1. ДРИФТ-АРЕНА (6 СЕКУНД: ВОСЬМЕРКА С ДЫМОМ)
     // ----------------------------------------------------
     renderDriftDiscipline(container) {
         if (!state.garage || state.garage.length === 0) {
@@ -124,17 +127,18 @@ const PhoneRacing = {
                         ${selectorOptions}
                     </select>
                 </div>
-                <div class="flex-between text-xs mt-1">
-                    <span>Температура: <b class="${tempVal > 105 ? 'color-red' : 'color-green'}">${tempVal}°C</b></span>
-                    <span>Остаток шин: <b class="${tiresPct < 30 ? 'color-red' : 'color-green'}">${tiresPct}%</b></span>
+                <div class="car-spec-chips-row mb-1">
+                    <div class="car-spec-chip"><i class="fa-solid fa-temperature-half ${tempVal > 105 ? 'color-red' : 'color-green'}"></i> <b>${tempVal}°C</b></div>
+                    <div class="car-spec-chip"><i class="fa-solid fa-circle-notch ${tiresPct < 30 ? 'color-red' : 'color-green'}"></i> <b>${tiresPct}%</b> шины</div>
+                    <div class="car-spec-chip"><i class="fa-solid fa-bolt color-amber"></i> <b>${car.power || 100}</b> л.с.</div>
                 </div>
                 <div class="grid-2 mt-2">
-                    <button onclick="PhoneRacing.serviceTiresAndCooling(${carIdx})" class="btn btn-dark btn-sm">🛞 Новая резина & Остудить (15k)</button>
-                    <button onclick="PhoneRacing.coolDownEngine(${carIdx})" class="btn btn-cyan btn-sm">❄️ Остудить мотор (Бесплатно)</button>
+                    <button onclick="PhoneRacing.serviceTiresAndCooling(${carIdx})" class="btn btn-dark btn-sm">🛞 Замена шин & СТО (15k)</button>
+                    <button onclick="PhoneRacing.coolDownEngine(${carIdx})" class="btn btn-cyan btn-sm">❄️ Остудить мотор</button>
                 </div>
             </div>
 
-            <div class="space-y-2">
+            <div class="space-y-2" id="driftEventsCardsBox">
                 <div class="glass-card p-2" style="border-left: 3px solid var(--cyan);">
                     <div class="flex-between mb-1">
                         <div>
@@ -225,6 +229,7 @@ const PhoneRacing = {
         this.renderStreetSubScreen();
     },
 
+    // ЗАПУСК ИНТЕРАКТИВНОЙ 6-СЕКУНДНОЙ ВОСЬМЕРКИ
     runDriftChallenge(league, cost) {
         let cash = state.player?.cash || 0;
         if (cash < cost) return showToast("Не хватает денег на стартовый взнос!");
@@ -234,7 +239,6 @@ const PhoneRacing = {
         if (!car) return;
 
         state.player.cash -= cost;
-        
         car.engineTemp = (car.engineTemp || 90) + Math.floor(12 + Math.random() * 8);
         car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - Math.floor(18 + Math.random() * 12));
         if (car.wear) {
@@ -245,86 +249,233 @@ const PhoneRacing = {
         tgHaptic('medium');
 
         const resultsArea = document.getElementById('driftRunResultsArea');
+        const cardsBox = document.getElementById('driftEventsCardsBox');
         if (!resultsArea) return;
+        if (cardsBox) cardsBox.style.display = 'none';
 
         resultsArea.innerHTML = `
-            <div class="glass-card text-center p-3">
-                <div style="font-size:24px;">💨 🔥 🏎️</div>
-                <div class="font-bold text-xs color-amber my-1">РАЗГОН... ИНИЦИАЦИЯ ЗАНОСА...</div>
+            <div class="interactive-arena-card mb-2">
+                <div class="flex-between mb-1">
+                    <b class="text-xs color-cyan"><i class="fa-solid fa-compass-drafting"></i> Дрифт-Арена: Восьмёрка</b>
+                    <span class="tag-badge bg-tag-red" id="driftLiveTimerBadge">6.0с</span>
+                </div>
+                
+                <div class="drift-track-canvas-wrap">
+                    <canvas id="driftFigureEightCanvas" width="400" height="220" class="drift-canvas-stage"></canvas>
+                    <div class="drift-telemetry-hud">
+                        <div>УГОЛ: <b class="color-red" id="driftAngleTxt">62°</b></div>
+                        <div>СКОРОСТЬ: <b class="color-cyan" id="driftSpeedTxt">84 км/ч</b></div>
+                        <div>БАЛЛЫ: <b class="color-green" id="driftLiveScoreTxt">0</b></div>
+                    </div>
+                </div>
+
+                <div class="sub-label text-center mt-1" id="driftPhaseHint">Постановка фуридаши в первую дугу...</div>
             </div>
         `;
 
-        setTimeout(() => {
-            let power = car.power || 100;
-            let t = car.tuning || {};
+        this.startDriftEightAnimation(league, cost, car);
+    },
 
-            let score = 0;
-            let comment = "";
+    startDriftEightAnimation(league, cost, car) {
+        const cvs = document.getElementById('driftFigureEightCanvas');
+        if (!cvs) return;
+        const ctx = cvs.getContext('2d');
+        const W = cvs.width;
+        const H = cvs.height;
 
-            if (league === 'matsuri') {
-                score = Math.floor(65 + Math.random() * 25);
-                if (t.hydroHandbrake) score += 8;
-                if (power > 120) score += 5;
-                score = Math.min(100, score);
-                comment = score >= 80 ? "Чистый проезд по снежной дуге, публика в восторге!" : "Небольшая коррекция рулём, но траектория удержана.";
-            } else if (league === 'europe') {
-                let powerRatio = power / 300;
-                score = Math.floor(55 * powerRatio + Math.random() * 30);
-                if (t.hydroHandbrake) score += 10;
-                if (t.dragSlicks) score += 5;
-                score = Math.min(100, score);
-                comment = score >= 85 ? "Шикарная перекладка без распрямлений, зачёт на 85+ баллов!" : "Не хватило угла во второй дуге, потеря темпа.";
-            } else if (league === 'gp') {
-                let powerRatio = power / 550;
-                score = Math.floor(60 * powerRatio + Math.random() * 30);
-                if (t.rollCage) score += 5;
-                if (t.dragSlicks) score += 10;
-                score = Math.min(100, score);
-                comment = score >= 90 ? "Дым стеной, глубочайший бэквард и постановка впритирку со стеной!" : "Слабая скорость в базе дуги, судьи сняли баллы за клиппинг.";
+        let startTime = Date.now();
+        let duration = 6000;
+        let tireMarks = [];
+        let smokeParticles = [];
+
+        let power = car.power || 100;
+        let t = car.tuning || {};
+
+        let angleBase = league === 'gp' ? 78 : (league === 'europe' ? 68 : 58);
+        let speedBase = league === 'gp' ? 125 : (league === 'europe' ? 95 : 65);
+
+        playEngineSound();
+
+        if (this.activeAnimTimer) clearInterval(this.activeAnimTimer);
+
+        this.activeAnimTimer = setInterval(() => {
+            let elapsed = Date.now() - startTime;
+            let progress = Math.min(1, elapsed / duration);
+            let timeLeft = Math.max(0, (duration - elapsed) / 1000).toFixed(1);
+
+            const timerBadge = document.getElementById('driftLiveTimerBadge');
+            const angleEl = document.getElementById('driftAngleTxt');
+            const speedEl = document.getElementById('driftSpeedTxt');
+            const scoreEl = document.getElementById('driftLiveScoreTxt');
+            const hintEl = document.getElementById('driftPhaseHint');
+
+            if (timerBadge) timerBadge.innerText = `${timeLeft}с`;
+
+            // Траектория лемнискаты Бернулли (восьмёрка)
+            let tParam = progress * 4 * Math.PI;
+            let scaleX = 140;
+            let scaleY = 70;
+            let cx = W / 2;
+            let cy = H / 2;
+
+            let carX = cx + (scaleX * Math.cos(tParam)) / (1 + Math.sin(tParam) * Math.sin(tParam));
+            let carY = cy + (scaleY * Math.sin(tParam) * Math.cos(tParam)) / (1 + Math.sin(tParam) * Math.sin(tParam));
+
+            // Расчет угла заноса
+            let currentAngle = Math.round(angleBase + Math.sin(tParam * 2) * 14);
+            let currentSpeed = Math.round(speedBase + Math.cos(tParam) * 12);
+            let currentScore = Math.round(progress * (league === 'gp' ? 94 : (league === 'europe' ? 88 : 82)));
+
+            if (angleEl) angleEl.innerText = `${currentAngle}°`;
+            if (speedEl) speedEl.innerText = `${currentSpeed} км/ч`;
+            if (scoreEl) scoreEl.innerText = `${currentScore}`;
+
+            if (hintEl) {
+                if (progress < 0.25) hintEl.innerText = "Инициализация заноса фуридаши! Клиппинг #1...";
+                else if (progress < 0.5) hintEl.innerText = "Глубокая перекладка через центр парковки!";
+                else if (progress < 0.75) hintEl.innerText = "Вход во вторую дугу! Газ в отсечку!";
+                else hintEl.innerText = "Финишный выход в базу под овации зрителей!";
             }
 
-            let isWin = score >= 75;
-            let reward = Math.round(cost * (league === 'gp' ? 2.5 : (league === 'europe' ? 2.3 : 2.0)));
-            let repBonus = league === 'gp' ? 70 : (league === 'europe' ? 35 : 15);
+            // Добавляем следы шин
+            tireMarks.push({ x: carX, y: carY, alpha: 0.7 });
+            if (tireMarks.length > 90) tireMarks.shift();
 
-            if (typeof trackQuestProgress === 'function') {
-                trackQuestProgress('drift_run', 1);
+            // Дым из-под задней оси
+            smokeParticles.push({
+                x: carX + (Math.random() * 8 - 4),
+                y: carY + (Math.random() * 8 - 4),
+                radius: 4 + Math.random() * 6,
+                alpha: 0.6
+            });
+            if (smokeParticles.length > 40) smokeParticles.shift();
+
+            // Отрисовка кадра
+            ctx.clearRect(0, 0, W, H);
+
+            // Асфальтовое покрытие парковки с сеткой
+            ctx.fillStyle = "#070c14";
+            ctx.fillRect(0, 0, W, H);
+            
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
+            ctx.lineWidth = 1;
+            for (let x = 0; x < W; x += 30) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+            }
+            for (let y = 0; y < H; y += 30) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
             }
 
-            if (isWin) {
-                state.player.cash += reward;
-                state.player.streetCred = (state.player.streetCred || 100) + repBonus;
-                playSound('win');
-                tgHaptic('success');
+            // Столбы/Конусы парковки
+            ctx.fillStyle = "#ffb300";
+            ctx.beginPath(); ctx.arc(cx - 70, cy, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + 70, cy, 7, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "#000";
+            ctx.beginPath(); ctx.arc(cx - 70, cy, 3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + 70, cy, 3, 0, Math.PI * 2); ctx.fill();
 
-                resultsArea.innerHTML = `
-                    <div class="glass-card p-2 text-center" style="border-color:var(--green);">
-                        <div class="font-bold text-xs color-green mb-1">🏁 ЗАЕЗД ЗАВЕРШЁН: ${score} ИЗ 100 БАЛЛОВ!</div>
-                        <div class="sub-label mb-2" style="font-size:10px;">${comment}<br>Выигрыш: <b class="color-green">+${reward.toLocaleString()} ₽</b> (+${repBonus} Респекта)</div>
-                        <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-green btn-sm w-full">Отлично!</button>
+            // Следы жженой резины
+            ctx.strokeStyle = "rgba(20, 20, 20, 0.85)";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            for (let i = 0; i < tireMarks.length; i++) {
+                let p = tireMarks[i];
+                if (i === 0) ctx.moveTo(p.x, p.y);
+                else ctx.lineTo(p.x, p.y);
+            }
+            ctx.stroke();
+
+            // Дым
+            for (let i = 0; i < smokeParticles.length; i++) {
+                let sp = smokeParticles[i];
+                ctx.fillStyle = `rgba(220, 230, 242, ${sp.alpha})`;
+                ctx.beginPath();
+                ctx.arc(sp.x, sp.y, sp.radius, 0, Math.PI * 2);
+                ctx.fill();
+                sp.radius += 0.3;
+                sp.alpha = Math.max(0, sp.alpha - 0.02);
+            }
+
+            // Машина (красный/бирюзовый болид под углом)
+            ctx.save();
+            ctx.translate(carX, carY);
+            let headingAngle = Math.atan2(scaleY * Math.cos(tParam * 2), -scaleX * Math.sin(tParam)) + (currentAngle * Math.PI / 180 * 0.45);
+            ctx.rotate(headingAngle);
+
+            // Кузов авто
+            ctx.fillStyle = "#ff3366";
+            ctx.shadowColor = "#ff3366";
+            ctx.shadowBlur = 8;
+            ctx.fillRect(-12, -7, 24, 14);
+
+            // Стекла и крыша
+            ctx.fillStyle = "#0b101a";
+            ctx.fillRect(-5, -5, 11, 10);
+
+            // Фары
+            ctx.fillStyle = "#00f2fe";
+            ctx.fillRect(10, -6, 3, 3);
+            ctx.fillRect(10, 3, 3, 3);
+
+            ctx.restore();
+
+            if (progress >= 1) {
+                clearInterval(this.activeAnimTimer);
+                this.finishDriftChallenge(league, cost, currentScore, car);
+            }
+        }, 33);
+    },
+
+    finishDriftChallenge(league, cost, score, car) {
+        let isWin = score >= 75;
+        let reward = Math.round(cost * (league === 'gp' ? 2.5 : (league === 'europe' ? 2.3 : 2.0)));
+        let repBonus = league === 'gp' ? 70 : (league === 'europe' ? 35 : 15);
+
+        if (typeof trackQuestProgress === 'function') {
+            trackQuestProgress('drift_run', 1);
+        }
+
+        const resultsArea = document.getElementById('driftRunResultsArea');
+        if (!resultsArea) return;
+
+        if (isWin) {
+            state.player.cash += reward;
+            state.player.streetCred = (state.player.streetCred || 100) + repBonus;
+            playSound('win');
+            tgHaptic('success');
+
+            resultsArea.innerHTML = `
+                <div class="glass-card p-2 text-center" style="border-color:var(--green);">
+                    <div class="font-bold text-xs color-green mb-1">🏁 ЗАЕЗД ЗАВЕРШЁН: ${score} ИЗ 100 БАЛЛОВ!</div>
+                    <div class="sub-label mb-2" style="font-size:10px;">
+                        Чистая восьмёрка без распрямлений! Судьи зафиксировали отличный угол.<br>
+                        Выигрыш: <b class="color-green">+${reward.toLocaleString()} ₽</b> (+${repBonus} Респекта)
                     </div>
-                `;
-            } else {
-                state.player.streetCred = Math.max(10, (state.player.streetCred || 100) - 10);
-                playSound('error');
-                tgHaptic('error');
+                    <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-green btn-sm w-full">Отлично, к выбору заездов ✓</button>
+                </div>
+            `;
+        } else {
+            state.player.streetCred = Math.max(10, (state.player.streetCred || 100) - 10);
+            playSound('error');
+            tgHaptic('error');
 
-                resultsArea.innerHTML = `
-                    <div class="glass-card p-2 text-center" style="border-color:var(--red);">
-                        <div class="font-bold text-xs color-red mb-1">💥 НЕ КВАЛИФИЦИРОВАН: ${score} БАЛЛОВ</div>
-                        <div class="sub-label mb-2" style="font-size:10px;">${comment}<br>Потерян стартовый взнос: -${cost.toLocaleString()} ₽</div>
-                        <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-dark btn-sm w-full">Попробовать снова</button>
+            resultsArea.innerHTML = `
+                <div class="glass-card p-2 text-center" style="border-color:var(--red);">
+                    <div class="font-bold text-xs color-red mb-1">💥 НЕ КВАЛИФИЦИРОВАН: ${score} БАЛЛОВ</div>
+                    <div class="sub-label mb-2" style="font-size:10px;">
+                        Разворот в центре перекладки или потеря дыма. Стартовый взнос -${cost.toLocaleString()} ₽ потерян.
                     </div>
-                `;
-            }
+                    <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-dark btn-sm w-full">Попробовать снова</button>
+                </div>
+            `;
+        }
 
-            saveState();
-            updateHeaderUI();
-        }, 1600);
+        saveState();
+        updateHeaderUI();
     },
 
     // ----------------------------------------------------
-    // 2. ДРАГ 402М
+    // 2. ДРАГ 402М С РОЖДЕСТВЕНСКОЙ ЕЛКОЙ СТАРТА
     // ----------------------------------------------------
     renderDragDiscipline(container) {
         if (!state.garage || state.garage.length === 0) {
@@ -347,18 +498,28 @@ const PhoneRacing = {
                         ${selectorOptions}
                     </select>
                 </div>
-                <div class="flex-between text-xs mt-1">
-                    <span>Мощность: <b class="color-red">${myPower} л.с.</b></span>
-                    <span>Слики: <b>${car.tuning?.dragSlicks ? 'Установлены (-0.6с)' : 'Обычная резина'}</b></span>
+                <div class="car-spec-chips-row mb-1">
+                    <div class="car-spec-chip"><i class="fa-solid fa-bolt color-red"></i> <b>${myPower}</b> л.с.</div>
+                    <div class="car-spec-chip"><i class="fa-solid fa-circle-notch color-amber"></i> <b>${car.tuning?.dragSlicks ? 'Слики (-0.6с)' : 'Сток шины'}</b></div>
                 </div>
             </div>
 
-            <div class="race-panel mb-2 p-2">
+            <div class="race-panel mb-2 p-2" id="dragRaceMainPanel">
                 <div class="flex-between mb-1">
                     <div class="race-status" id="raceStatusText" style="font-size:11px; margin-bottom:0;">Держите газ в зелёной зоне (5500-6500 RPM)!</div>
                     <span class="tag-badge bg-tag-amber" id="raceHeatBadge">Внимание ДПС: ${state.player?.consecutiveRaces || 0}/12</span>
                 </div>
                 
+                <!-- РОЖДЕСТВЕНСКАЯ ЕЛКА СВЕТОФОРА (CHRISTMAS TREE) -->
+                <div class="drag-christmas-tree-box my-2">
+                    <div class="tree-light" id="treePreStage">⚪</div>
+                    <div class="tree-light" id="treeStage">⚪</div>
+                    <div class="tree-light tree-amber" id="treeAmber1">🟡</div>
+                    <div class="tree-light tree-amber" id="treeAmber2">🟡</div>
+                    <div class="tree-light tree-amber" id="treeAmber3">🟡</div>
+                    <div class="tree-light tree-green" id="treeGreen">🟢</div>
+                </div>
+
                 <div class="race-track-box my-2">
                     <div class="race-lane"><span class="sub-label" style="position:absolute; left:6px;">ВЫ</span><div class="race-car-runner" id="playerRaceCarRunner" style="left:0%;">🏎️</div></div>
                     <div class="race-lane"><span class="sub-label" style="position:absolute; left:6px;">СОПЕРНИК</span><div class="race-car-runner" id="rivalRaceCarRunner" style="left:0%;">🚙</div></div>
@@ -388,7 +549,7 @@ const PhoneRacing = {
     },
 
     // ----------------------------------------------------
-    // 3. СТЕНС-СХОДКА
+    // 3. СТЕНС-СХОДКА (СТРАВЛИВАНИЕ ПНЕВМЫ КУЗОВА В ПОЛ)
     // ----------------------------------------------------
     renderStanceDiscipline(container) {
         if (!state.garage || state.garage.length === 0) {
@@ -416,7 +577,7 @@ const PhoneRacing = {
         }
         if (car.bodyThickness?.doors > 250 || car.bodyThickness?.wings > 250) {
             score -= 15;
-            penaltyText += "• Шпаклёвка видна невооружённым глазом (-15 баллов)<br>";
+            penaltyText += "• Шпаклёвка звенит под толщиномером (-15 баллов)<br>";
         }
 
         score = Math.max(5, Math.min(100, score));
@@ -429,6 +590,15 @@ const PhoneRacing = {
                     <span class="tag-badge bg-tag-amber">${score} / 100 Очков Стиля</span>
                 </div>
                 <div class="sub-label mb-2" style="font-size:10px;">Проект: <b>${car.name}</b> (${rankName})</div>
+
+                <!-- ПОДИУМ УЧАСТНИКА С АНИМАЦИЕЙ ДРОПА ПНЕВМЫ -->
+                <div class="stance-stage-podium mb-2" id="stancePodiumBox">
+                    <div class="stance-camera-flashes" id="cameraFlashOverlay"></div>
+                    <div class="stance-car-chassis" id="stanceCarChassis">
+                        <img src="${car.img || 'assets/cars/economy/vaz-2107.jpg'}" class="stance-car-model-img" onerror="this.src='assets/cars/economy/vaz-2107.jpg';">
+                    </div>
+                    <div class="stance-air-hiss-text" id="airHissSoundText">💨 ПШ-Ш-Ш...</div>
+                </div>
 
                 <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
                     <div class="text-xs mb-1 font-bold">Оценка судейского жюри:</div>
@@ -451,8 +621,8 @@ const PhoneRacing = {
                     ${penaltyText ? `<div class="sub-label color-red mt-1" style="font-size:9px;">Штрафы жюри:<br>${penaltyText}</div>` : ''}
                 </div>
 
-                <button onclick="PhoneRacing.enterStanceContest(${score})" class="btn btn-amber btn-sm w-full">
-                    🏆 Заехать на подиум участников (Взнос 15,000 ₽)
+                <button onclick="PhoneRacing.enterStanceContest(${score})" class="btn btn-amber btn-sm w-full" id="btnEnterStance">
+                    🏆 Заехать на подиум и стравить пневму (Взнос 15k ₽)
                 </button>
             </div>
             <div id="stanceContestResult"></div>
@@ -468,17 +638,33 @@ const PhoneRacing = {
         playSound('tick');
         tgHaptic('light');
 
+        const btn = document.getElementById('btnEnterStance');
+        const chassis = document.getElementById('stanceCarChassis');
+        const hissText = document.getElementById('airHissSoundText');
+        const flashes = document.getElementById('cameraFlashOverlay');
         const resBox = document.getElementById('stanceContestResult');
-        if (!resBox) return;
 
-        resBox.innerHTML = `
-            <div class="glass-card text-center p-3">
-                <div style="font-size:24px;">📸 🎙️ ✨</div>
-                <div class="font-bold text-xs color-cyan my-1">ЗАМЕР КЛИРЕНСА И ОЦЕНКА ФИТМЕНТА...</div>
-            </div>
-        `;
+        if (btn) btn.disabled = true;
+
+        // 1. Анимация заезда на подиум
+        if (chassis) chassis.classList.add('entering-podium');
 
         setTimeout(() => {
+            // 2. Стравливание пневмы в пол (Пш-ш-ш)
+            if (chassis) chassis.classList.add('slammed-drop');
+            if (hissText) hissText.classList.add('show-hiss');
+            playSound('tick');
+            tgHaptic('medium');
+        }, 1800);
+
+        setTimeout(() => {
+            // 3. Вспышки фотокамер зрителей
+            if (flashes) flashes.classList.add('flashing-active');
+            playSound('win');
+        }, 3400);
+
+        setTimeout(() => {
+            // 4. Судейский замер клиренса и вердикт
             if (score >= 75) {
                 let prize = Math.round(cost * (score / 35));
                 state.player.cash += prize;
@@ -486,34 +672,38 @@ const PhoneRacing = {
                 playSound('win');
                 tgHaptic('success');
 
-                resBox.innerHTML = `
-                    <div class="glass-card p-2 text-center" style="border-color:var(--amber);">
-                        <div class="font-bold text-xs color-amber mb-1">🥇 ПОБЕДИТЕЛЬ НОМИНАЦИИ «BEST FITMENT»!</div>
-                        <div class="sub-label mb-2" style="font-size:10px;">Кубок ваш! Судьи в восторге от посадки дисков в арки.<br>Награда: <b class="color-green">+${prize.toLocaleString()} ₽</b> (+35 Респекта)</div>
-                        <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-amber btn-sm w-full">Забрать кубок 🏆</button>
-                    </div>
-                `;
+                if (resBox) {
+                    resBox.innerHTML = `
+                        <div class="glass-card p-2 text-center" style="border-color:var(--amber);">
+                            <div class="font-bold text-xs color-amber mb-1">🥇 ПОБЕДИТЕЛЬ НОМИНАЦИИ «BEST FITMENT»!</div>
+                            <div class="sub-label mb-2" style="font-size:10px;">Кубок ваш! Судьи в восторге от посадки дисков в арки.<br>Награда: <b class="color-green">+${prize.toLocaleString()} ₽</b> (+35 Респекта)</div>
+                            <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-amber btn-sm w-full">Забрать кубок 🏆</button>
+                        </div>
+                    `;
+                }
             } else {
                 playSound('error');
-                resBox.innerHTML = `
-                    <div class="glass-card p-2 text-center" style="border-color:var(--red);">
-                        <div class="font-bold text-xs color-red mb-1">🥉 ВНЕ ПРИЗОВОЙ ТРОЙКИ (${score} баллов)</div>
-                        <div class="sub-label mb-2" style="font-size:10px;">Проект выглядит сырым: не хватает занижения или кузов требует покраски!</div>
-                        <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-dark btn-sm w-full">Понятно</button>
-                    </div>
-                `;
+                if (resBox) {
+                    resBox.innerHTML = `
+                        <div class="glass-card p-2 text-center" style="border-color:var(--red);">
+                            <div class="font-bold text-xs color-red mb-1">🥉 ВНЕ ПРИЗОВОЙ ТРОЙКИ (${score} баллов)</div>
+                            <div class="sub-label mb-2" style="font-size:10px;">Проект выглядит сырым: не хватает занижения пневмы или арки пустые!</div>
+                            <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-dark btn-sm w-full">Понятно</button>
+                        </div>
+                    `;
+                }
             }
 
             saveState();
             updateHeaderUI();
-        }, 1500);
+        }, 5500);
     },
 
     // ----------------------------------------------------
-    // 4. ШАШКИ В ПОТОКЕ ПО МКАД
+    // 4. ШАШКИ В ПОТОКЕ ПО МКАД (ИНТЕРАКТИВНЫЙ ПРОСТРЕЛ)
     // ----------------------------------------------------
     renderSprintDiscipline(container) {
-        let carIdx = state.player.selectedStreetCarIndex || 0;
+        let carIdx = state.player?.selectedStreetCarIndex || 0;
         const car = state.garage ? state.garage[carIdx] : null;
         let power = car?.power || 100;
         let maxSpeed = Math.round(Math.min(320, 120 + Math.sqrt(power) * 8.5));
@@ -552,13 +742,22 @@ const PhoneRacing = {
         if (!resBox) return;
 
         resBox.innerHTML = `
-            <div class="glass-card text-center p-3">
-                <div style="font-size:24px;">🏎️ 💨 🚨</div>
-                <div class="font-bold text-xs color-red my-1">ОБГОН СПРАВА! СКОРОСТЬ ${maxSpeed} КМ/Ч...</div>
+            <div class="interactive-arena-card mb-2 text-center p-3">
+                <div style="font-size:26px;">🏎️ 💨 🚙 🚛</div>
+                <div class="font-bold text-xs color-red my-1" id="sprintLiveSpeedTxt">ПЕРЕСТРОЕНИЕ... СКОРОСТЬ ${Math.round(maxSpeed * 0.5)} КМ/Ч</div>
+                <div class="sub-label" style="font-size:10px;">Обгон справа по обочине, зазор 15 см между фурами!</div>
             </div>
         `;
 
+        let currentS = Math.round(maxSpeed * 0.5);
+        let speedTimer = setInterval(() => {
+            currentS = Math.min(maxSpeed, currentS + 20);
+            const txt = document.getElementById('sprintLiveSpeedTxt');
+            if (txt) txt.innerText = `ПЕРЕСТРОЕНИЕ... СКОРОСТЬ ${currentS} КМ/Ч`;
+        }, 400);
+
         setTimeout(() => {
+            clearInterval(speedTimer);
             let immunity = state.player?.policeImmunityDays || 0;
             let policeRaidChance = immunity > 0 ? 0 : (mode === 'insane' ? 0.35 : 0.18);
 
@@ -593,7 +792,7 @@ const PhoneRacing = {
 
             saveState();
             updateHeaderUI();
-        }, 1700);
+        }, 4500);
     }
 };
 

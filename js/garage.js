@@ -1,8 +1,8 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.4.7)
+// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini
 // Условие гаража для тюнинга/детейлинга, интерактивный Launch OBD2,
-// конструктор страхового полиса, штрафстоянка ГИБДД
+// конструктор страхового полиса, штрафстоянка ГИБДД, улучшенная типографика
 // ========================================================
 
 let previewCarIndex = null;
@@ -367,12 +367,12 @@ function renderGarage() {
 
         html += `
         <div class="glass-card mb-3 ${isPersonal ? 'personal-car-card' : ''}">
-            <div class="car-img-wrap" style="height:145px;">
+            <div class="car-img-wrap" style="height:150px;">
                 <img src="${cImg}" class="car-img" onerror="this.src='${car.fallback || 'assets/cars/economy/vaz-2107.jpg'}';">
                 <div class="plate-corner">
                     <div class="license-plate">${cPlate} <div class="license-flag">RUS</div></div>
                 </div>
-                <div class="badge-tag" style="bottom:8px; right:8px; display:flex; gap:4px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+                <div class="badge-tag">
                     ${personalBadge}
                     ${legalBadge}
                     ${insuranceBadge}
@@ -382,15 +382,20 @@ function renderGarage() {
                 </div>
             </div>
             
-            <div class="flex-between mb-1">
+            <div class="flex-between mb-2">
                 <div>
-                    <h4 class="font-bold">${cName}</h4>
-                    <div class="sub-label">${cPower} л.с. | Пробег: ${(car.mileage || 85000).toLocaleString()} км | Кузов: ${car.condition || 80}%</div>
+                    <h4 class="font-bold text-xs color-cyan" style="font-size:14px;">${cName}</h4>
                 </div>
-                <div class="text-right">
-                    <span class="text-xs color-green font-bold">ОЦЕНКА:</span>
-                    <div class="price-val text-xs">${cPrice} ₽</div>
+                <div class="price-val text-xs text-right color-green" style="font-size:15px;">
+                    ${cPrice} ₽
                 </div>
+            </div>
+
+            <!-- МИКРО-ПЛИТКИ ПАРАМЕТРОВ (SPEC GRID) -->
+            <div class="car-spec-chips-row mb-2">
+                <div class="car-spec-chip"><i class="fa-solid fa-bolt color-amber"></i> <b>${cPower}</b> л.с.</div>
+                <div class="car-spec-chip"><i class="fa-solid fa-road color-cyan"></i> <b>${(car.mileage || 85000).toLocaleString()}</b> км</div>
+                <div class="car-spec-chip"><i class="fa-solid fa-shield color-green"></i> <b>${car.condition || 80}%</b> кузов</div>
             </div>
 
             <div class="car-mods-badges-container mb-2">
@@ -435,7 +440,7 @@ function renderCarModsBadges(car) {
     if (car.rolledOdometer) badges.push(`<span class="mod-pill color-red" title="Скрученный одометр"><i class="fa-solid fa-clock-rotate-left"></i> Скручен</span>`);
 
     if (badges.length === 0) {
-        return `<span class="sub-label" style="font-size:9px; opacity:0.6;"><i class="fa-solid fa-car"></i> Заводской сток</span>`;
+        return `<span class="stock-badge-pill"><i class="fa-solid fa-car"></i> Заводской сток</span>`;
     }
 
     return badges.join(' ');
