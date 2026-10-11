@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v0.4.5</title>
-    <link rel="stylesheet" href="style.css?v=155">
+    <link rel="stylesheet" href="style.css?v=156">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -334,7 +334,6 @@
             <button onclick="bigCharityDonate()" class="btn btn-green w-full">🕊 Меценатство 100,000 ₽ (+25 Кармы)</button>
           </div>
 
-          <!-- СУТОЧНЫЙ ЦИКЛ РЕАЛЬНОГО ВРЕМЕНИ -->
           <div class="glass-card flex-between mb-3">
             <div>
               <h3 class="font-bold color-cyan"><i class="fa-solid fa-clock"></i> Суточный цикл (Реальное время)</h3>
@@ -370,7 +369,6 @@
             <h3 id="profileTgUsername">Перекуп #777</h3>
             <p class="sub-label mb-2" id="profPlayerRank">Статус: Гаражный Делец</p>
             
-            <!-- ВЫБОР ЯЗЫКА В ПРОФИЛЕ -->
             <div class="p-2 mb-3 flex-between" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
               <span class="text-xs font-bold"><i class="fa-solid fa-language color-cyan"></i> Язык игры / Language:</span>
               <div class="flex-gap">
@@ -466,13 +464,13 @@
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Илья Чепиль (DXF) & Perekup Dev Team</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10px;">Версия клиента: v0.4.5 (Сборка #155)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10px;">Версия клиента: v0.4.5 (Сборка #156)</div>
         
         <div class="space-y-2 mb-3" style="max-height: 280px; overflow-y: auto; padding-right: 4px;">
           <div class="patch-item">
             <b class="text-xs color-green">🏷️ Динамическая стоимость госномеров:</b>
             <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Установка красивых, архивных и спецсерийных знаков (777, ЕКХ, АМР, 001-007, одинаковые буквы) моментально повышает рыночную оценку авто на точную стоимость знака. Снятие на транзиты возвращает базовую цену кузова.
+              Установка красивых, архивных и спецсерийных знаков (777, ЕКХ, АМР, 001-007, одинаковые буквы) моментально повышает рыночную оценку авто на точную стоимость знака. Снятие на транзиты возвращает базовую цену кузова[span_6](start_span)[span_6](end_span).
             </div>
           </div>
 
@@ -486,14 +484,14 @@
           <div class="patch-item">
             <b class="text-xs color-purple">🕵️‍♂️ Синдикат с 7 уровня и диагностика:</b>
             <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Доступ открывается с 7 уровня, но требует жесткой экипировки: видеоэндоскоп, любой толщиномер, сканер Launch и не менее 5 Stars ⭐ на балансе.
+              Доступ открывается с 7 уровня, но требует жесткой экипировки: видеоэндоскоп, любой толщиномер, сканер Launch и не менее 5 Stars ⭐ на балансе[span_7](start_span)[span_7](end_span).
             </div>
           </div>
 
           <div class="patch-item">
             <b class="text-xs color-cyan">🎰 Супер Вилспин & Антифарм в Дрифте:</b>
             <div class="sub-label mt-1" style="font-size: 10px; line-height: 1.4;">
-              Супер Вилспин получил 1 бесплатный запуск в реальные сутки и сбалансированный лут. Заезды на треке получили физический износ шин, сцепления и перегрев ДВС с кулдауном.
+              Супер Вилспин получил 1 бесплатный запуск в реальные сутки и сбалансированный лут[span_8](start_span)[span_8](end_span). Заезды на треке получили физический износ шин, сцепления и перегрев ДВС с кулдауном.
             </div>
           </div>
 
@@ -626,7 +624,7 @@
           <h4 class="color-cyan font-bold"><i class="fa-solid fa-shield-halved"></i> Автострахование</h4>
           <button onclick="closeModal('modalInsurance')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
-        <p class="sub-label mb-2">Защитите авто от ночных ударов на парковке, подстав и попыток угона.</p>
+        <p class="sub-label mb-2">Защитите авто от ночных ударов на парковке, подстав и попыток угона[span_9](start_span)[span_9](end_span).</p>
         <div class="p-2 mb-3" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
           <div class="text-xs sub-label">Автомобиль:</div>
           <b class="color-cyan text-xs" id="insureCarTitle">-</b>
@@ -686,7 +684,7 @@
       <div class="modal-box text-center">
         <div style="font-size:48px; margin-bottom:10px;">💥</div>
         <h3 class="color-red font-bold mb-2">АВТО-ПОДСТАВА!</h3>
-        <p class="sub-label mb-3">Вас намеренно притер черный седан без номеров. Из машины вышли агрессивные люди и требуют возместить ущерб на месте.</p>
+        <p class="sub-label mb-3">Вас намеренно притер черный седан без номеров. Из машины вышли агрессивные люди и требуют возместить ущерб на месте[span_10](start_span)[span_10](end_span).</p>
         <div class="space-y-2 mb-3">
           <button onclick="resolvePodstava('pay')" class="btn btn-dark w-full" id="podstavaBtnPay">Заплатить 150,000 ₽ на месте</button>
           <button onclick="resolvePodstava('reshala')" class="btn btn-purple w-full">Звонок Решале (1 🤝 Связь)</button>
@@ -779,7 +777,7 @@
           </div>
         </div>
         <div class="chat-thread-container mb-2" id="dealChatThread">
-          <div class="chat-msg msg-seller" id="dealSellerMessage">«Алло, да, продаю. Машина в порядке, сел и поехал.»</div>
+          <div class="chat-msg msg-seller" id="dealSellerMessage">«Алло, да, продаю. Машина в порядке, сел и поехал.»[span_11](start_span)[span_11](end_span)</div>
         </div>
         <div id="dealHaggleArea" class="mb-2"></div>
         <div class="grid-2">
@@ -811,7 +809,7 @@
           </div>
         </div>
         <div class="chat-thread-container mb-2" id="saleHaggleChatThread">
-          <div class="chat-msg msg-seller" id="saleBuyerGreetingMsg">«Машина интересная. Но цену надо обсудить...»</div>
+          <div class="chat-msg msg-seller" id="saleBuyerGreetingMsg">«Машина интересная. Но цену надо обсудить...»[span_12](start_span)[span_12](end_span)</div>
         </div>
         <div class="risk-meter-box mb-2">
           <div class="flex-between text-xs">
@@ -823,8 +821,8 @@
           </div>
         </div>
         <div class="space-y-2 mb-3">
-          <button onclick="attemptHaggleSale('safe')" class="btn btn-dark w-full">🛡 Обосновать по кузову (+2% | Риск 20%)</button>
-          <button onclick="attemptHaggleSale('firm')" class="btn btn-dark w-full">🔥 Давить на эксклюзив (+6% | Риск 50%)</button>
+          <button onclick="attemptHaggleSale('safe')" class="btn btn-dark w-full">🛡 Обосновать по кузову (+2% | Риск 20%)[span_13](start_span)[span_13](end_span)</button>
+          <button onclick="attemptHaggleSale('firm')" class="btn btn-dark w-full">🔥 Давить на эксклюзив (+6% | Риск 50%)[span_14](start_span)[span_14](end_span)</button>
         </div>
         <div class="grid-2">
           <button onclick="confirmSaleFromHaggleModal()" class="btn btn-green">Продать по текущей 🤝</button>
@@ -1062,17 +1060,17 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- ПОСЛЕДОВАТЕЛЬНОЕ ПОДКЛЮЧЕНИЕ ВСЕХ МОДУЛЕЙ -->
-    <script src="data.js?v=155"></script>
-    <script src="app.js?v=155"></script>
-    <script src="phone.js?v=155"></script>
-    <script src="market.js?v=155"></script>
-    <script src="garage.js?v=155"></script>
-    <script src="salesLot.js?v=155"></script>
-    <script src="life.js?v=155"></script>
-    <script src="street.js?v=155"></script>
-    <script src="syndicate.js?v=155"></script>
-    <script src="firebase-bridge.js?v=155"></script>
-    <script src="network.js?v=155"></script>
+    <script src="data.js?v=156"></script>
+    <script src="firebase-bridge.js?v=156"></script>
+    <script src="js/street.js?v=156"></script>
+    <script src="js/garage.js?v=156"></script>
+    <script src="js/market.js?v=156"></script>
+    <script src="js/salesLot.js?v=156"></script>
+    <script src="js/life.js?v=156"></script>
+    <script src="js/syndicate.js?v=156"></script>
+    <script src="js/phone.js?v=156"></script>
+    <script src="js/network.js?v=156"></script>
+    <script src="js/app.js?v=156"></script>
 
   </body>
 </html>
