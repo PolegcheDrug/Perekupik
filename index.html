@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v0.6.4</title>
+    <title>Симулятор Перекупа v0.6.7</title>
     
     <!-- Модульные CSS-стили -->
-    <link rel="stylesheet" href="css/base.css?v=270">
-    <link rel="stylesheet" href="css/hud.css?v=270">
-    <link rel="stylesheet" href="css/market.css?v=270">
-    <link rel="stylesheet" href="css/phone.css?v=270">
-    <link rel="stylesheet" href="css/modals.css?v=270">
-    <link rel="stylesheet" href="css/nav.css?v=270">
+    <link rel="stylesheet" href="css/base.css?v=275">
+    <link rel="stylesheet" href="css/hud.css?v=275">
+    <link rel="stylesheet" href="css/market.css?v=275">
+    <link rel="stylesheet" href="css/phone.css?v=275">
+    <link rel="stylesheet" href="css/modals.css?v=275">
+    <link rel="stylesheet" href="css/nav.css?v=275">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -27,7 +27,7 @@
         <div class="hud-card hud-top-row">
           
           <!-- Левая зона: Аватар и капсула никнейма с опытом -->
-          <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль">
+          <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль и аналитику">
             <div class="avatar-ring">
               <div class="avatar-glow"></div>
               <div class="avatar-fx-glow"></div>
@@ -145,7 +145,7 @@
               </button>
             </div>
 
-            <!-- СЕТКА КЛАССОВ (ВКЛЮЧАЯ «ВСЕ КАТЕГОРИИ») -->
+            <!-- СЕТКА КЛАССОВ -->
             <div class="market-categories-grid" id="marketCatListContainer">
               <button onclick="setCategory('all')" id="catBtn-all" class="cat-tile" style="grid-column: span 3; border-color: rgba(0, 242, 254, 0.4) !important;">
                 <div class="cat-tile-icon"><i class="fa-solid fa-layer-group color-cyan"></i></div>
@@ -272,7 +272,7 @@
 
             <!-- ЭКРАН ТЕЛЕФОНА -->
             <div class="phone-screen-content">
-              <!-- ДОМАШНИЙ ЭКРАН С 17 ИКОНКАМИ -->
+              <!-- ДОМАШНИЙ ЭКРАН -->
               <div id="phoneHomeScreen">
                 <div id="phoneBizWidgetContainer" class="mb-2" style="display:none;"></div>
                 <div id="phoneDailyQuestsWidget" class="phone-quests-widget mb-3"></div>
@@ -303,9 +303,10 @@
                     <span class="phone-app-label">Решала</span>
                   </div>
 
+                  <!-- ПРИЛОЖЕНИЕ «ПОДКЛЮЧ» (ЭКС-СИНДИКАТ) -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('syndicate')">
-                    <div class="phone-app-icon bg-purple"><i class="fa-solid fa-globe"></i></div>
-                    <span class="phone-app-label">Синдикат</span>
+                    <div class="phone-app-icon bg-purple"><i class="fa-solid fa-key"></i></div>
+                    <span class="phone-app-label">ПодКлюч</span>
                   </div>
 
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('barn')">
@@ -361,7 +362,7 @@
                     <span class="phone-app-label">Блокнот</span>
                   </div>
 
-                  <!-- 17-Я ИКОНКА: СЕКРЕТНОЕ ПРИЛОЖЕНИЕ DEV -->
+                  <!-- 17-Я ИКОНКА: DEV СТУДИЯ -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('dev')">
                     <div class="phone-app-icon bg-dev-terminal">
                       <i class="fa-solid fa-terminal color-green"></i>
@@ -387,43 +388,9 @@
           <!-- Рендерится через renderLifeScreen() в js/life.js -->
         </section>
 
-        <!-- 6. TAB: ПРОФИЛЬ (ЧИСТЫЙ СТАТУСНЫЙ ЭКРАН) -->
+        <!-- 6. TAB: ПОЛНОСТЬЮ ПЕРЕРАБОТАННЫЙ ПРОФИЛЬ ПЕРЕКУПА С АНАЛИТИКОЙ -->
         <section id="tabProfile" class="tab-screen">
-          <div class="glass-card text-center mb-3">
-            <h3 id="profileTgUsername">Перекуп #777</h3>
-            <p class="sub-label mb-2" id="profPlayerRank">Статус: Гаражный Делец</p>
-            
-            <div class="p-2 mb-3 flex-between" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
-              <span class="text-xs font-bold"><i class="fa-solid fa-language color-cyan"></i> Скин / Язык:</span>
-              <div class="flex-gap">
-                <button onclick="openHudCustomizerModal()" class="btn btn-purple btn-auto btn-sm">🎨 Скин HUD</button>
-                <button onclick="setGameLanguage('ru')" id="btnLangRu" class="btn btn-cyan btn-auto btn-sm">RU</button>
-                <button onclick="setGameLanguage('en')" id="btnLangEn" class="btn btn-dark btn-auto btn-sm">EN</button>
-              </div>
-            </div>
-
-            <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-bolt"></i> Патчноут & Обновление v0.6.4
-            </button>
-            <div class="grid-2 mb-2">
-              <div class="stat-box"><div class="sub-label">Плюс:</div><div id="statProfitable" class="stat-value color-green">0</div></div>
-              <div class="stat-box"><div class="sub-label">Минус:</div><div id="statLoss" class="stat-value color-red">0</div></div>
-            </div>
-            <div class="grid-2 mb-3">
-              <div class="stat-box"><div class="sub-label">Итого:</div><div id="statTotalNetProfit" class="stat-value color-cyan">0 ₽</div></div>
-              <div class="stat-box"><div class="sub-label">Винрейт:</div><div id="statWinrate" class="stat-value color-amber">0%</div></div>
-            </div>
-            <div class="p-2 mb-2" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
-              <div class="flex-between mb-2">
-                <div class="text-xs font-bold color-cyan"><i class="fa-solid fa-cloud-arrow-up"></i> Облачное хранилище</div>
-                <span class="tag-badge bg-tag-green" id="cloudStorageStatus">TG Cloud: Активно</span>
-              </div>
-              <div class="grid-2">
-                <button onclick="syncCloudStorageManual()" class="btn btn-cyan btn-sm"><i class="fa-solid fa-rotate"></i> Синхронизация</button>
-                <button onclick="openSaveManagerModal()" class="btn btn-dark btn-sm"><i class="fa-solid fa-file-export"></i> Резерв</button>
-              </div>
-            </div>
-          </div>
+          <div id="profileDashboardContainer"></div>
         </section>
       </main>
       
@@ -469,16 +436,16 @@
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v0.6.4</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v0.6.7</div>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.6.4 (Сборка #270)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #275 (ПодКлюч & Аналитический Профиль)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>📟 Секретное приложение DEV:</b> Инструменты разработчика и студия перемещены в смартфон с доступом по PIN-коду 0770.</div>
-          <div class="patch-item"><b>✂️ Встроенный кроппер:</b> Возможность обрезать и масштабировать обложки в пропорциях 16:9 прямо с телефона.</div>
-          <div class="patch-item"><b>🟣 Редактирование базы по классам:</b> Редактируйте существующие автомобили игры и сохраняйте их в data.js.</div>
-          <div class="patch-item"><b>🎲 Рандомизатор:</b> Случайная генерация характеристик, номеров и тюнинга в 1 клик.</div>
+          <div class="patch-item"><b>📊 Профиль игрока нового поколения:</b> Полный расчет капитализации активов, винрейт, честные сделки и коллекция ачивок.</div>
+          <div class="patch-item"><b>🔑 Сервис «ПодКлюч»:</b> Заказы разделились на Корчи, Таксопарки и VIP-экспорт. Никаких дубликатов P2P.</div>
+          <div class="patch-item"><b>⚡ Autodrot Marketplace:</b> Полная концентрация свободной P2P торговли машинами, номерами, бизнесом и горячим выкупом.</div>
+          <div class="patch-item"><b>🎡 VIP Колесо Фортуны:</b> Полный фикс черного экрана и плавная векторная отрисовка.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
       </div>
@@ -665,7 +632,7 @@
     <div id="modalSelectContractCar" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-car-side"></i> СИНДИКАТ ПОД КЛЮЧ</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-key"></i> СПЕЦЗАКАЗ «ПОДКЛЮЧ»</div>
           <button onclick="closeModal('modalSelectContractCar')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div id="contractTargetInfo" class="text-xs color-amber mb-2 font-bold"></div>
@@ -1023,10 +990,11 @@
       </div>
     </div>
 
+    <!-- МОДАЛКА ВЫСТАВЛЕНИЯ НА P2P AUTODROT -->
     <div id="modalCreateP2P" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-handshake"></i> ВЫСТАВИТЬ НА P2P</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-handshake"></i> ВЫСТАВИТЬ НА P2P БИРЖУ</div>
           <button onclick="closeModal('modalCreateP2P')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="grid-4 mb-2">
@@ -1046,7 +1014,7 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ (ВКЛЮЧАЯ PHONE-DEV.JS) -->
+    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ -->
     <script>
       (function() {
         const modules = [
@@ -1079,12 +1047,12 @@
         function loadModule(name) {
           return new Promise((resolve) => {
             const s1 = document.createElement('script');
-            s1.src = name + '?v=270';
+            s1.src = name + '?v=275';
             s1.onload = () => resolve(true);
             s1.onerror = () => {
               s1.remove();
               const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=270';
+              s2.src = 'js/' + name + '?v=275';
               s2.onload = () => resolve(true);
               s2.onerror = () => {
                 console.warn('[Loader] Не удалось загрузить ' + name);

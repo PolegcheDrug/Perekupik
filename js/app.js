@@ -1,12 +1,12 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, MODAL MANAGER & CLOUD SYNC (v0.6.6)
+// js/app.js — ЯДРО СИМУЛЯТОРА, ДАШБОРД ПРОФИЛЯ & CLOUD SYNC (v0.6.7)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Единый менеджер модальных окон, мульти-фото авто из папок,
-// уровень комфорта с 15 ур., Telegram Cloud Storage,
-// реактивные депозиты, зарплаты персонала бизнеса и автозакупки.
+// Стильный аналитический профиль игрока (Net Worth, KPI, Винрейт, Ачивки),
+// мульти-фото авто из папок, спецзаказы «ПодКлюч»,
+// Telegram Cloud Storage, реактивные депозиты и бизнес-цикл.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.6.6";
+const CURRENT_GAME_VERSION = "v0.6.7";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -217,7 +217,7 @@ function showToast(msg) {
 }
 
 // ========================================================
-// 4. ИНТЕРАКТИВНЫЙ РЕНДЕР НАГРАД И ЖЕТОНОВ (ВЕРДИКТ)
+// 4. ИНТЕРАКТИВНЫЙ РЕНДЕР НАГРАД И ЖЕТОНОВ
 // ========================================================
 function renderPrizeTokensHTML(items) {
     if (!Array.isArray(items) || items.length === 0) return "";
@@ -302,7 +302,7 @@ function extractPrizesFromText(text) {
         } else if (trimLine.includes('🤝') || trimLine.toLowerCase().includes('связь')) {
             tokens.push({
                 icon: '🤝',
-                title: 'Связи Синдиката',
+                title: 'Связи ПодКлюч',
                 value: trimLine.replace('🤝', '').trim(),
                 desc: 'Решение вопросов с ГИБДД и ДКП',
                 rarity: 'token-purple'
@@ -415,7 +415,7 @@ const DEFAULT_STATE = {
         club: null, karma: 50, streetCred: 100, superSpinTickets: 1,
         freeImpoundPasses: 0,
         phoneWidgetsCollapsed: { biz: false, quests: false },
-        stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0, scandalsAvoided: 0 },
+        stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0, scandalsAvoided: 0, bestSingleMargin: 0 },
         hunger: 80, mood: 85, loanDebt: 0, taxDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
         lastRealDayTimestamp: Date.now(),
         diet: 'shaurma', 
@@ -852,13 +852,6 @@ function applyLanguageToDOM() {
             ? `<i class="fa-solid fa-globe"></i> <span>RU</span>` 
             : `<i class="fa-solid fa-globe"></i> <span>EN</span>`;
     }
-
-    const btnRu = document.getElementById('btnLangRu');
-    const btnEn = document.getElementById('btnLangEn');
-    if (btnRu && btnEn) {
-        btnRu.className = lang === 'ru' ? 'btn btn-cyan btn-auto btn-sm' : 'btn btn-dark btn-auto btn-sm';
-        btnEn.className = lang === 'en' ? 'btn btn-cyan btn-auto btn-sm' : 'btn btn-dark btn-auto btn-sm';
-    }
 }
 
 // ========================================================
@@ -972,7 +965,7 @@ function getTotalGarageSlots() {
 }
 
 // ========================================================
-// 11. ПРОВЕРКА ДОСТУПА К СИНДИКАТУ (7 УРОВЕНЬ + ПРИБОРЫ + 5 ЗВЁЗД)
+// 11. ПРОВЕРКА ДОСТУПА К СЕРВИСУ «ПОДКЛЮЧ»
 // ========================================================
 function checkSyndicateAccessDetails() {
     const lvl = state.player?.level || 1;
@@ -1000,7 +993,7 @@ function checkSyndicateAccessDetails() {
 }
 
 // ========================================================
-// 12. TELEGRAM CLOUD STORAGE & ЧАНКИНГ
+// 12. TELEGRAM CLOUD STORAGE
 // ========================================================
 const CHUNK_SIZE = 2048;
 
@@ -1259,55 +1252,6 @@ function sanitizeState() {
     if (!state.player.toolsWear) {
         state.player.toolsWear = { gauge: 60, gauge_pro: 100, obd: 50, obd_launch: 80, endoscope: 40, compressor: 50, battery_tester: 60 };
     }
-    
-    // Синхронизация расширенной структуры бизнесов
-    if (typeof BUSINESS_DATA !== 'undefined') {
-        if (!state.businesses || state.businesses.length === 0) {
-            state.businesses = JSON.parse(JSON.stringify(BUSINESS_DATA));
-        } else {
-            BUSINESS_DATA.forEach(tBiz => {
-                let existing = state.businesses.find(b => b && b.id === tBiz.id);
-                if (!existing) {
-                    state.businesses.push(JSON.parse(JSON.stringify(tBiz)));
-                } else {
-                    existing.img = tBiz.img;
-                    existing.fallback = tBiz.fallback;
-                    existing.desc = tBiz.desc || existing.desc;
-                    existing.perk = tBiz.perk || existing.perk;
-                    if (!existing.staff) existing.staff = { manager: null, master: null, security: null };
-                    if (!Array.isArray(existing.fleet)) existing.fleet = [];
-                    if (!existing.upgrades) existing.upgrades = { equipment: 0, storage: 0, marketing: 0 };
-                    if (existing.maxStock === undefined) existing.maxStock = 100;
-                }
-            });
-        }
-    }
-
-    if (state.garage && Array.isArray(state.garage)) {
-        state.garage.forEach(car => {
-            if (car && !car.tuning) {
-                car.tuning = { chip: 0, exhaust: false, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 };
-            }
-            if (car && car.insurance === undefined) car.insurance = null;
-            if (car && car.isPersonal === undefined) car.isPersonal = false;
-            if (car && car.isRegisteredOnPlayer === undefined) car.isRegisteredOnPlayer = true;
-            if (car && car.ownershipDays === undefined) car.ownershipDays = 0;
-            if (car && car.engineTemp === undefined) car.engineTemp = 90;
-            if (car && car.tireWear === undefined) car.tireWear = 100;
-
-            if (typeof recalculateCarMarketValue === 'function') {
-                recalculateCarMarketValue(car);
-            }
-        });
-    }
-
-    if (!Array.isArray(state.marketFeed) || state.marketFeed.length === 0 || !state.marketFeed.some(c => c && !c.unavailable)) {
-        state.marketFeed = [];
-    }
-
-    if (!state.marketModifiers) {
-        state.marketModifiers = { economy: 1, comfort: 1, premium: 1, hyper: 1, moto: 1, truck: 1, all: 1 };
-    }
 }
 
 function saveState() {
@@ -1428,9 +1372,6 @@ function importSaveCodeAction() {
     }
 }
 
-// ========================================================
-// 13. ДИНАМИЧЕСКИЕ ТРЕНДЫ АВТОРЫНКА (MARKET NEWS)
-// ========================================================
 function triggerMarketNewsEvent() {
     if (typeof MARKET_NEWS_EVENTS === 'undefined' || MARKET_NEWS_EVENTS.length === 0) return;
     const ev = MARKET_NEWS_EVENTS[Math.floor(Math.random() * MARKET_NEWS_EVENTS.length)];
@@ -1455,9 +1396,6 @@ function triggerMarketNewsEvent() {
     showToast(`📰 Свежие новости рынка: ${ev.title}`);
 }
 
-// ========================================================
-// 14. СМЕНА СУТОК В РЕАЛЬНОМ ВРЕМЕНИ (ПОЛНОЧЬ 00:00)
-// ========================================================
 function checkRealTimeDayChange() {
     const now = new Date();
     const lastDate = new Date(state.player.lastRealDayTimestamp || Date.now());
@@ -1479,72 +1417,20 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.expressTickets = state.player.maxExpressTickets || 25;
     state.player.consecutiveRaces = 0;
 
-    // 1. Новости рынка
     if (typeof MARKET_NEWS_EVENTS !== 'undefined' && Math.random() < 0.35) {
         triggerMarketNewsEvent();
-    } else {
-        if (state.marketModifiers) {
-            ['economy', 'comfort', 'premium', 'hyper', 'moto', 'truck', 'all'].forEach(k => {
-                if (state.marketModifiers[k]) {
-                    if (state.marketModifiers[k] > 1.0) state.marketModifiers[k] = Math.max(1.0, state.marketModifiers[k] - 0.05);
-                    if (state.marketModifiers[k] < 1.0) state.marketModifiers[k] = Math.min(1.0, state.marketModifiers[k] + 0.05);
-                }
-            });
-        }
     }
 
-    // 2. Кредиты
     if (state.player.loanDebt > 0) {
         state.player.loanDebt = Math.round(state.player.loanDebt * 1.02);
-        if (state.player.phoneMessages) {
-            state.player.phoneMessages.unshift({
-                id: "sms_bank_loan_" + Date.now(),
-                sender: "💳 Во-Банк Онлайн",
-                avatar: "🏦",
-                preview: `Начислен % по кредиту. Текущий долг: ${state.player.loanDebt.toLocaleString()} ₽`,
-                time: "00:00",
-                unread: true,
-                chatHistory: [{ from: "them", text: `Ежедневный процент (2%) по кредиту начислен. Просим своевременно вносить платежи.` }]
-            });
-        }
     }
 
-    // 3. Криптовалюты
-    if (state.player.crypto) {
-        let btcChange = 0.90 + Math.random() * 0.25;
-        let ethChange = 0.85 + Math.random() * 0.35;
-        state.player.crypto.prices.btc = Math.round((state.player.crypto.prices.btc || 9500000) * btcChange);
-        state.player.crypto.prices.eth = Math.round((state.player.crypto.prices.eth || 340000) * ethChange);
-        
-        if (Array.isArray(state.player.crypto.staked)) {
-            state.player.crypto.staked.forEach(st => {
-                if (st.daysLeft > 0) st.daysLeft -= 1;
-            });
-        }
-    }
-
-    // 4. Сейф (+3%)
     if (state.player.safeDeposit > 0) {
         let percentEarned = Math.round(state.player.safeDeposit * 0.03);
         state.player.safeDeposit += percentEarned;
         spawnFloatingReward(`+${percentEarned.toLocaleString()} ₽ в сейфе`);
-
-        if (state.player.phoneMessages) {
-            state.player.phoneMessages.unshift({
-                id: "sms_bank_" + Date.now(),
-                sender: "💳 Во-Банк Онлайн",
-                avatar: "🏦",
-                preview: `Капитализация сейфа: +${percentEarned.toLocaleString()} ₽!`,
-                time: "00:01",
-                unread: true,
-                chatHistory: [
-                    { from: "them", text: `Начислен ежедневный процент на сейф: +${percentEarned.toLocaleString()} ₽.` }
-                ]
-            });
-        }
     }
 
-    // 5. Вклады
     if (Array.isArray(state.player.bankDeposits)) {
         state.player.bankDeposits.forEach(dep => {
             dep.daysPassed = (dep.daysPassed || 0) + 1;
@@ -1559,155 +1445,19 @@ function executeDayCycleMidnight(currentDateObj) {
         });
     }
 
-    // 6. Ипотека
-    if (state.player.mortgage) {
-        let m = state.player.mortgage;
-        let installment = Math.round(m.debtAmount * 0.05);
-        if (state.player.cash >= installment) {
-            state.player.cash -= installment;
-            m.debtAmount = Math.max(0, m.debtAmount - installment);
-            if (m.debtAmount === 0) {
-                state.player.mortgage = null;
-                showToast("🎉 Ипотека на недвижимость полностью погашена!");
-            }
-        } else {
-            state.player.mood = Math.max(0, (state.player.mood || 80) - 25);
-            showToast("⚠️ Просрочен ипотечный платёж в Во-Банке!");
-        }
-    }
-
-    // 7. Аренда жилья
-    let curId = state.player?.housingId || 'trailer';
-    let isOwn = state.player?.ownedHouses?.includes(curId);
-    let activeHouseObj = null;
-
-    if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
-        activeHouseObj = HOUSING_LIST.find(item => item.id === curId);
-        if (!isOwn) {
-            let rentVal = activeHouseObj ? (activeHouseObj.rent || 800) : 800;
-            state.player.cash = Math.max(0, (state.player.cash || 0) - rentVal);
-        }
-    }
-
-    let baseHousingMoodBonus = activeHouseObj ? (activeHouseObj.moodBonus || 0) : 0;
-    state.player.mood = Math.max(10, Math.min(100, (state.player.mood || 85) + baseHousingMoodBonus));
-
-    if (state.player.policeImmunityDays > 0) {
-        state.player.policeImmunityDays -= 1;
-    }
-
-    // 8. РАСЧЁТ БИЗНЕС-СЕТИ: ДОХОДЫ, ЗАРПЛАТЫ И СЫРЬЁ
-    let totalSalariesPaid = 0;
-    if (state.businesses) {
-        const staffCat = typeof BUSINESS_STAFF_CATALOG !== 'undefined' ? BUSINESS_STAFF_CATALOG : { managers: [], masters: [], security: [] };
-
-        state.businesses.forEach(b => {
-            if (b && b.level > 0) {
-                // Выплата зарплат персоналу точки
-                if (b.staff) {
-                    ['manager', 'master', 'security'].forEach(role => {
-                        let staffId = b.staff[role];
-                        if (staffId) {
-                            let roleArr = role === 'manager' ? staffCat.managers : (role === 'master' ? staffCat.masters : staffCat.security);
-                            let employee = roleArr.find(e => e.id === staffId);
-                            if (employee && employee.salary) {
-                                let sal = employee.salary;
-                                if (b.stored >= sal) {
-                                    b.stored -= sal;
-                                    totalSalariesPaid += sal;
-                                } else if (state.player.cash >= sal) {
-                                    state.player.cash -= sal;
-                                    totalSalariesPaid += sal;
-                                } else {
-                                    b.staff[role] = null; // Увольнение за невыплату
-                                    showToast(`⚠️ ${employee.name} уволился из «${b.name}» из-за задержки зарплаты!`);
-                                }
-                            }
-                        }
-                    });
-                }
-
-                // Авто-закупка сырья менеджером
-                let hasAutoManager = false;
-                let restockDiscount = 0;
-                if (b.staff?.manager) {
-                    let mgr = staffCat.managers.find(m => m.id === b.staff.manager);
-                    if (mgr && mgr.autoRestock) {
-                        hasAutoManager = true;
-                        restockDiscount = mgr.restockDiscount || 0;
-                    }
-                }
-
-                let maxStk = b.maxStock || 100;
-                if (hasAutoManager && (b.stock || 0) <= Math.round(maxStk * 0.15)) {
-                    let buyCost = Math.round(15000 * (1 - restockDiscount));
-                    if (b.stored >= buyCost) {
-                        b.stored -= buyCost;
-                        b.stock = maxStk;
-                    } else if (state.player.cash >= buyCost) {
-                        state.player.cash -= buyCost;
-                        b.stock = maxStk;
-                    }
-                }
-
-                // Списание сырья и начисление кассы
-                if ((b.stock || 0) > 0) {
-                    let masterSavePct = 0;
-                    if (b.staff?.master) {
-                        let mst = staffCat.masters.find(m => m.id === b.staff.master);
-                        if (mst && mst.stockSavePct) masterSavePct = mst.stockSavePct;
-                    }
-                    let stockDrop = Math.max(5, Math.round(15 * (1 - (masterSavePct / 100))));
-                    b.stock = Math.max(0, b.stock - stockDrop);
-
-                    let calcInc = (typeof AppBusiness !== 'undefined' && typeof AppBusiness.calculateBusinessIncome === 'function')
-                        ? AppBusiness.calculateBusinessIncome(b)
-                        : (b.income * b.level);
-                    b.stored = (b.stored || 0) + calcInc;
-                }
-            }
-        });
-    }
-
-    if (totalSalariesPaid > 0) {
-        showToast(`💼 Выплачены зарплаты персоналу филиалов: -${totalSalariesPaid.toLocaleString()} ₽`);
-    }
-
-    // 9. Автопарк
-    if (state.garage) {
-        state.garage.forEach(car => {
-            if (car) {
-                car.ownershipDays = (car.ownershipDays || 0) + 1;
-                car.engineTemp = 90;
-            }
-        });
-    }
-
     state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
     state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
     refreshDailyQuestsList();
 
-    if (typeof triggerHousingRandomEvent === 'function') {
-        triggerHousingRandomEvent();
-    }
-    if (typeof triggerGarageRandomEvent === 'function') {
-        triggerGarageRandomEvent();
-    }
-
     saveState();
     updateHeaderUI();
-    if (typeof PhoneManager !== 'undefined') {
-        PhoneManager.renderDailyQuestsWidget();
-        PhoneManager.renderBusinessWidget();
-        PhoneManager.updateUnreadBadge();
-    }
     showToast("Наступил новый день 🌙 Суточные лимиты, кассы и зарплаты обновлены!");
     playSound('win');
     tgHaptic('success');
 }
 
 // ========================================================
-// 15. UI И РЕСУРСЫ
+// 13. UI И ДАШБОРД ПРОФИЛЯ
 // ========================================================
 function updateHeaderUI() {
     let cash = state.player?.cash || 0;
@@ -1768,25 +1518,9 @@ function updateHeaderUI() {
     } else {
         setTxt('garageHeaderSlots', `${gLen}/${totalSlots} ⛺`);
     }
-    
-    const slotCost = getGarageSlotCost();
-    const btnSlot = document.getElementById('btnBuyGarageSlot');
-    if (btnSlot) btnSlot.innerText = "+1 Бокс (" + (slotCost / 1000).toFixed(0) + "k ₽)";
 
     applyHudCustomization();
-    updateRaceHeatBadge();
     if (typeof PhoneManager !== 'undefined') PhoneManager.updateUnreadBadge();
-}
-
-function updateRaceHeatBadge() {
-    const heatBadge = document.getElementById('raceHeatBadge');
-    if (!heatBadge) return;
-    const curRaces = state.player?.consecutiveRaces || 0;
-    const maxRaces = state.player?.maxRacesBeforeRaid || 12;
-    heatBadge.innerText = "Внимание ДПС: " + curRaces + "/" + maxRaces;
-    if (curRaces >= maxRaces - 2) heatBadge.className = "tag-badge bg-tag-red";
-    else if (curRaces >= Math.floor(maxRaces / 2)) heatBadge.className = "tag-badge bg-tag-amber";
-    else heatBadge.className = "tag-badge bg-tag-green";
 }
 
 function updateLevelGatesUI() {
@@ -1911,257 +1645,202 @@ function claimDailyReward() {
 }
 
 // ========================================================
-// 16. МАГАЗИН ПЕРЕКУПА
-// ========================================================
-function switchShopSection(section) {
-    ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
-        const sec = document.getElementById('shopSec-' + s);
-        const btn = document.getElementById('shopTab-' + s);
-        if (sec) sec.style.display = (s === section) ? 'block' : 'none';
-        if (btn) {
-            btn.className = (s === section) ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
-        }
-    });
-
-    if (section === 'tools') renderShopTools();
-    if (section === 'consumables') renderShopConsumables();
-    if (section === 'tuningParts') renderShopTuningParts();
-    if (section === 'homeItems') renderShopHomeItems();
-}
-
-function renderShopTools() {
-    const box = document.getElementById('shopToolsList');
-    if (!box) return;
-    const tools = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.tools) ? SHOP_CATALOG.tools : [];
-
-    let html = "";
-    tools.forEach(t => {
-        let isOwned = !!(state.player.tools && state.player.tools[t.id]);
-        let wear = (state.player.toolsWear && state.player.toolsWear[t.id] !== undefined) ? state.player.toolsWear[t.id] : (t.maxUses || 50);
-        let maxUses = t.maxUses || 50;
-
-        let actionBlock = "";
-        if (!isOwned) {
-            let starsTxt = t.reqStars ? ` + ${t.reqStars} ⭐` : "";
-            actionBlock = `<button onclick="buyToolAction('${t.id}', ${t.cost}, ${t.reqStars || 0})" class="btn btn-cyan btn-sm btn-auto">${t.cost.toLocaleString()} ₽${starsTxt}</button>`;
-        } else {
-            let wearClass = wear < 15 ? "color-red" : "color-green";
-            actionBlock = `
-                <div style="text-align:right;">
-                    <div class="sub-label mb-1" style="font-size:9.5px;">Ресурс: <b class="${wearClass}">${wear} / ${maxUses}</b></div>
-                    <button onclick="calibrateToolAction('${t.id}', ${t.serviceCost || 3000})" class="btn btn-dark btn-sm btn-auto" ${wear >= maxUses ? 'disabled' : ''}>
-                        Калибровка (${(t.serviceCost || 3000).toLocaleString()} ₽)
-                    </button>
-                </div>
-            `;
-        }
-
-        html += `
-        <div class="glass-card flex-between p-2 mb-2">
-            <div style="flex:1; margin-right:8px;">
-                <b class="text-xs color-cyan"><i class="fa-solid ${t.icon || 'fa-wrench'} mr-1"></i> ${t.name}</b>
-                <div class="sub-label" style="font-size:10px;">${t.desc}</div>
-            </div>
-            ${actionBlock}
-        </div>`;
-    });
-    box.innerHTML = html;
-}
-
-function buyToolAction(toolId, cost, reqStars = 0) {
-    let cash = state.player.cash || 0;
-    let stars = state.player.stars || 0;
-    if (cash < cost) return showToast("Не хватает рублей на покупку прибора!");
-    if (stars < reqStars) return showToast(`Требуется ещё ${reqStars} Stars ⭐!`);
-
-    state.player.cash -= cost;
-    state.player.stars -= reqStars;
-    if (!state.player.tools) state.player.tools = {};
-    if (!state.player.toolsWear) state.player.toolsWear = {};
-
-    state.player.tools[toolId] = true;
-    const template = (SHOP_CATALOG.tools || []).find(t => t.id === toolId);
-    state.player.toolsWear[toolId] = template ? template.maxUses : 50;
-
-    saveState();
-    renderShopTools();
-    if (typeof renderContracts === 'function') renderContracts();
-    playSound('win'); tgHaptic('success');
-    showToast("Прибор куплен и готов к диагностике!");
-}
-
-function calibrateToolAction(toolId, cost) {
-    let cash = state.player.cash || 0;
-    if (cash < cost) return showToast("Не хватает денег на обслуживание прибора!");
-    
-    state.player.cash -= cost;
-    const template = (SHOP_CATALOG.tools || []).find(t => t.id === toolId);
-    if (!state.player.toolsWear) state.player.toolsWear = {};
-    state.player.toolsWear[toolId] = template ? template.maxUses : 50;
-
-    saveState();
-    renderShopTools();
-    playSound('win'); tgHaptic('success');
-    showToast("Прибор откалиброван, батарея заряжена до 100%!");
-}
-
-function renderShopConsumables() {
-    const box = document.getElementById('shopConsumablesList');
-    if (!box) return;
-    const packs = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.consumables) ? SHOP_CATALOG.consumables : [];
-
-    let html = "";
-    packs.forEach(p => {
-        let starsTxt = p.reqStars ? ` + ${p.reqStars} ⭐` : "";
-        html += `
-        <div class="glass-card flex-between p-2 mb-2">
-            <div style="flex:1; margin-right:8px;">
-                <b class="text-xs color-amber">${p.name}</b>
-                <div class="sub-label" style="font-size:10px;">${p.desc}</div>
-            </div>
-            <button onclick="buyConsumableAction(${p.cost}, ${p.reqStars || 0}, ${p.value})" class="btn btn-amber btn-sm btn-auto">${p.cost.toLocaleString()} ₽${starsTxt}</button>
-        </div>`;
-    });
-    box.innerHTML = html;
-}
-
-function buyConsumableAction(cost, reqStars, val) {
-    let cash = state.player.cash || 0;
-    let stars = state.player.stars || 0;
-    if (cash < cost) return showToast("Не хватает рублей на сырьё!");
-    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
-
-    state.player.cash -= cost;
-    state.player.stars -= reqStars;
-    if (state.businesses) {
-        state.businesses.forEach(b => {
-            let maxStk = b.maxStock || 100;
-            b.stock = Math.min(maxStk, (b.stock || 0) + val);
-        });
-    }
-    saveState();
-    playSound('win'); tgHaptic('success');
-    showToast("Склады предприятий пополнены сырьем!");
-}
-
-function renderShopTuningParts() {
-    const box = document.getElementById('shopTuningPartsList');
-    if (!box) return;
-    const parts = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.tuningParts) ? SHOP_CATALOG.tuningParts : [];
-
-    let html = "";
-    parts.forEach(p => {
-        let isBought = false;
-        if (p.id === 'raf_license') isBought = !!state.player.hasRacingLicense;
-        let starsTxt = p.reqStars ? ` + ${p.reqStars} ⭐` : "";
-        let btn = isBought
-            ? `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Оформлено ✓</button>`
-            : `<button onclick="buyShopDocAction('${p.id}', ${p.cost}, ${p.reqStars || 0})" class="btn btn-red btn-sm btn-auto">${p.cost.toLocaleString()} ₽${starsTxt}</button>`;
-
-        html += `
-        <div class="glass-card flex-between p-2 mb-2">
-            <div style="flex:1; margin-right:8px;">
-                <b class="text-xs color-red"><i class="fa-solid ${p.icon || 'fa-file'} mr-1"></i> ${p.name}</b>
-                <div class="sub-label" style="font-size:10px;">${p.desc}</div>
-            </div>
-            ${btn}
-        </div>`;
-    });
-
-    html += `
-    <div class="glass-card p-2 text-center sub-label" style="font-size:10px;">
-        💡 Спортивные компоненты покупаются в <b>Гараже</b> под конкретный кузов при наличии смотровой ямы!
-    </div>`;
-
-    box.innerHTML = html;
-}
-
-function buyShopDocAction(docId, cost, reqStars = 0) {
-    let cash = state.player.cash || 0;
-    let stars = state.player.stars || 0;
-    if (cash < cost) return showToast("Не хватает рублей!");
-    if (stars < reqStars) return showToast(`Требуется ${reqStars} Stars ⭐!`);
-
-    state.player.cash -= cost;
-    state.player.stars -= reqStars;
-
-    if (docId === 'raf_license') {
-        state.player.hasRacingLicense = true;
-        openVerdictModal("ЛИЦЕНЗИЯ ПИЛОТА РАФ! 🏎️", "Официальная лицензия оформлена. Доступ к заездам открыт!", true);
-    } else if (docId === 'insurance_osago') {
-        showToast("Полис оформлен! Вы можете активировать его на любой авто в Гараже.");
-    } else if (docId === 'gps_tracker') {
-        showToast("GPS-маяк приобретен в арсенал безопасности!");
-    }
-
-    saveState();
-    renderShopTuningParts();
-    playSound('win');
-    tgHaptic('success');
-}
-
-function renderShopHomeItems() {
-    const box = document.getElementById('shopHomeItemsList');
-    if (!box) return;
-    if (typeof HOUSING_INTERIOR_CATALOG === 'undefined') return;
-    if (!state.player.furniture) state.player.furniture = [];
-
-    let html = "";
-    HOUSING_INTERIOR_CATALOG.forEach(item => {
-        let isBought = state.player.furniture.includes(item.id);
-        let starsTxt = item.reqStars ? ` + ${item.reqStars} ⭐` : "";
-        let btnContent = isBought 
-            ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Куплено ✓</button>"
-            : `<button onclick="buyHomeFurnitureShop('${item.id}', ${item.cost}, ${item.reqStars || 0})" class="btn btn-green btn-sm btn-auto">${(item.cost / 1000).toFixed(0)}k ₽${starsTxt}</button>`;
-
-        html += `
-        <div class="glass-card p-2 flex-between mb-2">
-            <div>
-                <div class="font-bold text-xs color-cyan">${item.name}</div>
-                <div class="sub-label" style="font-size:10px;">${item.perk}</div>
-            </div>
-            ${btnContent}
-        </div>`;
-    });
-    box.innerHTML = html;
-}
-
-function buyHomeFurnitureShop(fId, cost, reqStars = 0) {
-    let cash = state.player?.cash || 0;
-    let stars = state.player?.stars || 0;
-    if (cash < cost) return showToast("Не хватает рублей!");
-    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
-
-    state.player.cash -= cost;
-    state.player.stars -= reqStars;
-    if (!state.player.furniture) state.player.furniture = [];
-    state.player.furniture.push(fId);
-    saveState();
-    renderShopHomeItems();
-    playSound('win'); tgHaptic('success');
-    showToast("Куплено и установлено в вашем жилье!");
-}
-
-// ========================================================
-// 17. АНАЛИТИКА ПРОФИЛЯ
+// 14. ПОЛНОСТЬЮ ПЕРЕРАБОТАННЫЙ АНАЛИТИЧЕСКИЙ ПРОФИЛЬ ПЕРЕКУПА
 // ========================================================
 function renderProfileAnalytics() {
-    let s = state.player?.stats || { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
-    setTxt('statProfitable', s.profitableSales || 0);
-    setTxt('statLoss', s.lossSales || 0);
-    setTxt('statTotalNetProfit', (s.totalNetProfit || 0).toLocaleString() + " ₽");
+    const container = document.getElementById('profileDashboardContainer');
+    if (!container) return;
+
+    let p = state.player || {};
+    let s = p.stats || { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
+    let lvl = p.level || 1;
+
+    // Расчет совокупной капитализации (Net Worth)
+    let totalCash = p.cash || 0;
+    let safeCash = p.safeDeposit || 0;
+    let depositsTotal = 0;
+    if (Array.isArray(p.bankDeposits)) {
+        p.bankDeposits.forEach(d => { depositsTotal += (d.currentAmount || d.principal || 0); });
+    }
+
+    let fleetValuation = 0;
+    if (Array.isArray(state.garage)) {
+        state.garage.forEach(c => {
+            if (c) fleetValuation += (c.marketValue || c.basePrice || 100000);
+        });
+    }
+
+    let realEstateValuation = 0;
+    if (Array.isArray(p.ownedHouses) && typeof HOUSING_LIST !== 'undefined') {
+        p.ownedHouses.forEach(hId => {
+            let h = HOUSING_LIST.find(x => x.id === hId);
+            if (h) realEstateValuation += (h.buyPrice || 0);
+        });
+    }
+
+    let totalNetWorth = Math.round(totalCash + safeCash + depositsTotal + fleetValuation + realEstateValuation);
+
+    // Торговые показатели
     let totalSales = (s.profitableSales || 0) + (s.lossSales || 0);
     let winrate = totalSales > 0 ? Math.round(((s.profitableSales || 0) / totalSales) * 100) : 0;
-    setTxt('statWinrate', winrate + "%");
-    setTxt('profileTgUsername', state.player?.name || "Перекуп #777");
+    let avgMargin = totalSales > 0 ? Math.round((s.totalNetProfit || 0) / totalSales) : 0;
 
-    let lvl = state.player?.level || 1;
-    let rank = lvl >= 50 ? "Автомобильный Олигарх" : (lvl >= 30 ? "Хозяин Авторынка" : (lvl >= 15 ? "Серый Делец" : "Гаражный Перекуп"));
-    setTxt('profPlayerRank', "Статус: " + rank);
+    // Ранг
+    let rankTitle = lvl >= 50 ? "Олигарх Авторынка" : (lvl >= 30 ? "Хозяин Площадки" : (lvl >= 15 ? "Серый Делец" : "Гаражный Перекуп"));
+    let rankColor = lvl >= 50 ? "color-amber" : (lvl >= 30 ? "color-purple" : "color-cyan");
+
+    // Репутация и честность
+    let repRating = (p.bankReputation?.rating || 5.0).toFixed(1);
+    let fairDeals = p.bankReputation?.fairDealsCount || s.profitableSales || 0;
+
+    // Ачивки
+    let goals = (typeof NOTEPAD_CAREER_GOALS !== 'undefined') ? NOTEPAD_CAREER_GOALS : [];
+    let achievementsHtml = goals.slice(0, 4).map(g => {
+        let done = false;
+        if (g.targetProfit && (s.totalNetProfit || 0) >= g.targetProfit) done = true;
+        if (g.targetSales && totalSales >= g.targetSales) done = true;
+        if (g.targetSlots && getTotalGarageSlots() >= g.targetSlots) done = true;
+        if (g.targetHousing && (p.ownedHouses || []).includes(g.targetHousing)) done = true;
+
+        return `
+            <div class="glass-card p-2 text-left" style="border-left: 3px solid ${done ? 'var(--green)' : 'rgba(255,255,255,0.1)'};">
+                <div class="flex-between">
+                    <b class="text-xs ${done ? 'color-green' : 'color-main'}">${g.title}</b>
+                    <span class="tag-badge ${done ? 'bg-tag-green' : 'bg-tag-dark'}">${done ? 'ВЫПОЛНЕНО ✓' : 'В ПРОЦЕССЕ'}</span>
+                </div>
+                <div class="sub-label mt-1" style="font-size:9px;">${g.desc}</div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <!-- 1. VIP ID КАРТА ПЕРЕКУПА -->
+        <div class="glass-card mb-3 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.18), #090e18); border-color: var(--cyan);">
+            <div class="avatar-ring mb-2" style="margin: 0 auto; width: 62px; height: 62px;">
+                <div class="avatar-glow"></div>
+                <div class="avatar-fx-glow"></div>
+                <div class="avatar" style="width: 54px; height: 54px; font-size: 22px;">
+                    <i class="fa-solid fa-user-ninja"></i>
+                </div>
+            </div>
+
+            <h3 class="font-bold text-xs" style="font-size:16px;">${p.name || 'Перекуп #777'}</h3>
+            <div class="sub-label mt-1 font-bold ${rankColor}">${rankTitle} (Уровень ${lvl})</div>
+            
+            <div class="xp-bar-wrap my-2" style="height:6px; max-width:240px; margin-left:auto; margin-right:auto;">
+                <div class="xp-bar-fill" style="width: ${Math.min(100, ((p.xp || 0) / (p.maxXp || 120)) * 100)}%;"></div>
+            </div>
+            <div class="sub-label" style="font-size:9px;">Опыт: ${p.xp || 0} / ${p.maxXp || 120} XP</div>
+
+            <div class="flex-between mt-3 pt-2" style="border-top: 1px dashed rgba(255,255,255,0.08);">
+                <button onclick="openHudCustomizerModal()" class="btn btn-purple btn-sm btn-auto" style="font-size:10px;">
+                    🎨 Скин & Эффекты
+                </button>
+                <button onclick="openPatchNotesModal()" class="btn btn-dark btn-sm btn-auto" style="font-size:10px;">
+                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут v0.6.7
+                </button>
+            </div>
+        </div>
+
+        <!-- 2. СВОДКА КАПИТАЛИЗАЦИИ (NET WORTH) -->
+        <div class="glass-card mb-3 p-3" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.14), #090e18); border-color: var(--green);">
+            <div class="flex-between mb-1">
+                <div>
+                    <span class="sub-label" style="font-size:9.5px;">Совокупная капитализация активов:</span>
+                    <div class="price-val color-green" style="font-size:22px;">${totalNetWorth.toLocaleString()} ₽</div>
+                </div>
+                <span class="tag-badge bg-tag-green">NET WORTH</span>
+            </div>
+
+            <div class="grid-2 my-2 text-xs" style="gap:6px;">
+                <div class="p-2" style="background:#090e18; border-radius:8px;">
+                    <span class="sub-label" style="font-size:9px;">Кэш & Банк:</span>
+                    <div class="font-bold color-cyan mt-1">${(totalCash + safeCash + depositsTotal).toLocaleString()} ₽</div>
+                </div>
+                <div class="p-2" style="background:#090e18; border-radius:8px;">
+                    <span class="sub-label" style="font-size:9px;">Оценка автопарка:</span>
+                    <div class="font-bold color-amber mt-1">${fleetValuation.toLocaleString()} ₽</div>
+                </div>
+            </div>
+            <div class="sub-label text-right" style="font-size:9px;">Недвижимость в собственности: <b>${realEstateValuation.toLocaleString()} ₽</b></div>
+        </div>
+
+        <!-- 3. БИЗНЕС-KPI И СТАТИСТИКА СДЕЛОК -->
+        <div class="glass-card mb-3 p-3">
+            <b class="text-xs color-cyan block mb-2"><i class="fa-solid fa-chart-pie mr-1"></i> Бизнес-KPI торговли:</b>
+
+            <div class="grid-2 mb-2">
+                <div class="stat-box">
+                    <div class="sub-label" style="font-size:9px;">Чистый профит:</div>
+                    <div class="stat-value color-green">${(s.totalNetProfit || 0).toLocaleString()} ₽</div>
+                </div>
+                <div class="stat-box">
+                    <div class="sub-label" style="font-size:9px;">Торговый винрейт:</div>
+                    <div class="stat-value color-amber">${winrate}%</div>
+                </div>
+            </div>
+
+            <div class="grid-3 mb-2" style="gap:6px;">
+                <div class="stat-box p-2">
+                    <div class="sub-label" style="font-size:8.5px;">Продано авто:</div>
+                    <b class="text-xs mt-1 block">${totalSales} шт.</b>
+                </div>
+                <div class="stat-box p-2">
+                    <div class="sub-label" style="font-size:8.5px;">Сделок в плюс:</div>
+                    <b class="text-xs color-green mt-1 block">${s.profitableSales || 0}</b>
+                </div>
+                <div class="stat-box p-2">
+                    <div class="sub-label" style="font-size:8.5px;">Сделок в минус:</div>
+                    <b class="text-xs color-red mt-1 block">${s.lossSales || 0}</b>
+                </div>
+            </div>
+
+            <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+                <div>
+                    <b class="text-xs color-green"><i class="fa-solid fa-shield-halved"></i> Рейтинг честности</b>
+                    <div class="sub-label" style="font-size:9px;">Честных продаж: <b>${fairDeals}</b> • Отзывы: <b>⭐ ${repRating}</b></div>
+                </div>
+                <span class="tag-badge bg-tag-green">ПРОВЕРЕН</span>
+            </div>
+        </div>
+
+        <!-- 4. КАРЬЕРНЫЕ ВЕХИ И АЧИВКИ -->
+        <div class="glass-card mb-3 p-3">
+            <div class="flex-between mb-2">
+                <b class="text-xs color-purple"><i class="fa-solid fa-trophy mr-1"></i> Карьерные достижения:</b>
+                <span class="tag-badge bg-tag-purple">Цели</span>
+            </div>
+            <div class="space-y-2">
+                ${achievementsHtml}
+            </div>
+        </div>
+
+        <!-- 5. ОБЛАЧНЫЙ СИНХРОН И РЕЗЕРВ -->
+        <div class="glass-card p-3" style="background:#090e18; border-color:var(--border-glass);">
+            <div class="flex-between mb-2">
+                <div class="flex-gap" style="align-items:center;">
+                    <i class="fa-solid fa-cloud-arrow-up color-cyan"></i>
+                    <b class="text-xs">Синхронизация данных</b>
+                </div>
+                <span class="tag-badge bg-tag-green" id="cloudStorageStatus">TG Cloud: Активно</span>
+            </div>
+            <div class="grid-2 mb-2">
+                <button onclick="syncCloudStorageManual()" class="btn btn-cyan btn-sm">
+                    <i class="fa-solid fa-rotate"></i> Синхронизация
+                </button>
+                <button onclick="openSaveManagerModal()" class="btn btn-dark btn-sm">
+                    <i class="fa-solid fa-file-export"></i> Экспорт кода
+                </button>
+            </div>
+            <button onclick="resetGameData()" class="btn btn-danger btn-sm w-full">
+                <i class="fa-solid fa-trash-can mr-1"></i> Начать игру заново (Wipe)
+            </button>
+        </div>
+    `;
 }
 
 // ========================================================
-// 18. НАВИГАЦИЯ И ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
+// 15. НАВИГАЦИЯ И ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
 // ========================================================
 function switchTab(tabId) {
     try { initAudio(); playSound('tick'); tgHaptic('light'); } catch(e) {}
@@ -2216,7 +1895,7 @@ function checkAutoShowPatchNotes() {
 }
 
 // ========================================================
-// 19. СВАЙП-ЛИСТЕНЕР РЫНКА
+// 16. СВАЙП-ЛИСТЕНЕР РЫНКА
 // ========================================================
 function initMarketScrollListener() {
     const mainContent = document.querySelector('.main-content');
@@ -2262,7 +1941,7 @@ function initMarketScrollListener() {
 }
 
 // ========================================================
-// 20. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ
+// 17. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ
 // ========================================================
 function initApp() {
     initTelegramAuthAndStorage(() => {
@@ -2317,7 +1996,6 @@ setInterval(() => {
 
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
-                // Автозакупка сырья менеджером
                 let hasAutoManager = false;
                 let restockDiscount = 0;
                 if (b.staff?.manager) {
@@ -2334,12 +2012,10 @@ setInterval(() => {
                     if (b.stored >= cost) {
                         b.stored -= cost;
                         b.stock = maxStk;
-                        showToast(`👨‍💼 Управляющий «${b.name}» закупил сырьё из кассы!`);
                         bizUpdated = true;
                     } else if (state.player.cash >= cost) {
                         state.player.cash -= cost;
                         b.stock = maxStk;
-                        showToast(`👨‍💼 Управляющий «${b.name}» закупил сырьё с вашего счёта!`);
                         bizUpdated = true;
                     }
                 }
@@ -2426,7 +2102,6 @@ setInterval(() => {
                     slot.maxTimer = t;
                     slot.timer = t;
                     lotChanged = true;
-                    showToast("🚶‍♂️ Клиент не дождался вас и ушел. Площадка ищет следующего...");
                 }
             }
         }
@@ -2485,11 +2160,5 @@ window.syncCloudStorageManual = syncCloudStorageManual;
 window.resetGameData = resetGameData;
 window.openPatchNotesModal = openPatchNotesModal;
 window.dismissPatchNotesModal = dismissPatchNotesModal;
-window.switchShopSection = switchShopSection;
-window.buyToolAction = buyToolAction;
-window.calibrateToolAction = calibrateToolAction;
-window.buyConsumableAction = buyConsumableAction;
-window.buyShopDocAction = buyShopDocAction;
-window.buyHomeFurnitureShop = buyHomeFurnitureShop;
 window.renderProfileAnalytics = renderProfileAnalytics;
 window.triggerMarketNewsEvent = triggerMarketNewsEvent;

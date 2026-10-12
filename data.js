@@ -1,38 +1,53 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.6.6)
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.6.7)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// База транспорта с поддержкой папок и нескольких фото,
-// разблокировка Комфорта с 15 ур., обновленный Синдикат, Жизнь
-// и полная база из 11 предприятий со штатом, ветками апгрейдов и автопарком.
+// Спецзаказы «ПодКлюч», сектора Колеса Фортуны,
+// расширенная аналитика профиля, база авто и предприятий.
 // ========================================================
 
 const GAME_METADATA = {
-    version: "v0.6.6",
-    build: 272,
+    version: "v0.6.7",
+    build: 275,
     authors: "Tak Toje, Max, Sergo, gemini, Илья Чепиль",
-    releaseDate: "2026-10-15",
+    releaseDate: "2026-10-16",
     patchNotes: [
         {
-            title: "📸 Мульти-фото авто и папки моделей",
-            text: "Каждая модель теперь поддерживает подбор индивидуальных фото из своей папки (например, assets/cars/economy/2101/)."
+            title: "📊 Аналитический дашборд профиля",
+            text: "Полный редизайн экрана профиля: финансовые KPI, торговый винрейт, капитализация активов, индекс добросовестности и карьерные ачивки."
         },
         {
-            title: "🚗 Комфорт-класс с 15 уровня",
-            text: "Класс комфортных иномарок и седанов теперь открывается с 15 уровня авторитета вместо 20."
+            title: "🔑 Сервис спецзаказов «ПодКлюч»",
+            text: "Синдикат преобразован в сервис подбора «ПодКлюч». Удалены дубликаты биржи, добавлены вариативные контракты (Корчи, Корпоративные, Коллекционные, Срочные)."
         },
         {
-            title: "🏢 Расширенная бизнес-империя (11 точек)",
-            text: "Добавлены служба эвакуации, малярный цех Хамелеон, Stage Lab, Автоподбор Pro и Таможенный хаб Порта с персоналом и спецтранспортом."
+            title: "⚡ Полный апгрейд Autodrot",
+            text: "Autodrot стал единым маркетплейсом: P2P техника, редкие госномера, готовый бизнес, недвижимость, горячий выкуп и отзывы покупателей."
         },
         {
-            title: "🏦 Полная переработка Во-Банка",
-            text: "Репутация перекупа перенесена в банк. Внедрен полноценный валютный обменник и гибкая система срочных вкладов с капитализацией."
+            title: "🎡 Фикс Колеса Фортуны",
+            text: "Исправлена отрисовка секторов классического VIP-колеса, устранён пустой чёрный экран на мобильных устройствах."
         }
     ]
 };
 
 // ========================================================
-// 0. ПАЛИТРЫ ЦВЕТА HUD, АНИМАЦИИ НИКНЕЙМА И АВАТАРОК
+// 0. СЕКТОРА КЛАССИЧЕСКОГО КОЛЕСА ФОРТУНЫ (ФИКС БАГА CANVAS)
+// ========================================================
+const WHEEL_SECTORS = [
+    { label: "+100k ₽", type: "cash", amount: 100000, color: "#10b981", textColor: "#000000" },
+    { label: "+15 ⭐", type: "stars", amount: 15, color: "#f59e0b", textColor: "#000000" },
+    { label: "Бак 100 ⛽", type: "fuel", amount: 100, color: "#0284c7", textColor: "#ffffff" },
+    { label: "+200k ₽", type: "cash", amount: 200000, color: "#059669", textColor: "#ffffff" },
+    { label: "+1 🤝 Связь", type: "conn", amount: 1, color: "#9333ea", textColor: "#ffffff" },
+    { label: "+25 🎟️ Талонов", type: "tickets", amount: 25, color: "#06b6d4", textColor: "#000000" },
+    { label: "+300k ₽", type: "cash", amount: 300000, color: "#047857", textColor: "#ffffff" },
+    { label: "+25 ⭐", type: "stars", amount: 25, color: "#d97706", textColor: "#000000" },
+    { label: "Талон ГИБДД 🚔", type: "impound", amount: 1, color: "#e11d48", textColor: "#ffffff" },
+    { label: "💰 ДЖЕКПОТ 1M", type: "jackpot", amount: 1000000, color: "#ffd700", textColor: "#000000" }
+];
+
+// ========================================================
+// 1. ПАЛИТРЫ ЦВЕТА HUD, АНИМАЦИИ НИКНЕЙМА И АВАТАРОК
 // ========================================================
 const HUD_SOLID_COLORS = [
     { id: "lightning", name: "Грозовой неон (Молнии)", hex: "#00f2fe", secondaryHex: "#7928ca", glow: "rgba(0, 242, 254, 0.65)", isLightning: true },
@@ -60,7 +75,7 @@ const AVATAR_EFFECTS_CATALOG = [
     { id: "lightning_shield", name: "Электро-щит Теслы", desc: "Сверкающие дуги молний вокруг аватара перекупа.", cost: 220000, reqStars: 15, className: "avatar-fx-lightning" },
     { id: "neon_breath", name: "Неоновый импульс", desc: "Плавное пульсирующее кольцо с мягким свечением.", cost: 85000, reqStars: 5, className: "avatar-fx-neon-breath" },
     { id: "fire_drift", name: "Огненная аура Дрифта", desc: "Вспышки языков пламени и раскаленный янтарный контур.", cost: 180000, reqStars: 10, className: "avatar-fx-fire" },
-    { id: "gold_halo", name: "Золотой ореол Синдиката", desc: "Премиальное вращающееся кольцо из чистого золота.", cost: 300000, reqStars: 20, className: "avatar-fx-gold" },
+    { id: "gold_halo", name: "Золотой ореол ПодКлюч", desc: "Премиальное вращающееся кольцо из чистого золота.", cost: 300000, reqStars: 20, className: "avatar-fx-gold" },
     { id: "cyber_matrix", name: "Матричный щит", desc: "Вращающиеся шестеренки и цифровой защитный ореол.", cost: 450000, reqStars: 25, className: "avatar-fx-matrix" }
 ];
 
@@ -69,7 +84,7 @@ const HUD_THEMES_CATALOG = [
     { id: "cyber_neon", name: "Cyber Neon", desc: "Бирюзовый неоновый стиль с глубоким контрастным черным фоном.", colorId: "cyan", cost: 0, reqStars: 0, reqLevel: 1 },
     { id: "tokyo_drift", name: "Tokyo Drift", desc: "Агрессивный рубиновый акцент с янтарным свечением.", colorId: "red", cost: 150000, reqStars: 5, reqLevel: 5 },
     { id: "toxic_acid", name: "Toxic Acid", desc: "Ядовитый неоновый лайм уличных нелегальных гонок.", colorId: "green", cost: 250000, reqStars: 8, reqLevel: 8 },
-    { id: "syndicate_gold", name: "Syndicate Gold", desc: "Премиальное золото и рояльный лак высшего ранга.", colorId: "gold", cost: 500000, reqStars: 15, reqLevel: 15 },
+    { id: "syndicate_gold", name: "Prestige Gold", desc: "Премиальное золото и рояльный лак высшего ранга.", colorId: "gold", cost: 500000, reqStars: 15, reqLevel: 15 },
     { id: "carbon_stealth", name: "Stealth Titanium", desc: "Сдержанный матовый титановый минимализм без кричащих тонов.", colorId: "white", cost: 350000, reqStars: 10, reqLevel: 12 }
 ];
 
@@ -80,7 +95,7 @@ const STREET_RACE_ANIM_CONFIG = {
 };
 
 // ========================================================
-// 1. АЛГОРИТМ ОЦЕНКИ БЛАТНЫХ ГОСНОМЕРОВ
+// 2. АЛГОРИТМ ОЦЕНКИ БЛАТНЫХ ГОСНОМЕРОВ
 // ========================================================
 function calculatePlateValue(plateStr) {
     if (!plateStr || typeof plateStr !== 'string') return 0;
@@ -134,7 +149,7 @@ function calculatePlateValue(plateStr) {
 }
 
 // ========================================================
-// 2. СЛОВАРЬ ЛОКАЛИЗАЦИИ
+// 3. СЛОВАРЬ ЛОКАЛИЗАЦИИ
 // ========================================================
 const I18N_TRANSLATIONS = {
     ru: {
@@ -214,7 +229,7 @@ const CAR_FALLBACKS_BY_CATEGORY = {
 };
 
 // ========================================================
-// 3. БАЗА ДАННЫХ АВТОТЕХНИКИ (С ПОДДЕРЖКОЙ ПАПОК И ГАЛЕРЕЙ)
+// 4. БАЗА ДАННЫХ АВТОТЕХНИКИ
 // ========================================================
 const CAR_DATABASE = {
     economy: [
@@ -394,7 +409,7 @@ async function loadExternalCarDatabase(jsonUrl) {
 }
 
 // ========================================================
-// 4. НЕДВИЖИМОСТЬ, БОКСЫ И МАСТЕРСКИЕ
+// 5. НЕДВИЖИМОСТЬ, БОКСЫ И МАСТЕРСКИЕ
 // ========================================================
 const HOUSING_LIST = [
     { 
@@ -723,7 +738,7 @@ const HOUSING_RANDOM_EVENTS = [
 ];
 
 // ========================================================
-// 5. БИЗНЕС-СЕТЬ (11 НАПРАВЛЕНИЙ)
+// 6. БИЗНЕС-СЕТЬ (11 НАПРАВЛЕНИЙ)
 // ========================================================
 const BUSINESS_DATA = [
     { 
@@ -798,14 +813,13 @@ const BUSINESS_DATA = [
     },
     { 
         id: 'customs_hub', name: 'Таможенный хаб Порта', minLevel: 40, income: 25000, level: 0, cost: 5500000, reqStars: 60, stored: 0, stock: 100, 
-        perk: 'Прямые поставки контейнеров и +2 связи Синдиката', 
+        perk: 'Прямые поставки контейнеров и +2 связи ПодКлюч', 
         desc: 'Собственный терминал для таможенной очистки автовозов и контейнеров.',
         img: 'assets/business/hub.jpg',
         fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80'
     }
 ];
 
-// ВЕТКИ АПГРЕЙДОВ ЦЕХА
 const BUSINESS_UPGRADES_BRANCHES = {
     equipment: [
         { name: "Базовый слесарный пост (+15% к выручке)", costMul: 0.35, bonusPct: 15 },
@@ -824,7 +838,6 @@ const BUSINESS_UPGRADES_BRANCHES = {
     ]
 };
 
-// ШТАТ СОТРУДНИКОВ БИЗНЕСА
 const BUSINESS_STAFF_CATALOG = {
     managers: [
         { id: "mgr_junior", name: "Стажёр Денис", salary: 2500, hireCost: 35000, reqStars: 2, incomeBonusPct: 5, autoRestock: false, perkText: "+5% к выручке" },
@@ -839,14 +852,13 @@ const BUSINESS_STAFF_CATALOG = {
     ]
 };
 
-// КОММЕРЧЕСКИЙ АВТОПАРК
 const BUSINESS_FLEET_CATALOG = [
     { id: "fl_gazel", name: "ГАЗель NEXT Фургон", cost: 450000, reqStars: 5, suitableBusinesses: ["wash", "shina", "sto", "detailing", "razborka"], incomeBonusPct: 12, stockCapacityBonus: 50, desc: "Подвоз запчастей и сырья без задержек." },
     { id: "fl_tow", name: "Эвакуатор ГАЗон NEXT", cost: 1200000, reqStars: 12, suitableBusinesses: ["sto", "razborka", "tow_truck"], incomeBonusPct: 25, stockCapacityBonus: 100, desc: "Доставка аварийных машин на СТО и разборку." }
 ];
 
 // ========================================================
-// 6. САРАИ, ВИЛСПИНЫ И МАГАЗИН
+// 7. САРАИ, ВИЛСПИНЫ И МАГАЗИН
 // ========================================================
 const BARN_TIERS_CONFIG = [
     { 
@@ -939,8 +951,8 @@ const SHOP_CATALOG = {
         { id: "gauge", name: "Магнитный толщиномер ЛКП (Базовый)", cost: 35000, reqStars: 0, maxUses: 60, serviceCost: 3500, desc: "Проверяет шпаклёвку и вторичные окрасы. Ресурс: 60 замеров.", icon: "fa-ruler-combined" },
         { id: "gauge_pro", name: "Ультразвуковой толщиномер Pro (Цветмет)", cost: 75000, reqStars: 5, maxUses: 100, serviceCost: 7000, desc: "Точность до 1 мкм. Ресурс батареи и датчика: 100 замеров.", icon: "fa-microchip" },
         { id: "obd", name: "Диагностический автосканер ELM327 Bluetooth", cost: 65000, reqStars: 3, maxUses: 50, serviceCost: 5000, desc: "Считывает коды DTC в ЭБУ. Ресурс: 50 сканирований.", icon: "fa-laptop-code" },
-        { id: "obd_launch", name: "Профессиональный сканер Launch Pro", cost: 180000, reqStars: 10, maxUses: 80, serviceCost: 15000, desc: "Обязателен для Синдиката! Адаптация и глубокий анализ. Ресурс: 80 циклов.", icon: "fa-tablet-screen-button" },
-        { id: "endoscope", name: "HD Видеоэндоскоп мотора с поворотной камерой", cost: 95000, reqStars: 5, maxUses: 40, serviceCost: 9000, desc: "Обязателен для Синдиката! Осмотр цилиндров на задиры. Ресурс: 40 проверок.", icon: "fa-video" },
+        { id: "obd_launch", name: "Профессиональный сканер Launch Pro", cost: 180000, reqStars: 10, maxUses: 80, serviceCost: 15000, desc: "Обязателен для сервиса «ПодКлюч»! Адаптация и глубокий анализ. Ресурс: 80 циклов.", icon: "fa-tablet-screen-button" },
+        { id: "endoscope", name: "HD Видеоэндоскоп мотора с поворотной камерой", cost: 95000, reqStars: 5, maxUses: 40, serviceCost: 9000, desc: "Обязателен для сервиса «ПодКлюч»! Осмотр цилиндров на задиры. Ресурс: 40 проверок.", icon: "fa-video" },
         { id: "compressor", name: "Профессиональный компрессометр", cost: 45000, reqStars: 2, maxUses: 50, serviceCost: 4000, desc: "Замер компрессии цилиндров. Ресурс манометра: 50 замеров.", icon: "fa-gauge-high" },
         { id: "battery_tester", name: "Нагрузочная вилка аккумулятора", cost: 25000, reqStars: 0, maxUses: 60, serviceCost: 2000, desc: "Проверка емкости и пускового тока АКБ. Ресурс: 60 проверок.", icon: "fa-car-battery" }
     ],
@@ -1024,7 +1036,7 @@ const SELLER_ADS_PHRASES = [
 ];
 
 // ========================================================
-// 7. ОБНОВЛЕННЫЙ РАЦИОН И АКТИВНОСТИ ПЕРЕКУПА
+// 8. РАЦИОН И АКТИВНОСТИ ПЕРЕКУПА
 // ========================================================
 const DIETS = [
     { id: 'water', name: 'Вода из кулера', category: 'fast', cost: 0, hunger: 5, mood: -20, desc: 'Бесплатно в боксе, но силы тают на глазах' },
@@ -1118,8 +1130,8 @@ const NOTEPAD_CAREER_GOALS = [
     },
     {
         id: "goal_syndicate_king",
-        category: "Синдикат",
-        title: "Поставщик Синдиката",
+        category: "ПодКлюч",
+        title: "Поставщик ПодКлюч",
         desc: "Выполнить 5 эксклюзивных контрактов под ключ.",
         targetContracts: 5,
         reward: "+5 🤝 Теневых Связей"
@@ -1213,11 +1225,14 @@ const BUYERS_CATALOG = {
 };
 
 // ========================================================
-// 9. КОНТРАКТЫ СИНДИКАТА (С ПРИВЯЗКОЙ К УРОВНЯМ И КЛАССАМ)
+// 9. КОНТРАКТЫ СЕРВИСА «ПОДКЛЮЧ» (РАСШИРЕННОЕ РАЗНООБРАЗИЕ)
 // ========================================================
-const SYNDICATE_CONTRACT_TEMPLATES = [
+const PODKLYUCH_CONTRACT_TEMPLATES = [
+    // --- 1. КОРПОРАТИВНЫЕ И ТАКСОПАРКИ ---
     {
         type: 'taxi_economy',
+        categoryTag: 'fleet',
+        categoryTitle: '🚕 Таксопарк',
         minPlayerLevel: 7,
         maxPlayerLevel: 14,
         requiredUnlockedCategory: 'economy',
@@ -1233,12 +1248,39 @@ const SYNDICATE_CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 120000,
+        rewardBonus: 125000,
         rewardConn: 1,
-        rewardXp: 75
+        rewardXp: 80
     },
     {
+        type: 'comfort_corporate',
+        categoryTag: 'fleet',
+        categoryTitle: '💼 Корпоративный седан',
+        minPlayerLevel: 15,
+        maxPlayerLevel: 29,
+        requiredUnlockedCategory: 'comfort',
+        clientName: "Начальник автоколонны «Альянс»",
+        avatar: "👨‍💼",
+        title: "Седан бизнес-филиала для командировок",
+        desc: "Требуется проверенный седан или хэтчбек класса Комфорт. Мотор от 110 сил, подтвержденный пробег, без криминала.",
+        reqs: {
+            allowedClasses: ['comfort'],
+            minPower: 110,
+            maxMileage: 160000,
+            minCondition: 75,
+            noCriminal: true,
+            noDefects: true
+        },
+        rewardBonus: 290000,
+        rewardConn: 2,
+        rewardXp: 145
+    },
+
+    // --- 2. СПОРТИВНЫЕ ПРОЕКТЫ И КОРЧИ ---
+    {
         type: 'winter_drift_init',
+        categoryTag: 'sport',
+        categoryTitle: '🏎️ Дрифт-проект',
         minPlayerLevel: 7,
         maxPlayerLevel: 14,
         requiredUnlockedCategory: 'economy',
@@ -1255,55 +1297,16 @@ const SYNDICATE_CONTRACT_TEMPLATES = [
             noCriminal: false,
             noDefects: false
         },
-        rewardBonus: 160000,
+        rewardBonus: 170000,
         rewardConn: 1,
-        rewardXp: 85
-    },
-    {
-        type: 'moto_courier',
-        minPlayerLevel: 8,
-        maxPlayerLevel: 14,
-        requiredUnlockedCategory: 'moto',
-        clientName: "Служба экспресс-доставки",
-        avatar: "🛵",
-        title: "Городской двухколесный транспорт",
-        desc: "Заказ на бодрый скутер или легкий мотоцикл в хорошем состоянии для доставки документов.",
-        reqs: {
-            allowedClasses: ['scooter', 'moto'],
-            minPower: 12,
-            minCondition: 70,
-            noCriminal: true,
-            noDefects: true
-        },
-        rewardBonus: 110000,
-        rewardConn: 1,
-        rewardXp: 70
-    },
-    {
-        type: 'comfort_corporate',
-        minPlayerLevel: 15,
-        maxPlayerLevel: 29,
-        requiredUnlockedCategory: 'comfort',
-        clientName: "Начальник автоколонны «Альянс»",
-        avatar: "👨‍💼",
-        title: "Комфортный седан для филиала",
-        desc: "Требуется проверенный седан или хэтчбек класса Комфорт. Мотор от 110 сил, подтвержденный пробег, без криминала.",
-        reqs: {
-            allowedClasses: ['comfort'],
-            minPower: 110,
-            maxMileage: 160000,
-            minCondition: 75,
-            noCriminal: true,
-            noDefects: true
-        },
-        rewardBonus: 280000,
-        rewardConn: 2,
-        rewardXp: 140
+        rewardXp: 90
     },
     {
         type: 'drift_europe_spec',
+        categoryTag: 'sport',
+        categoryTitle: '🏁 Спортивный корч',
         minPlayerLevel: 16,
-        maxPlayerLevel: 29,
+        maxPlayerLevel: 35,
         requiredUnlockedCategory: 'comfort',
         clientName: "Пилот RDS Europe",
         avatar: "🏁",
@@ -1318,12 +1321,63 @@ const SYNDICATE_CONTRACT_TEMPLATES = [
             noCriminal: false,
             noDefects: false
         },
-        rewardBonus: 320000,
+        rewardBonus: 340000,
         rewardConn: 2,
-        rewardXp: 160
+        rewardXp: 165
     },
     {
+        type: 'drag_strip_monster',
+        categoryTag: 'sport',
+        categoryTitle: '🚀 Драг 402м',
+        minPlayerLevel: 25,
+        maxPlayerLevel: 55,
+        requiredUnlockedCategory: 'comfort',
+        clientName: "Капитан команды Drag Masters",
+        avatar: "🔥",
+        title: "Турбо-снаряд для соревнований на 402м",
+        desc: "Требуется доработанный мощный авто с чип-тюнингом не ниже Stage 2 и отдачей от 240 сил без чека.",
+        reqs: {
+            allowedClasses: ['comfort', 'premium'],
+            minPower: 240,
+            minCondition: 70,
+            reqPolishOrChip: true,
+            noCriminal: true,
+            noDefects: true
+        },
+        rewardBonus: 520000,
+        rewardConn: 3,
+        rewardXp: 220
+    },
+
+    // --- 3. СЛУЖБЫ ДОСТАВКИ И КУРЬЕРЫ ---
+    {
+        type: 'moto_courier',
+        categoryTag: 'express',
+        categoryTitle: '🛵 Экспресс-курьер',
+        minPlayerLevel: 8,
+        maxPlayerLevel: 14,
+        requiredUnlockedCategory: 'moto',
+        clientName: "Служба экспресс-доставки",
+        avatar: "🛵",
+        title: "Городской двухколесный транспорт",
+        desc: "Заказ на бодрый скутер или легкий мотоцикл в хорошем состоянии для доставки документов.",
+        reqs: {
+            allowedClasses: ['scooter', 'moto'],
+            minPower: 12,
+            minCondition: 70,
+            noCriminal: true,
+            noDefects: true
+        },
+        rewardBonus: 115000,
+        rewardConn: 1,
+        rewardXp: 75
+    },
+
+    // --- 4. ПРЕМИАЛЬНЫЙ ЭСКОРТ И ДЕПУТАТСКИЕ ГАРАЖИ ---
+    {
         type: 'vip_escort',
+        categoryTag: 'vip',
+        categoryTitle: '🤵 VIP Эскорт',
         minPlayerLevel: 30,
         maxPlayerLevel: 49,
         requiredUnlockedCategory: 'premium',
@@ -1338,12 +1392,16 @@ const SYNDICATE_CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 750000,
+        rewardBonus: 780000,
         rewardConn: 3,
-        rewardXp: 280
+        rewardXp: 290
     },
+
+    // --- 5. ЭКСПОРТ И ЭЛИТНЫЕ КОЛЛЕКЦИИ ---
     {
         type: 'arab_export',
+        categoryTag: 'vip',
+        categoryTitle: '👑 Экспорт Дубай',
         minPlayerLevel: 50,
         maxPlayerLevel: 100,
         requiredUnlockedCategory: 'hyper',
@@ -1359,19 +1417,21 @@ const SYNDICATE_CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 1950000,
+        rewardBonus: 2100000,
         rewardConn: 5,
-        rewardXp: 450
+        rewardXp: 480
     },
     {
         type: 'collector_yacht',
+        categoryTag: 'vip',
+        categoryTitle: '🛥️ Регата Монако',
         minPlayerLevel: 100,
         maxPlayerLevel: 100,
         requiredUnlockedCategory: 'yacht',
         clientName: "Коллекционер из Монако",
         avatar: "🛥️",
         title: "Поставка элитной морской техники",
-        desc: "Закрытый контракт на скоростной катер или премиальную яхту для закрытой регаты Синдиката.",
+        desc: "Закрытый контракт на скоростной катер или премиальную яхту для закрытой регаты ПодКлюч.",
         reqs: {
             allowedClasses: ['yacht'],
             minPower: 250,
@@ -1379,11 +1439,13 @@ const SYNDICATE_CONTRACT_TEMPLATES = [
             noCriminal: true,
             noDefects: true
         },
-        rewardBonus: 3500000,
+        rewardBonus: 3800000,
         rewardConn: 6,
-        rewardXp: 600
+        rewardXp: 650
     }
 ];
+
+const SYNDICATE_CONTRACT_TEMPLATES = PODKLYUCH_CONTRACT_TEMPLATES;
 
 // ========================================================
 // 10. АВТОМЕРОПРИЯТИЯ И ГОНОЧНЫЕ ТРЕКИ
@@ -1429,6 +1491,7 @@ const STREET_EVENTS_DATA = [
 
 // Экспорт в глобальный контекст window
 window.GAME_METADATA = GAME_METADATA;
+window.WHEEL_SECTORS = WHEEL_SECTORS;
 window.HUD_SOLID_COLORS = HUD_SOLID_COLORS;
 window.NICKNAME_EFFECTS_CATALOG = NICKNAME_EFFECTS_CATALOG;
 window.AVATAR_EFFECTS_CATALOG = AVATAR_EFFECTS_CATALOG;
@@ -1461,5 +1524,6 @@ window.DAILY_QUESTS_POOL = DAILY_QUESTS_POOL;
 window.NOTEPAD_CAREER_GOALS = NOTEPAD_CAREER_GOALS;
 window.MARKET_NEWS_EVENTS = MARKET_NEWS_EVENTS;
 window.BUYERS_CATALOG = BUYERS_CATALOG;
+window.PODKLYUCH_CONTRACT_TEMPLATES = PODKLYUCH_CONTRACT_TEMPLATES;
 window.SYNDICATE_CONTRACT_TEMPLATES = SYNDICATE_CONTRACT_TEMPLATES;
 window.STREET_EVENTS_DATA = STREET_EVENTS_DATA;

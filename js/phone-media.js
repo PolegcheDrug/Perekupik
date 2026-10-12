@@ -1,9 +1,9 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО И ФОРТУНА PEREKUP OS (v0.6.1)
+// js/phone-media.js — МЕДИА, РАДИО И ФОРТУНА PEREKUP OS (v0.6.7)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Live-автомагнитола (17 электронных потоков), VIP Колесо Фортуны,
 // неоновый Супер Вилспин с электрическими эффектами барабанов.
-// Обменники валют перенесены в Во-Банк, лавка сфокусирована на вилспинах.
+// Исправлен баг Canvas-отрисовки: больше никакого черного экрана!
 // ========================================================
 
 const ELECTRONIC_RADIO_STATIONS = [
@@ -36,6 +36,10 @@ let isRadioLoading = false;
 let radioVolume = 0.8;
 let radioNetworkFilter = 'all';
 
+// Состояние вращения Колеса Фортуны
+let wheelRotationAngle = 0;
+let isClassicWheelSpinning = false;
+
 function getRecordAudio() {
     if (!recordAudioElement) {
         recordAudioElement = new Audio();
@@ -64,7 +68,7 @@ function getRecordAudio() {
             isRadioPlaying = false;
             isRadioLoading = false;
             updateRadioPlaybackUI();
-            showToast("⚠️ Ошибка соединения с аудиопотоком станции");
+            if (typeof showToast === 'function') showToast("⚠️ Ошибка соединения с аудиопотоком станции");
         });
     }
     return recordAudioElement;
@@ -105,9 +109,13 @@ function updateRadioPlaybackUI() {
         else visualizer.classList.remove('playing');
     }
 
-    setTxt('radioCurrentTrackName', curStation.name);
-    setTxt('radioCurrentGenre', `${curStation.genre} • ${curStation.network}`);
-    setTxt('radioNetworkBadgeText', curStation.network.toUpperCase());
+    const tName = document.getElementById('radioCurrentTrackName');
+    const tGenre = document.getElementById('radioCurrentGenre');
+    const tBadge = document.getElementById('radioNetworkBadgeText');
+
+    if (tName) tName.innerText = curStation.name;
+    if (tGenre) tGenre.innerText = `${curStation.genre} • ${curStation.network}`;
+    if (tBadge) tBadge.innerText = curStation.network.toUpperCase();
 }
 
 const PhoneMedia = {
@@ -213,7 +221,7 @@ const PhoneMedia = {
             audio.pause();
             isRadioPlaying = false;
             isRadioLoading = false;
-            tgHaptic('light');
+            if (typeof tgHaptic === 'function') tgHaptic('light');
             updateRadioPlaybackUI();
         } else {
             isRadioLoading = true;
@@ -229,14 +237,14 @@ const PhoneMedia = {
                 playPromise.then(() => {
                     isRadioPlaying = true;
                     isRadioLoading = false;
-                    tgHaptic('success');
-                    showToast(`📻 В эфире: ${curStation.name}!`);
+                    if (typeof tgHaptic === 'function') tgHaptic('success');
+                    if (typeof showToast === 'function') showToast(`📻 В эфире: ${curStation.name}!`);
                     updateRadioPlaybackUI();
                 }).catch(() => {
                     isRadioPlaying = false;
                     isRadioLoading = false;
                     updateRadioPlaybackUI();
-                    showToast("Нажмите «СЛУШАТЬ» ещё раз");
+                    if (typeof showToast === 'function') showToast("Нажмите «СЛУШАТЬ» ещё раз");
                 });
             }
         }
@@ -263,9 +271,9 @@ const PhoneMedia = {
             });
         }
 
-        tgHaptic('light');
-        playSound('tick');
-        showToast(`Переключено: ${curStation.name}`);
+        if (typeof tgHaptic === 'function') tgHaptic('light');
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof showToast === 'function') showToast(`Переключено: ${curStation.name}`);
         this.renderRadioApp(document.getElementById('phoneAppContainer'));
     },
 
@@ -284,8 +292,8 @@ const PhoneMedia = {
         audio.play().then(() => {
             isRadioPlaying = true;
             isRadioLoading = false;
-            tgHaptic('success');
-            showToast(`Включено: ${curStation.name}`);
+            if (typeof tgHaptic === 'function') tgHaptic('success');
+            if (typeof showToast === 'function') showToast(`Включено: ${curStation.name}`);
             updateRadioPlaybackUI();
         }).catch(() => {
             isRadioPlaying = false;
@@ -305,7 +313,7 @@ const PhoneMedia = {
     },
 
     // ----------------------------------------------------
-    // РЕДИЗАЙН: КЛУБ ФОРТУНЫ & СУПЕР ВИЛСПИН
+    // КЛУБ ФОРТУНЫ & ИСПРАВЛЕННОЕ КОЛЕСО
     // ----------------------------------------------------
     renderFortuneApp(container) {
         let tickets = state.player?.superSpinTickets || 0;
@@ -313,6 +321,8 @@ const PhoneMedia = {
         let pDay = state.player?.day || 1;
         let lastSuperDay = state.player?.lastFreeSuperSpinDay || 0;
         let canFreeSuperSpin = lastSuperDay < pDay;
+        let lastClassicDay = state.player?.lastFreeSpinDay || 0;
+        let canFreeClassic = lastClassicDay < pDay;
         let freeImpound = state.player?.freeImpoundPasses || 0;
 
         container.innerHTML = `
@@ -323,16 +333,16 @@ const PhoneMedia = {
             </div>
             <div class="phone-app-body">
                 
-                <!-- БАННЕР СТАТУСА ПРИЗОВ -->
-                <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(255,179,0,0.12), #090e18); border-color: rgba(255,179,0,0.35);">
+                <!-- БАННЕР ДЖЕКПОТОВ -->
+                <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(255,179,0,0.14), #090e18); border-color: rgba(255,179,0,0.35);">
                     <div>
                         <div class="text-xs font-bold color-amber"><i class="fa-solid fa-sparkles"></i> Джекпоты сезона:</div>
                         <div class="sub-label" style="font-size:9.5px;">Porsche 911 GT3 RS • Номера 777 • Талоны ГИБДД</div>
                     </div>
-                    ${freeImpound > 0 ? `<span class="tag-badge bg-tag-purple"><i class="fa-solid fa-ticket"></i> ${freeImpound} талонов спецстоянки</span>` : `<span class="tag-badge bg-tag-amber">Шанс х3</span>`}
+                    ${freeImpound > 0 ? `<span class="tag-badge bg-tag-purple"><i class="fa-solid fa-ticket"></i> ${freeImpound} талонов штрафстоянки</span>` : `<span class="tag-badge bg-tag-amber">Шанс х3</span>`}
                 </div>
 
-                <!-- 1. СУПЕР ВИЛСПИН: ТРЕХБАРАБАННЫЙ СЛОТ С ЭЛЕКТРИЧЕСКИМ СВЕЧЕНИЕМ -->
+                <!-- 1. СУПЕР ВИЛСПИН -->
                 <div class="glass-card mb-3 p-3 super-spin-showcase-box" style="background: radial-gradient(circle at 50% 0%, #1e1338 0%, #090e18 100%); border: 1.5px solid var(--purple); box-shadow: 0 0 25px rgba(192,132,252,0.35);">
                     <div class="flex-between mb-2">
                         <div>
@@ -376,29 +386,44 @@ const PhoneMedia = {
                     </div>
                 </div>
 
-                <!-- 2. КЛАССИЧЕСКОЕ VIP КОЛЕСО ФОРТУНЫ -->
-                <div class="glass-card text-center mb-3 p-2">
-                    <div class="flex-between mb-1 px-1">
-                        <b class="text-xs color-amber"><i class="fa-solid fa-dharmachakra"></i> Классическое VIP Колесо</b>
+                <!-- 2. КЛАССИЧЕСКОЕ VIP КОЛЕСО ФОРТУНЫ (С ГАРАНТИРОВАННОЙ ОТРИСОВКОЙ ХОЛСТА) -->
+                <div class="glass-card text-center mb-3 p-3" style="background:#090e18; border-color: rgba(255,179,0,0.35);">
+                    <div class="flex-between mb-2">
+                        <b class="text-xs color-amber" style="font-size:13px;"><i class="fa-solid fa-dharmachakra"></i> Классическое VIP Колесо</b>
                         <span class="tag-badge bg-tag-amber">1 Сектор</span>
                     </div>
-                    <div class="wheel-stage-container my-1" style="transform: scale(0.82); margin: 0 auto;">
-                        <div class="wheel-outer-ring">
-                            <canvas id="wheelCanvas" width="560" height="560" class="neon-wheel-canvas"></canvas>
-                            <div class="wheel-center-hub">⭐</div>
+
+                    <div style="position:relative; width: 260px; height: 260px; margin: 0 auto; display:flex; align-items:center; justify-content:center;">
+                        <!-- Стрелка-указатель сверху -->
+                        <div id="wheelPointerTicker" style="position:absolute; top:-8px; left:50%; transform:translateX(-50%); z-index:10; font-size:22px; color:#ffd700; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.8));">
+                            ▼
                         </div>
-                        <div class="wheel-arrow-ticker">▼</div>
+
+                        <!-- Сам холст колеса -->
+                        <canvas id="wheelCanvas" width="520" height="520" style="width:250px; height:250px; border-radius:50%; box-shadow: 0 0 25px rgba(255,215,0,0.25); border: 3px solid #ffd700; background:#070b14;"></canvas>
+
+                        <!-- Центральная втулка -->
+                        <div style="position:absolute; width:44px; height:44px; border-radius:50%; background:radial-gradient(circle, #ffd700, #b45309); border:2px solid #fff; box-shadow: 0 0 10px rgba(0,0,0,0.9); display:flex; align-items:center; justify-content:center; color:#000; font-size:18px; z-index:5;">
+                            ⭐
+                        </div>
                     </div>
-                    <div class="grid-2 mt-1">
-                        <button id="btnWheelFree" onclick="spinWheelAction(true)" class="btn btn-green btn-sm">🎁 Бесплатно (00:00)</button>
-                        <button id="btnWheelPaid" onclick="spinWheelAction(false)" class="btn btn-amber btn-sm">⭐ 30 Stars</button>
+
+                    <div class="grid-2 mt-3">
+                        <button id="btnWheelFree" onclick="PhoneMedia.spinClassicWheel(true)" class="btn btn-green btn-sm" ${!canFreeClassic ? 'disabled' : ''}>
+                            🎁 ${canFreeClassic ? 'Бесплатно (Готово)' : 'Бесплатно (в 00:00)'}
+                        </button>
+                        <button id="btnWheelPaid" onclick="PhoneMedia.spinClassicWheel(false)" class="btn btn-amber btn-sm" ${stars < 30 ? 'disabled' : ''}>
+                            ⭐ 30 Stars
+                        </button>
                     </div>
                 </div>
 
             </div>
         `;
 
-        if (typeof initWheelModule === 'function') initWheelModule();
+        requestAnimationFrame(() => {
+            initWheelModule();
+        });
     },
 
     spinSuperWheelAction() {
@@ -423,8 +448,8 @@ const PhoneMedia = {
         }
 
         this.isSuperSpinning = true;
-        playSound('tick');
-        tgHaptic('medium');
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('medium');
 
         const r1 = document.getElementById('reelTxt1');
         const r2 = document.getElementById('reelTxt2');
@@ -443,7 +468,7 @@ const PhoneMedia = {
             if (r1) r1.innerText = ["ВАЗ-2107", "Талон ГИБДД", "Polo Sedan", "Launch Pro", "+150 XP"][Math.floor(Math.random() * 5)];
             if (r2) r2.innerText = ["150,000 ₽", "Полный Бак", "400,000 ₽", "+80 XP", "25 Талонов"][Math.floor(Math.random() * 5)];
             if (r3) r3.innerText = ["В777ВВ 77", "50 ⭐ Stars", "Stage 2 Чип", "Е777КХ 777", "Штраф"][Math.floor(Math.random() * 5)];
-            playSound('tick');
+            if (typeof playSound === 'function') playSound('tick');
         }, 90);
 
         setTimeout(() => {
@@ -511,7 +536,7 @@ const PhoneMedia = {
                 state.player.freeImpoundPasses = (state.player.freeImpoundPasses || 0) + 1;
                 resText1 = `🚔 Талон бесплатного забора со штрафстоянки получен!`;
             } else if (drop1.type === 'xp_bundle') {
-                addXp(drop1.amount || 150);
+                if (typeof addXp === 'function') addXp(drop1.amount || 150);
                 resText1 = `🎖️ Пакет опыта перекупа (+${drop1.amount || 150} XP)!`;
             } else if (drop1.type === 'tool') {
                 if (!state.player.tools) state.player.tools = {};
@@ -529,7 +554,7 @@ const PhoneMedia = {
                 state.player.cash = (state.player.cash || 0) + drop2.amount;
                 resText2 = `💰 +${drop2.amount.toLocaleString()} ₽`;
             } else if (drop2.type === 'xp') {
-                addXp(drop2.amount || 80);
+                if (typeof addXp === 'function') addXp(drop2.amount || 80);
                 resText2 = `🎖️ +${drop2.amount || 80} XP Опыта`;
             } else if (drop2.type === 'fuel') {
                 state.player.fuel = Math.min(100, (state.player.fuel || 0) + drop2.amount);
@@ -567,81 +592,192 @@ const PhoneMedia = {
             if (r2) r2.innerText = drop2.label;
             if (r3) r3.innerText = drop3.label;
 
-            saveState();
-            updateHeaderUI();
-            playSound('win');
-            tgHaptic('success');
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
 
-            openVerdictModal(
-                "СУПЕР ВИЛСПИН! 🎉",
-                `Результат вращения барабанов:\n\n1. ${resText1}\n2. ${resText2}\n3. ${resText3}`,
-                true
-            );
+            if (typeof openVerdictModal === 'function') {
+                openVerdictModal(
+                    "СУПЕР ВИЛСПИН! 🎉",
+                    `Результат вращения барабанов:\n\n1. ${resText1}\n2. ${resText2}\n3. ${resText3}`,
+                    true
+                );
+            }
 
-            PhoneMedia.renderFortuneApp(document.getElementById('phoneAppContainer'));
-        }, 2400);
+            this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+        }, 2200);
+    },
+
+    spinClassicWheel(isFree) {
+        if (isClassicWheelSpinning) return;
+
+        let stars = state.player?.stars || 0;
+        let pDay = state.player?.day || 1;
+        let lastClassicDay = state.player?.lastFreeSpinDay || 0;
+
+        if (isFree) {
+            if (lastClassicDay >= pDay) return showToast("Бесплатный спин уже использован! Ждите 00:00 🌙");
+            state.player.lastFreeSpinDay = pDay;
+        } else {
+            if (stars < 30) return showToast("Нужно 30 Stars ⭐ для прокрута!");
+            state.player.stars -= 30;
+        }
+
+        isClassicWheelSpinning = true;
+        const btnFree = document.getElementById('btnWheelFree');
+        const btnPaid = document.getElementById('btnWheelPaid');
+        if (btnFree) btnFree.disabled = true;
+        if (btnPaid) btnPaid.disabled = true;
+
+        const sectors = (typeof WHEEL_SECTORS !== 'undefined' && Array.isArray(WHEEL_SECTORS))
+            ? WHEEL_SECTORS
+            : [
+                { label: "+100k ₽", type: "cash", amount: 100000 },
+                { label: "+15 ⭐", type: "stars", amount: 15 },
+                { label: "Бак 100 ⛽", type: "fuel", amount: 100 },
+                { label: "+200k ₽", type: "cash", amount: 200000 },
+                { label: "+1 🤝", type: "conn", amount: 1 },
+                { label: "ДЖЕКПОТ 1M", type: "jackpot", amount: 1000000 }
+            ];
+
+        const targetSectorIndex = Math.floor(Math.random() * sectors.length);
+        const winningSector = sectors[targetSectorIndex];
+
+        const sectorArc = (2 * Math.PI) / sectors.length;
+        // Стрелка находится наверху: 3 * PI / 2 (270 градусов)
+        const targetAngleAtTop = (3 * Math.PI / 2) - (targetSectorIndex * sectorArc + sectorArc / 2);
+        const extraFullSpins = (5 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
+        const finalTargetRotation = wheelRotationAngle + extraFullSpins + ((targetAngleAtTop - (wheelRotationAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI));
+
+        let startTime = Date.now();
+        let spinDuration = 4500;
+        let startRotation = wheelRotationAngle;
+
+        let spinInterval = setInterval(() => {
+            let elapsed = Date.now() - startTime;
+            let progress = Math.min(1, elapsed / spinDuration);
+            // Плавное торможение кубической кривой
+            let easeOut = 1 - Math.pow(1 - progress, 3);
+
+            wheelRotationAngle = startRotation + (finalTargetRotation - startRotation) * easeOut;
+            drawWheelAtAngle(wheelRotationAngle);
+
+            if (Math.random() < 0.25 && typeof playSound === 'function') {
+                playSound('tick');
+            }
+
+            if (progress >= 1) {
+                clearInterval(spinInterval);
+                isClassicWheelSpinning = false;
+                wheelRotationAngle = finalTargetRotation % (2 * Math.PI);
+
+                if (winningSector.type === 'cash' || winningSector.type === 'jackpot') {
+                    state.player.cash = (state.player.cash || 0) + winningSector.amount;
+                } else if (winningSector.type === 'stars') {
+                    state.player.stars = (state.player.stars || 0) + winningSector.amount;
+                } else if (winningSector.type === 'fuel') {
+                    state.player.fuel = 100;
+                } else if (winningSector.type === 'conn') {
+                    state.player.connections = (state.player.connections || 0) + winningSector.amount;
+                } else if (winningSector.type === 'tickets') {
+                    state.player.expressTickets = (state.player.expressTickets || 0) + winningSector.amount;
+                } else if (winningSector.type === 'impound') {
+                    state.player.freeImpoundPasses = (state.player.freeImpoundPasses || 0) + 1;
+                }
+
+                if (typeof saveState === 'function') saveState();
+                if (typeof updateHeaderUI === 'function') updateHeaderUI();
+                if (typeof playSound === 'function') playSound('win');
+                if (typeof tgHaptic === 'function') tgHaptic('success');
+
+                if (typeof openVerdictModal === 'function') {
+                    openVerdictModal("КОЛЕСО ФОРТУНЫ 🎡", `Стрелка остановилась на секторе:\n${winningSector.label}! Приз начислен.`, true);
+                }
+
+                this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+            }
+        }, 16);
     }
 };
 
 // ========================================================
-// ИСПРАВЛЕННАЯ ОТРИСОВКА КОЛЕСА ФОРТУНЫ БЕЗ ПЕРЕВЁРНУТОГО ТЕКСТА
+// НАДЕЖНЫЙ ОТРИСОВЩИК КОЛЕСА ФОРТУНЫ
 // ========================================================
 function initWheelModule() {
-    const cvs = document.getElementById('wheelCanvas');
-    if (!cvs || typeof WHEEL_SECTORS === 'undefined') return;
-    const ctx = cvs.getContext('2d');
-    const totalSectors = WHEEL_SECTORS.length;
-    const arc = (2 * Math.PI) / totalSectors;
-    const cx = 280;
-    const cy = 280;
-    const radius = 270;
+    drawWheelAtAngle(wheelRotationAngle);
+}
 
-    ctx.clearRect(0, 0, 560, 560);
+function drawWheelAtAngle(rotationAngle) {
+    const cvs = document.getElementById('wheelCanvas');
+    if (!cvs) return;
+    const ctx = cvs.getContext('2d');
+    if (!ctx) return;
+
+    const sectors = (typeof WHEEL_SECTORS !== 'undefined' && Array.isArray(WHEEL_SECTORS) && WHEEL_SECTORS.length > 0)
+        ? WHEEL_SECTORS
+        : [
+            { label: "+100k ₽", color: "#10b981", textColor: "#000" },
+            { label: "+15 ⭐", color: "#f59e0b", textColor: "#000" },
+            { label: "Бак 100 ⛽", color: "#0284c7", textColor: "#fff" },
+            { label: "+200k ₽", color: "#059669", textColor: "#fff" },
+            { label: "+1 🤝", color: "#9333ea", textColor: "#fff" },
+            { label: "+25 🎟️", color: "#06b6d4", textColor: "#000" },
+            { label: "+300k ₽", color: "#047857", textColor: "#fff" },
+            { label: "+25 ⭐", color: "#d97706", textColor: "#000" },
+            { label: "Талон ГИБДД 🚔", color: "#e11d48", textColor: "#fff" },
+            { label: "ДЖЕКПОТ 1M", color: "#ffd700", textColor: "#000" }
+        ];
+
+    const totalSectors = sectors.length;
+    const arc = (2 * Math.PI) / totalSectors;
+    const cx = cvs.width / 2;
+    const cy = cvs.height / 2;
+    const radius = cx - 12;
+
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rotationAngle);
 
     for (let i = 0; i < totalSectors; i++) {
         const startAngle = i * arc;
         const endAngle = startAngle + arc;
-        const sec = WHEEL_SECTORS[i];
+        const sec = sectors[i];
 
+        // Сектор
         ctx.beginPath();
-        ctx.fillStyle = sec.color;
-        ctx.moveTo(cx, cy);
-        ctx.arc(cx, cy, radius, startAngle, endAngle);
-        ctx.lineTo(cx, cy);
+        ctx.fillStyle = sec.color || (i % 2 === 0 ? "#1e293b" : "#0f172a");
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, radius, startAngle, endAngle);
+        ctx.lineTo(0, 0);
         ctx.fill();
 
+        // Неоновая разделительная линия
         ctx.strokeStyle = "rgba(255, 215, 0, 0.45)";
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 3;
         ctx.stroke();
 
+        // Отрисовка текста сектора
         const midAngle = startAngle + arc / 2;
-        const normAngle = (midAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-
         ctx.save();
-        ctx.translate(cx, cy);
         ctx.rotate(midAngle);
 
-        const isFlipped = normAngle > Math.PI / 2 && normAngle < (3 * Math.PI) / 2;
-
-        ctx.font = "900 17px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-        ctx.fillStyle = sec.textColor;
+        ctx.font = "900 20px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+        ctx.fillStyle = sec.textColor || "#ffffff";
         ctx.shadowColor = "rgba(0, 0, 0, 0.85)";
         ctx.shadowBlur = 4;
-
-        if (isFlipped) {
-            ctx.rotate(Math.PI);
-            ctx.textAlign = "left";
-            ctx.textBaseline = "middle";
-            ctx.fillText(sec.label, -radius + 28, 0);
-        } else {
-            ctx.textAlign = "right";
-            ctx.textBaseline = "middle";
-            ctx.fillText(sec.label, radius - 28, 0);
-        }
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillText(sec.label, radius - 24, 0);
 
         ctx.restore();
     }
+
+    ctx.restore();
 }
 
 window.PhoneMedia = PhoneMedia;
 window.initWheelModule = initWheelModule;
+window.drawWheelAtAngle = drawWheelAtAngle;
