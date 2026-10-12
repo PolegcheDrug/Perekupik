@@ -1,16 +1,24 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.7.1)
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.7.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Полный каталог Маркета: 4 категории (Приборы, Сырьё, Лицензии, Интерьер),
-// жесткий учет инвентаря, Storage Wars, ПодКлюч и автопарк.
+// жесткий учет инвентаря, Storage Wars, Порт, ПодКлюч и автопарк.
 // ========================================================
 
 const GAME_METADATA = {
-    version: "v0.7.1",
-    build: 285,
+    version: "v0.7.5",
+    build: 298,
     authors: "Tak Toje, Max, Sergo, gemini, Илья Чепиль",
-    releaseDate: "2026-10-19",
+    releaseDate: "2026-10-20",
     patchNotes: [
+        {
+            title: "🚢 Storage Wars & Порт 2.0",
+            text: "Живой чат аукциона с репликами ботов и аукциониста, шкала доминирования ставки, 3 удара молотка, эндоскопия щелей и полный фикс терминала."
+        },
+        {
+            title: "💱 Мультивалютный обменник Во-Банка",
+            text: "Полноценный двусторонний конвертер между всеми валютами: Рубли, Stars, Топливо, Талоны и Крипта (BTC/ETH)."
+        },
         {
             title: "🛒 Полный перезапуск Авто-Маркета",
             text: "Исчезновение товаров исправлено! Маркет разделен на 4 полноценные категории с сырьем для всех предприятий, приборами, лицензиями и мебелью боксов."
@@ -18,14 +26,6 @@ const GAME_METADATA = {
         {
             title: "🔒 Жесткая привязка приборов",
             text: "Больше нельзя пользоваться сканерами OBD2 и толщиномерами без их покупки в Маркете. У каждого прибора появился запас прочности."
-        },
-        {
-            title: "🖤 Cyber Black Neo",
-            text: "Новая тема матовых черных иконок телефона с неоновым контуром, идентичная консоли разработчика."
-        },
-        {
-            title: "🚢 Storage Wars в Порту",
-            text: "Аукцион контейнеров в реальном времени против ботов с таймером молотка и блефом."
         }
     ]
 };
@@ -45,6 +45,53 @@ const WHEEL_SECTORS = [
     { label: "Талон ГИБДД 🚔", type: "impound", amount: 1, color: "#e11d48", textColor: "#ffffff" },
     { label: "💰 ДЖЕКПОТ 1M", type: "jackpot", amount: 1000000, color: "#ffd700", textColor: "#000000" }
 ];
+
+// ========================================================
+// 0.1. ПУЛЫ НАГРАД ДЛЯ СУПЕРВИЛСПИНА (3 ПРИЗА СРАЗУ)
+// ========================================================
+const SUPER_SPIN_TIERS = {
+    reelCars: [
+        { type: "car", name: "ВАЗ-2101 «Копейка»", category: "economy", basePrice: 180000, power: 85, emoji: "🏎️" },
+        { type: "car", name: "BMW E30 Coupe", category: "comfort", basePrice: 650000, power: 170, emoji: "🏎️" },
+        { type: "car", name: "VW Golf VI GTI", category: "comfort", basePrice: 1450000, power: 211, emoji: "🏎️" },
+        { type: "car", name: "Toyota Mark II (JZX90)", category: "economy", basePrice: 590000, power: 200, emoji: "🏎️" },
+        { type: "tool", toolId: "obd_launch", name: "Сканер Launch Pro", emoji: "📱" },
+        { type: "tool", toolId: "endoscope", name: "HD Видеоэндоскоп", emoji: "📹" },
+        { type: "free_impound", name: "Талон ГИБДД", emoji: "🚔" },
+        { type: "xp_bundle", name: "Пакет Опыта (+350 XP)", amount: 350, emoji: "🎖️" }
+    ],
+    reelResources: [
+        { type: "cash", label: "250,000 ₽", amount: 250000 },
+        { type: "cash", label: "500,000 ₽", amount: 500000 },
+        { type: "jackpot", label: "ДЖЕКПОТ 1.5M ₽", amount: 1500000 },
+        { type: "fuel", label: "Полный бак 100 ⛽", amount: 100 },
+        { type: "tickets", label: "+25 Талонов 🎟️", amount: 25 },
+        { type: "conn", label: "+2 Связи 🤝", amount: 2 },
+        { type: "xp", label: "+200 XP", amount: 200 }
+    ],
+    reelExclusives: [
+        { type: "stars", label: "30 ⭐ Stars", amount: 30, emoji: "⭐" },
+        { type: "stars", label: "75 ⭐ Stars", amount: 75, emoji: "⭐" },
+        { type: "plate", label: "Номер А777АА 77", plate: "А777АА 77", emoji: "🏷️" },
+        { type: "plate", label: "Номер В888ВВ 777", plate: "В888ВВ 777", emoji: "🏷️" },
+        { type: "mod_cert", label: "Сертификат на Stage 2", cashValue: 120000, emoji: "🔧" },
+        { type: "free_impound", label: "Амнистия ГИБДД", emoji: "👮" }
+    ]
+};
+
+// ========================================================
+// 0.2. БАЗОВЫЕ КУРСЫ ВАЛЮТНОГО ОБМЕННИКА ВО-БАНКА
+// ========================================================
+const BANK_EXCHANGE_RATES = {
+    // Стоимость 1 единицы в базовых рублях (покупка банком / продажа банком)
+    rub: { buyRub: 1, sellRub: 1 },
+    stars: { buyRub: 12000, sellRub: 14000, icon: "fa-star", emoji: "⭐", name: "Stars" },
+    fuel: { buyRub: 1800, sellRub: 2200, icon: "fa-gas-pump", emoji: "⛽", name: "Топливо (л)" },
+    tickets: { buyRub: 6500, sellRub: 8000, icon: "fa-ticket", emoji: "🎟️", name: "Талоны" },
+    conn: { buyRub: 150000, sellRub: 200000, icon: "fa-handshake", emoji: "🤝", name: "Связи" },
+    btc: { buyRub: 9200000, sellRub: 9700000, icon: "fa-bitcoin", emoji: "₿", name: "Bitcoin" },
+    eth: { buyRub: 330000, sellRub: 355000, icon: "fa-ethereum", emoji: "Ξ", name: "Ethereum" }
+};
 
 // ========================================================
 // 1. ПАЛИТРЫ ЦВЕТА HUD, АНИМАЦИИ НИКНЕЙМА И АВАТАРОК
@@ -917,7 +964,7 @@ const SHOP_CATALOG = {
             reqStars: 5, 
             maxUses: 40, 
             serviceCost: 9000, 
-            desc: "Осмотр цилиндров на задиры и нагар. Обязателен для контрактов «ПодКлюч». Ресурс: 40 осмотров.", 
+            desc: "Осмотр цилиндров на задиры и нагар. Обязателен для контрактов «ПодКлюч» и досмотра контейнеров. Ресурс: 40 осмотров.", 
             icon: "fa-video" 
         },
         { 
@@ -1084,19 +1131,197 @@ const SHOP_CATALOG = {
 const HOUSING_INTERIOR_CATALOG = SHOP_CATALOG.homeItems;
 
 // ========================================================
-// 8. STORAGE WARS (АУКЦИОН КОНТЕЙНЕРОВ РЕАЛЬНОГО ВРЕМЕНИ)
+// 8. ПОРТ, ТАМОЖНЯ, БРОКЕРЫ И STORAGE WARS
 // ========================================================
+
+// Профили брокеров для одиночного торга у терминала
+const PORT_BROKER_PROFILES = [
+    {
+        id: "broker_rashid",
+        name: "Брокер Рашид",
+        avatar: "🧔‍♂️",
+        title: "Таможенный декларант порта",
+        patience: 4,
+        bluffChance: 0.35,
+        greetings: [
+            "«Контейнер только со стапеля разгрузки. Какое твоё предложение?»",
+            "«Документы на подписи, судно уже в нейтральных водах. Забираешь или мне звать других покупателей?»"
+        ],
+        successHaggle: [
+            "«Ладно, уступаю на пошлину. Но больше не торгуюсь!»",
+            "«Уговорил, оформляю скидку на растаможку.»"
+        ],
+        failHaggle: [
+            "«Меньше заявленного не отдам! У меня очередь из перекупов.»",
+            "«Не морочь мне голову, это эксклюзивный карго!»"
+        ]
+    },
+    {
+        id: "broker_viktor",
+        name: "Инспектор Виктор",
+        avatar: "👮‍♂️",
+        title: "Старший таможенный агент",
+        patience: 5,
+        bluffChance: 0.20,
+        greetings: [
+            "«Пломбы на месте, досмотр пройден формально. Ценник окончательный, но готов выслушать аргументы.»"
+        ],
+        successHaggle: [
+            "«Аргумент принят, скорректировал декларацию в меньшую сторону.»",
+            "«Сделаю скидку на повреждения внешнего каркаса тары.»"
+        ],
+        failHaggle: [
+            "«По регламенту скидка не положена. Бери или опечатываю обратно.»"
+        ]
+    },
+    {
+        id: "broker_kenji",
+        name: "Кэндзи Сато",
+        avatar: "🎌",
+        title: "Представитель аукциона USS Tokyo",
+        patience: 3,
+        bluffChance: 0.50,
+        greetings: [
+            "«Контейнер напрямую из Йокогамы. Внутри японская аукционная классика. Быстрый расчет — хорошая сделка.»"
+        ],
+        successHaggle: [
+            "«Хорошо, согласен на дисконт ради долгого сотрудничества.»"
+        ],
+        failHaggle: [
+            "«Японское качество не продаётся за копейки!»"
+        ]
+    }
+];
+
+// Каталог одиночных контейнеров терминала порта (синхронизирован с CONTAINER_ITEMS)
+const PORT_AUCTIONS_CATALOG = [
+    { 
+        id: 'japan', 
+        name: 'Японский Контейнер (USS Tokyo)', 
+        title: 'Японский Контейнер (USS Tokyo)',
+        cost: 350000, 
+        reqStars: 5, 
+        reqLvl: 10,
+        country: 'JAPAN',
+        flagEmoji: '🇯🇵',
+        auctionHouse: 'USS Tokyo / Kobe Port',
+        auctionGrade: 'Grade 4.5B',
+        desc: 'Опечатанный морской контейнер из порта Кобе. Дроп: JDM легенды, турбо-седаны, японские спортбайки и архивные знаки Токио.',
+        possibleCars: ["Toyota Mark II (JZX90)", "Toyota Chaser (X100)", "Yamaha MT-07", "Honda CB400 Super Four", "Nissan Silvia S13"],
+        lootPool: [
+            { name: "Комплект кованых дисков Volk TE37 в багажнике", cashVal: 95000, emoji: "✨" },
+            { name: "Японский номер префектуры Синагава", cashVal: 130000, plateStr: "品川 500 あ 77-77", emoji: "🏷️" },
+            { name: "Турбо-кит GReddy T88 в деревянном ящике", cashVal: 110000, emoji: "🚀" }
+        ],
+        img: 'assets/containers/japan.jpg', 
+        fallback: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80' 
+    },
+    { 
+        id: 'europe', 
+        name: 'Европейский Контейнер (BCA Germany)', 
+        title: 'Европейский Контейнер (BCA Germany)',
+        cost: 650000, 
+        reqStars: 8, 
+        reqLvl: 14,
+        country: 'GERMANY',
+        flagEmoji: '🇩🇪',
+        auctionHouse: 'BCA Autoauktionen Hamburg',
+        auctionGrade: 'Euro Clean',
+        desc: 'Прямая поставка из Гамбурга без пробега по СНГ. Дроп: горячие хэтчбеки GTI, турбо-вагоны RS, баварские седаны.',
+        possibleCars: ["VW Golf VI GTI", "BMW 3 Series (G20)", "Audi A6 (C8)", "Skoda Octavia A7 1.8 TSI", "BMW E30 Coupe"],
+        lootPool: [
+            { name: "Диагностический планшет Launch в кейсе", cashVal: 85000, emoji: "📱" },
+            { name: "Оригинальный обвес M-Performance в коробках", cashVal: 120000, emoji: "🌪️" },
+            { name: "Пакет немецких дойчмарок из бардачка", cashVal: 65000, emoji: "💶" }
+        ],
+        img: 'assets/containers/europe.jpg', 
+        fallback: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80' 
+    },
+    { 
+        id: 'usa_auction', 
+        name: 'Американский Аукцион (Copart #502)', 
+        title: 'Американский Аукцион (Copart #502)',
+        cost: 850000, 
+        reqStars: 12, 
+        reqLvl: 18,
+        country: 'USA',
+        flagEmoji: '🇺🇸',
+        auctionHouse: 'Copart Los Angeles Yard',
+        auctionGrade: 'Salvage / Clean Title',
+        desc: 'Контейнер со страхового аукциона США. Кот в мешке: от лёгкого удара по навеске до мощных маслкаров и заряженных багги.',
+        possibleCars: ["Ford Focus III", "Chevrolet Cruze", "BRP Can-Am Maverick X3", "Ford Mustang GT"],
+        lootPool: [
+            { name: "Спортивные драговые слики Mickey Thompson", cashVal: 75000, emoji: "🛞" },
+            { name: "Калифорнийский ретро-номер 1978", cashVal: 160000, plateStr: "CALIFORNIA 777", emoji: "🏷️" },
+            { name: "Пачка долларов за обшивкой двери", cashVal: 140000, emoji: "💵" }
+        ],
+        img: 'assets/containers/usa.jpg', 
+        fallback: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80' 
+    },
+    { 
+        id: 'dubai', 
+        name: 'Эмиратский Контейнер (Dubai Al-Aweer)', 
+        title: 'Эмиратский Контейнер (Dubai Al-Aweer)',
+        cost: 1600000, 
+        reqStars: 20, 
+        reqLvl: 25,
+        country: 'UAE',
+        flagEmoji: '🇦🇪',
+        auctionHouse: 'Al-Aweer Auto Market Dubai',
+        auctionGrade: 'VIP Royal',
+        desc: 'Аукционная роскошь Эмиратов: Гелики G63, Porsche Cayenne, катера или спорткары с минимальным пробегом.',
+        possibleCars: ["BMW X5 (G05)", "Mercedes G63 AMG «Гелик»", "Porsche Cayenne (PO536)", "Катер Bayliner VR5"],
+        lootPool: [
+            { name: "Золотые часы Rolex из бардачка", cashVal: 320000, emoji: "⌚" },
+            { name: "Дубайский блатной номер «7»", cashVal: 450000, plateStr: "DUBAI 7", emoji: "💎" },
+            { name: "Кованые составные диски Mansory", cashVal: 220000, emoji: "✨" }
+        ],
+        img: 'assets/containers/dubai.jpg', 
+        fallback: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80' 
+    },
+    { 
+        id: 'hangar', 
+        name: 'Заброшенный Ангар Портового Хаба', 
+        title: 'Заброшенный Ангар Портового Хаба',
+        cost: 4500000, 
+        reqStars: 35, 
+        reqLvl: 35,
+        country: 'GLOBAL',
+        flagEmoji: '🌐',
+        auctionHouse: 'Customs Seized Warehouse',
+        auctionGrade: 'Ultra Seized',
+        desc: 'Конфискованный таможней ангар! От коммерческих тягачей Scania и Volvo до Porsche 911 GT3 RS и Nissan GT-R Nismo!',
+        possibleCars: ["Scania R500 V8", "Volvo FH16 750", "Porsche 911 GT3 RS (992)", "Nissan GT-R R35 Nismo", "Bugatti Chiron Sport"],
+        lootPool: [
+            { name: "Кейс с ценными бумагами и платиной", cashVal: 750000, emoji: "💼" },
+            { name: "Карбоновый обвес Nismo в сборе", cashVal: 400000, emoji: "🏎️" },
+            { name: "Таможенный пропуск высшего допуска", cashVal: 300000, emoji: "📜" }
+        ],
+        img: 'assets/containers/hangar.jpg', 
+        fallback: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80' 
+    }
+];
+
+const CONTAINER_ITEMS = PORT_AUCTIONS_CATALOG;
+
+// Каталог живого аукциона Storage Wars
 const STORAGE_WARS_CONTAINERS = [
     {
         id: "sw_copart_muscle",
         title: "Контейнер Copart #502 (США)",
         badge: "Маслкары & Джипы",
+        country: "USA",
         baseBid: 320000,
-        estValue: "500,000 — 1,200,000 ₽",
+        maxBotBudget: 850000,
+        estValue: "500,000 — 1,300,000 ₽",
         riskLevel: "Средний",
-        desc: "Закрытый 40-футовый контейнер из порта Лос-Анджелеса. Сквозь щели виден широкий бампер и резина на литье.",
-        possibleCars: ["Ford Focus III", "Chevrolet Cruze", "BRP Can-Am Maverick X3"],
-        scrapChance: 0.20,
+        desc: "Закрытый 40-футовый контейнер из порта Лос-Анджелеса. Сквозь щели виден широкий бампер, резина на ковке и слой заокеанской пыли.",
+        possibleCars: ["Ford Focus III", "Chevrolet Cruze", "BRP Can-Am Maverick X3", "Ford Mustang GT"],
+        lootPool: [
+            { name: "Комплект полусликов Toyo R888R", cashVal: 65000, emoji: "🛞" },
+            { name: "Пачка долларов за козырьком", cashVal: 85000, emoji: "💵" }
+        ],
+        scrapChance: 0.15,
         img: "assets/containers/usa.jpg",
         fallback: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80"
     },
@@ -1104,12 +1329,18 @@ const STORAGE_WARS_CONTAINERS = [
         id: "sw_kobe_jdm",
         title: "Контейнер Кобе #911 (Япония)",
         badge: "JDM & Турбо",
+        country: "JAPAN",
         baseBid: 450000,
-        estValue: "700,000 — 2,400,000 ₽",
+        maxBotBudget: 1250000,
+        estValue: "700,000 — 2,200,000 ₽",
         riskLevel: "Умеренный",
-        desc: "Прямой груз с аукциона USS Tokyo. Характерные кованые диски и японские наклейки на стеклах.",
-        possibleCars: ["Toyota Mark II (JZX90)", "Toyota Chaser (X100)", "Yamaha MT-07"],
-        scrapChance: 0.15,
+        desc: "Прямой груз с аукциона USS Tokyo. Характерные золотые полки дисков Work, стикеры парковки и нетронутый интерьер.",
+        possibleCars: ["Toyota Mark II (JZX90)", "Toyota Chaser (X100)", "Yamaha MT-07", "Nissan Silvia S13"],
+        lootPool: [
+            { name: "Кованые диски Work Meister S1", cashVal: 90000, emoji: "✨" },
+            { name: "Японский номер Осака", cashVal: 110000, plateStr: "大阪 330 む 77-77", emoji: "🏷️" }
+        ],
+        scrapChance: 0.10,
         img: "assets/containers/japan.jpg",
         fallback: "https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80"
     },
@@ -1117,60 +1348,90 @@ const STORAGE_WARS_CONTAINERS = [
         id: "sw_dubai_super",
         title: "Контейнер Дубай #777 (ОАЭ)",
         badge: "Суперкары & Люкс",
+        country: "UAE",
         baseBid: 1200000,
-        estValue: "2,000,000 — 6,500,000 ₽",
+        maxBotBudget: 2800000,
+        estValue: "2,000,000 — 5,500,000 ₽",
         riskLevel: "Высокий",
-        desc: "Опечатанный бокс таможенного терминала Аль-Авир. Карбоновые элементы и спортивные диффузоры.",
-        possibleCars: ["BMW X5 (G05)", "Mercedes G63 AMG «Гелик»", "Porsche Cayenne (PO536)"],
-        scrapChance: 0.25,
+        desc: "Опечатанный бокс таможенного терминала Аль-Авир. Карбоновые зеркала, диффузор и золотой ключ на приборке.",
+        possibleCars: ["BMW X5 (G05)", "Mercedes G63 AMG «Гелик»", "Porsche Cayenne (PO536)", "Катер Bayliner VR5"],
+        lootPool: [
+            { name: "Золотые слитки в кейсе из багажника", cashVal: 280000, emoji: "🏆" },
+            { name: "Дубайский VIP-номер «777»", cashVal: 350000, plateStr: "DUBAI 777", emoji: "💎" }
+        ],
+        scrapChance: 0.12,
         img: "assets/containers/dubai.jpg",
         fallback: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80"
     }
 ];
 
+// Умные боты Storage Wars с фразами для чата
 const STORAGE_WARS_BOTS = [
-    { name: "Барыга Алик", avatar: "🧔", maxBudgetMul: 1.45, bluffChance: 0.35, aggro: "moderate" },
-    { name: "Мажор Влад", avatar: "🕺", maxBudgetMul: 2.10, bluffChance: 0.50, aggro: "aggressive" },
-    { name: "Дед Михалыч", avatar: "👴", maxBudgetMul: 1.25, bluffChance: 0.10, aggro: "calm" },
-    { name: "Перекуп Семён", avatar: "🕶️", maxBudgetMul: 1.65, bluffChance: 0.40, aggro: "moderate" }
-];
-
-const CONTAINER_ITEMS = [
     { 
-        id: 'japan', name: 'Японский Контейнер', cost: 150000, reqStars: 5, timer: 30, minLevel: 12, 
-        badge: 'JDM & Мото', desc: 'Прямые поставки из порта Кобе. Шанс достать Silvia, Mark II или Yamaha MT-07.', 
-        possibleCars: ["Toyota Mark II (JZX90)", "Toyota Chaser (X100)", "Yamaha MT-07", "Honda CB400 Super Four"],
-        img: 'assets/containers/japan.jpg', fallback: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80' 
+        name: "Барыга Алик", 
+        avatar: "🧔", 
+        maxBudgetMul: 1.55, 
+        bluffChance: 0.35, 
+        aggro: "moderate",
+        shouts: [
+            "«Этот контейнер точно мой, не лезьте под руку!»",
+            "«Я чую японский турбо-мотор за версту, поднимаю!»",
+            "«Эй, перекуп, у тебя денег не хватит со мной бодаться!»",
+            "«Поднимаю планку, по рукам!»"
+        ],
+        passShouts: [
+            "«Ценник в космос улетел, я пас...»",
+            "«За такие бабки пусть забирает, там кот в мешке!»"
+        ]
     },
     { 
-        id: 'europe', name: 'Европейский Автовоз', cost: 450000, reqStars: 10, timer: 35, minLevel: 15, 
-        badge: 'Комфорт & Премиум', desc: 'Автомобили из Германии без пробега по РФ. Дроп: Golf GTI, BMW 3 Series, Audi A6.', 
-        possibleCars: ["VW Golf VI GTI", "BMW 3 Series (G20)", "Audi A6 (C8)", "Skoda Octavia A7 1.8 TSI"],
-        img: 'assets/containers/europe.jpg', fallback: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80' 
+        name: "Мажор Влад", 
+        avatar: "🕺", 
+        maxBudgetMul: 2.20, 
+        bluffChance: 0.55, 
+        aggro: "aggressive",
+        shouts: [
+            "«Мелочь не считаю, перебиваю ставку!»",
+            "«Папа дал бюджет, контейнер едет ко мне на виллу!»",
+            "«Кто готов перебить мою ставку? Слабо?!»",
+            "«Давайте сразу по-взрослому играть, накидываю!»"
+        ],
+        passShouts: [
+            "«Скучно с вами, пойду в ресторан...»",
+            "«Ладно, забирайте этот хлам, найду себе получше.»"
+        ]
     },
     { 
-        id: 'usa_auction', name: 'Американский Аукцион', cost: 750000, reqStars: 15, timer: 40, minLevel: 18, 
-        badge: 'Битые & Маслкары', desc: 'Контейнер с Copart. Кот в мешке: от восстановления до идеала.', 
-        possibleCars: ["Ford Focus III", "Chevrolet Cruze", "BRP Can-Am Maverick X3"],
-        img: 'assets/containers/usa.jpg', fallback: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80' 
+        name: "Дед Михалыч", 
+        avatar: "👴", 
+        maxBudgetMul: 1.30, 
+        bluffChance: 0.15, 
+        aggro: "calm",
+        shouts: [
+            "«Не спешите, хлопцы, я на пенсии, но порох в пороховницах есть!»",
+            "«В моё время такие лоты за копейки брали. Ставлю!»",
+            "«Прибавлю еще немного, на запчасти сгодится.»"
+        ],
+        passShouts: [
+            "«Ох, пенсия не резиновая, выхожу из торгов.»",
+            "«Слишком дорого стало, я умываю руки.»"
+        ]
     },
     { 
-        id: 'china_ship', name: 'Китайский Сухогруз', cost: 950000, reqStars: 20, timer: 38, minLevel: 22, 
-        badge: 'Электрички & Новые', desc: 'Свежие Geely Monjaro, кроссоверы и квадроциклы прямиком из порта.', 
-        possibleCars: ["Geely Monjaro", "CFMOTO CFORCE 500", "Stels Guepard 850"],
-        img: 'assets/containers/china.jpg', fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80' 
-    },
-    { 
-        id: 'dubai', name: 'Эмиратский Контейнер', cost: 1200000, reqStars: 25, timer: 45, minLevel: 25, 
-        badge: 'Катера & Суперкары', desc: 'Аукционная роскошь Дубая: BMW X5, Гелик G63 или скоростной катер.', 
-        possibleCars: ["BMW X5 (G05)", "Mercedes G63 AMG «Гелик»", "Porsche Cayenne (PO536)", "Катер Bayliner VR5"],
-        img: 'assets/containers/dubai.jpg', fallback: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80' 
-    },
-    { 
-        id: 'hangar', name: 'Заброшенный Ангар', cost: 5000000, reqStars: 50, timer: 60, minLevel: 30, 
-        badge: 'Тягачи & Гиперкары', desc: 'Списанное имущество хаба: от тягачей Scania до Porsche 911 GT3 RS!', 
-        possibleCars: ["Scania R500 V8", "Volvo FH16 750", "Porsche 911 GT3 RS (992)", "Nissan GT-R R35 Nismo"],
-        img: 'assets/containers/hangar.jpg', fallback: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80' 
+        name: "Перекуп Семён", 
+        avatar: "🕶️", 
+        maxBudgetMul: 1.75, 
+        bluffChance: 0.40, 
+        aggro: "moderate",
+        shouts: [
+            "«Я уже посчитал маржу, здесь чистый профит. Повышаю!»",
+            "«Перебиваю! Мой автосалон ждет этот лот!»",
+            "«Контейнер уйдет влет на авторынке, забираю!»"
+        ],
+        passShouts: [
+            "«Маржа ушла в минус, пас!»",
+            "«Дальше торговаться бессмысленно, я выхожу.»"
+        ]
     }
 ];
 
@@ -1672,6 +1933,8 @@ const STREET_EVENTS_DATA = [
 // Экспорт в глобальный контекст window
 window.GAME_METADATA = GAME_METADATA;
 window.WHEEL_SECTORS = WHEEL_SECTORS;
+window.SUPER_SPIN_TIERS = SUPER_SPIN_TIERS;
+window.BANK_EXCHANGE_RATES = BANK_EXCHANGE_RATES;
 window.HUD_SOLID_COLORS = HUD_SOLID_COLORS;
 window.NICKNAME_EFFECTS_CATALOG = NICKNAME_EFFECTS_CATALOG;
 window.AVATAR_EFFECTS_CATALOG = AVATAR_EFFECTS_CATALOG;
@@ -1688,14 +1951,13 @@ window.BUSINESS_DATA = BUSINESS_DATA;
 window.BUSINESS_UPGRADES_BRANCHES = BUSINESS_UPGRADES_BRANCHES;
 window.BUSINESS_STAFF_CATALOG = BUSINESS_STAFF_CATALOG;
 window.BUSINESS_FLEET_CATALOG = BUSINESS_FLEET_CATALOG;
-window.BARN_TIERS_CONFIG = BARN_TIERS_CONFIG;
-window.BARN_FINDS = BARN_FINDS;
-window.SUPER_SPIN_TIERS = SUPER_SPIN_TIERS;
 window.SHOP_CATALOG = SHOP_CATALOG;
 window.HOUSING_INTERIOR_CATALOG = HOUSING_INTERIOR_CATALOG;
+window.PORT_BROKER_PROFILES = PORT_BROKER_PROFILES;
+window.PORT_AUCTIONS_CATALOG = PORT_AUCTIONS_CATALOG;
+window.CONTAINER_ITEMS = CONTAINER_ITEMS;
 window.STORAGE_WARS_CONTAINERS = STORAGE_WARS_CONTAINERS;
 window.STORAGE_WARS_BOTS = STORAGE_WARS_BOTS;
-window.CONTAINER_ITEMS = CONTAINER_ITEMS;
 window.BUYER_BACKFIRE_EVENTS = BUYER_BACKFIRE_EVENTS;
 window.SELLER_ADS_PHRASES = SELLER_ADS_PHRASES;
 window.DIETS = DIETS;

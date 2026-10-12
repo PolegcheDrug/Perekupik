@@ -20,7 +20,7 @@
 }
 
 /* ========================================================
-   1. КОМПАКТНАЯ СЕТКА КАТЕГОРИЙ
+   1. КОМПАКТНАЯ СЕТКА КАТЕГОРИЙ РЫНКА
    ======================================================== */
 .market-categories-grid {
   display: grid !important;
@@ -174,31 +174,6 @@
   box-shadow: 0 0 6px var(--cyan-glow);
 }
 
-.car-exhaust-audio-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(8, 13, 24, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: var(--amber);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  cursor: pointer;
-  z-index: 16;
-  transition: transform 0.12s ease, background 0.15s ease, color 0.15s ease;
-}
-.car-exhaust-audio-btn:active {
-  transform: scale(0.9);
-  color: #fff;
-  background: var(--amber);
-  box-shadow: 0 0 10px var(--amber-glow);
-}
-
 /* ========================================================
    3. ОБЪЁМНЫЕ РЕЛЬЕФНЫЕ ПРЯМОУГОЛЬНИКИ ХАРАКТЕРИСТИК (3D CAPSULES)
    ======================================================== */
@@ -250,7 +225,7 @@
   line-height: 1.15;
 }
 
-/* Рельефная 3D-сетка характеристик (ВМЕСТО ПЛОСКОГО ТЕКСТА) */
+/* Рельефная 3D-сетка характеристик */
 .car-specs-grid-volumetric {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -346,7 +321,7 @@
 }
 
 /* ========================================================
-   4. СТАТУС-ПЛАШКА ТЮНИНГА / СТОКА С АНИМАЦИЕЙ SHIMMER
+   4. СТАТУС-ПЛАШКА ТЮНИНГА / СТОКА
    ======================================================== */
 .car-tuning-status-capsule {
   background: linear-gradient(145deg, rgba(16, 24, 38, 0.95), rgba(7, 11, 20, 0.95));
@@ -416,83 +391,84 @@
 }
 
 /* ========================================================
-   5. АНИМИРОВАННЫЕ ШКАЛЫ ТЕЛЕМЕТРИИ КАРТОЧКИ
+   5. МОРСКОЙ ПОРТ, ТАМОЖНЯ И СУПЕРВИЛСПИН
    ======================================================== */
-.car-telemetry-panel {
+.fortune-reel-card {
+  background: linear-gradient(160deg, #101726 0%, #060a12 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 10px 4px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  background: rgba(5, 8, 16, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-md);
-  padding: 8px 10px;
-  margin-bottom: 8px;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  min-height: 95px;
 }
 
-.telemetry-row {
+.fortune-reel-card.reel-spinning-anim {
+  animation: reelShakePulse 0.12s infinite alternate ease-in-out;
+  border-color: var(--amber) !important;
+  box-shadow: 0 0 16px var(--amber-glow) !important;
+}
+
+@keyframes reelShakePulse {
+  0% { transform: translateY(-2px); }
+  100% { transform: translateY(2px); }
+}
+
+/* Радиомагнитола Pioneer */
+.radio-cassette-glow {
+  background: #04070e;
+  border: 1.5px solid var(--purple);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: inset 0 0 15px rgba(192, 132, 252, 0.2), 0 0 12px rgba(192, 132, 252, 0.3);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  font-size: 10px;
 }
 
-.telemetry-label {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--text-sub);
-  min-width: 82px;
-  font-weight: 800;
-}
-
-.telemetry-bar-bg {
-  flex: 1;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
-  overflow: hidden;
-  position: relative;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
-}
-
-.telemetry-bar-fill {
-  height: 100%;
-  border-radius: 6px;
-  transition: width 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-  position: relative;
-}
-
-.fill-power {
-  background: linear-gradient(90deg, #0284c7 0%, #00f2fe 55%, #ffb300 85%, #ff3366 100%);
-  box-shadow: 0 0 8px var(--cyan-glow);
-}
-
-.fill-condition-high {
-  background: linear-gradient(90deg, #059669, #00e676);
-  box-shadow: 0 0 8px var(--green-glow);
-}
-
-.fill-condition-mid {
-  background: linear-gradient(90deg, #d97706, #ffb300);
-  box-shadow: 0 0 8px var(--amber-glow);
-}
-
-.fill-condition-low {
-  background: linear-gradient(90deg, #b91c1c, #ff3366);
-  box-shadow: 0 0 8px var(--red-glow);
-  animation: pulseWarningBar 1.2s infinite alternate ease-in-out;
-}
-@keyframes pulseWarningBar {
-  0% { opacity: 0.7; }
-  100% { opacity: 1; filter: brightness(1.25); }
-}
-
-.telemetry-val {
-  min-width: 52px;
-  text-align: right;
+.radio-brand-badge {
+  font-size: 8.5px;
   font-weight: 900;
-  font-size: 10px;
+  color: var(--purple);
+  letter-spacing: 0.8px;
+}
+
+.radio-equalizer-bars {
+  display: flex;
+  gap: 3px;
+  height: 18px;
+  align-items: flex-end;
+}
+
+.radio-equalizer-bars span {
+  width: 3px;
+  height: 4px;
+  background: var(--purple);
+  border-radius: 2px;
+  transition: height 0.15s ease;
+}
+
+.radio-equalizer-bars.playing span:nth-child(1) { animation: eqBar 0.5s infinite alternate ease-in-out; }
+.radio-equalizer-bars.playing span:nth-child(2) { animation: eqBar 0.7s infinite alternate ease-in-out 0.1s; }
+.radio-equalizer-bars.playing span:nth-child(3) { animation: eqBar 0.4s infinite alternate ease-in-out 0.2s; }
+.radio-equalizer-bars.playing span:nth-child(4) { animation: eqBar 0.8s infinite alternate ease-in-out 0.15s; }
+.radio-equalizer-bars.playing span:nth-child(5) { animation: eqBar 0.6s infinite alternate ease-in-out 0.05s; }
+.radio-equalizer-bars.playing span:nth-child(6) { animation: eqBar 0.9s infinite alternate ease-in-out 0.25s; }
+.radio-equalizer-bars.playing span:nth-child(7) { animation: eqBar 0.5s infinite alternate ease-in-out 0.1s; }
+
+@keyframes eqBar {
+  0% { height: 4px; }
+  100% { height: 18px; }
+}
+
+.active-station {
+  border-color: var(--purple) !important;
+  background: rgba(192, 132, 252, 0.12) !important;
+  box-shadow: 0 0 14px rgba(192, 132, 252, 0.3) !important;
 }
 
 /* ========================================================

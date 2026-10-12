@@ -24,7 +24,9 @@
 #modalNeedGarage, 
 #modalDealVerdict, 
 #modalHudCustomizer,
-#modalImpoundLot {
+#modalImpoundLot,
+#modalPortBrokerDeal,
+#modalStorageWars {
   z-index: 5500 !important;
 }
 
@@ -106,6 +108,48 @@
 @keyframes counterRotate {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(-360deg); }
+}
+
+/* ========================================================
+   ИНДИКАТОРЫ STORAGE WARS 2.0 (ШКАЛА ДОМИНИРОВАНИЯ)
+   ======================================================== */
+.sw-leading-active {
+  background: rgba(0, 230, 118, 0.12) !important;
+  border: 1.5px solid var(--green) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 0 15px rgba(0, 230, 118, 0.35) !important;
+  transition: all 0.25s ease;
+}
+
+.sw-outbid-alert {
+  background: rgba(220, 38, 38, 0.18) !important;
+  border: 1.5px solid var(--red) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 0 18px rgba(255, 51, 102, 0.5) !important;
+  animation: swOutbidFlash 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes swOutbidFlash {
+  0% {
+    background: rgba(220, 38, 38, 0.12);
+    border-color: rgba(255, 51, 102, 0.6);
+    box-shadow: 0 0 8px rgba(255, 51, 102, 0.3);
+  }
+  100% {
+    background: rgba(220, 38, 38, 0.32);
+    border-color: var(--red);
+    box-shadow: 0 0 22px rgba(255, 51, 102, 0.8);
+  }
+}
+
+.hammer-strike-anim {
+  animation: hammerScale 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes hammerScale {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
 }
 
 .chat-deal-box {

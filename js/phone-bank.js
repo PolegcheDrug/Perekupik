@@ -1,14 +1,22 @@
 // ========================================================
-// js/phone-bank.js — ПРИЛОЖЕНИЕ «ВО-БАНК ОНЛАЙН» (v0.6.2)
+// js/phone-bank.js — ПРИЛОЖЕНИЕ «ВО-БАНК ОНЛАЙН» 2.0 (v0.7.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Полноценный мультивалютный обменник, репутация перекупа,
-// гибкие срочные вклады с капитализацией, крипто-биржа и ипотека.
+// Полноценный двусторонний мультивалютный обменник всех валют,
+// гибкие вклады, сейф, репутация, крипто-биржа, кредиты и ипотека.
 // ========================================================
 
 const AppBank = {
     subTab: 'accounts', // 'accounts', 'exchange', 'deposits', 'reputation', 'crypto', 'credit', 'mortgage'
 
+    // Состояние интерактивного кросс-обменника
+    exchangeState: {
+        fromCurrency: 'rub',
+        toCurrency: 'stars',
+        amount: 140000
+    },
+
     render(container) {
+        if (!container) return;
         let cash = state.player?.cash || 0;
         let safe = state.player?.safeDeposit || 0;
         let debt = state.player?.loanDebt || 0;
@@ -59,7 +67,7 @@ const AppBank = {
     },
 
     // ========================================================
-    // 1. ВКЛАДКА: СЧЕТА И СЕЙФ
+    // 1. ВКЛАДКА: СЧЕТА И БРОНИРОВАННЫЙ СЕЙФ
     // ========================================================
     renderAccountsTab(cash, safe) {
         let historyHtml = "";
@@ -117,7 +125,7 @@ const AppBank = {
 
             <div class="glass-card p-2">
                 <div class="flex-between mb-1">
-                    <b class="text-xs color-cyan"><i class="fa-solid fa-clock-rotate-left"></i> Выписка по карте</b>
+                    <b class="text-xs color-cyan"><i class="fa-solid fa-clock-rotate-left"></i> Выписка по счёту</b>
                     <span class="sub-label" style="font-size:9px;">Последние операции</span>
                 </div>
                 <div class="space-y-1" style="max-height: 150px; overflow-y: auto;">
@@ -128,86 +136,299 @@ const AppBank = {
     },
 
     // ========================================================
-    // 2. ВКЛАДКА: ВАЛЮТНЫЙ ОБМЕННИК
+    // 2. ДВУСТОРОННИЙ МУЛЬТИВАЛЮТНЫЙ ОБМЕННИК
     // ========================================================
+    getCurrencyBalance(code) {
+        let p = state.player || {};
+        switch (code) {
+            case 'rub': return p.cash || 0;
+            case 'stars': return p.stars || 0;
+            case 'fuel': return p.fuel || 0;
+            case 'tickets': return p.expressTickets || 0;
+            case 'conn': return p.connections || 0;
+            case 'btc': return p.crypto?.btc || 0;
+            case 'eth': return p.crypto?.eth || 0;
+            default: return 0;
+        }
+    },
+
+    setCurrencyBalance(code, val) {
+        if (!state.player) state.player = {};
+        switch (code) {
+            case 'rub': state.player.cash = Math.max(0, val); break;
+            case 'stars': state.player.stars = Math.max(0, val); break;
+            case 'fuel': state.player.fuel = Math.max(0, Math.min(100, val)); break;
+            case 'tickets': state.player.expressTickets = Math.max(0, Math.min(state.player.maxExpressTickets || 25, val)); break;
+            case 'conn': state.player.connections = Math.max(0, val); break;
+            case 'btc': 
+                if (!state.player.crypto) state.player.crypto = {};
+                state.player.crypto.btc = Math.max(0, val); 
+                break;
+            case 'eth': 
+                if (!state.player.crypto) state.player.crypto = {};
+                state.player.crypto.eth = Math.max(0, val); 
+                break;
+        }
+    },
+
+    calculateExchangeResult(fromCode, toCode, amount) {
+        if (fromCode === toCode || amount <= 0) return { canExchange: false, targetAmount: 0, rateText: "1 = 1" };
+
+        const rates = (typeof BANK_EXCHANGE_RATES !== 'undefined') ? BANK_EXCHANGE_RATES : {
+            rub: { buyRub: 1, sellRub: 1 },
+            stars: { buyRub: 12000, sellRub: 14000 },
+            fuel: { buyRub: 1800, sellRub: 2200 },
+            tickets: { buyRub: 6500, sellRub: 8000 },
+            conn: { buyRub: 150000, sellRub: 200000 },
+            btc: { buyRub: 9200000, sellRub: 9700000 },
+            eth: { buyRub: 330000, sellRub: 355000 }
+        };
+
+        // Шаг 1: Конвертируем исходную валюту в базовые рубли (банк выкупает по buyRub)
+        let inRubles = (fromCode === 'rub') ? amount : amount * (rates[fromCode]?.buyRub || 1);
+
+        // Шаг 2: Конвертируем рубли в целевую валюту (банк продает по sellRub)
+        let outVal = 0;
+        if (toCode === 'rub') {
+            outVal = inRubles;
+        } else {
+            let costPerUnit = rates[toCode]?.sellRub || 1;
+            outVal = inRubles / costPerUnit;
+        }
+
+        // Округление: криптовалюта до 4-6 знаков, остальные до целого
+        let isCrypto = (toCode === 'btc' || toCode === 'eth');
+        let finalTarget = isCrypto ? parseFloat(outVal.toFixed(4)) : Math.floor(outVal);
+
+        let unitRate = 1;
+        if (fromCode === 'rub') {
+            unitRate = 1 / (rates[toCode]?.sellRub || 1);
+        } else if (toCode === 'rub') {
+            unitRate = rates[fromCode]?.buyRub || 1;
+        } else {
+            unitRate = (rates[fromCode]?.buyRub || 1) / (rates[toCode]?.sellRub || 1);
+        }
+
+        let rateText = isCrypto 
+            ? `1 ${fromCode.toUpperCase()} ≈ ${unitRate.toFixed(4)} ${toCode.toUpperCase()}`
+            : `1 ${fromCode.toUpperCase()} ≈ ${unitRate.toFixed(2)} ${toCode.toUpperCase()}`;
+
+        return {
+            canExchange: finalTarget > 0,
+            targetAmount: finalTarget,
+            rateText: rateText
+        };
+    },
+
     renderExchangeTab() {
-        let cash = state.player?.cash || 0;
-        let stars = state.player?.stars || 0;
-        let fuel = state.player?.fuel || 0;
-        let tickets = state.player?.expressTickets || 0;
-        let superSpinTickets = state.player?.superSpinTickets || 0;
+        const currencies = [
+            { code: 'rub', label: 'Рубли ₽', emoji: '₽', icon: 'fa-ruble-sign' },
+            { code: 'stars', label: 'Stars ⭐', emoji: '⭐', icon: 'fa-star' },
+            { code: 'fuel', label: 'Топливо ⛽', emoji: '⛽', icon: 'fa-gas-pump' },
+            { code: 'tickets', label: 'Талоны 🎟️', emoji: '🎟️', icon: 'fa-ticket' },
+            { code: 'conn', label: 'Связи 🤝', emoji: '🤝', icon: 'fa-handshake' },
+            { code: 'btc', label: 'Bitcoin ₿', emoji: '₿', icon: 'fa-bitcoin' },
+            { code: 'eth', label: 'Ethereum Ξ', emoji: 'Ξ', icon: 'fa-ethereum' }
+        ];
+
+        let fromC = this.exchangeState.fromCurrency || 'rub';
+        let toC = this.exchangeState.toCurrency || 'stars';
+        let amount = this.exchangeState.amount || 0;
+
+        let fromBalance = this.getCurrencyBalance(fromC);
+        let toBalance = this.getCurrencyBalance(toC);
+
+        let calc = this.calculateExchangeResult(fromC, toC, amount);
+
+        let fromOpts = currencies.map(c => `
+            <option value="${c.code}" ${c.code === fromC ? 'selected' : ''}>
+                ${c.emoji} ${c.label}
+            </option>
+        `).join('');
+
+        let toOpts = currencies.map(c => `
+            <option value="${c.code}" ${c.code === toC ? 'selected' : ''} ${c.code === fromC ? 'disabled' : ''}>
+                ${c.emoji} ${c.label}
+            </option>
+        `).join('');
 
         return `
-            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.12), #090e18); border-color: rgba(0, 242, 254, 0.35);">
+            <div class="glass-card mb-2 p-3" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.16), #090e18); border-color: var(--cyan);">
                 <div class="flex-between mb-1">
-                    <b class="text-xs color-cyan"><i class="fa-solid fa-arrow-right-arrow-left"></i> Мультивалютная Касса Во-Банка</b>
-                    <span class="tag-badge bg-tag-cyan">Комиссия 0%</span>
+                    <b class="text-xs color-cyan"><i class="fa-solid fa-arrow-right-arrow-left"></i> Мультивалютный Кросс-Обменник</b>
+                    <span class="tag-badge bg-tag-green">БЕЗ ЗАДЕРЖЕК</span>
                 </div>
-                <div class="sub-label mb-2" style="font-size:9.5px;">Мгновенный обмен валют, конвертация бензина, талонов и покупка Stars.</div>
+                <div class="sub-label mb-2" style="font-size:9.5px;">
+                    Мгновенная двусторонняя конвертация любой игровой валюты в реальном времени.
+                </div>
 
-                <div class="car-spec-chips-row mb-1">
-                    <div class="car-spec-chip"><i class="fa-solid fa-ruble-sign color-green"></i> <b>${(cash / 1000).toFixed(0)}k</b></div>
-                    <div class="car-spec-chip"><i class="fa-solid fa-star color-amber"></i> <b>${stars}</b> ⭐</div>
-                    <div class="car-spec-chip"><i class="fa-solid fa-gas-pump color-cyan"></i> <b>${fuel}</b> ⛽</div>
-                    <div class="car-spec-chip"><i class="fa-solid fa-ticket color-purple"></i> <b>${tickets}</b> 🎟️</div>
+                <!-- БАЛАНСЫ ВАЛЮТ В ВИДЕ БЕЙДЖЕЙ -->
+                <div class="car-spec-chips-row mb-2">
+                    <div class="car-spec-chip"><i class="fa-solid fa-ruble-sign color-green"></i> <b>${Math.round(state.player?.cash || 0).toLocaleString()}</b></div>
+                    <div class="car-spec-chip"><i class="fa-solid fa-star color-amber"></i> <b>${state.player?.stars || 0}</b></div>
+                    <div class="car-spec-chip"><i class="fa-solid fa-gas-pump color-cyan"></i> <b>${state.player?.fuel || 0}</b></div>
+                    <div class="car-spec-chip"><i class="fa-solid fa-ticket color-purple"></i> <b>${state.player?.expressTickets || 0}</b></div>
                 </div>
-            </div>
 
-            <!-- Размен рублей на Stars -->
-            <div class="glass-card p-2 mb-2">
-                <div class="flex-between mb-1">
-                    <b class="text-xs color-amber"><i class="fa-solid fa-star"></i> Покупка Stars за Наличные</b>
-                    <span class="sub-label text-xs">Курс: 1 ⭐ = 14,000 ₽</span>
-                </div>
-                <div class="grid-3 mb-1">
-                    <button onclick="AppBank.buyStarsPack(10, 140000)" class="btn btn-dark btn-sm">+10 ⭐ (140k)</button>
-                    <button onclick="AppBank.buyStarsPack(25, 350000)" class="btn btn-amber btn-sm">+25 ⭐ (350k)</button>
-                    <button onclick="AppBank.buyStarsPack(100, 1400000)" class="btn btn-dark btn-sm">+100 ⭐ (1.4M)</button>
-                </div>
-            </div>
+                <!-- КАРТОЧКА ОБМЕНА -->
+                <div class="p-2 mb-2" style="background:#090e18; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
+                    
+                    <!-- ОТДАЮ -->
+                    <div class="mb-2">
+                        <div class="flex-between text-xs mb-1">
+                            <span class="sub-label font-bold">ОТДАЮ:</span>
+                            <span class="sub-label">Доступно: <b class="color-cyan">${fromC === 'btc' || fromC === 'eth' ? fromBalance.toFixed(4) : fromBalance.toLocaleString()}</b></span>
+                        </div>
+                        <div class="grid-2" style="grid-template-columns: 1.1fr 1fr; gap:6px;">
+                            <select onchange="AppBank.setExchangeCurrency('from', this.value)" class="chat-input" style="padding:6px; font-size:11px;">
+                                ${fromOpts}
+                            </select>
+                            <input type="number" id="exFromAmountInput" value="${amount}" oninput="AppBank.setExchangeAmount(parseFloat(this.value)||0)" class="chat-input" style="padding:6px; font-size:12px; text-align:right; font-weight:bold; color:var(--green);">
+                        </div>
 
-            <!-- Конвертация топлива в Stars -->
-            <div class="glass-card p-2 mb-2">
-                <div class="flex-between mb-1">
-                    <b class="text-xs color-cyan"><i class="fa-solid fa-gas-pump"></i> Сдать излишки Топлива ⛽</b>
-                    <span class="sub-label text-xs">АЗС Скупка</span>
-                </div>
-                <div class="grid-2">
-                    <button onclick="AppBank.exchangeFuelForCash(30)" class="btn btn-dark btn-sm" ${fuel < 30 ? 'disabled' : ''}>-30 ⛽ (+60,000 ₽)</button>
-                    <button onclick="AppBank.exchangeFuelForStars(50, 8)" class="btn btn-cyan btn-sm" ${fuel < 50 ? 'disabled' : ''}>-50 ⛽ (+8 ⭐ Stars)</button>
-                </div>
-            </div>
-
-            <!-- Конвертация талонов -->
-            <div class="glass-card p-2 mb-2">
-                <div class="flex-between mb-1">
-                    <b class="text-xs color-purple"><i class="fa-solid fa-ticket"></i> Обмен экспресс-пропусков 🎟️</b>
-                    <span class="sub-label text-xs">Талоны площадки</span>
-                </div>
-                <div class="grid-2">
-                    <button onclick="AppBank.exchangeTicketsForCash(10)" class="btn btn-dark btn-sm" ${tickets < 10 ? 'disabled' : ''}>-10 🎟️ (+75,000 ₽)</button>
-                    <button onclick="AppBank.exchangeTicketsForStars(15, 10)" class="btn btn-purple btn-sm" ${tickets < 15 ? 'disabled' : ''}>-15 🎟️ (+10 ⭐ Stars)</button>
-                </div>
-            </div>
-
-            <!-- Билеты супер-вилспина -->
-            <div class="glass-card p-2" style="border: 1px solid rgba(0, 230, 118, 0.4);">
-                <div class="flex-between mb-1">
-                    <div>
-                        <b class="text-xs color-green"><i class="fa-solid fa-clover"></i> Билет «Супер Вилспин»</b>
-                        <div class="sub-label" style="font-size:9px;">В наличии: <b>${superSpinTickets} шт.</b></div>
+                        <!-- Кнопки быстрого выбора процентов -->
+                        <div class="grid-4 mt-1" style="gap:4px;">
+                            <button onclick="AppBank.applyPercentAmount(0.25)" class="btn btn-dark btn-sm" style="font-size:8px; padding:2px;">25%</button>
+                            <button onclick="AppBank.applyPercentAmount(0.50)" class="btn btn-dark btn-sm" style="font-size:8px; padding:2px;">50%</button>
+                            <button onclick="AppBank.applyPercentAmount(0.75)" class="btn btn-dark btn-sm" style="font-size:8px; padding:2px;">75%</button>
+                            <button onclick="AppBank.applyPercentAmount(1.00)" class="btn btn-dark btn-sm" style="font-size:8px; padding:2px;">MAX</button>
+                        </div>
                     </div>
-                    <span class="price-val text-xs color-green">300k ₽ + 30 ⭐</span>
+
+                    <!-- КНОПКА РЕВЕРСА ПАРЫ -->
+                    <div class="text-center my-1">
+                        <button onclick="AppBank.reverseExchangePair()" class="btn btn-dark btn-auto btn-sm" style="border-radius:50%; width:32px; height:32px; padding:0;" title="Поменять местами">
+                            <i class="fa-solid fa-up-down"></i>
+                        </button>
+                    </div>
+
+                    <!-- ПОЛУЧАЮ -->
+                    <div>
+                        <div class="flex-between text-xs mb-1">
+                            <span class="sub-label font-bold">ПОЛУЧАЮ:</span>
+                            <span class="sub-label">Баланс: <b class="color-green">${toC === 'btc' || toC === 'eth' ? toBalance.toFixed(4) : toBalance.toLocaleString()}</b></span>
+                        </div>
+                        <div class="grid-2" style="grid-template-columns: 1.1fr 1fr; gap:6px;">
+                            <select onchange="AppBank.setExchangeCurrency('to', this.value)" class="chat-input" style="padding:6px; font-size:11px;">
+                                ${toOpts}
+                            </select>
+                            <div class="price-val color-green p-1 text-right" style="font-size:15px; border-radius:6px; background:#04070e; border:1px solid rgba(255,255,255,0.06);">
+                                +${toC === 'btc' || toC === 'eth' ? calc.targetAmount.toFixed(4) : calc.targetAmount.toLocaleString()}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sub-label text-center mt-2" style="font-size:9.5px; color:#94a3b8;">
+                        Курс конвертации: <b class="color-amber">${calc.rateText}</b>
+                    </div>
                 </div>
-                <button onclick="AppBank.buySuperSpinTicketBank()" class="btn btn-green btn-sm w-full mt-1">
-                    Приобрести билет Фортуны 🎰
+
+                <button onclick="AppBank.executeUniversalExchange()" class="btn btn-green w-full" ${(!calc.canExchange || fromBalance < amount) ? 'disabled' : ''}>
+                    ${fromBalance < amount ? 'Недостаточно средств для обмена' : `Обменять ${amount.toLocaleString()}${fromC.toUpperCase()} 💱`}
+                </button>
+            </div>
+
+            <!-- БЫСТРАЯ ПОКУПКА БИЛЕТОВ СУПЕРВИЛСПИНА -->
+            <div class="glass-card p-2 mb-2 flex-between" style="border: 1px solid rgba(0, 230, 118, 0.4);">
+                <div>
+                    <b class="text-xs color-green"><i class="fa-solid fa-clover"></i> Билет «Супер Вилспин»</b>
+                    <div class="sub-label" style="font-size:9px;">На балансе: <b>${state.player?.superSpinTickets || 0} шт.</b></div>
+                </div>
+                <button onclick="AppBank.buySuperSpinTicketBank()" class="btn btn-green btn-auto btn-sm">
+                    Купить (300k + 30 ⭐)
                 </button>
             </div>
         `;
     },
 
+    setExchangeCurrency(direction, code) {
+        if (direction === 'from') {
+            this.exchangeState.fromCurrency = code;
+            if (this.exchangeState.toCurrency === code) {
+                this.exchangeState.toCurrency = (code === 'rub') ? 'stars' : 'rub';
+            }
+        } else {
+            this.exchangeState.toCurrency = code;
+        }
+
+        // Корректируем базовую сумму ввода под валюту
+        let bal = this.getCurrencyBalance(this.exchangeState.fromCurrency);
+        this.exchangeState.amount = Math.min(bal, this.exchangeState.amount || (bal > 0 ? Math.round(bal * 0.5) : 10));
+
+        playSound('tick');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    setExchangeAmount(val) {
+        this.exchangeState.amount = Math.max(0, val);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    applyPercentAmount(pct) {
+        let bal = this.getCurrencyBalance(this.exchangeState.fromCurrency);
+        let calculated = (this.exchangeState.fromCurrency === 'btc' || this.exchangeState.fromCurrency === 'eth')
+            ? parseFloat((bal * pct).toFixed(4))
+            : Math.floor(bal * pct);
+
+        this.exchangeState.amount = calculated;
+        playSound('tick');
+        tgHaptic('light');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    reverseExchangePair() {
+        let temp = this.exchangeState.fromCurrency;
+        this.exchangeState.fromCurrency = this.exchangeState.toCurrency;
+        this.exchangeState.toCurrency = temp;
+
+        let bal = this.getCurrencyBalance(this.exchangeState.fromCurrency);
+        this.exchangeState.amount = Math.min(bal, this.exchangeState.amount);
+
+        playSound('tick');
+        tgHaptic('medium');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    executeUniversalExchange() {
+        const fromC = this.exchangeState.fromCurrency;
+        const toC = this.exchangeState.toCurrency;
+        const amt = this.exchangeState.amount;
+
+        let fromBal = this.getCurrencyBalance(fromC);
+        if (fromBal < amt || amt <= 0) {
+            return showToast("Недостаточно средств для операции обмена!");
+        }
+
+        let calc = this.calculateExchangeResult(fromC, toC, amt);
+        if (!calc.canExchange || calc.targetAmount <= 0) {
+            return showToast("Сумма слишком мала для конвертации!");
+        }
+
+        // Списание и начисление
+        this.setCurrencyBalance(fromC, fromBal - amt);
+        let toBal = this.getCurrencyBalance(toC);
+        this.setCurrencyBalance(toC, toBal + calc.targetAmount);
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Обмен ${amt} ${fromC.toUpperCase()} на ${calc.targetAmount} ${toC.toUpperCase()}`, (fromC === 'rub' ? amt : calc.targetAmount), (toC === 'rub'));
+        }
+
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+
+        openVerdictModal(
+            "ОБМЕН УСПЕШНО ЗАВЕРШЁН! 💱",
+            `Списано: ${amt.toLocaleString()} ${fromC.toUpperCase()}\nЗачислено: +${calc.targetAmount.toLocaleString()} ${toC.toUpperCase()}\nКурс: ${calc.rateText}`,
+            true
+        );
+
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
     // ========================================================
-    // 3. ВКЛАДКА: ГЛУБОКАЯ СИСТЕМА ДЕПОЗИТОВ
+    // 3. ВКЛАДКА: ДЕПОЗИТЫ С КАПИТАЛИЗАЦИЕЙ
     // ========================================================
     renderDepositsTab() {
         let deposits = state.player?.bankDeposits || [];
@@ -572,95 +793,6 @@ const AppBank = {
     // ========================================================
     // ВСПОМОГАТЕЛЬНЫЕ ФИНАНСОВЫЕ ОПЕРАЦИИ
     // ========================================================
-    buyStarsPack(starsAmount, rubCost) {
-        let cash = state.player?.cash || 0;
-        if (cash < rubCost) return showToast(`Не хватает рублей! Нужно ${rubCost.toLocaleString()} ₽.`);
-
-        state.player.cash -= rubCost;
-        state.player.stars = (state.player.stars || 0) + starsAmount;
-
-        if (typeof logBankTransaction === 'function') {
-            logBankTransaction(`Покупка ${starsAmount} ⭐ Stars`, rubCost, false);
-        }
-
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast(`Успешно куплено +${starsAmount} ⭐ Stars!`);
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    exchangeFuelForCash(fuelAmount) {
-        let fuel = state.player?.fuel || 0;
-        if (fuel < fuelAmount) return showToast("Не хватает топлива в баке!");
-
-        state.player.fuel -= fuelAmount;
-        let gain = fuelAmount * 2000;
-        state.player.cash = (state.player.cash || 0) + gain;
-
-        if (typeof logBankTransaction === 'function') {
-            logBankTransaction(`Продажа ${fuelAmount} ⛽ бензина`, gain, true);
-        }
-
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast(`Слито ${fuelAmount} ⛽ бензина. Получено +${gain.toLocaleString()} ₽!`);
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    exchangeFuelForStars(fuelAmount, starsGain) {
-        let fuel = state.player?.fuel || 0;
-        if (fuel < fuelAmount) return showToast("Не хватает топлива в баке!");
-
-        state.player.fuel -= fuelAmount;
-        state.player.stars = (state.player.stars || 0) + starsGain;
-
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast(`Обменяно ${fuelAmount} ⛽ на +${starsGain} ⭐ Stars!`);
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    exchangeTicketsForCash(ticketsCount) {
-        let tck = state.player?.expressTickets || 0;
-        if (tck < ticketsCount) return showToast("Не хватает экспресс-талонов!");
-
-        state.player.expressTickets -= ticketsCount;
-        let gain = ticketsCount * 7500;
-        state.player.cash = (state.player.cash || 0) + gain;
-
-        if (typeof logBankTransaction === 'function') {
-            logBankTransaction(`Обмен ${ticketsCount} 🎟️ талонов`, gain, true);
-        }
-
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast(`Сдано ${ticketsCount} 🎟️ талонов за +${gain.toLocaleString()} ₽!`);
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    exchangeTicketsForStars(ticketsCount, starsGain) {
-        let tck = state.player?.expressTickets || 0;
-        if (tck < ticketsCount) return showToast("Не хватает экспресс-талонов!");
-
-        state.player.expressTickets -= ticketsCount;
-        state.player.stars = (state.player.stars || 0) + starsGain;
-
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast(`Обменяно ${ticketsCount} 🎟️ талонов на +${starsGain} ⭐ Stars!`);
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
     buySuperSpinTicketBank() {
         const costCash = 300000;
         const costStars = 30;

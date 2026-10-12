@@ -1,8 +1,8 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И СДЕЛКИ (v0.7.2)
+// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И 3D-КАПСУЛЫ (v0.7.4)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Живые анимированные шкалы мощности, HP кузова, мини-галерея фото
-// прямо на карточке, LED-бейджи, прогазовка и жесткий учет приборов.
+// Объёмные 3D-виджеты характеристик, рельефная плашка цены,
+// интерактивная галерея фото, строгий учёт приборов.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -295,13 +295,9 @@ function populateMarketFeed() {
 
         let carOnlyPrice = Math.round(dynPrice * priceMultiplier);
         let sellerPrice = carOnlyPrice;
-        let isLuckyFind = false;
 
         if (plateVal > 5000) {
-            if (Math.random() < 0.30) {
-                isLuckyFind = true;
-                sellerPrice = carOnlyPrice;
-            } else {
+            if (Math.random() >= 0.30) {
                 let plateMarkup = Math.round(plateVal * 0.60);
                 sellerPrice = carOnlyPrice + plateMarkup;
             }
@@ -327,9 +323,6 @@ function populateMarketFeed() {
         if (isPodborFind) {
             sNote = "«Срочный выкуп найден вашими автоподборщиками. Продавец отдаёт с дисконтом 35%!»";
             sMoodIcon = "🎯";
-        } else if (isLuckyFind) {
-            sNote = "«Отдаю дедовский аппарат как есть, в номерах ничего не понимаю.» (🔥 Не знает цену номеров!)";
-            sMoodIcon = "👴";
         } else if (dealType === 'overprice') {
             const overpriceNotes = [
                 "«Цена окончательная, знаю рынок. Свои цены не предлагать!»",
@@ -488,13 +481,9 @@ function cycleMarketCarImage(carId, delta, event) {
     tgHaptic('light');
 }
 
-function playCarExhaustPreview(event) {
-    if (event) event.stopPropagation();
-    playEngineSound();
-    tgHaptic('medium');
-    showToast("💨 Прогазовка мотора!");
-}
-
+// ========================================================
+// ОСНОВНОЙ РЕНДЕР КАРТОЧЕК РЫНКА (3D-КАПСУЛЫ)
+// ========================================================
 function renderMarketFeed() {
     const container = document.getElementById('marketCardContainer');
     if (!container) return;
@@ -542,17 +531,14 @@ function renderMarketFeed() {
         let viewedClass = car.viewed ? "viewed-card" : "";
         let autoIcon = car.autotekaChecked ? "Проверено ✓" : "5,000 ₽";
 
-        // Расчет процентов шкал
-        let powerVal = car.power || 100;
-        let powerPct = Math.min(100, Math.round((powerVal / 500) * 100));
-
         let condVal = car.condition || 80;
-        let condClass = condVal >= 80 ? 'fill-condition-high' : (condVal >= 50 ? 'fill-condition-mid' : 'fill-condition-low');
-        let condColor = condVal >= 80 ? 'color-green' : (condVal >= 50 ? 'color-amber' : 'color-red');
+        let shieldIconClass = condVal >= 80 
+            ? 'spec-tile-icon-shield' 
+            : (condVal >= 50 ? 'spec-tile-icon-shield-mid' : 'spec-tile-icon-shield-low');
+        let condColorClass = condVal >= 80 
+            ? 'color-green' 
+            : (condVal >= 50 ? 'color-amber' : 'color-red');
 
-        let mileagePct = Math.min(100, Math.round(((car.mileage || 85000) / 250000) * 100));
-
-        // LED и спец-бейджи
         let dealBadge = "";
         if (car.isPodborFind) {
             dealBadge = "<span class='tag-badge bg-tag-green ml-1'><span class='led-dot led-green'></span> ПОДБОР -35%</span>";
@@ -571,7 +557,6 @@ function renderMarketFeed() {
             ? "<span class='tag-badge badge-police-strobe ml-1'>🚨 РОЗЫСК</span>" 
             : "";
 
-        // Галерея точек
         let imagesCount = Array.isArray(car.images) ? car.images.length : 1;
         let galleryDotsHtml = "";
         if (imagesCount > 1) {
@@ -587,7 +572,6 @@ function renderMarketFeed() {
             <button class="car-gallery-nav-btn car-gallery-next" onclick="cycleMarketCarImage('${car.id}', 1, event)">❯</button>
         ` : "";
 
-        // Реплика продавца
         let sellerDialogHtml = car.sellerNote ? `
             <div class="seller-dialog-bubble">
                 <span class="seller-mood-icon">${car.sellerMoodIcon || '🚗'}</span>
@@ -610,16 +594,12 @@ function renderMarketFeed() {
                 <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>${t('paid_call')} (1,000 ₽)</button>
             </div>
 
-            <!-- ИНТЕРАКТИВНАЯ ОБЛОЖКА С ПЕРЕКЛЮЧАТЕЛЕМ ФОТО -->
+            <!-- ОБЛОЖКА С МУЛЬТИ-ФОТО (БЕЗ КНОПКИ ЗВУКА) -->
             <div class='car-img-wrap'>
                 <img id="market_car_img_${car.id}" src='${carImg}' class='car-img' onerror="this.onerror=null; this.src='${fallbackUrl}';">
                 
                 ${navArrowsHtml}
                 ${galleryDotsHtml}
-
-                <button class="car-exhaust-audio-btn" onclick="playCarExhaustPreview(event)" title="Звук выхлопа">
-                    <i class="fa-solid fa-volume-high"></i>
-                </button>
 
                 <div class='plate-corner'><div class='license-plate notranslate' translate='no'>${car.plate} <div class='license-flag'>RUS</div></div></div>
                 <div class='badge-tag badge-br'>
@@ -630,48 +610,58 @@ function renderMarketFeed() {
                 </div>
             </div>
 
-            <div class='flex-between mb-2'>
-                <h4 class='font-bold text-xs color-cyan' style='font-size:14.5px;'>${car.name}</h4>
-                ${profitPill}
+            <!-- РЕЛЬЕФНАЯ СТРОКА ЗАГОЛОВКА И ЦЕНЫ (3D) -->
+            <div class="car-header-row-volumetric">
+                <div>
+                    <div class="car-title-plate">${car.name}</div>
+                    <div class="mt-1">${profitPill}</div>
+                </div>
+                <div class="car-price-badge-3d">
+                    <span class="car-price-label-sub">Цена продавца</span>
+                    <span class="car-price-value-3d" id='price_txt_${car.id}'>${carPrice} ₽</span>
+                </div>
             </div>
 
-            <!-- АНИМИРОВАННЫЕ ШКАЛЫ ТЕЛЕМЕТРИИ -->
-            <div class="car-telemetry-panel">
-                <div class="telemetry-row">
-                    <div class="telemetry-label"><i class="fa-solid fa-bolt color-amber"></i> Мощность:</div>
-                    <div class="telemetry-bar-bg">
-                        <div class="telemetry-bar-fill fill-power" style="width:${powerPct}%;"></div>
+            <!-- ОБЪЁМНЫЕ РЕЛЬЕФНЫЕ КАПСУЛЫ ХАРАКТЕРИСТИК (3D CAPSULES) -->
+            <div class="car-specs-grid-volumetric">
+                <div class="spec-tile-3d">
+                    <div class="spec-tile-icon-wrap spec-tile-icon-power">
+                        <i class="fa-solid fa-bolt"></i>
                     </div>
-                    <div class="telemetry-val color-amber">${powerVal} л.с.</div>
+                    <div class="spec-tile-val color-amber">${car.power || 100} л.с.</div>
+                    <div class="spec-tile-sub">Мощность</div>
                 </div>
 
-                <div class="telemetry-row">
-                    <div class="telemetry-label"><i class="fa-solid fa-shield ${condColor}"></i> Кузов / HP:</div>
-                    <div class="telemetry-bar-bg">
-                        <div class="telemetry-bar-fill ${condClass}" style="width:${condVal}%;"></div>
+                <div class="spec-tile-3d">
+                    <div class="spec-tile-icon-wrap spec-tile-icon-road">
+                        <i class="fa-solid fa-road"></i>
                     </div>
-                    <div class="telemetry-val ${condColor}">${condVal}%</div>
+                    <div class="spec-tile-val color-cyan">${carMileage} км</div>
+                    <div class="spec-tile-sub">Пробег</div>
                 </div>
 
-                <div class="telemetry-row">
-                    <div class="telemetry-label"><i class="fa-solid fa-road color-cyan"></i> Пробег:</div>
-                    <div class="telemetry-bar-bg">
-                        <div class="telemetry-bar-fill fill-power" style="width:${mileagePct}%; background: linear-gradient(90deg, #0284c7, #38bdf8);"></div>
+                <div class="spec-tile-3d">
+                    <div class="spec-tile-icon-wrap ${shieldIconClass}">
+                        <i class="fa-solid fa-shield"></i>
                     </div>
-                    <div class="telemetry-val color-cyan">${carMileage} км</div>
+                    <div class="spec-tile-val ${condColorClass}">${condVal}%</div>
+                    <div class="spec-tile-sub">Кузов / HP</div>
                 </div>
             </div>
 
             ${sellerDialogHtml}
 
-            <div class='price-box'>
+            <!-- ОЦЕНКА РЫНКА И ПОТЕНЦИАЛ -->
+            <div class="p-2 mb-2 flex-between" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.06);">
                 <div>
-                    <span class='text-xs color-green font-bold'>${t('price')}:</span>
-                    <div class='price-val notranslate' translate='no' id='price_txt_${car.id}'>${carPrice} ₽</div>
+                    <span class="sub-label text-xs">Оценка вторичного рынка:</span>
+                    <div class="font-bold color-cyan text-xs" style="font-size:12px;">~${carMarketVal} ₽</div>
                 </div>
-                <div class='sub-label text-right'>
-                    <span class='sub-label text-xs'>${t('market_estimate')}:</span>
-                    <div class='font-bold color-cyan text-xs'>~${carMarketVal} ₽</div>
+                <div class="text-right">
+                    <span class="sub-label text-xs">Прибыль перекупа:</span>
+                    <div class="font-bold ${estimatedProfit > 0 ? 'color-green' : 'color-red'} text-xs" style="font-size:12px;">
+                        ${estimatedProfit > 0 ? '+' : ''}${estimatedProfit.toLocaleString()} ₽
+                    </div>
                 </div>
             </div>
 
@@ -1571,7 +1561,6 @@ window.refreshMarketFeedManual = refreshMarketFeedManual;
 window.populateMarketFeed = populateMarketFeed;
 window.renderMarketFeed = renderMarketFeed;
 window.cycleMarketCarImage = cycleMarketCarImage;
-window.playCarExhaustPreview = playCarExhaustPreview;
 window.openGaugeModal = openGaugeModal;
 window.checkBodyPart = checkBodyPart;
 window.closeGaugeModal = closeGaugeModal;
