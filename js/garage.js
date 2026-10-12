@@ -1,10 +1,9 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.7.1)
+// js/garage.js — АВТОПАРК, ОБЪЁМНЫЕ ВИДЖЕТЫ И ТЮНИНГ (v0.7.3)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Окупаемый детейлинг и тюнинг, стационарный Launch OBD2 строго по прибору,
-// конструктор страхового полиса, штрафстоянка ГИБДД (ModalManager),
-// бесплатный забор служебным эвакуатором «Шериф»,
-// малярка «Хамелеон» без следов на толщиномере и Stage Lab.
+// 3D-капсулы характеристик, рельефный блок оценки, окупаемый тюнинг,
+// стационарный Launch OBD2 строго по прибору, полисы ОСАГО/КАСКО
+// и забор машин со спецстоянки ГИБДД через ModalManager.
 // ========================================================
 
 let previewCarIndex = null;
@@ -124,7 +123,7 @@ function openNeedCapabilityModal(type = 'tune', customTitle = null) {
         title = "ТРЕБУЕТСЯ ЧИСТЫЙ БОКС С ВОДОЙ И СВЕТОМ";
         heading = (customTitle || "Детейлинг и покраска") + " недоступны!";
         desc = `Полировка и покраска кузова <b>под открытым небом испортят ЛКП дорожной пылью</b>!<br><br>
-                ✨ Для качественного облива и полировки требуется закрытый сухой бокс с водопроводом и ярким светом (Двойной бокс, Новостройка, Коттедж или Вилла).`;
+                ✨ Для качественного облива и полировки требуется закрытый сухой бокс с водопроводом и ярким светом.`;
         icon = "✨";
     } else if (type === 'service') {
         title = "ТРЕБУЕТСЯ МЕСТО ДЛЯ ОБСЛУЖИВАНИЯ";
@@ -141,7 +140,7 @@ function openNeedCapabilityModal(type = 'tune', customTitle = null) {
     } else if (type === 'personal') {
         title = "ТРЕБУЕТСЯ ОХРАНЯЕМОЕ МАШИНОМЕСТО";
         heading = "Назначение личного авто недоступно!";
-        desc = `Личный автомобиль нельзя бросать без присмотра на неохраняемой стройплощадке — высок риск кражи зеркал и вандализма.<br><br>
+        desc = `Личный автомобиль нельзя бросать без присмотра на неохраняемой стройплощадке — высок риск кражи деталей и вандализма.<br><br>
                 👑 Арендуйте жилье с закрепленным парковочным местом, бокс в ГСК или подземный паркинг.`;
         icon = "👑";
     }
@@ -232,7 +231,7 @@ function recalculateCarMarketValue(car) {
 }
 
 // ========================================================
-// 3. ОСНОВНОЙ РЕНДЕР ГАРАЖА
+// 3. ОСНОВНОЙ РЕНДЕР ГАРАЖА (ОБЪЁМНЫЕ 3D-КАПСУЛЫ)
 // ========================================================
 function renderGarage() {
     const list = document.getElementById('garageList');
@@ -283,15 +282,16 @@ function renderGarage() {
         if (isImpounded) {
             legalBadge = "<span class='tag-badge bg-red'>🚔 НА ШТРАФСТОЯНКЕ</span>";
         } else if (car.isStolen) {
-            legalBadge = "<span class='tag-badge bg-tag-red'>🚨 В РОЗЫСКЕ</span>";
+            legalBadge = "<span class='tag-badge badge-police-strobe'>🚨 В РОЗЫСКЕ</span>";
         } else if (car.unregistered) {
-            legalBadge = "<span class='tag-badge bg-tag-red'>12.5.1 АННУЛИРОВАН</span>";
+            legalBadge = "<span class='tag-badge badge-police-strobe'>12.5.1 АННУЛИРОВАН</span>";
         } else if (car.isRegisteredOnPlayer) {
-            legalBadge = "<span class='tag-badge bg-tag-green'>✓ УЧЁТ РФ (МРЭО)</span>";
+            legalBadge = "<span class='tag-badge bg-tag-green'><span class='led-dot led-green'></span> УЧЁТ РФ</span>";
         } else {
             let daysLeft = Math.max(0, 10 - (car.ownershipDays || 0));
             let dkpClass = daysLeft === 0 ? "bg-tag-red" : "bg-tag-amber";
-            legalBadge = `<span class='tag-badge ${dkpClass}' title='Без постановки на учёт'>📄 НА ДКП (${daysLeft} дн. лимит)</span>`;
+            let ledClass = daysLeft === 0 ? "led-amber" : "led-green";
+            legalBadge = `<span class='tag-badge ${dkpClass}'><span class='led-dot ${ledClass}'></span> НА ДКП (${daysLeft} дн. лимит)</span>`;
         }
 
         let insuranceBadge = "";
@@ -305,7 +305,7 @@ function renderGarage() {
 
         let pVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(cPlate) : 0;
         let coolPlateBadge = pVal > 15000 
-            ? `<span class='tag-badge bg-tag-purple ml-1' title='Блатной госномер (+${pVal.toLocaleString()} ₽ к стоимости)'><i class='fa-solid fa-gem'></i> БЛАТНОЙ</span>`
+            ? `<span class='tag-badge badge-shimmer-gold ml-1'><i class='fa-solid fa-gem'></i> БЛАТНОЙ</span>`
             : "";
 
         let tempVal = car.engineTemp || 90;
@@ -315,8 +315,17 @@ function renderGarage() {
 
         let tireVal = car.tireWear !== undefined ? car.tireWear : 100;
         let tireBadge = tireVal < 35 
-            ? `<span class='tag-badge bg-tag-red ml-1'><i class='fa-solid fa-circle-notch'></i> СЛИК ИЗНОШЕН (${tireVal}%)</span>`
+            ? `<span class='tag-badge bg-tag-red ml-1'><i class='fa-solid fa-circle-notch'></i> СЛИК ${tireVal}%</span>`
             : "";
+
+        // Расчёт состояния кузова для иконки
+        let condVal = car.condition !== undefined ? car.condition : 80;
+        let shieldIconClass = condVal >= 80 
+            ? 'spec-tile-icon-shield' 
+            : (condVal >= 50 ? 'spec-tile-icon-shield-mid' : 'spec-tile-icon-shield-low');
+        let condColorClass = condVal >= 80 
+            ? 'color-green' 
+            : (condVal >= 50 ? 'color-amber' : 'color-red');
 
         let modsIconsHtml = renderCarModsBadges(car);
 
@@ -372,23 +381,51 @@ function renderGarage() {
                 </div>
             </div>
             
-            <div class="flex-between mb-2">
-                <div>
-                    <h4 class="font-bold text-xs color-cyan" style="font-size:14px;">${cName}</h4>
-                </div>
-                <div class="price-val text-xs text-right color-green" style="font-size:15px;">
-                    ${cPrice} ₽
+            <!-- РЕЛЬЕФНАЯ СТРОКА ЗАГОЛОВКА И ЦЕНЫ -->
+            <div class="car-header-row-volumetric">
+                <div class="car-title-plate">${cName}</div>
+                <div class="car-price-badge-3d">
+                    <span class="car-price-label-sub">Оценка рынка</span>
+                    <span class="car-price-value-3d">${cPrice} ₽</span>
                 </div>
             </div>
 
-            <div class="car-spec-chips-row mb-2">
-                <div class="car-spec-chip"><i class="fa-solid fa-bolt color-amber"></i> <b>${cPower}</b> л.с.</div>
-                <div class="car-spec-chip"><i class="fa-solid fa-road color-cyan"></i> <b>${(car.mileage || 85000).toLocaleString()}</b> км</div>
-                <div class="car-spec-chip"><i class="fa-solid fa-shield color-green"></i> <b>${car.condition || 80}%</b> кузов</div>
+            <!-- ОБЪЁМНЫЕ РЕЛЬЕФНЫЕ КАПСУЛЫ ХАРАКТЕРИСТИК (ВМЕСТО ПЛОСКОГО СПИСКА) -->
+            <div class="car-specs-grid-volumetric">
+                <div class="spec-tile-3d">
+                    <div class="spec-tile-icon-wrap spec-tile-icon-power">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <div class="spec-tile-val color-amber">${cPower} л.с.</div>
+                    <div class="spec-tile-sub">Мощность</div>
+                </div>
+
+                <div class="spec-tile-3d">
+                    <div class="spec-tile-icon-wrap spec-tile-icon-road">
+                        <i class="fa-solid fa-road"></i>
+                    </div>
+                    <div class="spec-tile-val color-cyan">${(car.mileage || 85000).toLocaleString()} км</div>
+                    <div class="spec-tile-sub">Пробег</div>
+                </div>
+
+                <div class="spec-tile-3d">
+                    <div class="spec-tile-icon-wrap ${shieldIconClass}">
+                        <i class="fa-solid fa-shield"></i>
+                    </div>
+                    <div class="spec-tile-val ${condColorClass}">${condVal}%</div>
+                    <div class="spec-tile-sub">Кузов / HP</div>
+                </div>
             </div>
 
-            <div class="car-mods-badges-container mb-2">
-                ${modsIconsHtml}
+            <!-- СТАТУС ТЮНИНГА / СТОКА -->
+            <div class="car-tuning-status-capsule">
+                <div class="tuning-status-left">
+                    <i class="fa-solid fa-gear color-cyan" style="font-size:12px;"></i>
+                    <span class="sub-label font-bold" style="font-size:9.5px;">Конфигурация:</span>
+                </div>
+                <div class="car-mods-badges-container">
+                    ${modsIconsHtml}
+                </div>
             </div>
 
             ${actionControlBlock}
@@ -841,7 +878,7 @@ function updateTuneRiskMeter(car) {
 }
 
 // ========================================================
-// 8. ОСМОТР, СТАЦИОНАРНЫЙ OBD2 И РЕМОНТ (СТРОГО ПО ПРИБОРУ)
+// 8. ОСМОТР, СТАЦИОНАРНЫЙ OBD2 И РЕМОНТ
 // ========================================================
 function openCarPreviewModal(idx) {
     previewCarIndex = idx;
@@ -876,7 +913,6 @@ function openOBD2Modal() {
     const car = state.garage[previewCarIndex];
     if (!car) return;
 
-    // ЖЕСТКАЯ ПРОВЕРКА: сканер должен быть куплен
     const hasScanner = !!(state.player?.tools && (state.player.tools.obd || state.player.tools.obd_launch));
     if (!hasScanner) {
         playSound('error');
@@ -898,7 +934,6 @@ function openOBD2Modal() {
         return showToast("⚠️ Диагностический сканер разряжен! Откалибруйте его в Авто-Маркете.");
     }
 
-    // Списание ресурса
     state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
     saveState();
 
