@@ -1,13 +1,130 @@
 // ========================================================
-// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, ТОП (v0.6.2)
+// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, ТОП (v0.6.5)
 // Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
 // Подбор контрактов Синдиката строго под открытые классы,
-// разблокировка комфорта с 15 уровня, P2P-биржа и автоклубы.
+// разблокировка комфорта с 15 уровня, P2P-биржа, автоклубы,
+// лидерборд перекупов и реферальная программа друзей.
+// Встроенный полноценный модуль AppSyndicate для Perekup OS.
 // ========================================================
 
 let p2pActiveFilter = 'cars';
 let p2pNewListingType = 'car';
 let activeContractForCarSelect = null;
+
+// ========================================================
+// ПОЛНОЦЕННЫЙ ЭКРАН ПРИЛОЖЕНИЯ «СИНДИКАТ» ДЛЯ СМАРТФОНА
+// ========================================================
+const AppSyndicate = {
+    render(container) {
+        let sub = state.syndicateSubTab || 'contracts';
+
+        container.innerHTML = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
+                <div class="phone-app-title color-purple"><i class="fa-solid fa-globe mr-1"></i> СИНДИКАТ ХАБ</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body">
+                <!-- 6 ОСНОВНЫХ ВКЛАДОК СИНДИКАТА -->
+                <div class="grid-3 mb-2" style="grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                    <button onclick="switchSyndicateTab('contracts')" id="synTabBtn-contracts" class="btn ${sub === 'contracts' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9.5px; padding:6px 2px;">Заказы</button>
+                    <button onclick="switchSyndicateTab('p2p')" id="synTabBtn-p2p" class="btn ${sub === 'p2p' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9.5px; padding:6px 2px;">P2P Биржа</button>
+                    <button onclick="switchSyndicateTab('blackmarket')" id="synTabBtn-blackmarket" class="btn ${sub === 'blackmarket' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9.5px; padding:6px 2px;">Номера</button>
+                </div>
+                <div class="grid-3 mb-2" style="grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                    <button onclick="switchSyndicateTab('clubs')" id="synTabBtn-clubs" class="btn ${sub === 'clubs' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9.5px; padding:6px 2px;">Автоклубы</button>
+                    <button onclick="switchSyndicateTab('leaderboard')" id="synTabBtn-leaderboard" class="btn ${sub === 'leaderboard' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9.5px; padding:6px 2px;">Топ</button>
+                    <button onclick="switchSyndicateTab('friends')" id="synTabBtn-friends" class="btn ${sub === 'friends' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9.5px; padding:6px 2px;">Рефералы</button>
+                </div>
+
+                <!-- 1. ЭКРАН ЗАКАЗОВ -->
+                <div id="synScreen-contracts" style="${sub === 'contracts' ? 'display:block;' : 'display:none;'}">
+                    <div id="contractsLockCover" style="display:none;"></div>
+                    <div class="glass-card mb-2 p-2 flex-between">
+                        <div>
+                            <b class="text-xs color-cyan"><i class="fa-solid fa-file-contract"></i> База эксклюзивных контрактов</b>
+                            <div class="sub-label" style="font-size:9.5px;">Подбор техники под вип-клиентов</div>
+                        </div>
+                        <button onclick="refreshContractsManual()" class="btn btn-dark btn-auto btn-sm" style="font-size:9px;">Обновить (25k)</button>
+                    </div>
+                    <div id="contractsList"></div>
+                </div>
+
+                <!-- 2. ЭКРАН P2P БИРЖИ -->
+                <div id="synScreen-p2p" style="${sub === 'p2p' ? 'display:block;' : 'display:none;'}">
+                    <div class="glass-card mb-2 p-2">
+                        <div class="flex-between mb-1">
+                            <b class="text-xs color-green"><i class="fa-solid fa-handshake"></i> P2P Биржа Autodrot</b>
+                            <button onclick="openCreateListingModal()" class="btn btn-green btn-auto btn-sm" style="font-size:9.5px;">+ Продать лот</button>
+                        </div>
+                        <div class="sub-label" style="font-size:9.5px;">Прямая торговля машинами, номерами, бизнесом и недвижимостью.</div>
+                    </div>
+                    <div class="grid-4 mb-2">
+                        <button onclick="filterP2P('cars')" id="p2pFilter-cars" class="btn ${p2pActiveFilter === 'cars' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">Авто</button>
+                        <button onclick="filterP2P('plates')" id="p2pFilter-plates" class="btn ${p2pActiveFilter === 'plates' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">Номера</button>
+                        <button onclick="filterP2P('business')" id="p2pFilter-business" class="btn ${p2pActiveFilter === 'business' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">Бизнес</button>
+                        <button onclick="filterP2P('housing')" id="p2pFilter-housing" class="btn ${p2pActiveFilter === 'housing' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">Жильё</button>
+                    </div>
+                    <div id="p2pItemsList"></div>
+                </div>
+
+                <!-- 3. ЭКРАН ЧЕРНОГО РЫНКА НОМЕРОВ -->
+                <div id="synScreen-blackmarket" style="${sub === 'blackmarket' ? 'display:block;' : 'display:none;'}">
+                    <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(192,132,252,0.15), #090e18); border-color:var(--purple);">
+                        <div>
+                            <b class="text-xs color-purple"><i class="fa-solid fa-gem"></i> Теневой базар спецзнаков</b>
+                            <div class="sub-label" style="font-size:9.5px;">Архивные и блатные серии РФ</div>
+                        </div>
+                        <button onclick="refreshBlackMarketPlates()" class="btn btn-purple btn-auto btn-sm" style="font-size:9px;">Связь (35k)</button>
+                    </div>
+                    <div id="blackMarketPlatesList"></div>
+                </div>
+
+                <!-- 4. ЭКРАН АВТОКЛУБОВ -->
+                <div id="synScreen-clubs" style="${sub === 'clubs' ? 'display:block;' : 'display:none;'}">
+                    <div class="glass-card mb-2 p-2 flex-between">
+                        <div>
+                            <b class="text-xs color-cyan"><i class="fa-solid fa-users"></i> Ваш автоклуб:</b>
+                            <div class="font-bold text-xs color-green" id="synMyClubName">Без автоклуба</div>
+                        </div>
+                        <button onclick="createClubPrompt()" class="btn btn-dark btn-auto btn-sm" style="font-size:9px;">Создать клуб</button>
+                    </div>
+                    <div id="synClubsContainer"></div>
+                </div>
+
+                <!-- 5. ЭКРАН ЛИДЕРБОРДА -->
+                <div id="synScreen-leaderboard" style="${sub === 'leaderboard' ? 'display:block;' : 'display:none;'}">
+                    <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(255,215,0,0.15), #090e18); border-color:var(--amber);">
+                        <div>
+                            <b class="text-xs color-amber"><i class="fa-solid fa-trophy"></i> Топ Олигархов Авторынка</b>
+                            <div class="sub-label" style="font-size:9.5px;">Рейтинг чистой прибыли перекупов</div>
+                        </div>
+                        <span class="tag-badge bg-tag-amber">LIVE ТОП</span>
+                    </div>
+                    <div id="leaderboardListContainer"></div>
+                </div>
+
+                <!-- 6. ЭКРАН РЕФЕРАЛОВ И ДРУЗЕЙ -->
+                <div id="synScreen-friends" style="${sub === 'friends' ? 'display:block;' : 'display:none;'}">
+                    <div class="glass-card mb-2 p-2">
+                        <div class="flex-between mb-1">
+                            <b class="text-xs color-green"><i class="fa-solid fa-user-plus"></i> Пригласить напарника (+50k ₽)</b>
+                            <span class="tag-badge bg-tag-green" id="friendsCountBadge">0 друзей</span>
+                        </div>
+                        <div class="sub-label mb-2" style="font-size:9.5px;">Отправьте ссылку другу и получайте бонусы с каждой его удачной сделки.</div>
+                        <div class="grid-2">
+                            <button onclick="shareReferralLink()" class="btn btn-green btn-sm">В Telegram</button>
+                            <button onclick="copyReferralLink()" class="btn btn-cyan btn-sm">Скопировать</button>
+                        </div>
+                    </div>
+                    <div id="friendsListContainer"></div>
+                </div>
+            </div>
+        `;
+
+        switchSyndicateTab(sub);
+    }
+};
 
 function renderSyndicateHub() {
     let subTab = state.syndicateSubTab ? state.syndicateSubTab : 'contracts';
@@ -22,13 +139,9 @@ function switchSyndicateTab(sub) {
         if (scr) scr.style.display = (s === sub) ? 'block' : 'none';
         if (btn) {
             if (s === sub) {
-                btn.classList.add('active');
-                btn.classList.add('btn-cyan');
-                btn.classList.remove('btn-dark');
+                btn.className = 'btn btn-cyan btn-sm';
             } else {
-                btn.classList.remove('active');
-                btn.classList.remove('btn-cyan');
-                btn.classList.add('btn-dark');
+                btn.className = 'btn btn-dark btn-sm';
             }
         }
     });
@@ -42,13 +155,13 @@ function switchSyndicateTab(sub) {
 }
 
 // ========================================================
-// 1. ЗАКАЗЫ СИНДИКАТА ПОД ОТКРЫТЫЕ КЛАССЫ ТРАНСПОРТА
+// 1. ЗАКАЗЫ СИНДИКАТА ПОД ОТКРЫТЫЕ КЛАССЫ
 // ========================================================
 function getUnlockedCategoriesForPlayer(lvl) {
     let list = ['economy', 'scooter'];
     if (lvl >= 5) list.push('moto');
     if (lvl >= 8) list.push('atv');
-    if (lvl >= 15) list.push('comfort'); // Комфорт доступен с 15 уровня!
+    if (lvl >= 15) list.push('comfort');
     if (lvl >= 30) list.push('premium');
     if (lvl >= 50) list.push('hyper', 'truck');
     if (lvl >= 100) list.push('yacht');
@@ -64,19 +177,14 @@ function generateContracts() {
     let playerLvl = state.player?.level || 1;
     let unlockedCats = getUnlockedCategoriesForPlayer(playerLvl);
 
-    // Фильтруем шаблоны: подходят по уровню И все требуемые классы открыты игроку
     let matchedPool = pool.filter(t => {
         let minLvl = t.minPlayerLevel || 7;
         let maxLvl = t.maxPlayerLevel || 100;
         let lvlOk = playerLvl >= minLvl && playerLvl <= maxLvl;
-
-        // Проверяем, открыт ли хотя бы один класс из разрешённых в контракте
         let hasUnlockedClass = t.reqs.allowedClasses.some(c => unlockedCats.includes(c));
-
         return lvlOk && hasUnlockedClass;
     });
 
-    // Резервный откат на доступные по уровню
     if (matchedPool.length === 0) {
         matchedPool = pool.filter(t => (t.minPlayerLevel || 7) <= playerLvl);
     }
@@ -125,18 +233,18 @@ function renderContracts() {
         if (lock) {
             lock.style.display = 'block';
             lock.innerHTML = `
-                <div class="glass-card text-center p-3" style="border: 1px solid var(--purple);">
-                    <div style="font-size:36px; margin-bottom:8px;">🔒</div>
+                <div class="glass-card text-center p-3 mb-2" style="border: 1px solid var(--purple);">
+                    <div style="font-size:32px; margin-bottom:6px;">🔒</div>
                     <h4 class="font-bold color-purple mb-1">Синдикат закрыт</h4>
-                    <p class="sub-label mb-3" style="font-size:10px;">Для допуска к контрактам Синдиката требуется подтвердить статус эксперта и профессиональное диагностическое оборудование:</p>
-                    <div class="space-y-1 text-left p-2 mb-3" style="background:#090e18; border-radius:8px; font-size:10px;">
-                        <div class="flex-between"><span>• Уровень авторитета: <b>7+ ур</b></span> <b class="${access.hasLvl ? 'color-green' : 'color-red'}">${access.hasLvl ? '✓ Да (' + access.lvl + ')' : '✗ Нет (' + access.lvl + '/7)'}</b></div>
-                        <div class="flex-between"><span>• HD Видеоэндоскоп мотора</span> <b class="${access.hasEndoscope ? 'color-green' : 'color-red'}">${access.hasEndoscope ? '✓ В наличии' : '✗ Купить в Маркете'}</b></div>
-                        <div class="flex-between"><span>• Толщиномер ЛКП (любой)</span> <b class="${access.hasGauge ? 'color-green' : 'color-red'}">${access.hasGauge ? '✓ В наличии' : '✗ Купить в Маркете'}</b></div>
-                        <div class="flex-between"><span>• Сканер Launch Pro</span> <b class="${access.hasLaunch ? 'color-green' : 'color-red'}">${access.hasLaunch ? '✓ В наличии' : '✗ Купить в Маркете'}</b></div>
-                        <div class="flex-between"><span>• Баланс Синдиката: <b>5+ Stars ⭐</b></span> <b class="${access.hasStars ? 'color-green' : 'color-red'}">${access.hasStars ? '✓ Да (' + access.stars + ')' : '✗ Нет (' + access.stars + '/5)'}</b></div>
+                    <p class="sub-label mb-2" style="font-size:9.5px;">Требуется подтвердить статус эксперта и оборудование:</p>
+                    <div class="space-y-1 text-left p-2 mb-2" style="background:#090e18; border-radius:8px; font-size:9.5px;">
+                        <div class="flex-between"><span>• Авторитет: <b>7+ ур</b></span> <b class="${access.hasLvl ? 'color-green' : 'color-red'}">${access.hasLvl ? '✓ Да' : '✗ Нет (' + access.lvl + '/7)'}</b></div>
+                        <div class="flex-between"><span>• HD Видеоэндоскоп</span> <b class="${access.hasEndoscope ? 'color-green' : 'color-red'}">${access.hasEndoscope ? '✓ В наличии' : '✗ Купить'}</b></div>
+                        <div class="flex-between"><span>• Толщиномер ЛКП</span> <b class="${access.hasGauge ? 'color-green' : 'color-red'}">${access.hasGauge ? '✓ В наличии' : '✗ Купить'}</b></div>
+                        <div class="flex-between"><span>• Сканер Launch Pro</span> <b class="${access.hasLaunch ? 'color-green' : 'color-red'}">${access.hasLaunch ? '✓ В наличии' : '✗ Купить'}</b></div>
+                        <div class="flex-between"><span>• Баланс: <b>5+ Stars ⭐</b></span> <b class="${access.hasStars ? 'color-green' : 'color-red'}">${access.hasStars ? '✓ Да' : '✗ Нет (' + access.stars + '/5)'}</b></div>
                     </div>
-                    <button onclick="PhoneManager.openApp('shop')" class="btn btn-cyan btn-sm w-full">Перейти в Маркет за приборами</button>
+                    <button onclick="PhoneManager.openApp('shop')" class="btn btn-cyan btn-sm w-full">Купить приборы в Маркете</button>
                 </div>
             `;
         }
@@ -158,44 +266,42 @@ function renderContracts() {
         let extraReqs = [];
         extraReqs.push(`Класс: <b>${classesText}</b>`);
         extraReqs.push(`Мин. мощность: <b>${reqs.minPower} л.с.</b>`);
-        extraReqs.push(`Состояние кузова: <b>≥${reqs.minCondition}%</b>`);
+        extraReqs.push(`Состояние: <b>≥${reqs.minCondition}%</b>`);
         if (reqs.maxMileage) extraReqs.push(`Пробег: <b>до ${reqs.maxMileage.toLocaleString()} км</b>`);
-        if (reqs.reqWeldedDiff) extraReqs.push(`Заварка: <b>Обязательна</b>`);
-        if (reqs.reqSteeringAngle) extraReqs.push(`Выворот: <b>Обязателен</b>`);
-        if (reqs.reqPolishOrChip) extraReqs.push(`Полировка или Chip: <b>Да</b>`);
-        if (reqs.noCriminal) extraReqs.push(`Юр. чистота: <b>Без розыска и 12.5.1</b>`);
-        if (reqs.noDefects) extraReqs.push(`ЭБУ: <b>Без скрытых дефектов</b>`);
+        if (reqs.reqWeldedDiff) extraReqs.push(`Заварка: <b>Да</b>`);
+        if (reqs.reqSteeringAngle) extraReqs.push(`Выворот: <b>Да</b>`);
+        if (reqs.reqPolishOrChip) extraReqs.push(`Полировка/Chip: <b>Да</b>`);
+        if (reqs.noCriminal) extraReqs.push(`Юр. чистота: <b>Чист</b>`);
+        if (reqs.noDefects) extraReqs.push(`ЭБУ: <b>Без дефектов</b>`);
 
-        let bonusBadges = `<span class='tag-badge bg-tag-green font-bold'>+${c.rewardBonus.toLocaleString()} ₽ премия</span>`;
+        let bonusBadges = `<span class='tag-badge bg-tag-green font-bold'>+${c.rewardBonus.toLocaleString()} ₽</span>`;
         if (c.rewardConn > 0) bonusBadges += ` <span class='tag-badge bg-tag-purple font-bold'>+${c.rewardConn} 🤝</span>`;
         bonusBadges += ` <span class='tag-badge bg-tag-cyan font-bold'>+${c.rewardXp} XP</span>`;
 
         html += `
-        <div class="glass-card mb-3 p-3">
-            <div class="flex-between mb-2">
+        <div class="glass-card mb-2 p-2">
+            <div class="flex-between mb-1">
                 <div class="flex-gap" style="align-items:center;">
-                    <div class="chat-avatar-circle" style="font-size:22px;">${c.avatar}</div>
+                    <div class="chat-avatar-circle" style="font-size:20px; width:30px; height:30px;">${c.avatar}</div>
                     <div>
                         <b class="text-xs color-cyan">${c.clientName}</b>
-                        <div class="sub-label" style="font-size:9px;">Заказчик Синдиката (Допуск: ${c.minPlayerLevel || 7}+ ур.)</div>
+                        <div class="sub-label" style="font-size:8.5px;">Допуск: ${c.minPlayerLevel || 7}+ ур.</div>
                     </div>
                 </div>
                 <span class="tag-badge bg-tag-amber">АКТИВЕН</span>
             </div>
 
-            <h4 class="font-bold mb-1" style="font-size:13px;">${c.title}</h4>
-            <p class="sub-label mb-2" style="font-size:10px; line-height:1.4;">${c.desc}</p>
+            <h4 class="font-bold mb-1 text-xs" style="font-size:12px;">${c.title}</h4>
+            <p class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">${c.desc}</p>
 
-            <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
-                <div class="text-xs color-amber font-bold mb-1">Требования к автомобилю:</div>
-                <div class="sub-label" style="font-size:10px; line-height:1.5;">
-                    ${extraReqs.join(' • ')}
-                </div>
+            <div class="p-2 mb-2" style="background:#090e18; border-radius:6px; font-size:9.5px; line-height:1.4;">
+                <div class="color-amber font-bold mb-1">Требования к авто:</div>
+                ${extraReqs.join(' • ')}
             </div>
 
             <div class="flex-between mb-2">
-                <div class="text-xs sub-label">Награда за сдачу:</div>
-                <div style="text-align:right;">${bonusBadges}</div>
+                <span class="text-xs sub-label">Премия:</span>
+                <div>${bonusBadges}</div>
             </div>
 
             <button onclick="openSelectContractCarModal('${c.id}')" class="btn btn-cyan btn-sm w-full">
@@ -208,7 +314,7 @@ function renderContracts() {
 }
 
 // ========================================================
-// 2. ВЫБОР И ПРОВЕРКА АВТО ПОД КОНТРАКТ
+// 2. ВЫБОР И ПРОВЕРКА АВТО
 // ========================================================
 function checkCarMeetsContract(car, c) {
     if (!car || !c) return { passed: false, errors: ["Ошибка данных"] };
@@ -227,11 +333,11 @@ function checkCarMeetsContract(car, c) {
 
     let cond = car.condition || 50;
     if (cond < reqs.minCondition) {
-        errors.push(`Плохое состояние кузова (${cond}/${reqs.minCondition}%)`);
+        errors.push(`Плохое состояние (${cond}/${reqs.minCondition}%)`);
     }
 
     if (reqs.maxMileage && (car.mileage || 0) > reqs.maxMileage) {
-        errors.push(`Слишком большой пробег (${(car.mileage || 0).toLocaleString()} км)`);
+        errors.push(`Большой пробег (${(car.mileage || 0).toLocaleString()} км)`);
     }
 
     if (reqs.reqWeldedDiff && !car.tuning?.weldedDiff) {
@@ -260,7 +366,7 @@ function checkCarMeetsContract(car, c) {
     }
 
     if (car.isPersonal) {
-        errors.push(`Это ваш личный автомобиль (снимите статус в гараже)`);
+        errors.push(`Это ваш личный автомобиль`);
     }
 
     return {
@@ -295,8 +401,8 @@ function openSelectContractCarModal(contractId) {
             let basePayout = (car.marketValue || car.basePrice || 100000) + contract.rewardBonus;
 
             let statusBlock = check.passed
-                ? `<div class="color-green text-xs font-bold mb-1">✓ Полностью соответствует всем требованиям!</div>
-                   <div class="sub-label mb-2" style="font-size:10px;">Итоговая выплата с учётом авто и номеров: <b class="color-green">+${basePayout.toLocaleString()} ₽</b></div>
+                ? `<div class="color-green text-xs font-bold mb-1">✓ Полностью соответствует!</div>
+                   <div class="sub-label mb-2" style="font-size:10px;">Итоговая выплата: <b class="color-green">+${basePayout.toLocaleString()} ₽</b></div>
                    <button onclick="fulfillContract('${contract.id}', ${idx})" class="btn btn-green btn-sm w-full">Сдать автомобиль под контракт 🤝</button>`
                 : `<div class="color-red text-xs font-bold mb-1">✗ Не подходит:</div>
                    <div class="sub-label color-red mb-2" style="font-size:9.5px; line-height:1.3;">${check.errors.join('<br>')}</div>
@@ -370,7 +476,7 @@ function fulfillContract(contractId, carIndex) {
     spawnFloatingReward(`+${totalPayout.toLocaleString()} ₽`);
     openVerdictModal(
         "КОНТРАКТ СИНДИКАТА ЗАКРЫТ! 🤝",
-        `Клиент «${contract.clientName}» остался крайне доволен поставкой «${car.name}».\nВыплата: +${totalPayout.toLocaleString()} ₽ (Премия: +${contract.rewardBonus.toLocaleString()} ₽)\nПолучено: +${contract.rewardXp} XP ${contract.rewardConn ? `и +${contract.rewardConn} 🤝` : ''}`,
+        `Клиент «${contract.clientName}» принял поставку «${car.name}».\nВыплата: +${totalPayout.toLocaleString()} ₽ (Премия: +${contract.rewardBonus.toLocaleString()} ₽)\nПолучено: +${contract.rewardXp} XP ${contract.rewardConn ? `и +${contract.rewardConn} 🤝` : ''}`,
         true,
         totalPayout,
         netGain
@@ -378,7 +484,7 @@ function fulfillContract(contractId, carIndex) {
 }
 
 // ========================================================
-// 3. P2P БИРЖА ТЕХНИКИ, НОМЕРОВ, БИЗНЕСА И ЖИЛЬЯ
+// 3. P2P БИРЖА
 // ========================================================
 function filterP2P(type) {
     p2pActiveFilter = type;
@@ -852,12 +958,11 @@ function cancelP2PListing(listingId) {
 }
 
 // ========================================================
-// 4. ТЕНЕВОЙ РЫНОК НОМЕРОВ (BLACK MARKET)
+// 4. ТЕНЕВОЙ РЫНОК НОМЕРОВ
 // ========================================================
 function generateBlackMarketPlates() {
     const rareRegions = ['77', '99', '97', '777', '199', '177'];
     const rareLetters = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
-    
     let generated = [];
     
     for (let i = 0; i < 4; i++) {
@@ -1172,6 +1277,7 @@ function renderFriendsList() {
 }
 
 // Экспорт функций в window
+window.AppSyndicate = AppSyndicate;
 window.renderSyndicateHub = renderSyndicateHub;
 window.switchSyndicateTab = switchSyndicateTab;
 window.generateContracts = generateContracts;

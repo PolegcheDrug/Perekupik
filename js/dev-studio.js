@@ -1,10 +1,11 @@
 // ========================================================
-// js/dev-studio.js — ДВУХЭКРАННАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v0.6.4)
+// js/dev-studio.js — ДВУХЭКРАННАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v0.6.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // 🟢 Экран 1: Создание новых карточек (Бирюзово-зеленый стиль)
 // 🟣 Экран 2: Редактирование существующих авто по классам (Фиолетово-золотой стиль)
 // ✂️ Встроенный Canvas-кроппер/подгонщик обложки, парсинг data.js,
 // рандомизатор и экспорт базы в 1 клик.
+// Гарантированная защита от null-draft и ошибок Canvas.
 // ========================================================
 
 const DevStudio = {
@@ -86,6 +87,7 @@ const DevStudio = {
         if (modal) {
             modal.classList.add('active');
             modal.style.display = 'flex';
+            modal.style.zIndex = '9999';
             modal.scrollTop = 0;
         }
 
@@ -109,8 +111,9 @@ const DevStudio = {
     },
 
     switchScreen(screenName) {
+        if (!this.currentDraft) this.resetDraft();
         this.activeScreen = screenName;
-        if (screenName === 'create' && this.currentDraft?.isExistingCar) {
+        if (screenName === 'create' && this.currentDraft.isExistingCar) {
             this.resetDraft();
         }
         this.render();
@@ -119,9 +122,10 @@ const DevStudio = {
     },
 
     // ========================================================
-    // ГЛАВНЫЙ РЕНДЕР: ДВУХЦВЕТНАЯ СИСТЕМА ЭКРАНОВ
+    // ГЛАВНЫЙ РЕНДЕР
     // ========================================================
     render() {
+        if (!this.currentDraft) this.resetDraft();
         const container = document.getElementById('devStudioContent');
         if (!container) return;
 
@@ -165,7 +169,7 @@ const DevStudio = {
         this.renderUploadedThumbs();
         setTimeout(() => {
             this.initCropperCanvasPreview();
-        }, 50);
+        }, 60);
     },
 
     // ========================================================
@@ -176,7 +180,6 @@ const DevStudio = {
         const queueCount = this.stagedBatchQueue.length;
 
         return `
-            <!-- ПЛАШКА DATA.JS И РАНДОМИЗАТОР -->
             <div class="glass-card p-2 mb-2 studio-box-create">
                 <div class="flex-between mb-2">
                     <div>
@@ -245,7 +248,7 @@ const DevStudio = {
     },
 
     // ========================================================
-    // 🟣 ЭКРАН 2: РЕДАКТИРОВАНИЕ СУЩЕСТВУЮЩИХ АВТО ИЗ БАЗЫ
+    // 🟣 ЭКРАН 2: РЕДАКТИРОВАНИЕ ИЗ БАЗЫ
     // ========================================================
     renderEditScreen() {
         const d = this.currentDraft;
@@ -289,7 +292,6 @@ const DevStudio = {
         }
 
         return `
-            <!-- ВЫБОР АВТО ИЗ БАЗЫ -->
             <div class="glass-card p-2 mb-2 studio-box-edit">
                 <b class="text-xs color-purple block mb-1"><i class="fa-solid fa-list-ul mr-1"></i> 1. Выберите авто из базы проекта:</b>
                 
@@ -351,7 +353,7 @@ const DevStudio = {
     },
 
     // ========================================================
-    // ✂️ ВИДЖЕТ КАДРИРОВАНИЯ И ОБРЕЗКИ ОБЛОЖКИ (CANVAS CROPPER)
+    // ✂️ ВИДЖЕТ КАДРИРОВАНИЯ
     // ========================================================
     renderCropperWidgetHtml(isCreate) {
         const color = isCreate ? 'var(--cyan)' : 'var(--purple)';
@@ -364,12 +366,10 @@ const DevStudio = {
                 </div>
                 <div class="sub-label mb-2" style="font-size:9px;">Настройте ползунками точную позицию и нажмите «Обрезать и применить».</div>
 
-                <!-- ХОЛСТ ПРЕДПРОСМОТРА ОБРЕЗКИ -->
                 <div class="car-img-wrap" style="height: 165px; position:relative; overflow:hidden; border:1px solid ${color};">
                     <canvas id="studioCropCanvas" width="400" height="225" style="width:100%; height:100%; display:block; object-fit:cover;"></canvas>
                 </div>
 
-                <!-- РЕГУЛЯТОРЫ -->
                 <div class="space-y-1 my-2 text-xs">
                     <div class="flex-between">
                         <span class="sub-label" style="font-size:9px;">Масштаб (Zoom):</span>
@@ -474,7 +474,7 @@ const DevStudio = {
     },
 
     // ========================================================
-    // ФОРМА РЕДАКТИРОВАНИЯ ПАРАМЕТРОВ
+    // ФОРМА ХАРАКТЕРИСТИК
     // ========================================================
     renderCarFormFieldsHtml(isCreate) {
         const d = this.currentDraft;
@@ -548,9 +548,6 @@ const DevStudio = {
         `;
     },
 
-    // ========================================================
-    // ЛОГИКА ВЫБОРА И СОХРАНЕНИЯ РЕДАКТИРУЕМОГО АВТО
-    // ========================================================
     selectEditClassFilter(catId) {
         this.editFilterClass = catId;
         this.selectedEditCarIndex = -1;
@@ -654,9 +651,6 @@ const DevStudio = {
         this.render();
     },
 
-    // ========================================================
-    // ФОТО И МАССОВАЯ ОЧЕРЕДЬ
-    // ========================================================
     handleFilesSelected(files) {
         if (!files || files.length === 0) return;
         const d = this.currentDraft;
@@ -740,12 +734,12 @@ const DevStudio = {
     },
 
     updateField(field, val) {
-        if (!this.currentDraft) return;
+        if (!this.currentDraft) this.resetDraft();
         this.currentDraft[field] = val;
     },
 
     updateCategory(cat) {
-        if (!this.currentDraft) return;
+        if (!this.currentDraft) this.resetDraft();
         this.currentDraft.type = cat;
         const catFolders = {
             economy: "assets/cars/economy/", scooter: "assets/moto/", moto: "assets/moto/",
@@ -759,6 +753,7 @@ const DevStudio = {
     },
 
     randomizeDraftParameters() {
+        if (!this.currentDraft) this.resetDraft();
         const d = this.currentDraft;
         d.mileage = Math.floor(25000 + Math.random() * 140000);
         if (typeof generateCoolPlate === 'function') d.plate = generateCoolPlate();
@@ -778,6 +773,7 @@ const DevStudio = {
     },
 
     applyPreset(type) {
+        if (!this.currentDraft) this.resetDraft();
         const d = this.currentDraft;
         if (type === 'drift') {
             d.name = d.name.includes("Корч") ? d.name : `${d.name} (Дрифт-Спек)`;
@@ -834,7 +830,7 @@ const DevStudio = {
                 <div class="flex-gap" style="align-items:center;">
                     <b class="color-cyan">${idx + 1}.</b>
                     <span>${item.name}</span>
-                    <span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">${item.type.toUpperCase()}</span>
+                    <span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">${(item.type || 'economy').toUpperCase()}</span>
                 </div>
                 <button onclick="DevStudio.removeFromBatchQueue(${idx})" style="background:none; border:none; color:var(--red); cursor:pointer;">✕</button>
             </div>
@@ -1037,6 +1033,9 @@ const DevStudio = {
 
 window.DevStudio = DevStudio;
 
-document.addEventListener('DOMContentLoaded', () => {
+// Инициализация при любом состоянии готовности документа
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { DevStudio.init(); });
+} else {
     DevStudio.init();
-});
+}
