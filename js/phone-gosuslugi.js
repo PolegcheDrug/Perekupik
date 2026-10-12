@@ -10,7 +10,6 @@ const AppGosuslugi = {
     render(container) {
         let sub = this.subTab;
 
-        // Инициализация данных, если их нет
         if (state.player.trafficFines === undefined) state.player.trafficFines = 0;
         if (state.player.taxDebt === undefined) state.player.taxDebt = 0;
 
@@ -73,7 +72,7 @@ const AppGosuslugi = {
         let fines = state.player?.trafficFines || 0;
         if (fines <= 0) return showToast("Штрафов нет!");
 
-        let toPay = Math.round(fines * 0.5); // Льготная оплата 50%
+        let toPay = Math.round(fines * 0.5);
         let cash = state.player?.cash || 0;
         if (cash < toPay) return showToast(`Не хватает денег для оплаты: ${toPay.toLocaleString()} ₽!`);
 
@@ -89,13 +88,12 @@ const AppGosuslugi = {
     },
 
     renderTaxesTab() {
-        // Расчет налога на основе мощности машин в гараже (все что > 250 л.с.)
         let totalPowerTax = 0;
         if (state.garage) {
             state.garage.forEach(c => {
                 let p = c.power || 100;
                 if (p > 250) {
-                    totalPowerTax += (p - 250) * 150; // 150 рублей за каждую лошадь свыше 250 л.с. за цикл
+                    totalPowerTax += (p - 250) * 150;
                 }
             });
         }
@@ -117,7 +115,7 @@ const AppGosuslugi = {
                             <b class="text-xs color-amber">Федеральная налоговая служба</b>
                             <span class="tag-badge bg-tag-amber">К уплате</span>
                         </div>
-                        <div class="sub-label mb-2" style="font-size:9.5px;">Начислено за мощные автомобили в вашем автопарке: <b>${tax.toLocaleString()} ₽</b></div>
+                        <div class="sub-label mb-2" style="font-size:9.5px;">Начислено за мощные автомобили в автопарке: <b>${tax.toLocaleString()} ₽</b></div>
                         <button onclick="AppGosuslugi.payTaxes()" class="btn btn-green btn-sm w-full">Оплатить налог (${tax.toLocaleString()} ₽)</button>
                     </div>
                 ` : `
@@ -146,7 +144,7 @@ const AppGosuslugi = {
     },
 
     renderPlatesAuctionTab() {
-        if (!state.officialPlateAuction) {
+        if (!state.officialPlateAuction || state.officialPlateAuction.length === 0) {
             state.officialPlateAuction = [
                 { id: 'p_1', plate: 'А777АА 777', currentBid: 450000, highestBidder: 'Государство' },
                 { id: 'p_2', plate: 'М001ММ 99', currentBid: 750000, highestBidder: 'Государство' },
@@ -155,7 +153,6 @@ const AppGosuslugi = {
         }
 
         let html = "";
-        state.officialPlateAuction.push = state.officialPlateAuction || [];
         state.officialPlateAuction.forEach((lot, lIdx) => {
             html += `
             <div class="glass-card mb-2 p-2">
@@ -195,13 +192,11 @@ const AppGosuslugi = {
         lot.currentBid = newBid;
         lot.highestBidder = state.player?.name || "Вы";
 
-        // Если ставка перебита, сразу забираем номер в инвентарь (упрощенно для геймплея)
         state.player.cash -= newBid;
         if (!state.ownedPlates) state.ownedPlates = [];
         state.ownedPlates.push(lot.plate);
 
-        // Заменяем лот на новый
-        let newP = generateCoolPlate();
+        let newP = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77";
         state.officialPlateAuction[lotIdx] = {
             id: 'p_' + Date.now(),
             plate: newP,

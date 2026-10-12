@@ -1,7 +1,8 @@
 // ========================================================
 // js/phone-housing.js — ПРИЛОЖЕНИЕ «ЖИЛЬЁ & МАСТЕРСКИЕ» (v0.6.0)
 // Аренда и покупка гаражей, боксов, вилл и пентхаусов,
-// проверка технических возможностей (яма, свет, вода) и интерьер.
+// проверка технических возможностей (яма, свет, вода),
+// интерьер, переезд и выставление объектов на P2P биржу.
 // ========================================================
 
 const AppHousing = {
@@ -23,7 +24,7 @@ const AppHousing = {
                         <span class="tag-badge bg-tag-green">Тех. паспорт</span>
                     </div>
                     <div class="sub-label" style="font-size:9.5px; line-height:1.4;">
-                        Слесарный тюнинг и корчевание требуют <b>смотровую яму</b>, а полировка кузова — <b>закрытый чистый бокс с водой</b>.
+                        Слесарный тюнинг и корчевание требуют <b>смотровую яму</b>, а качественная полировка кузова — <b>закрытый чистый бокс с водой</b>.
                     </div>
                 </div>
         `;
@@ -82,12 +83,12 @@ const AppHousing = {
                 <div class="glass-card mb-3 p-2 ${isCur ? 'personal-car-card' : ''}">
                     <div class="car-img-wrap mb-2" style="height:125px; overflow:hidden; border-radius:10px;">
                         <img src="${imgSrc}" class="car-img" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackSrc}';">
-                        <div class="badge-tag" style="position:absolute; bottom:8px; right:8px; z-index:10;">
+                        <div class="badge-tag badge-br">
                             <span class="tag-badge ${isPurchased ? 'bg-tag-green' : (isCur ? 'bg-tag-cyan' : 'bg-tag-amber')}">
                                 ${isPurchased ? 'Собственность' : (isCur ? 'Арендовано' : 'Доступно')}
                             </span>
                         </div>
-                        <div class="badge-tag" style="position:absolute; top:8px; left:8px; right:auto; z-index:10;">
+                        <div class="badge-tag badge-tl">
                             <span class="tag-badge bg-tag-cyan">${h.typeLabel || 'Объект'}</span>
                         </div>
                     </div>
@@ -137,7 +138,8 @@ const AppHousing = {
         saveState();
         updateHeaderUI();
         if (typeof renderGarage === 'function') renderGarage();
-        playSound('win'); tgHaptic('success');
+        playSound('win');
+        tgHaptic('success');
         showToast(`Недвижимость продана риелторам (+${refundAmount.toLocaleString()} ₽)!`);
         this.render(document.getElementById('phoneAppContainer'));
     },

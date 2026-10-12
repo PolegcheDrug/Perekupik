@@ -1,62 +1,44 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ЧЕСТНЫЙ ТОРГ (v0.5.2)
-// Разработчики: Tak Toje, Max, Sergo, gemini
-// Честная реакция покупателей, гарантированная прибыль от перепродажи,
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ЧЕСТНЫЙ ТОРГ (v0.6.1)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Детализация маржи, себестоимость выкупа и вложенных доработок,
+// честная реакция покупателей, гарантированная прибыль от перепродажи,
 // право отказаться от подписания ДКП, налог 13% только на учёт РФ.
-// Внедрена строгая экономика торга (урезанная маржа).
+// Изоляция окон через ModalManager, предотвращение наложений интерфейса.
 // ========================================================
-
-const BUYERS_CATALOG = {
-    economy: [
-        { name: "Студент Макс", avatar: "🧑‍🎓", rate: 1.12, type: "economy", meticulous: 0.20 },
-        { name: "Таксист Ашот", avatar: "🧔", rate: 1.18, type: "economy", meticulous: 0.45 },
-        { name: "Дед Михалыч", avatar: "👴", rate: 1.25, type: "economy", meticulous: 0.15 },
-        { name: "Перекуп Саня", avatar: "😎", rate: 1.06, type: "economy", meticulous: 0.85 },
-        { name: "Дачник Петрович", avatar: "👨‍🌾", rate: 1.20, type: "economy", meticulous: 0.25 },
-        { name: "Курьер Руслан", avatar: "🛵", rate: 1.14, type: "economy", meticulous: 0.30 },
-        { name: "Пацан с района Костян", avatar: "🧢", rate: 1.10, type: "economy", meticulous: 0.18 },
-        { name: "Новичок с правами Лера", avatar: "👩‍🦰", rate: 1.28, type: "economy", meticulous: 0.30 },
-        { name: "Гаражный мастер Толя", avatar: "👨‍🔧", rate: 1.08, type: "economy", meticulous: 0.70 },
-        { name: "Бригадир Валера", avatar: "👷‍♂️", rate: 1.22, type: "economy", meticulous: 0.35 }
-    ],
-    comfort: [
-        { name: "Менеджер Олег", avatar: "👨‍💼", rate: 1.16, type: "comfort", meticulous: 0.40 },
-        { name: "Семейный Илья", avatar: "👨‍👩‍👦", rate: 1.24, type: "comfort", meticulous: 0.50 },
-        { name: "Блогерша Аня", avatar: "👩‍🎤", rate: 1.30, type: "comfort", meticulous: 0.25 },
-        { name: "Автоподборщик со сканером", avatar: "🕵️‍♂️", rate: 1.10, type: "comfort", meticulous: 0.90 },
-        { name: "IT-тимлид Денис", avatar: "👨‍💻", rate: 1.28, type: "comfort", meticulous: 0.60 },
-        { name: "Риелтор Кристина", avatar: "👩‍💼", rate: 1.22, type: "comfort", meticulous: 0.40 },
-        { name: "Фитнес-тренер Влад", avatar: "💪", rate: 1.18, type: "comfort", meticulous: 0.30 },
-        { name: "Врач-стоматолог Павел", avatar: "👨‍⚕️", rate: 1.32, type: "comfort", meticulous: 0.55 },
-        { name: "Торговый представитель Юра", avatar: "🚘", rate: 1.14, type: "comfort", meticulous: 0.50 },
-        { name: "Дизайнер интерьеров Соня", avatar: "🎨", rate: 1.26, type: "comfort", meticulous: 0.35 }
-    ],
-    premium: [
-        { name: "Бизнесмен Игорь", avatar: "🤵", rate: 1.20, type: "premium", meticulous: 0.60 },
-        { name: "Мажор Артур", avatar: "🕺", rate: 1.35, type: "premium", meticulous: 0.20 },
-        { name: "Депутат Виталий", avatar: "🕴️", rate: 1.15, type: "premium", meticulous: 0.70 },
-        { name: "Владелец таксопарка", avatar: "🧔‍♂️", rate: 1.12, type: "premium", meticulous: 0.80 },
-        { name: "Застройщик Альберт", avatar: "🏗️", rate: 1.26, type: "premium", meticulous: 0.55 },
-        { name: "Продюсер Марк", avatar: "🎬", rate: 1.32, type: "premium", meticulous: 0.35 },
-        { name: "Ресторатор Карен", avatar: "🍽️", rate: 1.22, type: "premium", meticulous: 0.45 },
-        { name: "Юрист международник Яна", avatar: "⚖️", rate: 1.25, type: "premium", meticulous: 0.85 },
-        { name: "Владелец сети клиник Борис", avatar: "🩺", rate: 1.30, type: "premium", meticulous: 0.65 },
-        { name: "Инвестор Герман", avatar: "📈", rate: 1.18, type: "premium", meticulous: 0.75 }
-    ],
-    hyper: [
-        { name: "Шейх Мансур", avatar: "👳‍♂️", rate: 1.38, type: "hyper", meticulous: 0.35 },
-        { name: "Олигарх Роман", avatar: "🛥️", rate: 1.22, type: "hyper", meticulous: 0.80 },
-        { name: "Крипто-миллионер", avatar: "🤑", rate: 1.45, type: "hyper", meticulous: 0.25 },
-        { name: "Стример-хайпожор", avatar: "🎮", rate: 1.35, type: "hyper", meticulous: 0.30 },
-        { name: "Звезда футбола Алекс", avatar: "⚽", rate: 1.28, type: "hyper", meticulous: 0.40 },
-        { name: "Коллекционер редких авто", avatar: "🏛️", rate: 1.50, type: "hyper", meticulous: 0.95 },
-        { name: "IT-фаундер из Дубая", avatar: "🚀", rate: 1.30, type: "hyper", meticulous: 0.50 },
-        { name: "Наследник синдиката Тариэл", avatar: "🕶️", rate: 1.25, type: "hyper", meticulous: 0.70 }
-    ]
-};
 
 let dkpAutoCloseTimer = null;
 let dealIsAborted = false;
+let activeHaggleLotIndex = null;
+let currentSaleBuyer = null;
+
+function calculateCarUpgradesCost(car) {
+    if (!car) return 0;
+    let total = 0;
+    let t = car.tuning || {};
+
+    if (t.chip === 1) total += 30000;
+    else if (t.chip === 2) total += 95000;
+    else if (t.chip >= 3) total += 275000;
+
+    if (t.weldedDiff) total += 12000;
+    if (t.steeringAngle) total += 25000;
+    if (t.hydroHandbrake) total += 35000;
+    if (t.bucketSeats) total += 45000;
+    if (t.dragSlicks) total += 45000;
+    if (t.rollCage) total += 85000;
+    if (t.exhaust) total += 35000;
+    if (t.stance) total += 75000;
+    if (t.customWheels) total += 60000;
+    if (t.bodykit) total += 50000;
+
+    if (car.isPolished) total += 7000;
+    if (car.isRepainted) total += 25000;
+    if (car.hasAdditive) total += 12000;
+    if (car.rolledOdometer) total += 15000;
+
+    return total;
+}
 
 function calculateLotWaitTime() {
     let baseTime = Math.floor(40 + Math.random() * 80);
@@ -100,6 +82,11 @@ function renderSalesLot() {
         let cPlate = car.customPlate || car.plate || "ТРАНЗИТ";
         let asking = lot.askingPrice || 100000;
 
+        let buyCost = car.purchaseCost || car.basePrice || 100000;
+        let modsCost = calculateCarUpgradesCost(car);
+        let totalInvested = buyCost + modsCost;
+        let potentialMargin = asking - totalInvested;
+
         let statusBlock = "";
         if (!lot.currentBuyer) {
             let maxTime = lot.maxTimer || 120;
@@ -123,6 +110,8 @@ function renderSalesLot() {
         } else {
             let buyer = lot.currentBuyer;
             let timeLeft = lot.buyerTimerLeft || 60;
+            let currentMargin = buyer.offerPrice - totalInvested;
+
             statusBlock = `
             <div class='p-2' style='background:rgba(0,230,118,0.08); border:1px solid var(--green); border-radius:10px;'>
                 <div class='flex-between mb-1'>
@@ -137,7 +126,10 @@ function renderSalesLot() {
                 </div>
                 <div class='flex-between mb-2 p-1' style='background:#060a12; border-radius:6px;'>
                     <span class='sub-label text-xs'>Предложение клиента:</span>
-                    <span class='price-val text-xs color-green' style='font-size:14px;'>${buyer.offerPrice.toLocaleString()} ₽</span>
+                    <div class='text-right'>
+                        <span class='price-val text-xs color-green' style='font-size:14px;'>${buyer.offerPrice.toLocaleString()} ₽</span>
+                        <div class='sub-label' style='font-size:9px;'>Маржа: <b class="${currentMargin >= 0 ? 'color-green' : 'color-red'}">${currentMargin >= 0 ? '+' : ''}${currentMargin.toLocaleString()} ₽</b></div>
+                    </div>
                 </div>
                 <div class='grid-2'>
                     <button onclick="openSaleHaggleModal(${idx})" class='btn btn-cyan btn-sm'>💬 Торговаться</button>
@@ -159,7 +151,7 @@ function renderSalesLot() {
             <div class='car-img-wrap' style='height: 140px;'>
                 <img src='${cImg}' class='car-img' onerror="this.src='assets/cars/economy/vaz-2107.jpg'">
                 <div class='plate-corner'><div class='license-plate'>${cPlate} <div class='license-flag'>RUS</div></div></div>
-                <div class='badge-tag' style='bottom:6px; right:6px;'>
+                <div class='badge-tag badge-br'>
                     ${regBadge}
                     ${criminalBadge}
                 </div>
@@ -180,6 +172,24 @@ function renderSalesLot() {
                 <div class='car-spec-chip'><i class='fa-solid fa-shield color-green'></i> <b>${car.condition || 80}%</b> кузов</div>
             </div>
 
+            <!-- ФИНАНСОВЫЙ БЛОК: СЕБЕСТОИМОСТЬ, ТЮНИНГ И МАРЖА -->
+            <div class='p-2 mb-2' style='background:#090e18; border-radius:8px; border:1px solid var(--border-glass); font-size:10px;'>
+                <div class='flex-between mb-1'>
+                    <span class='sub-label'>Себестоимость выкупа:</span>
+                    <b>${buyCost.toLocaleString()} ₽</b>
+                </div>
+                <div class='flex-between mb-1'>
+                    <span class='sub-label'>Вложено в доработки:</span>
+                    <b class='color-amber'>+${modsCost.toLocaleString()} ₽</b>
+                </div>
+                <div class='flex-between pt-1' style='border-top:1px dashed rgba(255,255,255,0.08);'>
+                    <span class='sub-label font-bold'>Ожидаемая чистая маржа:</span>
+                    <b class='${potentialMargin >= 0 ? "color-green" : "color-red"} font-bold'>
+                        ${potentialMargin >= 0 ? "+" : ""}${potentialMargin.toLocaleString()} ₽
+                    </b>
+                </div>
+            </div>
+
             <div class='flex-between mb-2'>
                 <span class='sub-label text-xs'>Цена в объявлении: <b class='color-cyan'>${asking.toLocaleString()} ₽</b></span>
                 <button onclick='cancelSalesLot(${idx})' class='btn btn-dark btn-auto btn-sm' style='padding:4px 8px;'>Снять</button>
@@ -197,14 +207,16 @@ function generateBuyerForSlot(slot) {
     const car = slot.car;
     let carCat = car.type ? car.type : 'economy';
     
-    if (!BUYERS_CATALOG[carCat]) carCat = 'economy';
-    const pool = BUYERS_CATALOG[carCat];
+    const catalog = (typeof BUYERS_CATALOG !== 'undefined') ? BUYERS_CATALOG : {};
+    if (!catalog[carCat]) carCat = 'economy';
+    const pool = catalog[carCat] || [
+        { name: "Покупатель", avatar: "🧔", rate: 1.10, type: "economy", meticulous: 0.3 }
+    ];
     const template = pool[Math.floor(Math.random() * pool.length)];
     
     let asking = slot.askingPrice ? slot.askingPrice : car.marketValue;
     let baseVal = car.marketValue || car.basePrice || 100000;
     
-    // БОНУСЫ К ЦЕНЕ ПОКУПАТЕЛЯ ЗА ПОДГОТОВКУ МАШИНЫ
     let tuneBonus = 0;
     if (car.tuning) {
         if (car.tuning.stance) tuneBonus += 0.05;
@@ -225,14 +237,10 @@ function generateBuyerForSlot(slot) {
         plateBonus = 0.15 + Math.random() * 0.10;
     }
     
-    // ЖЕСТКАЯ ЭКОНОМИКА (v0.5.2) - Покупатели стали жаднее (снижен рейт на 0.15)
     let rate = (template.rate - 0.15) + tuneBonus + plateBonus + karmaBonus;
     let offer = Math.round(baseVal * (rate + (Math.random() * 0.06 - 0.03)));
     
-    // Покупатель готов дать максимум до 108% от желаемой цены игрока (было 115%)
     if (offer > asking * 1.08) offer = Math.round(asking * 1.02);
-    
-    // Покупатель может сильно сбить цену (до 80% от реального рынка вместо 90%)
     if (offer < baseVal * 0.80) offer = Math.round(baseVal * 0.85);
 
     let calculatedMeticulous = template.meticulous || 0.3;
@@ -245,7 +253,6 @@ function generateBuyerForSlot(slot) {
         type: template.type,
         offerPrice: offer,
         initialOfferPrice: offer,
-        // Снижен потолок торга (максимум +5-10% от текущего предложения, было 10-22%)
         maxOfferPrice: Math.round(offer * (1.05 + Math.random() * 0.05)),
         patience: 100,
         meticulous: Math.min(0.95, calculatedMeticulous),
@@ -260,25 +267,10 @@ function generateBuyerForSlot(slot) {
         playSound('tick');
     } catch(e) {}
     
-    sendBackgroundNotification("Клиент у капота!", `Покупатель ${template.name} осматривает «${car.name}»`);
-
     let plateText = plateBonus > 0 ? " (🔥 Оценил красивый госномер!)" : "";
     showToast("🔔 На площадке клиент: " + template.name + plateText);
     renderSalesLot();
 }
-
-function sendBackgroundNotification(title, body) {
-    if (document.visibilityState === 'hidden') {
-        tgHaptic('warning');
-        document.title = `🔔 ${title}`;
-    }
-}
-
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        document.title = "Симулятор Перекупа v0.5.2";
-    }
-});
 
 function upgradeExpressCapacity() {
     let cost = getExpressTicketUpgradeCost();
@@ -332,11 +324,8 @@ function cancelSalesLot(idx) {
 }
 
 // ========================================================
-// ЛОГИКА ТОРГА С ПРОВЕРКОЙ ЧЕСТНОСТИ (УСЛОЖНЕНА v0.5.2)
+// ЛОГИКА ТОРГА С ПРОВЕРКОЙ ЧЕСТНОСТИ
 // ========================================================
-let activeHaggleLotIndex = null;
-let currentSaleBuyer = null;
-
 function openSaleHaggleModal(idx) {
     dealIsAborted = false;
     activeHaggleLotIndex = idx;
@@ -349,6 +338,11 @@ function openSaleHaggleModal(idx) {
     const imgEl = document.getElementById("saleCarImg");
     if (imgEl) imgEl.src = car.img ? car.img : "assets/cars/economy/vaz-2107.jpg";
     
+    let buyCost = car.purchaseCost || car.basePrice || 100000;
+    let modsCost = calculateCarUpgradesCost(car);
+    let totalInvested = buyCost + modsCost;
+    let currentMargin = currentSaleBuyer.offerPrice - totalInvested;
+
     setTxt("saleCarTitle", car.name ? car.name : "Автомобиль");
     setTxt("saleBuyerOfferVal", currentSaleBuyer.offerPrice.toLocaleString() + " ₽");
     setTxt("saleBuyerAvatar", currentSaleBuyer.avatar);
@@ -363,6 +357,8 @@ function openSaleHaggleModal(idx) {
 
     const thread = document.getElementById("saleHaggleChatThread");
     if (thread) {
+        let marginInfo = `<div class='text-xs mb-1 sub-label' style='font-size:9.5px;'>Себестоимость: ${buyCost.toLocaleString()} ₽ | Тюнинг: +${modsCost.toLocaleString()} ₽ | Текущая маржа: <b class="${currentMargin >= 0 ? 'color-green' : 'color-red'}">${currentMargin >= 0 ? '+' : ''}${currentMargin.toLocaleString()} ₽</b></div>`;
+
         const greetings = [
             "«Машина интересная, цена неплохая, но давай обсудим детали...»",
             "«Осмотрел аппарат, готов брать прямо сейчас, если договоримся.»",
@@ -370,7 +366,7 @@ function openSaleHaggleModal(idx) {
             "«Вижу, что ухаживал за тачкой. Оформляем ДКП?»"
         ];
         let randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
-        thread.innerHTML = "<div class='chat-msg msg-seller' id='saleBuyerGreetingMsg'>" + randomGreeting + "</div>";
+        thread.innerHTML = marginInfo + "<div class='chat-msg msg-seller' id='saleBuyerGreetingMsg'>" + randomGreeting + "</div>";
     }
 
     const modalButtons = document.querySelectorAll('#modalHaggleSale button');
@@ -380,8 +376,7 @@ function openSaleHaggleModal(idx) {
         b.style.pointerEvents = 'auto';
     });
 
-    const modal = document.getElementById("modalHaggleSale");
-    if (modal) modal.classList.add('active');
+    ModalManager.open("modalHaggleSale", { closeOthers: true });
     playSound('tick');
 }
 
@@ -391,7 +386,7 @@ function rejectBuyerHaggle() {
     if (!slot) return;
 
     dealIsAborted = true;
-    closeModal("modalHaggleSale");
+    ModalManager.close("modalHaggleSale");
     slot.currentBuyer = null;
     slot.maxTimer = calculateLotWaitTime();
     slot.timer = slot.maxTimer;
@@ -410,7 +405,7 @@ function attemptHaggleSale(type) {
     const car = slot.car;
     const thread = document.getElementById("saleHaggleChatThread");
 
-    // 1. ПРОВЕРКА НА КРИМИНАЛ (УГОН, 12.5.1)
+    // 1. Проверка на криминал (угон, 12.5.1)
     let isCriminal = car.isStolen || car.unregistered;
     if (isCriminal) {
         let bustRoll = Math.random();
@@ -436,7 +431,7 @@ function attemptHaggleSale(type) {
             playSound('error');
 
             setTimeout(() => {
-                closeModal("modalHaggleSale");
+                ModalManager.close("modalHaggleSale");
                 state.salesLot.splice(activeHaggleLotIndex, 1);
                 
                 let fine = 45000;
@@ -458,7 +453,7 @@ function attemptHaggleSale(type) {
         }
     }
 
-    // 2. ПРОВЕРКА НА УМЫШЛЕННЫЙ ОБМАН ИГРОКА
+    // 2. Проверка на умышленный обман игрока
     let isIntentionalScam = !!car.rolledOdometer || !!car.hasAdditive;
     if (isIntentionalScam) {
         let scamRoll = Math.random();
@@ -490,12 +485,12 @@ function attemptHaggleSale(type) {
             tgHaptic('error');
             playSound('error');
 
-            if (typeof PhoneManager !== 'undefined') {
+            if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.pushBuyerFollowupSMS === 'function') {
                 PhoneManager.pushBuyerFollowupSMS(car.name, true, currentSaleBuyer.name);
             }
 
             setTimeout(() => {
-                closeModal("modalHaggleSale");
+                ModalManager.close("modalHaggleSale");
                 slot.currentBuyer = null;
                 slot.maxTimer = calculateLotWaitTime();
                 slot.timer = slot.maxTimer;
@@ -507,7 +502,7 @@ function attemptHaggleSale(type) {
         }
     }
 
-    // 3. ЕСТЕСТВЕННЫЙ ИЗНОС (НЕ СЧИТАЕТСЯ ОБМАНОМ — СБИВАЕТСЯ ЦЕНА НА РЕМОНТ)
+    // 3. Естественный износ
     if (car.hiddenDefect && !car.hasAdditive) {
         if (Math.random() < 0.35) {
             let repairDiscount = Math.round((car.hiddenDefect.cost || 15000) * 0.70);
@@ -528,7 +523,7 @@ function attemptHaggleSale(type) {
         }
     }
 
-    // 4. ПРОВЕРКА ЛИМИТА ТОРГА
+    // 4. Лимит торга
     if (currentSaleBuyer.successfulHagglesCount >= currentSaleBuyer.maxAllowedHaggles) {
         if (thread) {
             thread.innerHTML += `
@@ -540,18 +535,17 @@ function attemptHaggleSale(type) {
         return;
     }
 
-    // 5. БАЗОВЫЙ РАСЧЁТ ТОРГА (УСЛОЖНЕН v0.5.2)
-    let baseSuccess = type === 'safe' ? 0.75 : 0.40; // Шанс стал ниже
+    // 5. Расчет торга
+    let baseSuccess = type === 'safe' ? 0.75 : 0.40;
     let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    let statBonus = ((karma - 50) / 250) + (lvl / 300); // Бонус от лвл/кармы стал меньше
+    let statBonus = ((karma - 50) / 250) + (lvl / 300);
     
     let successChance = baseSuccess + statBonus;
     let success = Math.random() < successChance;
 
     if (success) {
         currentSaleBuyer.successfulHagglesCount += 1;
-        // Шаг торга снижен (теперь +2..5% за раз вместо 4..13%)
         let increasePercent = type === 'safe' ? (0.02 + Math.random() * 0.03) : (0.05 + Math.random() * 0.04);
         let delta = Math.round(currentSaleBuyer.offerPrice * increasePercent);
         
@@ -585,7 +579,7 @@ function attemptHaggleSale(type) {
         playSound('win');
         tgHaptic('success');
     } else {
-        let damage = type === 'safe' ? Math.floor(20 + Math.random() * 15) : Math.floor(35 + Math.random() * 20); // Терпение кончается быстрее
+        let damage = type === 'safe' ? Math.floor(20 + Math.random() * 15) : Math.floor(35 + Math.random() * 20);
         currentSaleBuyer.patience = Math.max(0, currentSaleBuyer.patience - damage);
         
         setTxt("saleBuyerPatienceText", currentSaleBuyer.patience + "%");
@@ -612,7 +606,7 @@ function attemptHaggleSale(type) {
         if (currentSaleBuyer.patience <= 0) {
             dealIsAborted = true;
             setTimeout(() => {
-                closeModal("modalHaggleSale");
+                ModalManager.close("modalHaggleSale");
                 slot.currentBuyer = null;
                 slot.maxTimer = calculateLotWaitTime();
                 slot.timer = slot.maxTimer;
@@ -636,7 +630,6 @@ function acceptBuyerOffer(idx) {
     const buyer = slot.currentBuyer;
     const car = slot.car;
 
-    // Проверка криминала при быстрой продаже
     if ((car.isStolen || car.unregistered) && Math.random() < buyer.meticulous) {
         let crimReason = car.isStolen ? "перебитый VIN и розыск" : "аннулированный учёт по ст. 12.5.1";
         state.salesLot.splice(idx, 1);
@@ -652,9 +645,10 @@ function acceptBuyerOffer(idx) {
 
     const finalPrice = buyer.offerPrice;
     let purchaseCost = car.purchaseCost || car.basePrice || 100000;
-    let rawProfit = finalPrice - purchaseCost;
+    let modsCost = calculateCarUpgradesCost(car);
+    let totalInvested = purchaseCost + modsCost;
+    let rawProfit = finalPrice - totalInvested;
 
-    // Расчет налога 13% ТОЛЬКО если машина стояла на официальном учёте РФ в МРЭО
     let taxAmount = 0;
     let netProfit = rawProfit;
     let isTaxApplied = false;
@@ -672,6 +666,9 @@ function acceptBuyerOffer(idx) {
         seller: (state.player && state.player.name) ? state.player.name : "Перекуп #777",
         buyer: buyer.name,
         price: finalPrice,
+        purchaseCost: purchaseCost,
+        modsCost: modsCost,
+        totalInvested: totalInvested,
         rawProfit: rawProfit,
         profit: netProfit,
         tax: taxAmount,
@@ -704,15 +701,17 @@ function openDKPModal(dealData) {
         if (dealData.profit !== undefined) {
             profitBadge.style.display = 'block';
             let taxInfo = dealData.isTaxApplied ? ` (Удержан НДФЛ 13%: -${dealData.tax.toLocaleString()} ₽)` : " (ДКП без налога ✓)";
+            let breakdown = `<div class='sub-label mb-1' style='font-size:9.5px;'>Выкуп: ${(dealData.purchaseCost || 0).toLocaleString()} ₽ | Вложено: +${(dealData.modsCost || 0).toLocaleString()} ₽</div>`;
+
             if (dealData.profit > 0) {
                 profitBadge.className = 'text-xs text-center font-bold mb-2 color-green';
-                profitBadge.innerText = `Чистая прибыль от продажи: +${dealData.profit.toLocaleString()} ₽ 📈${taxInfo}`;
+                profitBadge.innerHTML = `${breakdown}Чистая прибыль от продажи: +${dealData.profit.toLocaleString()} ₽ 📈${taxInfo}`;
             } else if (dealData.profit < 0) {
                 profitBadge.className = 'text-xs text-center font-bold mb-2 color-red';
-                profitBadge.innerText = `Убыток от сделки: ${dealData.profit.toLocaleString()} ₽ 📉`;
+                profitBadge.innerHTML = `${breakdown}Убыток от сделки: ${dealData.profit.toLocaleString()} ₽ 📉`;
             } else {
                 profitBadge.className = 'text-xs text-center font-bold mb-2 color-amber';
-                profitBadge.innerText = `Сделка закрыта в ноль (0 ₽)`;
+                profitBadge.innerHTML = `${breakdown}Сделка закрыта в ноль (0 ₽)`;
             }
         } else {
             profitBadge.style.display = 'none';
@@ -738,8 +737,7 @@ function openDKPModal(dealData) {
     }
     if (btnClose) btnClose.style.display = 'none';
 
-    const modal = document.getElementById('modalDKP');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalDKP', { closeOthers: true });
     playSound('tick');
 }
 
@@ -748,7 +746,7 @@ function abortDKPDeal() {
         clearInterval(dkpAutoCloseTimer);
         dkpAutoCloseTimer = null;
     }
-    closeModal('modalDKP');
+    ModalManager.close('modalDKP');
     activePendingDKPDeal = null;
     playSound('tick');
     showToast("Сделка расторгнута. Автомобиль остался у вас!");
@@ -804,7 +802,11 @@ function confirmSignDKP() {
             showToast("🕊️ Честная сделка! Карма выросла (+6)");
         }
 
-        if (typeof PhoneManager !== 'undefined') {
+        if (typeof AppAutodrot !== 'undefined' && typeof AppAutodrot.triggerBuyerReview === 'function') {
+            AppAutodrot.triggerBuyerReview(car);
+        }
+
+        if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.pushBuyerFollowupSMS === 'function') {
             PhoneManager.pushBuyerFollowupSMS(car.name, false, deal.buyer);
         }
 
@@ -820,7 +822,7 @@ function confirmSignDKP() {
         updateHeaderUI();
         showToast("🤝 ДКП зарегистрирован! Средства зачислены.");
     } else if (deal.type === 'buy') {
-        closeModal('modalDKP');
+        ModalManager.close('modalDKP');
         if (typeof openRegistrationChoiceModal === 'function') {
             openRegistrationChoiceModal(deal);
         } else if (typeof finishMarketCarBuyProcess === 'function') {
@@ -841,18 +843,19 @@ function confirmSignDKP() {
         if (secondsLeft <= 0) {
             clearInterval(dkpAutoCloseTimer);
             dkpAutoCloseTimer = null;
-            closeModal('modalDKP');
+            ModalManager.close('modalDKP');
         }
     }, 1000);
 }
 
 function confirmSaleFromHaggleModal() {
     if (dealIsAborted || activeHaggleLotIndex === null) return;
-    closeModal("modalHaggleSale");
+    ModalManager.close("modalHaggleSale");
     acceptBuyerOffer(activeHaggleLotIndex);
 }
 
 // Экспорт в глобальную область видимости
+window.calculateCarUpgradesCost = calculateCarUpgradesCost;
 window.renderSalesLot = renderSalesLot;
 window.generateBuyerForSlot = generateBuyerForSlot;
 window.calculateLotWaitTime = calculateLotWaitTime;

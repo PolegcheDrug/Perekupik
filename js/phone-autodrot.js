@@ -1,7 +1,7 @@
 // ========================================================
 // js/phone-autodrot.js — ПРИЛОЖЕНИЕ «AUTODROT» (v0.6.0)
-// Онлайн P2P биржа, чат перекупов, горячие сделки и 
-// новая система отзывов и рейтинга профиля.
+// Онлайн P2P биржа (авто, номера, бизнес, жильё), чат перекупов,
+// срочный выкуп и система отзывов / рейтинга профиля.
 // ========================================================
 
 const AppAutodrot = {
@@ -9,11 +9,10 @@ const AppAutodrot = {
     p2pFilter: 'cars',
 
     render(container) {
-        let sub = this.subTrustSubTab || this.subTab;
+        let sub = this.subTab;
         if (!state.player.p2pReputation) {
-            state.player.p2pReputation = { rating: 5.0, reviewsCount: 0, badReviews: 0 };
+            state.player.p2pReputation = { rating: 5.0, reviewsCount: 0, badReviews: 0, reviewsLog: [] };
         }
-        let rep = state.player.p2pReputation;
 
         container.innerHTML = `
             <div class="phone-app-header">
@@ -37,7 +36,6 @@ const AppAutodrot = {
     switchTab(tab) {
         playSound('tick');
         tgHaptic('light');
-        this.subTrustSubTab = tab;
         this.subTab = tab;
         this.render(document.getElementById('phoneAppContainer'));
     },
@@ -59,7 +57,7 @@ const AppAutodrot = {
                         <b class="text-xs color-green"><i class="fa-solid fa-handshake"></i> Онлайн P2P торговля</b>
                         <button onclick="openCreateListingModal()" class="btn btn-green btn-auto btn-sm">+ Продать лот</button>
                     </div>
-                    <div class="sub-label" style="font-size:10px;">Продавайте свои авто, номера, бизнес и недвижимость реальным игрокам.</div>
+                    <div class="sub-label" style="font-size:10px;">Продавайте свои авто, номера, бизнес и недвижимость другим дельцам.</div>
                 </div>
                 <div class="grid-4 mb-2">
                     <button onclick="AppAutodrot.setFilter('cars')" class="btn ${f === 'cars' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9.5px;">🚗 Авто</button>
@@ -97,10 +95,10 @@ const AppAutodrot = {
                 <div class="glass-card mb-2 p-2">
                     <div class="flex-between mb-1">
                         <b class="text-xs">Toyota Mark II JZX90 (Срочно)</b>
-                        <span class="tag-badge bg-tag-red">Осталось: 55с</span>
+                        <span class="tag-badge bg-tag-red">Осталось: 45с</span>
                     </div>
-                    <div class="sub-label mb-2" style="font-size:10px;">Цена продавца: <b class="color-green">290,000 ₽</b> (Рынок: 490,000 ₽)</div>
-                    <button onclick="showToast('Лот выкуплен другим игроком в сети!');" class="btn btn-amber btn-sm w-full">Перехватить сделку ⚡</button>
+                    <div class="sub-label mb-2" style="font-size:10px;">Цена продавца: <b class="color-green">290,000 ₽</b> (Рыночная оценка: 490,000 ₽)</div>
+                    <button onclick="AppAutodrot.interceptHotDeal()" class="btn btn-amber btn-sm w-full">Перехватить сделку ⚡</button>
                 </div>
             `;
         } else if (this.subTab === 'reputation') {
@@ -108,7 +106,55 @@ const AppAutodrot = {
         }
     },
 
-    // --- НОВАЯ МЕХАНИКА: СИСТЕМА ОТЗЫВОВ И РЕЙТИНГА ---
+    interceptHotDeal() {
+        let cash = state.player?.cash || 0;
+        let cost = 290000;
+        if (cash < cost) return showToast("Не хватает 290,000 ₽ на срочный выкуп!");
+
+        let maxSlots = getTotalGarageSlots();
+        let curSlots = state.garage ? state.garage.length : 0;
+        if (curSlots >= maxSlots) return showToast("Гараж переполнен! Освободите бокс.");
+
+        state.player.cash -= cost;
+        let car = {
+            id: "hot_mark2_" + Date.now(),
+            name: "Toyota Mark II JZX90",
+            power: 180,
+            type: "economy",
+            drivetrain: "rwd",
+            basePrice: 490000,
+            price: cost,
+            baseMarketValue: 490000,
+            marketValue: 490000,
+            img: "assets/cars/economy/mark2.jpg",
+            fallback: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80",
+            plate: generateNormalPlate(),
+            isStolen: false,
+            condition: 75,
+            wear: { engine: 80, transmission: 75 },
+            tuning: { chip: 0, weldedDiff: false, steeringAngle: false, risk1251: 0 },
+            purchaseCost: cost,
+            ownershipDays: 0,
+            engineTemp: 90,
+            tireWear: 85
+        };
+
+        if (typeof recalculateCarMarketValue === 'function') {
+            recalculateCarMarketValue(car);
+        }
+
+        if (!state.garage) state.garage = [];
+        state.garage.push(car);
+
+        saveState();
+        updateHeaderUI();
+        if (typeof renderGarage === 'function') renderGarage();
+        playSound('win');
+        tgHaptic('success');
+        openVerdictModal("СРОЧНЫЙ ВЫКУП! 🔥", `Вы успели перехватить «${car.name}» за ${cost.toLocaleString()} ₽!\nМашина доставлена в гараж.`, true);
+        this.renderSubScreen();
+    },
+
     renderReputationScreen(content) {
         if (!state.player.p2pReputation) {
             state.player.p2pReputation = { rating: 5.0, reviewsCount: 0, badReviews: 0, reviewsLog: [] };
@@ -118,7 +164,7 @@ const AppAutodrot = {
         let logHtml = "";
         let logs = rep.reviewsLog || [];
         if (logs.length === 0) {
-            logHtml = "<div class='sub-label text-center py-3'>У вас пока нет отзывов. Продавайте машины на бирже, чтобы заработать репутацию!</div>";
+            logHtml = "<div class='sub-label text-center py-3'>У вас пока нет отзывов. Продавайте машины клиентам, чтобы заработать репутацию!</div>";
         } else {
             logs.forEach(rev => {
                 let isGood = rev.stars >= 4;
@@ -134,8 +180,8 @@ const AppAutodrot = {
         }
 
         let penaltyInfo = rep.rating < 4.0 
-            ? `<div class="p-2 mb-2" style="background:rgba(220,38,38,0.15); border:1px solid var(--red); border-radius:8px; font-size:9.5px; color:var(--red);">⚠️ <b>Низкий рейтинг!</b> Покупатели на P2P бирже обходят ваши лоты стороной. Продавайте честные машины без скрутки пробега, чтобы поднять оценку.</div>`
-            : `<div class="p-2 mb-2" style="background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.3); border-radius:8px; font-size:9.5px; color:var(--green);">✓ <b>Отличная репутация!</b> Клиенты доверяют вашему автосалону.</div>`;
+            ? `<div class="p-2 mb-2" style="background:rgba(220,38,38,0.15); border:1px solid var(--red); border-radius:8px; font-size:9.5px; color:var(--red);">⚠️ <b>Низкий рейтинг!</b> Покупатели на площадке и бирже торгуются агрессивнее. Продавайте честные машины без скрутки пробега, чтобы поднять оценку.</div>`
+            : `<div class="p-2 mb-2" style="background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.3); border-radius:8px; font-size:9.5px; color:var(--green);">✓ <b>Отличная репутация!</b> Клиенты безоговорочно доверяют вашему автосалону.</div>`;
 
         content.innerHTML = `
             <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0,242,254,0.15), #090e18);">
@@ -153,7 +199,6 @@ const AppAutodrot = {
         `;
     },
 
-    // Метод генерации отзыва после продажи тачки (вызывается из логики продаж)
     triggerBuyerReview(car) {
         if (!state.player.p2pReputation) {
             state.player.p2pReputation = { rating: 5.0, reviewsCount: 0, badReviews: 0, reviewsLog: [] };
@@ -163,11 +208,11 @@ const AppAutodrot = {
 
         let stars = 5;
         let reviewText = "Отличная машина! Сел и поехал, продавцу респект.";
-        let buyerNames = ["Алексей Д.", "Максим К.", "Артур М.", "Илья С.", "Денис В."];
+        let buyerNames = ["Алексей Д.", "Максим К.", "Артур М.", "Илья С.", "Денис В.", "Сергей Т."];
         let bName = buyerNames[Math.floor(Math.random() * buyerNames.length)];
 
         if (isCheated && Math.random() < 0.75) {
-            stars = Math.floor(1 + Math.random() * 2); // 1 или 2 звезды
+            stars = Math.floor(1 + Math.random() * 2);
             rep.badReviews++;
             const badComments = [
                 "Обманщик! Скрутил пробег, через 10 км застучал мотор!",
@@ -184,7 +229,6 @@ const AppAutodrot = {
         }
 
         rep.reviewsCount++;
-        // Пересчет общего рейтинга
         let totalScore = (rep.rating * (rep.reviewsCount - 1)) + stars;
         rep.rating = Math.max(1.0, Math.min(5.0, totalScore / rep.reviewsCount));
 

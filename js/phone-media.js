@@ -1,9 +1,9 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО И ВИЛСПИНЫ PEREKUP OS (v0.5.2)
-// Разработчики: Tak Toje, Max, Sergo, gemini
-// Live-автомагнитола (17 потоков), VIP Колесо Фортуны,
-// Супер Вилспин с комбинированной оплатой (₽ + ⭐) и лавка обмена.
-// Экономика усложнена: инфляция цен на спины и обмен валют.
+// js/phone-media.js — МЕДИА, РАДИО И ФОРТУНА PEREKUP OS (v0.6.1)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Live-автомагнитола (17 электронных потоков), VIP Колесо Фортуны,
+// неоновый Супер Вилспин с электрическими эффектами барабанов.
+// Обменники валют перенесены в Во-Банк, лавка сфокусирована на вилспинах.
 // ========================================================
 
 const ELECTRONIC_RADIO_STATIONS = [
@@ -305,7 +305,7 @@ const PhoneMedia = {
     },
 
     // ----------------------------------------------------
-    // ФОРТУНА & СУПЕР ВИЛСПИН
+    // РЕДИЗАЙН: КЛУБ ФОРТУНЫ & СУПЕР ВИЛСПИН
     // ----------------------------------------------------
     renderFortuneApp(container) {
         let tickets = state.player?.superSpinTickets || 0;
@@ -313,20 +313,31 @@ const PhoneMedia = {
         let pDay = state.player?.day || 1;
         let lastSuperDay = state.player?.lastFreeSuperSpinDay || 0;
         let canFreeSuperSpin = lastSuperDay < pDay;
+        let freeImpound = state.player?.freeImpoundPasses || 0;
 
         container.innerHTML = `
             <div class="phone-app-header">
                 <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-clover color-amber mr-1"></i> Клуб Фортуны</div>
+                <div class="phone-app-title"><i class="fa-solid fa-clover color-amber mr-1"></i> Клуб Фортуны VIP</div>
                 <div class="text-xs color-amber font-bold">${stars} ⭐</div>
             </div>
             <div class="phone-app-body">
                 
-                <div class="glass-card mb-3 p-3" style="background: radial-gradient(circle at 50% 0%, #1e1338 0%, #090e18 100%); border: 1.5px solid var(--purple); box-shadow: 0 0 20px rgba(192,132,252,0.3);">
+                <!-- БАННЕР СТАТУСА ПРИЗОВ -->
+                <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(255,179,0,0.12), #090e18); border-color: rgba(255,179,0,0.35);">
+                    <div>
+                        <div class="text-xs font-bold color-amber"><i class="fa-solid fa-sparkles"></i> Джекпоты сезона:</div>
+                        <div class="sub-label" style="font-size:9.5px;">Porsche 911 GT3 RS • Номера 777 • Талоны ГИБДД</div>
+                    </div>
+                    ${freeImpound > 0 ? `<span class="tag-badge bg-tag-purple"><i class="fa-solid fa-ticket"></i> ${freeImpound} талонов спецстоянки</span>` : `<span class="tag-badge bg-tag-amber">Шанс х3</span>`}
+                </div>
+
+                <!-- 1. СУПЕР ВИЛСПИН: ТРЕХБАРАБАННЫЙ СЛОТ С ЭЛЕКТРИЧЕСКИМ СВЕЧЕНИЕМ -->
+                <div class="glass-card mb-3 p-3 super-spin-showcase-box" style="background: radial-gradient(circle at 50% 0%, #1e1338 0%, #090e18 100%); border: 1.5px solid var(--purple); box-shadow: 0 0 25px rgba(192,132,252,0.35);">
                     <div class="flex-between mb-2">
                         <div>
-                            <b class="text-xs color-purple" style="font-size:13px;">🎰 СУПЕР ВИЛСПИН</b>
-                            <div class="sub-label" style="font-size:9.5px;">Авто/Дроп + Ресурсы + Эксклюзивы!</div>
+                            <b class="text-xs color-purple" style="font-size:13px;"><i class="fa-solid fa-bolt-lightning mr-1"></i> СУПЕР ВИЛСПИН</b>
+                            <div class="sub-label" style="font-size:9.5px;">Авто/Дроп + Ресурсы/XP + Эксклюзивы</div>
                         </div>
                         <span class="tag-badge ${canFreeSuperSpin ? 'bg-tag-green' : 'bg-tag-purple'}">
                             ${canFreeSuperSpin ? '🎁 1 БЕСПЛАТНЫЙ СПИН' : `Билетов: ${tickets} 🎟️`}
@@ -334,32 +345,43 @@ const PhoneMedia = {
                     </div>
 
                     <div class="grid-3 my-2" style="gap:6px;">
-                        <div class="p-2 text-center" id="superReel1" style="background:#090d16; border-radius:10px; border:1px solid rgba(0,242,254,0.3); min-height:85px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                            <div style="font-size:26px;">🚗</div>
-                            <b class="text-xs color-cyan mt-1" id="reelTxt1">ТЕХНИКА / ДРОП</b>
-                            <div class="sub-label" style="font-size:8px;">(Авто / Запчасти / Пусто)</div>
+                        <div class="p-2 text-center fortune-reel-card" id="superReel1">
+                            <div style="font-size:26px;">🏎️</div>
+                            <b class="text-xs color-cyan mt-1" id="reelTxt1">ТЕХНИКА & ДРОП</b>
+                            <div class="sub-label" style="font-size:8px;">(Авто / Запчасти / Талоны)</div>
                         </div>
 
-                        <div class="p-2 text-center" id="superReel2" style="background:#090d16; border-radius:10px; border:1px solid rgba(0,230,118,0.3); min-height:85px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                            <div style="font-size:26px;">⛽</div>
-                            <b class="text-xs color-green mt-1" id="reelTxt2">РЕСУРСЫ</b>
-                            <div class="sub-label" style="font-size:8px;">(Кэш / Бак / Талоны)</div>
+                        <div class="p-2 text-center fortune-reel-card" id="superReel2">
+                            <div style="font-size:26px;">💰</div>
+                            <b class="text-xs color-green mt-1" id="reelTxt2">РЕСУРСЫ & ОПЫТ</b>
+                            <div class="sub-label" style="font-size:8px;">(Кэш / XP / Полный Бак)</div>
                         </div>
 
-                        <div class="p-2 text-center" id="superReel3" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,179,0,0.3); min-height:85px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                        <div class="p-2 text-center fortune-reel-card" id="superReel3">
                             <div style="font-size:26px;">💎</div>
                             <b class="text-xs color-amber mt-1" id="reelTxt3">ЭКСКЛЮЗИВ</b>
-                            <div class="sub-label" style="font-size:8px;">(Номера / Тюнинг / Штраф)</div>
+                            <div class="sub-label" style="font-size:8px;">(Блатные 777 / Чип Stage)</div>
                         </div>
                     </div>
 
-                    <button id="btnLaunchSuperSpin" onclick="PhoneMedia.spinSuperWheelAction()" class="btn ${canFreeSuperSpin ? 'btn-green' : 'btn-purple'} btn-sm w-full mt-2">
+                    <button id="btnLaunchSuperSpin" onclick="PhoneMedia.spinSuperWheelAction()" class="btn ${canFreeSuperSpin ? 'btn-green' : 'btn-purple'} btn-sm w-full mt-2" style="box-shadow: 0 0 16px rgba(192,132,252,0.4);">
                         🎰 ${canFreeSuperSpin ? 'КРУТИТЬ БЕСПЛАТНО (Суточный бонус 🎁)' : (tickets > 0 ? 'КРУТИТЬ (1 Билет 🎟️)' : 'КРУТИТЬ (300,000 ₽ + 30 ⭐)')}
                     </button>
+                    
+                    <div class="flex-between mt-2 pt-1 text-xs" style="border-top: 1px dashed rgba(255,255,255,0.08);">
+                        <span class="sub-label" style="font-size:9px;">Билеты можно купить в Во-Банке</span>
+                        <a href="javascript:void(0)" onclick="PhoneManager.openApp('bank'); setTimeout(() => AppBank.switchTab('exchange'), 100);" class="color-cyan font-bold" style="font-size:9.5px; text-decoration:none;">
+                            Купить билеты в Банке →
+                        </a>
+                    </div>
                 </div>
 
+                <!-- 2. КЛАССИЧЕСКОЕ VIP КОЛЕСО ФОРТУНЫ -->
                 <div class="glass-card text-center mb-3 p-2">
-                    <b class="text-xs color-amber">🎡 VIP Колесо Фортуны (1 Сектор)</b>
+                    <div class="flex-between mb-1 px-1">
+                        <b class="text-xs color-amber"><i class="fa-solid fa-dharmachakra"></i> Классическое VIP Колесо</b>
+                        <span class="tag-badge bg-tag-amber">1 Сектор</span>
+                    </div>
                     <div class="wheel-stage-container my-1" style="transform: scale(0.82); margin: 0 auto;">
                         <div class="wheel-outer-ring">
                             <canvas id="wheelCanvas" width="560" height="560" class="neon-wheel-canvas"></canvas>
@@ -373,102 +395,10 @@ const PhoneMedia = {
                     </div>
                 </div>
 
-                <div class="glass-card mb-3 p-2">
-                    <div class="flex-between mb-2">
-                        <b class="text-xs color-cyan"><i class="fa-solid fa-store"></i> Лавка Фортуны & Обмен Валют</b>
-                        <span class="sub-label" style="font-size:10px;">Конвертация топлива, денег и талонов</span>
-                    </div>
-
-                    <div class="space-y-2">
-                        <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
-                            <div>
-                                <b class="text-xs color-amber">⭐ Пак 25 Stars за Деньги</b>
-                                <div class="sub-label" style="font-size:9.5px;">Конвертация оборотки в звёзды</div>
-                            </div>
-                            <button onclick="PhoneMedia.exchangeForStars('cash', 350000, 25)" class="btn btn-amber btn-sm btn-auto">350,000 ₽</button>
-                        </div>
-
-                        <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
-                            <div>
-                                <b class="text-xs color-cyan">⛽ Обмен 60 Бензина на 10 Stars</b>
-                                <div class="sub-label" style="font-size:9.5px;">Слив излишков топлива</div>
-                            </div>
-                            <button onclick="PhoneMedia.exchangeForStars('fuel', 60, 10)" class="btn btn-cyan btn-sm btn-auto">-60 ⛽</button>
-                        </div>
-
-                        <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
-                            <div>
-                                <b class="text-xs color-purple">🎟️ Обмен 20 Талонов на 15 Stars</b>
-                                <div class="sub-label" style="font-size:9.5px;">Обмен неиспользованных пропусков</div>
-                            </div>
-                            <button onclick="PhoneMedia.exchangeForStars('tickets', 20, 15)" class="btn btn-purple btn-sm btn-auto">-20 🎟️</button>
-                        </div>
-
-                        <div class="p-2 flex-between" style="background:#090e18; border-radius:8px; border:1px solid rgba(0, 230, 118, 0.25);">
-                            <div>
-                                <b class="text-xs color-green"><i class="fa-solid fa-ticket"></i> 1х Билет Супер Вилспина</b>
-                                <div class="sub-label" style="font-size:9.5px;">Комбинированная стоимость: <b>300k ₽ + 30 ⭐</b></div>
-                            </div>
-                            <button onclick="PhoneMedia.buySuperSpinTicket()" class="btn btn-green btn-sm btn-auto">
-                                Купить (300k ₽ + 30 ⭐)
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </div>
         `;
 
         if (typeof initWheelModule === 'function') initWheelModule();
-    },
-
-    exchangeForStars(type, cost, gainStars) {
-        if (type === 'cash') {
-            let cash = state.player?.cash || 0;
-            if (cash < cost) return showToast("Не хватает денег для обмена!");
-            state.player.cash -= cost;
-        } else if (type === 'fuel') {
-            let fuel = state.player?.fuel || 0;
-            if (fuel < cost) return showToast("Не хватает топлива в баке!");
-            state.player.fuel -= cost;
-        } else if (type === 'tickets') {
-            let tck = state.player?.expressTickets || 0;
-            if (tck < cost) return showToast("Не хватает талонов для обмена!");
-            state.player.expressTickets -= cost;
-        }
-
-        state.player.stars = (state.player.stars || 0) + gainStars;
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast(`Обмен успешен! Получено +${gainStars} Stars ⭐!`);
-        this.renderFortuneApp(document.getElementById('phoneAppContainer'));
-    },
-
-    buySuperSpinTicket() {
-        const costCash = 300000;
-        const costStars = 30;
-
-        let cash = state.player?.cash || 0;
-        let stars = state.player?.stars || 0;
-
-        if (cash < costCash) {
-            return showToast(`Не хватает рублей! Нужно ${costCash.toLocaleString()} ₽.`);
-        }
-        if (stars < costStars) {
-            return showToast(`Не хватает звёзд! Нужно ${costStars} ⭐ Stars.`);
-        }
-
-        state.player.cash -= costCash;
-        state.player.stars -= costStars;
-        state.player.superSpinTickets = (state.player.superSpinTickets || 0) + 1;
-
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        showToast("Билет «Супер Вилспин» успешно приобретён за 300,000 ₽ + 30 ⭐!");
-        this.renderFortuneApp(document.getElementById('phoneAppContainer'));
     },
 
     spinSuperWheelAction() {
@@ -499,20 +429,31 @@ const PhoneMedia = {
         const r1 = document.getElementById('reelTxt1');
         const r2 = document.getElementById('reelTxt2');
         const r3 = document.getElementById('reelTxt3');
+        const box1 = document.getElementById('superReel1');
+        const box2 = document.getElementById('superReel2');
+        const box3 = document.getElementById('superReel3');
         const btn = document.getElementById('btnLaunchSuperSpin');
         if (btn) btn.disabled = true;
 
+        if (box1) box1.classList.add('reel-spinning-anim');
+        if (box2) box2.classList.add('reel-spinning-anim');
+        if (box3) box3.classList.add('reel-spinning-anim');
+
         let spinAnim = setInterval(() => {
-            if (r1) r1.innerText = ["Пусто", "ВАЗ-2107", "Колодки", "Nexia", "Polo Sedan"][Math.floor(Math.random() * 5)];
-            if (r2) r2.innerText = ["25,000 ₽", "35 ⛽ Бак", "60,000 ₽", "10 🎟️ Талонов", "150,000 ₽"][Math.floor(Math.random() * 5)];
-            if (r3) r3.innerText = ["В777ВВ 77", "10 ⭐ Stars", "Stage 2 Чип", "Без спецприза", "Штраф"][Math.floor(Math.random() * 5)];
+            if (r1) r1.innerText = ["ВАЗ-2107", "Талон ГИБДД", "Polo Sedan", "Launch Pro", "+150 XP"][Math.floor(Math.random() * 5)];
+            if (r2) r2.innerText = ["150,000 ₽", "Полный Бак", "400,000 ₽", "+80 XP", "25 Талонов"][Math.floor(Math.random() * 5)];
+            if (r3) r3.innerText = ["В777ВВ 77", "50 ⭐ Stars", "Stage 2 Чип", "Е777КХ 777", "Штраф"][Math.floor(Math.random() * 5)];
             playSound('tick');
-        }, 100);
+        }, 90);
 
         setTimeout(() => {
             clearInterval(spinAnim);
             this.isSuperSpinning = false;
             if (btn) btn.disabled = false;
+
+            if (box1) box1.classList.remove('reel-spinning-anim');
+            if (box2) box2.classList.remove('reel-spinning-anim');
+            if (box3) box3.classList.remove('reel-spinning-anim');
 
             const tiers = typeof SUPER_SPIN_TIERS !== 'undefined' ? SUPER_SPIN_TIERS : {
                 reelCars: [{ type: "empty", name: "Ничего" }],
@@ -526,7 +467,7 @@ const PhoneMedia = {
 
             let resText1 = "";
             if (drop1.type === 'car') {
-                let maxSlots = getTotalGarageSlots();
+                let maxSlots = typeof getTotalGarageSlots === 'function' ? getTotalGarageSlots() : 2;
                 let curSlots = state.garage ? state.garage.length : 0;
                 let wonPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "ТРАНЗИТ";
                 let baseP = drop1.basePrice || 100000;
@@ -566,6 +507,16 @@ const PhoneMedia = {
                     state.player.cash = (state.player.cash || 0) + compensation;
                     resText1 = `🚗 ${wonCar.name} (Гараж полон: компенсация +${compensation.toLocaleString()} ₽)`;
                 }
+            } else if (drop1.type === 'free_impound') {
+                state.player.freeImpoundPasses = (state.player.freeImpoundPasses || 0) + 1;
+                resText1 = `🚔 Талон бесплатного забора со штрафстоянки получен!`;
+            } else if (drop1.type === 'xp_bundle') {
+                addXp(drop1.amount || 150);
+                resText1 = `🎖️ Пакет опыта перекупа (+${drop1.amount || 150} XP)!`;
+            } else if (drop1.type === 'tool') {
+                if (!state.player.tools) state.player.tools = {};
+                state.player.tools[drop1.toolId] = true;
+                resText1 = `📱 ${drop1.name} добавлен в арсенал!`;
             } else if (drop1.type === 'part') {
                 state.player.cash = (state.player.cash || 0) + drop1.cashValue;
                 resText1 = `📦 ${drop1.name} (Сдано за +${drop1.cashValue.toLocaleString()} ₽)`;
@@ -577,6 +528,9 @@ const PhoneMedia = {
             if (drop2.type === 'cash' || drop2.type === 'jackpot') {
                 state.player.cash = (state.player.cash || 0) + drop2.amount;
                 resText2 = `💰 +${drop2.amount.toLocaleString()} ₽`;
+            } else if (drop2.type === 'xp') {
+                addXp(drop2.amount || 80);
+                resText2 = `🎖️ +${drop2.amount || 80} XP Опыта`;
             } else if (drop2.type === 'fuel') {
                 state.player.fuel = Math.min(100, (state.player.fuel || 0) + drop2.amount);
                 resText2 = `⛽ +${drop2.amount} Топлива`;
@@ -592,6 +546,9 @@ const PhoneMedia = {
             if (drop3.type === 'stars') {
                 state.player.stars = (state.player.stars || 0) + drop3.amount;
                 resText3 = `⭐ +${drop3.amount} Stars`;
+            } else if (drop3.type === 'free_impound') {
+                state.player.freeImpoundPasses = (state.player.freeImpoundPasses || 0) + 1;
+                resText3 = `🎫 Талон забора со спецстоянки 🚔!`;
             } else if (drop3.type === 'plate') {
                 if (!state.ownedPlates) state.ownedPlates = [];
                 state.ownedPlates.push(drop3.plate);

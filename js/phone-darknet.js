@@ -1,6 +1,6 @@
 // ========================================================
 // js/phone-darknet.js — ПРИЛОЖЕНИЕ «ДАРКНЕТ» (v0.6.0)
-// Теневой портал Артура: покупка ворованных/контрактных 
+// Теневой портал Артура: покупка контрактных/ворованных 
 // запчастей со скидкой, крыша ГИБДД и отмыв криминальных VIN.
 // ========================================================
 
@@ -12,6 +12,14 @@ const AppDarknet = {
         let conn = state.player?.connections || 0;
         let immunity = state.player?.policeImmunityDays || 0;
 
+        const caps = (typeof getPlayerHousingCapabilities === 'function') 
+            ? getPlayerHousingCapabilities() 
+            : { reshalaDiscountPct: 0 };
+
+        let discountBadge = caps.reshalaDiscountPct > 0 
+            ? `<span class="tag-badge bg-tag-green">Скидка цеха -${caps.reshalaDiscountPct}%</span>`
+            : `<span class="tag-badge bg-tag-purple">Штаб Артура</span>`;
+
         container.innerHTML = `
             <div class="phone-app-header">
                 <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
@@ -22,10 +30,10 @@ const AppDarknet = {
                 <div class="reshala-banner mb-2 p-2">
                     <div class="flex-between mb-1">
                         <b class="text-xs color-purple">Теневые Связи: ${conn} 🤝</b>
-                        <span class="tag-badge bg-tag-purple">Штаб Артура</span>
+                        ${discountBadge}
                     </div>
                     <div class="sub-label" style="font-size:10px;">
-                        Анонимный доступ к серым услугам и контрактным деталям без лишних вопросов.
+                        Анонимный доступ к серым услугам, отмыву документов и контрактным деталям без лишних вопросов.${caps.reshalaDiscountPct > 0 ? ` Действует скидка вашего бокса <b>${caps.reshalaDiscountPct}%</b>!` : ''}
                     </div>
                 </div>
 
@@ -39,7 +47,7 @@ const AppDarknet = {
                     <button onclick="AppDarknet.switchTab('parts')" class="btn ${sub === 'parts' ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-size:9.5px;">Контрактные запчасти</button>
                 </div>
 
-                ${sub === 'services' ? this.renderServicesTab(immunity) : this.renderStolenPartsTab()}
+                ${sub === 'services' ? this.renderServicesTab(immunity, caps) : this.renderStolenPartsTab()}
             </div>
         `;
     },
@@ -51,8 +59,17 @@ const AppDarknet = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    renderServicesTab(immunity) {
+    renderServicesTab(immunity, caps) {
         let hasLic = !!state.player?.hasRacingLicense;
+        let discountMultiplier = Math.max(0.5, 1 - ((caps?.reshalaDiscountPct || 0) / 100));
+
+        let baseRoofCost = 450000;
+        let baseLicCost = 120000;
+        let baseLegalizeCost = 300000;
+
+        let roofCost = Math.round(baseRoofCost * discountMultiplier);
+        let licCost = Math.round(baseLicCost * discountMultiplier);
+        let legalizeCost = Math.round(baseLegalizeCost * discountMultiplier);
 
         return `
             <div class="reshala-deal-card mb-2 p-2">
@@ -60,9 +77,9 @@ const AppDarknet = {
                     <b class="text-xs">🚨 Крыша ГИБДД (3 дня)</b>
                     <span class="tag-badge bg-tag-amber">${immunity > 0 ? immunity + ' дн.' : 'Иммунитет'}</span>
                 </div>
-                <p class="sub-label my-1" style="font-size:10px;">Защита от облав на заездах и штрафов за просроченный ДКП.</p>
+                <p class="sub-label my-1" style="font-size:10px;">Защита от облав на заездах 402м и штрафов за просроченный ДКП.</p>
                 <button onclick="buyReshalaService('roof'); AppDarknet.render(document.getElementById('phoneAppContainer'));" class="btn btn-amber btn-sm w-full" ${immunity > 0 ? 'disabled' : ''}>
-                    ${immunity > 0 ? 'Крыша активна' : 'Оформить (450k ₽ / 45 ⭐)'}
+                    ${immunity > 0 ? 'Крыша активна' : `Оформить (${(roofCost / 1000).toFixed(0)}k ₽ / 45 ⭐)`}
                 </button>
             </div>
 
@@ -73,7 +90,7 @@ const AppDarknet = {
                 </div>
                 <p class="sub-label my-1" style="font-size:10px;">Официальный регламентный допуск пилота к заездам.</p>
                 <button onclick="buyReshalaService('license'); AppDarknet.render(document.getElementById('phoneAppContainer'));" class="btn btn-cyan btn-sm w-full" ${hasLic ? 'disabled' : ''}>
-                    ${hasLic ? 'Оформлено ✓' : 'Оформить (120k ₽ / 15 ⭐)'}
+                    ${hasLic ? 'Оформлено ✓' : `Оформить (${(licCost / 1000).toFixed(0)}k ₽ / 15 ⭐)`}
                 </button>
             </div>
 
@@ -83,23 +100,22 @@ const AppDarknet = {
                     <span class="tag-badge bg-tag-cyan">Чистый VIN</span>
                 </div>
                 <p class="sub-label my-1" style="font-size:10px;">Снимает статус «В розыске» и аннулирование 12.5.1 с проблемного авто.</p>
-                <button onclick="openLegalizeCarModal()" class="btn btn-dark btn-sm w-full">Выбрать авто (300k + 1 🤝)</button>
+                <button onclick="openLegalizeCarModal()" class="btn btn-dark btn-sm w-full">
+                    Выбрать авто (${(legalizeCost / 1000).toFixed(0)}k ₽ + 1 🤝)
+                </button>
             </div>
         `;
     },
 
-    // --- НОВАЯ МЕХАНИКА: КОНТРАКТНЫЕ (ВОРОВАННЫЕ) ЗАПЧАСТИ ---
     renderStolenPartsTab() {
-        if (!state.player.darknetStolenParts) state.player.darknetStolenParts = [];
-
         const catalog = [
-            { id: 'stolen_turbo', name: 'Stage 3 Big Turbo (Контракт)', type: 'turbo', cost: 85000, marketCost: 180000, risk: 40, perk: '+150 л.с. (Снят с распила в Владивостоке)' },
-            { id: 'stolen_cage', name: 'Вварной каркас безопасности', type: 'cage', cost: 40000, marketCost: 85000, risk: 25, perk: 'Допуск в RDS GP' },
-            { id: 'stolen_slicks', name: 'Комплект полусликов Toyo', type: 'slicks', cost: 20000, marketCost: 45000, risk: 15, perk: 'Максимальный зацеп на квотере' }
+            { id: 'stolen_turbo', name: 'Stage 3 Big Turbo (Контракт)', type: 'turbo', cost: 85000, marketCost: 180000, risk: 40, perk: '+150 л.с. (Снят с распила во Владивостоке)' },
+            { id: 'stolen_cage', name: 'Вварной каркас безопасности', type: 'cage', cost: 40000, marketCost: 85000, risk: 25, perk: 'Допуск в высшую лигу RDS GP' },
+            { id: 'stolen_slicks', name: 'Комплект полусликов Toyo R888R', type: 'slicks', cost: 20000, marketCost: 45000, risk: 15, perk: 'Максимальный зацеп на старте (-0.6с к квотеру)' }
         ];
 
         let html = "";
-        catalog.forEach((part, pIdx) => {
+        catalog.forEach((part) => {
             html += `
             <div class="glass-card mb-2 p-2">
                 <div class="flex-between mb-1">
@@ -107,7 +123,7 @@ const AppDarknet = {
                     <span class="price-val text-xs color-green">${part.cost.toLocaleString()} ₽</span>
                 </div>
                 <div class="sub-label mb-1" style="font-size:9.5px;">${part.perk}</div>
-                <div class="sub-label mb-2 color-red" style="font-size:8.5px;">⚠️ Риск конфискации на техкоме RDS: <b>${part.risk}%</b></div>
+                <div class="sub-label mb-2 color-red" style="font-size:8.5px;">⚠️ Риск проверки номеров на техкоме: <b>${part.risk}%</b></div>
                 
                 <div class="flex-between">
                     <span class="sub-label" style="font-size:9px;">Экономия: ~${(part.marketCost - part.cost).toLocaleString()} ₽</span>
@@ -128,8 +144,12 @@ const AppDarknet = {
         `;
     },
 
-    buyPart(count) { buyReshalaPack(count === 1 ? 'pack1' : 'pack5'); this.render(document.getElementById('phoneAppContainer')); },
-    buyPack(count) { buyReshalaPack(count === 1 ? 'pack1' : 'pack5'); this.render(document.getElementById('phoneAppContainer')); },
+    buyPack(count) { 
+        if (typeof buyReshalaPack === 'function') {
+            buyReshalaPack(count === 1 ? 'pack1' : 'pack5'); 
+        }
+        this.render(document.getElementById('phoneAppContainer')); 
+    },
 
     buyStolenPart(partId, cost, riskPct) {
         let cash = state.player?.cash || 0;
@@ -162,7 +182,8 @@ const AppDarknet = {
         updateHeaderUI();
         playSound('win');
         tgHaptic('success');
-        openVerdictModal("ДЕТАЛЬ УСТАНОВЛЕНА! 🏴‍☠️", `Контрактная деталь инсталлирована на «${car.name}».\nВнимание: на техкоме RDS есть риск проверки серийных номеров!`, true);
+        openVerdictModal("ДЕТАЛЬ УСТАНОВЛЕНА! 🏴‍☠️", `Контрактная деталь инсталлирована на «${car.name}».\nВнимание: на техкоме RDS есть риск проверки серийных номеров агрегатов!`, true);
+        this.render(document.getElementById('phoneAppContainer'));
     }
 };
 

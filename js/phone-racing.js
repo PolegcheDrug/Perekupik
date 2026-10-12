@@ -1,9 +1,9 @@
 // ========================================================
-// js/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.5.1)
-// Разработчики: Tak Toje, Max, Sergo, gemini
-// Интерактивные зрелищные заезды (6 секунд):
+// js/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.6.0)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Интерактивные зрелищные заезды:
 // Арена дрифта (восьмёрка с дымом), Драг 402м с ёлкой старта,
-// Стенс-шоу со стравливанием пневмы кузова в пол, шашки по МКАД
+// Стенс-шоу со стравливанием пневмы кузова в пол, шашки по МКАД.
 // ========================================================
 
 const PhoneRacing = {
@@ -109,8 +109,11 @@ const PhoneRacing = {
             return;
         }
 
-        let carIdx = state.player.selectedStreetCarIndex || 0;
-        if (carIdx >= state.garage.length) carIdx = 0;
+        let carIdx = (typeof getActiveStreetCarIndex === 'function') 
+            ? getActiveStreetCarIndex() 
+            : (state.player.selectedStreetCarIndex || 0);
+
+        if (carIdx === -1 || !state.garage[carIdx]) carIdx = 0;
         const car = state.garage[carIdx];
         const spec = this.getDriftSpecInfo(car);
 
@@ -151,8 +154,8 @@ const PhoneRacing = {
                         Регламент: Мин. 75 л.с., заварка и выворот.<br>
                         ${!spec.matsuriReady ? `<b class="color-red">${spec.matsuriReason}</b>` : `<span class="color-green">Допуск открыт!</span>`}
                     </div>
-                    <button onclick="PhoneRacing.runDriftChallenge('matsuri', 15000)" class="btn btn-cyan btn-sm w-full" ${!spec.matsuriReady ? 'disabled' : ''}>
-                        Выехать на спот (Взнос 15k ₽)
+                    <button onclick="PhoneRacing.runDriftChallenge('matsuri', 25000)" class="btn btn-cyan btn-sm w-full" ${!spec.matsuriReady ? 'disabled' : ''}>
+                        Выехать на спот (Взнос 25k ₽)
                     </button>
                 </div>
 
@@ -168,8 +171,8 @@ const PhoneRacing = {
                         Регламент: Мин. 200 л.с., гидроручник, заварка, выворот.<br>
                         ${!spec.europeReady ? `<b class="color-red">${spec.europeReason}</b>` : `<span class="color-green">Техком пройден!</span>`}
                     </div>
-                    <button onclick="PhoneRacing.runDriftChallenge('europe', 60000)" class="btn btn-amber btn-sm w-full" ${!spec.europeReady ? 'disabled' : ''}>
-                        Квалификация RDS Europe (Взнос 60k ₽)
+                    <button onclick="PhoneRacing.runDriftChallenge('europe', 80000)" class="btn btn-amber btn-sm w-full" ${!spec.europeReady ? 'disabled' : ''}>
+                        Квалификация RDS Europe (Взнос 80k ₽)
                     </button>
                 </div>
 
@@ -185,8 +188,8 @@ const PhoneRacing = {
                         Регламент: Мин. 420 л.с., вварной каркас, ковши, гидроручник.<br>
                         ${!spec.gpReady ? `<b class="color-red">${spec.gpReason}</b>` : `<span class="color-green">Болид готов к ТОП-32!</span>`}
                     </div>
-                    <button onclick="PhoneRacing.runDriftChallenge('gp', 200000)" class="btn btn-red btn-sm w-full" ${!spec.gpReady ? 'disabled' : ''}>
-                        ТОП-32 RDS GP (Взнос 200k ₽)
+                    <button onclick="PhoneRacing.runDriftChallenge('gp', 250000)" class="btn btn-red btn-sm w-full" ${!spec.gpReady ? 'disabled' : ''}>
+                        ТОП-32 RDS GP (Взнос 250k ₽)
                     </button>
                 </div>
             </div>
@@ -233,7 +236,9 @@ const PhoneRacing = {
         let cash = state.player?.cash || 0;
         if (cash < cost) return showToast("Не хватает денег на стартовый взнос!");
 
-        const carIdx = state.player.selectedStreetCarIndex || 0;
+        const carIdx = (typeof getActiveStreetCarIndex === 'function') 
+            ? getActiveStreetCarIndex() 
+            : (state.player.selectedStreetCarIndex || 0);
         const car = state.garage[carIdx];
         if (!car) return;
 
@@ -286,8 +291,6 @@ const PhoneRacing = {
         let duration = 6000;
         let tireMarks = [];
         let smokeParticles = [];
-
-        let power = car.power || 100;
 
         let angleBase = league === 'gp' ? 78 : (league === 'europe' ? 68 : 58);
         let speedBase = league === 'gp' ? 125 : (league === 'europe' ? 95 : 65);
@@ -468,9 +471,12 @@ const PhoneRacing = {
             return;
         }
 
-        let carIdx = state.player.selectedStreetCarIndex || 0;
-        if (carIdx >= state.garage.length) carIdx = 0;
-        const car = state.garage[carIdx];
+        let carIdx = (typeof getActiveStreetCarIndex === 'function') 
+            ? getActiveStreetCarIndex() 
+            : (state.player.selectedStreetCarIndex || 0);
+
+        if (carIdx === -1 || !state.garage[carIdx]) carIdx = 0;
+        let car = state.garage[carIdx];
         let myPower = car.power || 100;
 
         let selectorOptions = state.garage.map((c, i) => `<option value="${i}" ${i === carIdx ? 'selected' : ''}>${c.name} (${c.power || 100} л.с.)</option>`).join('');
@@ -541,8 +547,11 @@ const PhoneRacing = {
             return;
         }
 
-        let carIdx = state.player.selectedStreetCarIndex || 0;
-        if (carIdx >= state.garage.length) carIdx = 0;
+        let carIdx = (typeof getActiveStreetCarIndex === 'function') 
+            ? getActiveStreetCarIndex() 
+            : (state.player.selectedStreetCarIndex || 0);
+
+        if (carIdx === -1 || !state.garage[carIdx]) carIdx = 0;
         const car = state.garage[carIdx];
         const t = car.tuning || {};
 
@@ -605,7 +614,7 @@ const PhoneRacing = {
                 </div>
 
                 <button onclick="PhoneRacing.enterStanceContest(${score})" class="btn btn-amber btn-sm w-full" id="btnEnterStance">
-                    🏆 Заехать на подиум и стравить пневму (Взнос 15k ₽)
+                    🏆 Заехать на подиум и стравить пневму (Взнос 25k ₽)
                 </button>
             </div>
             <div id="stanceContestResult"></div>
@@ -613,7 +622,7 @@ const PhoneRacing = {
     },
 
     enterStanceContest(score) {
-        let cost = 15000;
+        let cost = 25000;
         let cash = state.player?.cash || 0;
         if (cash < cost) return showToast("Не хватает денег на взнос участника фестиваля!");
 
@@ -682,7 +691,10 @@ const PhoneRacing = {
     // 4. ШАШКИ В ПОТОКЕ ПО МКАД
     // ----------------------------------------------------
     renderSprintDiscipline(container) {
-        let carIdx = state.player?.selectedStreetCarIndex || 0;
+        let carIdx = (typeof getActiveStreetCarIndex === 'function') 
+            ? getActiveStreetCarIndex() 
+            : (state.player.selectedStreetCarIndex || 0);
+
         const car = state.garage ? state.garage[carIdx] : null;
         let power = car?.power || 100;
         let maxSpeed = Math.round(Math.min(320, 120 + Math.sqrt(power) * 8.5));
@@ -696,9 +708,9 @@ const PhoneRacing = {
                 <p class="sub-label mb-2" style="font-size:10px;">Агрессивный прострел в ночном трафике. Чем мощнее двигатель, тем выше шанс оторваться от потока и сорвать банк!</p>
 
                 <div class="grid-2 mb-2">
-                    <button onclick="PhoneRacing.startCitySprint('normal', ${maxSpeed})" class="btn btn-dark btn-sm">Поток 140 км/ч (Ставка 40k)</button>
+                    <button onclick="PhoneRacing.startCitySprint('normal', ${maxSpeed})" class="btn btn-dark btn-sm">Поток 140 км/ч (Ставка 50k)</button>
                     <button onclick="PhoneRacing.startCitySprint('insane', ${maxSpeed})" class="btn btn-danger btn-sm" ${maxSpeed < 200 ? 'disabled' : ''}>
-                        Прострел 220+ км/ч ${maxSpeed < 200 ? '(Нужно 180+ л.с.)' : '(Ставка 150k)'}
+                        Прострел 220+ км/ч ${maxSpeed < 200 ? '(Нужно 180+ л.с.)' : '(Ставка 200k)'}
                     </button>
                 </div>
             </div>
@@ -707,7 +719,7 @@ const PhoneRacing = {
     },
 
     startCitySprint(mode, maxSpeed) {
-        let bet = mode === 'insane' ? 150000 : 40000;
+        let bet = mode === 'insane' ? 200000 : 50000;
         let cash = state.player?.cash || 0;
         if (cash < bet) return showToast("Не хватает денег на заезд!");
 
@@ -738,10 +750,10 @@ const PhoneRacing = {
         setTimeout(() => {
             clearInterval(speedTimer);
             let immunity = state.player?.policeImmunityDays || 0;
-            let policeRaidChance = immunity > 0 ? 0 : (mode === 'insane' ? 0.32 : 0.16);
+            let policeRaidChance = immunity > 0 ? 0 : (mode === 'insane' ? 0.35 : 0.18);
 
             if (Math.random() < policeRaidChance) {
-                let fine = Math.round(bet * 1.5);
+                let fine = Math.round(bet * 2.0);
                 state.player.cash = Math.max(0, state.player.cash - fine);
                 playSound('error');
                 tgHaptic('error');
@@ -754,7 +766,7 @@ const PhoneRacing = {
                     </div>
                 `;
             } else {
-                let win = Math.round(bet * (mode === 'insane' ? 2.7 : 2.2));
+                let win = Math.round(bet * (mode === 'insane' ? 2.5 : 2.0));
                 state.player.cash += win;
                 state.player.streetCred = (state.player.streetCred || 100) + (mode === 'insane' ? 55 : 25);
                 playSound('win');

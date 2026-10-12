@@ -1,0 +1,271 @@
+.glass-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-xl);
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+}
+
+.glass-card.personal-car-card {
+  border: 1.5px solid rgba(255, 179, 0, 0.75) !important;
+  box-shadow: 0 0 20px rgba(255, 179, 0, 0.3) !important;
+}
+
+/* СЕТКА И ПЛИТКИ КАТЕГОРИЙ */
+.market-categories-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 8px !important;
+  margin-top: 8px;
+}
+.market-categories-grid.collapsed {
+  display: none !important;
+}
+
+.market-categories-grid .cat-tile {
+  background: #0d1424 !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px;
+  padding: 10px 4px;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px;
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+}
+.market-categories-grid .cat-tile:active { transform: scale(0.96); }
+
+.market-categories-grid .cat-tile-icon { font-size: 18px; color: var(--text-sub); }
+.market-categories-grid .cat-tile-name { font-size: 11px; font-weight: 800; color: #fff; text-align: center; }
+.market-categories-grid .cat-tile-sub { font-size: 9px; font-weight: 700; color: var(--text-sub); }
+
+.market-categories-grid .cat-tile.active {
+  background: linear-gradient(145deg, rgba(0, 242, 254, 0.25), rgba(2, 132, 199, 0.35)) !important;
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+.market-categories-grid .cat-tile.active .cat-tile-icon { color: var(--cyan); }
+.market-categories-grid .cat-tile.active .cat-tile-sub { color: #a5f3fc; }
+
+.market-categories-grid .cat-tile.locked {
+  background: #080c14 !important;
+  border-color: rgba(255, 255, 255, 0.04) !important;
+  opacity: 0.6;
+}
+
+/* ШИРОКИЕ ОБЛОЖКИ КАРТОЧЕК */
+.car-img-wrap {
+  position: relative !important;
+  width: 100% !important;
+  height: 165px !important;
+  border-radius: var(--radius-lg) !important;
+  overflow: hidden !important;
+  margin-bottom: 10px !important;
+  background: #0c111c !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.car-img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+.car-img-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+/* ИСПРАВЛЕННЫЙ ОВЕРЛЕЙ ДОЗВОНА И ТАЙМЕРА */
+.cooldown-timer {
+  position: absolute !important;
+  inset: 0 !important;
+  background: rgba(8, 13, 24, 0.92) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border-radius: var(--radius-xl) !important;
+  z-index: 30 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 16px !important;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.timer-clock {
+  font-size: 28px !important;
+  font-weight: 900 !important;
+  color: var(--amber) !important;
+  text-shadow: 0 0 14px var(--amber-glow);
+}
+
+.timer-text {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: var(--text-sub) !important;
+  text-align: center !important;
+}
+
+/* БЕЙДЖИ И ГОСНОМЕРА */
+.plate-corner {
+  position: absolute !important;
+  top: 8px !important;
+  left: 8px !important;
+  z-index: 10 !important;
+}
+
+.license-plate {
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-family: monospace, sans-serif !important;
+  border: 2px solid #000 !important;
+  border-radius: 4px !important;
+  font-weight: 900 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 2px 6px !important;
+  font-size: 11px !important;
+  line-height: 1.1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.license-flag {
+  border-left: 1px solid #111 !important;
+  padding-left: 4px !important;
+  margin-left: 4px !important;
+  font-size: 8px !important;
+}
+
+.badge-tag {
+  position: absolute !important;
+  background: rgba(8, 12, 20, 0.9) !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  z-index: 10 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+.badge-br { bottom: 8px !important; right: 8px !important; }
+.badge-tl { top: 8px !important; left: 8px !important; }
+
+.viewed-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 242, 254, 0.15);
+  border: 1px solid var(--border-glow);
+  color: var(--cyan);
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.car-spec-chips-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.car-spec-chip {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  padding: 5px 6px;
+  font-size: 10px;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.car-spec-chip b { color: #fff; font-weight: 800; }
+
+.price-box {
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.25);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.price-val {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--green);
+}
+
+.seller-note-card {
+  background: rgba(0, 242, 254, 0.06);
+  border-left: 3px solid var(--cyan);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-style: italic;
+  font-size: 11px;
+  color: #e2e8f0;
+  margin: 6px 0 8px 0;
+  line-height: 1.4;
+}
+
+.autoteka-pts-card {
+  background: linear-gradient(145deg, #090e18 0%, #060a12 100%);
+  border: 1px solid var(--border-glow);
+  border-radius: 14px;
+  padding: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.autoteka-owner-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 10px;
+}
+
+.autoteka-owner-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: #162238;
+  border: 2px solid var(--cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.autoteka-stat-tile {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 8px 10px;
+}

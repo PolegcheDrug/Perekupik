@@ -1,24 +1,108 @@
 // ========================================================
-// js/app.js — ЯДРО, TELEGRAM CLOUD STORAGE & СИНХРОНИЗАЦИЯ (v0.5.2)
-// Разработчики: Tak Toje, Max, Sergo, gemini
-// Интерактивные неоновые жетоны наград, реальное время (00:00),
-// комбинированная экономика (₽ + ⭐), кастомизация цвета HUD,
-// динамические тренды авторынка, крипта и авто-закупка бизнеса!
+// js/app.js — ЯДРО СИМУЛЯТОРА, MODAL MANAGER & CLOUD SYNC (v0.6.2)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Единый менеджер модальных окон, мульти-фото авто из папок,
+// уровень комфорта с 15 ур., Telegram Cloud Storage,
+// реактивные депозиты и расширенный жизненный цикл.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.5.2";
+const CURRENT_GAME_VERSION = "v0.6.2";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
 let tgUserId = "guest_777";
 let tgUserData = null;
-let SAVE_KEY_PREFIX = "perekup_v5_";
+let SAVE_KEY_PREFIX = "perekup_v6_";
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
 
 // ========================================================
-// 1. ЗВУК И ТАКТИЛЬНЫЙ ОТКЛИК (HAPTICS)
+// 1. ДИНАМИЧЕСКИЙ ВЫБОР ФОТО АВТОМОБИЛЯ ИЗ ПАПКИ МОДЕЛИ
+// ========================================================
+function getCarImage(template) {
+    if (!template) return "assets/cars/economy/2101/vaz-2101.jpg";
+    
+    // Если у модели определена галерея (например, vaz-2101, vaz-2101_1.jpg ... vaz-2101_10.jpg)
+    if (Array.isArray(template.images) && template.images.length > 0) {
+        const randIdx = Math.floor(Math.random() * template.images.length);
+        return template.images[randIdx];
+    }
+    
+    // Если галереи нет, берем базовое img
+    if (template.img) {
+        return template.img;
+    }
+    
+    // Откат по типу
+    if (typeof getCategoryFallback === 'function') {
+        return getCategoryFallback(template.type || 'economy');
+    }
+    return "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80";
+}
+window.getCarImage = getCarImage;
+
+// ========================================================
+// 2. ЦЕНТРАЛИЗОВАННЫЙ МЕНЕДЖЕР МОДАЛЬНЫХ ОКОН (MODAL MANAGER)
+// ========================================================
+const ModalManager = {
+    activeModals: [],
+
+    open(modalId, options = {}) {
+        const el = document.getElementById(modalId);
+        if (!el) return;
+
+        if (options.closeOthers) {
+            this.closeAll();
+        }
+
+        if (!el.classList.contains('active')) {
+            el.classList.add('active');
+            this.activeModals.push(modalId);
+        }
+
+        const baseZIndex = 5000;
+        const currentStackPos = this.activeModals.indexOf(modalId);
+        el.style.zIndex = baseZIndex + (currentStackPos * 50);
+
+        try {
+            tgHaptic('light');
+        } catch(e) {}
+    },
+
+    close(modalId) {
+        const el = document.getElementById(modalId);
+        if (el) {
+            el.classList.remove('active');
+            el.style.zIndex = '';
+        }
+        this.activeModals = this.activeModals.filter(id => id !== modalId);
+    },
+
+    closeAll() {
+        const opened = [...this.activeModals];
+        opened.forEach(id => this.close(id));
+        document.querySelectorAll('.modal-overlay.active').forEach(m => {
+            m.classList.remove('active');
+            m.style.zIndex = '';
+        });
+        this.activeModals = [];
+    },
+
+    isAnyOpen() {
+        return this.activeModals.length > 0;
+    }
+};
+
+window.ModalManager = ModalManager;
+
+function closeModal(id) {
+    ModalManager.close(id);
+}
+window.closeModal = closeModal;
+
+// ========================================================
+// 3. ЗВУК И ТАКТИЛЬНЫЙ ОТКЛИК (HAPTICS)
 // ========================================================
 function tgHaptic(type = 'light') {
     try { 
@@ -101,8 +185,8 @@ function playEngineSound() {
         osc.connect(g); 
         g.connect(audioCtx.destination);
         osc.frequency.setValueAtTime(110, now);
-        osc.frequency.exponentialRampToValueAtTime(520, now + 0.45);
-        osc.frequency.exponentialRampToValueAtTime(140, now + 0.9);
+        osc.exponentialRampToValueAtTime(520, now + 0.45);
+        osc.exponentialRampToValueAtTime(140, now + 0.9);
         g.gain.setValueAtTime(0.25, now);
         g.gain.linearRampToValueAtTime(0, now + 0.95);
         osc.start(now); osc.stop(now + 0.95);
@@ -135,13 +219,8 @@ function showToast(msg) {
     setTimeout(() => { t.classList.remove('show'); }, 2500);
 }
 
-function closeModal(id) {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('active');
-}
-
 // ========================================================
-// ИНТЕРАКТИВНЫЙ РЕНДЕР НАГРАД И ЖЕТОНОВ (ВЕРДИКТ)
+// 4. ИНТЕРАКТИВНЫЙ РЕНДЕР НАГРАД И ЖЕТОНОВ (ВЕРДИКТ)
 // ========================================================
 function renderPrizeTokensHTML(items) {
     if (!Array.isArray(items) || items.length === 0) return "";
@@ -189,6 +268,23 @@ function extractPrizesFromText(text) {
                 value: match ? '+' + match[1] + ' ⭐' : trimLine,
                 desc: 'Премиальная валюта перекупа',
                 rarity: 'token-amber'
+            });
+        } else if (trimLine.includes('XP') || trimLine.toLowerCase().includes('опыт')) {
+            let match = trimLine.match(/([+\-]?\d+)\s*XP/i);
+            tokens.push({
+                icon: '🎖️',
+                title: 'Опыт авторитета',
+                value: match ? '+' + match[1] + ' XP' : trimLine,
+                desc: 'Повышает ранг перекупа',
+                rarity: 'token-cyan'
+            });
+        } else if (trimLine.toLowerCase().includes('штрафстоян') || trimLine.includes('🚔')) {
+            tokens.push({
+                icon: '🚔',
+                title: 'Талон штрафстоянки',
+                value: 'Бесплатный забор авто',
+                desc: 'Позволяет забрать машину без оплаты протокола',
+                rarity: 'token-purple'
             });
         } else if (trimLine.includes('🚗') || trimLine.toLowerCase().includes('получен в гараж')) {
             tokens.push({
@@ -294,25 +390,24 @@ function openVerdictModal(title, text, isSuccess, amount, profit, customTokens =
             profitEl.style.display = 'none';
         }
     }
-    const mod = document.getElementById('modalDealVerdict');
-    if (mod) mod.classList.add('active');
+    
+    ModalManager.open('modalDealVerdict');
 }
 
 function openPatchNotesModal() {
-    const modal = document.getElementById('modalPatchNotes');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalPatchNotes');
     playSound('tick');
 }
 
 function dismissPatchNotesModal() {
-    closeModal('modalPatchNotes');
+    ModalManager.close('modalPatchNotes');
     try {
         localStorage.setItem('perekup_last_seen_version', CURRENT_GAME_VERSION);
     } catch(e) {}
 }
 
 // ========================================================
-// 2. ИГРОВОЙ STATE & ДЕФОЛТНЫЕ ДАННЫЕ
+// 5. ИГРОВОЙ STATE & ДЕФОЛТНЫЕ ДАННЫЕ
 // ========================================================
 const DEFAULT_STATE = {
     lang: 'ru',
@@ -321,15 +416,18 @@ const DEFAULT_STATE = {
         expressTickets: 25, maxExpressTickets: 25, fuel: 100, level: 1, xp: 0, maxXp: 120,
         baseSlots: 2, vip: false, vipPro: false, lastFreeSpinDay: 0, lastFreeSuperSpinDay: 0,
         club: null, karma: 50, streetCred: 100, superSpinTickets: 1,
+        freeImpoundPasses: 0,
+        phoneWidgetsCollapsed: { biz: false, quests: false },
         stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0, scandalsAvoided: 0 },
-        hunger: 80, mood: 85, loanDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
+        hunger: 80, mood: 85, loanDebt: 0, taxDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
         lastRealDayTimestamp: Date.now(),
         diet: 'shaurma', 
         housingId: 'trailer',
         housingType: 'rent', 
         ownedHouses: [], 
+        mortgage: null,
         
-        hudColorId: 'cyan',
+        hudColorId: 'lightning',
         customHexColor: null,
         nickEffect: 'none',
         avatarEffect: 'none',
@@ -337,7 +435,21 @@ const DEFAULT_STATE = {
         ownedAvatarEffects: ['none'],
         soundProfile: 'cyber',
         
-        crypto: { btc: 0, eth: 0, prices: { btc: 9500000, eth: 340000 } },
+        crypto: { btc: 0, eth: 0, staked: [], prices: { btc: 9500000, eth: 340000 } },
+        
+        // Репутация в банке и отзывы клиентов
+        bankReputation: { 
+            rating: 5.0, 
+            successfulDeals: 0, 
+            fairDealsCount: 0, 
+            scandalsCount: 0, 
+            vipBankTier: 'Стандарт',
+            loanLimit: 500000,
+            reviewsLog: [
+                { author: "Алексей В.", rating: 5, date: "Недавно", text: "Отличный продавец, машина в идеале, доехали без сюрпризов!" },
+                { author: "Сергей Д.", rating: 5, date: "Недавно", text: "Честный парень, Launch показал чистый блок, респект!" }
+            ] 
+        },
 
         selectedStreetCarIndex: 0,
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
@@ -350,12 +462,27 @@ const DEFAULT_STATE = {
         dailyQuests: [],
         dailyQuestsSuperClaimed: false,
         bankHistory: [],
-        bankDeposits: []
+        
+        // Расширенная система вкладов
+        bankDeposits: [
+            {
+                id: "dep_init",
+                name: "Стартовый Перекупский",
+                principal: 100000,
+                currentAmount: 100000,
+                dailyPercent: 3.0,
+                totalDays: 7,
+                daysPassed: 0,
+                autoCompound: true,
+                startDate: Date.now()
+            }
+        ]
     },
     garage: [], salesLot: [], contracts: [], plateCatalog: [],
     ownedPlates: ["В777ВВ 77"], registeredPlates: ["В777ВВ 77"],
     activeCategory: 'economy', marketFeed: [], p2pMode: 'cars', syndicateSubTab: 'contracts',
     myP2PListings: [], p2pMarketListings: [], businesses: [], confiscatedLot: null, blackMarketPlates: [],
+    officialPlateAuction: [],
     marketModifiers: { economy: 1, comfort: 1, premium: 1, hyper: 1, moto: 1, truck: 1, all: 1 },
     lifeChatMessages: [], friendsList: []
 };
@@ -373,15 +500,17 @@ function t(key) {
 window.t = t;
 
 // ========================================================
-// ДИНАМИЧЕСКОЕ ПРИМЕНЕНИЕ ЦВЕТОВ HUD, АНИМАЦИИ НИКНЕЙМА И АВАТАРКИ
+// 6. ДИНАМИЧЕСКИЙ HUD, АНИМАЦИИ, ТЕМЫ И СМАРТФОН
 // ========================================================
 function applyHudCustomization() {
     const root = document.documentElement;
-    const curColorId = state.player?.hudColorId || 'cyan';
+    const curColorId = state.player?.hudColorId || 'lightning';
     const customHex = state.player?.customHexColor;
 
     let targetHex = "#00f2fe";
+    let targetSecondaryHex = "#7928ca";
     let targetGlow = "rgba(0, 242, 254, 0.45)";
+    let isLightningTheme = false;
 
     if (customHex) {
         targetHex = customHex;
@@ -389,15 +518,31 @@ function applyHudCustomization() {
     } else if (typeof HUD_SOLID_COLORS !== 'undefined') {
         const found = HUD_SOLID_COLORS.find(c => c.id === curColorId) || HUD_SOLID_COLORS[0];
         targetHex = found.hex;
+        targetSecondaryHex = found.secondaryHex || "#0284c7";
         targetGlow = found.glow;
+        isLightningTheme = !!found.isLightning;
     }
 
     root.style.setProperty('--cyan', targetHex);
     root.style.setProperty('--cyan-glow', targetGlow);
     root.style.setProperty('--border-glow', hexToRgba(targetHex, 0.35));
+    root.style.setProperty('--lightning-secondary', targetSecondaryHex);
+
+    const phoneDevice = document.querySelector('.phone-device-wrapper');
+    if (phoneDevice) {
+        if (isLightningTheme) {
+            phoneDevice.classList.add('theme-lightning-active');
+            phoneDevice.style.borderColor = targetHex;
+            phoneDevice.style.boxShadow = `0 20px 50px rgba(0, 0, 0, 0.9), inset 0 0 25px ${targetGlow}, 0 0 30px ${hexToRgba(targetSecondaryHex, 0.35)}`;
+        } else {
+            phoneDevice.classList.remove('theme-lightning-active');
+            phoneDevice.style.borderColor = '';
+            phoneDevice.style.boxShadow = '';
+        }
+    }
 
     const nameEl = document.getElementById('playerName');
-    const nickFxId = state.player?.nickEffect || 'none';
+    const nickFxId = state.player?.nickEffect || (isLightningTheme ? 'lightning_spark' : 'none');
     if (nameEl && typeof NICKNAME_EFFECTS_CATALOG !== 'undefined') {
         NICKNAME_EFFECTS_CATALOG.forEach(fx => {
             if (fx.className) nameEl.classList.remove(fx.className);
@@ -409,7 +554,7 @@ function applyHudCustomization() {
     }
 
     const ringEl = document.querySelector('.avatar-ring');
-    const avatarFxId = state.player?.avatarEffect || 'none';
+    const avatarFxId = state.player?.avatarEffect || (isLightningTheme ? 'lightning_shield' : 'none');
     if (ringEl && typeof AVATAR_EFFECTS_CATALOG !== 'undefined') {
         AVATAR_EFFECTS_CATALOG.forEach(fx => {
             if (fx.className) ringEl.classList.remove(fx.className);
@@ -429,21 +574,13 @@ function hexToRgba(hex, alpha = 0.5) {
 }
 
 // ========================================================
-// МОДАЛЬНОЕ ОКНО КАСТОМИЗАЦИИ HUD (ЦВЕТА, НИК, АВАТАРКА)
+// 7. МОДАЛЬНОЕ ОКНО КАСТОМИЗАЦИИ HUD
 // ========================================================
 let activeCustomizerTab = 'colors';
 
 function openHudCustomizerModal() {
-    let modal = document.getElementById('modalHudCustomizer');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'modalHudCustomizer';
-        modal.className = 'modal-overlay';
-        document.body.appendChild(modal);
-    }
-
     renderHudCustomizerContent();
-    modal.classList.add('active');
+    ModalManager.open('modalHudCustomizer');
     playSound('tick');
 }
 
@@ -457,7 +594,7 @@ function renderHudCustomizerContent() {
     const modal = document.getElementById('modalHudCustomizer');
     if (!modal) return;
 
-    const curColorId = state.player?.hudColorId || 'cyan';
+    const curColorId = state.player?.hudColorId || 'lightning';
     const curNickFx = state.player?.nickEffect || 'none';
     const curAvatarFx = state.player?.avatarEffect || 'none';
     const ownedNicks = state.player?.ownedNickEffects || ['none'];
@@ -470,8 +607,10 @@ function renderHudCustomizerContent() {
         let colorsGrid = "";
         (typeof HUD_SOLID_COLORS !== 'undefined' ? HUD_SOLID_COLORS : []).forEach(c => {
             const isSel = curColorId === c.id && !state.player?.customHexColor;
+            let lightningBadge = c.isLightning ? `<span class="tag-badge bg-tag-purple" style="font-size:7px; position:absolute; top:-4px; left:-4px;">⚡ МОЛНИИ</span>` : "";
             colorsGrid += `
-                <div class="color-palette-tile ${isSel ? 'selected' : ''}" onclick="setHudSolidColor('${c.id}')" style="--tile-color:${c.hex};">
+                <div class="color-palette-tile ${isSel ? 'selected' : ''}" onclick="setHudSolidColor('${c.id}')" style="--tile-color:${c.hex}; position:relative;">
+                    ${lightningBadge}
                     <div class="color-palette-swatch" style="background:${c.hex}; box-shadow:0 0 10px ${c.glow};"></div>
                     <span class="color-palette-name">${c.name}</span>
                     ${isSel ? '<i class="fa-solid fa-check color-check"></i>' : ''}
@@ -480,7 +619,7 @@ function renderHudCustomizerContent() {
         });
 
         bodyHtml = `
-            <div class="sub-label mb-2" style="font-size:10px;">Выберите чистый неоновый цвет контуров, рамок и индикаторов:</div>
+            <div class="sub-label mb-2" style="font-size:10px;">Выберите неоновый цвет контуров, HUD и корпуса телефона:</div>
             <div class="hud-colors-palette-grid mb-3">
                 ${colorsGrid}
             </div>
@@ -558,7 +697,7 @@ function renderHudCustomizerContent() {
         <div class="modal-box" style="max-width:430px;">
             <div class="flex-between mb-2">
                 <div class="modal-glow-badge"><i class="fa-solid fa-wand-magic-sparkles"></i> КАСТОМИЗАЦИЯ ИНТЕРФЕЙСА</div>
-                <button onclick="closeModal('modalHudCustomizer')" class="btn btn-dark btn-auto btn-sm">✕</button>
+                <button onclick="ModalManager.close('modalHudCustomizer')" class="btn btn-dark btn-auto btn-sm">✕</button>
             </div>
 
             <div class="grid-3 mb-2">
@@ -581,7 +720,7 @@ function renderHudCustomizerContent() {
                 </div>
             </div>
 
-            <button onclick="closeModal('modalHudCustomizer')" class="btn btn-cyan w-full">Применить и закрыть ✓</button>
+            <button onclick="ModalManager.close('modalHudCustomizer')" class="btn btn-cyan w-full">Применить и закрыть ✓</button>
         </div>
     `;
 }
@@ -594,7 +733,7 @@ function setHudSolidColor(colorId) {
     renderHudCustomizerContent();
     playSound('tick');
     tgHaptic('light');
-    showToast("Цвет подсветки применён!");
+    showToast("Тема оформления успешно активирована!");
 }
 
 function setHudCustomHexColor(hexValue) {
@@ -687,7 +826,7 @@ function setSoundProfileAction(profile) {
 }
 
 // ========================================================
-// 3. МУЛЬТИЯЗЫЧНОСТЬ (I18N)
+// 8. МУЛЬТИЯЗЫЧНОСТЬ (I18N)
 // ========================================================
 function toggleGameLanguage() {
     let nextLang = state.lang === 'ru' ? 'en' : 'ru';
@@ -728,7 +867,7 @@ function applyLanguageToDOM() {
 }
 
 // ========================================================
-// 4. ТРЕКЕР ЗАДАНИЙ (ПЛАН ПЕРЕКУПА & СВЯЗКА С БЛОКНОТОМ)
+// 9. ЗАДАНИЯ И ВЕХИ КАРЬЕРЫ
 // ========================================================
 function trackQuestProgress(actionType, count = 1) {
     if (!state.player || !Array.isArray(state.player.dailyQuests)) return;
@@ -798,7 +937,7 @@ function refreshDailyQuestsList() {
 }
 
 // ========================================================
-// 5. РАСЧЕТ ЗАТРАТ И СЛОТОВ АВТОПАРКА
+// 10. ЗАТРАТЫ И СЛОТЫ АВТОПАРКА
 // ========================================================
 function getMarketRefreshCost() {
     let lvl = state.player?.level || 1;
@@ -838,7 +977,7 @@ function getTotalGarageSlots() {
 }
 
 // ========================================================
-// 6. ПРОВЕРКА ДОСТУПА К СИНДИКАТУ (7 УРОВЕНЬ + ПРИБОРЫ + 5 ЗВЁЗД)
+// 11. ПРОВЕРКА ДОСТУПА К СИНДИКАТУ (7 УРОВЕНЬ + ПРИБОРЫ + 5 ЗВЁЗД)
 // ========================================================
 function checkSyndicateAccessDetails() {
     const lvl = state.player?.level || 1;
@@ -866,7 +1005,7 @@ function checkSyndicateAccessDetails() {
 }
 
 // ========================================================
-// 7. TELEGRAM CLOUD STORAGE ЧАНКИНГ
+// 12. TELEGRAM CLOUD STORAGE & ЧАНКИНГ
 // ========================================================
 const CHUNK_SIZE = 2048;
 
@@ -1022,6 +1161,8 @@ function applyLoadedState(parsed) {
         if (parsed.player.tools) state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
         if (parsed.player.toolsWear) state.player.toolsWear = { ...DEFAULT_STATE.player.toolsWear, ...parsed.player.toolsWear };
         if (parsed.player.crypto) state.player.crypto = { ...DEFAULT_STATE.player.crypto, ...parsed.player.crypto };
+        if (parsed.player.bankReputation) state.player.bankReputation = { ...DEFAULT_STATE.player.bankReputation, ...parsed.player.bankReputation };
+        if (parsed.player.phoneWidgetsCollapsed) state.player.phoneWidgetsCollapsed = { ...DEFAULT_STATE.player.phoneWidgetsCollapsed, ...parsed.player.phoneWidgetsCollapsed };
         if (Array.isArray(parsed.player.phoneMessages)) state.player.phoneMessages = parsed.player.phoneMessages;
         if (Array.isArray(parsed.player.dailyQuests)) state.player.dailyQuests = parsed.player.dailyQuests;
         if (Array.isArray(parsed.player.bankHistory)) state.player.bankHistory = parsed.player.bankHistory;
@@ -1039,6 +1180,7 @@ function applyLoadedState(parsed) {
     if (parsed.confiscatedLot) state.confiscatedLot = parsed.confiscatedLot;
     if (Array.isArray(parsed.marketFeed)) state.marketFeed = parsed.marketFeed;
     if (Array.isArray(parsed.blackMarketPlates)) state.blackMarketPlates = parsed.blackMarketPlates;
+    if (Array.isArray(parsed.officialPlateAuction)) state.officialPlateAuction = parsed.officialPlateAuction;
     
     if (tgUserData) {
         let names = [];
@@ -1065,9 +1207,11 @@ function sanitizeState() {
     if (typeof state.player.streetCred !== 'number') state.player.streetCred = 100;
     if (typeof state.player.superSpinTickets !== 'number') state.player.superSpinTickets = 1;
     if (typeof state.player.lastFreeSuperSpinDay !== 'number') state.player.lastFreeSuperSpinDay = 0;
+    if (typeof state.player.freeImpoundPasses !== 'number') state.player.freeImpoundPasses = 0;
+    if (!state.player.phoneWidgetsCollapsed) state.player.phoneWidgetsCollapsed = { biz: false, quests: false };
     if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
     
-    if (!state.player.hudColorId) state.player.hudColorId = 'cyan';
+    if (!state.player.hudColorId) state.player.hudColorId = 'lightning';
     if (!state.player.nickEffect) state.player.nickEffect = 'none';
     if (!state.player.avatarEffect) state.player.avatarEffect = 'none';
     if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
@@ -1075,7 +1219,23 @@ function sanitizeState() {
     if (!state.player.soundProfile) state.player.soundProfile = 'cyber';
 
     if (!state.player.crypto) {
-        state.player.crypto = { btc: 0, eth: 0, prices: { btc: 9500000, eth: 340000 } };
+        state.player.crypto = { btc: 0, eth: 0, staked: [], prices: { btc: 9500000, eth: 340000 } };
+    }
+    if (!Array.isArray(state.player.crypto.staked)) state.player.crypto.staked = [];
+
+    // Банковская репутация
+    if (!state.player.bankReputation) {
+        state.player.bankReputation = { 
+            rating: 5.0, 
+            successfulDeals: 0, 
+            fairDealsCount: 0, 
+            scandalsCount: 0, 
+            vipBankTier: 'Стандарт',
+            loanLimit: 500000,
+            reviewsLog: [
+                { author: "Алексей В.", rating: 5, date: "Недавно", text: "Отличный продавец, машина в идеале, доехали без сюрпризов!" }
+            ] 
+        };
     }
 
     if (!Array.isArray(state.player.furniture)) state.player.furniture = [];
@@ -1084,9 +1244,11 @@ function sanitizeState() {
     if (!Array.isArray(state.player.bankDeposits)) state.player.bankDeposits = [];
     if (!Array.isArray(state.registeredPlates)) state.registeredPlates = ["В777ВВ 77"];
     if (!Array.isArray(state.p2pMarketListings)) state.p2pMarketListings = [];
+    if (!Array.isArray(state.officialPlateAuction)) state.officialPlateAuction = [];
     if (typeof state.player.cash !== 'number' || state.player.cash < 0) state.player.cash = 150000;
     if (typeof state.player.stars !== 'number' || state.player.stars < 0) state.player.stars = 15;
     if (typeof state.player.loanDebt !== 'number' || state.player.loanDebt < 0) state.player.loanDebt = 0;
+    if (typeof state.player.taxDebt !== 'number' || state.player.taxDebt < 0) state.player.taxDebt = 0;
     if (typeof state.player.safeDeposit !== 'number') state.player.safeDeposit = 0;
     if (typeof state.player.fuel !== 'number') state.player.fuel = 100;
     if (typeof state.player.karma !== 'number') state.player.karma = 50;
@@ -1229,8 +1391,7 @@ function openSaveManagerModal() {
         try { area.value = btoa(unescape(encodeURIComponent(JSON.stringify(state)))); }
         catch(e) { area.value = JSON.stringify(state); }
     }
-    const modal = document.getElementById('modalSaveManager');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalSaveManager');
     playSound('tick');
 }
 
@@ -1259,7 +1420,7 @@ function importSaveCodeAction() {
         if (!parsed.player) throw new Error();
         applyLoadedState(parsed);
         saveState();
-        closeModal('modalSaveManager');
+        ModalManager.close('modalSaveManager');
         location.reload();
     } catch(err) {
         tgHaptic('error'); showToast("Некорректный код сейва!");
@@ -1267,7 +1428,7 @@ function importSaveCodeAction() {
 }
 
 // ========================================================
-// ДИНАМИЧЕСКИЕ ТРЕНДЫ АВТОРЫНКА (MARKET NEWS)
+// 13. ДИНАМИЧЕСКИЕ ТРЕНДЫ АВТОРЫНКА (MARKET NEWS)
 // ========================================================
 function triggerMarketNewsEvent() {
     if (typeof MARKET_NEWS_EVENTS === 'undefined' || MARKET_NEWS_EVENTS.length === 0) return;
@@ -1294,7 +1455,7 @@ function triggerMarketNewsEvent() {
 }
 
 // ========================================================
-// 8. ПРИВЯЗКА К СМЕНЕ СУТОК В РЕАЛЬНОМ ВРЕМЕНИ (ПОЛНОЧЬ 00:00)
+// 14. СМЕНА СУТОК В РЕАЛЬНОМ ВРЕМЕНИ (ПОЛНОЧЬ 00:00)
 // ========================================================
 function checkRealTimeDayChange() {
     const now = new Date();
@@ -1317,7 +1478,7 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.expressTickets = state.player.maxExpressTickets || 25;
     state.player.consecutiveRaces = 0;
 
-    // Логика Динамических Трендов Рынка (Market News)
+    // Динамические новости рынка
     if (typeof MARKET_NEWS_EVENTS !== 'undefined' && Math.random() < 0.35) {
         triggerMarketNewsEvent();
     } else {
@@ -1331,7 +1492,7 @@ function executeDayCycleMidnight(currentDateObj) {
         }
     }
 
-    // Начисление 2% на долг по кредиту
+    // Начисление процентов на долг по кредиту
     if (state.player.loanDebt > 0) {
         state.player.loanDebt = Math.round(state.player.loanDebt * 1.02);
         if (state.player.phoneMessages) {
@@ -1347,14 +1508,74 @@ function executeDayCycleMidnight(currentDateObj) {
         }
     }
 
-    // Симуляция динамики крипторынка
+    // Динамика криптовалют
     if (state.player.crypto) {
-        let btcChange = 0.90 + Math.random() * 0.25; // от -10% до +15%
-        let ethChange = 0.85 + Math.random() * 0.35; // от -15% до +20%
+        let btcChange = 0.90 + Math.random() * 0.25;
+        let ethChange = 0.85 + Math.random() * 0.35;
         state.player.crypto.prices.btc = Math.round((state.player.crypto.prices.btc || 9500000) * btcChange);
         state.player.crypto.prices.eth = Math.round((state.player.crypto.prices.eth || 340000) * ethChange);
+        
+        if (Array.isArray(state.player.crypto.staked)) {
+            state.player.crypto.staked.forEach(st => {
+                if (st.daysLeft > 0) st.daysLeft -= 1;
+            });
+        }
     }
 
+    // Капитализация сейфа (+3%)
+    if (state.player.safeDeposit > 0) {
+        let percentEarned = Math.round(state.player.safeDeposit * 0.03);
+        state.player.safeDeposit += percentEarned;
+        spawnFloatingReward(`+${percentEarned.toLocaleString()} ₽ в сейфе`);
+
+        if (state.player.phoneMessages) {
+            state.player.phoneMessages.unshift({
+                id: "sms_bank_" + Date.now(),
+                sender: "💳 Во-Банк Онлайн",
+                avatar: "🏦",
+                preview: `Капитализация сейфа: +${percentEarned.toLocaleString()} ₽!`,
+                time: "00:01",
+                unread: true,
+                chatHistory: [
+                    { from: "them", text: `Начислен ежедневный процент на сейф: +${percentEarned.toLocaleString()} ₽.` }
+                ]
+            });
+        }
+    }
+
+    // Начисление процентов и прогресс срочных вкладов банка
+    if (Array.isArray(state.player.bankDeposits)) {
+        state.player.bankDeposits.forEach(dep => {
+            dep.daysPassed = (dep.daysPassed || 0) + 1;
+            let dailyRate = (dep.dailyPercent || 3.0) / 100;
+            let gain = Math.round(dep.currentAmount * dailyRate);
+            
+            if (dep.autoCompound) {
+                dep.currentAmount += gain;
+            } else {
+                dep.accumulatedProfit = (dep.accumulatedProfit || 0) + gain;
+            }
+        });
+    }
+
+    // Ипотечный платеж 5%
+    if (state.player.mortgage) {
+        let m = state.player.mortgage;
+        let installment = Math.round(m.debtAmount * 0.05);
+        if (state.player.cash >= installment) {
+            state.player.cash -= installment;
+            m.debtAmount = Math.max(0, m.debtAmount - installment);
+            if (m.debtAmount === 0) {
+                state.player.mortgage = null;
+                showToast("🎉 Ипотека на недвижимость полностью погашена!");
+            }
+        } else {
+            state.player.mood = Math.max(0, (state.player.mood || 80) - 25);
+            showToast("⚠️ Просрочен ипотечный платёж в Во-Банке!");
+        }
+    }
+
+    // Аренда жилья
     let curId = state.player?.housingId || 'trailer';
     let isOwn = state.player?.ownedHouses?.includes(curId);
     let activeHouseObj = null;
@@ -1370,52 +1591,8 @@ function executeDayCycleMidnight(currentDateObj) {
     let baseHousingMoodBonus = activeHouseObj ? (activeHouseObj.moodBonus || 0) : 0;
     state.player.mood = Math.max(10, Math.min(100, (state.player.mood || 85) + baseHousingMoodBonus));
 
-    if (state.player.furniture?.includes('home_ps5')) {
-        state.player.mood = Math.min(100, (state.player.mood || 85) + 25);
-    }
-    if (state.player.furniture?.includes('home_cinema_audio')) {
-        state.player.mood = Math.min(100, (state.player.mood || 85) + 35);
-    }
-    if (state.player.furniture?.includes('home_leather_sofa')) {
-        state.player.hunger = Math.min(100, (state.player.hunger || 80) + 15);
-    }
-
-    let hasPersonal = state.garage?.some(c => c && c.isPersonal);
-    if (hasPersonal) {
-        state.player.mood = Math.min(100, (state.player.mood || 85) + 15);
-    }
-
     if (state.player.policeImmunityDays > 0) {
         state.player.policeImmunityDays -= 1;
-    }
-
-    if (state.player.safeDeposit > 0) {
-        let percentEarned = Math.round(state.player.safeDeposit * 0.03);
-        state.player.safeDeposit += percentEarned;
-        spawnFloatingReward(`+${percentEarned.toLocaleString()} ₽ в сейфе`);
-
-        if (state.player.phoneMessages) {
-            state.player.phoneMessages.unshift({
-                id: "sms_bank_" + Date.now(),
-                sender: "💳 Во-Банк Онлайн",
-                avatar: "🏦",
-                preview: `Капитализация сейфа: +${percentEarned.toLocaleString()} ₽!`,
-                time: "00:01",
-                unread: true,
-                chatHistory: [
-                    { from: "them", text: `Начислен ежедневный процент на сейф перекупа: +${percentEarned.toLocaleString()} ₽. Баланс сейфа: ${state.player.safeDeposit.toLocaleString()} ₽.` }
-                ]
-            });
-        }
-    }
-
-    if (Array.isArray(state.player.bankDeposits)) {
-        state.player.bankDeposits.forEach(dep => {
-            if (dep.active) {
-                let gain = Math.round(dep.amount * (dep.dailyRate || 0.02));
-                dep.amount += gain;
-            }
-        });
     }
 
     if (state.businesses) {
@@ -1457,13 +1634,13 @@ function executeDayCycleMidnight(currentDateObj) {
         PhoneManager.renderBusinessWidget();
         PhoneManager.updateUnreadBadge();
     }
-    showToast("Наступил новый календарный день 🌙 Суточные лимиты и начисления обновлены!");
+    showToast("Наступил новый день 🌙 Суточные лимиты и начисления обновлены!");
     playSound('win');
     tgHaptic('success');
 }
 
 // ========================================================
-// 9. UI И РЕСУРСЫ
+// 15. UI И РЕСУРСЫ
 // ========================================================
 function updateHeaderUI() {
     let cash = state.player?.cash || 0;
@@ -1545,12 +1722,13 @@ function updateRaceHeatBadge() {
     else heatBadge.className = "tag-badge bg-tag-green";
 }
 
+// КОМФОРТ ТЕПЕРЬ С 15 УРОВНЯ!
 function updateLevelGatesUI() {
     let lvl = state.player?.level || 1;
     const gates = [
         { id: 'moto', lockId: 'lock-moto', minLvl: 5 },
         { id: 'atv', lockId: 'lock-atv', minLvl: 8 },
-        { id: 'comfort', lockId: 'lock-comfort', minLvl: 20 },
+        { id: 'comfort', lockId: 'lock-comfort', minLvl: 15 }, // <-- Установлен 15 уровень
         { id: 'premium', lockId: 'lock-premium', minLvl: 30 },
         { id: 'hyper', lockId: 'lock-hyper', minLvl: 50 },
         { id: 'truck', lockId: 'lock-truck', minLvl: 50 },
@@ -1633,8 +1811,7 @@ function openDailyBonusModal() {
         claimBtn.disabled = !canClaim;
         claimBtn.innerText = canClaim ? "Забрать награду" : "Уже получено сегодня";
     }
-    const mod = document.getElementById('modalDailyBonus');
-    if (mod) mod.classList.add('active');
+    ModalManager.open('modalDailyBonus');
 }
 
 function claimDailyReward() {
@@ -1649,6 +1826,12 @@ function claimDailyReward() {
     if (r.fuel) state.player.fuel = Math.min(100, (state.player.fuel || 0) + r.fuel);
     if (r.connections) state.player.connections = (state.player.connections || 0) + r.connections;
     if (r.stars) state.player.stars += r.stars;
+    if (r.xp) addXp(r.xp);
+    if (r.freeImpoundPasses) state.player.freeImpoundPasses = (state.player.freeImpoundPasses || 0) + r.freeImpoundPasses;
+    if (r.tool) {
+        if (!state.player.tools) state.player.tools = {};
+        state.player.tools[r.tool] = true;
+    }
     if (r.specialPlate) {
         if (!state.ownedPlates) state.ownedPlates = [];
         state.ownedPlates.push(r.specialPlate);
@@ -1656,13 +1839,13 @@ function claimDailyReward() {
     state.player.lastClaimedDay = pDay;
     state.player.streakDay = (sDay % 7) + 1;
     saveState();
-    closeModal('modalDailyBonus');
+    ModalManager.close('modalDailyBonus');
     playSound('win'); tgHaptic('success');
     openVerdictModal("БОНУС ПОЛУЧЕН! 🎁", "Вам начислено:\n" + currentReward.title, true);
 }
 
 // ========================================================
-// 10. МАГАЗИН ПЕРЕКУПА
+// 16. МАГАЗИН ПЕРЕКУПА
 // ========================================================
 function switchShopSection(section) {
     ['tools', 'consumables', 'tuningParts', 'homeItems'].forEach(s => {
@@ -1791,7 +1974,7 @@ function buyConsumableAction(cost, reqStars, val) {
     }
     saveState();
     playSound('win'); tgHaptic('success');
-    showToast("Склады предприятий и гаража пополнены расходниками!");
+    showToast("Склады предприятий пополнены сырьем!");
 }
 
 function renderShopTuningParts() {
@@ -1820,7 +2003,7 @@ function renderShopTuningParts() {
 
     html += `
     <div class="glass-card p-2 text-center sub-label" style="font-size:10px;">
-        💡 Спортивные компоненты покупаются непосредственно в <b>Гараже</b> под конкретный кузов при наличии смотровой ямы!
+        💡 Спортивные компоненты покупаются в <b>Гараже</b> под конкретный кузов при наличии смотровой ямы!
     </div>`;
 
     box.innerHTML = html;
@@ -1893,7 +2076,7 @@ function buyHomeFurnitureShop(fId, cost, reqStars = 0) {
 }
 
 // ========================================================
-// 11. АНАЛИТИКА ПРОФИЛЯ
+// 17. АНАЛИТИКА ПРОФИЛЯ
 // ========================================================
 function renderProfileAnalytics() {
     let s = state.player?.stats || { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
@@ -1911,7 +2094,7 @@ function renderProfileAnalytics() {
 }
 
 // ========================================================
-// 12. НАВИГАЦИЯ И ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
+// 18. НАВИГАЦИЯ И ПЕРЕКЛЮЧЕНИЕ ВКЛАДОК
 // ========================================================
 function switchTab(tabId) {
     try { initAudio(); playSound('tick'); tgHaptic('light'); } catch(e) {}
@@ -1947,8 +2130,8 @@ function switchTab(tabId) {
             }
         }
         if (tabId === 'tabLife') {
-            if (typeof renderDiets === 'function') renderDiets();
-            if (typeof renderLifeChat === 'function') renderLifeChat();
+            if (typeof renderLifeScreen === 'function') renderLifeScreen();
+            else if (typeof renderDiets === 'function') renderDiets();
         }
         if (tabId === 'tabProfile') renderProfileAnalytics();
     } catch(err) {
@@ -1966,14 +2149,11 @@ function checkAutoShowPatchNotes() {
 }
 
 // ========================================================
-// 13. СВАЙП-ЛИСТЕНЕР РЫНКА
+// 19. СВАЙП-ЛИСТЕНЕР РЫНКА
 // ========================================================
 function initMarketScrollListener() {
     const mainContent = document.querySelector('.main-content');
     if (!mainContent) return;
-
-    let touchStartY = 0;
-    let touchEndY = 0;
 
     mainContent.addEventListener('scroll', () => {
         const marketTab = document.getElementById('tabMarket');
@@ -1989,6 +2169,9 @@ function initMarketScrollListener() {
             }
         }
     });
+
+    let touchStartY = 0;
+    let touchEndY = 0;
 
     mainContent.addEventListener('touchstart', (e) => {
         touchStartY = e.touches[0].clientY;
@@ -2012,7 +2195,7 @@ function initMarketScrollListener() {
 }
 
 // ========================================================
-// 14. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ
+// 20. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ
 // ========================================================
 function initApp() {
     initTelegramAuthAndStorage(() => {
@@ -2034,7 +2217,9 @@ function initApp() {
 
         if (typeof renderGarage === 'function') renderGarage();
         if (typeof renderSalesLot === 'function') renderSalesLot();
-        if (typeof renderDiets === 'function') renderDiets();
+        if (typeof renderLifeScreen === 'function') renderLifeScreen();
+        else if (typeof renderDiets === 'function') renderDiets();
+        
         if (typeof renderContracts === 'function') renderContracts();
         if (typeof renderMarketFeed === 'function') renderMarketFeed();
         
@@ -2062,7 +2247,6 @@ setInterval(() => {
         let bizUpdated = false;
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
-                // Полуавтоматическая закупка сырья для бизнеса 5+ уровня
                 if (b.level >= 5 && b.stock <= 10) {
                     let cost = 15000;
                     if (b.stored >= cost) {
@@ -2167,13 +2351,12 @@ setInterval(() => {
     }
 }, 1000);
 
-// Экспорт всех глобальных функций в объект window
+// Экспорт всех глобальных функций в window
 window.initApp = initApp;
 window.switchTab = switchTab;
 window.saveState = saveState;
 window.updateHeaderUI = updateHeaderUI;
 window.showToast = showToast;
-window.closeModal = closeModal;
 window.openVerdictModal = openVerdictModal;
 window.renderPrizeTokensHTML = renderPrizeTokensHTML;
 window.extractPrizesFromText = extractPrizesFromText;

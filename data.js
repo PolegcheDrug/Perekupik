@@ -1,32 +1,31 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.5.2)
-// Разработчики: Tak Toje, Max, Sergo, gemini
-// Расширенная база автотехники, процедурная генерация,
-// поддержка внешних JSON-паков и обновлённая экономика.
-// Внедрены "Динамические Тренды Авторынка" (Market News).
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.6.2)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// База транспорта с поддержкой папок и нескольких фото,
+// разблокировка Комфорта с 15 ур., обновленный Синдикат и Жизнь.
 // ========================================================
 
 const GAME_METADATA = {
-    version: "v0.5.2",
-    build: 206,
-    authors: "Tak Toje, Max, Sergo, gemini",
+    version: "v0.6.2",
+    build: 260,
+    authors: "Tak Toje, Max, Sergo, gemini, Илья Чепиль",
     releaseDate: "2026-10-15",
     patchNotes: [
         {
-            title: "📉 Ребаланс экономики перекупа (v0.5.2)",
-            text: "Снижена излишняя маржинальность. Продавцы реже отдают авто за бесценок, а покупатели торгуются агрессивнее. Ожидаемая чистая прибыль приведена к реалистичным 20-40%."
+            title: "📸 Мульти-фото авто и папки моделей",
+            text: "Каждая модель теперь поддерживает подбор индивидуальных фото из своей папки (например, assets/cars/economy/2101/)."
         },
         {
-            title: "📈 Динамические тренды авторынка",
-            text: "Внедрена система макроэкономики. Следите за SMS от «АвтоВестника»: сезонность, дефицит и налоги теперь меняют глобальные цены на классы авто до 35%!"
+            title: "🚗 Комфорт-класс с 15 уровня",
+            text: "Класс комфортных иномарок и седанов теперь открывается с 15 уровня авторитета вместо 20."
         },
         {
-            title: "🚗 Снижение порога входа",
-            text: "Класс автомобилей «Комфорт» теперь доступен с 20-го уровня авторитета (ранее с 30-го)."
+            title: "🏦 Полная переработка Во-Банка",
+            text: "Репутация перекупа перенесена в банк. Внедрен полноценный валютный обменник и гибкая система срочных вкладов с капитализацией."
         },
         {
-            title: "🔧 Инфляция услуг СТО",
-            text: "Стоимость предпродажной подготовки (детейлинг, скрутка, присадки) и ремонта двигателей слегка увеличена для баланса."
+            title: "☕ Переосмысление раздела «Жизнь»",
+            text: "Удобный рацион питания, спортзал, авто-доставка еды и жизненные активности с ощутимыми игровыми бонусами."
         }
     ]
 };
@@ -35,6 +34,7 @@ const GAME_METADATA = {
 // 0. ПАЛИТРЫ ЦВЕТА HUD, АНИМАЦИИ НИКНЕЙМА И АВАТАРОК
 // ========================================================
 const HUD_SOLID_COLORS = [
+    { id: "lightning", name: "Грозовой неон (Молнии)", hex: "#00f2fe", secondaryHex: "#7928ca", glow: "rgba(0, 242, 254, 0.65)", isLightning: true },
     { id: "cyan", name: "Неоновый бирюзовый", hex: "#00f2fe", glow: "rgba(0, 242, 254, 0.45)" },
     { id: "green", name: "Кислотный лайм", hex: "#00e676", glow: "rgba(0, 230, 118, 0.45)" },
     { id: "gold", name: "Слиток золота", hex: "#ffd700", glow: "rgba(255, 215, 0, 0.5)" },
@@ -47,6 +47,7 @@ const HUD_SOLID_COLORS = [
 
 const NICKNAME_EFFECTS_CATALOG = [
     { id: "none", name: "Статичный", desc: "Классический чистый белый текст без анимации.", cost: 0, reqStars: 0, className: "nick-fx-none" },
+    { id: "lightning_spark", name: "Грозовой разряд (Молнии)", desc: "Электрические импульсы и неоновые разряды по буквам ника.", cost: 200000, reqStars: 12, className: "nick-fx-lightning" },
     { id: "shimmer", name: "Бегущий блик (Shimmer)", desc: "Переливающаяся световая волна по буквам ника.", cost: 75000, reqStars: 5, className: "nick-fx-shimmer" },
     { id: "neon_pulse", name: "Неоновое дыхание", desc: "Плавная мягкая пульсация яркости в цвет выбранного стиля.", cost: 120000, reqStars: 8, className: "nick-fx-neon-pulse" },
     { id: "gold_shine", name: "Золотой отлив Олигарха", desc: "Богатый металлический золотой блеск с мерцанием.", cost: 250000, reqStars: 15, className: "nick-fx-gold-shine" },
@@ -55,6 +56,7 @@ const NICKNAME_EFFECTS_CATALOG = [
 
 const AVATAR_EFFECTS_CATALOG = [
     { id: "none", name: "Базовое кольцо", desc: "Аккуратная статичная рамка цвета интерфейса.", cost: 0, reqStars: 0, className: "avatar-fx-none" },
+    { id: "lightning_shield", name: "Электро-щит Теслы", desc: "Сверкающие дуги молний вокруг аватара перекупа.", cost: 220000, reqStars: 15, className: "avatar-fx-lightning" },
     { id: "neon_breath", name: "Неоновый импульс", desc: "Плавное пульсирующее кольцо с мягким свечением.", cost: 85000, reqStars: 5, className: "avatar-fx-neon-breath" },
     { id: "fire_drift", name: "Огненная аура Дрифта", desc: "Вспышки языков пламени и раскаленный янтарный контур.", cost: 180000, reqStars: 10, className: "avatar-fx-fire" },
     { id: "gold_halo", name: "Золотой ореол Синдиката", desc: "Премиальное вращающееся кольцо из чистого золота.", cost: 300000, reqStars: 20, className: "avatar-fx-gold" },
@@ -62,6 +64,7 @@ const AVATAR_EFFECTS_CATALOG = [
 ];
 
 const HUD_THEMES_CATALOG = [
+    { id: "lightning_storm", name: "Lightning Storm (Гроза)", desc: "Электрический сине-фиолетовый неон с искрами молний на HUD и телефоне.", colorId: "lightning", cost: 300000, reqStars: 15, reqLevel: 7, isLightning: true },
     { id: "cyber_neon", name: "Cyber Neon", desc: "Бирюзовый неоновый стиль с глубоким контрастным черным фоном.", colorId: "cyan", cost: 0, reqStars: 0, reqLevel: 1 },
     { id: "tokyo_drift", name: "Tokyo Drift", desc: "Агрессивный рубиновый акцент с янтарным свечением.", colorId: "red", cost: 150000, reqStars: 5, reqLevel: 5 },
     { id: "toxic_acid", name: "Toxic Acid", desc: "Ядовитый неоновый лайм уличных нелегальных гонок.", colorId: "green", cost: 250000, reqStars: 8, reqLevel: 8 },
@@ -76,7 +79,7 @@ const STREET_RACE_ANIM_CONFIG = {
 };
 
 // ========================================================
-// 1. АВТОНОМНЫЙ АЛГОРИТМ ОЦЕНКИ БЛАТНЫХ ГОСНОМЕРОВ
+// 1. АЛГОРИТМ ОЦЕНКИ БЛАТНЫХ ГОСНОМЕРОВ
 // ========================================================
 function calculatePlateValue(plateStr) {
     if (!plateStr || typeof plateStr !== 'string') return 0;
@@ -135,6 +138,7 @@ function calculatePlateValue(plateStr) {
 const I18N_TRANSLATIONS = {
     ru: {
         classes_title: "Классы автотехники",
+        cat_all: "Все категории",
         cat_economy: "Эконом",
         cat_scooter: "Скутеры",
         cat_moto: "Мото",
@@ -165,6 +169,7 @@ const I18N_TRANSLATIONS = {
     },
     en: {
         classes_title: "Vehicle Classes",
+        cat_all: "All Categories",
         cat_economy: "Economy",
         cat_scooter: "Scooters",
         cat_moto: "Motorcycles",
@@ -208,133 +213,163 @@ const CAR_FALLBACKS_BY_CATEGORY = {
 };
 
 // ========================================================
-// 3. БАЗА ДАННЫХ АВТОТЕХНИКИ
+// 3. БАЗА ДАННЫХ АВТОТЕХНИКИ (С ПОДДЕРЖКОЙ ПАПОК И ГАЛЕРЕЙ)
 // ========================================================
 const CAR_DATABASE = {
     economy: [
-        { name: "Ока (ВАЗ-1111)", power: 33, basePrice: 45000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/oka.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ЗАЗ-968М «Запорожец»", power: 40, basePrice: 40000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/zaz.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Москвич-412", power: 75, basePrice: 55000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/moskvich.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ИЖ-2126 «Ода»", power: 73, basePrice: 65000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/izh.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2101 «Копейка»", power: 64, basePrice: 75000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/vaz-2101.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2105 «Пятерка»", power: 71, basePrice: 85000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/vaz-2105.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2106 «Шестерка»", power: 75, basePrice: 90000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/vaz-2106.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2107 «Семёрка»", power: 74, basePrice: 110000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/vaz-2107.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2108 «Зубило»", power: 70, basePrice: 120000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2108.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2109 «Девятка»", power: 72, basePrice: 135000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2109.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-21099 «Дуплет»", power: 78, basePrice: 145000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-21099.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2110 «Десятка»", power: 89, basePrice: 155000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2110.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2112 «Двенашка»", power: 91, basePrice: 165000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2112.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2114 «Четырка»", power: 81, basePrice: 160000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2114.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ВАЗ-2115 «Пятнашка»", power: 81, basePrice: 165000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/vaz-2115.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Lada Kalina I", power: 81, basePrice: 240000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/kalina.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Lada Priora", power: 98, basePrice: 310000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/priora.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Lada Granta I", power: 87, basePrice: 380000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/granta.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ГАЗ-3110 «Волга»", power: 130, basePrice: 140000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/volga.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "ГАЗ-31105 «Волга» (Крайслер)", power: 137, basePrice: 210000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/volga105.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "УАЗ 469 «Бобик»", power: 75, basePrice: 150000, drivetrain: "awd", type: "economy", img: "assets/cars/economy/uaz469.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Нива 2121 4x4", power: 83, basePrice: 280000, drivetrain: "awd", type: "economy", img: "assets/cars/economy/niva.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Chevrolet Niva", power: 80, basePrice: 340000, drivetrain: "awd", type: "economy", img: "assets/cars/economy/chevy_niva.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Daewoo Matiz", power: 51, basePrice: 130000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/matiz.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Daewoo Nexia", power: 80, basePrice: 170000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/nexia.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Chevrolet Lanos", power: 86, basePrice: 190000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/lanos.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Renault Logan I", power: 75, basePrice: 370000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/logan.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Renault Sandero I", power: 84, basePrice: 420000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/sandero.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Nissan Almera Classic", power: 107, basePrice: 440000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/almera.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Ford Focus I", power: 100, basePrice: 320000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/focus1.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Mitsubishi Carisma", power: 103, basePrice: 280000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/carisma.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Mitsubishi Lancer IX", power: 98, basePrice: 410000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/lancer9.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Toyota Mark II (JZX90)", power: 180, basePrice: 490000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/mark2.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Toyota Chaser (X100)", power: 200, basePrice: 590000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/chaser.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "BMW E34 520i", power: 150, basePrice: 290000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/e34.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "BMW E36 318i", power: 115, basePrice: 340000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/e36.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Mercedes W202 C180", power: 122, basePrice: 310000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/w202.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Mercedes W210 «Лупатый»", power: 136, basePrice: 350000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/w210.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Audi 80 B4 «Бочка»", power: 90, basePrice: 240000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/audi80.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
-        { name: "Audi A6 C5", power: 165, basePrice: 390000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/a6c5.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy }
+        { 
+            name: "ВАЗ-2101 «Копейка»", 
+            power: 64, 
+            basePrice: 75000, 
+            drivetrain: "rwd", 
+            type: "economy", 
+            img: "assets/cars/economy/2101/vaz-2101.jpg",
+            images: [
+                "assets/cars/economy/2101/vaz-2101.jpg",
+                "assets/cars/economy/2101/vaz-2101_1.jpg",
+                "assets/cars/economy/2101/vaz-2101_2.jpg",
+                "assets/cars/economy/2101/vaz-2101_3.jpg",
+                "assets/cars/economy/2101/vaz-2101_4.jpg",
+                "assets/cars/economy/2101/vaz-2101_5.jpg",
+                "assets/cars/economy/2101/vaz-2101_6.png",
+                "assets/cars/economy/2101/vaz-2101_7.jpg",
+                "assets/cars/economy/2101/vaz-2101_8.jpg",
+                "assets/cars/economy/2101/vaz-2101_9.jpg",
+                "assets/cars/economy/2101/vaz-2101_10.jpg"
+            ],
+            fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
+        },
+        {   name: "Ока (ВАЗ-1111)", power: 33, basePrice: 45000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/oka/oka.jpg", images: [
+            "assets/cars/economy/oka/oka.jpg",
+            "assets/cars/economy/oka/oka_2.jpg",
+            "assets/cars/economy/oka/oka_3.jpg",
+            "assets/cars/economy/oka/oka_4.jpg",
+            "assets/cars/economy/oka/oka_5.jpg",
+            "assets/cars/economy/oka/oka_6.jpg",
+            "assets/cars/economy/oka/oka_7.jpg"
+            ], 
+            fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
+            },
+        { name: "ЗАЗ-968М «Запорожец»", power: 40, basePrice: 40000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/zaz/zaz.jpg", images: ["assets/cars/economy/zaz/zaz.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Москвич-412", power: 75, basePrice: 55000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/moskvich/moskvich.jpg", images: ["assets/cars/economy/moskvich/moskvich.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ИЖ-2126 «Ода»", power: 73, basePrice: 65000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/izh/izh.jpg", images: ["assets/cars/economy/izh/izh.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2105 «Пятерка»", power: 71, basePrice: 85000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/2105/vaz-2105.jpg", images: ["assets/cars/economy/2105/vaz-2105.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2106 «Шестерка»", power: 75, basePrice: 90000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/2106/vaz-2106.jpg", images: ["assets/cars/economy/2106/vaz-2106.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2107 «Семёрка»", power: 74, basePrice: 110000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/2107/vaz-2107.jpg", images: ["assets/cars/economy/2107/vaz-2107.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2108 «Зубило»", power: 70, basePrice: 120000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/2108/vaz-2108.jpg", images: ["assets/cars/economy/2108/vaz-2108.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2109 «Девятка»", power: 72, basePrice: 135000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/2109/vaz-2109.jpg", images: ["assets/cars/economy/2109/vaz-2109.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-21099 «Дуплет»", power: 78, basePrice: 145000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/21099/vaz-21099.jpg", images: ["assets/cars/economy/21099/vaz-21099.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2110 «Десятка»", power: 89, basePrice: 155000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/2110/vaz-2110.jpg", images: ["assets/cars/economy/2110/vaz-2110.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2112 «Двенашка»", power: 91, basePrice: 165000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/2112/vaz-2112.jpg", images: ["assets/cars/economy/2112/vaz-2112.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2114 «Четырка»", power: 81, basePrice: 160000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/2114/vaz-2114.jpg", images: ["assets/cars/economy/2114/vaz-2114.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ВАЗ-2115 «Пятнашка»", power: 81, basePrice: 165000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/2115/vaz-2115.jpg", images: ["assets/cars/economy/2115/vaz-2115.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Lada Kalina I", power: 81, basePrice: 240000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/kalina/kalina.jpg", images: ["assets/cars/economy/kalina/kalina.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Lada Priora", power: 98, basePrice: 310000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/priora/priora.jpg", images: ["assets/cars/economy/priora/priora.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Lada Granta I", power: 87, basePrice: 380000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/granta/granta.jpg", images: ["assets/cars/economy/granta/granta.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ГАЗ-3110 «Волга»", power: 130, basePrice: 140000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/volga/volga.jpg", images: ["assets/cars/economy/volga/volga.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "ГАЗ-31105 «Волга»", power: 137, basePrice: 210000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/volga105/volga105.jpg", images: ["assets/cars/economy/volga105/volga105.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "УАЗ 469 «Бобик»", power: 75, basePrice: 150000, drivetrain: "awd", type: "economy", img: "assets/cars/economy/uaz469/uaz469.jpg", images: ["assets/cars/economy/uaz469/uaz469.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Нива 2121 4x4", power: 83, basePrice: 280000, drivetrain: "awd", type: "economy", img: "assets/cars/economy/niva/niva.jpg", images: ["assets/cars/economy/niva/niva.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Chevrolet Niva", power: 80, basePrice: 340000, drivetrain: "awd", type: "economy", img: "assets/cars/economy/chevy_niva/chevy_niva.jpg", images: ["assets/cars/economy/chevy_niva/chevy_niva.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Daewoo Matiz", power: 51, basePrice: 130000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/matiz/matiz.jpg", images: ["assets/cars/economy/matiz/matiz.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Daewoo Nexia", power: 80, basePrice: 170000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/nexia/nexia.jpg", images: ["assets/cars/economy/nexia/nexia.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Chevrolet Lanos", power: 86, basePrice: 190000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/lanos/lanos.jpg", images: ["assets/cars/economy/lanos/lanos.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Renault Logan I", power: 75, basePrice: 370000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/logan/logan.jpg", images: ["assets/cars/economy/logan/logan.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Renault Sandero I", power: 84, basePrice: 420000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/sandero/sandero.jpg", images: ["assets/cars/economy/sandero/sandero.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Nissan Almera Classic", power: 107, basePrice: 440000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/almera/almera.jpg", images: ["assets/cars/economy/almera/almera.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Ford Focus I", power: 100, basePrice: 320000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/focus1/focus1.jpg", images: ["assets/cars/economy/focus1/focus1.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Mitsubishi Carisma", power: 103, basePrice: 280000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/carisma/carisma.jpg", images: ["assets/cars/economy/carisma/carisma.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Mitsubishi Lancer IX", power: 98, basePrice: 410000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/lancer9/lancer9.jpg", images: ["assets/cars/economy/lancer9/lancer9.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Toyota Mark II (JZX90)", power: 180, basePrice: 490000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/mark2/mark2.jpg", images: ["assets/cars/economy/mark2/mark2.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Toyota Chaser (X100)", power: 200, basePrice: 590000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/chaser/chaser.jpg", images: ["assets/cars/economy/chaser/chaser.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "BMW E34 520i", power: 150, basePrice: 290000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/e34/e34.jpg", images: ["assets/cars/economy/e34/e34.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "BMW E36 318i", power: 115, basePrice: 340000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/e36/e36.jpg", images: ["assets/cars/economy/e36/e36.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Mercedes W202 C180", power: 122, basePrice: 310000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/w202/w202.jpg", images: ["assets/cars/economy/w202/w202.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Mercedes W210 «Лупатый»", power: 136, basePrice: 350000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/w210/w210.jpg", images: ["assets/cars/economy/w210/w210.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Audi 80 B4 «Бочка»", power: 90, basePrice: 240000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/audi80/audi80.jpg", images: ["assets/cars/economy/audi80/audi80.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+        { name: "Audi A6 C5", power: 165, basePrice: 390000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/a6c5/a6c5.jpg", images: ["assets/cars/economy/a6c5/a6c5.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy }
     ],
     scooter: [
-        { name: "Honda Dio AF34", power: 7, basePrice: 45000, drivetrain: "rwd", type: "scooter", img: "assets/moto/dio.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
-        { name: "Yamaha Jog ZR", power: 8, basePrice: 55000, drivetrain: "rwd", type: "scooter", img: "assets/moto/jog.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
-        { name: "Suzuki Lets 2", power: 6, basePrice: 38000, drivetrain: "rwd", type: "scooter", img: "assets/moto/lets.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
-        { name: "Honda Tact AF24", power: 6, basePrice: 42000, drivetrain: "rwd", type: "scooter", img: "assets/moto/tact.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
-        { name: "Vespa Primavera 150", power: 13, basePrice: 220000, drivetrain: "rwd", type: "scooter", img: "assets/moto/vespa.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.scooter }
+        { name: "Honda Dio AF34", power: 7, basePrice: 45000, drivetrain: "rwd", type: "scooter", img: "assets/moto/dio/dio.jpg", images: ["assets/moto/dio/dio.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
+        { name: "Yamaha Jog ZR", power: 8, basePrice: 55000, drivetrain: "rwd", type: "scooter", img: "assets/moto/jog/jog.jpg", images: ["assets/moto/jog/jog.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
+        { name: "Suzuki Lets 2", power: 6, basePrice: 38000, drivetrain: "rwd", type: "scooter", img: "assets/moto/lets/lets.jpg", images: ["assets/moto/lets/lets.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
+        { name: "Honda Tact AF24", power: 6, basePrice: 42000, drivetrain: "rwd", type: "scooter", img: "assets/moto/tact/tact.jpg", images: ["assets/moto/tact/tact.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.scooter },
+        { name: "Vespa Primavera 150", power: 13, basePrice: 220000, drivetrain: "rwd", type: "scooter", img: "assets/moto/vespa/vespa.jpg", images: ["assets/moto/vespa/vespa.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.scooter }
     ],
     moto: [
-        { name: "Иж Юпитер-5 с люлькой", power: 24, basePrice: 85000, drivetrain: "rwd", type: "moto", img: "assets/moto/jupiter.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "Ява-350 (638)", power: 26, basePrice: 120000, drivetrain: "rwd", type: "moto", img: "assets/moto/jawa.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "Bajaj Pulsar NS200", power: 25, basePrice: 240000, drivetrain: "rwd", type: "moto", img: "assets/moto/pulsar.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "Kawasaki Ninja 300", power: 39, basePrice: 450000, drivetrain: "rwd", type: "moto", img: "assets/moto/ninja.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "Honda CB400 Super Four", power: 53, basePrice: 370000, drivetrain: "rwd", type: "moto", img: "assets/moto/cb400.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "Yamaha MT-07", power: 74, basePrice: 890000, drivetrain: "rwd", type: "moto", img: "assets/moto/mt07.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "KTM 390 Duke", power: 44, basePrice: 560000, drivetrain: "rwd", type: "moto", img: "assets/moto/duke.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "Harley-Davidson Iron 883", power: 51, basePrice: 1250000, drivetrain: "rwd", type: "moto", img: "assets/moto/iron883.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "BMW R1250GS Adventure", power: 136, basePrice: 2600000, drivetrain: "rwd", type: "moto", img: "assets/moto/gs1250.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "Yamaha YZF-R1", power: 200, basePrice: 2200000, drivetrain: "rwd", type: "moto", img: "assets/moto/r1.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
-        { name: "Ducati Panigale V4", power: 214, basePrice: 3400000, drivetrain: "rwd", type: "moto", img: "assets/moto/ducati.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.moto }
+        { name: "Иж Юпитер-5 с люлькой", power: 24, basePrice: 85000, drivetrain: "rwd", type: "moto", img: "assets/moto/jupiter/jupiter.jpg", images: ["assets/moto/jupiter/jupiter.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Ява-350 (638)", power: 26, basePrice: 120000, drivetrain: "rwd", type: "moto", img: "assets/moto/jawa/jawa.jpg", images: ["assets/moto/jawa/jawa.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Bajaj Pulsar NS200", power: 25, basePrice: 240000, drivetrain: "rwd", type: "moto", img: "assets/moto/pulsar/pulsar.jpg", images: ["assets/moto/pulsar/pulsar.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Kawasaki Ninja 300", power: 39, basePrice: 450000, drivetrain: "rwd", type: "moto", img: "assets/moto/ninja/ninja.jpg", images: ["assets/moto/ninja/ninja.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Honda CB400 Super Four", power: 53, basePrice: 370000, drivetrain: "rwd", type: "moto", img: "assets/moto/cb400/cb400.jpg", images: ["assets/moto/cb400/cb400.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Yamaha MT-07", power: 74, basePrice: 890000, drivetrain: "rwd", type: "moto", img: "assets/moto/mt07/mt07.jpg", images: ["assets/moto/mt07/mt07.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "KTM 390 Duke", power: 44, basePrice: 560000, drivetrain: "rwd", type: "moto", img: "assets/moto/duke/duke.jpg", images: ["assets/moto/duke/duke.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Harley-Davidson Iron 883", power: 51, basePrice: 1250000, drivetrain: "rwd", type: "moto", img: "assets/moto/iron883/iron883.jpg", images: ["assets/moto/iron883/iron883.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "BMW R1250GS Adventure", power: 136, basePrice: 2600000, drivetrain: "rwd", type: "moto", img: "assets/moto/gs1250/gs1250.jpg", images: ["assets/moto/gs1250/gs1250.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Yamaha YZF-R1", power: 200, basePrice: 2200000, drivetrain: "rwd", type: "moto", img: "assets/moto/r1/r1.jpg", images: ["assets/moto/r1/r1.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto },
+        { name: "Ducati Panigale V4", power: 214, basePrice: 3400000, drivetrain: "rwd", type: "moto", img: "assets/moto/ducati/ducati.jpg", images: ["assets/moto/ducati/ducati.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.moto }
     ],
     atv: [
-        { name: "CFMOTO CFORCE 500", power: 35, basePrice: 620000, drivetrain: "awd", type: "atv", img: "assets/moto/cforce.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
-        { name: "Stels Guepard 850", power: 71, basePrice: 950000, drivetrain: "awd", type: "atv", img: "assets/moto/guepard.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
-        { name: "Yamaha Grizzly 700", power: 49, basePrice: 1400000, drivetrain: "awd", type: "atv", img: "assets/moto/grizzly.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
-        { name: "BRP Can-Am Maverick X3", power: 195, basePrice: 3600000, drivetrain: "awd", type: "atv", img: "assets/moto/maverick.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.atv }
+        { name: "CFMOTO CFORCE 500", power: 35, basePrice: 620000, drivetrain: "awd", type: "atv", img: "assets/moto/cforce/cforce.jpg", images: ["assets/moto/cforce/cforce.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
+        { name: "Stels Guepard 850", power: 71, basePrice: 950000, drivetrain: "awd", type: "atv", img: "assets/moto/guepard/guepard.jpg", images: ["assets/moto/guepard/guepard.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
+        { name: "Yamaha Grizzly 700", power: 49, basePrice: 1400000, drivetrain: "awd", type: "atv", img: "assets/moto/grizzly/grizzly.jpg", images: ["assets/moto/grizzly/grizzly.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.atv },
+        { name: "BRP Can-Am Maverick X3", power: 195, basePrice: 3600000, drivetrain: "awd", type: "atv", img: "assets/moto/maverick/maverick.jpg", images: ["assets/moto/maverick/maverick.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.atv }
     ],
     comfort: [
-        { name: "Hyundai Solaris I", power: 123, basePrice: 680000, drivetrain: "fwd", type: "comfort", img: "assets/cars/economy/solaris.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Kia Rio 3", power: 123, basePrice: 710000, drivetrain: "fwd", type: "comfort", img: "assets/cars/economy/rio.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "VW Polo Sedan", power: 110, basePrice: 870000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/polo.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Skoda Rapid", power: 110, basePrice: 920000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/rapid.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Ford Focus III", power: 125, basePrice: 970000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/focus.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Chevrolet Cruze", power: 109, basePrice: 790000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/cruze.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Skoda Octavia A7 1.8 TSI", power: 180, basePrice: 1450000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/octavia.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "VW Golf VI GTI", power: 211, basePrice: 1550000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/golf6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Toyota Camry XV50", power: 181, basePrice: 1950000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/camry.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Kia Optima (JF)", power: 188, basePrice: 1900000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/optima.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Kia K5", power: 194, basePrice: 2450000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/k5.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Mazda 6 (GJ)", power: 192, basePrice: 2150000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/mazda6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Toyota RAV4 (XA40)", power: 150, basePrice: 2350000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/rav4.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Mazda CX-5", power: 194, basePrice: 2400000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/cx5.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-        { name: "Geely Monjaro", power: 238, basePrice: 3300000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/monjaro.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort }
+        { name: "Hyundai Solaris I", power: 123, basePrice: 680000, drivetrain: "fwd", type: "comfort", img: "assets/cars/economy/solaris/solaris.jpg", images: ["assets/cars/economy/solaris/solaris.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Kia Rio 3", power: 123, basePrice: 710000, drivetrain: "fwd", type: "comfort", img: "assets/cars/economy/rio/rio.jpg", images: ["assets/cars/economy/rio/rio.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "VW Polo Sedan", power: 110, basePrice: 870000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/polo/polo.jpg", images: ["assets/cars/comfort/polo/polo.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Skoda Rapid", power: 110, basePrice: 920000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/rapid/rapid.jpg", images: ["assets/cars/comfort/rapid/rapid.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Ford Focus III", power: 125, basePrice: 970000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/focus/focus.jpg", images: ["assets/cars/comfort/focus/focus.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Chevrolet Cruze", power: 109, basePrice: 790000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/cruze/cruze.jpg", images: ["assets/cars/comfort/cruze/cruze.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Skoda Octavia A7 1.8 TSI", power: 180, basePrice: 1450000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/octavia/octavia.jpg", images: ["assets/cars/comfort/octavia/octavia.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "VW Golf VI GTI", power: 211, basePrice: 1550000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/golf6/golf6.jpg", images: ["assets/cars/comfort/golf6/golf6.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Toyota Camry XV50", power: 181, basePrice: 1950000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/camry/camry.jpg", images: ["assets/cars/comfort/camry/camry.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Kia Optima (JF)", power: 188, basePrice: 1900000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/optima/optima.jpg", images: ["assets/cars/comfort/optima/optima.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Kia K5", power: 194, basePrice: 2450000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/k5/k5.jpg", images: ["assets/cars/comfort/k5/k5.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Mazda 6 (GJ)", power: 192, basePrice: 2150000, drivetrain: "fwd", type: "comfort", img: "assets/cars/comfort/mazda6/mazda6.jpg", images: ["assets/cars/comfort/mazda6/mazda6.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Toyota RAV4 (XA40)", power: 150, basePrice: 2350000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/rav4/rav4.jpg", images: ["assets/cars/comfort/rav4/rav4.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Mazda CX-5", power: 194, basePrice: 2400000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/cx5/cx5.jpg", images: ["assets/cars/comfort/cx5/cx5.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+        { name: "Geely Monjaro", power: 238, basePrice: 3300000, drivetrain: "awd", type: "comfort", img: "assets/cars/comfort/monjaro/monjaro.jpg", images: ["assets/cars/comfort/monjaro/monjaro.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.comfort }
     ],
     premium: [
-        { name: "BMW 3 Series (G20)", power: 190, basePrice: 3600000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/g20.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "BMW 5 Series (G30)", power: 249, basePrice: 4200000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/g30.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Mercedes E-Class (W213)", power: 249, basePrice: 4400000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/w213.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Audi A6 (C8)", power: 245, basePrice: 4300000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/a6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "BMW M340i xDrive", power: 387, basePrice: 5100000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/bmw_m_340i.jpeg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Mercedes C63s AMG", power: 510, basePrice: 5600000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/mercedes_c_c63_w205_sedan.jpeg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Porsche Macan GTS", power: 440, basePrice: 7800000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/macan.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "BMW X5 (G05)", power: 340, basePrice: 8900000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/x5.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "BMW X6 (G06)", power: 340, basePrice: 9400000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/x6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Porsche Cayenne (PO536)", power: 340, basePrice: 11000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/cayenne_new.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Toyota Land Cruiser 300", power: 415, basePrice: 12500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/lc300.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Mercedes S-Class (W223)", power: 367, basePrice: 16500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/w223.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Mercedes G63 AMG «Гелик»", power: 585, basePrice: 18500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/mercedes_g63amg.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
-        { name: "Audi RS6 Avant (C8)", power: 600, basePrice: 14500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/rs6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium }
+        { name: "BMW 3 Series (G20)", power: 190, basePrice: 3600000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/g20/g20.jpg", images: ["assets/cars/premium/g20/g20.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "BMW 5 Series (G30)", power: 249, basePrice: 4200000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/g30/g30.jpg", images: ["assets/cars/premium/g30/g30.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes E-Class (W213)", power: 249, basePrice: 4400000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/w213/w213.jpg", images: ["assets/cars/premium/w213/w213.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Audi A6 (C8)", power: 245, basePrice: 4300000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/a6/a6.jpg", images: ["assets/cars/premium/a6/a6.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "BMW M340i xDrive", power: 387, basePrice: 5100000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/bmw_m340i/bmw_m_340i.jpeg", images: ["assets/cars/premium/bmw_m340i/bmw_m_340i.jpeg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes C63s AMG", power: 510, basePrice: 5600000, drivetrain: "rwd", type: "premium", img: "assets/cars/premium/c63/mercedes_c_c63_w205_sedan.jpeg", images: ["assets/cars/premium/c63/mercedes_c_c63_w205_sedan.jpeg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Porsche Macan GTS", power: 440, basePrice: 7800000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/macan/macan.jpg", images: ["assets/cars/premium/macan/macan.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "BMW X5 (G05)", power: 340, basePrice: 8900000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/x5/x5.jpg", images: ["assets/cars/premium/x5/x5.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "BMW X6 (G06)", power: 340, basePrice: 9400000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/x6/x6.jpg", images: ["assets/cars/premium/x6/x6.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Porsche Cayenne (PO536)", power: 340, basePrice: 11000000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/cayenne/cayenne_new.jpg", images: ["assets/cars/premium/cayenne/cayenne_new.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Toyota Land Cruiser 300", power: 415, basePrice: 12500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/lc300/lc300.jpg", images: ["assets/cars/premium/lc300/lc300.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes S-Class (W223)", power: 367, basePrice: 16500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/w223/w223.jpg", images: ["assets/cars/premium/w223/w223.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Mercedes G63 AMG «Гелик»", power: 585, basePrice: 18500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/g63/mercedes_g63amg.jpg", images: ["assets/cars/premium/g63/mercedes_g63amg.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
+        { name: "Audi RS6 Avant (C8)", power: 600, basePrice: 14500000, drivetrain: "awd", type: "premium", img: "assets/cars/premium/rs6/rs6.jpg", images: ["assets/cars/premium/rs6/rs6.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.premium }
     ],
     hyper: [
-        { name: "Nissan GT-R R35 Nismo", power: 600, basePrice: 14000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/gtr.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
-        { name: "Porsche 911 GT3 RS (992)", power: 525, basePrice: 32000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/911.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
-        { name: "Lamborghini Huracan EVO", power: 640, basePrice: 38000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/huracan.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
-        { name: "Ferrari SF90 Stradale", power: 1000, basePrice: 78000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/sf90.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
-        { name: "McLaren 720S", power: 720, basePrice: 34000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/mclaren.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
-        { name: "Bugatti Chiron Sport", power: 1500, basePrice: 380000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/chiron.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.hyper }
+        { name: "Nissan GT-R R35 Nismo", power: 600, basePrice: 14000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/gtr/gtr.jpg", images: ["assets/cars/hyper/gtr/gtr.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Porsche 911 GT3 RS (992)", power: 525, basePrice: 32000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/911/911.jpg", images: ["assets/cars/hyper/911/911.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Lamborghini Huracan EVO", power: 640, basePrice: 38000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/huracan/huracan.jpg", images: ["assets/cars/hyper/huracan/huracan.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Ferrari SF90 Stradale", power: 1000, basePrice: 78000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/sf90/sf90.jpg", images: ["assets/cars/hyper/sf90/sf90.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "McLaren 720S", power: 720, basePrice: 34000000, drivetrain: "rwd", type: "hyper", img: "assets/cars/hyper/mclaren/mclaren.jpg", images: ["assets/cars/hyper/mclaren/mclaren.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.hyper },
+        { name: "Bugatti Chiron Sport", power: 1500, basePrice: 380000000, drivetrain: "awd", type: "hyper", img: "assets/cars/hyper/chiron/chiron.jpg", images: ["assets/cars/hyper/chiron/chiron.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.hyper }
     ],
     truck: [
-        { name: "ЗИЛ-130 Самосвал", power: 150, basePrice: 280000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/zil.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
-        { name: "ГАЗель NEXT Рефрижератор", power: 149, basePrice: 1950000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/gazel.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
-        { name: "КАМАЗ-54901 Тягач", power: 460, basePrice: 7800000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/kamaz.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
-        { name: "Scania R500 V8", power: 500, basePrice: 11000000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/scania.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
-        { name: "Volvo FH16 750", power: 750, basePrice: 16500000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/volvo.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.truck }
+        { name: "ЗИЛ-130 Самосвал", power: 150, basePrice: 280000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/zil/zil.jpg", images: ["assets/cars/truck/zil/zil.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "ГАЗель NEXT Рефрижератор", power: 149, basePrice: 1950000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/gazel/gazel.jpg", images: ["assets/cars/truck/gazel/gazel.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "КАМАЗ-54901 Тягач", power: 460, basePrice: 7800000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/kamaz/kamaz.jpg", images: ["assets/cars/truck/kamaz/kamaz.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Scania R500 V8", power: 500, basePrice: 11000000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/scania/scania.jpg", images: ["assets/cars/truck/scania/scania.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.truck },
+        { name: "Volvo FH16 750", power: 750, basePrice: 16500000, drivetrain: "rwd", type: "truck", img: "assets/cars/truck/volvo/volvo.jpg", images: ["assets/cars/truck/volvo/volvo.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.truck }
     ],
     yacht: [
-        { name: "Гидроцикл Yamaha FX SVHO", power: 250, basePrice: 1950000, drivetrain: "jet", type: "yacht", img: "assets/cars/yacht/yamaha.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.yacht },
-        { name: "Катер Bayliner VR5", power: 200, basePrice: 4800000, drivetrain: "prop", type: "yacht", img: "assets/cars/yacht/bayliner.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.yacht },
-        { name: "Azimut Atlantis 45", power: 880, basePrice: 78000000, drivetrain: "prop", type: "yacht", img: "assets/cars/yacht/azimut.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.yacht }
+        { name: "Гидроцикл Yamaha FX SVHO", power: 250, basePrice: 1950000, drivetrain: "jet", type: "yacht", img: "assets/cars/yacht/yamaha/yamaha.jpg", images: ["assets/cars/yacht/yamaha/yamaha.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.yacht },
+        { name: "Катер Bayliner VR5", power: 200, basePrice: 4800000, drivetrain: "prop", type: "yacht", img: "assets/cars/yacht/bayliner/bayliner.jpg", images: ["assets/cars/yacht/bayliner/bayliner.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.yacht },
+        { name: "Azimut Atlantis 45", power: 880, basePrice: 78000000, drivetrain: "prop", type: "yacht", img: "assets/cars/yacht/azimut/azimut.jpg", images: ["assets/cars/yacht/azimut/azimut.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.yacht }
     ]
 };
 
-// Функция расширения каталога внешним JSON
 async function loadExternalCarDatabase(jsonUrl) {
     try {
         const response = await fetch(jsonUrl);
@@ -379,7 +414,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
         perk: 'Только ночлег. Доработки и тюнинг невозможны.',
-        desc: 'Временный строительный вагончик у обочины. Сквозняки, запах мазута, верстака нет. Автомобили стоят под открытым небом.', 
+        desc: 'Временный строительный вагончик у обочины. Сквозняки, верстака нет. Автомобили стоят под открытым небом.', 
         img: 'assets/houses/trailer.jpg',
         fallback: 'https://images.unsplash.com/photo-1590725140246-201552a488c9?auto=format&fit=crop&w=600&q=80'
     },
@@ -400,8 +435,8 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
-        perk: 'Одно стихийное машиноместо во дворе. Разрешена быстрая замена масла/присадок.',
-        desc: 'Комната в спальном районе. Автомобиль стоит под окнами у подъезда. Мелкий сервисный ремонт разрешён, но красить и варить соседи не дадут.', 
+        perk: 'Одно машиноместо во дворе. Разрешена замена масла/присадок.',
+        desc: 'Комната в спальном районе. Автомобиль стоит под окнами. Мелкий сервисный ремонт разрешён.', 
         img: 'assets/houses/room.jpg',
         fallback: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=600&q=80'
     },
@@ -423,7 +458,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: true,
         reshalaDiscountPct: 5,
         perk: 'Смотровая яма, электричество 220V, верстак со слесарными тисками.',
-        desc: 'Настоящее логово перекупа! Сухая яма, верстак и диодное освещение. Открывает корчевание, заварку редукторов и диагностику ЭБУ.', 
+        desc: 'Настоящее логово перекупа! Сухая яма, верстак и диодное освещение. Открывает корчевание и диагностику ЭБУ.', 
         img: 'assets/houses/garage.jpg',
         fallback: 'https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?auto=format&fit=crop&w=600&q=80'
     },
@@ -445,7 +480,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
         perk: 'Уютный сон, быстрое восстановление настроения, парковка во дворе.',
-        desc: 'Бабушкин ремонт, старый скрипучий паркет, зато своя горячая ванна и кухня. Машина паркуется на асфальте под фонарём.', 
+        desc: 'Бабушкин ремонт, старый скрипучий паркет, зато своя ванна и кухня. Машина паркуется во дворе под фонарём.', 
         img: 'assets/houses/khrusch.jpg',
         fallback: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=600&q=80'
     },
@@ -467,7 +502,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: true,
         reshalaDiscountPct: 10,
         perk: 'Сварка, полировальный пост, печь на отработке и 3 свободных машиноместа.',
-        desc: 'Широкий спаренный бокс с буржуйкой, верстаком, компрессором и мойкой высокого давления. Позволяет готовить тачки к продаже под ключ.', 
+        desc: 'Широкий бокс с печью, верстаком, компрессором и мойкой. Позволяет готовить тачки к продаже под ключ.', 
         img: 'assets/houses/garage.jpg',
         fallback: 'https://images.unsplash.com/photo-1616423640778-28d1b53229bd?auto=format&fit=crop&w=600&q=80'
     },
@@ -489,7 +524,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: true,
         reshalaDiscountPct: 0,
         perk: 'Закреплённое парковочное место со шлагбаумом во дворе.',
-        desc: 'Хороший кирпичный дом, стеклопакеты, видеонаблюдение за парковкой. Высокий комфорт проживания перекупа.', 
+        desc: 'Кирпичный дом, стеклопакеты, видеонаблюдение за парковкой. Высокий комфорт проживания.', 
         img: 'assets/houses/dvushka.jpg',
         fallback: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80'
     },
@@ -511,7 +546,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: true,
         reshalaDiscountPct: 20,
         perk: 'Двухстоечный подъёмник, камера обдува, скидка 20% на услуги Решалы!',
-        desc: 'Полноценный коммерческий цех в промзоне. Подъёмник, мощная приточка, возможность перебивать и отмывать VIN своими силами.', 
+        desc: 'Коммерческий цех в промзоне. Подъёмник, мощная приточка, возможность отмывать VIN дешевле.', 
         img: 'assets/houses/workshop.jpg',
         fallback: 'https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=600&q=80'
     },
@@ -532,8 +567,8 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 0,
-        perk: 'Подземный теплый паркинг с детейлинг-постом и зарядкой для электрокаров.',
-        desc: 'ЖК комфорт-класса. Закрытый двор, охраняемый подземный паркинг, автомоечный комплекс прямо в цоколе здания.', 
+        perk: 'Подземный теплый паркинг с детейлинг-постом и зарядкой.',
+        desc: 'ЖК комфорт-класса. Закрытый двор, охраняемый подземный паркинг, автомойка в цоколе.', 
         img: 'assets/houses/treshka.jpg',
         fallback: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80'
     },
@@ -555,7 +590,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: true,
         reshalaDiscountPct: 15,
         perk: 'Свой закрытый двор на 7 авто, тёплый гараж, зона отдыха и барбекю.',
-        desc: 'Собственный участок, трёхфазная сеть 380V, смотровая яма и мойка высокого давления. Соседи далеко — газуй в отсечку хоть ночью.', 
+        desc: 'Собственный участок, трёхфазная сеть 380V, смотровая яма и мойка высокого давления.', 
         img: 'assets/houses/cottage.jpg',
         fallback: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=600&q=80'
     },
@@ -577,7 +612,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: true,
         reshalaDiscountPct: 0,
         perk: '+40% настроения каждый день, персональные места на VIP-паркинге.',
-        desc: 'Красный кирпич, панорамные окна с видом на набережную, стильный интерьер. Идеально для отдыха автоолигарха.', 
+        desc: 'Красный кирпич, панорамные окна на набережную, стильный интерьер для отдыха автоолигарха.', 
         img: 'assets/houses/loft.jpg',
         fallback: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80'
     },
@@ -599,7 +634,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: true,
         reshalaDiscountPct: 25,
         perk: 'Личный VIP-бокс на -3 этаже Башни с охраной, консьержем и мойкой.',
-        desc: 'Панорамный вид с 65 этажа, консьерж-сервис, охраняемый подземный гаражный комплекс для коллекции спорткаров.', 
+        desc: 'Панорамный вид с 65 этажа, консьерж-сервис, охраняемый подземный гаражный комплекс.', 
         img: 'assets/houses/penthouse.jpg',
         fallback: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'
     },
@@ -621,7 +656,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: true,
         reshalaDiscountPct: 35,
         perk: 'Свой автосервисный цех, малярная камера, охрана ЧОП, скидка 35% у Решалы!',
-        desc: 'Гектар соснового бора, собственный автосервис на 4 поста, профессиональная покрасочная камера и ангар для редких лотов.', 
+        desc: 'Гектар соснового бора, собственный автосервис на 4 поста, малярная камера и ангар для редких лотов.', 
         img: 'assets/houses/villa.jpg',
         fallback: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=600&q=80'
     },
@@ -643,7 +678,7 @@ const HOUSING_LIST = [
         hasPersonalSlot: true,
         reshalaDiscountPct: 50,
         perk: 'Полный иммунитет от проверок ГИБДД, личный пирс для яхт и скидка 50% у Решалы!',
-        desc: 'Абсолютная автономия в нейтральных водах. Свой порт, вертолётная площадка, музей для гиперкаров и полная свобода от любых ограничений.', 
+        desc: 'Абсолютная автономия в нейтральных водах. Свой порт, вертолётная площадка и музей для гиперкаров.', 
         img: 'assets/houses/island.jpg',
         fallback: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'
     }
@@ -763,10 +798,10 @@ const BARN_TIERS_CONFIG = [
 ];
 
 const BARN_FINDS = [
-    { name: "ВАЗ-2101 «Копейка» (Дрифт-Спек)", power: 160, type: 'economy', basePrice: 850000, marketValue: 1250000, img: "assets/cars/barn/vaz2101_drift.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
+    { name: "ВАЗ-2101 «Копейка» (Дрифт-Спек)", power: 160, type: 'economy', basePrice: 850000, marketValue: 1250000, img: "assets/cars/economy/2101/vaz-2101_drift.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
     { name: "BMW E30 Coupe", power: 170, type: 'comfort', basePrice: 650000, marketValue: 1300000, img: "assets/cars/barn/e30.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
     { name: "Nissan Silvia S13", power: 200, type: 'comfort', basePrice: 900000, marketValue: 1800000, img: "assets/cars/barn/silvia.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
-    { name: "VW Golf VI GTI (Stage 2 Project)", power: 280, type: 'comfort', basePrice: 1100000, marketValue: 1900000, img: "assets/cars/comfort/golf6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
+    { name: "VW Golf VI GTI (Stage 2 Project)", power: 280, type: 'comfort', basePrice: 1100000, marketValue: 1900000, img: "assets/cars/comfort/golf6/golf6.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.comfort },
     { name: "ГАЗ-24 «Волга» V8", power: 220, type: 'economy', basePrice: 700000, marketValue: 1500000, img: "assets/cars/barn/volga24.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
     { name: "Nissan Skyline GT-R R34 (В пыли)", power: 280, type: 'premium', basePrice: 4500000, marketValue: 9500000, img: "assets/cars/barn/r34.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium },
     { name: "Toyota Supra A80 (Без мотора)", power: 0, type: 'premium', basePrice: 3200000, marketValue: 7000000, img: "assets/cars/barn/supra.jpg", fallback: CAR_FALLBACKS_BY_CATEGORY.premium }
@@ -775,9 +810,12 @@ const BARN_FINDS = [
 const SUPER_SPIN_TIERS = {
     reelCars: [
         { type: "empty", name: "Ничего (Промах)", emoji: "💨", desc: "Пустой лот слота" },
-        { type: "part", name: "Спортивный фильтр нулевик", emoji: "🌪️", cashValue: 12000 },
-        { type: "part", name: "Комплект тормозных колодок Brembo", emoji: "🛑", cashValue: 24000 },
+        { type: "free_impound", name: "Талон забора со спецстоянки ГИБДД", emoji: "🚔", desc: "Бесплатная эвакуация авто" },
+        { type: "xp_bundle", name: "Пакет опыта эксперта (+150 XP)", emoji: "🎖️", amount: 150 },
+        { type: "tool", name: "HD Видеоэндоскоп мотора", emoji: "📹", toolId: "endoscope" },
+        { type: "tool", name: "Профессиональный Launch Pro", emoji: "📱", toolId: "obd_launch" },
         { type: "car", name: "Ока (ВАЗ-1111)", power: 33, category: "economy", basePrice: 45000 },
+        { type: "car", name: "ВАЗ-2101 «Копейка»", power: 64, category: "economy", basePrice: 75000 },
         { type: "car", name: "ВАЗ-2107 «Семёрка»", power: 74, category: "economy", basePrice: 110000 },
         { type: "car", name: "Daewoo Nexia", power: 80, category: "economy", basePrice: 170000 },
         { type: "car", name: "Lada Priora", power: 98, category: "economy", basePrice: 310000 },
@@ -791,6 +829,7 @@ const SUPER_SPIN_TIERS = {
         { type: "cash", label: "60,000 ₽", amount: 60000 },
         { type: "cash", label: "150,000 ₽", amount: 150000 },
         { type: "cash", label: "400,000 ₽", amount: 400000 },
+        { type: "xp", label: "+80 XP Опыта", amount: 80 },
         { type: "fuel", label: "35 ⛽ Топлива", amount: 35 },
         { type: "fuel", label: "100 ⛽ Полный бак", amount: 100 },
         { type: "tickets", label: "10 🎟️ Талонов", amount: 10 },
@@ -800,6 +839,7 @@ const SUPER_SPIN_TIERS = {
     ],
     reelExclusives: [
         { type: "none", label: "Без спецприза", emoji: "⚪" },
+        { type: "free_impound", label: "Талон штрафстоянки 🚔", emoji: "🎫" },
         { type: "stars", label: "10 ⭐ Stars", amount: 10 },
         { type: "stars", label: "25 ⭐ Stars", amount: 25 },
         { type: "stars", label: "50 ⭐ Stars", amount: 50 },
@@ -846,12 +886,42 @@ const HOUSING_INTERIOR_CATALOG = [
 ];
 
 const CONTAINER_ITEMS = [
-    { id: 'japan', name: 'Японский Контейнер', cost: 150000, reqStars: 5, timer: 30, minLevel: 12, badge: 'JDM & Мото', desc: 'Прямые поставки из порта Кобе.', img: 'assets/containers/japan.jpg', fallback: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80' },
-    { id: 'europe', name: 'Европейский Автовоз', cost: 450000, reqStars: 10, timer: 35, minLevel: 15, badge: 'Комфорт & Премиум', desc: 'Автомобили из Германии без пробега по РФ.', img: 'assets/containers/europe.jpg', fallback: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80' },
-    { id: 'usa_auction', name: 'Американский Аукцион', cost: 750000, reqStars: 15, timer: 40, minLevel: 18, badge: 'Битые & Маслкары', desc: 'Контейнер с Copart. Кот в мешке.', img: 'assets/containers/usa.jpg', fallback: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80' },
-    { id: 'china_ship', name: 'Китайский Сухогруз', cost: 950000, reqStars: 20, timer: 38, minLevel: 22, badge: 'Электрички & Новые', desc: 'Свежие Lixiang и Zeekr прямиком из Гуанчжоу.', img: 'assets/containers/china.jpg', fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80' },
-    { id: 'dubai', name: 'Эмиратский Контейнер', cost: 1200000, reqStars: 25, timer: 45, minLevel: 25, badge: 'Катера & Суперкары', desc: 'Аукционная роскошь шейхов.', img: 'assets/containers/dubai.jpg', fallback: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80' },
-    { id: 'hangar', name: 'Заброшенный Ангар', cost: 5000000, reqStars: 50, timer: 60, minLevel: 30, badge: 'Тягачи & Гиперкары', desc: 'Списанное имущество логистического хаба!', img: 'assets/containers/hangar.jpg', fallback: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80' }
+    { 
+        id: 'japan', name: 'Японский Контейнер', cost: 150000, reqStars: 5, timer: 30, minLevel: 12, 
+        badge: 'JDM & Мото', desc: 'Прямые поставки из порта Кобе. Шанс достать Silvia, Mark II или Yamaha MT-07.', 
+        possibleCars: ["Toyota Mark II (JZX90)", "Toyota Chaser (X100)", "Yamaha MT-07", "Honda CB400 Super Four"],
+        img: 'assets/containers/japan.jpg', fallback: 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80' 
+    },
+    { 
+        id: 'europe', name: 'Европейский Автовоз', cost: 450000, reqStars: 10, timer: 35, minLevel: 15, 
+        badge: 'Комфорт & Премиум', desc: 'Автомобили из Германии без пробега по РФ. Дроп: Golf GTI, BMW 3 Series, Audi A6.', 
+        possibleCars: ["VW Golf VI GTI", "BMW 3 Series (G20)", "Audi A6 (C8)", "Skoda Octavia A7 1.8 TSI"],
+        img: 'assets/containers/europe.jpg', fallback: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80' 
+    },
+    { 
+        id: 'usa_auction', name: 'Американский Аукцион', cost: 750000, reqStars: 15, timer: 40, minLevel: 18, 
+        badge: 'Битые & Маслкары', desc: 'Контейнер с Copart. Кот в мешке: от восстановления до идеала.', 
+        possibleCars: ["Ford Focus III", "Chevrolet Cruze", "BRP Can-Am Maverick X3"],
+        img: 'assets/containers/usa.jpg', fallback: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80' 
+    },
+    { 
+        id: 'china_ship', name: 'Китайский Сухогруз', cost: 950000, reqStars: 20, timer: 38, minLevel: 22, 
+        badge: 'Электрички & Новые', desc: 'Свежие Geely Monjaro, кроссоверы и квадроциклы прямиком из порта.', 
+        possibleCars: ["Geely Monjaro", "CFMOTO CFORCE 500", "Stels Guepard 850"],
+        img: 'assets/containers/china.jpg', fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80' 
+    },
+    { 
+        id: 'dubai', name: 'Эмиратский Контейнер', cost: 1200000, reqStars: 25, timer: 45, minLevel: 25, 
+        badge: 'Катера & Суперкары', desc: 'Аукционная роскошь Дубая: BMW X5, Гелик G63 или скоростной катер.', 
+        possibleCars: ["BMW X5 (G05)", "Mercedes G63 AMG «Гелик»", "Porsche Cayenne (PO536)", "Катер Bayliner VR5"],
+        img: 'assets/containers/dubai.jpg', fallback: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80' 
+    },
+    { 
+        id: 'hangar', name: 'Заброшенный Ангар', cost: 5000000, reqStars: 50, timer: 60, minLevel: 30, 
+        badge: 'Тягачи & Гиперкары', desc: 'Списанное имущество хаба: от тягачей Scania до Porsche 911 GT3 RS!', 
+        possibleCars: ["Scania R500 V8", "Volvo FH16 750", "Porsche 911 GT3 RS (992)", "Nissan GT-R R35 Nismo"],
+        img: 'assets/containers/hangar.jpg', fallback: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80' 
+    }
 ];
 
 const SELLER_ADS_PHRASES = [
@@ -871,15 +941,26 @@ const SELLER_ADS_PHRASES = [
     "«Двигатель работает как швейцарские часы.»"
 ];
 
+// ========================================================
+// 7. ОБНОВЛЕННЫЙ РАЦИОН И АКТИВНОСТИ ПЕРЕКУПА
+// ========================================================
 const DIETS = [
-    { id: 'water', name: 'Вода из-под крана', cost: 0, hunger: 5, mood: -30, desc: 'Живот крутит, жить не хочется' },
-    { id: 'doshik', name: 'Бич-пакет и сухари', cost: 150, hunger: 20, mood: -15, desc: 'Желудок ноет, депрессия, тяжело торговаться' },
-    { id: 'home_sandwich', name: 'Бутерброд из дома', cost: 250, hunger: 30, mood: -5, desc: 'Майонез, колбаса "Красная цена", терпимо' },
-    { id: 'pelmeni', name: 'Пельмени по акции', cost: 400, hunger: 45, mood: 0, desc: 'Дешево и сердито, главное сварить' },
-    { id: 'shaurma', name: 'Шаурма на вокзале', cost: 800, hunger: 50, mood: -5, desc: 'Сытно, но жирно и тоскливо' },
-    { id: 'fastfood', name: 'Фастфуд комбо', cost: 1200, hunger: 60, mood: 10, desc: 'Бургер, картошка, кола. Классика.' },
-    { id: 'stolovka', name: 'Обед в столовой', cost: 2200, hunger: 70, mood: 15, desc: 'Нормальное первое, второе и компот' },
-    { id: 'cafe', name: 'Бизнес-ланч в ресторане', cost: 6500, hunger: 90, mood: 25, desc: 'Свежий стейк, кофе и уверенность в себе' }
+    { id: 'water', name: 'Вода из кулера', category: 'fast', cost: 0, hunger: 5, mood: -20, desc: 'Бесплатно в боксе, но силы тают на глазах' },
+    { id: 'coffee', name: 'Двойной эспрессо с заправки', category: 'fast', cost: 180, hunger: 10, mood: 12, desc: 'Бодрит перед ночным выездом на сделку' },
+    { id: 'doshik', name: 'Бич-пакет с сосиской', category: 'fast', cost: 220, hunger: 25, mood: -10, desc: 'Классика гаражного обеда' },
+    { id: 'home_sandwich', name: 'Домашний бутер с сыром', category: 'home', cost: 350, hunger: 35, mood: 5, desc: 'Сытно, душевно и без изжоги' },
+    { id: 'pelmeni', name: 'Пельмени с маслом и перцем', category: 'home', cost: 550, hunger: 50, mood: 10, desc: 'Горячий обед после холодной смотровой ямы' },
+    { id: 'shaurma', name: 'Сытная шаурма на вокзале', category: 'street', cost: 850, hunger: 60, mood: 8, desc: 'Перекус у капота в ожидании покупателя' },
+    { id: 'fastfood', name: 'Бургер-комбо 24/7', category: 'street', cost: 1400, hunger: 70, mood: 18, desc: 'Бургер, картошка и кола перед ночными гонками' },
+    { id: 'stolovka', name: 'Комплексный обед перекупа', category: 'restaurant', cost: 2500, hunger: 85, mood: 25, desc: 'Борщ, котлета с пюре, компот и булочка' },
+    { id: 'cafe', name: 'Стейк Рибай в ресторане', category: 'restaurant', cost: 7500, hunger: 100, mood: 40, desc: 'Празднование закрытия жирной сделки' }
+];
+
+const LIFE_ACTIVITIES = [
+    { id: 'gym', name: 'Тренировка в спортзале', cost: 1500, energy: -20, mood: 25, karma: 2, desc: 'Держит в форме, снижает стресс от жестких торгов' },
+    { id: 'sauna', name: 'Гаражная баня с мужиками', cost: 4500, energy: 30, mood: 35, karma: 5, desc: 'Обсуждение цен, слухов с рынка и полный релакс' },
+    { id: 'karting', name: 'Заезд на прокатном картинге', cost: 3000, energy: -15, mood: 30, karma: 0, desc: 'Тренировка траекторий и разгрузка головы' },
+    { id: 'charity_cats', name: 'Корм для гаражных котов', cost: 800, energy: -5, mood: 15, karma: 8, desc: 'Коты охраняют боксы от мышей, карма растет' }
 ];
 
 const OBD_ERRORS = [
@@ -896,12 +977,12 @@ const OBD_ERRORS = [
 
 const DAILY_REWARDS_CONFIG = [
     { day: 1, title: "+25k ₽ & 15 ⛽", reward: { cash: 25000, fuel: 15 } },
-    { day: 2, title: "+50k ₽ & 1 🤝", reward: { cash: 50000, connections: 1 } },
-    { day: 3, title: "+90k ₽ & 10 ⭐", reward: { cash: 90000, stars: 10 } },
+    { day: 2, title: "+50k ₽ & 1 🤝 & Талон Штрафстоянки", reward: { cash: 50000, connections: 1, freeImpoundPasses: 1 } },
+    { day: 3, title: "+90k ₽ & 10 ⭐ & +100 XP", reward: { cash: 90000, stars: 10, xp: 100 } },
     { day: 4, title: "+150k ₽ & 2 🤝", reward: { cash: 150000, connections: 2 } },
-    { day: 5, title: "+250k ₽ & 20 ⭐", reward: { cash: 250000, stars: 20 } },
-    { day: 6, title: "+400k ₽ & Полный Бак", reward: { cash: 400000, fuel: 100 } },
-    { day: 7, title: "+750k ₽ & 30 ⭐", reward: { cash: 750000, stars: 30, specialPlate: "Х777ХХ 77" } }
+    { day: 5, title: "+250k ₽ & 20 ⭐ & Сканер Launch", reward: { cash: 250000, stars: 20, tool: "obd_launch" } },
+    { day: 6, title: "+400k ₽ & Полный Бак & +250 XP", reward: { cash: 400000, fuel: 100, xp: 250 } },
+    { day: 7, title: "+750k ₽ & 30 ⭐ & Номер Х777ХХ 77", reward: { cash: 750000, stars: 30, specialPlate: "Х777ХХ 77" } }
 ];
 
 const STREET_CHAT_LOG = [
@@ -987,9 +1068,6 @@ const NOTEPAD_CAREER_GOALS = [
     }
 ];
 
-// ========================================================
-// 7. ДИНАМИЧЕСКИЕ ТРЕНДЫ АВТОРЫНКА (MARKET NEWS)
-// ========================================================
 const MARKET_NEWS_EVENTS = [
     { cat: 'economy', type: 'up', mod: 1.25, sender: "📈 АвтоВестник", title: "Бум на дешёвые авто!", text: "Из-за кризиса все скупают бюджетные машины. Цены на Эконом взлетели на 25%!" },
     { cat: 'economy', type: 'down', mod: 0.85, sender: "📉 АвтоВестник", title: "Льготное кредитование", text: "Государство ввело льготы на новые авто. Старый Эконом на вторичке подешевел на 15%." },
@@ -1003,7 +1081,276 @@ const MARKET_NEWS_EVENTS = [
     { cat: 'all', type: 'down', mod: 0.90, sender: "📉 АвтоВестник", title: "Стагнация рынка", text: "Ключевая ставка ЦБ повышена, автокредиты недоступны. Весь рынок просел на 10%." }
 ];
 
-// Экспорт в глобальный контекст
+const BUYERS_CATALOG = {
+    economy: [
+        { name: "Студент Макс", avatar: "🧑‍🎓", rate: 1.08, type: "economy", meticulous: 0.20 },
+        { name: "Таксист Ашот", avatar: "🧔", rate: 1.12, type: "economy", meticulous: 0.45 },
+        { name: "Дед Михалыч", avatar: "👴", rate: 1.18, type: "economy", meticulous: 0.15 },
+        { name: "Перекуп Саня", avatar: "😎", rate: 1.04, type: "economy", meticulous: 0.85 },
+        { name: "Дачник Петрович", avatar: "👨‍🌾", rate: 1.15, type: "economy", meticulous: 0.25 },
+        { name: "Курьер Руслан", avatar: "🛵", rate: 1.10, type: "economy", meticulous: 0.30 },
+        { name: "Пацан с района Костян", avatar: "🧢", rate: 1.06, type: "economy", meticulous: 0.18 },
+        { name: "Новичок с правами Лера", avatar: "👩‍🦰", rate: 1.20, type: "economy", meticulous: 0.30 },
+        { name: "Гаражный мастер Толя", avatar: "👨‍🔧", rate: 1.05, type: "economy", meticulous: 0.70 },
+        { name: "Бригадир Валера", avatar: "👷‍♂️", rate: 1.16, type: "economy", meticulous: 0.35 }
+    ],
+    comfort: [
+        { name: "Менеджер Олег", avatar: "👨‍💼", rate: 1.12, type: "comfort", meticulous: 0.40 },
+        { name: "Семейный Илья", avatar: "👨‍👩‍👦", rate: 1.18, type: "comfort", meticulous: 0.50 },
+        { name: "Блогерша Аня", avatar: "👩‍🎤", rate: 1.22, type: "comfort", meticulous: 0.25 },
+        { name: "Автоподборщик со сканером", avatar: "🕵️‍♂️", rate: 1.06, type: "comfort", meticulous: 0.90 },
+        { name: "IT-тимлид Денис", avatar: "👨‍💻", rate: 1.20, type: "comfort", meticulous: 0.60 },
+        { name: "Риелтор Кристина", avatar: "👩‍💼", rate: 1.15, type: "comfort", meticulous: 0.40 },
+        { name: "Фитнес-тренер Влад", avatar: "💪", rate: 1.14, type: "comfort", meticulous: 0.30 },
+        { name: "Врач-стоматолог Павел", avatar: "👨‍⚕️", rate: 1.24, type: "comfort", meticulous: 0.55 },
+        { name: "Торговый представитель Юра", avatar: "🚘", rate: 1.10, type: "comfort", meticulous: 0.50 },
+        { name: "Дизайнер интерьеров Соня", avatar: "🎨", rate: 1.19, type: "comfort", meticulous: 0.35 }
+    ],
+    premium: [
+        { name: "Бизнесмен Игорь", avatar: "🤵", rate: 1.15, type: "premium", meticulous: 0.60 },
+        { name: "Мажор Артур", avatar: "🕺", rate: 1.25, type: "premium", meticulous: 0.20 },
+        { name: "Депутат Виталий", avatar: "🕴️", rate: 1.10, type: "premium", meticulous: 0.70 },
+        { name: "Владелец таксопарка", avatar: "🧔‍♂️", rate: 1.08, type: "premium", meticulous: 0.80 },
+        { name: "Застройщик Альберт", avatar: "🏗️", rate: 1.18, type: "premium", meticulous: 0.55 },
+        { name: "Продюсер Марк", avatar: "🎬", rate: 1.24, type: "premium", meticulous: 0.35 },
+        { name: "Ресторатор Карен", avatar: "🍽️", rate: 1.16, type: "premium", meticulous: 0.45 },
+        { name: "Юрист международник Яна", avatar: "⚖️", rate: 1.18, type: "premium", meticulous: 0.85 },
+        { name: "Владелец сети клиник Борис", avatar: "🩺", rate: 1.22, type: "premium", meticulous: 0.65 },
+        { name: "Инвестор Герман", avatar: "📈", rate: 1.14, type: "premium", meticulous: 0.75 }
+    ],
+    hyper: [
+        { name: "Шейх Мансур", avatar: "👳‍♂️", rate: 1.30, type: "hyper", meticulous: 0.35 },
+        { name: "Олигарх Роман", avatar: "🛥️", rate: 1.15, type: "hyper", meticulous: 0.80 },
+        { name: "Крипто-миллионер", avatar: "🤑", rate: 1.32, type: "hyper", meticulous: 0.25 },
+        { name: "Стример-хайпожор", avatar: "🎮", rate: 1.25, type: "hyper", meticulous: 0.30 },
+        { name: "Звезда футбола Алекс", avatar: "⚽", rate: 1.22, type: "hyper", meticulous: 0.40 },
+        { name: "Коллекционер редких авто", avatar: "🏛️", rate: 1.35, type: "hyper", meticulous: 0.95 },
+        { name: "IT-фаундер из Дубая", avatar: "🚀", rate: 1.24, type: "hyper", meticulous: 0.50 },
+        { name: "Наследник синдиката Тариэл", avatar: "🕶️", rate: 1.20, type: "hyper", meticulous: 0.70 }
+    ]
+};
+
+// ========================================================
+// 9. КОНТРАКТЫ СИНДИКАТА (С ПРИВЯЗКОЙ К УРОВНЯМ И КЛАССАМ)
+// ========================================================
+const SYNDICATE_CONTRACT_TEMPLATES = [
+    // 7-14 Уровни (Только открытые Эконом, Мото, Квадро)
+    {
+        type: 'taxi_economy',
+        minPlayerLevel: 7,
+        maxPlayerLevel: 14,
+        requiredUnlockedCategory: 'economy',
+        clientName: "Диспетчер такси «Везёт»",
+        avatar: "🧔‍♂️",
+        title: "Бюджетный седан под аренду такси",
+        desc: "Ищем неприхотливый надёжный автомобиль класса Эконом. Без серьёзных скрытых дефектов и с родным кузовом.",
+        reqs: {
+            allowedClasses: ['economy'],
+            minPower: 70,
+            maxMileage: 190000,
+            minCondition: 65,
+            noCriminal: true,
+            noDefects: true
+        },
+        rewardBonus: 120000,
+        rewardConn: 1,
+        rewardXp: 75
+    },
+    {
+        type: 'winter_drift_init',
+        minPlayerLevel: 7,
+        maxPlayerLevel: 14,
+        requiredUnlockedCategory: 'economy',
+        clientName: "Организатор Matsuri Drift",
+        avatar: "🏎️",
+        title: "Жигули под зимний дрифт-сезон",
+        desc: "Срочно требуется заднеприводный кузов с заваркой редуктора и выворотом. Мелкие вмятины не важны.",
+        reqs: {
+            allowedClasses: ['economy'],
+            minPower: 64,
+            minCondition: 40,
+            reqWeldedDiff: true,
+            reqSteeringAngle: true,
+            noCriminal: false,
+            noDefects: false
+        },
+        rewardBonus: 160000,
+        rewardConn: 1,
+        rewardXp: 85
+    },
+    {
+        type: 'moto_courier',
+        minPlayerLevel: 8,
+        maxPlayerLevel: 14,
+        requiredUnlockedCategory: 'moto',
+        clientName: "Служба экспресс-доставки",
+        avatar: "🛵",
+        title: "Городской двухколесный транспорт",
+        desc: "Заказ на бодрый скутер или легкий мотоцикл в хорошем состоянии для доставки документов.",
+        reqs: {
+            allowedClasses: ['scooter', 'moto'],
+            minPower: 12,
+            minCondition: 70,
+            noCriminal: true,
+            noDefects: true
+        },
+        rewardBonus: 110000,
+        rewardConn: 1,
+        rewardXp: 70
+    },
+
+    // 15-29 Уровни (Разблокирован Комфорт с 15 ур.)
+    {
+        type: 'comfort_corporate',
+        minPlayerLevel: 15,
+        maxPlayerLevel: 29,
+        requiredUnlockedCategory: 'comfort',
+        clientName: "Начальник автоколонны «Альянс»",
+        avatar: "👨‍💼",
+        title: "Комфортный седан для филиала",
+        desc: "Требуется проверенный седан или хэтчбек класса Комфорт. Мотор от 110 сил, подтвержденный пробег, без криминала.",
+        reqs: {
+            allowedClasses: ['comfort'],
+            minPower: 110,
+            maxMileage: 160000,
+            minCondition: 75,
+            noCriminal: true,
+            noDefects: true
+        },
+        rewardBonus: 280000,
+        rewardConn: 2,
+        rewardXp: 140
+    },
+    {
+        type: 'drift_europe_spec',
+        minPlayerLevel: 16,
+        maxPlayerLevel: 29,
+        requiredUnlockedCategory: 'comfort',
+        clientName: "Пилот RDS Europe",
+        avatar: "🏁",
+        title: "Боевой проект для сухого асфальта",
+        desc: "Ищем мощную иномарку или подготовленный проект с гидроручником, выворотом и мощностью от 170 л.с.",
+        reqs: {
+            allowedClasses: ['economy', 'comfort'],
+            minPower: 170,
+            minCondition: 60,
+            reqWeldedDiff: true,
+            reqSteeringAngle: true,
+            noCriminal: false,
+            noDefects: false
+        },
+        rewardBonus: 320000,
+        rewardConn: 2,
+        rewardXp: 160
+    },
+
+    // 30+ Уровни (Премиум, Грузовики, Гиперкары и Яхты)
+    {
+        type: 'vip_escort',
+        minPlayerLevel: 30,
+        maxPlayerLevel: 49,
+        requiredUnlockedCategory: 'premium',
+        clientName: "Помощник депутата Госдумы",
+        avatar: "🤵",
+        title: "Представительский авто в кортеж",
+        desc: "Строгий немецкий седан или внедорожник класса Премиум. Идеальный отчет Автотеки, без окрасов и ДТП.",
+        reqs: {
+            allowedClasses: ['premium'],
+            minPower: 240,
+            minCondition: 88,
+            noCriminal: true,
+            noDefects: true
+        },
+        rewardBonus: 750000,
+        rewardConn: 3,
+        rewardXp: 280
+    },
+    {
+        type: 'arab_export',
+        minPlayerLevel: 50,
+        maxPlayerLevel: 100,
+        requiredUnlockedCategory: 'hyper',
+        clientName: "Шейх Мансур (ОАЭ)",
+        avatar: "👳‍♂️",
+        title: "Экспорт суперкара в Дубай",
+        desc: "Срочный заказ на мощный премиум или гиперкар. Требуется идеальный кузов после детейлинга или наличие чипа.",
+        reqs: {
+            allowedClasses: ['premium', 'hyper'],
+            minPower: 500,
+            minCondition: 92,
+            reqPolishOrChip: true,
+            noCriminal: true,
+            noDefects: true
+        },
+        rewardBonus: 1950000,
+        rewardConn: 5,
+        rewardXp: 450
+    },
+    {
+        type: 'collector_yacht',
+        minPlayerLevel: 100,
+        maxPlayerLevel: 100,
+        requiredUnlockedCategory: 'yacht',
+        clientName: "Коллекционер из Монако",
+        avatar: "🛥️",
+        title: "Поставка элитной морской техники",
+        desc: "Закрытый контракт на скоростной катер или премиальную яхту для закрытой регаты Синдиката.",
+        reqs: {
+            allowedClasses: ['yacht'],
+            minPower: 250,
+            minCondition: 85,
+            noCriminal: true,
+            noDefects: true
+        },
+        rewardBonus: 3500000,
+        rewardConn: 6,
+        rewardXp: 600
+    }
+];
+
+// ========================================================
+// 10. АВТОМЕРОПРИЯТИЯ И ГОНОЧНЫЕ ТРЕКИ
+// ========================================================
+const STREET_EVENTS_DATA = [
+    {
+        id: "ev_drift_meet",
+        name: "Ночная дрифт-сходка у ТЦ",
+        type: "drift",
+        classBadge: "Дрифт",
+        req: "Заварка редуктора + Выворот",
+        reward: "60,000 ₽ + 25 Кармы",
+        rewardCash: 60000,
+        rewardKarma: 25,
+        desc: "Парные проезды по мокрому асфальту под аплодисменты зрителей.",
+        check: (car) => !!(car.tuning?.weldedDiff && car.tuning?.steeringAngle)
+    },
+    {
+        id: "ev_stance_show",
+        name: "Городской Стенс-Фестиваль",
+        type: "show",
+        classBadge: "Стенс / Шоу",
+        req: "Пневма/Стенс + Диски + Обвес",
+        reward: "120,000 ₽ + 2 🤝 Связи",
+        rewardCash: 120000,
+        rewardConn: 2,
+        desc: "Выставка проектов. Оценивается фитмент, чистота полок и зазоры кузова.",
+        check: (car) => !!(car.tuning?.stance && car.tuning?.customWheels && car.tuning?.bodykit)
+    },
+    {
+        id: "ev_drag_cup",
+        name: "Кубок Нелегала 402м",
+        type: "drag",
+        classBadge: "Драг",
+        req: "Каркас + Слики + Stage 2+",
+        reward: "250,000 ₽ + 50 ⭐ Stars",
+        rewardCash: 250000,
+        rewardStars: 50,
+        desc: "Серьезная битва самых быстрых турбо-корчей города за крупный куш.",
+        check: (car) => !!(car.tuning?.rollCage && car.tuning?.dragSlicks && (car.tuning?.chip || 0) >= 2)
+    }
+];
+
+// Экспорт в глобальный контекст window
 window.GAME_METADATA = GAME_METADATA;
 window.HUD_SOLID_COLORS = HUD_SOLID_COLORS;
 window.NICKNAME_EFFECTS_CATALOG = NICKNAME_EFFECTS_CATALOG;
@@ -1026,9 +1373,13 @@ window.HOUSING_INTERIOR_CATALOG = HOUSING_INTERIOR_CATALOG;
 window.CONTAINER_ITEMS = CONTAINER_ITEMS;
 window.SELLER_ADS_PHRASES = SELLER_ADS_PHRASES;
 window.DIETS = DIETS;
+window.LIFE_ACTIVITIES = LIFE_ACTIVITIES;
 window.OBD_ERRORS = OBD_ERRORS;
 window.DAILY_REWARDS_CONFIG = DAILY_REWARDS_CONFIG;
 window.STREET_CHAT_LOG = STREET_CHAT_LOG;
 window.DAILY_QUESTS_POOL = DAILY_QUESTS_POOL;
 window.NOTEPAD_CAREER_GOALS = NOTEPAD_CAREER_GOALS;
 window.MARKET_NEWS_EVENTS = MARKET_NEWS_EVENTS;
+window.BUYERS_CATALOG = BUYERS_CATALOG;
+window.SYNDICATE_CONTRACT_TEMPLATES = SYNDICATE_CONTRACT_TEMPLATES;
+window.STREET_EVENTS_DATA = STREET_EVENTS_DATA;

@@ -77,7 +77,7 @@ const AppBusiness = {
                 <div class="glass-card mb-3 p-2">
                     <div class="car-img-wrap mb-2" style="height:115px; position:relative;">
                         <img src="${imgSrc}" class="car-img" onerror="this.onerror=null; this.src='${fallbackSrc}';">
-                        <div class="badge-tag" style="bottom:6px; right:6px;">
+                        <div class="badge-tag badge-br">
                             <span class="tag-badge ${isOwned ? 'bg-tag-green' : 'bg-tag-amber'}">${isOwned ? 'Ур. ' + biz.level : 'С ' + biz.minLevel + ' ур'}</span>
                         </div>
                     </div>
@@ -101,69 +101,6 @@ const AppBusiness = {
 
         html += `</div>`;
         container.innerHTML = html;
-    },
-
-    // Отрисовка виджета на главном экране телефона
-    renderWidget(widgetContainer) {
-        const hasAnyBusiness = state.businesses && state.businesses.some(b => b && b.level > 0);
-
-        if (!hasAnyBusiness) {
-            widgetContainer.innerHTML = '';
-            widgetContainer.style.display = 'none';
-            return;
-        }
-
-        widgetContainer.style.display = 'block';
-        let totalIncomePerDay = 0;
-        let totalStoredCash = 0;
-        let activePoints = 0;
-        let minStock = 100;
-
-        state.businesses.forEach(b => {
-            if (b && b.level > 0) {
-                activePoints++;
-                totalStoredCash += (b.stored || 0);
-                if (b.stock > 0) totalIncomePerDay += ((b.income || 0) * b.level);
-                if (b.stock !== undefined && b.stock < minStock) minStock = b.stock;
-            }
-        });
-
-        let statusBadge = minStock <= 15 ? "<span class='tag-badge bg-tag-red'>Мало сырья!</span>" : "<span class='tag-badge bg-tag-green'>Работает</span>";
-
-        widgetContainer.innerHTML = `
-            <div class="phone-biz-widget">
-                <div class="flex-between mb-1">
-                    <div class="flex-gap" style="align-items:center;">
-                        <div class="widget-icon-bubble"><i class="fa-solid fa-briefcase color-green"></i></div>
-                        <div>
-                            <div class="widget-title">Сеть предприятий</div>
-                            <div class="sub-label" style="font-size:9.5px;">Активно: <b class="color-green">${activePoints}</b> точек</div>
-                        </div>
-                    </div>
-                    ${statusBadge}
-                </div>
-                
-                <div class="widget-metrics-row mb-2">
-                    <div>
-                        <div class="sub-label" style="font-size:9px;">Накоплено в кассах:</div>
-                        <div class="price-val text-xs color-green">${totalStoredCash.toLocaleString()} ₽</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div class="sub-label" style="font-size:9px;">Прибыль сети:</div>
-                        <b class="text-xs color-cyan">+${totalIncomePerDay.toLocaleString()} ₽/д</b>
-                    </div>
-                </div>
-
-                <div class="grid-2">
-                    <button onclick="collectAllBusinessCash(); PhoneManager.renderOpenApp();" class="btn btn-green btn-sm" ${totalStoredCash <= 0 ? 'disabled' : ''}>
-                        Снять кассу
-                    </button>
-                    <button onclick="PhoneManager.openApp('business')" class="btn btn-dark btn-sm">
-                        Управление
-                    </button>
-                </div>
-            </div>
-        `;
     },
 
     sellToNPC(bizId, refundAmount) {

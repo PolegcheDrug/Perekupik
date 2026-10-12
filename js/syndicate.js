@@ -1,9 +1,8 @@
 // ========================================================
-// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, НОМЕРА, ТОП (v0.5.2)
+// js/syndicate.js — ЗАКАЗЫ СИНДИКАТА, P2P БИРЖА, ТОП (v0.6.2)
 // Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
-// Доступ к Синдикату с 7 уровня при наличии эндоскопа, толщиномера,
-// Launch сканера и 5 Stars ⭐.
-// Экономика усложнена: снижены сверхприбыли по контрактам, выросли взносы.
+// Подбор контрактов Синдиката строго под открытые классы,
+// разблокировка комфорта с 15 уровня, P2P-биржа и автоклубы.
 // ========================================================
 
 let p2pActiveFilter = 'cars';
@@ -43,103 +42,49 @@ function switchSyndicateTab(sub) {
 }
 
 // ========================================================
-// 1. ЗАКАЗЫ И КОНТРАКТЫ СИНДИКАТА ПОД КЛЮЧ
+// 1. ЗАКАЗЫ СИНДИКАТА ПОД ОТКРЫТЫЕ КЛАССЫ ТРАНСПОРТА
 // ========================================================
-const CONTRACT_TEMPLATES = [
-    {
-        type: 'vip_escort',
-        clientName: "Помощник депутата",
-        avatar: "🤵",
-        title: "VIP Кортеж / Сопровождение",
-        desc: "Требуется строгий представительский авто в идеальном состоянии. Без ДТП, ошибок по ЭБУ и проблем с законом.",
-        reqs: {
-            allowedClasses: ['comfort', 'premium'],
-            minPower: 160,
-            minCondition: 80,
-            noCriminal: true,
-            noDefects: true
-        },
-        rewardBonus: 250000, // Порезано с 380k
-        rewardConn: 1,
-        rewardXp: 110
-    },
-    {
-        type: 'drift_spec',
-        clientName: "Организатор ночных гонок",
-        avatar: "🏎️",
-        title: "Боевой корч под зимний сезон",
-        desc: "Ищем подготовленный заднеприводный кузов с заваркой и выворотом. Мелкие косяки по ЛКП значения не имеют.",
-        reqs: {
-            allowedClasses: ['economy', 'comfort'],
-            minPower: 75,
-            minCondition: 40,
-            reqWeldedDiff: true,
-            reqSteeringAngle: true,
-            noCriminal: false,
-            noDefects: false
-        },
-        rewardBonus: 180000, // Порезано с 240k
-        rewardConn: 1,
-        rewardXp: 85
-    },
-    {
-        type: 'taxi_fleet',
-        clientName: "Шеф таксомоторного парка",
-        avatar: "🧔‍♂️",
-        title: "Срочный выкуп в городской таксопарк",
-        desc: "Нужен надёжный городской седан с подтверждённым пробегом до 170k км и живыми агрегатами. Учёт РФ обязателен.",
-        reqs: {
-            allowedClasses: ['economy', 'comfort'],
-            minPower: 85,
-            maxMileage: 170000,
-            minCondition: 70,
-            noCriminal: true,
-            noDefects: true
-        },
-        rewardBonus: 130000, // Порезано с 180k
-        rewardConn: 0,
-        rewardXp: 70
-    },
-    {
-        type: 'arab_export',
-        clientName: "Шейх Мансур (ОАЭ)",
-        avatar: "👳‍♂️",
-        title: "Экспорт суперкара в Дубай",
-        desc: "Срочный заказ на мощный премиум или гиперкар. Требуется идеальный кузов после детейлинга или наличие чипа.",
-        reqs: {
-            allowedClasses: ['premium', 'hyper'],
-            minPower: 300,
-            minCondition: 90,
-            reqPolishOrChip: true,
-            noCriminal: true,
-            noDefects: true
-        },
-        rewardBonus: 950000, // Порезано с 1.35M
-        rewardConn: 3,
-        rewardXp: 240
-    },
-    {
-        type: 'chop_guard',
-        clientName: "Начальник службы безопасности",
-        avatar: "🕶️",
-        title: "Машина прикрытия ЧОП",
-        desc: "Ищем мощный внедорожник или универсал для группы быстрого реагирования. Мотор от 180 л.с.",
-        reqs: {
-            allowedClasses: ['comfort', 'premium', 'truck'],
-            minPower: 180,
-            minCondition: 65,
-            noCriminal: true,
-            noDefects: false
-        },
-        rewardBonus: 220000, // Порезано с 320k
-        rewardConn: 1,
-        rewardXp: 95
-    }
-];
+function getUnlockedCategoriesForPlayer(lvl) {
+    let list = ['economy', 'scooter'];
+    if (lvl >= 5) list.push('moto');
+    if (lvl >= 8) list.push('atv');
+    if (lvl >= 15) list.push('comfort'); // Комфорт доступен с 15 уровня!
+    if (lvl >= 30) list.push('premium');
+    if (lvl >= 50) list.push('hyper', 'truck');
+    if (lvl >= 100) list.push('yacht');
+    return list;
+}
 
 function generateContracts() {
     state.contracts = [];
-    const shuffled = [...CONTRACT_TEMPLATES].sort(() => 0.5 - Math.random());
+    const pool = (typeof SYNDICATE_CONTRACT_TEMPLATES !== 'undefined')
+        ? SYNDICATE_CONTRACT_TEMPLATES
+        : [];
+
+    let playerLvl = state.player?.level || 1;
+    let unlockedCats = getUnlockedCategoriesForPlayer(playerLvl);
+
+    // Фильтруем шаблоны: подходят по уровню И все требуемые классы открыты игроку
+    let matchedPool = pool.filter(t => {
+        let minLvl = t.minPlayerLevel || 7;
+        let maxLvl = t.maxPlayerLevel || 100;
+        let lvlOk = playerLvl >= minLvl && playerLvl <= maxLvl;
+
+        // Проверяем, открыт ли хотя бы один класс из разрешённых в контракте
+        let hasUnlockedClass = t.reqs.allowedClasses.some(c => unlockedCats.includes(c));
+
+        return lvlOk && hasUnlockedClass;
+    });
+
+    // Резервный откат на доступные по уровню
+    if (matchedPool.length === 0) {
+        matchedPool = pool.filter(t => (t.minPlayerLevel || 7) <= playerLvl);
+    }
+    if (matchedPool.length === 0) {
+        matchedPool = pool.slice(0, 3);
+    }
+
+    const shuffled = [...matchedPool].sort(() => 0.5 - Math.random());
     const count = Math.min(3, shuffled.length);
 
     for (let i = 0; i < count; i++) {
@@ -154,7 +99,7 @@ function generateContracts() {
 
 function refreshContractsManual() {
     let cash = state.player?.cash || 0;
-    let cost = 25000; // Инфляция (было 15000)
+    let cost = 25000;
     if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ на обновление базы контрактов!`);
 
     state.player.cash -= cost;
@@ -164,7 +109,7 @@ function refreshContractsManual() {
     renderContracts();
     playSound('tick');
     tgHaptic('success');
-    showToast(`База заказов Синдиката обновлена (-${cost.toLocaleString()} ₽)`);
+    showToast(`Заказы Синдиката обновлены под открытые классы (${state.player?.level || 1} ур.)!`);
 }
 
 function renderContracts() {
@@ -232,7 +177,7 @@ function renderContracts() {
                     <div class="chat-avatar-circle" style="font-size:22px;">${c.avatar}</div>
                     <div>
                         <b class="text-xs color-cyan">${c.clientName}</b>
-                        <div class="sub-label" style="font-size:9px;">Заказчик Синдиката</div>
+                        <div class="sub-label" style="font-size:9px;">Заказчик Синдиката (Допуск: ${c.minPlayerLevel || 7}+ ур.)</div>
                     </div>
                 </div>
                 <span class="tag-badge bg-tag-amber">АКТИВЕН</span>
@@ -262,9 +207,9 @@ function renderContracts() {
     list.innerHTML = html;
 }
 
-// ----------------------------------------------------
-// ВЫБОР И СДАЧА АВТОМОБИЛЯ ПОД КОНТРАКТ
-// ----------------------------------------------------
+// ========================================================
+// 2. ВЫБОР И ПРОВЕРКА АВТО ПОД КОНТРАКТ
+// ========================================================
 function checkCarMeetsContract(car, c) {
     if (!car || !c) return { passed: false, errors: ["Ошибка данных"] };
     let reqs = c.reqs;
@@ -345,7 +290,7 @@ function openSelectContractCarModal(contractId) {
             }
 
             const check = checkCarMeetsContract(car, contract);
-            let cImg = car.img || "assets/cars/economy/vaz-2107.jpg";
+            let cImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
             let cPlate = car.customPlate || car.plate || "ТРАНЗИТ";
             let basePayout = (car.marketValue || car.basePrice || 100000) + contract.rewardBonus;
 
@@ -360,7 +305,7 @@ function openSelectContractCarModal(contractId) {
             html += `
             <div class="glass-card p-2 mb-2" style="border-color:${check.passed ? 'var(--green)' : 'var(--border-glass)'};">
                 <div class="deal-car-preview-card mb-2">
-                    <img src="${cImg}" class="deal-car-thumb" onerror="this.src='assets/cars/economy/vaz-2107.jpg'">
+                    <img src="${cImg}" class="deal-car-thumb" onerror="this.src='assets/cars/economy/2101/vaz-2101.jpg'">
                     <div style="flex:1;">
                         <b class="text-xs">${car.name}</b>
                         <div class="sub-label" style="font-size:9.5px;">${car.power || 100} л.с. | ${car.condition || 80}% | ${(car.mileage || 85000).toLocaleString()} км</div>
@@ -373,8 +318,7 @@ function openSelectContractCarModal(contractId) {
         listEl.innerHTML = html;
     }
 
-    const modal = document.getElementById('modalSelectContractCar');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalSelectContractCar');
     playSound('tick');
 }
 
@@ -415,7 +359,7 @@ function fulfillContract(contractId, carIndex) {
 
     state.contracts.splice(cIdx, 1);
 
-    closeModal('modalSelectContractCar');
+    ModalManager.close('modalSelectContractCar');
     saveState();
     updateHeaderUI();
     renderContracts();
@@ -433,9 +377,9 @@ function fulfillContract(contractId, carIndex) {
     );
 }
 
-// ----------------------------------------------------
-// 2. P2P БИРЖА ТЕХНИКИ, НОМЕРОВ И НЕДВИЖИМОСТИ
-// ----------------------------------------------------
+// ========================================================
+// 3. P2P БИРЖА ТЕХНИКИ, НОМЕРОВ, БИЗНЕСА И ЖИЛЬЯ
+// ========================================================
 function filterP2P(type) {
     p2pActiveFilter = type;
     ['cars', 'plates', 'business', 'housing'].forEach(t => {
@@ -455,13 +399,13 @@ function renderP2PListings() {
         state.p2pMarketListings = [
             { 
                 id: "p2p_1", seller: "Maga_GTI", type: "cars", name: "VW Golf VI GTI (Stage 2)",
-                price: 1850000, plate: "О777ОО 77", power: 260, img: "assets/cars/comfort/golf6.jpg",
+                price: 1850000, plate: "О777ОО 77", power: 260, img: "assets/cars/comfort/golf6/golf6.jpg",
                 originalCarObj: { condition: 85, wear: {engine: 80, transmission: 75}, tuning: {chip: 2, exhaust: true, stance: false, bodykit: false} }
             },
             { id: "p2p_2", seller: "Major_Vova", type: "plates", name: "Госномер А777АА 77", price: 1500000, plate: "А777АА 77" },
             { 
-                id: "p2p_3", seller: "Serega_Drift", type: "cars", name: "ВАЗ-2107 (Корч)",
-                price: 250000, plate: "В123ВВ 77", power: 85, img: "assets/cars/economy/vaz-2107.jpg",
+                id: "p2p_3", seller: "Serega_Drift", type: "cars", name: "ВАЗ-2101 (Корч)",
+                price: 250000, plate: "В123ВВ 77", power: 85, img: "assets/cars/economy/2101/vaz-2101_1.jpg",
                 originalCarObj: { condition: 60, wear: {engine: 50, transmission: 40}, tuning: {chip: 0, exhaust: true, stance: false, bodykit: false, weldedDiff: true, steeringAngle: true, hydroHandbrake: true} }
             },
             { id: "p2p_4", seller: "Bumer_Boy", type: "plates", name: "Госномер В001ОР 777", price: 950000, plate: "В001ОР 777" },
@@ -472,10 +416,6 @@ function renderP2PListings() {
             {
                 id: "p2p_6", seller: "Maksim_Realtor", type: "housing", name: "Стандартный бокс в ГСК-7",
                 houseId: "gsk_box", price: 1750000, desc: "В собственности, яма, верстак, +2 машиноместа."
-            },
-            {
-                id: "p2p_7", seller: "Pro_Tuning_MSK", type: "housing", name: "Тюнинг-Ангар с подъёмником",
-                houseId: "workshop_pro", price: 13500000, desc: "Подъёмник, малярка, скидка 20% у Решалы, +5 машиномест."
             }
         ];
     }
@@ -495,7 +435,7 @@ function renderP2PListings() {
             : "<button onclick=\"buyP2PListing('" + item.id + "')\" class='btn btn-green btn-auto btn-sm'>Купить (" + item.price.toLocaleString() + " ₽)</button>";
 
         if (item.type === 'car' || item.type === 'cars') {
-            let carImg = item.img ? item.img : "assets/cars/economy/vaz-2107.jpg";
+            let carImg = item.img ? item.img : "assets/cars/economy/2101/vaz-2101.jpg";
             let tuneBadges = "";
             let t = item.originalCarObj?.tuning;
             if (t) {
@@ -504,67 +444,67 @@ function renderP2PListings() {
                 if (t.weldedDiff) tuneBadges += "<span class='tag-badge bg-tag-red mx-1'>ДРИФТ</span>";
             }
 
-            html +=
-            "<div class='glass-card mb-2'>" +
-                "<div class='flex-between mb-2'>" +
-                    "<div class='flex-gap' style='align-items:center;'>" +
-                        "<div class='chat-avatar-circle' style='width:28px; height:28px; font-size:14px;'>👤</div>" +
-                        "<div><b class='text-xs color-cyan'>" + item.seller + "</b><div class='sub-label' style='font-size:9px;'>Продавец авто</div></div>" +
-                    "</div>" +
-                    "<span class='tag-badge bg-tag-cyan'>АВТО P2P</span>" +
-                "</div>" +
-                "<div class='deal-car-preview-card mb-2'>" +
-                    "<img src='" + carImg + "' class='deal-car-thumb' onerror=\"this.src='assets/cars/economy/vaz-2107.jpg'\">" +
-                    "<div style='flex:1;'>" +
-                        "<div class='font-bold text-xs'>" + item.name + "</div>" +
-                        "<div class='license-plate text-xs' style='padding:1px 4px; margin:4px 0;'>" + item.plate + "</div>" +
-                        "<div class='price-val text-xs color-green'>" + item.price.toLocaleString() + " ₽</div>" +
-                    "</div>" +
-                "</div>" +
-                "<div class='flex-between'>" +
-                    "<div>" +
-                        "<div class='sub-label text-xs'>Мощность: " + (item.power || 100) + " л.с.</div>" +
-                        "<div class='mt-1'>" + tuneBadges + "</div>" +
-                    "</div>" +
-                    btnAction +
-                "</div>" +
-            "</div>";
+            html += `
+            <div class='glass-card mb-2'>
+                <div class='flex-between mb-2'>
+                    <div class='flex-gap' style='align-items:center;'>
+                        <div class='chat-avatar-circle' style='width:28px; height:28px; font-size:14px;'>👤</div>
+                        <div><b class='text-xs color-cyan'>${item.seller}</b><div class='sub-label' style='font-size:9px;'>Продавец авто</div></div>
+                    </div>
+                    <span class='tag-badge bg-tag-cyan'>АВТО P2P</span>
+                </div>
+                <div class='deal-car-preview-card mb-2'>
+                    <img src='${carImg}' class='deal-car-thumb' onerror="this.src='assets/cars/economy/2101/vaz-2101.jpg'">
+                    <div style='flex:1;'>
+                        <div class='font-bold text-xs'>${item.name}</div>
+                        <div class='license-plate text-xs' style='padding:1px 4px; margin:4px 0;'>${item.plate}</div>
+                        <div class='price-val text-xs color-green'>${item.price.toLocaleString()} ₽</div>
+                    </div>
+                </div>
+                <div class='flex-between'>
+                    <div>
+                        <div class='sub-label text-xs'>Мощность: ${item.power || 100} л.с.</div>
+                        <div class='mt-1'>${tuneBadges}</div>
+                    </div>
+                    ${btnAction}
+                </div>
+            </div>`;
         } else if (item.type === 'plate' || item.type === 'plates') {
-            html +=
-            "<div class='glass-card p-2 flex-between mb-2'>" +
-                "<div>" +
-                    "<div class='license-plate mb-1' style='font-size:14px;'>" + item.plate + " <div class='license-flag'>RUS</div></div>" +
-                    "<div class='sub-label text-xs'>Продавец: <b class='color-cyan'>" + item.seller + "</b></div>" +
-                "</div>" +
-                "<div class='text-right'>" +
-                    "<div class='price-val text-xs color-green mb-1'>" + item.price.toLocaleString() + " ₽</div>" +
-                    btnAction +
-                "</div>" +
-            "</div>";
+            html += `
+            <div class='glass-card p-2 flex-between mb-2'>
+                <div>
+                    <div class='license-plate mb-1' style='font-size:14px;'>${item.plate} <div class='license-flag'>RUS</div></div>
+                    <div class='sub-label text-xs'>Продавец: <b class='color-cyan'>${item.seller}</b></div>
+                </div>
+                <div class='text-right'>
+                    <div class='price-val text-xs color-green mb-1'>${item.price.toLocaleString()} ₽</div>
+                    ${btnAction}
+                </div>
+            </div>`;
         } else if (item.type === 'business') {
-            html +=
-            "<div class='glass-card p-2 flex-between mb-2'>" +
-                "<div>" +
-                    "<b class='text-xs color-green'><i class='fa-solid fa-briefcase'></i> " + item.name + "</b>" +
-                    "<div class='sub-label' style='font-size:10px;'>Продавец: <b>" + item.seller + "</b> | " + (item.desc || '') + "</div>" +
-                "</div>" +
-                "<div class='text-right'>" +
-                    "<div class='price-val text-xs color-green mb-1'>" + item.price.toLocaleString() + " ₽</div>" +
-                    btnAction +
-                "</div>" +
-            "</div>";
+            html += `
+            <div class='glass-card p-2 flex-between mb-2'>
+                <div>
+                    <b class='text-xs color-green'><i class='fa-solid fa-briefcase'></i> ${item.name}</b>
+                    <div class='sub-label' style='font-size:10px;'>Продавец: <b>${item.seller}</b> | ${item.desc || ''}</div>
+                </div>
+                <div class='text-right'>
+                    <div class='price-val text-xs color-green mb-1'>${item.price.toLocaleString()} ₽</div>
+                    ${btnAction}
+                </div>
+            </div>`;
         } else if (item.type === 'housing') {
-            html +=
-            "<div class='glass-card p-2 flex-between mb-2'>" +
-                "<div>" +
-                    "<b class='text-xs color-cyan'><i class='fa-solid fa-warehouse'></i> " + item.name + "</b>" +
-                    "<div class='sub-label' style='font-size:10px;'>Продавец: <b>" + item.seller + "</b> | " + (item.desc || '') + "</div>" +
-                "</div>" +
-                "<div class='text-right'>" +
-                    "<div class='price-val text-xs color-green mb-1'>" + item.price.toLocaleString() + " ₽</div>" +
-                    btnAction +
-                "</div>" +
-            "</div>";
+            html += `
+            <div class='glass-card p-2 flex-between mb-2'>
+                <div>
+                    <b class='text-xs color-cyan'><i class='fa-solid fa-warehouse'></i> ${item.name}</b>
+                    <div class='sub-label' style='font-size:10px;'>Продавец: <b>${item.seller}</b> | ${item.desc || ''}</div>
+                </div>
+                <div class='text-right'>
+                    <div class='price-val text-xs color-green mb-1'>${item.price.toLocaleString()} ₽</div>
+                    ${btnAction}
+                </div>
+            </div>`;
         }
     });
 
@@ -573,8 +513,7 @@ function renderP2PListings() {
 
 function openCreateListingModal() {
     selectP2PListingType('car');
-    const modal = document.getElementById('modalCreateP2P');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalCreateP2P');
     playSound('tick');
 }
 
@@ -775,7 +714,7 @@ function confirmCreateP2PListing() {
     }
 
     saveState();
-    closeModal('modalCreateP2P');
+    ModalManager.close('modalCreateP2P');
     if (typeof renderGarage === 'function') renderGarage();
     renderP2PListings();
     playSound('win');
@@ -912,9 +851,9 @@ function cancelP2PListing(listingId) {
     showToast("Лот снят с продажи и возвращён в инвентарь.");
 }
 
-// ----------------------------------------------------
-// 3. ТЕНЕВОЙ РЫНОК НОМЕРОВ (BLACK MARKET)
-// ----------------------------------------------------
+// ========================================================
+// 4. ТЕНЕВОЙ РЫНОК НОМЕРОВ (BLACK MARKET)
+// ========================================================
 function generateBlackMarketPlates() {
     const rareRegions = ['77', '99', '97', '777', '199', '177'];
     const rareLetters = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -964,7 +903,7 @@ function generateBlackMarketPlates() {
 
 function refreshBlackMarketPlates() {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    let cost = 35000; // Инфляция
+    let cost = 35000;
     if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ за услуги связи с барыгой!`);
     
     state.player.cash -= cost;
@@ -992,17 +931,17 @@ function renderBlackMarketPlates() {
         let borderGlow = isSuperRare ? "border: 1px solid var(--purple); box-shadow: 0 0 15px rgba(192, 132, 252, 0.25);" : "";
         let rarityText = isSuperRare ? "<span class='color-purple text-xs font-bold'>ЭКСКЛЮЗИВ</span>" : "<span class='color-amber text-xs'>БЛАТНОЙ</span>";
 
-        html +=
-        "<div class='glass-card flex-between p-2 mb-2' style='" + borderGlow + "'>" +
-            "<div>" +
-                "<div class='license-plate mb-1' style='font-size:15px; padding:4px 8px;'>" + item.plate + " <div class='license-flag'>RUS</div></div>" +
-                rarityText +
-            "</div>" +
-            "<div class='text-right'>" +
-                "<div class='price-val text-xs color-green mb-1'>" + item.price.toLocaleString() + " ₽</div>" +
-                "<button onclick=\"buyBlackMarketPlate(" + idx + ")\" class='btn " + (isSuperRare ? "btn-purple" : "btn-amber") + " btn-sm btn-auto'>Выкупить</button>" +
-            "</div>" +
-        "</div>";
+        html += `
+        <div class='glass-card flex-between p-2 mb-2' style='${borderGlow}'>
+            <div>
+                <div class='license-plate mb-1' style='font-size:15px; padding:4px 8px;'>${item.plate} <div class='license-flag'>RUS</div></div>
+                ${rarityText}
+            </div>
+            <div class='text-right'>
+                <div class='price-val text-xs color-green mb-1'>${item.price.toLocaleString()} ₽</div>
+                <button onclick="buyBlackMarketPlate(${idx})" class='btn ${isSuperRare ? "btn-purple" : "btn-amber"} btn-sm btn-auto'>Выкупить</button>
+            </div>
+        </div>`;
     });
 
     list.innerHTML = html;
@@ -1025,12 +964,12 @@ function buyBlackMarketPlate(idx) {
     renderBlackMarketPlates();
     playSound('win');
     tgHaptic('success');
-    openVerdictModal("НОМЕР ПРИОБРЕТЕН! 🏷️", "Госзнак «" + lot.plate + "» добавлен в ваш инвентарь. Можете установить его в Гараже, чтобы повысить стоимость любого автомобиля!", true);
+    openVerdictModal("НОМЕР ПРИОБРЕТЕН! 🏷️", `Госзнак «${lot.plate}» добавлен в ваш инвентарь. Можете установить его в Гараже, чтобы повысить стоимость любого автомобиля!`, true);
 }
 
-// ----------------------------------------------------
-// 4. АВТОКЛУБЫ СИНДИКАТА
-// ----------------------------------------------------
+// ========================================================
+// 5. АВТОКЛУБЫ СИНДИКАТА
+// ========================================================
 function renderClubsList() {
     const container = document.getElementById('synClubsContainer');
     const myClubNameEl = document.getElementById('synMyClubName');
@@ -1041,7 +980,6 @@ function renderClubsList() {
         myClubNameEl.innerText = myClub ? myClub.name : "Без автоклуба";
     }
 
-    // Инфляция цен на клубы (v0.5.2)
     const clubsPool = [
         { id: "club_jdm", name: "JDM Legends Moscow", members: 42, perk: "+10% к оценке японских авто", fee: 150000 },
         { id: "club_vaz", name: "Боевой Классика Клуб", members: 89, perk: "Бесплатный ремонт подвески на сходках", fee: 75000 },
@@ -1054,16 +992,16 @@ function renderClubsList() {
         let isMember = myClub && myClub.id === club.id;
         let btnContent = isMember 
             ? "<button onclick='leaveClubAction()' class='btn btn-danger btn-auto btn-sm'>Покинуть</button>"
-            : "<button onclick=\"joinClubAction('" + club.id + "', '" + club.name + "', " + club.fee + ")\" class='btn btn-cyan btn-auto btn-sm'>Вступить (" + (club.fee / 1000).toFixed(0) + "k ₽)</button>";
+            : `<button onclick="joinClubAction('${club.id}', '${club.name}', ${club.fee})" class='btn btn-cyan btn-auto btn-sm'>Вступить (${(club.fee / 1000).toFixed(0)}k ₽)</button>`;
 
-        html +=
-        "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div>" +
-                "<b class='color-cyan text-xs'>" + club.name + "</b>" +
-                "<div class='sub-label' style='font-size:10px;'>👥 Участников: " + club.members + " | " + club.perk + "</div>" +
-            "</div>" +
-            btnContent +
-        "</div>";
+        html += `
+        <div class='glass-card p-2 flex-between mb-2'>
+            <div>
+                <b class='color-cyan text-xs'>${club.name}</b>
+                <div class='sub-label' style='font-size:10px;'>👥 Участников: ${club.members} | ${club.perk}</div>
+            </div>
+            ${btnContent}
+        </div>`;
     });
 
     container.innerHTML = html;
@@ -1080,7 +1018,7 @@ function joinClubAction(clubId, clubName, fee) {
     renderClubsList();
     playSound('win');
     tgHaptic('success');
-    showToast("Вы вступили в автоклуб «" + clubName + "»!");
+    showToast(`Вы вступили в автоклуб «${clubName}»!`);
 }
 
 function leaveClubAction() {
@@ -1096,7 +1034,7 @@ function createClubPrompt() {
     if (!name || !name.trim()) return;
 
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    let cost = 750000; // Подорожало с 500k
+    let cost = 750000;
     if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ на регистрацию клуба!`);
 
     state.player.cash -= cost;
@@ -1106,12 +1044,12 @@ function createClubPrompt() {
     renderClubsList();
     playSound('win');
     tgHaptic('success');
-    showToast("Автоклуб «" + name.trim() + "» успешно создан!");
+    showToast(`Автоклуб «${name.trim()}» успешно создан!`);
 }
 
-// ----------------------------------------------------
-// 5. ТОП ПЕРЕКУПОВ (ЛИДЕРБОРД)
-// ----------------------------------------------------
+// ========================================================
+// 6. ТОП ПЕРЕКУПОВ И РЕФЕРАЛЫ
+// ========================================================
 function renderLeaderboard() {
     const container = document.getElementById('leaderboardListContainer');
     if (!container) return;
@@ -1135,25 +1073,22 @@ function renderLeaderboard() {
         let isMe = lead.rank === 5;
         let rankColor = lead.rank === 1 ? "color-amber" : (lead.rank === 2 ? "color-cyan" : (lead.rank === 3 ? "color-purple" : ""));
 
-        html +=
-        "<div class='glass-card p-2 flex-between mb-2 " + (isMe ? "border-cyan" : "") + "'>" +
-            "<div class='flex-gap' style='align-items:center;'>" +
-                "<b class='font-bold " + rankColor + "' style='font-size:14px; min-width:20px;'>#" + lead.rank + "</b>" +
-                "<div>" +
-                    "<b class='text-xs'>" + lead.name + "</b>" +
-                    "<div class='sub-label' style='font-size:10px;'>Ур. " + lead.lvl + " | Чистая прибыль: <span class='color-green font-bold'>" + lead.profit.toLocaleString() + " ₽</span></div>" +
-                "</div>" +
-            "</div>" +
-            "<span class='tag-badge " + (isMe ? "bg-tag-cyan" : "bg-tag-amber") + "'>" + lead.badge + "</span>" +
-        "</div>";
+        html += `
+        <div class='glass-card p-2 flex-between mb-2 ${isMe ? "border-cyan" : ""}'>
+            <div class='flex-gap' style='align-items:center;'>
+                <b class='font-bold ${rankColor}' style='font-size:14px; min-width:20px;'>#${lead.rank}</b>
+                <div>
+                    <b class='text-xs'>${lead.name}</b>
+                    <div class='sub-label' style='font-size:10px;'>Ур. ${lead.lvl} | Чистая прибыль: <span class='color-green font-bold'>${lead.profit.toLocaleString()} ₽</span></div>
+                </div>
+            </div>
+            <span class='tag-badge ${isMe ? "bg-tag-cyan" : "bg-tag-amber"}'>${lead.badge}</span>
+        </div>`;
     });
 
     container.innerHTML = html;
 }
 
-// ----------------------------------------------------
-// 6. РЕФЕРАЛЬНАЯ СЕТЬ (ДРУЗЬЯ В TELEGRAM)
-// ----------------------------------------------------
 function getReferralLink() {
     let userId = "777";
     try {
@@ -1223,14 +1158,14 @@ function renderFriendsList() {
 
     let html = "";
     state.friendsList.forEach(f => {
-        html +=
-        "<div class='glass-card p-2 flex-between mb-2'>" +
-            "<div>" +
-                "<b class='color-cyan text-xs'>" + f.name + "</b>" +
-                "<div class='sub-label' style='font-size:10px;'>Уровень: " + f.lvl + " | Приглашён: " + f.date + "</div>" +
-            "</div>" +
-            "<span class='tag-badge bg-tag-green'>+50,000 ₽ получено</span>" +
-        "</div>";
+        html += `
+        <div class='glass-card p-2 flex-between mb-2'>
+            <div>
+                <b class='color-cyan text-xs'>${f.name}</b>
+                <div class='sub-label' style='font-size:10px;'>Уровень: ${f.lvl} | Приглашён: ${f.date}</div>
+            </div>
+            <span class='tag-badge bg-tag-green'>+50,000 ₽ получено</span>
+        </div>`;
     });
 
     container.innerHTML = html;

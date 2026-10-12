@@ -1,9 +1,10 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.5.2)
-// Разработчики: Tak Toje, Max, Sergo, gemini
-// Окупаемый детейлинг и тюнинг, Launch OBD2,
-// конструктор страхового полиса, штрафстоянка ГИБДД.
-// Экономика усложнена: повышена стоимость предпродажной подготовки.
+// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.6.1)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Окупаемый детейлинг и тюнинг, стационарный Launch OBD2,
+// конструктор страхового полиса, штрафстоянка ГИБДД (ModalManager),
+// бесплатный забор по талонам спецстоянки.
+// Полная связка технических возможностей недвижимости и боксов.
 // ========================================================
 
 let previewCarIndex = null;
@@ -22,7 +23,7 @@ let insuranceOptions = {
 };
 
 // ========================================================
-// ПРОВЕРКА ВОЗМОЖНОСТЕЙ НЕДВИЖИМОСТИ И БОКСОВ
+// 1. ПРОВЕРКА ВОЗМОЖНОСТЕЙ НЕДВИЖИМОСТИ И БОКСОВ
 // ========================================================
 
 /**
@@ -120,14 +121,14 @@ function openNeedCapabilityModal(type = 'tune', customTitle = null) {
         title = "ТРЕБУЕТСЯ СМОТРОВАЯ ЯМА И ВЕРСТАК";
         heading = (customTitle || "Слесарные работы и тюнинг") + " заблокированы!";
         desc = `Вы работаете на <b>уличной парковке</b> без смотровой ямы, верстака и сварочного аппарата.<br><br>
-                🔩 Для заварки редуктора, установки спортивных рычагов выворота, гидроручника и Big Turbo требуется <b>капитальный гаражный бокс (ГСК)</b> или мастерская с подъёмником.<br><br>
+                🔩 Для заварки редуктора, установки рычагов выворота, гидроручника и Big Turbo требуется <b>капитальный гаражный бокс (ГСК)</b> или мастерская с подъёмником.<br><br>
                 💡 Арендуйте или купите бокс в приложении <b>«Жильё & Боксы»</b>!`;
         icon = "🔩";
     } else if (type === 'detail') {
         title = "ТРЕБУЕТСЯ ЧИСТЫЙ БОКС С ВОДОЙ И СВЕТОМ";
         heading = (customTitle || "Детейлинг и покраска") + " недоступны!";
         desc = `Полировка и покраска кузова <b>под открытым небом испортят ЛКП дорожной пылью</b>!<br><br>
-                ✨ Для качественного облива и нанесения защитных составов требуется закрытый сухой бокс с водопроводом и ярким светом (Двойной бокс, Новостройка с детейлингом, Коттедж или Вилла).`;
+                ✨ Для качественного облива и полировки требуется закрытый сухой бокс с водопроводом и ярким светом (Двойной бокс, Новостройка, Коттедж или Вилла).`;
         icon = "✨";
     } else if (type === 'service') {
         title = "ТРЕБУЕТСЯ МЕСТО ДЛЯ ОБСЛУЖИВАНИЯ";
@@ -139,7 +140,7 @@ function openNeedCapabilityModal(type = 'tune', customTitle = null) {
         title = "ТРЕБУЕТСЯ ЗАКРЫТЫЙ БОКС ДЛЯ ДИАГНОСТИКИ";
         heading = "Стационарная диагностика ЭБУ недоступна!";
         desc = `Глубокая адаптация блоков управления требует стабильного бортового питания и защиты разъёмов от сырости.<br><br>
-                💻 Для работы с Launch в гараже арендуйте капитальный бокс с подключением к сети 220V.`;
+                💻 Для работы со стационарным Launch в гараже арендуйте капитальный бокс с подключением к сети 220V.`;
         icon = "💻";
     } else if (type === 'personal') {
         title = "ТРЕБУЕТСЯ ОХРАНЯЕМОЕ МАШИНОМЕСТО";
@@ -163,17 +164,17 @@ function openNeedCapabilityModal(type = 'tune', customTitle = null) {
             </p>
 
             <div class="space-y-2 mb-3">
-                <button onclick="closeModal('modalNeedGarage'); switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('housing'); }, 150);" class="btn btn-cyan btn-sm w-full">
+                <button onclick="ModalManager.close('modalNeedGarage'); switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('housing'); }, 150);" class="btn btn-cyan btn-sm w-full">
                     🏠 Открыть каталог «Жильё & Боксы»
                 </button>
-                <button onclick="closeModal('modalNeedGarage')" class="btn btn-dark btn-sm w-full">
+                <button onclick="ModalManager.close('modalNeedGarage')" class="btn btn-dark btn-sm w-full">
                     Понятно
                 </button>
             </div>
         </div>
     `;
 
-    modal.classList.add('active');
+    ModalManager.open('modalNeedGarage');
 }
 
 function openNeedGarageModal(actionTitle = "Тюнинг и доработки") {
@@ -181,7 +182,7 @@ function openNeedGarageModal(actionTitle = "Тюнинг и доработки")
 }
 
 // ========================================================
-// 0. ФОРМУЛА ДИНАМИЧЕСКОГО ПЕРЕРАСЧЕТА РЫНОЧНОЙ СТОИМОСТИ (ОКУПАЕМЫЙ ТЮНИНГ)
+// 2. ФОРМУЛА ДИНАМИЧЕСКОГО ПЕРЕРАСЧЕТА РЫНОЧНОЙ СТОИМОСТИ (ОКУПАЕМЫЙ ТЮНИНГ)
 // ========================================================
 function recalculateCarMarketValue(car) {
     if (!car) return 0;
@@ -189,12 +190,12 @@ function recalculateCarMarketValue(car) {
     let base = car.baseMarketValue || car.basePrice || 100000;
     let cond = (car.condition !== undefined) ? car.condition : 80;
     
-    // Мягкий коэффициент состояния (от 70% до 120% от базы)
+    // Коэффициент состояния кузова (от 70% до 120% от базы)
     let condMultiplier = 0.70 + (cond / 100) * 0.45;
     let currentVal = Math.round(base * condMultiplier);
 
     let t = car.tuning || {};
-    // Тюнинг окупается с наценкой x1.4 - x1.6 к рынку
+    // Тюнинг окупается с перекупской наценкой x1.3 - x1.6 к рынку
     if (t.chip === 1) currentVal += 50000;
     else if (t.chip === 2) currentVal += 115000;
     else if (t.chip >= 3) currentVal += 290000;
@@ -210,9 +211,9 @@ function recalculateCarMarketValue(car) {
     if (t.customWheels) currentVal += 95000;
     if (t.bodykit) currentVal += 85000;
 
-    // Предпродажная подготовка дает солидный чистый профит
+    // Предпродажный детейлинг даёт ощутимую прибавку
     if (car.isPolished) currentVal = Math.round(currentVal * 1.12);
-    if (car.isRepainted) currentVal += 40000; // Повышено с 35к (т.к. услуга подорожала до 25к)
+    if (car.isRepainted) currentVal += 40000;
 
     let engWear = car.wear?.engine !== undefined ? car.wear.engine : 85;
     let transWear = car.wear?.transmission !== undefined ? car.wear.transmission : 85;
@@ -238,7 +239,7 @@ function recalculateCarMarketValue(car) {
 }
 
 // ========================================================
-// 1. ОСНОВНОЙ РЕНДЕР ГАРАЖА
+// 3. ОСНОВНОЙ РЕНДЕР ГАРАЖА
 // ========================================================
 function renderGarage() {
     const list = document.getElementById('garageList');
@@ -332,7 +333,7 @@ function renderGarage() {
                 <div class="p-2 mb-2" style="background:rgba(220,38,38,0.15); border:1px solid var(--red); border-radius:10px;">
                     <div class="text-xs color-red font-bold mb-1">Машина арестована инспектором ГИБДД!</div>
                     <button onclick="openImpoundLotModal(${idx})" class="btn btn-danger btn-sm w-full">
-                        🚔 Штрафстоянка: Забрать / Утиль
+                        🚔 Штрафстоянка: Забрать / Талон / Утиль
                     </button>
                 </div>
             `;
@@ -363,12 +364,12 @@ function renderGarage() {
 
         html += `
         <div class="glass-card mb-3 ${isPersonal ? 'personal-car-card' : ''}">
-            <div class="car-img-wrap" style="height:150px;">
+            <div class="car-img-wrap" style="height:155px;">
                 <img src="${cImg}" class="car-img" onerror="this.src='${car.fallback || 'assets/cars/economy/vaz-2107.jpg'}';">
                 <div class="plate-corner">
                     <div class="license-plate">${cPlate} <div class="license-flag">RUS</div></div>
                 </div>
-                <div class="badge-tag">
+                <div class="badge-tag badge-br">
                     ${personalBadge}
                     ${legalBadge}
                     ${insuranceBadge}
@@ -405,7 +406,7 @@ function renderGarage() {
 }
 
 // ========================================================
-// 2. ИКОНКИ МОДИФИКАЦИЙ
+// 4. ИКОНКИ МОДИФИКАЦИЙ
 // ========================================================
 function renderCarModsBadges(car) {
     if (!car) return "";
@@ -442,7 +443,7 @@ function renderCarModsBadges(car) {
 }
 
 // ========================================================
-// 3. СТАТУС ЛИЧНОГО АВТОМОБИЛЯ И СВЯЗКА СО СТРИТОМ
+// 5. СТАТУС ЛИЧНОГО АВТОМОБИЛЯ И СВЯЗКА СО СТРИТОМ
 // ========================================================
 function togglePersonalCar(idx) {
     const car = state.garage[idx];
@@ -497,7 +498,7 @@ function buyGarageSlot() {
 }
 
 // ========================================================
-// 4. ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (ИНФЛЯЦИЯ v0.5.2)
+// 6. ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА
 // ========================================================
 function openPreSaleModal(idx) {
     const caps = getPlayerHousingCapabilities();
@@ -579,8 +580,7 @@ function openPreSaleModal(idx) {
         }
     }
 
-    const modal = document.getElementById('modalPreSale');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalPreSale');
     playSound('tick');
 }
 
@@ -643,7 +643,7 @@ function applyPreSaleMod(type) {
 }
 
 // ========================================================
-// 5. СПОРТИВНЫЙ ТЮНИНГ
+// 7. СПОРТИВНЫЙ ТЮНИНГ
 // ========================================================
 function openTuningModal(idx) {
     if (!checkPlayerCapability('tune')) {
@@ -661,8 +661,7 @@ function openTuningModal(idx) {
     setTxt('tuneCarTitle', `Мастерская: <b>${car.name}</b> (${car.power || 100} л.с.)`);
     switchTuneTab(activeTuneTab || 'drift');
     
-    const modal = document.getElementById('modalTuning');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalTuning');
     playSound('tick');
 }
 
@@ -827,7 +826,7 @@ function updateTuneRiskMeter(car) {
 }
 
 // ========================================================
-// 6. ОСМОТР, ИНТЕРАКТИВНЫЙ OBD2 И СТРАХОВОЙ ПОЛИС
+// 8. ОСМОТР, СТАЦИОНАРНЫЙ OBD2 И СТРАХОВОЙ ПОЛИС
 // ========================================================
 function openCarPreviewModal(idx) {
     previewCarIndex = idx;
@@ -846,15 +845,14 @@ function openCarPreviewModal(idx) {
     let specsText = `${car.power || 100} л.с. | Пробег: ${(car.mileage || 85000).toLocaleString()} км | Состояние: ${car.condition || 80}%`;
     setTxt('prevSpecs', specsText);
 
-    const modal = document.getElementById('modalPreview');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalPreview');
     playSound('tick');
 }
 
 function openTuningFromPreview() {
     if (previewCarIndex === null) return;
     let idx = previewCarIndex;
-    closeModal('modalPreview');
+    ModalManager.close('modalPreview');
     openTuningModal(idx);
 }
 
@@ -887,7 +885,7 @@ function openOBD2Modal() {
     state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
     saveState();
 
-    closeModal('modalPreview');
+    ModalManager.close('modalPreview');
 
     setTxt('obd2CarTitle', `Диагностика CAN-шины: ${car.name}`);
     const resBox = document.getElementById('obd2ResultBox');
@@ -910,8 +908,7 @@ function openOBD2Modal() {
     `;
     actBox.innerHTML = `<button class="btn btn-dark w-full opacity-50" disabled><i class="fa-solid fa-spinner fa-spin"></i> СКАНИРОВАНИЕ БЛОКОВ УПРАВЛЕНИЯ...</button>`;
 
-    const modal = document.getElementById('modalOBD2');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalOBD2');
     playSound('tick');
 
     if (typeof trackQuestProgress === 'function') {
@@ -943,7 +940,7 @@ function openOBD2Modal() {
             clearInterval(scanInterval);
             renderGarageOBDFinal(car, resBox, actBox);
         }
-    }, 500);
+    }, 450);
 }
 
 function renderGarageOBDFinal(car, resBox, actBox) {
@@ -1048,25 +1045,24 @@ function repairDefectInGarage() {
 }
 
 function closeOBD2Modal() {
-    closeModal('modalOBD2');
+    ModalManager.close('modalOBD2');
     if (previewCarIndex !== null) {
         openCarPreviewModal(previewCarIndex);
     }
 }
 
 // ========================================================
-// ДЕТАЛЬНЫЙ СТРАХОВОЙ ДОГОВОР-КОНСТРУКТОР
+// 9. СТРАХОВОЙ ДОГОВОР-КОНСТРУКТОР
 // ========================================================
 function openInsuranceModalFromPreview() {
     if (previewCarIndex === null) return;
     const car = state.garage[previewCarIndex];
     if (!car) return;
 
-    closeModal('modalPreview');
+    ModalManager.close('modalPreview');
     renderInsuranceContractUI(car);
 
-    const modal = document.getElementById('modalInsurance');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalInsurance');
     playSound('tick');
 }
 
@@ -1132,7 +1128,7 @@ function confirmSignInsurancePolicy() {
         date: Date.now()
     };
 
-    closeModal('modalInsurance');
+    ModalManager.close('modalInsurance');
     saveState();
     renderGarage();
     playSound('win');
@@ -1142,14 +1138,14 @@ function confirmSignInsurancePolicy() {
 }
 
 function closeInsuranceModal() {
-    closeModal('modalInsurance');
+    ModalManager.close('modalInsurance');
     if (previewCarIndex !== null) {
         openCarPreviewModal(previewCarIndex);
     }
 }
 
 // ========================================================
-// 7. МЕХАНИКА ШТРАФСТОЯНКИ ГИБДД
+// 10. ШТРАФСТОЯНКА ГИБДД (С БЕСПЛАТНЫМ ТАЛОНОМ)
 // ========================================================
 function openImpoundLotModal(idx) {
     activeImpoundCarIndex = idx;
@@ -1166,6 +1162,18 @@ function openImpoundLotModal(idx) {
 
     let isRegistered = !!car.isRegisteredOnPlayer;
     let scrapReward = Math.round((car.basePrice || 100000) * 0.45);
+    let passes = state.player?.freeImpoundPasses || 0;
+
+    let freePassBlock = passes > 0 ? `
+        <div class="glass-card p-2 mb-2" style="border: 1px solid var(--purple); background: rgba(192,132,252,0.1);">
+            <div class="flex-between mb-1">
+                <b class="text-xs color-purple"><i class="fa-solid fa-ticket"></i> Талон бесплатного забора</b>
+                <span class="tag-badge bg-tag-purple">В наличии: ${passes} шт</span>
+            </div>
+            <div class="sub-label mb-2" style="font-size:10px;">Забрать автомобиль мгновенно без уплаты протокола и связей Решалы.</div>
+            <button onclick="resolveImpoundFreePass()" class="btn btn-purple btn-sm w-full">Использовать талон (0 ₽)</button>
+        </div>
+    ` : "";
 
     modal.innerHTML = `
         <div class="modal-box text-center" style="max-width: 420px;">
@@ -1177,6 +1185,8 @@ function openImpoundLotModal(idx) {
             <div class="sub-label mb-3">Госномер: <span class="license-plate" style="font-size:10px; padding:2px 6px;">${car.customPlate || car.plate || "ТРАНЗИТ"}</span></div>
 
             <div class="space-y-2 mb-3 text-left">
+                ${freePassBlock}
+
                 <div class="glass-card p-2">
                     <div class="flex-between mb-1">
                         <b class="text-xs color-amber"><i class="fa-solid fa-handshake"></i> 1. Договориться на месте</b>
@@ -1214,12 +1224,32 @@ function openImpoundLotModal(idx) {
                 </div>
             </div>
 
-            <button onclick="closeModal('modalImpoundLot')" class="btn btn-dark w-full">Закрыть</button>
+            <button onclick="ModalManager.close('modalImpoundLot')" class="btn btn-dark w-full">Закрыть</button>
         </div>
     `;
 
-    modal.classList.add('active');
+    ModalManager.open('modalImpoundLot');
     playSound('tick');
+}
+
+function resolveImpoundFreePass() {
+    if (activeImpoundCarIndex === null) return;
+    const car = state.garage[activeImpoundCarIndex];
+    if (!car) return;
+
+    let passes = state.player?.freeImpoundPasses || 0;
+    if (passes <= 0) return showToast("У вас нет талонов бесплатного забора!");
+
+    state.player.freeImpoundPasses -= 1;
+    car.impounded = false;
+
+    ModalManager.close('modalImpoundLot');
+    saveState();
+    updateHeaderUI();
+    renderGarage();
+    playSound('win');
+    tgHaptic('success');
+    showToast("Автомобиль бесплатно освобожден по талону спецстоянки!");
 }
 
 function resolveImpoundBribe(type) {
@@ -1228,7 +1258,7 @@ function resolveImpoundBribe(type) {
     if (!car) return;
 
     if (type === 'cash') {
-        let cost = 45000; // Инфляция взятки
+        let cost = 45000;
         if ((state.player?.cash || 0) < cost) return showToast("Не хватает денег на взятку!");
         state.player.cash -= cost;
         showToast("Вопрос урегулирован наличными (-45,000 ₽)!");
@@ -1239,7 +1269,7 @@ function resolveImpoundBribe(type) {
     }
 
     car.impounded = false;
-    closeModal('modalImpoundLot');
+    ModalManager.close('modalImpoundLot');
     saveState();
     updateHeaderUI();
     renderGarage();
@@ -1252,12 +1282,12 @@ function resolveImpoundOfficialPay() {
     const car = state.garage[activeImpoundCarIndex];
     if (!car) return;
 
-    let cost = 30000; // Инфляция официального штрафа
+    let cost = 30000;
     if ((state.player?.cash || 0) < cost) return showToast("Не хватает денег для оплаты квитанции!");
 
     state.player.cash -= cost;
     car.impounded = false;
-    closeModal('modalImpoundLot');
+    ModalManager.close('modalImpoundLot');
     saveState();
     updateHeaderUI();
     renderGarage();
@@ -1275,7 +1305,7 @@ function resolveImpoundScrap(reward) {
 
     state.player.cash = (state.player.cash || 0) + reward;
     state.garage.splice(activeImpoundCarIndex, 1);
-    closeModal('modalImpoundLot');
+    ModalManager.close('modalImpoundLot');
     saveState();
     updateHeaderUI();
     renderGarage();
@@ -1285,7 +1315,7 @@ function resolveImpoundScrap(reward) {
 }
 
 // ========================================================
-// 8. ВЫСТАВЛЕНИЕ НА ПРОДАЖУ
+// 11. ВЫСТАВЛЕНИЕ НА ПРОДАЖУ
 // ========================================================
 function openPutOnLotModal(idx) {
     const car = state.garage[idx];
@@ -1303,12 +1333,10 @@ function openPutOnLotModal(idx) {
 
     if (titleEl) titleEl.innerText = `${car.name} (${car.power || 100} л.с.)`;
     if (costEl) costEl.innerText = `Себестоимость выкупа: ${(car.purchaseCost || car.basePrice || 100000).toLocaleString()} ₽`;
-    // Рекомендуемая цена продажи (аппетиты перекупа)
     if (askInput) askInput.value = Math.round((car.marketValue || car.basePrice || 100000) * 1.25);
 
     window.currentLotPutIndex = idx;
-    const modal = document.getElementById('modalPutOnLot');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalPutOnLot');
     playSound('tick');
 }
 
@@ -1336,7 +1364,7 @@ function confirmPutOnLot() {
         buyerTimerLeft: 0
     });
 
-    closeModal('modalPutOnLot');
+    ModalManager.close('modalPutOnLot');
     saveState();
     renderGarage();
     renderSalesLot();
@@ -1347,14 +1375,14 @@ function confirmPutOnLot() {
 }
 
 // ========================================================
-// 9. ГОСНОМЕРА
+// 12. ГОСНОМЕРА
 // ========================================================
 function openChangePlateModal() {
     if (previewCarIndex === null) return;
     const car = state.garage[previewCarIndex];
     if (!car) return;
 
-    closeModal('modalPreview');
+    ModalManager.close('modalPreview');
 
     const list = document.getElementById('changePlateList');
     if (!list) return;
@@ -1378,8 +1406,7 @@ function openChangePlateModal() {
         list.innerHTML = html;
     }
 
-    const modal = document.getElementById('modalChangePlate');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalChangePlate');
 }
 
 function applyPlateToCar(plateStr) {
@@ -1401,7 +1428,7 @@ function applyPlateToCar(plateStr) {
     let newVal = recalculateCarMarketValue(car);
     let diff = newVal - oldVal;
 
-    closeModal('modalChangePlate');
+    ModalManager.close('modalChangePlate');
     saveState();
     renderGarage();
     openCarPreviewModal(previewCarIndex);
@@ -1438,7 +1465,7 @@ function removePlateFromCar() {
     let newVal = recalculateCarMarketValue(car);
     let diff = oldVal - newVal;
 
-    closeModal('modalChangePlate');
+    ModalManager.close('modalChangePlate');
     saveState();
     updateHeaderUI();
     renderGarage();
@@ -1453,7 +1480,7 @@ function removePlateFromCar() {
 }
 
 // ========================================================
-// 10. СОБЫТИЯ В ГАРАЖЕ ПРИ СМЕНЕ СУТОК
+// 13. СОБЫТИЯ В ГАРАЖЕ ПРИ СМЕНЕ СУТОК
 // ========================================================
 function triggerGarageRandomEvent() {
     if (!state.garage || state.garage.length === 0) return;
@@ -1525,8 +1552,7 @@ function triggerGarageRandomEvent() {
         `;
     }
 
-    const modal = document.getElementById('modalGarageEvent');
-    if (modal) modal.classList.add('active');
+    ModalManager.open('modalGarageEvent');
     playSound('error');
     tgHaptic('warning');
 }
@@ -1548,7 +1574,7 @@ function resolveGarageEvent(type) {
         tgHaptic('error');
     }
 
-    closeModal('modalGarageEvent');
+    ModalManager.close('modalGarageEvent');
     activeGarageEventCar = null;
     saveState();
     renderGarage();
@@ -1586,6 +1612,7 @@ window.toggleInsuranceOption = toggleInsuranceOption;
 window.confirmSignInsurancePolicy = confirmSignInsurancePolicy;
 window.closeInsuranceModal = closeInsuranceModal;
 window.openImpoundLotModal = openImpoundLotModal;
+window.resolveImpoundFreePass = resolveImpoundFreePass;
 window.resolveImpoundBribe = resolveImpoundBribe;
 window.resolveImpoundOfficialPay = resolveImpoundOfficialPay;
 window.resolveImpoundScrap = resolveImpoundScrap;

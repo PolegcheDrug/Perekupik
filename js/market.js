@@ -1,8 +1,9 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ЛОКАЛИЗАЦИЯ И УНИКАЛЬНЫЕ НОМЕРА (v0.5.2)
-// Разработчики: Tak Toje, Max, Sergo, gemini
-// Сбалансированная перекупская экономика (реальная маржа 20-40%),
-// интерактивная диагностика у капота, отчёт Автотеки и обоснованный торг
+// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И СДЕЛКИ (v0.6.2)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Динамическая подгрузка фото машин из папок моделей,
+// доступ к Комфорту с 15 ур., сортировка всех категорий,
+// замеры толщиномером, диагностика Launch OBD2 и оформление ДКП.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -93,6 +94,8 @@ function refreshPlateCatalog() {
 let activeInspectCarId = null;
 let pendingMarketCar = null;
 let activePendingDKPDeal = null;
+let buyCallTimeoutTimer = null;
+let marketSortOrder = 'asc';
 
 function getDynamicPrice(basePrice, type) {
     if (!state.marketModifiers) state.marketModifiers = { economy: 1, comfort: 1, premium: 1, hyper: 1, moto: 1, truck: 1, all: 1 };
@@ -108,16 +111,16 @@ function getDynamicPrice(basePrice, type) {
 function getMarketRefreshCost() {
     let lvl = 1;
     if (state.player && state.player.level) lvl = state.player.level;
-    // Синхронизировано с удорожанием в app.js
     return 250 + (lvl * 450);
 }
 
 const CATEGORY_META = {
+    all: { name: "ВСЕ КАТЕГОРИИ", title: "Общий рынок техники", capital: "от 25 000 ₽", desc: "Все доступные по вашему уровню классы транспорта с возможностью сортировки по цене." },
     economy: { name: "ЭКОНОМ", title: "Сегмент Эконом", capital: "от 40 000 ₽", desc: "Быстрый оборот, легкий торг и моментальная ликвидность." },
     scooter: { name: "СКУТЕРЫ", title: "Городские Скутеры", capital: "от 25 000 ₽", desc: "Дешёвый вход, быстрые сделки и сезонный спрос молодёжи." },
     moto: { name: "МОТО", title: "Спортбайки & Классика", capital: "от 120 000 ₽", desc: "Высокая сезонная маржа, проверка геометрии рамы и вилки." },
     atv: { name: "КВАДРО", title: "Квадроциклы 4x4", capital: "от 180 000 ₽", desc: "Техника для бездорожья. Частые скрытые дефекты ходовой." },
-    comfort: { name: "КОМФОРТ", title: "Сегмент Комфорт", capital: "от 450 000 ₽", desc: "Седаны и кроссоверы. Идеально под выкуп для семей и таксопарков." },
+    comfort: { name: "КОМФОРТ", title: "Сегмент Комфорт", capital: "от 450 000 ₽", desc: "Седаны и кроссоверы (с 15 ур.). Идеально под выкуп для семей и таксопарков." },
     premium: { name: "ПРЕМИУМ", title: "Премиум & Люкс", capital: "от 1 200 000 ₽", desc: "Высокая чистая прибыль с одной сделки, статус и требовательные клиенты." },
     hyper: { name: "ГИПЕРКАРЫ", title: "Спорт & Экзотика", capital: "от 5 000 000 ₽", desc: "Огромная маржа, эксклюзивные клиенты и дорогие комплектующие." },
     truck: { name: "ГРУЗОВИКИ", title: "Коммерческий транспорт", capital: "от 2 500 000 ₽", desc: "Тягачи и фургоны для крупных заказов Синдиката под ключ." },
@@ -134,13 +137,30 @@ function toggleMarketCategories() {
     }
 }
 
+function toggleMarketSortOrder() {
+    marketSortOrder = marketSortOrder === 'asc' ? 'desc' : 'asc';
+    playSound('tick');
+    tgHaptic('light');
+    showToast(marketSortOrder === 'asc' ? "Сортировка: сначала дешевле ⬆️" : "Сортировка: сначала дороже ⬇️");
+    sortCurrentMarketFeed();
+    renderMarketFeed();
+}
+
+function sortCurrentMarketFeed() {
+    if (!state.marketFeed || state.marketFeed.length === 0) return;
+    state.marketFeed.sort((a, b) => {
+        let pA = a.price || 0;
+        let pB = b.price || 0;
+        return marketSortOrder === 'asc' ? pA - pB : pB - pA;
+    });
+}
+
 function setCategory(cat) {
     let lvl = state.player?.level ? state.player.level : 1;
     
     if (cat === 'moto' && lvl < 5) return showToast("🔒 Мотоциклы доступны с 5 уровня!");
     if (cat === 'atv' && lvl < 8) return showToast("🔒 Квадроциклы доступны с 8 уровня!");
-    // Порог входа для Комфорта снижен с 30 до 20 уровня
-    if (cat === 'comfort' && lvl < 20) return showToast("🔒 Нужен 20 ур!");
+    if (cat === 'comfort' && lvl < 15) return showToast("🔒 Класс «Комфорт» открывается с 15 уровня!"); // С 15 уровня!
     if (cat === 'premium' && lvl < 30) return showToast("🔒 Нужен 30 ур!");
     if (cat === 'hyper' && lvl < 50) return showToast("🔒 Нужен 50 ур!");
     if (cat === 'truck' && lvl < 50) return showToast("🔒 Нужен 50 ур!");
@@ -186,14 +206,34 @@ function refreshMarketFeedManual() {
     showToast("Лента предложений обновлена (-5 ⛽)!");
 }
 
-// ----------------------------------------------------
-// ГЕНЕРАТОР ПРЕДЛОЖЕНИЙ (ЖЕСТКАЯ ЭКОНОМИКА v0.5.2)
-// ----------------------------------------------------
+// ========================================================
+// ГЕНЕРАЦИЯ ОБЪЯВЛЕНИЙ С ДИНАМИЧЕСКИМИ ФОТО ИЗ ПАПОК
+// ========================================================
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
     
     let cat = state.activeCategory ? state.activeCategory : 'economy';
-    let pool = CAR_DATABASE[cat] ? CAR_DATABASE[cat] : CAR_DATABASE.economy;
+    let lvl = (state.player && state.player.level) ? state.player.level : 1;
+    let pool = [];
+
+    if (cat === 'all') {
+        let allowedCategories = ['economy', 'scooter'];
+        if (lvl >= 5) allowedCategories.push('moto');
+        if (lvl >= 8) allowedCategories.push('atv');
+        if (lvl >= 15) allowedCategories.push('comfort'); // Комфорт с 15 ур.!
+        if (lvl >= 30) allowedCategories.push('premium');
+        if (lvl >= 50) allowedCategories.push('hyper', 'truck');
+        if (lvl >= 100) allowedCategories.push('yacht');
+
+        allowedCategories.forEach(cKey => {
+            if (CAR_DATABASE[cKey] && Array.isArray(CAR_DATABASE[cKey])) {
+                pool.push(...CAR_DATABASE[cKey]);
+            }
+        });
+    } else {
+        pool = CAR_DATABASE[cat] ? CAR_DATABASE[cat] : CAR_DATABASE.economy;
+    }
+
     if (!pool || pool.length === 0) return;
 
     let shuffledPool = [...pool];
@@ -203,8 +243,7 @@ function populateMarketFeed() {
     }
 
     state.marketFeed = [];
-    let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    const feedCount = Math.min(8, Math.max(6, shuffledPool.length));
+    const feedCount = Math.min(10, Math.max(6, shuffledPool.length));
 
     for (let i = 0; i < feedCount; i++) {
         const template = shuffledPool[i % shuffledPool.length];
@@ -214,10 +253,6 @@ function populateMarketFeed() {
         let dealType = 'normal';
         let priceMultiplier = 0.80;
 
-        // ПЕРЕКУПСКАЯ ВИЛКА ЦЕН (ЖЕСТКАЯ ЭКОНОМИКА v0.5.2):
-        // urgent: продавец сливает тачку за 65-75% от рынка (было 50-65%)
-        // normal: продавец отдает за 78-88% от рынка (было 65-78%)
-        // overprice: продавец хочет почти полный рынок или выше 95-108% (было 90-104%)
         if (dealRoll < 0.25) { 
             dealType = 'urgent';
             priceMultiplier = 0.65 + Math.random() * 0.10;
@@ -233,7 +268,7 @@ function populateMarketFeed() {
         if (dealType === 'urgent') defectChance = 0.50;
         if (lvl <= 5) defectChance = 0.25;
         else if (lvl >= 20) defectChance = 0.45;
-        if (cat === 'premium' || cat === 'hyper') defectChance -= 0.10;
+        if (template.type === 'premium' || template.type === 'hyper') defectChance -= 0.10;
 
         let hasHiddenDefect = false;
         if (typeof OBD_ERRORS !== 'undefined' && OBD_ERRORS.length > 0) {
@@ -243,15 +278,13 @@ function populateMarketFeed() {
         let isStolen = Math.random() < (dealType === 'urgent' ? 0.15 : 0.07);
         const carId = "m_" + Date.now() + "_" + i;
         
-        let isCoolNumber = Math.random() < 0.10;
+        let isCoolNumber = Math.random() < 0.12;
         let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
 
         let baseP = template.basePrice ? template.basePrice : 100000;
         let tType = template.type ? template.type : cat;
-        // Учет динамических новостей рынка
         const dynPrice = getDynamicPrice(baseP, tType);
 
-        // Реальная рыночная стоимость авто (с запасом для маржи перекупа)
         const baseVal = Math.round(dynPrice * 1.15);
         const plateVal = evaluatePlate(genPlate);
 
@@ -259,13 +292,12 @@ function populateMarketFeed() {
         let sellerPrice = carOnlyPrice;
         let isLuckyFind = false;
 
-        // Шанс купить машину с дорогими номерами без наценки продавца («дедушка не знает цену»)
         if (plateVal > 5000) {
-            if (Math.random() < 0.30) { // Шанс халявных номеров тоже снижен (было 35%)
+            if (Math.random() < 0.30) {
                 isLuckyFind = true;
                 sellerPrice = carOnlyPrice;
             } else {
-                let plateMarkup = Math.round(plateVal * 0.60); // Продавцы теперь просят 60% от цены номеров (было 40%)
+                let plateMarkup = Math.round(plateVal * 0.60);
                 sellerPrice = carOnlyPrice + plateMarkup;
             }
         }
@@ -312,11 +344,13 @@ function populateMarketFeed() {
 
         let cName = template.name ? template.name : "Техника";
         let cPower = template.power ? template.power : 100;
-        let cImg = template.img ? template.img : "";
+        
+        // ВЫБОР ФОТО ИЗ ПАПКИ МОДЕЛИ ИЛИ ГАЛЕРЕИ
+        let cImg = (typeof getCarImage === 'function') ? getCarImage(template) : (template.img || "");
         let cFallback = template.fallback || getCategoryFallback(tType);
 
         let cCond = hasHiddenDefect ? Math.floor(45 + Math.random() * 25) : Math.floor(75 + Math.random() * 20);
-        if (cat === 'premium' || cat === 'hyper') cCond = Math.max(70, cCond);
+        if (tType === 'premium' || tType === 'hyper') cCond = Math.max(70, cCond);
 
         let isThick1 = (Math.random() > 0.55) ? Math.floor(220 + Math.random() * 300) : 110;
         let isThick2 = (Math.random() > 0.45) ? Math.floor(240 + Math.random() * 350) : 115;
@@ -342,7 +376,7 @@ function populateMarketFeed() {
             power: cPower,
             type: tType,
             drivetrain: template.drivetrain || 'rwd',
-            basePrice: baseP, // Базовая "идеальная" цена для истории
+            basePrice: baseP,
             mileage: Math.floor(Math.random() * (tType === 'premium' ? 75000 : 160000)) + 20000,
             price: sellerPrice,
             originalAskingPrice: sellerPrice,
@@ -396,6 +430,8 @@ function populateMarketFeed() {
             }
         });
     }
+
+    sortCurrentMarketFeed();
     saveState();
     renderMarketFeed();
 }
@@ -415,8 +451,18 @@ function renderMarketFeed() {
         container.innerHTML = `<div class='glass-card text-center py-6 sub-label'>${t('classes_title')}: нет активных лотов. Нажмите «${t('btn_refresh_market')}»!</div>`;
         return;
     }
+
+    let sortBarHtml = `
+        <div class="glass-card mb-2 p-2 flex-between" style="border-color: rgba(255, 255, 255, 0.08);">
+            <span class="text-xs sub-label">Сортировка цен:</span>
+            <button onclick="toggleMarketSortOrder()" class="btn btn-dark btn-sm btn-auto" style="padding: 4px 10px; font-size: 10px;">
+                <i class="fa-solid fa-arrow-down-wide-short color-cyan mr-1"></i>
+                ${marketSortOrder === 'asc' ? 'Сначала дешевле (▲)' : 'Сначала дороже (▼)'}
+            </button>
+        </div>
+    `;
     
-    let htmlContent = "";
+    let htmlContent = sortBarHtml;
     
     state.marketFeed.forEach(car => {
         if (!car || car.unavailable) return;
@@ -466,13 +512,13 @@ function renderMarketFeed() {
             <div class='cooldown-timer notranslate' translate='no' style='${isBusy ? "display:flex !important;" : "display:none !important;"}'>
                 <div class='timer-clock notranslate' translate='no' id='timer_num_${car.id}'>${timeLeft}с</div>
                 <div class='timer-text'>${t('busy_subscriber')}</div>
-                <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>${t('paid_call')} (1000 ₽)</button>
+                <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>${t('paid_call')} (1,000 ₽)</button>
             </div>
 
             <div class='car-img-wrap'>
                 <img src='${carImg}' class='car-img' onerror="this.onerror=null; this.src='${fallbackUrl}';">
                 <div class='plate-corner'><div class='license-plate notranslate' translate='no'>${carPlate} <div class='license-flag'>RUS</div></div></div>
-                <div class='badge-tag'>
+                <div class='badge-tag badge-br'>
                     <span class='tag-badge bg-tag-cyan'>${carType}</span>
                     ${dealBadge}
                     ${coolPlateBadge}
@@ -549,12 +595,11 @@ function quickOBDScanMarketCar(carId) {
     isOBDScanningInProgress = true;
     saveState();
 
-    const modal = document.getElementById("modalOBD2");
     const resBox = document.getElementById('obd2ResultBox');
     const actBox = document.getElementById('obd2ActionBox');
     setTxt('obd2CarTitle', `Диагностика CAN-шины: ${car.name}`);
 
-    if (modal) modal.classList.add('active');
+    ModalManager.open("modalOBD2");
     playSound('tick');
     tgHaptic('medium');
 
@@ -610,7 +655,7 @@ function quickOBDScanMarketCar(carId) {
 
             renderOBDFinalResults(car, resBox, actBox);
         }
-    }, 500);
+    }, 450);
 }
 
 function renderOBDFinalResults(car, resBox, actBox) {
@@ -677,10 +722,15 @@ function renderOBDFinalResults(car, resBox, actBox) {
 }
 
 function closeOBD2Modal() {
-    closeModal("modalOBD2");
+    ModalManager.close("modalOBD2");
 }
 
 function initiateBuyMarketCar(carId) {
+    if (buyCallTimeoutTimer) {
+        clearTimeout(buyCallTimeoutTimer);
+        buyCallTimeoutTimer = null;
+    }
+
     const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
     if (carIndex === -1) return;
     const car = state.marketFeed[carIndex];
@@ -698,11 +748,10 @@ function initiateBuyMarketCar(carId) {
     const btnBox = document.getElementById("buyCallActionBtnBox");
     if (btnBox) btnBox.innerHTML = "<button class='btn btn-dark w-full' disabled>Гудки в трубке...</button>";
     
-    const modal = document.getElementById("modalBuyCall");
-    if (modal) modal.classList.add('active');
+    ModalManager.open("modalBuyCall", { closeOthers: true });
     tgHaptic('light');
 
-    setTimeout(() => {
+    buyCallTimeoutTimer = setTimeout(() => {
         let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
         let callSuccessChance = 75;
         if (karma > 65) callSuccessChance += 15;
@@ -712,7 +761,7 @@ function initiateBuyMarketCar(carId) {
         const roll = Math.random() * 100;
 
         if (roll < callSuccessChance) {
-            closeModal("modalBuyCall");
+            ModalManager.close("modalBuyCall");
             showToast("🚗 Вы приехали по адресу и осматриваете машину у капота!");
             openMarketDeal(carId);
         } else if (roll < 92) {
@@ -721,7 +770,7 @@ function initiateBuyMarketCar(carId) {
             setTxt("buyCallEmoji", "📵");
             setTxt("buyCallTitle", "Продавец занят");
             setTxt("buyCallDesc", "«Сейчас на работе, перезвоните через " + waitSec + " сек, всё покажу!»");
-            if (btnBox) btnBox.innerHTML = "<button onclick=\"closeModal('modalBuyCall')\" class='btn btn-dark w-full'>Понятно</button>";
+            if (btnBox) btnBox.innerHTML = "<button onclick=\"ModalManager.close('modalBuyCall')\" class='btn btn-dark w-full'>Понятно</button>";
             saveState();
             renderMarketFeed();
         } else { 
@@ -731,9 +780,9 @@ function initiateBuyMarketCar(carId) {
             car.unavailable = true;
             saveState();
             renderMarketFeed();
-            if (btnBox) btnBox.innerHTML = "<button onclick=\"closeModal('modalBuyCall')\" class='btn btn-dark w-full'>Закрыть</button>";
+            if (btnBox) btnBox.innerHTML = "<button onclick=\"ModalManager.close('modalBuyCall')\" class='btn btn-dark w-full'>Закрыть</button>";
         }
-    }, 800);
+    }, 700);
 }
 
 function paidCallMarketCar(carId) {
@@ -797,14 +846,13 @@ function openMarketDeal(carId) {
     const thread = document.getElementById("dealChatThread");
     if (thread) {
         let greeting = "«Привет! Вот машина, осматривай кузов, проверяй сканером. Если всё устроит — оформим ДКП.»";
-        if (car.dealType === 'urgent') greeting = "«Здорово! Мне срочно нужны деньги до вечера, готов хорошо уступить реальному покупателю!»";
+        if (car.dealType === 'urgent') greeting = "«Здорово! Мне срочно нужны деньги до вечера, готов уступить реальному покупателю!»";
         if (car.dealType === 'overprice') greeting = "«Добрый день. Машина ухоженная, состояние отличное. Сильно сбивать цену не позволю.»";
         thread.innerHTML = "<div class='chat-msg msg-seller'>" + greeting + "</div>";
     }
 
     renderMarketHaggleControls();
-    const modal = document.getElementById("modalMarketDeal");
-    if (modal) modal.classList.add('active');
+    ModalManager.open("modalMarketDeal", { closeOthers: true });
     playSound('tick');
 }
 
@@ -987,7 +1035,7 @@ function confirmMarketPurchaseSuccess() {
 
     if (cash < price) return showToast("Недостаточно денег на выкуп!");
     
-    closeModal("modalMarketDeal");
+    ModalManager.close("modalMarketDeal");
 
     activePendingDKPDeal = {
         type: 'buy',
@@ -1007,18 +1055,13 @@ function confirmMarketPurchaseSuccess() {
 
 function openRegistrationChoiceModal(deal) {
     activePendingDKPDeal = deal;
-    let modal = document.getElementById('modalRegistrationChoice');
-    if (modal) {
-        modal.classList.add('active');
-        playSound('tick');
-        tgHaptic('light');
-    } else {
-        confirmRegistrationChoice(false);
-    }
+    ModalManager.open('modalRegistrationChoice');
+    playSound('tick');
+    tgHaptic('light');
 }
 
 function confirmRegistrationChoice(registerOnPlayer) {
-    closeModal('modalRegistrationChoice');
+    ModalManager.close('modalRegistrationChoice');
     if (!activePendingDKPDeal) return;
 
     if (registerOnPlayer) {
@@ -1137,8 +1180,7 @@ function openGaugeModal(carId) {
     }
 
     saveState();
-    const modal = document.getElementById("modalGauge");
-    if (modal) modal.classList.add('active');
+    ModalManager.open("modalGauge");
 }
 
 function checkBodyPart(part) { 
@@ -1161,7 +1203,7 @@ function checkBodyPart(part) {
 }
 
 function closeGaugeModal() {
-    closeModal("modalGauge");
+    ModalManager.close("modalGauge");
     activeInspectCarId = null;
     playSound('tick');
     renderMarketHaggleControls();
@@ -1306,8 +1348,7 @@ function openAutotekaModal(carId) {
         `;
     }
     
-    const modal = document.getElementById("modalAutoteka");
-    if (modal) modal.classList.add('active');
+    ModalManager.open("modalAutoteka");
     playSound('tick');
     renderMarketFeed();
 }
@@ -1339,6 +1380,8 @@ function updateMarketTimers() {
 // Экспорт функций в глобальный объект window
 window.setCategory = setCategory;
 window.toggleMarketCategories = toggleMarketCategories;
+window.toggleMarketSortOrder = toggleMarketSortOrder;
+window.sortCurrentMarketFeed = sortCurrentMarketFeed;
 window.refreshMarketFeedManual = refreshMarketFeedManual;
 window.populateMarketFeed = populateMarketFeed;
 window.renderMarketFeed = renderMarketFeed;
