@@ -1,9 +1,9 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, РЕЕСТР НОМЕРОВ & CLOUD FIRESTORE (v1.0.0)
+// js/market.js — АВТОРЫНОК, РЕЕСТР НОМЕРОВ & GITHUB ASSETS (v1.0.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Связка с облачным реестром госномеров FB_Bridge.Plates,
-// атомарное закрепление номера при ДКП, процедурные вариации,
-// диагностика Launch OBD2, толщиномер и торг у капота.
+// Загрузка фото напрямую из GitHub Raw (resolveCarAssetUrl),
+// связка с облачным реестром госномеров FB_Bridge.Plates,
+// атомарное закрепление номера при ДКП, Launch OBD2 и торг у капота.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -246,12 +246,11 @@ async function refreshMarketFeedManual() {
 // ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ АВТО И ОБЛАЧНАЯ БАЗА
 // ========================================================
 async function populateMarketFeed() {
-    // 1. Подгрузка актуальных моделей из Cloud Firestore
     if (window.FB_Bridge && window.FB_Bridge.CarsCatalog) {
         try {
             await window.FB_Bridge.CarsCatalog.fetchCloudCars();
         } catch (e) {
-            console.warn("[Market] Ошибка связи с Cloud Cars, работаем с локальной базой:", e);
+            console.warn("[Market] Ошибка связи с Cloud Cars:", e);
         }
     }
 
@@ -407,7 +406,7 @@ async function populateMarketFeed() {
             cName = `${cName} (Капсула времени)`;
         }
 
-        let cImg = (Array.isArray(template.images) && template.images.length > 0)
+        let rawImg = (Array.isArray(template.images) && template.images.length > 0)
             ? template.images[0]
             : (template.img || "assets/cars/economy/2101/vaz-2101.jpg");
             
@@ -445,7 +444,7 @@ async function populateMarketFeed() {
             originalAskingPrice: sellerPrice,
             baseMarketValue: baseVal,
             marketValue: baseVal + plateVal,
-            img: cImg,
+            img: rawImg,
             fallback: cFallback,
             plate: genPlate,
             isStolen: isStolen,
@@ -550,7 +549,8 @@ function renderMarketFeed() {
         let carType = car.type ? car.type.toUpperCase() : "CAR";
         
         let fallbackUrl = car.fallback || getCategoryFallback(car.type);
-        let carImg = car.img ? car.img : fallbackUrl;
+        let rawImg = car.img ? car.img : fallbackUrl;
+        let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         
         let viewedBadge = car.viewed ? `<div class='viewed-badge'><i class='fa-solid fa-eye'></i> ${t('inspected')}</div>` : "";
         let busyClass = isBusy ? "busy" : "";
@@ -979,7 +979,8 @@ function openMarketDeal(carId) {
     const imgEl = document.getElementById("dealCarImg");
     if (imgEl) {
         let fallbackUrl = car.fallback || getCategoryFallback(car.type);
-        imgEl.src = car.img ? car.img : fallbackUrl;
+        let rawImg = car.img ? car.img : fallbackUrl;
+        imgEl.src = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         imgEl.onerror = () => { imgEl.src = fallbackUrl; };
         imgEl.style.width = "90px";
         imgEl.style.height = "62px";

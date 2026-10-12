@@ -1,10 +1,10 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ИНСПЕКЦИЯ, СТРАХОВКА И ТЮНИНГ (v1.0.0)
+// js/garage.js — АВТОПАРК, ИНСПЕКЦИЯ, СТРАХОВКА И ТЮНИНГ (v1.0.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Интеграция с реестром госномеров FB_Bridge.Plates,
-// характеристики в 3 колонки слева направо (.spec-tile-3d-col),
-// интерактивный лист осмотра 4-х узлов, риски езды без ОСАГО,
-// расширенный детейлинг и легализация тюнинга по ст. 12.5.1.
+// Загрузка фото через GitHub Raw (resolveCarAssetUrl),
+// интеграция с реестром госномеров FB_Bridge.Plates,
+// характеристики в 3 колонки (.spec-tile-3d-col),
+// инспекция узлов, конструктор ОСАГО/КАСКО и детейлинг.
 // ========================================================
 
 let previewCarIndex = null;
@@ -272,7 +272,8 @@ function renderGarage() {
 
         let cName = car.name || "Автомобиль";
         let cPower = car.power || 100;
-        let cImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
+        let rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
+        let cImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         let cPlate = car.customPlate || car.plate || "ТРАНЗИТ";
         let cPrice = car.marketValue ? car.marketValue.toLocaleString() : (car.basePrice || 100000).toLocaleString();
 
@@ -377,7 +378,7 @@ function renderGarage() {
         html += `
         <div class="glass-card mb-3 ${isPersonal ? 'personal-car-card' : ''}">
             <div class="car-img-wrap" style="height:155px;">
-                <img src="${cImg}" class="car-img" onerror="this.src='${car.fallback || 'assets/cars/economy/2101/vaz-2101.jpg'}';">
+                <img src="${cImg}" class="car-img" onerror="this.onerror=null; this.src='${car.fallback || 'assets/cars/economy/2101/vaz-2101.jpg'}';">
             </div>
             
             <div class="car-header-row-volumetric">

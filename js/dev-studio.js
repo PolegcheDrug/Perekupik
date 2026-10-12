@@ -1,10 +1,9 @@
 // ========================================================
-// js/dev-studio.js — ОБЛАЧНАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v1.1.0 FIRESTORE)
+// js/dev-studio.js — ОБЛАЧНАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v1.2.0 FIRESTORE & GITHUB)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// 🟢 Экран 1: Создание новых авто с прямой публикацией в Cloud Firestore
-// 🟣 Экран 2: Онлайн-редактирование характеристик и цен моделей в базе
-// ✂️ Встроенный Canvas-кроппер обложки (16:9, Base64 JPEG/WebP),
-// сохранение без коммитов в GitHub, полная работа со смартфона.
+// 🟢 Экран 1: Создание новых авто с генерацией путей под GitHub и сохранением в Firestore
+// 🟣 Экран 2: Онлайн-редактирование характеристик и цен моделей в облачной базе
+// ✂️ Встроенный Canvas-кроппер обложки (16:9), подсказка пути к папке репозитория.
 // ========================================================
 
 const DevStudio = {
@@ -41,7 +40,7 @@ const DevStudio = {
             basePrice: 75000,
             drivetrain: "rwd",
             folderPath: "assets/cars/economy/2101/",
-            baseFilename: "vaz-2101",
+            baseFilename: "vaz_2101",
             images: [],
             sellerNote: "«Дедушка ездил только летом на дачу, сел и поехал.»",
             condition: 85,
@@ -138,10 +137,10 @@ const DevStudio = {
                         </div>
                         <div>
                             <h3 class="font-bold text-xs" style="font-size:14px; color:${isCreate ? 'var(--cyan)' : 'var(--purple)'};">
-                                ${isCreate ? '🟢 Студия: Создание в Cloud Firestore' : '🟣 Редактор Облачной Базы'}
+                                ${isCreate ? '🟢 Студия: Создание карточки под GitHub' : '🟣 Редактор Облачной Базы'}
                             </h3>
                             <div class="sub-label" style="font-size:9px;">
-                                ${isCreate ? 'Публикация моделей онлайн без коммитов в репозиторий' : 'Прямое изменение характеристик и цен машин в реальном времени'}
+                                ${isCreate ? 'Генерация путей под репозиторий GitHub и сохранение в Firestore' : 'Прямое изменение характеристик и цен машин в реальном времени'}
                             </div>
                         </div>
                     </div>
@@ -169,22 +168,27 @@ const DevStudio = {
     },
 
     // ========================================================
-    // 🟢 ЭКРАН 1: СОЗДАНИЕ В CLOUD FIRESTORE
+    // 🟢 ЭКРАН 1: СОЗДАНИЕ В CLOUD FIRESTORE ПОД GITHUB
     // ========================================================
     renderCreateScreen() {
+        const d = this.currentDraft;
+        const slug = d.baseFilename || d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
+        const category = d.type || "economy";
+        const targetPath = `assets/cars/${category}/${slug}/${slug}.jpg`;
+
         return `
             <div class="glass-card p-2 mb-2 studio-box-create">
-                <div class="flex-between mb-2">
+                <div class="flex-between mb-1">
                     <div>
-                        <b class="text-xs color-cyan"><i class="fa-solid fa-database mr-1"></i> Cloud Firestore Direct:</b>
+                        <b class="text-xs color-cyan"><i class="fa-brands fa-github mr-1"></i> Структура хранения GitHub:</b>
                         <div class="sub-label" style="font-size:9px;">
-                            <span class="color-green font-bold">✓ Онлайн-база активна (Тариф 0 ₽)</span>
+                            Картинка будет загружаться по адресу: <b class="color-amber">${targetPath}</b>
                         </div>
                     </div>
-                    <span class="tag-badge bg-tag-green">ONLINE SYNC</span>
+                    <span class="tag-badge bg-tag-green">GITHUB RAW</span>
                 </div>
 
-                <div class="grid-2">
+                <div class="grid-2 mt-2">
                     <button onclick="DevStudio.randomizeDraftParameters()" class="btn btn-cyan btn-sm">
                         <i class="fa-solid fa-dice mr-1"></i> Рандомизировать параметры 🎲
                     </button>
@@ -203,7 +207,7 @@ const DevStudio = {
             <!-- КНОПКИ ДЕЙСТВИЙ -->
             <div class="space-y-2 mb-2">
                 <button onclick="DevStudio.publishCarToCloudFirestore()" class="btn btn-green w-full" style="box-shadow: 0 0 16px var(--green-glow); font-size:12px; padding:10px;">
-                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Опубликовать в Cloud Firestore 🚀
+                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Опубликовать карточку в Firestore 🚀
                 </button>
                 <div class="grid-2">
                     <button onclick="DevStudio.spawnToMarketAction()" class="btn btn-cyan btn-sm">
@@ -323,7 +327,7 @@ const DevStudio = {
     },
 
     // ========================================================
-    // ✂️ ВИДЖЕТ КАДРИРОВАНИЯ И СЖАТИЯ ДЛЯ FIRESTORE
+    // ✂️ ВИДЖЕТ КАДРИРОВАНИЯ
     // ========================================================
     renderCropperWidgetHtml(isCreate) {
         const color = isCreate ? 'var(--cyan)' : 'var(--purple)';
@@ -331,10 +335,10 @@ const DevStudio = {
         return `
             <div class="glass-card mb-2 p-2">
                 <div class="flex-between mb-1">
-                    <b class="text-xs" style="color:${color};"><i class="fa-solid fa-crop-simple mr-1"></i> Обложка: Кадрирование (16:9)</b>
+                    <b class="text-xs" style="color:${color};"><i class="fa-solid fa-crop-simple mr-1"></i> Предпросмотр ракурса (16:9)</b>
                     <button onclick="DevStudio.resetCropperParams(); DevStudio.updateCropperCanvas();" class="btn btn-dark btn-auto btn-sm" style="font-size:8.5px; padding:2px 6px;">Сброс</button>
                 </div>
-                <div class="sub-label mb-2" style="font-size:9px;">Загрузите фото прямо из галереи, настройте ползунками ракурс и нажмите «Обрезать и сжать».</div>
+                <div class="sub-label mb-2" style="font-size:9px;">Вы можете загрузить тестовое фото для предпросмотра ракурса в игре.</div>
 
                 <div class="car-img-wrap" style="height: 165px; position:relative; overflow:hidden; border:1px solid ${color};">
                     <canvas id="studioCropCanvas" width="480" height="270" style="width:100%; height:100%; display:block; object-fit:cover;"></canvas>
@@ -357,10 +361,10 @@ const DevStudio = {
 
                 <div class="grid-2">
                     <button onclick="document.getElementById('studioFileInput').click()" class="btn btn-dark btn-sm">
-                        <i class="fa-solid fa-camera mr-1"></i> Выбрать фото из галереи
+                        <i class="fa-solid fa-camera mr-1"></i> Выбрать фото
                     </button>
                     <button onclick="DevStudio.applyCropToDraft()" class="btn ${isCreate ? 'btn-cyan' : 'btn-purple'} btn-sm">
-                        <i class="fa-solid fa-check mr-1"></i> Обрезать и сжать ✓
+                        <i class="fa-solid fa-check mr-1"></i> Применить ракурс ✓
                     </button>
                 </div>
 
@@ -390,7 +394,7 @@ const DevStudio = {
             ctx.fillStyle = "#38bdf8";
             ctx.font = "12px sans-serif";
             ctx.textAlign = "center";
-            ctx.fillText("📷 Загрузите фото автомобиля", canvas.width / 2, canvas.height / 2);
+            ctx.fillText("📷 Фото из репозитория GitHub", canvas.width / 2, canvas.height / 2);
         };
         img.src = coverSrc;
     },
@@ -427,8 +431,7 @@ const DevStudio = {
         const canvas = document.getElementById('studioCropCanvas');
         if (!canvas) return;
 
-        // Сжатие в оптимизированный JPEG (Base64) 480x270 — вес всего 25-30 КБ (бесплатно влезает в Firestore)
-        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
         const d = this.currentDraft;
 
         if (this.uploadedPhotos.length > 0) {
@@ -436,7 +439,7 @@ const DevStudio = {
         } else {
             this.uploadedPhotos.unshift({
                 name: `${d.baseFilename}.jpg`,
-                originalName: "cropped_cover.jpg",
+                originalName: "preview.jpg",
                 dataUrl: croppedDataUrl
             });
         }
@@ -444,7 +447,7 @@ const DevStudio = {
         this.updateDraftImagesArray();
         this.render();
         if (typeof playSound === 'function') playSound('win');
-        if (typeof showToast === 'function') showToast("✂️ Обложка кадрирована и сжата для базы!");
+        if (typeof showToast === 'function') showToast("Ракурс применён для предпросмотра!");
     },
 
     // ========================================================
@@ -532,17 +535,19 @@ const DevStudio = {
         const targetCar = catList[index];
         if (!targetCar) return;
 
+        const slug = targetCar.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, '_');
+
         this.currentDraft = {
             isExistingCar: true,
-            id: targetCar.id || ("car_" + targetCar.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_")),
+            id: targetCar.id || ("car_" + slug),
             originalNameRef: targetCar.name,
             name: targetCar.name,
             type: targetCar.type || this.editFilterClass,
             power: targetCar.power || 100,
             basePrice: targetCar.basePrice || 100000,
             drivetrain: targetCar.drivetrain || 'rwd',
-            folderPath: `assets/cars/${this.editFilterClass}/`,
-            baseFilename: targetCar.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+            folderPath: `assets/cars/${this.editFilterClass}/${slug}/`,
+            baseFilename: slug,
             images: Array.isArray(targetCar.images) ? [...targetCar.images] : (targetCar.img ? [targetCar.img] : []),
             sellerNote: "«Проверенный автомобиль из официальной базы игры.»",
             condition: 90,
@@ -561,37 +566,45 @@ const DevStudio = {
     },
 
     // ========================================================
-    // ПРЯМАЯ ПУБЛИКАЦИЯ В CLOUD FIRESTORE
+    // СОХРАНЕНИЕ КАРТОЧКИ В CLOUD FIRESTORE ПОД СТРУКТУРУ GITHUB
     // ========================================================
     async publishCarToCloudFirestore() {
         const d = this.currentDraft;
         if (!d || !d.name.trim()) return showToast("Укажите название модели!");
 
-        const cover = this.getCoverImageSrc();
-        const imagesList = this.uploadedPhotos.length > 0 
-            ? this.uploadedPhotos.map(p => p.dataUrl) 
-            : (d.images && d.images.length > 0 ? d.images : [cover]);
+        const slug = d.baseFilename || d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
+        const category = d.type || "economy";
+        
+        // Формируем чистый путь под GitHub
+        let generatedPath = `assets/cars/${category}/${slug}/${slug}.jpg`;
+        if (d.isExistingCar && d.images && d.images[0] && !d.images[0].startsWith("data:")) {
+            generatedPath = d.images[0];
+        }
 
         const carPayload = {
-            id: d.id || ("car_" + d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_")),
+            id: d.id || ("car_" + slug),
             name: d.name.trim(),
             power: Number(d.power) || 100,
             basePrice: Number(d.basePrice) || 100000,
             drivetrain: d.drivetrain || 'rwd',
-            type: d.type || 'economy',
-            img: imagesList[0] || cover,
-            images: imagesList,
-            fallback: (typeof getCategoryFallback === 'function') ? getCategoryFallback(d.type) : cover
+            type: category,
+            img: generatedPath,
+            images: [generatedPath],
+            fallback: (typeof getCategoryFallback === 'function') ? getCategoryFallback(category) : "",
+            authorId: String(window.FB_Bridge?.getProfile()?.id || "admin"),
+            authorName: window.FB_Bridge?.getProfile()?.name || "Перекуп",
+            isActive: true,
+            createdAt: Date.now()
         };
 
-        showToast("⏳ Сохранение в Cloud Firestore...");
+        showToast("⏳ Сохранение карточки в Cloud Firestore...");
 
         if (window.FB_Bridge && window.FB_Bridge.CarsCatalog) {
             const res = await window.FB_Bridge.CarsCatalog.saveCarToCloud(carPayload);
             if (res && res.success) {
                 if (typeof playSound === 'function') playSound('win');
                 if (typeof tgHaptic === 'function') tgHaptic('success');
-                showToast(`🚀 Модель «${d.name}» опубликована в Cloud Firestore!`);
+                alert(`✅ Модель «${d.name}» опубликована в Cloud Firestore!\n\nПуть для файла в репозитории GitHub:\n📁 ${generatedPath}`);
             } else {
                 this.saveCustomCarToStorage(carPayload);
                 showToast(`Сохранено локально (${res ? res.error : 'оффлайн'}).`);
@@ -682,9 +695,11 @@ const DevStudio = {
             return this.uploadedPhotos[0].dataUrl;
         }
         if (this.currentDraft && this.currentDraft.images && this.currentDraft.images.length > 0) {
-            return this.currentDraft.images[0];
+            let path = this.currentDraft.images[0];
+            return (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(path) : path;
         }
-        return "assets/cars/economy/2101/vaz-2101.jpg";
+        let defPath = "assets/cars/economy/2101/vaz-2101.jpg";
+        return (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(defPath) : defPath;
     },
 
     updateField(field, val) {
@@ -760,14 +775,17 @@ const DevStudio = {
 
     spawnToMarketAction() {
         const d = this.currentDraft;
-        const cover = this.getCoverImageSrc();
+        const slug = d.baseFilename || d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
+        const category = d.type || "economy";
+        const path = `assets/cars/${category}/${slug}/${slug}.jpg`;
+
         const lot = {
             id: "m_custom_" + Date.now(),
             name: d.name, power: d.power, type: d.type, drivetrain: d.drivetrain,
             basePrice: d.basePrice, mileage: d.mileage, price: d.basePrice,
             originalAskingPrice: d.basePrice, baseMarketValue: Math.round(d.basePrice * 1.25),
-            marketValue: Math.round(d.basePrice * 1.25), img: cover, fallback: cover,
-            images: d.images.length > 0 ? [...d.images] : [cover], plate: d.plate,
+            marketValue: Math.round(d.basePrice * 1.25), img: path, fallback: getCategoryFallback(category),
+            images: [path], plate: d.plate,
             isStolen: false, autotekaChecked: false, cooldownUntil: 0, stoChecked: false,
             gaugeChecked: false, haggled: false, hagglePatience: 4, sellerPersonality: "calm",
             dealType: "normal", unavailable: false, sellerNote: d.sellerNote,
@@ -797,13 +815,16 @@ const DevStudio = {
             return showToast("В гараже нет свободного места!");
         }
 
-        const cover = this.getCoverImageSrc();
+        const slug = d.baseFilename || d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
+        const category = d.type || "economy";
+        const path = `assets/cars/${category}/${slug}/${slug}.jpg`;
+
         const wonCar = {
             id: "garage_custom_" + Date.now(),
             name: d.name, power: d.power, type: d.type, drivetrain: d.drivetrain,
             basePrice: d.basePrice, price: d.basePrice, baseMarketValue: Math.round(d.basePrice * 1.3),
-            marketValue: Math.round(d.basePrice * 1.3), img: cover, fallback: cover,
-            images: d.images.length > 0 ? [...d.images] : [cover], plate: d.plate, customPlate: d.plate,
+            marketValue: Math.round(d.basePrice * 1.3), img: path, fallback: getCategoryFallback(category),
+            images: [path], plate: d.plate, customPlate: d.plate,
             condition: d.condition, wear: { engine: d.condition, transmission: d.condition },
             isRegisteredOnPlayer: true, ownershipDays: 1, engineTemp: 90, tireWear: 100,
             purchaseCost: d.basePrice, tuning: { ...d.tuning }

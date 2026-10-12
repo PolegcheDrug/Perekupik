@@ -1,31 +1,46 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.7.5)
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v1.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Полный каталог Маркета: 4 категории (Приборы, Сырьё, Лицензии, Интерьер),
-// жесткий учет инвентаря, Storage Wars, Порт, ПодКлюч и автопарк.
+// Базовый URL GitHub Raw для картинок, каталог Маркета,
+// учет инвентаря, Storage Wars, Порт, ПодКлюч и автопарк.
 // ========================================================
 
+// ВНИМАНИЕ: Укажите здесь свой логин и репозиторий GitHub
+const GITHUB_ASSETS_BASE = "https://github.com/PolegcheDrug/Perekupik.git";
+
+function resolveCarAssetUrl(path) {
+    if (!path) return "";
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+        return path;
+    }
+    const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+    return GITHUB_ASSETS_BASE + cleanPath;
+}
+
+window.GITHUB_ASSETS_BASE = GITHUB_ASSETS_BASE;
+window.resolveCarAssetUrl = resolveCarAssetUrl;
+
 const GAME_METADATA = {
-    version: "v0.7.5",
-    build: 298,
+    version: "v1.0.0",
+    build: 305,
     authors: "Tak Toje, Max, Sergo, gemini, Илья Чепиль",
     releaseDate: "2026-10-20",
     patchNotes: [
         {
+            title: "🌐 Cloud Firestore & GitHub Assets",
+            text: "Все изображения подгружаются напрямую из репозитория GitHub, а карточки авто синхронизируются через Cloud Firestore."
+        },
+        {
             title: "🚢 Storage Wars & Порт 2.0",
-            text: "Живой чат аукциона с репликами ботов и аукциониста, шкала доминирования ставки, 3 удара молотка, эндоскопия щелей и полный фикс терминала."
+            text: "Живой чат аукциона с репликами ботов и аукциониста, шкала доминирования ставки, 3 удара молотка, эндоскопия щелей."
         },
         {
             title: "💱 Мультивалютный обменник Во-Банка",
-            text: "Полноценный двусторонний конвертер между всеми валютами: Рубли, Stars, Топливо, Талоны и Крипта (BTC/ETH)."
+            text: "Полноценный двусторонний конвертер между всеми валютами: Рубли, Stars, Топливо, Талоны и Крипта."
         },
         {
             title: "🛒 Полный перезапуск Авто-Маркета",
-            text: "Исчезновение товаров исправлено! Маркет разделен на 4 полноценные категории с сырьем для всех предприятий, приборами, лицензиями и мебелью боксов."
-        },
-        {
-            title: "🔒 Жесткая привязка приборов",
-            text: "Больше нельзя пользоваться сканерами OBD2 и толщиномерами без их покупки в Маркете. У каждого прибора появился запас прочности."
+            text: "Маркет разделен на 4 полноценные категории с сырьем для предприятий, приборами, лицензиями и мебелью боксов."
         }
     ]
 };
@@ -83,14 +98,13 @@ const SUPER_SPIN_TIERS = {
 // 0.2. БАЗОВЫЕ КУРСЫ ВАЛЮТНОГО ОБМЕННИКА ВО-БАНКА
 // ========================================================
 const BANK_EXCHANGE_RATES = {
-    // Стоимость 1 единицы в базовых рублях (покупка банком / продажа банком)
     rub: { buyRub: 1, sellRub: 1 },
-    stars: { buyRub: 12000, sellRub: 14000, icon: "fa-star", emoji: "⭐", name: "Stars" },
-    fuel: { buyRub: 1800, sellRub: 2200, icon: "fa-gas-pump", emoji: "⛽", name: "Топливо (л)" },
-    tickets: { buyRub: 6500, sellRub: 8000, icon: "fa-ticket", emoji: "🎟️", name: "Талоны" },
-    conn: { buyRub: 150000, sellRub: 200000, icon: "fa-handshake", emoji: "🤝", name: "Связи" },
-    btc: { buyRub: 9200000, sellRub: 9700000, icon: "fa-bitcoin", emoji: "₿", name: "Bitcoin" },
-    eth: { buyRub: 330000, sellRub: 355000, icon: "fa-ethereum", emoji: "Ξ", name: "Ethereum" }
+    stars: { buyRub: 100000, sellRub: 100000, icon: "fa-star", emoji: "⭐", name: "Stars" },
+    fuel: { buyRub: 2000, sellRub: 2000, icon: "fa-gas-pump", emoji: "⛽", name: "Топливо (л)" },
+    tickets: { buyRub: 7500, sellRub: 7500, icon: "fa-ticket", emoji: "🎟️", name: "Талоны" },
+    conn: { buyRub: 175000, sellRub: 175000, icon: "fa-handshake", emoji: "🤝", name: "Связи" },
+    btc: { buyRub: 9500000, sellRub: 9500000, icon: "fa-bitcoin", emoji: "₿", name: "Bitcoin" },
+    eth: { buyRub: 340000, sellRub: 340000, icon: "fa-ethereum", emoji: "Ξ", name: "Ethereum" }
 };
 
 // ========================================================
@@ -309,14 +323,17 @@ const CAR_DATABASE = {
             ],
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
-        {   name: "Ока (ВАЗ-1111)", power: 33, basePrice: 45000, drivetrain: "fwd", type: "economy", img: "assets/cars/economy/oka/oka.jpg", images: [
-            "assets/cars/economy/oka/oka.jpg",
-            "assets/cars/economy/oka/oka_2.jpg",
-            "assets/cars/economy/oka/oka_3.jpg",
-            "assets/cars/economy/oka/oka_4.jpg",
-            "assets/cars/economy/oka/oka_5.jpg",
-            "assets/cars/economy/oka/oka_6.jpg",
-            "assets/cars/economy/oka/oka_7.jpg"
+        { 
+            name: "Ока (ВАЗ-1111)", power: 33, basePrice: 45000, drivetrain: "fwd", type: "economy", 
+            img: "assets/cars/economy/oka/oka.jpg", 
+            images: [
+                "assets/cars/economy/oka/oka.jpg",
+                "assets/cars/economy/oka/oka_2.jpg",
+                "assets/cars/economy/oka/oka_3.jpg",
+                "assets/cars/economy/oka/oka_4.jpg",
+                "assets/cars/economy/oka/oka_5.jpg",
+                "assets/cars/economy/oka/oka_6.jpg",
+                "assets/cars/economy/oka/oka_7.jpg"
             ], 
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
@@ -915,7 +932,6 @@ const BUSINESS_FLEET_CATALOG = [
 // 7. НАПОЛНЕННЫЙ АВТО-МАРКЕТ (4 ПОЛНОЦЕННЫЕ КАТЕГОРИИ)
 // ========================================================
 const SHOP_CATALOG = {
-    // 1. ДИАГНОСТИЧЕСКИЕ ПРИБОРЫ (СТРОГО НУЖНЫ ДЛЯ ПРОВЕРКИ И ПОДКЛЮЧ)
     tools: [
         { 
             id: "gauge", 
@@ -988,8 +1004,6 @@ const SHOP_CATALOG = {
             icon: "fa-car-battery" 
         }
     ],
-
-    // 2. СЫРЬЁ И РАСХОДНИКИ ДЛЯ БИЗНЕСА И ГАРАЖА
     consumables: [
         { 
             id: "oil_pack", 
@@ -1046,8 +1060,6 @@ const SHOP_CATALOG = {
             desc: "Мгновенно заполняет склады всех выкупленных предприятий до 100%!" 
         }
     ],
-
-    // 3. ЛИЦЕНЗИИ, ДОКУМЕНТЫ И БЕЗОПАСНОСТЬ
     tuningParts: [
         { 
             id: "raf_license", 
@@ -1082,8 +1094,6 @@ const SHOP_CATALOG = {
             icon: "fa-passport" 
         }
     ],
-
-    // 4. ИНТЕРЬЕР И ОБОРУДОВАНИЕ ДЛЯ БОКСОВ И ДОМА
     homeItems: [
         { 
             id: "home_ps5", 
@@ -1133,8 +1143,6 @@ const HOUSING_INTERIOR_CATALOG = SHOP_CATALOG.homeItems;
 // ========================================================
 // 8. ПОРТ, ТАМОЖНЯ, БРОКЕРЫ И STORAGE WARS
 // ========================================================
-
-// Профили брокеров для одиночного торга у терминала
 const PORT_BROKER_PROFILES = [
     {
         id: "broker_rashid",
@@ -1193,7 +1201,6 @@ const PORT_BROKER_PROFILES = [
     }
 ];
 
-// Каталог одиночных контейнеров терминала порта (синхронизирован с CONTAINER_ITEMS)
 const PORT_AUCTIONS_CATALOG = [
     { 
         id: 'japan', 
@@ -1304,7 +1311,6 @@ const PORT_AUCTIONS_CATALOG = [
 
 const CONTAINER_ITEMS = PORT_AUCTIONS_CATALOG;
 
-// Каталог живого аукциона Storage Wars
 const STORAGE_WARS_CONTAINERS = [
     {
         id: "sw_copart_muscle",
@@ -1365,7 +1371,6 @@ const STORAGE_WARS_CONTAINERS = [
     }
 ];
 
-// Умные боты Storage Wars с фразами для чата
 const STORAGE_WARS_BOTS = [
     { 
         name: "Барыга Алик", 
@@ -1435,9 +1440,6 @@ const STORAGE_WARS_BOTS = [
     }
 ];
 
-// ========================================================
-// 9. ГАРАНТИЙНЫЙ ШАНТАЖ И РАЗБОРКИ С ПОКУПАТЕЛЯМИ
-// ========================================================
 const BUYER_BACKFIRE_EVENTS = [
     {
         id: "ev_scam_lawyer",
@@ -1485,9 +1487,6 @@ const SELLER_ADS_PHRASES = [
     "«Двигатель работает как швейцарские часы.»"
 ];
 
-// ========================================================
-// 10. РАЦИОН И АКТИВНОСТИ ПЕРЕКУПА
-// ========================================================
 const DIETS = [
     { id: 'water', name: 'Вода из кулера', category: 'fast', cost: 0, hunger: 5, mood: -20, desc: 'Бесплатно в боксе, но силы тают на глазах' },
     { id: 'coffee', name: 'Двойной эспрессо с заправки', category: 'fast', cost: 180, hunger: 10, mood: 12, desc: 'Бодрит перед ночным выездом на сделку' },
@@ -1674,9 +1673,6 @@ const BUYERS_CATALOG = {
     ]
 };
 
-// ========================================================
-// 11. КОНТРАКТЫ СЕРВИСА «ПОДКЛЮЧ»
-// ========================================================
 const PODKLYUCH_CONTRACT_TEMPLATES = [
     {
         type: 'taxi_economy',
@@ -1888,9 +1884,6 @@ const PODKLYUCH_CONTRACT_TEMPLATES = [
 
 const SYNDICATE_CONTRACT_TEMPLATES = PODKLYUCH_CONTRACT_TEMPLATES;
 
-// ========================================================
-// 12. АВТОМЕРОПРИЯТИЯ И ГОНОЧНЫЕ ТРЕКИ
-// ========================================================
 const STREET_EVENTS_DATA = [
     {
         id: "ev_drift_meet",

@@ -1,11 +1,16 @@
 // ========================================================
-// firebase-bridge.js — СЕТЕВОЙ ШЛЮЗ FIRESTORE & AUTH 2.0 (v1.0.0)
+// firebase-bridge.js — СЕТЕВОЙ ШЛЮЗ FIRESTORE 2.0 (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Полная облачная экосистема (Spark Plan 100% Free):
-// 1. Cloud Cars Catalog (cars_catalog) с автоматической миграцией из data.js
-// 2. Единый реестр уникальных госномеров (registered_plates) через runTransaction
-// 3. Защищённая P2P-биржа с налогом рынка и отложенными выплатами
-// 4. Облачные сейвы, Соцсеть «M», QuickChat, Клубы и Лидерборд
+// Полная реализация структуры коллекций Firestore:
+// 1. players/{telegram_id} — публичные профили перекупов
+// 2. garages/{telegram_id} — изолированные автопарки
+// 3. market_lots/{lot_id} — P2P торговая площадка
+// 4. clubs/{club_id} — автоклубы и клановая казна
+// 5. leaderboard/{telegram_id} — живой онлайн-рейтинг
+// 6. transactions/{tx_id} — атомарный лог сделок
+// 7. chat_messages/{msg_id} — P2P и клубные сообщения
+// 8. notifications/{notif_id} — системные уведомления
+// 9. registered_plates & cars_catalog — номера и авто с GitHub
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -101,7 +106,7 @@ const TelegramAuthManager = {
 };
 
 // ========================================================
-// 1. WHITE-LIST ШАБЛОННЫХ ФРАЗ (QUICK-CHAT)
+// 1. ШАБЛОННЫЕ ФРАЗЫ QUICK-CHAT
 // ========================================================
 const CANNED_PHRASES = {
   greet_1: { id: "greet_1", text: "«Салам, перекуп! Что по технике?»", category: "greet" },
@@ -138,7 +143,7 @@ const CANNED_PHRASES = {
 };
 
 // ========================================================
-// 2. TTL КЭШ ДЛЯ ОПТИМИЗАЦИИ ЗАПРОСОВ (SPARK QUOTA PROTECT)
+// 2. TTL КЭШ ДЛЯ ОПТИМИЗАЦИИ
 // ========================================================
 const CacheManager = {
   cloudCars: null,
@@ -170,270 +175,117 @@ const CacheManager = {
 };
 
 // ========================================================
-// 3. БЛОК 1: ОБЛАЧНЫЙ КАТАЛОГ АВТОМОБИЛЕЙ (CARS_CATALOG)
+// 3. КОЛЛЕКЦИИ: players/{id} И garages/{id}
 // ========================================================
-const CarsCatalogManager = {
-  // Миграция локальной базы CAR_DATABASE (из data.js) в Firestore
-  async seedDefaultCarsCatalog(force = false) {
-    const isSeeded = localStorage.getItem("perekup_db_seeded_v1");
-    if (isSeeded && !force) return { success: true, message: "База уже мигрирована ранее" };
+let saveDebounceTimer = null;
+let lastSavedHash = "";
 
-    if (typeof window.CAR_DATABASE === "undefined") {
-      return { success: false, error: "Локальная база CAR_DATABASE не найдена" };
-    }
+const PlayersStorageManager = {
+  pushSave(userId, gameState) {
+    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
+    if (!targetUid) return;
 
-    try {
-      console.log("[☁️ CarsCatalog] Запуск миграции локальных авто в Cloud Firestore...");
-      let totalMigrated = 0;
+    const playerDoc = {
+      telegram_id: String(targetUid),
+      name: gameState.player?.name || "Перекуп",
+      avatar: gameState.player?.avatarUrl || null,
+      level: gameState.player?.level || 1,
+      xp: gameState.player?.xp || 0,
+      maxXp: gameState.player?.maxXp || 120,
+      cash: gameState.player?.cash || 0,
+      stars: gameState.player?.stars || 0,
+      fuel: gameState.player?.fuel || 100,
+      tickets: gameState.player?.expressTickets || 25,
+      maxTickets: gameState.player?.maxExpressTickets || 25,
+      karma: gameState.player?.karma || 50,
+      streetCred: gameState.player?.streetCred || 100,
+      connections: gameState.player?.connections || 1,
+      safeDeposit: gameState.player?.safeDeposit || 0,
+      loanDebt: gameState.player?.loanDebt || 0,
+      taxDebt: gameState.player?.taxDebt || 0,
+      hunger: gameState.player?.hunger || 80,
+      mood: gameState.player?.mood || 85,
+      day: gameState.player?.day || 1,
+      club: gameState.player?.club || null,
+      hudColorId: gameState.player?.hudColorId || 'lightning',
+      nickEffect: gameState.player?.nickEffect || 'none',
+      avatarEffect: gameState.player?.avatarEffect || 'none',
+      tools: gameState.player?.tools || {},
+      toolsWear: gameState.player?.toolsWear || {},
+      crypto: gameState.player?.crypto || {},
+      bankDeposits: gameState.player?.bankDeposits || [],
+      ownedHouses: gameState.player?.ownedHouses || [],
+      housingId: gameState.player?.housingId || 'trailer',
+      stats: gameState.player?.stats || {},
+      updatedAt: Date.now()
+    };
 
-      for (const [category, carsList] of Object.entries(window.CAR_DATABASE)) {
-        if (!Array.isArray(carsList)) continue;
+    const garageDoc = {
+      telegram_id: String(targetUid),
+      cars: (gameState.garage || []).slice(0, 35),
+      salesLot: (gameState.salesLot || []).slice(0, 10),
+      ownedPlates: (gameState.ownedPlates || []).slice(0, 20),
+      businesses: (gameState.businesses || []).slice(0, 15),
+      warehouse: gameState.player?.warehouse || { cars: [], items: [] },
+      updatedAt: Date.now()
+    };
 
-        for (const car of carsList) {
-          if (!car || !car.name) continue;
-          const carDocId = "car_" + car.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
-          const carRef = doc(db, "cars_catalog", carDocId);
+    const currentHash = `${playerDoc.cash}_${playerDoc.level}_${garageDoc.cars.length}_${playerDoc.club?.id || 'none'}`;
+    if (currentHash === lastSavedHash) return;
 
-          const payload = {
-            id: carDocId,
-            name: car.name,
-            power: Number(car.power) || 100,
-            basePrice: Number(car.basePrice) || 100000,
-            drivetrain: car.drivetrain || "rwd",
-            type: car.type || category,
-            img: car.img || "",
-            images: Array.isArray(car.images) && car.images.length > 0 ? car.images : [car.img || ""],
-            fallback: car.fallback || "",
-            authorId: "system",
-            authorName: "Perekup Base",
-            isActive: true,
-            createdAt: Date.now()
-          };
-
-          await setDoc(carRef, payload, { merge: true });
-          totalMigrated++;
-        }
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = setTimeout(async () => {
+      try {
+        await Promise.all([
+          setDoc(doc(db, "players", String(targetUid)), playerDoc, { merge: true }),
+          setDoc(doc(db, "garages", String(targetUid)), garageDoc, { merge: true }),
+          setDoc(doc(db, "saves", String(targetUid)), { ...playerDoc, ...garageDoc }, { merge: true }) // обратная совместимость
+        ]);
+        lastSavedHash = currentHash;
+        console.log(`[☁️ Firestore] players/ и garages/ синхронизированы для ${targetUid}`);
+      } catch (e) {
+        console.warn("[☁️ Firestore] Ошибка записи players/garages:", e);
       }
-
-      localStorage.setItem("perekup_db_seeded_v1", "true");
-      console.log(`[☁️ CarsCatalog] Миграция успешно завершена! Перенесено ${totalMigrated} моделей.`);
-      CacheManager.cloudCars = null;
-      return { success: true, count: totalMigrated };
-    } catch (e) {
-      console.error("[☁️ CarsCatalog] Ошибка миграции базы:", e);
-      return { success: false, error: e.message };
-    }
+    }, 3500);
   },
 
-  // Получить все машины из Cloud Firestore с интеграцией в CAR_DATABASE
-  async fetchCloudCars(force = false) {
-    const now = Date.now();
-    if (!force && CacheManager.cloudCars && (now - CacheManager.cloudCarsTimestamp < CacheManager.CLOUD_CARS_TTL)) {
-      return CacheManager.cloudCars;
-    }
-
+  async pullSave(userId) {
+    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
+    if (!targetUid) return null;
     try {
-      const q = query(collection(db, "cars_catalog"), orderBy("basePrice", "asc"), limit(200));
-      const snap = await getDocs(q);
-      const cars = [];
+      const [playerSnap, garageSnap] = await Promise.all([
+        getDoc(doc(db, "players", String(targetUid))),
+        getDoc(doc(db, "garages", String(targetUid)))
+      ]);
 
-      snap.forEach(d => {
-        const item = d.data();
-        if (item.isActive !== false) {
-          cars.push(item);
-        }
-      });
-
-      // Перезаписываем глобальный CAR_DATABASE, чтобы игра больше не использовала статичный data.js
-      if (cars.length > 0) {
-        const updatedDatabase = {
-          economy: [], scooter: [], moto: [], atv: [],
-          comfort: [], premium: [], hyper: [], truck: [], yacht: []
+      if (playerSnap.exists() || garageSnap.exists()) {
+        const pData = playerSnap.exists() ? playerSnap.data() : {};
+        const gData = garageSnap.exists() ? garageSnap.data() : {};
+        return {
+          player: { ...pData },
+          garage: gData.cars || [],
+          salesLot: gData.salesLot || [],
+          ownedPlates: gData.ownedPlates || [],
+          businesses: gData.businesses || []
         };
-
-        cars.forEach(c => {
-          const cat = c.type || "economy";
-          if (!updatedDatabase[cat]) updatedDatabase[cat] = [];
-          updatedDatabase[cat].push(c);
-        });
-
-        window.CAR_DATABASE = updatedDatabase;
-        console.log(`[☁️ CarsCatalog] Синхронизировано ${cars.length} машин из Cloud Firestore. Локальная база обновлена.`);
       }
 
-      CacheManager.cloudCars = cars;
-      CacheManager.cloudCarsTimestamp = now;
-      return cars;
+      // Фолбек на старый путь saves/
+      const oldSnap = await getDoc(doc(db, "saves", String(targetUid)));
+      if (oldSnap.exists()) return oldSnap.data();
     } catch (e) {
-      console.warn("[☁️ CarsCatalog] Сбой загрузки облачных авто, используем кэш/фолбек:", e);
-      return CacheManager.cloudCars || [];
+      console.warn("[☁️ Firestore] Ошибка загрузки профиля:", e);
     }
-  },
-
-  // Создание или обновление карточки машины онлайн (из DevStudio)
-  async saveCarToCloud(carData, authorProfile) {
-    const profile = authorProfile || TelegramAuthManager.getUserProfile();
-    if (!carData || !carData.name) return { success: false, error: "Не указано название авто" };
-
-    try {
-      const carDocId = carData.id || ("car_" + carData.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_"));
-      const carRef = doc(db, "cars_catalog", carDocId);
-
-      const payload = {
-        id: carDocId,
-        name: carData.name.trim(),
-        power: Number(carData.power) || 100,
-        basePrice: Number(carData.basePrice) || 100000,
-        drivetrain: carData.drivetrain || "rwd",
-        type: carData.type || "economy",
-        img: carData.img || (carData.images && carData.images[0]) || "",
-        images: Array.isArray(carData.images) && carData.images.length > 0 ? carData.images : [carData.img || ""],
-        fallback: carData.fallback || "",
-        authorId: String(profile?.id || "unknown"),
-        authorName: profile?.name || "Перекуп",
-        isActive: true,
-        updatedAt: Date.now()
-      };
-
-      await setDoc(carRef, payload, { merge: true });
-      CacheManager.cloudCars = null;
-
-      // Мгновенно добавляем в память текущей сессии
-      if (window.CAR_DATABASE) {
-        const cat = payload.type;
-        if (!window.CAR_DATABASE[cat]) window.CAR_DATABASE[cat] = [];
-        const existingIdx = window.CAR_DATABASE[cat].findIndex(c => c.name === payload.name);
-        if (existingIdx !== -1) {
-          window.CAR_DATABASE[cat][existingIdx] = payload;
-        } else {
-          window.CAR_DATABASE[cat].unshift(payload);
-        }
-      }
-
-      return { success: true, car: payload };
-    } catch (e) {
-      console.error("[☁️ CarsCatalog] Ошибка сохранения машины в Firestore:", e);
-      return { success: false, error: e.message };
-    }
+    return null;
   }
 };
 
 // ========================================================
-// 4. БЛОК 2: ЕДИНЫЙ РЕЕСТР ГОСНОМЕРОВ (REGISTERED_PLATES)
+// 4. КОЛЛЕКЦИЯ: market_lots/{lot_id} И transactions/{tx_id}
 // ========================================================
-const RegisteredPlatesManager = {
-  cleanPlateString(plateStr) {
-    if (!plateStr) return "";
-    return String(plateStr).toUpperCase().replace(/\s+/g, " ").trim();
-  },
+const MARKET_FEE_PERCENT = 0.03;
 
-  // Проверка уникальности и резерв номера через транзакцию Firestore
-  async claimPlateAtomic(plateStr, ownerId, carId = null) {
-    const cleanPlate = this.cleanPlateString(plateStr);
-    if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) {
-      return { success: true, plate: cleanPlate, transit: true };
-    }
-
-    const docId = cleanPlate.replace(/\s+/g, "_");
-    const plateRef = doc(db, "registered_plates", docId);
-    const targetUid = ownerId || TelegramAuthManager.getVerifiedUserId();
-
-    try {
-      const result = await runTransaction(db, async (tx) => {
-        const plateSnap = await tx.get(plateRef);
-
-        if (plateSnap.exists()) {
-          const data = plateSnap.data();
-          if (data.ownerId && String(data.ownerId) !== String(targetUid) && data.status === "owned") {
-            throw new Error(`Госномер «${cleanPlate}» уже зарегистрирован за другим владельцем!`);
-          }
-        }
-
-        const payload = {
-          plate: cleanPlate,
-          ownerId: String(targetUid),
-          carId: carId ? String(carId) : null,
-          status: "owned",
-          updatedAt: Date.now()
-        };
-
-        tx.set(plateRef, payload, { merge: true });
-        return payload;
-      });
-
-      console.log(`[🏷️ Plates] Госномер «${cleanPlate}» успешно закреплен за ${targetUid}`);
-      return { success: true, plate: result.plate };
-    } catch (e) {
-      console.warn("[🏷️ Plates] Ошибка резерва номера:", e.message);
-      return { success: false, error: e.message };
-    }
-  },
-
-  // Освобождение / Снятие номера на хранение или в архив
-  async releasePlate(plateStr, ownerId, archive = false) {
-    const cleanPlate = this.cleanPlateString(plateStr);
-    if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) return true;
-
-    const docId = cleanPlate.replace(/\s+/g, "_");
-    const plateRef = doc(db, "registered_plates", docId);
-    const targetUid = ownerId || TelegramAuthManager.getVerifiedUserId();
-
-    try {
-      await runTransaction(db, async (tx) => {
-        const plateSnap = await tx.get(plateRef);
-        if (!plateSnap.exists()) return;
-
-        const data = plateSnap.data();
-        if (data.ownerId && String(data.ownerId) !== String(targetUid)) {
-          throw new Error("Вы не являетесь владельцем этого госномера!");
-        }
-
-        if (archive) {
-          tx.update(plateRef, {
-            ownerId: null,
-            carId: null,
-            status: "archived",
-            updatedAt: Date.now()
-          });
-        } else {
-          tx.update(plateRef, {
-            carId: null,
-            status: "storage",
-            updatedAt: Date.now()
-          });
-        }
-      });
-
-      return true;
-    } catch (e) {
-      console.warn("[🏷️ Plates] Ошибка освобождения номера:", e);
-      return false;
-    }
-  },
-
-  // Проверка статуса номера онлайн
-  async isPlateAvailable(plateStr) {
-    const cleanPlate = this.cleanPlateString(plateStr);
-    if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) return true;
-
-    const docId = cleanPlate.replace(/\s+/g, "_");
-    try {
-      const snap = await getDoc(doc(db, "registered_plates", docId));
-      if (!snap.exists()) return true;
-      const data = snap.data();
-      return data.status !== "owned";
-    } catch (e) {
-      return true;
-    }
-  }
-};
-
-// ========================================================
-// 5. БЛОК 3: P2P БИРЖА (НАЛОГ РЫНКА 3% И ЧЕСТНЫЕ ВЫПЛАТЫ)
-// ========================================================
-const MARKET_FEE_PERCENT = 0.03; // 3% анти-инфляционный сбор биржи
-
-const P2PMarketManager = {
+const MarketLotsManager = {
   async publishLot(lotData, sellerProfile) {
     const profile = sellerProfile || TelegramAuthManager.getUserProfile();
     if (!lotData || !profile?.id) return { success: false, error: "Нет данных" };
@@ -443,7 +295,7 @@ const P2PMarketManager = {
       const rawPrice = Math.max(1000, parseInt(lotData.price) || 50000);
 
       const payload = {
-        id: lotId,
+        lot_id: lotId,
         sellerId: String(profile.id),
         sellerName: profile.name || "Перекуп",
         type: lotData.type,
@@ -451,10 +303,9 @@ const P2PMarketManager = {
         price: rawPrice,
         itemData: lotData.itemData || {},
         status: "active",
-        createdAt: Date.now()
+        timestamp: Date.now()
       };
 
-      // Если выставляется номер — помечаем статус на бирже
       if (lotData.type === "plate" || lotData.type === "plates") {
         const plateStr = lotData.itemData?.plate || lotData.name;
         const clean = RegisteredPlatesManager.cleanPlateString(plateStr);
@@ -469,11 +320,15 @@ const P2PMarketManager = {
         }
       }
 
-      await setDoc(doc(db, "p2p_market", lotId), payload);
+      await Promise.all([
+        setDoc(doc(db, "market_lots", lotId), payload),
+        setDoc(doc(db, "p2p_market", lotId), payload) // зеркало
+      ]);
+
       CacheManager.marketLots = null;
       return { success: true, lotId };
     } catch (e) {
-      console.error("[P2P] Ошибка публикации лота:", e);
+      console.error("[market_lots] Ошибка создания лота:", e);
       return { success: false, error: e.message };
     }
   },
@@ -486,8 +341,8 @@ const P2PMarketManager = {
 
     try {
       const q = query(
-        collection(db, "p2p_market"),
-        orderBy("createdAt", "desc"),
+        collection(db, "market_lots"),
+        orderBy("timestamp", "desc"),
         limit(40)
       );
       const snap = await getDocs(q);
@@ -501,7 +356,7 @@ const P2PMarketManager = {
       CacheManager.marketTimestamp = now;
       return lots;
     } catch (e) {
-      console.warn("[P2P] Ошибка загрузки рынка:", e);
+      console.warn("[market_lots] Фолбек на p2p_market:", e);
       return CacheManager.marketLots || [];
     }
   },
@@ -510,8 +365,10 @@ const P2PMarketManager = {
     const profile = buyerProfile || TelegramAuthManager.getUserProfile();
     if (!lotId || !profile?.id) return { success: false, error: "Неверные данные" };
 
-    const lotRef = doc(db, "p2p_market", String(lotId));
-    const payoutRef = doc(db, "payouts", "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
+    const lotRef = doc(db, "market_lots", String(lotId));
+    const txId = "tx_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    const txRef = doc(db, "transactions", txId);
+    const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
 
     try {
       const transactionResult = await runTransaction(db, async (tx) => {
@@ -523,10 +380,10 @@ const P2PMarketManager = {
         if (lot.sellerId === String(profile.id)) throw new Error("Нельзя купить собственный лот!");
         if (buyerCash < lot.price) throw new Error("Недостаточно денег на балансе!");
 
-        // Расчет выплаты продавцу с вычетом налога биржи
         const marketFee = Math.round(lot.price * MARKET_FEE_PERCENT);
         const sellerPayout = lot.price - marketFee;
 
+        // 1. Помечаем лот проданным
         tx.update(lotRef, {
           status: "sold",
           buyerId: String(profile.id),
@@ -534,18 +391,35 @@ const P2PMarketManager = {
           soldAt: Date.now()
         });
 
-        tx.set(payoutRef, {
-          sellerId: lot.sellerId,
+        // 2. Записываем в transactions/{tx_id}
+        tx.set(txRef, {
+          tx_id: txId,
+          lot_id: String(lotId),
+          buyerId: String(profile.id),
           buyerName: profile.name || "Покупатель",
-          amount: sellerPayout,
-          grossAmount: lot.price,
+          sellerId: String(lot.sellerId),
+          sellerName: lot.sellerName || "Продавец",
+          item: lot.name,
+          type: lot.type,
+          price: lot.price,
           fee: marketFee,
-          itemTitle: lot.name,
-          claimed: false,
-          createdAt: Date.now()
+          payout: sellerPayout,
+          timestamp: Date.now()
         });
 
-        // Если куплен номер — перепривязываем владельца в едином реестре
+        // 3. Создаем уведомление продавцу notifications/{notif_id}
+        tx.set(notifRef, {
+          toUser: String(lot.sellerId),
+          type: "deal_payout",
+          title: "Продажа на P2P бирже!",
+          text: `Покупатель ${profile.name} приобрёл «${lot.name}» за ${lot.price.toLocaleString()} ₽ (начислено: +${sellerPayout.toLocaleString()} ₽).`,
+          amount: sellerPayout,
+          read: false,
+          claimed: false,
+          timestamp: Date.now()
+        });
+
+        // 4. Перепривязка номера, если продавался номер
         if (lot.type === "plate" || lot.type === "plates") {
           const plateStr = lot.itemData?.plate || lot.name;
           const clean = RegisteredPlatesManager.cleanPlateString(plateStr);
@@ -575,454 +449,322 @@ const P2PMarketManager = {
   async cancelLot(lotId, sellerId) {
     const targetUid = sellerId || TelegramAuthManager.getVerifiedUserId();
     try {
-      const lotRef = doc(db, "p2p_market", String(lotId));
+      const lotRef = doc(db, "market_lots", String(lotId));
       const snap = await getDoc(lotRef);
       if (snap.exists() && snap.data().sellerId === String(targetUid)) {
         const lot = snap.data();
-        
-        // Возвращаем статус номера обратно владельцу
         if (lot.type === "plate" || lot.type === "plates") {
           const plateStr = lot.itemData?.plate || lot.name;
           await RegisteredPlatesManager.releasePlate(plateStr, targetUid, false);
         }
-
         await deleteDoc(lotRef);
         CacheManager.marketLots = null;
         return true;
       }
     } catch (e) {
-      console.warn("[P2P] Ошибка отмены лота:", e);
+      console.warn("[market_lots] Ошибка снятия лота:", e);
     }
     return false;
-  },
-
-  async claimPendingPayouts(userId) {
-    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    if (!targetUid) return { totalClaimed: 0, claimedItems: [] };
-    try {
-      const q = query(collection(db, "payouts"), limit(15));
-      const snap = await getDocs(q);
-      let totalClaimed = 0;
-      const claimedItems = [];
-
-      for (const d of snap.docs) {
-        const item = d.data();
-        if (item.sellerId === String(targetUid) && !item.claimed) {
-          totalClaimed += item.amount;
-          claimedItems.push(`${item.itemTitle} (+${Number(item.amount).toLocaleString()} ₽)`);
-          await updateDoc(d.ref, { claimed: true, claimedAt: Date.now() });
-        }
-      }
-      return { totalClaimed, claimedItems };
-    } catch (e) {
-      console.warn("[P2P] Ошибка сбора выплат:", e);
-      return { totalClaimed: 0, claimedItems: [] };
-    }
   }
 };
 
 // ========================================================
-// 6. ОБЛАЧНЫЕ СОХРАНЕНИЯ (CLOUD SAVE)
+// 5. КОЛЛЕКЦИЯ: chat_messages/{msg_id}
 // ========================================================
-let saveDebounceTimer = null;
-let lastSavedHash = "";
-
-const CloudSaveManager = {
-  pushSave(userId, gameState) {
-    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    if (!targetUid) return;
+const ChatMessagesManager = {
+  async sendMessage(params) {
+    const profile = params.senderProfile || TelegramAuthManager.getUserProfile();
+    const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    const msgRef = doc(db, "chat_messages", msgId);
 
     const payload = {
-      player: {
-        name: gameState.player?.name || "Перекуп",
-        cash: gameState.player?.cash || 0,
-        stars: gameState.player?.stars || 0,
-        fuel: gameState.player?.fuel || 100,
-        level: gameState.player?.level || 1,
-        xp: gameState.player?.xp || 0,
-        maxXp: gameState.player?.maxXp || 120,
-        karma: gameState.player?.karma || 50,
-        streetCred: gameState.player?.streetCred || 100,
-        connections: gameState.player?.connections || 1,
-        expressTickets: gameState.player?.expressTickets || 25,
-        maxExpressTickets: gameState.player?.maxExpressTickets || 25,
-        safeDeposit: gameState.player?.safeDeposit || 0,
-        loanDebt: gameState.player?.loanDebt || 0,
-        taxDebt: gameState.player?.taxDebt || 0,
-        hunger: gameState.player?.hunger || 80,
-        mood: gameState.player?.mood || 85,
-        day: gameState.player?.day || 1,
-        stats: gameState.player?.stats || {},
-        ownedHouses: gameState.player?.ownedHouses || [],
-        housingId: gameState.player?.housingId || 'trailer',
-        housingType: gameState.player?.housingType || 'rent',
-        hudColorId: gameState.player?.hudColorId || 'lightning',
-        nickEffect: gameState.player?.nickEffect || 'none',
-        avatarEffect: gameState.player?.avatarEffect || 'none',
-        club: gameState.player?.club || null,
-        tools: gameState.player?.tools || {},
-        toolsWear: gameState.player?.toolsWear || {},
-        crypto: gameState.player?.crypto || {},
-        bankDeposits: gameState.player?.bankDeposits || []
-      },
-      garage: (gameState.garage || []).slice(0, 35),
-      salesLot: (gameState.salesLot || []).slice(0, 10),
-      ownedPlates: (gameState.ownedPlates || []).slice(0, 20),
-      businesses: (gameState.businesses || []).slice(0, 15),
-      updatedAt: Date.now()
+      msg_id: msgId,
+      senderId: String(profile.id),
+      senderName: profile.name || "Перекуп",
+      receiverId: params.receiverId ? String(params.receiverId) : null,
+      clubId: params.clubId ? String(params.clubId) : null,
+      dialogId: params.dialogId || null,
+      text: params.text,
+      timestamp: Date.now()
     };
 
-    const currentHash = `${payload.player.cash}_${payload.player.level}_${payload.garage.length}_${payload.player.club?.id || 'none'}`;
-    if (currentHash === lastSavedHash) return;
-
-    clearTimeout(saveDebounceTimer);
-    saveDebounceTimer = setTimeout(async () => {
-      try {
-        await setDoc(doc(db, "saves", String(targetUid)), payload, { merge: true });
-        lastSavedHash = currentHash;
-        console.log(`[☁️ Firebase] Прогресс синхронизирован для ${targetUid}`);
-      } catch (e) {
-        console.warn("[☁️ Firebase] Ошибка записи сейва:", e);
-      }
-    }, 3500);
-  },
-
-  async pullSave(userId) {
-    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    if (!targetUid) return null;
     try {
-      const snap = await getDoc(doc(db, "saves", String(targetUid)));
-      if (snap.exists()) {
-        console.log(`[☁️ Firebase] Сейв найден в облаке для ${targetUid}`);
-        return snap.data();
-      }
+      await setDoc(msgRef, payload);
+      return { success: true, msg: payload };
     } catch (e) {
-      console.warn("[☁️ Firebase] Ошибка загрузки сейва:", e);
-    }
-    return null;
-  }
-};
-
-// ========================================================
-// 7. СОЦИАЛЬНАЯ СЕТЬ «M» (ПУЛЬС, ДРУЗЬЯ, ПОДАРКИ, ДУЭЛИ)
-// ========================================================
-const M_NetworkManager = {
-  async publishPost(eventData, userProfile) {
-    const profile = userProfile || TelegramAuthManager.getUserProfile();
-    if (!eventData || !profile?.id) return false;
-
-    try {
-      const postId = "post_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
-      const payload = {
-        id: postId,
-        authorId: String(profile.id),
-        authorName: profile.name || "Перекуп",
-        avatar: profile.photoUrl || null,
-        type: eventData.type || "deal",
-        title: eventData.title || "Сделка закрыта!",
-        text: eventData.text || "",
-        carName: eventData.carName || null,
-        carImg: eventData.carImg || null,
-        profit: eventData.profit || 0,
-        reactions: { fire: 0, cash: 0, handshake: 0, skull: 0 },
-        reactedUsers: [],
-        createdAt: Date.now()
-      };
-
-      await setDoc(doc(db, "m_feed", postId), payload);
-      CacheManager.feed = null;
-      return true;
-    } catch (e) {
-      console.warn("[M-Network] Ошибка публикации поста:", e);
-      return false;
-    }
-  },
-
-  async fetchFeed(force = false) {
-    const now = Date.now();
-    if (!force && CacheManager.feed && (now - CacheManager.feedTimestamp < CacheManager.FEED_TTL)) {
-      return CacheManager.feed;
-    }
-
-    try {
-      const q = query(collection(db, "m_feed"), orderBy("createdAt", "desc"), limit(25));
-      const snap = await getDocs(q);
-      const posts = [];
-      snap.forEach(d => posts.push(d.data()));
-
-      CacheManager.feed = posts;
-      CacheManager.feedTimestamp = now;
-      return posts;
-    } catch (e) {
-      console.warn("[M-Network] Ошибка загрузки ленты:", e);
-      return CacheManager.feed || [];
-    }
-  },
-
-  async toggleReaction(postId, reactionType, userProfile) {
-    const profile = userProfile || TelegramAuthManager.getUserProfile();
-    if (!postId || !profile?.id) return false;
-
-    try {
-      const postRef = doc(db, "m_feed", postId);
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(postRef);
-        if (!snap.exists()) return;
-
-        const data = snap.data();
-        const reacted = data.reactedUsers || [];
-        const userReactionKey = `${profile.id}_${reactionType}`;
-
-        if (reacted.includes(userReactionKey)) {
-          const newReacted = reacted.filter(r => r !== userReactionKey);
-          const currentCount = (data.reactions && data.reactions[reactionType]) ? data.reactions[reactionType] : 1;
-          tx.update(postRef, {
-            [`reactions.${reactionType}`]: Math.max(0, currentCount - 1),
-            reactedUsers: newReacted
-          });
-        } else {
-          reacted.push(userReactionKey);
-          const currentCount = (data.reactions && data.reactions[reactionType]) ? data.reactions[reactionType] : 0;
-          tx.update(postRef, {
-            [`reactions.${reactionType}`]: currentCount + 1,
-            reactedUsers: reacted
-          });
-        }
-      });
-
-      CacheManager.feed = null;
-      return true;
-    } catch (e) {
-      console.warn("[M-Network] Ошибка реакции:", e);
-      return false;
-    }
-  },
-
-  async addFriendDirect(myProfile, targetProfile) {
-    if (!myProfile?.id || !targetProfile?.id || String(myProfile.id) === String(targetProfile.id)) {
-      return { success: false, error: "Некорректный ID" };
-    }
-
-    try {
-      const docId = `friend_${myProfile.id}_${targetProfile.id}`;
-      await setDoc(doc(db, "m_friends", docId), {
-        userIdA: String(myProfile.id),
-        userIdB: String(targetProfile.id),
-        friendName: targetProfile.name || "Напарник",
-        friendUsername: targetProfile.username || "",
-        status: "active",
-        lastGiftSentAt: 0,
-        createdAt: Date.now()
-      });
-
-      CacheManager.friends = null;
-      return { success: true };
-    } catch (e) {
+      console.warn("[chat_messages] Ошибка отправки:", e);
       return { success: false, error: e.message };
     }
   },
 
-  async fetchFriends(userId, force = false) {
-    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    const now = Date.now();
-    if (!force && CacheManager.friends && (now - CacheManager.friendsTimestamp < CacheManager.FRIENDS_TTL)) {
-      return CacheManager.friends;
-    }
-
-    try {
-      const q = query(collection(db, "m_friends"), limit(50));
-      const snap = await getDocs(q);
-      const list = [];
-      snap.forEach(d => {
-        const item = d.data();
-        if (item.userIdA === String(targetUid) || item.userIdB === String(targetUid)) {
-          list.push({
-            id: item.userIdA === String(targetUid) ? item.userIdB : item.userIdA,
-            name: item.friendName || "Напарник",
-            lastGiftSentAt: item.lastGiftSentAt || 0
-          });
-        }
-      });
-
-      CacheManager.friends = list;
-      CacheManager.friendsTimestamp = now;
-      return list;
-    } catch (e) {
-      return CacheManager.friends || [];
-    }
-  },
-
-  async sendDailyGift(senderProfile, targetFriendId, giftType = "fuel") {
-    const profile = senderProfile || TelegramAuthManager.getUserProfile();
-    if (!profile?.id || !targetFriendId) return { success: false, error: "Ошибка данных" };
-
-    try {
-      const giftDocId = `gift_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`;
-      await setDoc(doc(db, "m_gifts", giftDocId), {
-        id: giftDocId,
-        fromId: String(profile.id),
-        fromName: profile.name,
-        toId: String(targetFriendId),
-        giftType: giftType,
-        claimed: false,
-        createdAt: Date.now()
-      });
-
-      return { success: true };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  },
-
-  async claimIncomingGifts(userId) {
-    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    if (!targetUid) return { totalFuel: 0, totalTickets: 0, senders: [] };
-
-    try {
-      const q = query(collection(db, "m_gifts"), limit(20));
-      const snap = await getDocs(q);
-      let totalFuel = 0;
-      let totalTickets = 0;
-      const senders = [];
-
-      for (const d of snap.docs) {
-        const item = d.data();
-        if (item.toId === String(targetUid) && !item.claimed) {
-          if (item.giftType === "fuel") totalFuel += 10;
-          if (item.giftType === "ticket") totalTickets += 1;
-          senders.push(item.fromName || "Друг");
-          await updateDoc(d.ref, { claimed: true, claimedAt: Date.now() });
-        }
-      }
-
-      return { totalFuel, totalTickets, senders };
-    } catch (e) {
-      return { totalFuel: 0, totalTickets: 0, senders: [] };
-    }
-  }
-};
-
-// ========================================================
-// 8. МЕССЕНДЖЕР И ШАБЛОННЫЕ ДИАЛОГИ (QUICK-CHAT)
-// ========================================================
-const QuickChatManager = {
-  getPhrasesList(filterCat = null) {
-    const list = Object.values(CANNED_PHRASES);
-    if (!filterCat) return list;
-    return list.filter(p => p.category === filterCat);
-  },
-
-  makeDialogId(userIdA, userIdB, contextId = "general") {
-    const sortedUsers = [String(userIdA), String(userIdB)].sort().join("_");
-    return `dlg_${sortedUsers}_${contextId}`;
-  },
-
-  async sendPhrase(dialogId, phraseId, senderProfile, contextMeta = {}) {
-    const profile = senderProfile || TelegramAuthManager.getUserProfile();
-    if (!dialogId || !profile?.id) return false;
-    const phraseObj = CANNED_PHRASES[phraseId];
-    if (!phraseObj) return false;
-
-    try {
-      const msgId = "msg_" + Date.now() + "_" + Math.random().toString(36).substring(2, 5);
-      const msgRef = doc(db, "chat_dialogs", dialogId, "messages", msgId);
-
-      await setDoc(msgRef, {
-        id: msgId,
-        senderId: String(profile.id),
-        senderName: profile.name || "Перекуп",
-        phraseId: phraseObj.id,
-        text: phraseObj.text,
-        createdAt: Date.now()
-      });
-
-      const dialogMetaRef = doc(db, "dialogs_meta", dialogId);
-      await setDoc(dialogMetaRef, {
-        dialogId,
-        lastMessage: phraseObj.text,
-        lastSender: profile.name || "Перекуп",
-        lastSenderId: String(profile.id),
-        participantA: String(contextMeta.participantA || profile.id),
-        participantB: String(contextMeta.participantB || "other"),
-        lotTitle: contextMeta.lotTitle || "",
-        lotPrice: contextMeta.lotPrice || 0,
-        lotCarData: contextMeta.lotCarData || null,
-        buyerAvatar: contextMeta.buyerAvatar || "👨‍💼",
-        updatedAt: Date.now()
-      }, { merge: true });
-
-      const cached = CacheManager.dialogs.get(dialogId);
-      if (cached) {
-        cached.msgs.push({
-          id: msgId,
-          senderId: String(profile.id),
-          senderName: profile.name || "Перекуп",
-          phraseId: phraseObj.id,
-          text: phraseObj.text,
-          createdAt: Date.now()
-        });
-      }
-
-      return true;
-    } catch (e) {
-      console.warn("[Chat] Ошибка отправки реплики:", e);
-      return false;
-    }
-  },
-
-  async fetchDialogMessages(dialogId) {
-    if (!dialogId) return [];
-    const now = Date.now();
-    const cached = CacheManager.dialogs.get(dialogId);
-    if (cached && (now - cached.timestamp < 6000)) {
-      return cached.msgs;
-    }
-
+  async fetchMessagesForDialog(dialogId) {
     try {
       const q = query(
-        collection(db, "chat_dialogs", dialogId, "messages"),
-        orderBy("createdAt", "asc"),
-        limit(35)
-      );
-      const snap = await getDocs(q);
-      const msgs = [];
-      snap.forEach(d => msgs.push(d.data()));
-
-      CacheManager.dialogs.set(dialogId, { msgs, timestamp: now });
-      return msgs;
-    } catch (e) {
-      console.warn("[Chat] Ошибка загрузки сообщений диалога:", e);
-      return cached ? cached.msgs : [];
-    }
-  },
-
-  async fetchUserDialogs(userId) {
-    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    if (!targetUid) return [];
-    try {
-      const q = query(
-        collection(db, "dialogs_meta"),
-        orderBy("updatedAt", "desc"),
-        limit(20)
+        collection(db, "chat_messages"),
+        orderBy("timestamp", "asc"),
+        limit(40)
       );
       const snap = await getDocs(q);
       const list = [];
       snap.forEach(d => {
-        const item = d.data();
-        if (item.participantA === String(targetUid) || item.participantB === String(targetUid) || item.dialogId.includes(String(targetUid))) {
-          list.push(item);
-        }
+        const it = d.data();
+        if (it.dialogId === dialogId) list.push(it);
       });
       return list;
     } catch (e) {
-      console.warn("[Chat] Ошибка загрузки списка диалогов:", e);
       return [];
     }
   }
 };
 
 // ========================================================
-// 9. СООБЩЕСТВА: АВТОКЛУБЫ С КЛАНОВЫМ ОБЩАКОМ И ЧАТОМ
+// 6. КОЛЛЕКЦИЯ: notifications/{notif_id}
+// ========================================================
+const NotificationsManager = {
+  async fetchMyNotifications(userId) {
+    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
+    try {
+      const q = query(
+        collection(db, "notifications"),
+        orderBy("timestamp", "desc"),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      const notifs = [];
+      snap.forEach(d => {
+        const it = d.data();
+        if (String(it.toUser) === String(targetUid) && !it.claimed) {
+          notifs.push({ id: d.id, ...it });
+        }
+      });
+      return notifs;
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async claimNotificationPayout(notifId) {
+    try {
+      const nRef = doc(db, "notifications", notifId);
+      await updateDoc(nRef, { claimed: true, read: true, claimedAt: Date.now() });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+};
+
+// ========================================================
+// 7. КОЛЛЕКЦИЯ: registered_plates & cars_catalog (GITHUB RAW)
+// ========================================================
+const RegisteredPlatesManager = {
+  cleanPlateString(plateStr) {
+    if (!plateStr) return "";
+    return String(plateStr).toUpperCase().replace(/\s+/g, " ").trim();
+  },
+
+  async claimPlateAtomic(plateStr, ownerId, carId = null) {
+    const cleanPlate = this.cleanPlateString(plateStr);
+    if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) {
+      return { success: true, plate: cleanPlate, transit: true };
+    }
+
+    const docId = cleanPlate.replace(/\s+/g, "_");
+    const plateRef = doc(db, "registered_plates", docId);
+    const targetUid = ownerId || TelegramAuthManager.getVerifiedUserId();
+
+    try {
+      const result = await runTransaction(db, async (tx) => {
+        const plateSnap = await tx.get(plateRef);
+        if (plateSnap.exists()) {
+          const data = plateSnap.data();
+          if (data.ownerId && String(data.ownerId) !== String(targetUid) && data.status === "owned") {
+            throw new Error(`Госномер «${cleanPlate}» уже зарегистрирован за другим владельцем!`);
+          }
+        }
+
+        const payload = {
+          plate: cleanPlate,
+          ownerId: String(targetUid),
+          carId: carId ? String(carId) : null,
+          status: "owned",
+          updatedAt: Date.now()
+        };
+
+        tx.set(plateRef, payload, { merge: true });
+        return payload;
+      });
+
+      return { success: true, plate: result.plate };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async releasePlate(plateStr, ownerId, archive = false) {
+    const cleanPlate = this.cleanPlateString(plateStr);
+    if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) return true;
+
+    const docId = cleanPlate.replace(/\s+/g, "_");
+    const plateRef = doc(db, "registered_plates", docId);
+    const targetUid = ownerId || TelegramAuthManager.getVerifiedUserId();
+
+    try {
+      await runTransaction(db, async (tx) => {
+        const plateSnap = await tx.get(plateRef);
+        if (!plateSnap.exists()) return;
+
+        const data = plateSnap.data();
+        if (data.ownerId && String(data.ownerId) !== String(targetUid)) {
+          throw new Error("Вы не владелец номера!");
+        }
+
+        tx.update(plateRef, {
+          ownerId: archive ? null : String(targetUid),
+          carId: null,
+          status: archive ? "archived" : "storage",
+          updatedAt: Date.now()
+        });
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  async isPlateAvailable(plateStr) {
+    const cleanPlate = this.cleanPlateString(plateStr);
+    if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) return true;
+
+    const docId = cleanPlate.replace(/\s+/g, "_");
+    try {
+      const snap = await getDoc(doc(db, "registered_plates", docId));
+      if (!snap.exists()) return true;
+      return snap.data().status !== "owned";
+    } catch (e) {
+      return true;
+    }
+  }
+};
+
+const CarsCatalogManager = {
+  async seedDefaultCarsCatalog(force = false) {
+    const isSeeded = localStorage.getItem("perekup_db_seeded_v1");
+    if (isSeeded && !force) return { success: true };
+    if (typeof window.CAR_DATABASE === "undefined") return { success: false };
+
+    try {
+      console.log("[cars_catalog] Синхронизация каталога под GitHub Raw...");
+      let count = 0;
+
+      for (const [category, carsList] of Object.entries(window.CAR_DATABASE)) {
+        if (!Array.isArray(carsList)) continue;
+        for (const car of carsList) {
+          if (!car || !car.name) continue;
+          const carDocId = "car_" + car.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
+          const carRef = doc(db, "cars_catalog", carDocId);
+
+          const payload = {
+            id: carDocId,
+            name: car.name,
+            power: Number(car.power) || 100,
+            basePrice: Number(car.basePrice) || 100000,
+            drivetrain: car.drivetrain || "rwd",
+            type: car.type || category,
+            img: car.img || "",
+            images: Array.isArray(car.images) && car.images.length > 0 ? car.images : [car.img || ""],
+            fallback: car.fallback || "",
+            authorId: "system",
+            authorName: "Perekup Base",
+            isActive: true,
+            createdAt: Date.now()
+          };
+
+          await setDoc(carRef, payload, { merge: true });
+          count++;
+        }
+      }
+
+      localStorage.setItem("perekup_db_seeded_v1", "true");
+      CacheManager.cloudCars = null;
+      return { success: true, count };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async fetchCloudCars(force = false) {
+    const now = Date.now();
+    if (!force && CacheManager.cloudCars && (now - CacheManager.cloudCarsTimestamp < CacheManager.CLOUD_CARS_TTL)) {
+      return CacheManager.cloudCars;
+    }
+
+    try {
+      const q = query(collection(db, "cars_catalog"), orderBy("basePrice", "asc"), limit(250));
+      const snap = await getDocs(q);
+      const cars = [];
+      snap.forEach(d => {
+        const item = d.data();
+        if (item.isActive !== false) cars.push(item);
+      });
+
+      if (cars.length > 0) {
+        const updatedDatabase = {
+          economy: [], scooter: [], moto: [], atv: [],
+          comfort: [], premium: [], hyper: [], truck: [], yacht: []
+        };
+        cars.forEach(c => {
+          const cat = c.type || "economy";
+          if (!updatedDatabase[cat]) updatedDatabase[cat] = [];
+          updatedDatabase[cat].push(c);
+        });
+        window.CAR_DATABASE = updatedDatabase;
+      }
+
+      CacheManager.cloudCars = cars;
+      CacheManager.cloudCarsTimestamp = now;
+      return cars;
+    } catch (e) {
+      return CacheManager.cloudCars || [];
+    }
+  },
+
+  async saveCarToCloud(carData, authorProfile) {
+    const profile = authorProfile || TelegramAuthManager.getUserProfile();
+    if (!carData || !carData.name) return { success: false, error: "Нет имени модели" };
+
+    try {
+      const slug = carData.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
+      const carDocId = carData.id || ("car_" + slug);
+      const carRef = doc(db, "cars_catalog", carDocId);
+
+      const payload = {
+        id: carDocId,
+        name: carData.name.trim(),
+        power: Number(carData.power) || 100,
+        basePrice: Number(carData.basePrice) || 100000,
+        drivetrain: carData.drivetrain || "rwd",
+        type: carData.type || "economy",
+        img: carData.img || "",
+        images: Array.isArray(carData.images) && carData.images.length > 0 ? carData.images : [carData.img || ""],
+        fallback: carData.fallback || "",
+        authorId: String(profile?.id || "unknown"),
+        authorName: profile?.name || "Перекуп",
+        isActive: true,
+        updatedAt: Date.now()
+      };
+
+      await setDoc(carRef, payload, { merge: true });
+      CacheManager.cloudCars = null;
+      return { success: true, car: payload };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  }
+};
+
+// ========================================================
+// 8. КОЛЛЕКЦИЯ: clubs/{club_id}
 // ========================================================
 const ClubsManager = {
   async fetchClubs(force = false) {
@@ -1041,21 +783,21 @@ const ClubsManager = {
       CacheManager.clubsTimestamp = now;
       return clubs;
     } catch (e) {
-      console.warn("[Clubs] Ошибка загрузки клубов:", e);
       return CacheManager.clubs || [];
     }
   },
 
   async createClub(clubName, userProfile, fee = 100000) {
     const profile = userProfile || TelegramAuthManager.getUserProfile();
-    if (!clubName || !profile?.id) return { success: false, error: "Неверные данные" };
+    if (!clubName || !profile?.id) return { success: false };
 
     try {
       const clubId = "club_" + Date.now();
       const clubData = {
+        club_id: clubId,
         id: clubId,
         name: clubName.trim(),
-        leaderId: String(profile.id),
+        ownerId: String(profile.id),
         leaderName: profile.name || "Олигарх",
         membersCount: 1,
         bank: 0,
@@ -1065,13 +807,6 @@ const ClubsManager = {
       };
 
       await setDoc(doc(db, "clubs", clubId), clubData);
-      await setDoc(doc(db, "clubs", clubId, "members", String(profile.id)), {
-        userId: String(profile.id),
-        userName: profile.name,
-        role: "leader",
-        joinedAt: Date.now()
-      });
-
       CacheManager.clubs = null;
       return { success: true, club: clubData };
     } catch (e) {
@@ -1084,138 +819,39 @@ const ClubsManager = {
     if (!clubId || !profile?.id) return false;
     try {
       const clubRef = doc(db, "clubs", String(clubId));
-      const memberRef = doc(db, "clubs", String(clubId), "members", String(profile.id));
-
       await runTransaction(db, async (tx) => {
         const cSnap = await tx.get(clubRef);
         if (!cSnap.exists()) throw new Error("Клуб не найден!");
-
         const cur = cSnap.data();
         tx.update(clubRef, { membersCount: (cur.membersCount || 1) + 1 });
-        tx.set(memberRef, {
-          userId: String(profile.id),
-          userName: profile.name,
-          role: "member",
-          joinedAt: Date.now()
-        });
       });
-
       CacheManager.clubs = null;
       return true;
     } catch (e) {
-      console.warn("[Clubs] Ошибка вступления в клуб:", e);
       return false;
     }
   },
 
-  async depositToClubBank(clubId, amount, userProfile) {
+  async depositToClubBank(clubId, amount) {
     if (!clubId || amount <= 0) return false;
-    const clubRef = doc(db, "clubs", String(clubId));
-
     try {
+      const clubRef = doc(db, "clubs", String(clubId));
       await runTransaction(db, async (tx) => {
         const cSnap = await tx.get(clubRef);
-        if (!cSnap.exists()) throw new Error("Клуб не найден!");
+        if (!cSnap.exists()) throw new Error();
         const cur = cSnap.data();
         tx.update(clubRef, { bank: (cur.bank || 0) + amount });
       });
-
       CacheManager.clubs = null;
       return true;
     } catch (e) {
-      console.warn("[Clubs] Ошибка взноса в общак:", e);
       return false;
-    }
-  },
-
-  async sendClubChatMessage(clubId, phraseId, userProfile) {
-    const profile = userProfile || TelegramAuthManager.getUserProfile();
-    if (!clubId || !profile?.id) return false;
-    const phraseObj = CANNED_PHRASES[phraseId];
-    if (!phraseObj) return false;
-
-    try {
-      const msgId = "cmsg_" + Date.now();
-      const msgRef = doc(db, "clubs", String(clubId), "chat", msgId);
-
-      await setDoc(msgRef, {
-        id: msgId,
-        senderId: String(profile.id),
-        senderName: profile.name || "Член клуба",
-        text: phraseObj.text,
-        createdAt: Date.now()
-      });
-
-      return true;
-    } catch (e) {
-      console.warn("[Clubs] Ошибка отправки сообщения в клуб:", e);
-      return false;
-    }
-  },
-
-  async fetchClubChatMessages(clubId) {
-    if (!clubId) return [];
-    try {
-      const q = query(
-        collection(db, "clubs", String(clubId), "chat"),
-        orderBy("createdAt", "asc"),
-        limit(30)
-      );
-      const snap = await getDocs(q);
-      const msgs = [];
-      snap.forEach(d => msgs.push(d.data()));
-      return msgs;
-    } catch (e) {
-      return [];
     }
   }
 };
 
 // ========================================================
-// 10. РЕФЕРАЛЫ TELEGRAM & СТАРТОВЫЕ БОНУСЫ
-// ========================================================
-const FriendsReferralManager = {
-  async handleReferralEntry(referrerId, myProfile) {
-    const profile = myProfile || TelegramAuthManager.getUserProfile();
-    if (!referrerId || !profile?.id || String(referrerId) === String(profile.id)) {
-      return { rewarded: false };
-    }
-
-    const refDoc = doc(db, "referrals", `${referrerId}_${profile.id}`);
-    try {
-      const snap = await getDoc(refDoc);
-      if (snap.exists()) return { rewarded: false };
-
-      await setDoc(refDoc, {
-        referrerId: String(referrerId),
-        invitedId: String(profile.id),
-        invitedName: profile.name,
-        rewardCash: 75000,
-        createdAt: Date.now()
-      });
-
-      const payoutRef = doc(db, "payouts", "refpay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 5));
-      await setDoc(payoutRef, {
-        sellerId: String(referrerId),
-        buyerName: profile.name,
-        amount: 75000,
-        itemTitle: "Реферальный бонус за друга 🤝",
-        claimed: false,
-        createdAt: Date.now()
-      });
-
-      await M_NetworkManager.addFriendDirect(profile, { id: referrerId, name: "Пригласивший напарник" });
-
-      return { rewarded: true, bonusCash: 75000 };
-    } catch (e) {
-      console.warn("[Friends] Ошибка обработки реферала:", e);
-      return { rewarded: false };
-    }
-  }
-};
-
-// ========================================================
-// 11. ОНЛАЙН-ЛИДЕРБОРД ПЕРЕКУПОВ
+// 9. КОЛЛЕКЦИЯ: leaderboard/{telegram_id}
 // ========================================================
 let lastLeaderboardUpdate = 0;
 
@@ -1228,17 +864,16 @@ const LeaderboardManager = {
 
     try {
       await setDoc(doc(db, "leaderboard", String(targetUid)), {
+        telegram_id: String(targetUid),
         name: playerName || "Перекуп",
         profit: Math.round(profit),
         level: level || 1,
-        updatedAt: now
+        lastUpdate: now
       }, { merge: true });
 
       lastLeaderboardUpdate = now;
       CacheManager.leaderboard = null;
-    } catch (e) {
-      console.warn("[Leaderboard] Ошибка записи ранга:", e);
-    }
+    } catch (e) {}
   },
 
   async fetchTop(force = false) {
@@ -1248,11 +883,7 @@ const LeaderboardManager = {
     }
 
     try {
-      const q = query(
-        collection(db, "leaderboard"),
-        orderBy("profit", "desc"),
-        limit(30)
-      );
+      const q = query(collection(db, "leaderboard"), orderBy("profit", "desc"), limit(30));
       const snap = await getDocs(q);
       const leaders = [];
       snap.forEach(d => leaders.push({ id: d.id, ...d.data() }));
@@ -1267,12 +898,10 @@ const LeaderboardManager = {
 };
 
 // ========================================================
-// 12. ВСПОМОГАТЕЛЬНЫЙ ПРОФИЛЬ И ЭКСПОРТ
+// 10. ВСПОМОГАТЕЛЬНЫЙ ПРОФИЛЬ И ЭКСПОРТ
 // ========================================================
 function getCurrentPlayerProfile() {
-  if (currentUserProfile && verifiedUserId) {
-    return currentUserProfile;
-  }
+  if (currentUserProfile && verifiedUserId) return currentUserProfile;
   const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
   if (tgUser?.id) {
     const names = [];
@@ -1307,16 +936,32 @@ window.FB_Bridge = {
   enabled: true,
   Auth: TelegramAuthManager,
   getProfile: getCurrentPlayerProfile,
+  Players: PlayersStorageManager,
+  MarketLots: MarketLotsManager,
+  Transactions: { buyLot: MarketLotsManager.buyLotAtomic },
+  ChatMessages: ChatMessagesManager,
+  Notifications: NotificationsManager,
   CarsCatalog: CarsCatalogManager,
   Plates: RegisteredPlatesManager,
-  CloudSave: CloudSaveManager,
-  M: M_NetworkManager,
-  P2P: P2PMarketManager,
-  QuickChat: QuickChatManager,
   Clubs: ClubsManager,
-  Friends: FriendsReferralManager,
-  Leaderboard: LeaderboardManager
+  Leaderboard: LeaderboardManager,
+  // Алиасы обратной совместимости:
+  CloudSave: {
+    pushSave: PlayersStorageManager.pushSave,
+    pullSave: PlayersStorageManager.pullSave
+  },
+  P2P: MarketLotsManager,
+  QuickChat: {
+    getPhrasesList: (cat) => Object.values(CANNED_PHRASES).filter(p => !cat || p.category === cat),
+    makeDialogId: (a, b, c) => `dlg_${[String(a), String(b)].sort().join("_")}_${c}`,
+    sendPhrase: async (dId, pId, pr) => {
+      const phr = CANNED_PHRASES[pId];
+      if (!phr) return false;
+      return (await ChatMessagesManager.sendMessage({ dialogId: dId, text: phr.text, senderProfile: pr })).success;
+    },
+    fetchDialogMessages: ChatMessagesManager.fetchMessagesForDialog
+  }
 };
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Bridge v1.0.0] CarsCatalog, RegisteredPlates, P2P, CloudSave активны 🌐");
+console.log("[☁️ FB_Bridge v1.1.0] players, garages, market_lots, transactions активны 🌐");
