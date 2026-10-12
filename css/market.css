@@ -2,11 +2,11 @@
   position: relative;
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-xl);
   padding: 14px;
   margin-bottom: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -15,8 +15,8 @@
 }
 
 .glass-card.personal-car-card {
-  border: 1.5px solid rgba(255, 179, 0, 0.75) !important;
-  box-shadow: 0 0 20px rgba(255, 179, 0, 0.3) !important;
+  border: 1.5px solid rgba(255, 179, 0, 0.85) !important;
+  box-shadow: 0 0 24px rgba(255, 179, 0, 0.35), inset 0 0 15px rgba(255, 179, 0, 0.08) !important;
 }
 
 /* ========================================================
@@ -118,11 +118,10 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.2) 45%, transparent 70%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.2) 45%, transparent 70%);
   pointer-events: none;
 }
 
-/* Стрелочки быстрого переключения фото на карточке */
 .car-gallery-nav-btn {
   position: absolute;
   top: 50%;
@@ -151,7 +150,6 @@
 .car-gallery-prev { left: 6px; }
 .car-gallery-next { right: 6px; }
 
-/* Индикатор количества фото */
 .car-gallery-dots {
   position: absolute;
   bottom: 8px;
@@ -176,7 +174,6 @@
   box-shadow: 0 0 6px var(--cyan-glow);
 }
 
-/* Кнопка быстрого звука выхлопа */
 .car-exhaust-audio-btn {
   position: absolute;
   top: 8px;
@@ -203,7 +200,223 @@
 }
 
 /* ========================================================
-   3. АНИМИРОВАННЫЕ ШКАЛЫ ТЕЛЕМЕТРИИ КАРТОЧКИ
+   3. ОБЪЁМНЫЕ РЕЛЬЕФНЫЕ ПРЯМОУГОЛЬНИКИ ХАРАКТЕРИСТИК (3D CAPSULES)
+   ======================================================== */
+.car-header-row-volumetric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.car-title-plate {
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 0.3px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  line-height: 1.2;
+}
+
+/* Объёмная 3D-плашка цены */
+.car-price-badge-3d {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.18) 0%, rgba(5, 20, 14, 0.85) 100%);
+  border: 1.5px solid rgba(0, 230, 118, 0.45);
+  border-top: 1.5px solid rgba(0, 230, 118, 0.85);
+  border-radius: 12px;
+  padding: 5px 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 12px rgba(0, 230, 118, 0.25);
+  flex-shrink: 0;
+}
+
+.car-price-label-sub {
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #86efac;
+  letter-spacing: 0.5px;
+}
+
+.car-price-value-3d {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--green);
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
+  line-height: 1.15;
+}
+
+/* Рельефная 3D-сетка характеристик (ВМЕСТО ПЛОСКОГО ТЕКСТА) */
+.car-specs-grid-volumetric {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.spec-tile-3d {
+  background: linear-gradient(160deg, rgba(25, 36, 56, 0.85) 0%, rgba(9, 14, 25, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  padding: 7px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.12s ease, border-color 0.15s ease;
+}
+
+.spec-tile-3d:active {
+  transform: scale(0.96);
+}
+
+.spec-tile-icon-wrap {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  margin-bottom: 1px;
+}
+
+.spec-tile-icon-power {
+  background: rgba(255, 179, 0, 0.15);
+  color: var(--amber);
+  border: 1px solid rgba(255, 179, 0, 0.35);
+  box-shadow: 0 0 8px rgba(255, 179, 0, 0.3);
+}
+
+.spec-tile-icon-road {
+  background: rgba(0, 242, 254, 0.15);
+  color: var(--cyan);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  box-shadow: 0 0 8px rgba(0, 242, 254, 0.3);
+}
+
+.spec-tile-icon-shield {
+  background: rgba(0, 230, 118, 0.15);
+  color: var(--green);
+  border: 1px solid rgba(0, 230, 118, 0.35);
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.3);
+}
+
+.spec-tile-icon-shield-mid {
+  background: rgba(255, 179, 0, 0.15);
+  color: var(--amber);
+  border: 1px solid rgba(255, 179, 0, 0.35);
+}
+
+.spec-tile-icon-shield-low {
+  background: rgba(255, 51, 102, 0.2);
+  color: var(--red);
+  border: 1px solid rgba(255, 51, 102, 0.45);
+  animation: pulseLowHealthIcon 1.2s infinite alternate;
+}
+@keyframes pulseLowHealthIcon {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  100% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 10px var(--red); }
+}
+
+.spec-tile-val {
+  font-size: 11px;
+  font-weight: 900;
+  color: #fff;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.spec-tile-sub {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ========================================================
+   4. СТАТУС-ПЛАШКА ТЮНИНГА / СТОКА С АНИМАЦИЕЙ SHIMMER
+   ======================================================== */
+.car-tuning-status-capsule {
+  background: linear-gradient(145deg, rgba(16, 24, 38, 0.95), rgba(7, 11, 20, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 3px solid var(--cyan);
+  border-radius: 10px;
+  padding: 7px 10px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
+.tuning-status-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.stock-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stock-badge-pill::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -60%;
+  width: 40%;
+  height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: rotate(25deg);
+  animation: shimmerSweepBadge 3.2s infinite ease-in-out;
+}
+
+.car-mods-badges-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.mod-pill {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ========================================================
+   5. АНИМИРОВАННЫЕ ШКАЛЫ ТЕЛЕМЕТРИИ КАРТОЧКИ
    ======================================================== */
 .car-telemetry-panel {
   display: flex;
@@ -250,7 +463,6 @@
   position: relative;
 }
 
-/* Градиенты шкал */
 .fill-power {
   background: linear-gradient(90deg, #0284c7 0%, #00f2fe 55%, #ffb300 85%, #ff3366 100%);
   box-shadow: 0 0 8px var(--cyan-glow);
@@ -284,7 +496,7 @@
 }
 
 /* ========================================================
-   4. СВЕТОДИОДНЫЕ (LED) И СТРОБОСКОПИЧЕСКИЕ БЕЙДЖИ
+   6. СВЕТОДИОДНЫЕ (LED) И СТРОБОСКОПИЧЕСКИЕ БЕЙДЖИ
    ======================================================== */
 .badge-tag {
   position: absolute !important;
@@ -304,7 +516,6 @@
 .badge-br { bottom: 8px !important; right: 8px !important; }
 .badge-tl { top: 8px !important; left: 8px !important; }
 
-/* Пульсирующая светодиодная точка (LED) */
 .led-dot {
   width: 6px;
   height: 6px;
@@ -331,7 +542,6 @@
   50% { opacity: 0.35; transform: scale(0.85); }
 }
 
-/* Стробоскопический аварийный бейдж (Розыск / 12.5.1) */
 .badge-police-strobe {
   border-color: #ff3366 !important;
   background: rgba(220, 38, 38, 0.25) !important;
@@ -349,7 +559,6 @@
   }
 }
 
-/* Золотой мерцающий блик (Блатной номер) */
 .badge-shimmer-gold {
   position: relative;
   overflow: hidden;
@@ -374,7 +583,7 @@
 }
 
 /* ========================================================
-   5. ЖИВЫЕ РЕПЛИКИ ПРОДАВЦА У КАПОТА
+   7. ЖИВЫЕ РЕПЛИКИ ПРОДАВЦА У КАПОТА
    ======================================================== */
 .seller-dialog-bubble {
   background: linear-gradient(135deg, rgba(14, 23, 40, 0.95), rgba(7, 12, 22, 0.95));
@@ -404,7 +613,7 @@
 }
 
 /* ========================================================
-   6. ПАНЕЛЬ ЦЕНЫ И БЕЙДЖИ МАРЖИ
+   8. ПАНЕЛЬ ЦЕНЫ И БЕЙДЖИ МАРЖИ
    ======================================================== */
 .price-box {
   background: rgba(0, 230, 118, 0.08);
