@@ -1,21 +1,31 @@
 // ========================================================
-// js/network.js — СЕТЕВОЙ КЛИЕНТ И WEBSOCKETS (v0.4.5)
+// js/network.js — СЕТЕВОЙ КЛИЕНТ И WEBSOCKETS (v0.4.6)
 // Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
 // Безопасная инициализация после готовности ядра state,
 // связка с P2P биржей, чатами и синхронизацией профиля
 // ========================================================
 
-const SERVER_URL = "http://localhost:3000"; // URL вашего VPS/домена после деплоя
+const DEFAULT_BACKEND_URL = (typeof window !== 'undefined' && window.SERVER_URL)
+    ? window.SERVER_URL
+    : (location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+        ? "http://localhost:3000"
+        : `${location.protocol}//${location.host}`);
+
 let socket = null;
 let authToken = null;
 let currentChatPartnerId = null;
+let networkInitAttempts = 0;
 
 const NetworkManager = {
     async init() {
-        // Гарантируем, что ядро игры и глобальный state уже инициализированы
+        // Гарантируем безопасное ожидание ядра игры (до 25 попыток по 200 мс)
         if (typeof state === 'undefined') {
-            console.warn("[🌐 Network v0.4.5] Ожидание инициализации app.js (state)...");
-            setTimeout(() => this.init(), 200);
+            networkInitAttempts++;
+            if (networkInitAttempts < 25) {
+                setTimeout(() => this.init(), 200);
+            } else {
+                console.warn("[🌐 Network] Превышено время ожидания state, работаем в автономном режиме.");
+            }
             return;
         }
 
@@ -26,11 +36,13 @@ const NetworkManager = {
             }
         } catch (e) {}
 
+        const serverUrl = window.SERVER_URL || DEFAULT_BACKEND_URL;
+
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 4000);
+            const timeoutId = setTimeout(() => controller.abort(), 3500);
 
-            const res = await fetch(`${SERVER_URL}/api/auth`, {
+            const res = await fetch(`${serverUrl}/api/auth`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ initData }),
@@ -42,17 +54,16 @@ const NetworkManager = {
             const data = await res.json();
             authToken = data.token;
 
-            // Если в БД сервера есть сохранённый профиль — подтягиваем данные
+            // Если в БД сервера есть сохранённый профиль — аккуратно подтягиваем данные
             if (data.profile) {
-                if (data.profile.cash !== undefined) state.player.cash = data.profile.cash;
-                if (data.profile.safe_deposit !== undefined) state.player.safeDeposit = data.profile.safe_deposit;
+                if (data.profile.cash !== undefined && state.player) state.player.cash = data.profile.cash;
+                if (data.profile.safe_deposit !== undefined && state.player) state.player.safeDeposit = data.profile.safe_deposit;
                 
                 if (data.profile.garage_json) {
                     try {
                         const parsedG = JSON.parse(data.profile.garage_json);
                         if (Array.isArray(parsedG) && parsedG.length > 0) {
                             state.garage = parsedG;
-                            // Актуализация стоимости автомобилей с учётом установленных номеров
                             state.garage.forEach(c => {
                                 if (typeof recalculateCarMarketValue === 'function') {
                                     recalculateCarMarketValue(c);
@@ -81,7 +92,7 @@ const NetworkManager = {
                 if (data.profile.houses_json) {
                     try {
                         const parsedHouses = JSON.parse(data.profile.houses_json);
-                        if (Array.isArray(parsedHouses) && parsedHouses.length > 0) {
+                        if (Array.isArray(parsedHouses) && parsedHouses.length > 0 && state.player) {
                             state.player.ownedHouses = parsedHouses;
                         }
                     } catch (e) {}
@@ -91,68 +102,77 @@ const NetworkManager = {
                 if (typeof renderGarage === 'function') renderGarage();
             }
 
-            this.connectSocket();
-            this.fetchP2PListings();
-            console.log("[🌐 Network v0.4.5] Успешная авторизация на бэкенде!");
+            this.connectSocket(serverUrl);
+            this.fetchP2PListings(serverUrl);
+            console.log("[🌐 Network v0.4.6] Успешная авторизация на бэкенде!");
         } catch (e) {
-            console.warn("[🌐 Network v0.4.5] Сервер оффлайн, работаем в автономном локальном режиме.");
+            console.warn("[🌐 Network v0.4.6] Сервер оффлайн, игра запущена в локальном автономном режиме.");
         }
     },
 
-    connectSocket() {
+    connectSocket(serverUrl) {
         if (typeof io === 'undefined') return;
-        socket = io(SERVER_URL, { reconnectionAttempts: 5, timeout: 5000 });
+        const targetUrl = serverUrl || window.SERVER_URL || DEFAULT_BACKEND_URL;
+        
+        try {
+            socket = io(targetUrl, { reconnectionAttempts: 3, timeout: 4000 });
 
-        socket.on('connect', () => {
-            if (authToken) {
-                socket.emit('auth:socket', authToken);
-            }
-        });
-
-        // Слушатели Городского Эфира
-        socket.on('chat:new_broadcast', (msg) => {
-            if (!state.lifeChatMessages) state.lifeChatMessages = [];
-            state.lifeChatMessages.push({
-                sender: msg.sender,
-                text: msg.text,
-                isMine: msg.senderId === String(window.Telegram?.WebApp?.initDataUnsafe?.user?.id || "dev_user_777")
+            socket.on('connect', () => {
+                if (authToken) {
+                    socket.emit('auth:socket', authToken);
+                }
             });
-            if (typeof renderLifeChat === 'function') renderLifeChat();
-        });
 
-        // Слушатели P2P биржи
-        socket.on('p2p:new_lot', (lot) => {
-            if (!state.p2pMarketListings) state.p2pMarketListings = [];
-            state.p2pMarketListings.unshift(lot);
-            if (typeof renderP2PListings === 'function') renderP2PListings();
-            if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.renderP2PListingsFiltered === 'function') {
-                PhoneManager.renderP2PListingsFiltered();
-            }
-        });
+            // Слушатели Городского Эфира
+            socket.on('chat:new_broadcast', (msg) => {
+                if (!state.lifeChatMessages) state.lifeChatMessages = [];
+                state.lifeChatMessages.push({
+                    author: msg.sender,
+                    text: msg.text,
+                    warning: false
+                });
+                if (typeof renderLifeChat === 'function') renderLifeChat();
+            });
 
-        socket.on('p2p:lot_sold', ({ listingId }) => {
-            if (!state.p2pMarketListings) return;
-            state.p2pMarketListings = state.p2pMarketListings.filter(l => l.id !== listingId);
-            if (typeof renderP2PListings === 'function') renderP2PListings();
-            if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.renderP2PListingsFiltered === 'function') {
-                PhoneManager.renderP2PListingsFiltered();
-            }
-        });
+            // Слушатели P2P биржи
+            socket.on('p2p:new_lot', (lot) => {
+                if (!state.p2pMarketListings) state.p2pMarketListings = [];
+                state.p2pMarketListings.unshift(lot);
+                if (typeof renderP2PListings === 'function') renderP2PListings();
+                if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.renderP2PListingsFiltered === 'function') {
+                    PhoneManager.renderP2PListingsFiltered();
+                }
+            });
 
-        // Личные сообщения перекупов
-        socket.on('dm:new_message', (msg) => {
-            this.appendDMMessage(msg);
-        });
+            socket.on('p2p:lot_sold', ({ listingId }) => {
+                if (!state.p2pMarketListings) return;
+                state.p2pMarketListings = state.p2pMarketListings.filter(l => l.id !== listingId);
+                if (typeof renderP2PListings === 'function') renderP2PListings();
+                if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.renderP2PListingsFiltered === 'function') {
+                    PhoneManager.renderP2PListingsFiltered();
+                }
+            });
 
-        socket.on('dm:notification', (notif) => {
-            showToast(`✉️ Сообщение от ${notif.fromName}: ${notif.text.slice(0, 25)}...`);
-            playSound('tick');
-        });
+            // Личные сообщения
+            socket.on('dm:new_message', (msg) => {
+                this.appendDMMessage(msg);
+            });
+
+            socket.on('dm:notification', (notif) => {
+                if (typeof showToast === 'function') {
+                    showToast(`✉️ Сообщение от ${notif.fromName}: ${String(notif.text).slice(0, 25)}...`);
+                }
+                if (typeof playSound === 'function') playSound('tick');
+            });
+        } catch (err) {
+            console.warn("[🌐 Network] Сбой инициализации WebSocket:", err);
+        }
     },
 
-    async fetchP2PListings() {
+    async fetchP2PListings(serverUrl) {
+        const targetUrl = serverUrl || window.SERVER_URL || DEFAULT_BACKEND_URL;
         try {
-            const res = await fetch(`${SERVER_URL}/api/p2p/listings`);
+            const res = await fetch(`${targetUrl}/api/p2p/listings`);
             const data = await res.json();
             if (Array.isArray(data) && data.length > 0) {
                 state.p2pMarketListings = data;
@@ -166,7 +186,9 @@ const NetworkManager = {
 
     sendBroadcastChat(text) {
         if (!socket || !socket.connected) {
-            sendChatMessageFromInput();
+            if (typeof sendChatMessageFromInput === 'function') {
+                sendChatMessageFromInput();
+            }
             return;
         }
         socket.emit('chat:broadcast', {
@@ -177,14 +199,14 @@ const NetworkManager = {
 
     openDirectChat(targetUserId, targetName) {
         currentChatPartnerId = targetUserId;
-        setTxt('dmModalTitle', `Чат с ${targetName}`);
+        if (typeof setTxt === 'function') setTxt('dmModalTitle', `Чат с ${targetName}`);
         const box = document.getElementById('dmMessagesBox');
         if (box) box.innerHTML = "<div class='sub-label text-center py-2'>Загрузка истории...</div>";
 
         if (socket && socket.connected) {
             socket.emit('dm:join_dialog', { targetUserId });
             socket.once('dm:history', (history) => {
-                if (box) {
+                if (box && Array.isArray(history)) {
                     box.innerHTML = history.map(m => `
                         <div class="chat-bubble ${m.sender_tg_id === targetUserId ? '' : 'mine'}">
                             <b>${m.sender_name}:</b> ${m.text}
@@ -226,5 +248,4 @@ const NetworkManager = {
     }
 };
 
-// Экспорт менеджера в window
 window.NetworkManager = NetworkManager;
