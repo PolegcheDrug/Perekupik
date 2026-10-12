@@ -1,10 +1,10 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И СДЕЛКИ (v0.6.4)
+// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И СДЕЛКИ (v0.6.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Динамическая подгрузка фото машин из папок моделей,
 // доступ к Комфорту с 15 ур., сортировка всех категорий,
 // замеры толщиномером, диагностика Launch OBD2 и оформление ДКП.
-// Защита от пустых категорий и гарантированный респавн лотов.
+// Интеграция с Автоподбором (-35% дисконт) и Разборкой.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -208,7 +208,7 @@ function refreshMarketFeedManual() {
 }
 
 // ========================================================
-// ГЕНЕРАЦИЯ ОБЪЯВЛЕНИЙ С ЗАЩИТОЙ ОТ ПУСТЫХ СПИСКОВ
+// ГЕНЕРАЦИЯ ОБЪЯВЛЕНИЙ (СВЯЗКА С АВТОПОДБОРОМ И РАЗБОРКОЙ)
 // ========================================================
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
@@ -216,6 +216,9 @@ function populateMarketFeed() {
     let cat = state.activeCategory ? state.activeCategory : 'economy';
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
     let pool = [];
+
+    // Проверка собственной службы Автоподбора
+    const hasAutopodbor = (state.businesses || []).some(b => b.id === 'autopodbor' && b.level > 0);
 
     if (cat === 'all') {
         let allowedCategories = ['economy', 'scooter'];
@@ -256,7 +259,13 @@ function populateMarketFeed() {
         let dealType = 'normal';
         let priceMultiplier = 0.80;
 
-        if (dealRoll < 0.25) { 
+        // БОНУС АВТОПОДБОРА: 25% шанс найти эксклюзив со скидкой 35%
+        let isPodborFind = false;
+        if (hasAutopodbor && Math.random() < 0.25) {
+            isPodborFind = true;
+            dealType = 'urgent';
+            priceMultiplier = 0.60 + Math.random() * 0.05; // -35-40% от рынка
+        } else if (dealRoll < 0.25) { 
             dealType = 'urgent';
             priceMultiplier = 0.65 + Math.random() * 0.10;
         } else if (dealRoll < 0.75) {
@@ -321,7 +330,9 @@ function populateMarketFeed() {
         }
 
         let sNote = "Машина на бодром ходу, сел и поехал.";
-        if (isLuckyFind) {
+        if (isPodborFind) {
+            sNote = "«Срочный выкуп найден вашими автоподборщиками. Продавец отдаёт с дисконтом 35%!» 🎯";
+        } else if (isLuckyFind) {
             sNote = "«Отдаю дедовский аппарат как есть, в этих ваших номерах ничего не понимаю.» (🔥 Продавец не знает цену номеров!)";
         } else if (dealType === 'overprice') {
             const overpriceNotes = [
@@ -388,12 +399,13 @@ function populateMarketFeed() {
             fallback: cFallback,
             plate: genPlate,
             isStolen: isStolen,
+            isPodborFind: isPodborFind,
             autotekaChecked: false,
             cooldownUntil: 0,
             stoChecked: false,
             gaugeChecked: false,
             haggled: false,
-            hagglePatience: currentSellerType === 'greedy' ? 3 : (currentSellerType === 'hurried' ? 5 : 4),
+            hagglePatience: isPodborFind ? 6 : (currentSellerType === 'greedy' ? 3 : (currentSellerType === 'hurried' ? 5 : 4)),
             sellerPersonality: currentSellerType,
             dealType: dealType,
             unavailable: false,
@@ -487,7 +499,9 @@ function renderMarketFeed() {
         let autoIcon = car.autotekaChecked ? "Проверено ✓" : "5,000 ₽";
 
         let dealBadge = "";
-        if (car.dealType === 'urgent') {
+        if (car.isPodborFind) {
+            dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🎯 ПОДБОР -35%</span>";
+        } else if (car.dealType === 'urgent') {
             dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🔥 СРОЧНО</span>";
         } else if (car.dealType === 'overprice') {
             dealBadge = "<span class='tag-badge bg-tag-red ml-1'>⚠️ ВЫСОКАЯ ЦЕНА</span>";
@@ -758,7 +772,7 @@ function initiateBuyMarketCar(carId) {
         let callSuccessChance = 75;
         if (karma > 65) callSuccessChance += 15;
         if (karma < 35) callSuccessChance -= 15;
-        if (car.dealType === 'urgent') callSuccessChance += 20;
+        if (car.dealType === 'urgent' || car.isPodborFind) callSuccessChance += 20;
         
         const roll = Math.random() * 100;
 
@@ -806,7 +820,7 @@ function paidCallMarketCar(carId) {
 }
 
 // ----------------------------------------------------
-// ВСТРЕЧА У КАПОТА: ПРОВЕРКИ И ТОРГ
+// ВСТРЕЧА У КАПОТА: ПРОВЕРКИ, ТОРГ И РАЗБОРКА
 // ----------------------------------------------------
 function openMarketDeal(carId) {
     const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
@@ -848,8 +862,9 @@ function openMarketDeal(carId) {
     const thread = document.getElementById("dealChatThread");
     if (thread) {
         let greeting = "«Привет! Вот машина, осматривай кузов, проверяй сканером. Если всё устроит — оформим ДКП.»";
-        if (car.dealType === 'urgent') greeting = "«Здорово! Мне срочно нужны деньги до вечера, готов уступить реальному покупателю!»";
-        if (car.dealType === 'overprice') greeting = "«Добрый день. Машина ухоженная, состояние отличное. Сильно сбивать цену не позволю.»";
+        if (car.isPodborFind) greeting = "«Здравствуйте! Мне сказали, что вы от автоподбора. Готов сразу отдать со скидкой, документы готовы.»";
+        else if (car.dealType === 'urgent') greeting = "«Здорово! Мне срочно нужны деньги до вечера, готов уступить реальному покупателю!»";
+        else if (car.dealType === 'overprice') greeting = "«Добрый день. Машина ухоженная, состояние отличное. Сильно сбивать цену не позволю.»";
         thread.innerHTML = "<div class='chat-msg msg-seller'>" + greeting + "</div>";
     }
 
@@ -865,6 +880,7 @@ function renderMarketHaggleControls() {
     const car = pendingMarketCar.car;
     let hasGauge = !!(state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_pro));
     let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
+    const hasScrapYard = (state.businesses || []).some(b => b.id === 'razborka' && b.level > 0);
 
     let toolIcon = hasGauge ? "✓" : "(3k)";
     let obdIcon = hasScanner ? "Launch OBD2 ✓" : "Launch (5k)";
@@ -884,6 +900,16 @@ function renderMarketHaggleControls() {
             </button>
         </div>
     `;
+
+    // Кнопка сбыта на разборку для проблемных авто
+    let scrapOptionBtn = "";
+    if (hasScrapYard && (car.isStolen || (car.hiddenDefect && car.hiddenDefect.severity === "Критическая"))) {
+        let scrapPrice = Math.round(car.price * 0.60);
+        scrapOptionBtn = `
+        <button onclick="buyCarDirectToScrapYard(${scrapPrice})" class="btn btn-danger btn-sm w-full mb-2">
+            🔩 Выкупить под распил на свою Разборку (${scrapPrice.toLocaleString()} ₽ / -40%)
+        </button>`;
+    }
 
     let inspectionBonusBtn = "";
     if (car.stoChecked && car.hiddenDefect) {
@@ -906,6 +932,7 @@ function renderMarketHaggleControls() {
             </div>
         </div>
         ${inspectionToolsBlock}
+        ${scrapOptionBtn}
         ${inspectionBonusBtn}
         <div class="grid-3">
             <button onclick="attemptMarketHaggle(5)" class="btn btn-dark btn-sm">
@@ -918,6 +945,45 @@ function renderMarketHaggleControls() {
                 -18%<br><span class="color-red text-xs">Жёстко</span>
             </button>
         </div>`;
+}
+
+function buyCarDirectToScrapYard(price) {
+    if (!pendingMarketCar) return;
+    const car = pendingMarketCar.car;
+    let cash = state.player?.cash || 0;
+    if (cash < price) return showToast("Не хватает денег на выкуп машины!");
+
+    state.player.cash -= price;
+    
+    // Прибыль от разборки на запчасти (+30-50% к цене выкупа)
+    let salvageYield = Math.round(price * (1.35 + Math.random() * 0.25));
+    let gainedXp = 50;
+
+    // Пополнение складов предприятий деталями
+    if (state.businesses) {
+        let razborka = state.businesses.find(b => b.id === 'razborka');
+        if (razborka) {
+            razborka.stock = Math.min(razborka.maxStock || 100, (razborka.stock || 0) + 40);
+            razborka.stored = (razborka.stored || 0) + (salvageYield - price);
+        }
+    }
+
+    addXp(gainedXp);
+    car.unavailable = true;
+    ModalManager.close("modalMarketDeal");
+    
+    saveState();
+    updateHeaderUI();
+    renderMarketFeed();
+    playSound('win');
+    tgHaptic('success');
+
+    openVerdictModal(
+        "РАСПИЛЕН НА РАЗБОРКЕ! 🔩",
+        `Автомобиль «${car.name}» доставлен на авторазборку «Последний Путь» минуя МРЭО!\nЧистая прибыль с запчастей: +${(salvageYield - price).toLocaleString()} ₽\nЗапас сырья на разборке пополнен (+40%).`,
+        true,
+        salvageYield
+    );
 }
 
 function attemptDefectArgueHaggle() {
@@ -978,6 +1044,7 @@ function attemptMarketHaggle(percent) {
     car.hagglePatience -= 1;
 
     let baseChance = percent === 5 ? 85 : (percent === 10 ? 60 : 35);
+    if (car.isPodborFind) baseChance += 20; // Бонус подбора
     if (car.sellerPersonality === 'hurried') baseChance += 25;
     if (car.sellerPersonality === 'greedy') baseChance -= 20;
 
@@ -1401,6 +1468,7 @@ window.renderMarketHaggleControls = renderMarketHaggleControls;
 window.attemptMarketHaggle = attemptMarketHaggle;
 window.attemptDefectArgueHaggle = attemptDefectArgueHaggle;
 window.attemptPaintArgueHaggle = attemptPaintArgueHaggle;
+window.buyCarDirectToScrapYard = buyCarDirectToScrapYard;
 window.confirmMarketPurchaseSuccess = confirmMarketPurchaseSuccess;
 window.openRegistrationChoiceModal = openRegistrationChoiceModal;
 window.confirmRegistrationChoice = confirmRegistrationChoice;

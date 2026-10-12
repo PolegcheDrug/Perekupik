@@ -1,13 +1,14 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.6.2)
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.6.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // База транспорта с поддержкой папок и нескольких фото,
-// разблокировка Комфорта с 15 ур., обновленный Синдикат и Жизнь.
+// разблокировка Комфорта с 15 ур., обновленный Синдикат, Жизнь
+// и полная база из 11 предприятий со штатом, ветками апгрейдов и автопарком.
 // ========================================================
 
 const GAME_METADATA = {
-    version: "v0.6.2",
-    build: 260,
+    version: "v0.6.6",
+    build: 272,
     authors: "Tak Toje, Max, Sergo, gemini, Илья Чепиль",
     releaseDate: "2026-10-15",
     patchNotes: [
@@ -20,12 +21,12 @@ const GAME_METADATA = {
             text: "Класс комфортных иномарок и седанов теперь открывается с 15 уровня авторитета вместо 20."
         },
         {
-            title: "🏦 Полная переработка Во-Банка",
-            text: "Репутация перекупа перенесена в банк. Внедрен полноценный валютный обменник и гибкая система срочных вкладов с капитализацией."
+            title: "🏢 Расширенная бизнес-империя (11 точек)",
+            text: "Добавлены служба эвакуации, малярный цех Хамелеон, Stage Lab, Автоподбор Pro и Таможенный хаб Порта с персоналом и спецтранспортом."
         },
         {
-            title: "☕ Переосмысление раздела «Жизнь»",
-            text: "Удобный рацион питания, спортзал, авто-доставка еды и жизненные активности с ощутимыми игровыми бонусами."
+            title: "🏦 Полная переработка Во-Банка",
+            text: "Репутация перекупа перенесена в банк. Внедрен полноценный валютный обменник и гибкая система срочных вкладов с капитализацией."
         }
     ]
 };
@@ -249,7 +250,7 @@ const CAR_DATABASE = {
             "assets/cars/economy/oka/oka_7.jpg"
             ], 
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
-            },
+        },
         { name: "ЗАЗ-968М «Запорожец»", power: 40, basePrice: 40000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/zaz/zaz.jpg", images: ["assets/cars/economy/zaz/zaz.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
         { name: "Москвич-412", power: 75, basePrice: 55000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/moskvich/moskvich.jpg", images: ["assets/cars/economy/moskvich/moskvich.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
         { name: "ИЖ-2126 «Ода»", power: 73, basePrice: 65000, drivetrain: "rwd", type: "economy", img: "assets/cars/economy/izh/izh.jpg", images: ["assets/cars/economy/izh/izh.jpg"], fallback: CAR_FALLBACKS_BY_CATEGORY.economy },
@@ -722,45 +723,126 @@ const HOUSING_RANDOM_EVENTS = [
 ];
 
 // ========================================================
-// 5. БИЗНЕС
+// 5. БИЗНЕС-СЕТЬ (11 НАПРАВЛЕНИЙ)
 // ========================================================
 const BUSINESS_DATA = [
     { 
         id: 'wash', name: 'Автомойка 24/7', minLevel: 5, income: 900, level: 0, cost: 90000, reqStars: 5, stored: 0, stock: 100, 
         perk: 'Скидка 50% на полировку и химчистку', 
+        desc: 'Круглосуточный комплекс бесконтактной мойки и сушки кузова.',
         img: 'assets/business/wash.jpg',
         fallback: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80'
     },
     { 
         id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 8, income: 1500, level: 0, cost: 150000, reqStars: 10, stored: 0, stock: 100, 
         perk: '+10% к стоимости авто на правильных дисках', 
+        desc: 'Правка дисков, ошиповка, монтаж низкого профиля и полусликов.',
         img: 'assets/business/shina.jpg',
         fallback: 'https://images.unsplash.com/photo-1578844251758-2f71da64c96f?auto=format&fit=crop&w=600&q=80'
     },
     { 
         id: 'sto', name: 'СТО дяди Вани', minLevel: 12, income: 2200, level: 0, cost: 300000, reqStars: 15, stored: 0, stock: 100, 
         perk: 'Скидка 40% на ремонт мотора', 
+        desc: 'Капитальный ремонт ДВС, замена цепей ГРМ, подвески и агрегатов.',
         img: 'assets/business/sto.jpg',
+        fallback: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'tow_truck', name: 'Служба эвакуации «Шериф»', minLevel: 10, income: 3200, level: 0, cost: 420000, reqStars: 10, stored: 0, stock: 100, 
+        perk: 'Бесплатный забор авто со спецстоянки ГИБДД', 
+        desc: 'Парк эвакуаторов для оперативной эвакуации и спасения задержанных машин.',
+        img: 'assets/business/tow.jpg',
+        fallback: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'paint_shop', name: 'Малярный цех «Хамелеон»', minLevel: 14, income: 4500, level: 0, cost: 650000, reqStars: 15, stored: 0, stock: 100, 
+        perk: 'Облив в заводской микронный слой без следов шпаклёвки', 
+        desc: 'Покрасочная камера с инфракрасной сушкой. ЛКП ложится в заводской допуск.',
+        img: 'assets/business/paint.jpg',
+        fallback: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'chip_tuning', name: 'Лаборатория Stage Lab', minLevel: 18, income: 5800, level: 0, cost: 820000, reqStars: 20, stored: 0, stock: 100, 
+        perk: 'Скидка 70% на установку чип-тюнинга Stage 1-3', 
+        desc: 'Диностенд и калибровка прошивок ЭБУ под наддувные двигатели.',
+        img: 'assets/business/chip.jpg',
         fallback: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80'
     },
     { 
         id: 'detailing', name: 'Детейлинг Студия', minLevel: 20, income: 6500, level: 0, cost: 950000, reqStars: 25, stored: 0, stock: 100, 
         perk: '+35% к баллам на Автошоу', 
+        desc: 'Нанесение керамики, бронеплёнка, полировка и глубокая химчистка салона.',
         img: 'assets/business/detailing.jpg',
         fallback: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80'
     },
     { 
         id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 8000, level: 0, cost: 1200000, reqStars: 30, stored: 0, stock: 100, 
         perk: 'Детали на ремонт обходятся дешевле на 30%', 
+        desc: 'Скупка тотальных и аварийных авто на запчасти, продажа контрактных узлов.',
         img: 'assets/business/razborka.jpg',
         fallback: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?auto=format&fit=crop&w=600&q=80'
     },
     { 
+        id: 'autopodbor', name: 'Агентство «Автоподбор Pro»', minLevel: 25, income: 9500, level: 0, cost: 1500000, reqStars: 35, stored: 0, stock: 100, 
+        perk: '25% шанс найти эксклюзив со скидкой 35% на авторынке', 
+        desc: 'Штат выездных экспертов находит срочные варианты с огромным дисконтом.',
+        img: 'assets/business/podbor.jpg',
+        fallback: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
         id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 32, income: 18000, level: 0, cost: 3800000, reqStars: 50, stored: 0, stock: 100, 
         perk: 'Пассивный доход и +1 🤝 связь каждый день', 
+        desc: 'Парк лицензированных седанов под аренду проверенным водителям.',
         img: 'assets/business/taxi.jpg',
         fallback: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80'
+    },
+    { 
+        id: 'customs_hub', name: 'Таможенный хаб Порта', minLevel: 40, income: 25000, level: 0, cost: 5500000, reqStars: 60, stored: 0, stock: 100, 
+        perk: 'Прямые поставки контейнеров и +2 связи Синдиката', 
+        desc: 'Собственный терминал для таможенной очистки автовозов и контейнеров.',
+        img: 'assets/business/hub.jpg',
+        fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80'
     }
+];
+
+// ВЕТКИ АПГРЕЙДОВ ЦЕХА
+const BUSINESS_UPGRADES_BRANCHES = {
+    equipment: [
+        { name: "Базовый слесарный пост (+15% к выручке)", costMul: 0.35, bonusPct: 15 },
+        { name: "Пневмолиния и специнструмент (+30% к выручке)", costMul: 0.65, bonusPct: 30 },
+        { name: "Компьютерные 3D-стенды и стенд сход-развала (+45% к выручке)", costMul: 1.10, bonusPct: 45 }
+    ],
+    storage: [
+        { name: "Стеллажная зона хранения (+135% к вместимости)", costMul: 0.25 },
+        { name: "Автоматизированный складской модуль (+270% к вместимости)", costMul: 0.55 },
+        { name: "Оптовый распределительный терминал (+405% к вместимости)", costMul: 0.90 }
+    ],
+    marketing: [
+        { name: "Светодиодная вывеска и локальный таргетинг (+15% трафика)", costMul: 0.20, trafficBonusPct: 15 },
+        { name: "Партнёрская программа с автоклубами (+25% трафика)", costMul: 0.50, trafficBonusPct: 25 },
+        { name: "Генеральный спонсор соревнований (+40% трафика)", costMul: 0.85, trafficBonusPct: 40 }
+    ]
+};
+
+// ШТАТ СОТРУДНИКОВ БИЗНЕСА
+const BUSINESS_STAFF_CATALOG = {
+    managers: [
+        { id: "mgr_junior", name: "Стажёр Денис", salary: 2500, hireCost: 35000, reqStars: 2, incomeBonusPct: 5, autoRestock: false, perkText: "+5% к выручке" },
+        { id: "mgr_pro", name: "Управляющий Артём", salary: 7000, hireCost: 120000, reqStars: 8, incomeBonusPct: 15, autoRestock: true, restockDiscount: 0.1, perkText: "Автозакупка сырья со скидкой 10%, +15% к кассе" }
+    ],
+    masters: [
+        { id: "mst_stepan", name: "Мастер Степаныч", salary: 3500, hireCost: 45000, reqStars: 3, incomeBonusPct: 10, stockSavePct: 15, perkText: "+10% к кассе, экономит 15% сырья" },
+        { id: "mst_expert", name: "Шеф-механик Вольдемар", salary: 9000, hireCost: 160000, reqStars: 10, incomeBonusPct: 25, stockSavePct: 35, perkText: "+25% к кассе, экономит 35% сырья" }
+    ],
+    security: [
+        { id: "sec_chop", name: "Пост ЧОП «Титан»", salary: 3000, hireCost: 40000, reqStars: 2, perkText: "Защита от ночных краж сырья и визитов полиции" }
+    ]
+};
+
+// КОММЕРЧЕСКИЙ АВТОПАРК
+const BUSINESS_FLEET_CATALOG = [
+    { id: "fl_gazel", name: "ГАЗель NEXT Фургон", cost: 450000, reqStars: 5, suitableBusinesses: ["wash", "shina", "sto", "detailing", "razborka"], incomeBonusPct: 12, stockCapacityBonus: 50, desc: "Подвоз запчастей и сырья без задержек." },
+    { id: "fl_tow", name: "Эвакуатор ГАЗон NEXT", cost: 1200000, reqStars: 12, suitableBusinesses: ["sto", "razborka", "tow_truck"], incomeBonusPct: 25, stockCapacityBonus: 100, desc: "Доставка аварийных машин на СТО и разборку." }
 ];
 
 // ========================================================
@@ -1134,7 +1216,6 @@ const BUYERS_CATALOG = {
 // 9. КОНТРАКТЫ СИНДИКАТА (С ПРИВЯЗКОЙ К УРОВНЯМ И КЛАССАМ)
 // ========================================================
 const SYNDICATE_CONTRACT_TEMPLATES = [
-    // 7-14 Уровни (Только открытые Эконом, Мото, Квадро)
     {
         type: 'taxi_economy',
         minPlayerLevel: 7,
@@ -1198,8 +1279,6 @@ const SYNDICATE_CONTRACT_TEMPLATES = [
         rewardConn: 1,
         rewardXp: 70
     },
-
-    // 15-29 Уровни (Разблокирован Комфорт с 15 ур.)
     {
         type: 'comfort_corporate',
         minPlayerLevel: 15,
@@ -1243,8 +1322,6 @@ const SYNDICATE_CONTRACT_TEMPLATES = [
         rewardConn: 2,
         rewardXp: 160
     },
-
-    // 30+ Уровни (Премиум, Грузовики, Гиперкары и Яхты)
     {
         type: 'vip_escort',
         minPlayerLevel: 30,
@@ -1365,6 +1442,9 @@ window.loadExternalCarDatabase = loadExternalCarDatabase;
 window.HOUSING_LIST = HOUSING_LIST;
 window.HOUSING_RANDOM_EVENTS = HOUSING_RANDOM_EVENTS;
 window.BUSINESS_DATA = BUSINESS_DATA;
+window.BUSINESS_UPGRADES_BRANCHES = BUSINESS_UPGRADES_BRANCHES;
+window.BUSINESS_STAFF_CATALOG = BUSINESS_STAFF_CATALOG;
+window.BUSINESS_FLEET_CATALOG = BUSINESS_FLEET_CATALOG;
 window.BARN_TIERS_CONFIG = BARN_TIERS_CONFIG;
 window.BARN_FINDS = BARN_FINDS;
 window.SUPER_SPIN_TIERS = SUPER_SPIN_TIERS;

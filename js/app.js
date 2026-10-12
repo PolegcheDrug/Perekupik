@@ -1,12 +1,12 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, MODAL MANAGER & CLOUD SYNC (v0.6.2)
+// js/app.js — ЯДРО СИМУЛЯТОРА, MODAL MANAGER & CLOUD SYNC (v0.6.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Единый менеджер модальных окон, мульти-фото авто из папок,
 // уровень комфорта с 15 ур., Telegram Cloud Storage,
-// реактивные депозиты и расширенный жизненный цикл.
+// реактивные депозиты, зарплаты персонала бизнеса и автозакупки.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.6.2";
+const CURRENT_GAME_VERSION = "v0.6.6";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -23,18 +23,15 @@ let isCloudStorageAvailable = false;
 function getCarImage(template) {
     if (!template) return "assets/cars/economy/2101/vaz-2101.jpg";
     
-    // Если у модели определена галерея (например, vaz-2101, vaz-2101_1.jpg ... vaz-2101_10.jpg)
     if (Array.isArray(template.images) && template.images.length > 0) {
         const randIdx = Math.floor(Math.random() * template.images.length);
         return template.images[randIdx];
     }
     
-    // Если галереи нет, берем базовое img
     if (template.img) {
         return template.img;
     }
     
-    // Откат по типу
     if (typeof getCategoryFallback === 'function') {
         return getCategoryFallback(template.type || 'economy');
     }
@@ -166,7 +163,7 @@ function playSound(type) {
             osc.connect(g); g.connect(audioCtx.destination);
             osc.type = 'square';
             osc.frequency.setValueAtTime(160, now);
-            osc.frequency.exponentialRampToValueAtTime(50, now + 0.3);
+            osc.exponentialRampToValueAtTime(50, now + 0.3);
             g.gain.setValueAtTime(0.15, now);
             g.gain.linearRampToValueAtTime(0, now + 0.3);
             osc.start(now); osc.stop(now + 0.3);
@@ -437,7 +434,6 @@ const DEFAULT_STATE = {
         
         crypto: { btc: 0, eth: 0, staked: [], prices: { btc: 9500000, eth: 340000 } },
         
-        // Репутация в банке и отзывы клиентов
         bankReputation: { 
             rating: 5.0, 
             successfulDeals: 0, 
@@ -463,7 +459,6 @@ const DEFAULT_STATE = {
         dailyQuestsSuperClaimed: false,
         bankHistory: [],
         
-        // Расширенная система вкладов
         bankDeposits: [
             {
                 id: "dep_init",
@@ -1223,7 +1218,6 @@ function sanitizeState() {
     }
     if (!Array.isArray(state.player.crypto.staked)) state.player.crypto.staked = [];
 
-    // Банковская репутация
     if (!state.player.bankReputation) {
         state.player.bankReputation = { 
             rating: 5.0, 
@@ -1266,14 +1260,27 @@ function sanitizeState() {
         state.player.toolsWear = { gauge: 60, gauge_pro: 100, obd: 50, obd_launch: 80, endoscope: 40, compressor: 50, battery_tester: 60 };
     }
     
-    if (state.businesses && typeof BUSINESS_DATA !== 'undefined') {
-        state.businesses.forEach(b => {
-            const template = BUSINESS_DATA.find(d => d.id === b.id);
-            if (template) {
-                b.img = template.img;
-                if (!b.perk) b.perk = template.perk;
-            }
-        });
+    // Синхронизация расширенной структуры бизнесов
+    if (typeof BUSINESS_DATA !== 'undefined') {
+        if (!state.businesses || state.businesses.length === 0) {
+            state.businesses = JSON.parse(JSON.stringify(BUSINESS_DATA));
+        } else {
+            BUSINESS_DATA.forEach(tBiz => {
+                let existing = state.businesses.find(b => b && b.id === tBiz.id);
+                if (!existing) {
+                    state.businesses.push(JSON.parse(JSON.stringify(tBiz)));
+                } else {
+                    existing.img = tBiz.img;
+                    existing.fallback = tBiz.fallback;
+                    existing.desc = tBiz.desc || existing.desc;
+                    existing.perk = tBiz.perk || existing.perk;
+                    if (!existing.staff) existing.staff = { manager: null, master: null, security: null };
+                    if (!Array.isArray(existing.fleet)) existing.fleet = [];
+                    if (!existing.upgrades) existing.upgrades = { equipment: 0, storage: 0, marketing: 0 };
+                    if (existing.maxStock === undefined) existing.maxStock = 100;
+                }
+            });
+        }
     }
 
     if (state.garage && Array.isArray(state.garage)) {
@@ -1292,12 +1299,6 @@ function sanitizeState() {
                 recalculateCarMarketValue(car);
             }
         });
-    }
-
-    if (!state.businesses || state.businesses.length === 0) {
-        if (typeof BUSINESS_DATA !== 'undefined') {
-            state.businesses = JSON.parse(JSON.stringify(BUSINESS_DATA));
-        }
     }
 
     if (!Array.isArray(state.marketFeed) || state.marketFeed.length === 0 || !state.marketFeed.some(c => c && !c.unavailable)) {
@@ -1478,7 +1479,7 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.expressTickets = state.player.maxExpressTickets || 25;
     state.player.consecutiveRaces = 0;
 
-    // Динамические новости рынка
+    // 1. Новости рынка
     if (typeof MARKET_NEWS_EVENTS !== 'undefined' && Math.random() < 0.35) {
         triggerMarketNewsEvent();
     } else {
@@ -1492,7 +1493,7 @@ function executeDayCycleMidnight(currentDateObj) {
         }
     }
 
-    // Начисление процентов на долг по кредиту
+    // 2. Кредиты
     if (state.player.loanDebt > 0) {
         state.player.loanDebt = Math.round(state.player.loanDebt * 1.02);
         if (state.player.phoneMessages) {
@@ -1508,7 +1509,7 @@ function executeDayCycleMidnight(currentDateObj) {
         }
     }
 
-    // Динамика криптовалют
+    // 3. Криптовалюты
     if (state.player.crypto) {
         let btcChange = 0.90 + Math.random() * 0.25;
         let ethChange = 0.85 + Math.random() * 0.35;
@@ -1522,7 +1523,7 @@ function executeDayCycleMidnight(currentDateObj) {
         }
     }
 
-    // Капитализация сейфа (+3%)
+    // 4. Сейф (+3%)
     if (state.player.safeDeposit > 0) {
         let percentEarned = Math.round(state.player.safeDeposit * 0.03);
         state.player.safeDeposit += percentEarned;
@@ -1543,7 +1544,7 @@ function executeDayCycleMidnight(currentDateObj) {
         }
     }
 
-    // Начисление процентов и прогресс срочных вкладов банка
+    // 5. Вклады
     if (Array.isArray(state.player.bankDeposits)) {
         state.player.bankDeposits.forEach(dep => {
             dep.daysPassed = (dep.daysPassed || 0) + 1;
@@ -1558,7 +1559,7 @@ function executeDayCycleMidnight(currentDateObj) {
         });
     }
 
-    // Ипотечный платеж 5%
+    // 6. Ипотека
     if (state.player.mortgage) {
         let m = state.player.mortgage;
         let installment = Math.round(m.debtAmount * 0.05);
@@ -1575,7 +1576,7 @@ function executeDayCycleMidnight(currentDateObj) {
         }
     }
 
-    // Аренда жилья
+    // 7. Аренда жилья
     let curId = state.player?.housingId || 'trailer';
     let isOwn = state.player?.ownedHouses?.includes(curId);
     let activeHouseObj = null;
@@ -1595,18 +1596,84 @@ function executeDayCycleMidnight(currentDateObj) {
         state.player.policeImmunityDays -= 1;
     }
 
+    // 8. РАСЧЁТ БИЗНЕС-СЕТИ: ДОХОДЫ, ЗАРПЛАТЫ И СЫРЬЁ
+    let totalSalariesPaid = 0;
     if (state.businesses) {
+        const staffCat = typeof BUSINESS_STAFF_CATALOG !== 'undefined' ? BUSINESS_STAFF_CATALOG : { managers: [], masters: [], security: [] };
+
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
-                if (b.stock > 0) {
-                    b.stock = Math.max(0, b.stock - 20);
-                    let inc = b.income || 0;
-                    b.stored = (b.stored || 0) + (inc * b.level);
+                // Выплата зарплат персоналу точки
+                if (b.staff) {
+                    ['manager', 'master', 'security'].forEach(role => {
+                        let staffId = b.staff[role];
+                        if (staffId) {
+                            let roleArr = role === 'manager' ? staffCat.managers : (role === 'master' ? staffCat.masters : staffCat.security);
+                            let employee = roleArr.find(e => e.id === staffId);
+                            if (employee && employee.salary) {
+                                let sal = employee.salary;
+                                if (b.stored >= sal) {
+                                    b.stored -= sal;
+                                    totalSalariesPaid += sal;
+                                } else if (state.player.cash >= sal) {
+                                    state.player.cash -= sal;
+                                    totalSalariesPaid += sal;
+                                } else {
+                                    b.staff[role] = null; // Увольнение за невыплату
+                                    showToast(`⚠️ ${employee.name} уволился из «${b.name}» из-за задержки зарплаты!`);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                // Авто-закупка сырья менеджером
+                let hasAutoManager = false;
+                let restockDiscount = 0;
+                if (b.staff?.manager) {
+                    let mgr = staffCat.managers.find(m => m.id === b.staff.manager);
+                    if (mgr && mgr.autoRestock) {
+                        hasAutoManager = true;
+                        restockDiscount = mgr.restockDiscount || 0;
+                    }
+                }
+
+                let maxStk = b.maxStock || 100;
+                if (hasAutoManager && (b.stock || 0) <= Math.round(maxStk * 0.15)) {
+                    let buyCost = Math.round(15000 * (1 - restockDiscount));
+                    if (b.stored >= buyCost) {
+                        b.stored -= buyCost;
+                        b.stock = maxStk;
+                    } else if (state.player.cash >= buyCost) {
+                        state.player.cash -= buyCost;
+                        b.stock = maxStk;
+                    }
+                }
+
+                // Списание сырья и начисление кассы
+                if ((b.stock || 0) > 0) {
+                    let masterSavePct = 0;
+                    if (b.staff?.master) {
+                        let mst = staffCat.masters.find(m => m.id === b.staff.master);
+                        if (mst && mst.stockSavePct) masterSavePct = mst.stockSavePct;
+                    }
+                    let stockDrop = Math.max(5, Math.round(15 * (1 - (masterSavePct / 100))));
+                    b.stock = Math.max(0, b.stock - stockDrop);
+
+                    let calcInc = (typeof AppBusiness !== 'undefined' && typeof AppBusiness.calculateBusinessIncome === 'function')
+                        ? AppBusiness.calculateBusinessIncome(b)
+                        : (b.income * b.level);
+                    b.stored = (b.stored || 0) + calcInc;
                 }
             }
         });
     }
 
+    if (totalSalariesPaid > 0) {
+        showToast(`💼 Выплачены зарплаты персоналу филиалов: -${totalSalariesPaid.toLocaleString()} ₽`);
+    }
+
+    // 9. Автопарк
     if (state.garage) {
         state.garage.forEach(car => {
             if (car) {
@@ -1634,7 +1701,7 @@ function executeDayCycleMidnight(currentDateObj) {
         PhoneManager.renderBusinessWidget();
         PhoneManager.updateUnreadBadge();
     }
-    showToast("Наступил новый день 🌙 Суточные лимиты и начисления обновлены!");
+    showToast("Наступил новый день 🌙 Суточные лимиты, кассы и зарплаты обновлены!");
     playSound('win');
     tgHaptic('success');
 }
@@ -1722,13 +1789,12 @@ function updateRaceHeatBadge() {
     else heatBadge.className = "tag-badge bg-tag-green";
 }
 
-// КОМФОРТ ТЕПЕРЬ С 15 УРОВНЯ!
 function updateLevelGatesUI() {
     let lvl = state.player?.level || 1;
     const gates = [
         { id: 'moto', lockId: 'lock-moto', minLvl: 5 },
         { id: 'atv', lockId: 'lock-atv', minLvl: 8 },
-        { id: 'comfort', lockId: 'lock-comfort', minLvl: 15 }, // <-- Установлен 15 уровень
+        { id: 'comfort', lockId: 'lock-comfort', minLvl: 15 },
         { id: 'premium', lockId: 'lock-premium', minLvl: 30 },
         { id: 'hyper', lockId: 'lock-hyper', minLvl: 50 },
         { id: 'truck', lockId: 'lock-truck', minLvl: 50 },
@@ -1969,7 +2035,8 @@ function buyConsumableAction(cost, reqStars, val) {
     state.player.stars -= reqStars;
     if (state.businesses) {
         state.businesses.forEach(b => {
-            b.stock = Math.min(100, (b.stock || 0) + val);
+            let maxStk = b.maxStock || 100;
+            b.stock = Math.min(maxStk, (b.stock || 0) + val);
         });
     }
     saveState();
@@ -2243,28 +2310,53 @@ setInterval(() => {
         checkRealTimeDayChange();
     }
 
+    // ТИК БИЗНЕСА (КАЖДЫЕ 30 СЕКУНД)
     if (gameCycleSeconds % 30 === 0 && state.businesses) {
         let bizUpdated = false;
+        const staffCat = typeof BUSINESS_STAFF_CATALOG !== 'undefined' ? BUSINESS_STAFF_CATALOG : { managers: [], masters: [], security: [] };
+
         state.businesses.forEach(b => {
             if (b && b.level > 0) {
-                if (b.level >= 5 && b.stock <= 10) {
-                    let cost = 15000;
+                // Автозакупка сырья менеджером
+                let hasAutoManager = false;
+                let restockDiscount = 0;
+                if (b.staff?.manager) {
+                    let mgr = staffCat.managers.find(m => m.id === b.staff.manager);
+                    if (mgr && mgr.autoRestock) {
+                        hasAutoManager = true;
+                        restockDiscount = mgr.restockDiscount || 0;
+                    }
+                }
+
+                let maxStk = b.maxStock || 100;
+                if ((b.level >= 5 || hasAutoManager) && (b.stock || 0) <= Math.round(maxStk * 0.15)) {
+                    let cost = Math.round(15000 * (1 - restockDiscount));
                     if (b.stored >= cost) {
                         b.stored -= cost;
-                        b.stock += 50;
+                        b.stock = maxStk;
                         showToast(`👨‍💼 Управляющий «${b.name}» закупил сырьё из кассы!`);
                         bizUpdated = true;
                     } else if (state.player.cash >= cost) {
                         state.player.cash -= cost;
-                        b.stock += 50;
+                        b.stock = maxStk;
                         showToast(`👨‍💼 Управляющий «${b.name}» закупил сырьё с вашего счёта!`);
                         bizUpdated = true;
                     }
                 }
 
-                if (b.stock > 0) {
-                    b.stock = Math.max(0, b.stock - 2);
-                    let tickIncome = Math.round((b.income * b.level) / 5);
+                if ((b.stock || 0) > 0) {
+                    let masterSavePct = 0;
+                    if (b.staff?.master) {
+                        let mst = staffCat.masters.find(m => m.id === b.staff.master);
+                        if (mst && mst.stockSavePct) masterSavePct = mst.stockSavePct;
+                    }
+                    let drop = Math.max(1, Math.round(2 * (1 - (masterSavePct / 100))));
+                    b.stock = Math.max(0, b.stock - drop);
+
+                    let calcInc = (typeof AppBusiness !== 'undefined' && typeof AppBusiness.calculateBusinessIncome === 'function')
+                        ? AppBusiness.calculateBusinessIncome(b)
+                        : (b.income * b.level);
+                    let tickIncome = Math.round(calcInc / 5);
                     b.stored = (b.stored || 0) + tickIncome;
                     bizUpdated = true;
                 }
