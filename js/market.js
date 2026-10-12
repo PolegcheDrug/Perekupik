@@ -1,7 +1,8 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, РЕЕСТР НОМЕРОВ & GITHUB ASSETS (v1.0.1)
+// js/market.js — АВТОРЫНОК, РЕЕСТР НОМЕРОВ & ЧИСТЫЕ НАЗВАНИЯ (v1.0.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Загрузка фото напрямую из GitHub Raw (resolveCarAssetUrl),
+// Убраны текстовые дублирования в названиях (капсулы, корчи),
+// загрузка фото напрямую из GitHub Raw (resolveCarAssetUrl),
 // связка с облачным реестром госномеров FB_Bridge.Plates,
 // атомарное закрепление номера при ДКП, Launch OBD2 и торг у капота.
 // ========================================================
@@ -243,7 +244,7 @@ async function refreshMarketFeedManual() {
 }
 
 // ========================================================
-// ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ АВТО И ОБЛАЧНАЯ БАЗА
+// ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ АВТО (ЧИСТЫЕ НАЗВАНИЯ)
 // ========================================================
 async function populateMarketFeed() {
     if (window.FB_Bridge && window.FB_Bridge.CarsCatalog) {
@@ -380,6 +381,7 @@ async function populateMarketFeed() {
             sMoodIcon = "⚡";
         }
 
+        // Чистое имя модели: не приписываем [SPEC DRIFT], (Под проект) или (Капсула времени)
         let cName = template.name ? template.name : "Техника";
         let cPower = template.power ? template.power : 100;
         
@@ -399,11 +401,6 @@ async function populateMarketFeed() {
             carTuning.customWheels = true;
             carTuning.risk1251 = 35;
             cPower = Math.round(cPower * (carTuning.chip === 2 ? 1.35 : 1.18));
-            cName = `${cName} [SPEC DRIFT]`;
-        } else if (isBeaterProject) {
-            cName = `${cName} (Под проект)`;
-        } else if (isMuseumStock) {
-            cName = `${cName} (Капсула времени)`;
         }
 
         let rawImg = (Array.isArray(template.images) && template.images.length > 0)
@@ -595,6 +592,7 @@ function renderMarketFeed() {
             `;
         }
 
+        // Статусные плашки под заголовком
         let statusBadgesHtml = `<span class='tag-badge bg-tag-cyan'>${carType}</span>`;
 
         if (car.isMuseumStock) {

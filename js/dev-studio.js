@@ -1,9 +1,9 @@
 // ========================================================
-// js/dev-studio.js — ОБЛАЧНАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v1.2.0 FIRESTORE & GITHUB)
+// js/dev-studio.js — ОБЛАЧНАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v1.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// 🟢 Экран 1: Создание новых авто с генерацией путей под GitHub и сохранением в Firestore
-// 🟣 Экран 2: Онлайн-редактирование характеристик и цен моделей в облачной базе
-// ✂️ Встроенный Canvas-кроппер обложки (16:9), подсказка пути к папке репозитория.
+// 🟢 Экран 1: Создание новых авто с настраиваемым именем
+// 🟣 Экран 2: Переименование и онлайн-редактирование моделей из базы
+// ✂️ Встроенный Canvas-кроппер обложки (16:9), гибкая смена названий.
 // ========================================================
 
 const DevStudio = {
@@ -33,6 +33,7 @@ const DevStudio = {
     resetDraft() {
         this.currentDraft = {
             isExistingCar: false,
+            id: null,
             originalNameRef: null,
             name: "ВАЗ-2101 «Копейка»",
             type: "economy",
@@ -137,10 +138,10 @@ const DevStudio = {
                         </div>
                         <div>
                             <h3 class="font-bold text-xs" style="font-size:14px; color:${isCreate ? 'var(--cyan)' : 'var(--purple)'};">
-                                ${isCreate ? '🟢 Студия: Создание карточки под GitHub' : '🟣 Редактор Облачной Базы'}
+                                ${isCreate ? '🟢 Создание новой модели' : '🟣 Редактирование и переименование'}
                             </h3>
                             <div class="sub-label" style="font-size:9px;">
-                                ${isCreate ? 'Генерация путей под репозиторий GitHub и сохранение в Firestore' : 'Прямое изменение характеристик и цен машин в реальном времени'}
+                                ${isCreate ? 'Добавление новой машины в базу Firestore' : 'Изменение названий, цен и характеристик в реальном времени'}
                             </div>
                         </div>
                     </div>
@@ -150,10 +151,10 @@ const DevStudio = {
                 <!-- НАВИГАЦИОННЫЙ СЕЛЕКТОР ЭКРАНОВ -->
                 <div class="grid-2 mb-3">
                     <button onclick="DevStudio.switchScreen('create')" class="btn ${isCreate ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-weight:900;">
-                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i> 1. Создать новую модель
+                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i> 1. Создать новую
                     </button>
                     <button onclick="DevStudio.switchScreen('edit')" class="btn ${!isCreate ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-weight:900;">
-                        <i class="fa-solid fa-list-check mr-1"></i> 2. Редактировать базу
+                        <i class="fa-solid fa-list-check mr-1"></i> 2. Редактировать / Переименовать
                     </button>
                 </div>
 
@@ -168,7 +169,7 @@ const DevStudio = {
     },
 
     // ========================================================
-    // 🟢 ЭКРАН 1: СОЗДАНИЕ В CLOUD FIRESTORE ПОД GITHUB
+    // 🟢 ЭКРАН 1: СОЗДАНИЕ В CLOUD FIRESTORE
     // ========================================================
     renderCreateScreen() {
         const d = this.currentDraft;
@@ -180,7 +181,7 @@ const DevStudio = {
             <div class="glass-card p-2 mb-2 studio-box-create">
                 <div class="flex-between mb-1">
                     <div>
-                        <b class="text-xs color-cyan"><i class="fa-brands fa-github mr-1"></i> Структура хранения GitHub:</b>
+                        <b class="text-xs color-cyan"><i class="fa-brands fa-github mr-1"></i> Путь в репозитории:</b>
                         <div class="sub-label" style="font-size:9px;">
                             Картинка будет загружаться по адресу: <b class="color-amber">${targetPath}</b>
                         </div>
@@ -201,7 +202,7 @@ const DevStudio = {
             <!-- КРОППЕР И НАСТРОЙКА ОБЛОЖКИ -->
             ${this.renderCropperWidgetHtml(true)}
 
-            <!-- ФОРМА ХАРАКТЕРИСТИК -->
+            <!-- ФОРМА ХАРАКТЕРИСТИК И НАЗВАНИЯ -->
             ${this.renderCarFormFieldsHtml(true)}
 
             <!-- КНОПКИ ДЕЙСТВИЙ -->
@@ -222,7 +223,7 @@ const DevStudio = {
     },
 
     // ========================================================
-    // 🟣 ЭКРАН 2: ОНЛАЙН-РЕДАКТИРОВАНИЕ БАЗЫ
+    // 🟣 ЭКРАН 2: ОНЛАЙН-РЕДАКТИРОВАНИЕ И ПЕРЕИМЕНОВАНИЕ
     // ========================================================
     renderEditScreen() {
         const d = this.currentDraft;
@@ -267,7 +268,7 @@ const DevStudio = {
 
         return `
             <div class="glass-card p-2 mb-2 studio-box-edit">
-                <b class="text-xs color-purple block mb-1"><i class="fa-solid fa-list-ul mr-1"></i> 1. Выберите авто из базы:</b>
+                <b class="text-xs color-purple block mb-1"><i class="fa-solid fa-list-ul mr-1"></i> 1. Выберите авто для редактирования / переименования:</b>
                 
                 <div class="flex-gap mb-2" style="overflow-x:auto; padding-bottom:4px;">
                     ${classChips}
@@ -300,13 +301,13 @@ const DevStudio = {
                 <!-- КРОППЕР И НАСТРОЙКА ОБЛОЖКИ -->
                 ${this.renderCropperWidgetHtml(false)}
 
-                <!-- ФОРМА ХАРАКТЕРИСТИК -->
+                <!-- ФОРМА ХАРАКТЕРИСТИК И ПЕРЕИМЕНОВАНИЯ -->
                 ${this.renderCarFormFieldsHtml(false)}
 
                 <!-- КНОПКИ СОХРАНЕНИЯ ПРАВОК -->
                 <div class="space-y-2 mb-2">
                     <button onclick="DevStudio.publishCarToCloudFirestore()" class="btn btn-purple w-full" style="box-shadow: 0 0 16px rgba(192,132,252,0.4); font-size:12px; padding:10px;">
-                        <i class="fa-solid fa-floppy-disk mr-1"></i> Сохранить изменения в Cloud Firestore ✓
+                        <i class="fa-solid fa-floppy-disk mr-1"></i> Сохранить изменения и имя в Firestore ✓
                     </button>
                     <div class="grid-2">
                         <button onclick="DevStudio.spawnToMarketAction()" class="btn btn-cyan btn-sm">
@@ -320,7 +321,7 @@ const DevStudio = {
             ` : `
                 <div class="glass-card text-center sub-label py-6">
                     <i class="fa-solid fa-hand-pointer color-purple mb-2" style="font-size:24px;"></i>
-                    <div>Выберите автомобиль из списка выше, чтобы отредактировать его параметры в реальном времени.</div>
+                    <div>Выберите автомобиль из списка выше, чтобы отредактировать его название, цену или характеристики.</div>
                 </div>
             `}
         `;
@@ -451,7 +452,7 @@ const DevStudio = {
     },
 
     // ========================================================
-    // ФОРМА ХАРАКТЕРИСТИК МОДЕЛИ
+    // ФОРМА ХАРАКТЕРИСТИК И ПЕРЕИМЕНОВАНИЯ МОДЕЛИ
     // ========================================================
     renderCarFormFieldsHtml(isCreate) {
         const d = this.currentDraft;
@@ -459,11 +460,14 @@ const DevStudio = {
 
         return `
             <div class="glass-card mb-2 p-2">
-                <b class="text-xs block mb-1" style="color:${color};"><i class="fa-solid fa-sliders mr-1"></i> Характеристики авто:</b>
+                <b class="text-xs block mb-1" style="color:${color};"><i class="fa-solid fa-sliders mr-1"></i> Название и параметры автомобиля:</b>
                 
                 <div class="mb-2">
-                    <span class="sub-label" style="font-size:9px;">Название марки и модели:</span>
-                    <input type="text" class="chat-input" value="${d.name}" oninput="DevStudio.updateField('name', this.value)" style="font-size:11px; padding:6px 8px;">
+                    <div class="flex-between mb-1">
+                        <span class="sub-label" style="font-size:9px;">Название марки и модели (Имя карточки):</span>
+                        <span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">РЕДАКТИРУЕМОЕ</span>
+                    </div>
+                    <input type="text" class="chat-input" value="${d.name}" oninput="DevStudio.updateField('name', this.value)" placeholder="Например: ВАЗ-2107 «Семёрка»" style="font-size:12px; font-weight:800; padding:7px 8px; border-color:var(--cyan);">
                 </div>
 
                 <div class="grid-2 mb-2">
@@ -535,13 +539,15 @@ const DevStudio = {
         const targetCar = catList[index];
         if (!targetCar) return;
 
-        const slug = targetCar.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, '_');
+        // Сохраняем исходный ID, чтобы при переименовании не плодить дубликаты
+        const stableId = targetCar.id || ("car_" + targetCar.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, '_'));
+        const slug = targetCar.baseFilename || targetCar.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, '_');
 
         this.currentDraft = {
             isExistingCar: true,
-            id: targetCar.id || ("car_" + slug),
+            id: stableId,
             originalNameRef: targetCar.name,
-            name: targetCar.name,
+            name: targetCar.name, // Текущее редактируемое имя
             type: targetCar.type || this.editFilterClass,
             power: targetCar.power || 100,
             basePrice: targetCar.basePrice || 100000,
@@ -549,44 +555,47 @@ const DevStudio = {
             folderPath: `assets/cars/${this.editFilterClass}/${slug}/`,
             baseFilename: slug,
             images: Array.isArray(targetCar.images) ? [...targetCar.images] : (targetCar.img ? [targetCar.img] : []),
-            sellerNote: "«Проверенный автомобиль из официальной базы игры.»",
-            condition: 90,
-            mileage: 65000,
-            plate: "В777ВВ 77",
-            tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, weldedDiff: false, steeringAngle: false, hydroHandbrake: false, rollCage: false, dragSlicks: false },
-            defectCode: "none",
-            thickness: { hood: 110, roof: 100, doors: 115, wings: 110 }
+            sellerNote: targetCar.sellerNote || "«Проверенный автомобиль из официальной базы игры.»",
+            condition: targetCar.condition || 90,
+            mileage: targetCar.mileage || 65000,
+            plate: targetCar.plate || "В777ВВ 77",
+            tuning: targetCar.tuning || { chip: 0, exhaust: false, stance: false, bodykit: false, weldedDiff: false, steeringAngle: false, hydroHandbrake: false, rollCage: false, dragSlicks: false },
+            defectCode: targetCar.defectCode || "none",
+            thickness: targetCar.thickness || { hood: 110, roof: 100, doors: 115, wings: 110 }
         };
 
         this.uploadedPhotos = [];
         this.render();
         if (typeof showToast === 'function') {
-            showToast(`Загружены параметры: «${targetCar.name}»!`);
+            showToast(`Загружены параметры модели: «${targetCar.name}»! Теперь её можно переименовать.`);
         }
     },
 
     // ========================================================
-    // СОХРАНЕНИЕ КАРТОЧКИ В CLOUD FIRESTORE ПОД СТРУКТУРУ GITHUB
+    // СОХРАНЕНИЕ / ПЕРЕИМЕНОВАНИЕ В CLOUD FIRESTORE
     // ========================================================
     async publishCarToCloudFirestore() {
         const d = this.currentDraft;
         if (!d || !d.name.trim()) return showToast("Укажите название модели!");
 
-        const slug = d.baseFilename || d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
+        const cleanName = d.name.trim();
         const category = d.type || "economy";
         
-        // Формируем чистый путь под GitHub
+        // Для существующей машины сохраняем ее стабильный ID документа в Firestore
+        const docId = d.id || ("car_" + cleanName.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_"));
+        const slug = d.baseFilename || cleanName.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
+        
         let generatedPath = `assets/cars/${category}/${slug}/${slug}.jpg`;
         if (d.isExistingCar && d.images && d.images[0] && !d.images[0].startsWith("data:")) {
             generatedPath = d.images[0];
         }
 
         const carPayload = {
-            id: d.id || ("car_" + slug),
-            name: d.name.trim(),
+            id: docId,
+            name: cleanName, // Обновленное имя сохраняется в базе
             power: Number(d.power) || 100,
             basePrice: Number(d.basePrice) || 100000,
-            drivetrain: d.drivetrain || 'rwd',
+            drivetrain: d.drivetrain || "rwd",
             type: category,
             img: generatedPath,
             images: [generatedPath],
@@ -594,7 +603,7 @@ const DevStudio = {
             authorId: String(window.FB_Bridge?.getProfile()?.id || "admin"),
             authorName: window.FB_Bridge?.getProfile()?.name || "Перекуп",
             isActive: true,
-            createdAt: Date.now()
+            updatedAt: Date.now()
         };
 
         showToast("⏳ Сохранение карточки в Cloud Firestore...");
@@ -604,7 +613,18 @@ const DevStudio = {
             if (res && res.success) {
                 if (typeof playSound === 'function') playSound('win');
                 if (typeof tgHaptic === 'function') tgHaptic('success');
-                alert(`✅ Модель «${d.name}» опубликована в Cloud Firestore!\n\nПуть для файла в репозитории GitHub:\n📁 ${generatedPath}`);
+
+                // Синхронизируем локальный CAR_DATABASE в памяти
+                if (window.CAR_DATABASE && window.CAR_DATABASE[category]) {
+                    const foundIdx = window.CAR_DATABASE[category].findIndex(c => c.id === docId || c.name === d.originalNameRef);
+                    if (foundIdx !== -1) {
+                        window.CAR_DATABASE[category][foundIdx] = carPayload;
+                    } else {
+                        window.CAR_DATABASE[category].unshift(carPayload);
+                    }
+                }
+
+                alert(`✅ Модель «${cleanName}» сохранена в Cloud Firestore!\n\nПуть для файла в репозитории GitHub:\n📁 ${generatedPath}`);
             } else {
                 this.saveCustomCarToStorage(carPayload);
                 showToast(`Сохранено локально (${res ? res.error : 'оффлайн'}).`);
@@ -737,7 +757,6 @@ const DevStudio = {
         if (!this.currentDraft) this.resetDraft();
         const d = this.currentDraft;
         if (type === 'drift') {
-            d.name = d.name.includes("Корч") ? d.name : `${d.name} (Дрифт-Спек)`;
             d.tuning.weldedDiff = true;
             d.tuning.steeringAngle = true;
             d.tuning.hydroHandbrake = true;
