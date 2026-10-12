@@ -1,5 +1,5 @@
 /* ========================================================
-   css/modals.css — МОДАЛЬНЫЕ ОКНА И ПРИБОРЫ (v0.6.1)
+   css/modals.css — МОДАЛЬНЫЕ ОКНА, ПРИБОРЫ И DEV-STUDIO (v0.6.4)
    ======================================================== */
 
 .modal-overlay {
@@ -20,7 +20,7 @@
 }
 .modal-overlay.active { display: flex !important; }
 
-/* Приоритетный стек вложенных окон диагностики и вердикта */
+/* Приоритетный стек вложенных окон диагностики, вердикта и кастомизации */
 #modalOBD2, 
 #modalGauge, 
 #modalInsurance, 
@@ -31,6 +31,22 @@
 #modalHudCustomizer,
 #modalImpoundLot {
   z-index: 5500 !important;
+}
+
+/* Высший приоритет для Dev Studio — поверх всех элементов и телефона */
+#modalDevStudio {
+  z-index: 9999 !important;
+}
+
+#modalDevStudio.active {
+  display: flex !important;
+}
+
+#modalDevStudio .modal-box {
+  max-width: 440px !important;
+  max-height: calc(100dvh - 16px) !important;
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 30px var(--cyan-glow), 0 20px 60px rgba(0, 0, 0, 0.95) !important;
 }
 
 .modal-box {
@@ -100,7 +116,47 @@
   100% { transform: rotate(-360deg); }
 }
 
-/* ЭКРАН ТОРГА У КАПОТА */
+/* ========================================================
+   СТИЛИ ДЛЯ DEV STUDIO (АВТО-СТУДИЯ)
+   ======================================================== */
+.dev-studio-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  gap: 6px;
+}
+
+.dev-studio-container .chat-input {
+  width: 100%;
+  background: #060a12;
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dev-studio-container .chat-input:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan-glow);
+}
+
+.dev-studio-container select.chat-input option {
+  background: #090e18;
+  color: #fff;
+}
+
+#studioUploadedThumbs img {
+  transition: transform 0.15s ease;
+}
+
+#studioUploadedThumbs img:active {
+  transform: scale(0.95);
+}
+
+/* ========================================================
+   ЭКРАН ТОРГА У КАПОТА
+   ======================================================== */
 .chat-deal-box {
   padding: 14px !important;
   background: 
@@ -186,7 +242,9 @@
   border-bottom-right-radius: 2px !important;
 }
 
-/* ОФИЦИАЛЬНЫЙ БЛАНК ДКП ГОСУСЛУГ (БЕЗ СМЕЩЕНИЯ ШТАМПА) */
+/* ========================================================
+   ОФИЦИАЛЬНЫЙ БЛАНК ДКП ГОСУСЛУГ (БЕЗ СМЕЩЕНИЯ ШТАМПА)
+   ======================================================== */
 .dkp-official-blank {
   background: linear-gradient(145deg, #101624 0%, #080d16 100%) !important;
   border: 2px solid var(--border-glow) !important;
@@ -296,7 +354,9 @@
   text-transform: uppercase;
 }
 
-/* ДИАГНОСТИЧЕСКИЙ СКАНЕР LAUNCH PRO */
+/* ========================================================
+   ДИАГНОСТИЧЕСКИЙ СКАНЕР LAUNCH PRO
+   ======================================================== */
 .obd-cyber-display {
   background: #020408 !important;
   border: 2px solid #00f2fe !important;
@@ -349,7 +409,9 @@
   transition: width 0.15s ease-out;
 }
 
-/* ТОЛЩИНОМЕР ЛКП */
+/* ========================================================
+   ТОЛЩИНОМЕР ЛКП
+   ======================================================== */
 .gauge-interactive-meter {
   display: flex;
   flex-direction: column;
@@ -380,7 +442,9 @@
   flex-shrink: 0;
 }
 
-/* ЖЕТОНЫ НАГРАД (ВЕРДИКТ) */
+/* ========================================================
+   ЖЕТОНЫ НАГРАД (ВЕРДИКТ)
+   ======================================================== */
 .reward-tokens-wrapper {
   width: 100%;
   margin: 6px 0 10px 0;
@@ -478,7 +542,9 @@
   line-height: 1.25;
 }
 
-/* СТРАХОВОЙ ПОЛИС */
+/* ========================================================
+   СТРАХОВОЙ ПОЛИС
+   ======================================================== */
 .insurance-contract-blank {
   background: linear-gradient(165deg, #0e172a 0%, #060b14 100%) !important;
   border: 2px solid rgba(0, 230, 118, 0.45) !important;

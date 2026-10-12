@@ -1,9 +1,10 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И СДЕЛКИ (v0.6.2)
+// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И СДЕЛКИ (v0.6.4)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Динамическая подгрузка фото машин из папок моделей,
 // доступ к Комфорту с 15 ур., сортировка всех категорий,
 // замеры толщиномером, диагностика Launch OBD2 и оформление ДКП.
+// Защита от пустых категорий и гарантированный респавн лотов.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -160,11 +161,11 @@ function setCategory(cat) {
     
     if (cat === 'moto' && lvl < 5) return showToast("🔒 Мотоциклы доступны с 5 уровня!");
     if (cat === 'atv' && lvl < 8) return showToast("🔒 Квадроциклы доступны с 8 уровня!");
-    if (cat === 'comfort' && lvl < 15) return showToast("🔒 Класс «Комфорт» открывается с 15 уровня!"); // С 15 уровня!
-    if (cat === 'premium' && lvl < 30) return showToast("🔒 Нужен 30 ур!");
-    if (cat === 'hyper' && lvl < 50) return showToast("🔒 Нужен 50 ур!");
-    if (cat === 'truck' && lvl < 50) return showToast("🔒 Нужен 50 ур!");
-    if (cat === 'yacht' && lvl < 100) return showToast("🔒 Нужен 100 ур!");
+    if (cat === 'comfort' && lvl < 15) return showToast("🔒 Класс «Комфорт» открывается с 15 уровня!");
+    if (cat === 'premium' && lvl < 30) return showToast("🔒 Премиум доступен с 30 уровня!");
+    if (cat === 'hyper' && lvl < 50) return showToast("🔒 Гиперкары доступны с 50 уровня!");
+    if (cat === 'truck' && lvl < 50) return showToast("🔒 Грузовики доступны с 50 уровня!");
+    if (cat === 'yacht' && lvl < 100) return showToast("🔒 Яхты доступны со 100 уровня!");
     
     state.activeCategory = cat;
     
@@ -207,7 +208,7 @@ function refreshMarketFeedManual() {
 }
 
 // ========================================================
-// ГЕНЕРАЦИЯ ОБЪЯВЛЕНИЙ С ДИНАМИЧЕСКИМИ ФОТО ИЗ ПАПОК
+// ГЕНЕРАЦИЯ ОБЪЯВЛЕНИЙ С ЗАЩИТОЙ ОТ ПУСТЫХ СПИСКОВ
 // ========================================================
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
@@ -220,7 +221,7 @@ function populateMarketFeed() {
         let allowedCategories = ['economy', 'scooter'];
         if (lvl >= 5) allowedCategories.push('moto');
         if (lvl >= 8) allowedCategories.push('atv');
-        if (lvl >= 15) allowedCategories.push('comfort'); // Комфорт с 15 ур.!
+        if (lvl >= 15) allowedCategories.push('comfort');
         if (lvl >= 30) allowedCategories.push('premium');
         if (lvl >= 50) allowedCategories.push('hyper', 'truck');
         if (lvl >= 100) allowedCategories.push('yacht');
@@ -231,10 +232,12 @@ function populateMarketFeed() {
             }
         });
     } else {
-        pool = CAR_DATABASE[cat] ? CAR_DATABASE[cat] : CAR_DATABASE.economy;
+        pool = (CAR_DATABASE[cat] && CAR_DATABASE[cat].length > 0) ? CAR_DATABASE[cat] : (CAR_DATABASE.economy || []);
     }
 
-    if (!pool || pool.length === 0) return;
+    if (!pool || pool.length === 0) {
+        pool = CAR_DATABASE.economy || [];
+    }
 
     let shuffledPool = [...pool];
     for (let i = shuffledPool.length - 1; i > 0; i--) {
@@ -345,7 +348,6 @@ function populateMarketFeed() {
         let cName = template.name ? template.name : "Техника";
         let cPower = template.power ? template.power : 100;
         
-        // ВЫБОР ФОТО ИЗ ПАПКИ МОДЕЛИ ИЛИ ГАЛЕРЕИ
         let cImg = (typeof getCarImage === 'function') ? getCarImage(template) : (template.img || "");
         let cFallback = template.fallback || getCategoryFallback(tType);
 

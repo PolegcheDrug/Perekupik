@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v0.6.1</title>
+    <title>Симулятор Перекупа v0.6.4</title>
     
     <!-- Модульные CSS-стили -->
-    <link rel="stylesheet" href="css/base.css?v=250">
-    <link rel="stylesheet" href="css/hud.css?v=250">
-    <link rel="stylesheet" href="css/market.css?v=250">
-    <link rel="stylesheet" href="css/phone.css?v=250">
-    <link rel="stylesheet" href="css/modals.css?v=250">
-    <link rel="stylesheet" href="css/nav.css?v=250">
+    <link rel="stylesheet" href="css/base.css?v=270">
+    <link rel="stylesheet" href="css/hud.css?v=270">
+    <link rel="stylesheet" href="css/market.css?v=270">
+    <link rel="stylesheet" href="css/phone.css?v=270">
+    <link rel="stylesheet" href="css/modals.css?v=270">
+    <link rel="stylesheet" href="css/nav.css?v=270">
     
     <!-- Внешние библиотеки -->
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
@@ -180,7 +180,7 @@
               <button onclick="setCategory('comfort')" id="catBtn-comfort" class="cat-tile locked">
                 <div class="cat-tile-icon"><i class="fa-solid fa-taxi"></i></div>
                 <div class="cat-tile-name" data-i18n="cat_comfort">Комфорт</div>
-                <div class="cat-tile-sub" id="lock-comfort"><i class="fa-solid fa-lock"></i> 20 ур</div>
+                <div class="cat-tile-sub" id="lock-comfort"><i class="fa-solid fa-lock"></i> 15 ур</div>
               </button>
 
               <button onclick="setCategory('premium')" id="catBtn-premium" class="cat-tile locked">
@@ -272,7 +272,7 @@
 
             <!-- ЭКРАН ТЕЛЕФОНА -->
             <div class="phone-screen-content">
-              <!-- ДОМАШНИЙ ЭКРАН -->
+              <!-- ДОМАШНИЙ ЭКРАН С 17 ИКОНКАМИ -->
               <div id="phoneHomeScreen">
                 <div id="phoneBizWidgetContainer" class="mb-2" style="display:none;"></div>
                 <div id="phoneDailyQuestsWidget" class="phone-quests-widget mb-3"></div>
@@ -360,6 +360,14 @@
                     <div class="phone-app-icon bg-notepad"><i class="fa-solid fa-note-sticky"></i></div>
                     <span class="phone-app-label">Блокнот</span>
                   </div>
+
+                  <!-- 17-Я ИКОНКА: СЕКРЕТНОЕ ПРИЛОЖЕНИЕ DEV -->
+                  <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('dev')">
+                    <div class="phone-app-icon bg-dev-terminal">
+                      <i class="fa-solid fa-terminal color-green"></i>
+                    </div>
+                    <span class="phone-app-label color-green font-bold">DEV</span>
+                  </div>
                 </div>
               </div>
 
@@ -376,41 +384,10 @@
         
         <!-- 5. TAB: ЖИЗНЬ -->
         <section id="tabLife" class="tab-screen">
-          <div class="glass-card mb-3">
-            <div class="flex-between mb-2">
-              <h3 class="color-green"><i class="fa-solid fa-handshake-angle"></i> Репутация Перекупа</h3>
-              <span class="tag-badge bg-tag-green">Карма & Связи</span>
-            </div>
-            <p class="sub-label mb-2">Высокая карма повышает доверие покупателей и снижает риск облав на трассе.</p>
-            <div class="grid-2 mb-2">
-              <button onclick="roadAssistanceAction()" class="btn btn-dark btn-sm">🛞 Помощь на трассе (-10 ⛽)</button>
-              <button onclick="donatePartsToMechanic()" class="btn btn-dark btn-sm">🔩 Запчасти СТО (45k ₽ | +1 🤝)</button>
-            </div>
-            <button onclick="bigCharityDonate()" class="btn btn-green w-full">🕊 Меценатство 150,000 ₽ (+25 Кармы)</button>
-          </div>
-
-          <div class="live-chat-card mb-3">
-            <div class="flex-between mb-2">
-              <div style="display:flex; align-items:center; gap:6px;">
-                <i class="fa-solid fa-satellite-dish color-cyan"></i>
-                <h4 class="font-bold">Городской Эфир</h4>
-              </div>
-              <span class="tag-badge bg-tag-cyan">Live</span>
-            </div>
-            <div id="lifeChatFeed" class="chat-messages-container"></div>
-            <div class="chat-compose-box">
-              <input type="text" id="feedMessageInput" class="chat-input" placeholder="Написать в эфир..." maxlength="100">
-              <button onclick="sendChatMessageFromInput()" class="chat-send-btn"><i class="fa-solid fa-paper-plane"></i></button>
-            </div>
-          </div>
-
-          <div class="glass-card mb-3">
-            <h3 class="color-green mb-1"><i class="fa-solid fa-utensils"></i> Рацион питания</h3>
-            <div class="space-y-2" id="dietList"></div>
-          </div>
+          <!-- Рендерится через renderLifeScreen() в js/life.js -->
         </section>
 
-        <!-- 6. TAB: ПРОФИЛЬ -->
+        <!-- 6. TAB: ПРОФИЛЬ (ЧИСТЫЙ СТАТУСНЫЙ ЭКРАН) -->
         <section id="tabProfile" class="tab-screen">
           <div class="glass-card text-center mb-3">
             <h3 id="profileTgUsername">Перекуп #777</h3>
@@ -426,7 +403,7 @@
             </div>
 
             <button onclick="openPatchNotesModal()" class="btn btn-purple btn-sm mb-3">
-              <i class="fa-solid fa-bolt"></i> Патчноут & Обновление v0.6.1
+              <i class="fa-solid fa-bolt"></i> Патчноут & Обновление v0.6.4
             </button>
             <div class="grid-2 mb-2">
               <div class="stat-box"><div class="sub-label">Плюс:</div><div id="statProfitable" class="stat-value color-green">0</div></div>
@@ -445,52 +422,6 @@
                 <button onclick="syncCloudStorageManual()" class="btn btn-cyan btn-sm"><i class="fa-solid fa-rotate"></i> Синхронизация</button>
                 <button onclick="openSaveManagerModal()" class="btn btn-dark btn-sm"><i class="fa-solid fa-file-export"></i> Резерв</button>
               </div>
-            </div>
-          </div>
-
-          <div class="glass-card mb-3">
-            <h4 class="color-amber font-bold mb-2"><i class="fa-solid fa-sliders"></i> Управление балансом (DEV-панель)</h4>
-            
-            <div class="cheat-adjust-row">
-              <span class="text-xs">💰 Наличные:</span>
-              <div class="flex-gap">
-                <button onclick="adjustResource('cash', -100000)" class="btn btn-dark btn-sm btn-auto">-100k</button>
-                <button onclick="adjustResource('cash', 100000)" class="btn btn-green btn-sm btn-auto">+100k</button>
-                <button onclick="adjustResource('cash', 500000)" class="btn btn-green btn-sm btn-auto">+500k</button>
-                <button onclick="adjustResource('cash', 5000000)" class="btn btn-green btn-sm btn-auto">+5M</button>
-              </div>
-            </div>
-
-            <div class="cheat-adjust-row">
-              <span class="text-xs">⭐ Звёзды (Stars):</span>
-              <div class="flex-gap">
-                <button onclick="adjustResource('stars', -10)" class="btn btn-dark btn-sm btn-auto">-10</button>
-                <button onclick="adjustResource('stars', 10)" class="btn btn-amber btn-sm btn-auto">+10</button>
-                <button onclick="adjustResource('stars', 50)" class="btn btn-amber btn-sm btn-auto">+50</button>
-                <button onclick="adjustResource('stars', 250)" class="btn btn-amber btn-sm btn-auto">+250</button>
-              </div>
-            </div>
-
-            <div class="cheat-adjust-row">
-              <span class="text-xs">🎖️ Уровень:</span>
-              <div class="flex-gap">
-                <button onclick="adjustResource('level', -1)" class="btn btn-dark btn-sm btn-auto">-1</button>
-                <button onclick="adjustResource('level', 1)" class="btn btn-cyan btn-sm btn-auto">+1</button>
-                <button onclick="adjustResource('level', 10)" class="btn btn-cyan btn-auto">+10</button>
-              </div>
-            </div>
-
-            <div class="cheat-adjust-row">
-              <span class="text-xs">🤝 Связи / 🎟️ Талоны:</span>
-              <div class="flex-gap">
-                <button onclick="adjustResource('connections', 1)" class="btn btn-purple btn-sm btn-auto">+1 🤝</button>
-                <button onclick="adjustResource('tickets', 10)" class="btn btn-purple btn-sm btn-auto">+10 🎟️</button>
-              </div>
-            </div>
-
-            <div class="grid-2 mt-2">
-              <button onclick="resetGameData()" class="btn btn-danger btn-sm">Сброс данных</button>
-              <button onclick="switchTab('tabMarket')" class="btn btn-dark btn-sm">В игру</button>
             </div>
           </div>
         </section>
@@ -525,6 +456,12 @@
     </div>
 
     <!-- МОДАЛЬНЫЕ ОКНА -->
+    <div id="modalDevStudio" class="modal-overlay">
+      <div class="modal-box" style="max-width: 440px; max-height: calc(100dvh - 20px);">
+        <div id="devStudioContent"></div>
+      </div>
+    </div>
+
     <div id="modalHudCustomizer" class="modal-overlay"></div>
     <div id="modalNeedGarage" class="modal-overlay"></div>
     <div id="modalImpoundLot" class="modal-overlay"></div>
@@ -532,24 +469,21 @@
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v0.6.1</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v0.6.4</div>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.6.1 (Сборка #250)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Версия клиента: v0.6.4 (Сборка #270)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>⚡ Грозовой неон и молнии:</b> Добавлена новая электрическая тема оформления, влияющая на HUD и телефон.</div>
-          <div class="patch-item"><b>📱 Сворачиваемые виджеты:</b> Информацию о предприятиях и план дня в телефоне теперь можно свернуть по нажатию.</div>
-          <div class="patch-item"><b>📦 Машины в контейнерах:</b> В таможенных контейнерах теперь можно найти реальные авто, а также редкие талоны и опыт XP.</div>
-          <div class="patch-item"><b>💼 Градация Синдиката:</b> Заказы клиентов теперь подбираются строго под текущий уровень авторитета игрока.</div>
-          <div class="patch-item"><b>🏦 Обменник в Во-Банке:</b> Конвертация Stars, покупка спинов и обмен топлива перенесены в банк.</div>
-          <div class="patch-item"><b>🔍 Все категории и маржа:</b> На рынке добавлен общий поиск с сортировкой цен, а на площадке — прозрачный расчёт вложений.</div>
+          <div class="patch-item"><b>📟 Секретное приложение DEV:</b> Инструменты разработчика и студия перемещены в смартфон с доступом по PIN-коду 0770.</div>
+          <div class="patch-item"><b>✂️ Встроенный кроппер:</b> Возможность обрезать и масштабировать обложки в пропорциях 16:9 прямо с телефона.</div>
+          <div class="patch-item"><b>🟣 Редактирование базы по классам:</b> Редактируйте существующие автомобили игры и сохраняйте их в data.js.</div>
+          <div class="patch-item"><b>🎲 Рандомизатор:</b> Случайная генерация характеристик, номеров и тюнинга в 1 клик.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
       </div>
     </div>
 
-    <!-- ДЕТАЛЬНЫЙ СТРАХОВОЙ ДОГОВОР-КОНСТРУКТОР -->
     <div id="modalInsurance" class="modal-overlay">
       <div class="modal-box insurance-contract-blank" style="max-width: 420px;">
         <div class="flex-between mb-2 pb-2" style="border-bottom: 1px solid var(--border-glass);">
@@ -825,7 +759,6 @@
       </div>
     </div>
 
-    <!-- ВСТРЕЧА У КАПОТА: ПРОВЕРКА OBD2 И ТОЛЩИНОМЕРА НА МЕСТЕ -->
     <div id="modalMarketDeal" class="modal-overlay">
       <div class="modal-box chat-deal-box">
         <div class="chat-header-bar flex-between mb-2">
@@ -955,7 +888,6 @@
       </div>
     </div>
 
-    <!-- ИНТЕРАКТИВНОЕ ОКНО ПОЛУЧЕНИЯ НАГРАД (С ЖЕТОНАМИ) -->
     <div id="modalDealVerdict" class="modal-overlay">
       <div class="modal-box text-center">
         <div class="radar-spinner-ring mb-2" id="verdictRingAnim">
@@ -1114,7 +1046,7 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
-    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ v0.6.1 -->
+    <!-- УНИВЕРСАЛЬНЫЙ АВТОЗАГРУЗЧИК СКРИПТОВ (ВКЛЮЧАЯ PHONE-DEV.JS) -->
     <script>
       (function() {
         const modules = [
@@ -1133,24 +1065,26 @@
           'phone-radar.js',
           'phone-media.js',
           'phone-racing.js',
+          'phone-dev.js',
           'market.js',
           'garage.js',
           'salesLot.js',
           'life.js',
           'street.js',
           'syndicate.js',
+          'dev-studio.js',
           'firebase-bridge.js'
         ];
 
         function loadModule(name) {
           return new Promise((resolve) => {
             const s1 = document.createElement('script');
-            s1.src = name + '?v=250';
+            s1.src = name + '?v=270';
             s1.onload = () => resolve(true);
             s1.onerror = () => {
               s1.remove();
               const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=250';
+              s2.src = 'js/' + name + '?v=270';
               s2.onload = () => resolve(true);
               s2.onerror = () => {
                 console.warn('[Loader] Не удалось загрузить ' + name);

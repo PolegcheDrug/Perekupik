@@ -1,5 +1,5 @@
 /* ========================================================
-   css/phone.css — ОБОЛОЧКА PEREKUP OS И ПРИЛОЖЕНИЯ (v0.6.2)
+   css/phone.css — ОБОЛОЧКА PEREKUP OS И ПРИЛОЖЕНИЯ (v0.6.4)
    ======================================================== */
 
 .phone-device-wrapper {
@@ -334,6 +334,13 @@
 .phone-app-icon.bg-radio { background: linear-gradient(135deg, #a855f7, #ec4899) !important; }
 .phone-app-icon.bg-notepad { background: linear-gradient(135deg, #64748b, #334155) !important; }
 
+/* 17-Я ИКОНКА DEV ТЕРМИНАЛА */
+.phone-app-icon.bg-dev-terminal {
+  background: linear-gradient(135deg, #090e18, #020408) !important;
+  border: 1.5px solid var(--green) !important;
+  box-shadow: 0 0 14px rgba(0, 230, 118, 0.35) !important;
+}
+
 .phone-app-badge {
   position: absolute;
   top: -4px;
@@ -362,6 +369,65 @@
   border-radius: 3px;
   margin: 10px auto 0 auto;
   cursor: pointer;
+}
+
+/* ========================================================
+   СЕКРЕТНОЕ ПРИЛОЖЕНИЕ DEV: PIN-КОД И ТЕРМИНАЛ
+   ======================================================== */
+.dev-pin-dots-row {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 12px 0;
+}
+
+.dev-pin-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--border-glow);
+  background: rgba(255, 255, 255, 0.05);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.dev-pin-dot.filled {
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: 0 0 12px var(--green);
+  transform: scale(1.15);
+}
+
+.dev-keypad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  max-width: 260px;
+  margin: 0 auto;
+}
+
+.dev-key-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.5));
+  border: 1px solid var(--border-glass);
+  border-radius: 14px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+  padding: 12px 0;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.dev-key-btn:active {
+  transform: scale(0.92);
+  background: rgba(0, 230, 118, 0.2);
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.dev-key-btn.dev-key-action {
+  font-size: 15px;
+  color: var(--text-sub);
 }
 
 /* КАРТОЧКА БАНКА */
@@ -395,7 +461,7 @@
   background-size: 100% 100%;
 }
 
-/* КЛУБ ФОРТУНЫ: БАРАБАНЫ СУПЕР ВИЛСПИНА[cite: 1] */
+/* КЛУБ ФОРТУНЫ: БАРАБАНЫ СУПЕР ВИЛСПИНА */
 .fortune-reel-card {
   background: #090d16;
   border-radius: 10px;
