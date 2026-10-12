@@ -1,9 +1,8 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ОБЪЁМНЫЕ ВИДЖЕТЫ И ТЮНИНГ (v0.7.6)
+// js/garage.js — АВТОПАРК, ОБЪЁМНЫЕ ВИДЖЕТЫ И ТЮНИНГ (v0.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// 3D-капсулы характеристик, шильдики марок, окупаемый тюнинг,
-// стационарный Launch OBD2 строго по прибору, полисы ОСАГО/КАСКО
-// и забор машин со спецстоянки ГИБДД через ModalManager.
+// Строчный формат характеристик (.spec-tile-3d-row),
+// увеличенные бейджи и номер, окупаемый тюнинг и стационарный OBD2.
 // ========================================================
 
 let previewCarIndex = null;
@@ -231,7 +230,7 @@ function recalculateCarMarketValue(car) {
 }
 
 // ========================================================
-// 3. ОСНОВНОЙ РЕНДЕР ГАРАЖА
+// 3. ОСНОВНОЙ РЕНДЕР ГАРАЖА (СТРОЧНЫЙ ДИЗАЙН ПЛИТОК)
 // ========================================================
 function renderGarage() {
     const list = document.getElementById('garageList');
@@ -275,47 +274,47 @@ function renderGarage() {
         let isImpounded = !!car.impounded;
 
         let personalBadge = isPersonal 
-            ? "<span class='tag-badge bg-tag-amber' style='box-shadow:0 0 10px rgba(255,179,0,0.5);'><i class='fa-solid fa-crown'></i> ЛИЧНЫЙ АВТО</span>"
+            ? "<span class='tag-badge bg-tag-amber'><i class='fa-solid fa-crown'></i> ЛИЧНЫЙ АВТО</span>"
             : "";
 
         let legalBadge = "";
         if (isImpounded) {
-            legalBadge = "<span class='tag-badge bg-red'>🚔 НА ШТРАФСТОЯНКЕ</span>";
+            legalBadge = "<span class='tag-badge bg-tag-red'>🚔 ШТРАФСТОЯНКА</span>";
         } else if (car.isStolen) {
-            legalBadge = "<span class='tag-badge badge-police-strobe'>🚨 В РОЗЫСКЕ</span>";
+            legalBadge = "<span class='tag-badge badge-police-strobe'>🚨 РОЗЫСК</span>";
         } else if (car.unregistered) {
-            legalBadge = "<span class='tag-badge badge-police-strobe'>12.5.1 АННУЛИРОВАН</span>";
+            legalBadge = "<span class='tag-badge badge-police-strobe'>12.5.1 СНЯТ</span>";
         } else if (car.isRegisteredOnPlayer) {
             legalBadge = "<span class='tag-badge bg-tag-green'><span class='led-dot led-green'></span> УЧЁТ РФ</span>";
         } else {
             let daysLeft = Math.max(0, 10 - (car.ownershipDays || 0));
             let dkpClass = daysLeft === 0 ? "bg-tag-red" : "bg-tag-amber";
             let ledClass = daysLeft === 0 ? "led-amber" : "led-green";
-            legalBadge = `<span class='tag-badge ${dkpClass}'><span class='led-dot ${ledClass}'></span> НА ДКП (${daysLeft} дн. лимит)</span>`;
+            legalBadge = `<span class='tag-badge ${dkpClass}'><span class='led-dot ${ledClass}'></span> ДКП (${daysLeft}д)</span>`;
         }
 
         let insuranceBadge = "";
         if (car.insurance) {
             if (car.insurance.type === 'comprehensive' || car.insurance === 'casco') {
-                insuranceBadge = "<span class='tag-badge bg-tag-green ml-1'>🛡️ КАСКО</span>";
+                insuranceBadge = "<span class='tag-badge bg-tag-green'>🛡️ КАСКО</span>";
             } else {
-                insuranceBadge = "<span class='tag-badge bg-tag-cyan ml-1'>📋 ОСАГО</span>";
+                insuranceBadge = "<span class='tag-badge bg-tag-cyan'>📋 ОСАГО</span>";
             }
         }
 
         let pVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(cPlate) : 0;
         let coolPlateBadge = pVal > 15000 
-            ? `<span class='tag-badge badge-shimmer-gold ml-1'><i class='fa-solid fa-gem'></i> БЛАТНОЙ</span>`
+            ? `<span class='tag-badge badge-shimmer-gold'>🏷️ БЛАТНОЙ</span>`
             : "";
 
         let tempVal = car.engineTemp || 90;
         let tempBadge = tempVal > 105 
-            ? `<span class='tag-badge bg-tag-red ml-1'><i class='fa-solid fa-temperature-high'></i> ПЕРЕГРЕВ ${tempVal}°C</span>`
+            ? `<span class='tag-badge bg-tag-red'>🔥 ${tempVal}°C</span>`
             : "";
 
         let tireVal = car.tireWear !== undefined ? car.tireWear : 100;
         let tireBadge = tireVal < 35 
-            ? `<span class='tag-badge bg-tag-red ml-1'><i class='fa-solid fa-circle-notch'></i> СЛИК ${tireVal}%</span>`
+            ? `<span class='tag-badge bg-tag-red'>🛞 ${tireVal}%</span>`
             : "";
 
         let condVal = car.condition !== undefined ? car.condition : 80;
@@ -344,7 +343,7 @@ function renderGarage() {
             `;
         } else {
             let personalBtn = isPersonal
-                ? `<button onclick="togglePersonalCar(${idx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-crown color-amber"></i> Снять статус лички</button>`
+                ? `<button onclick="togglePersonalCar(${idx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-crown color-amber"></i> Снять личку</button>`
                 : `<button onclick="togglePersonalCar(${idx})" class="btn btn-amber btn-sm"><i class="fa-solid fa-crown"></i> Сделать личным</button>`;
 
             actionControlBlock = `
@@ -369,56 +368,61 @@ function renderGarage() {
 
         html += `
         <div class="glass-card mb-3 ${isPersonal ? 'personal-car-card' : ''}">
+            <!-- ЧИСТАЯ ОБЛОЖКА -->
             <div class="car-img-wrap" style="height:155px;">
                 <img src="${cImg}" class="car-img" onerror="this.src='${car.fallback || 'assets/cars/economy/2101/vaz-2101.jpg'}';">
-                <div class="plate-corner">
-                    <div class="license-plate">${cPlate} <div class="license-flag">RUS</div></div>
-                </div>
-                <div class="badge-tag badge-br">
-                    ${personalBadge}
-                    ${legalBadge}
-                    ${insuranceBadge}
-                    ${coolPlateBadge}
-                    ${tempBadge}
-                    ${tireBadge}
-                </div>
             </div>
             
-            <!-- РЕЛЬЕФНАЯ СТРОКА С ШИЛЬДИКАМИ И ЦЕНОЙ -->
+            <!-- ВЕРХНИЙ БЛОК: ШИЛЬДИК МАРКИ, УВЕЛИЧЕННЫЕ ТЕГИ С НОМЕРОМ И ЦЕНА -->
             <div class="car-header-row-volumetric">
-                <div>
+                <div style="flex:1; min-width:0; margin-right:8px;">
                     ${brandHeaderHtml}
+                    <div class="car-status-badges-row mt-1">
+                        <div class="plate-mini-capsule notranslate" translate="no">
+                            ${cPlate} <span class="plate-flag-mini">RUS</span>
+                        </div>
+                        ${personalBadge}
+                        ${legalBadge}
+                        ${insuranceBadge}
+                        ${coolPlateBadge}
+                        ${tempBadge}
+                        ${tireBadge}
+                    </div>
                 </div>
+
                 <div class="car-price-badge-3d">
                     <span class="car-price-label-sub">Оценка рынка</span>
                     <span class="car-price-value-3d">${cPrice} ₽</span>
                 </div>
             </div>
 
-            <!-- ОБЪЁМНЫЕ РЕЛЬЕФНЫЕ КАПСУЛЫ ХАРАКТЕРИСТИК -->
+            <!-- СТРОЧНЫЙ ФОРМАТ ХАРАКТЕРИСТИК -->
             <div class="car-specs-grid-volumetric">
-                <div class="spec-tile-3d">
+                <div class="spec-tile-3d-row">
                     <div class="spec-tile-icon-wrap spec-tile-icon-power">
                         <i class="fa-solid fa-bolt"></i>
                     </div>
-                    <div class="spec-tile-val color-amber">${cPower} л.с.</div>
-                    <div class="spec-tile-sub">Мощность</div>
+                    <div class="spec-tile-row-text">
+                        Мощность — <b>${cPower} л.с.</b>
+                    </div>
                 </div>
 
-                <div class="spec-tile-3d">
+                <div class="spec-tile-3d-row">
                     <div class="spec-tile-icon-wrap spec-tile-icon-road">
                         <i class="fa-solid fa-road"></i>
                     </div>
-                    <div class="spec-tile-val color-cyan">${(car.mileage || 85000).toLocaleString()} км</div>
-                    <div class="spec-tile-sub">Пробег</div>
+                    <div class="spec-tile-row-text">
+                        Пробег — <b>${(car.mileage || 85000).toLocaleString()} км</b>
+                    </div>
                 </div>
 
-                <div class="spec-tile-3d">
+                <div class="spec-tile-3d-row">
                     <div class="spec-tile-icon-wrap ${shieldIconClass}">
                         <i class="fa-solid fa-shield"></i>
                     </div>
-                    <div class="spec-tile-val ${condColorClass}">${condVal}%</div>
-                    <div class="spec-tile-sub">Кузов / HP</div>
+                    <div class="spec-tile-row-text">
+                        Кузов — <b class="${condColorClass}">${condVal}%</b>
+                    </div>
                 </div>
             </div>
 

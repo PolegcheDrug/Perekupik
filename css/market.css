@@ -7,7 +7,8 @@
   padding: 14px;
   margin-bottom: 14px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+  overflow: hidden;
 }
 
 .glass-card:active {
@@ -20,7 +21,58 @@
 }
 
 /* ========================================================
-   1. КОМПАКТНАЯ СЕТКА КАТЕГОРИЙ РЫНКА
+   1. НЕОНОВЫЕ АУРЫ И АНИМАЦИИ КАРТОЧЕК РЫНКА
+   ======================================================== */
+.card-anim-shimmer::before {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -70%;
+  width: 50%;
+  height: 220%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+  transform: rotate(25deg);
+  pointer-events: none;
+  animation: cardShimmerSweep 6s infinite ease-in-out;
+}
+
+@keyframes cardShimmerSweep {
+  0% { left: -70%; }
+  30%, 100% { left: 170%; }
+}
+
+/* Фиолетовая аура боевых корчей */
+.card-glow-tuned {
+  border-color: rgba(192, 132, 252, 0.45) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px rgba(192, 132, 252, 0.25) !important;
+  animation: glowPulsePurple 3s infinite alternate ease-in-out;
+}
+
+@keyframes glowPulsePurple {
+  0% { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8), 0 0 12px rgba(192, 132, 252, 0.2); }
+  100% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 24px rgba(192, 132, 252, 0.45); }
+}
+
+/* Красная тревожная аура ушатанных авто */
+.card-glow-beater {
+  border-color: rgba(255, 51, 102, 0.45) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px rgba(255, 51, 102, 0.2) !important;
+  animation: glowPulseRed 2.5s infinite alternate ease-in-out;
+}
+
+@keyframes glowPulseRed {
+  0% { box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8), 0 0 10px rgba(255, 51, 102, 0.2); }
+  100% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 22px rgba(255, 51, 102, 0.4); }
+}
+
+/* Зеленая аура срочных лотов */
+.card-glow-urgent {
+  border-color: rgba(0, 230, 118, 0.45) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px rgba(0, 230, 118, 0.25) !important;
+}
+
+/* ========================================================
+   2. КОМПАКТНАЯ СЕТКА КАТЕГОРИЙ РЫНКА
    ======================================================== */
 .market-categories-grid {
   display: grid !important;
@@ -89,7 +141,7 @@
 }
 
 /* ========================================================
-   2. ШИЛЬДИКИ И СТИЛИЗОВАННЫЕ МАРКИ АВТОМОБИЛЕЙ
+   3. ШИЛЬДИКИ И СТИЛИЗОВАННЫЕ МАРКИ АВТОМОБИЛЕЙ
    ======================================================== */
 .car-brand-title-wrap {
   display: flex;
@@ -99,13 +151,13 @@
 }
 
 .car-brand-pill {
-  font-size: 8.5px;
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
-  padding: 2px 6px;
-  border-radius: 5px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  padding: 3px 7px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   display: inline-block;
   line-height: 1.1;
 }
@@ -126,7 +178,7 @@
 .brand-default { background: #1f2937; color: #cbd5e1; border: 1px solid #374151; }
 
 .car-model-name {
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 900;
   color: #ffffff;
   letter-spacing: 0.2px;
@@ -134,7 +186,86 @@
 }
 
 /* ========================================================
-   3. ОБЛОЖКА С ИНТЕРАКТИВНОЙ ГАЛЕРЕЕЙ ФОТО
+   4. УВЕЛИЧЕННАЯ СТРОКА ТЕГОВ И ГОСНОМЕР В ВЫДЕЛЕННОЙ ЗОНЕ
+   ======================================================== */
+.car-status-badges-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Увеличенные бейджи статусов */
+.car-status-badges-row .tag-badge {
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  padding: 4px 8px !important;
+  border-radius: 6px !important;
+  letter-spacing: 0.4px;
+}
+
+/* Увеличенный подтверждённый госномер */
+.plate-mini-capsule {
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-family: monospace, sans-serif !important;
+  border: 1.5px solid #000000 !important;
+  border-radius: 6px !important;
+  font-weight: 900 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 3px 7px !important;
+  font-size: 10.5px !important;
+  line-height: 1.1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  letter-spacing: 0.4px;
+  animation: fadeInPlate 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes fadeInPlate {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.plate-flag-mini {
+  border-left: 1.5px solid #111 !important;
+  padding-left: 4px !important;
+  margin-left: 4px !important;
+  font-size: 8px !important;
+  font-weight: 900;
+}
+
+/* Увеличенная заблюренная плашка скрытого номера до покупки Автотеки */
+.plate-hidden-capsule {
+  background: rgba(15, 23, 42, 0.92) !important;
+  color: #cbd5e1 !important;
+  font-family: monospace, sans-serif !important;
+  border: 1.5px dashed rgba(0, 242, 254, 0.4) !important;
+  border-radius: 6px !important;
+  font-weight: 800 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 3px 8px !important;
+  font-size: 10px !important;
+  line-height: 1.1;
+  letter-spacing: 0.8px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: all 0.2s ease;
+}
+
+.plate-hidden-capsule:hover {
+  border-color: var(--cyan) !important;
+  color: #fff !important;
+  box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+.plate-hidden-capsule:active {
+  transform: scale(0.95);
+}
+
+/* ========================================================
+   5. ЧИСТАЯ ОБЛОЖКА БЕЗ ПЕРЕГРУЖАЮЩИХ ПЛАШЕК
    ======================================================== */
 .car-img-wrap {
   position: relative !important;
@@ -163,7 +294,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.2) 45%, transparent 70%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.1) 40%, transparent 65%);
   pointer-events: none;
 }
 
@@ -220,14 +351,14 @@
 }
 
 /* ========================================================
-   4. ОБЪЁМНЫЕ РЕЛЬЕФНЫЕ ПРЯМОУГОЛЬНИКИ ХАРАКТЕРИСТИК (3D CAPSULES)
+   6. ВЕРХНИЙ БЛОК: ЦЕНА + МАРЖА
    ======================================================== */
 .car-header-row-volumetric {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .car-price-badge-3d {
@@ -235,12 +366,12 @@
   flex-direction: column;
   align-items: flex-end;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(0, 230, 118, 0.18) 0%, rgba(5, 20, 14, 0.85) 100%);
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.16) 0%, rgba(5, 20, 14, 0.9) 100%);
   border: 1.5px solid rgba(0, 230, 118, 0.45);
   border-top: 1.5px solid rgba(0, 230, 118, 0.85);
   border-radius: 12px;
-  padding: 5px 10px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 12px rgba(0, 230, 118, 0.25);
+  padding: 4px 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   flex-shrink: 0;
 }
 
@@ -256,36 +387,44 @@
   font-size: 15px;
   font-weight: 900;
   color: var(--green);
-  text-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.4);
   line-height: 1.15;
 }
 
+.market-price-margin-row {
+  font-size: 8.5px;
+  font-weight: 800;
+  margin-top: 2px;
+  line-height: 1.1;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+/* ========================================================
+   7. СТРОЧНЫЙ ФОРМАТ ХАРАКТЕРИСТИК (МОЩНОСТЬ — 72 Л.С.)
+   ======================================================== */
 .car-specs-grid-volumetric {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   margin-bottom: 8px;
 }
 
-.spec-tile-3d {
-  background: linear-gradient(160deg, rgba(25, 36, 56, 0.85) 0%, rgba(9, 14, 25, 0.95) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-top: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 12px;
-  padding: 7px 6px;
+.spec-tile-3d-row {
+  background: linear-gradient(160deg, rgba(20, 30, 48, 0.85) 0%, rgba(9, 14, 25, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 2.5px solid var(--border-glow);
+  border-radius: 8px;
+  padding: 6px 10px;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 3px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.12s ease, border-color 0.15s ease;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition: transform 0.12s ease;
 }
 
-.spec-tile-3d:active {
-  transform: scale(0.96);
+.spec-tile-3d-row:active {
+  transform: scale(0.985);
 }
 
 .spec-tile-icon-wrap {
@@ -295,29 +434,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  margin-bottom: 1px;
+  font-size: 10.5px;
+  flex-shrink: 0;
 }
 
 .spec-tile-icon-power {
   background: rgba(255, 179, 0, 0.15);
   color: var(--amber);
   border: 1px solid rgba(255, 179, 0, 0.35);
-  box-shadow: 0 0 8px rgba(255, 179, 0, 0.3);
 }
 
 .spec-tile-icon-road {
   background: rgba(0, 242, 254, 0.15);
   color: var(--cyan);
   border: 1px solid rgba(0, 242, 254, 0.35);
-  box-shadow: 0 0 8px rgba(0, 242, 254, 0.3);
 }
 
 .spec-tile-icon-shield {
   background: rgba(0, 230, 118, 0.15);
   color: var(--green);
   border: 1px solid rgba(0, 230, 118, 0.35);
-  box-shadow: 0 0 8px rgba(0, 230, 118, 0.3);
 }
 
 .spec-tile-icon-shield-mid {
@@ -330,32 +466,33 @@
   background: rgba(255, 51, 102, 0.2);
   color: var(--red);
   border: 1px solid rgba(255, 51, 102, 0.45);
-  animation: pulseLowHealthIcon 1.2s infinite alternate;
-}
-@keyframes pulseLowHealthIcon {
-  0% { transform: scale(0.95); opacity: 0.8; }
-  100% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 10px var(--red); }
 }
 
-.spec-tile-val {
+.spec-tile-icon-unknown {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.spec-tile-row-text {
   font-size: 11px;
-  font-weight: 900;
-  color: #fff;
-  line-height: 1.1;
-  text-align: center;
+  font-weight: 700;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  flex: 1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.spec-tile-sub {
-  font-size: 8.5px;
-  font-weight: 700;
-  color: var(--text-sub);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+.spec-tile-row-text b {
+  color: #ffffff;
+  margin-left: 4px;
 }
 
 /* ========================================================
-   5. СТАТУС-ПЛАШКА ТЮНИНГА / СТОКА
+   8. СТАТУС-ПЛАШКА ТЮНИНГА / СТОКА
    ======================================================== */
 .car-tuning-status-capsule {
   background: linear-gradient(145deg, rgba(16, 24, 38, 0.95), rgba(7, 11, 20, 0.95));
@@ -425,29 +562,25 @@
 }
 
 /* ========================================================
-   6. СВЕТОДИОДНЫЕ (LED) И СТРОБОСКОПИЧЕСКИЕ БЕЙДЖИ
+   9. СВЕТОДИОДНЫЕ (LED) И СТРОБОСКОПИЧЕСКИЕ БЕЙДЖИ
    ======================================================== */
 .badge-tag {
-  position: absolute !important;
   background: rgba(8, 12, 20, 0.92) !important;
   backdrop-filter: blur(6px) !important;
   -webkit-backdrop-filter: blur(6px) !important;
-  padding: 3px 8px !important;
+  padding: 3px 7px !important;
   border-radius: 6px !important;
-  font-size: 9.5px !important;
+  font-size: 9px !important;
   font-weight: 800 !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  z-index: 10 !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
-  gap: 5px !important;
+  gap: 4px !important;
 }
-.badge-br { bottom: 8px !important; right: 8px !important; }
-.badge-tl { top: 8px !important; left: 8px !important; }
 
 .led-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   display: inline-block;
 }
@@ -459,16 +592,6 @@
 @keyframes ledBlinkGreen {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.85); }
-}
-
-.led-amber {
-  background: #ffb300;
-  box-shadow: 0 0 8px #ffb300;
-  animation: ledBlinkAmber 1.2s infinite ease-in-out;
-}
-@keyframes ledBlinkAmber {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.35; transform: scale(0.85); }
 }
 
 .badge-police-strobe {
@@ -493,7 +616,7 @@
   overflow: hidden;
   border-color: #ffd700 !important;
   color: #ffd700 !important;
-  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
 }
 .badge-shimmer-gold::after {
   content: '';
@@ -512,7 +635,7 @@
 }
 
 /* ========================================================
-   7. ЖИВЫЕ РЕПЛИКИ ПРОДАВЦА У КАПОТА
+   10. ЖИВЫЕ РЕПЛИКИ ПРОДАВЦА У КАПОТА
    ======================================================== */
 .seller-dialog-bubble {
   background: linear-gradient(135deg, rgba(14, 23, 40, 0.95), rgba(7, 12, 22, 0.95));
@@ -542,45 +665,8 @@
 }
 
 /* ========================================================
-   8. ПАНЕЛЬ ЦЕНЫ И БЕЙДЖИ МАРЖИ
+   11. АВТОТЕКА И ТАЙМЕРЫ
    ======================================================== */
-.price-box {
-  background: rgba(0, 230, 118, 0.08);
-  border: 1px solid rgba(0, 230, 118, 0.25);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 8px 0;
-}
-
-.price-val {
-  font-size: 16px;
-  font-weight: 900;
-  color: var(--green);
-  text-shadow: 0 0 10px rgba(0, 230, 118, 0.35);
-}
-
-.margin-potential-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 9.5px;
-  font-weight: 800;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(0, 230, 118, 0.12);
-  border: 1px solid rgba(0, 230, 118, 0.3);
-  color: var(--green);
-}
-.margin-negative-pill {
-  background: rgba(220, 38, 38, 0.12);
-  border-color: rgba(220, 38, 38, 0.3);
-  color: var(--red);
-}
-
-/* БОКСЫ АВТОТЕКИ */
 .autoteka-pts-card {
   background: linear-gradient(145deg, #090e18 0%, #060a12 100%);
   border: 1px solid var(--border-glow);
@@ -617,35 +703,6 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 8px;
   padding: 8px 10px;
-}
-
-.plate-corner {
-  position: absolute !important;
-  top: 8px !important;
-  left: 8px !important;
-  z-index: 10 !important;
-}
-
-.license-plate {
-  background: #ffffff !important;
-  color: #111111 !important;
-  font-family: monospace, sans-serif !important;
-  border: 2px solid #000 !important;
-  border-radius: 4px !important;
-  font-weight: 900 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  padding: 2px 6px !important;
-  font-size: 11px !important;
-  line-height: 1.1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
-}
-
-.license-flag {
-  border-left: 1px solid #111 !important;
-  padding-left: 4px !important;
-  margin-left: 4px !important;
-  font-size: 8px !important;
 }
 
 .viewed-badge {

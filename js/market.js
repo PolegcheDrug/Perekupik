@@ -1,8 +1,8 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И 3D-КАПСУЛЫ (v0.7.6)
+// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И 3D-КАПСУЛЫ (v0.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Красивые шильдики марок, генерация корчей и ушатанных авто,
-// объёмные 3D-виджеты характеристик, проверки толщиномером и OBD2.
+// Увеличенный номер и теги, строчный формат характеристик,
+// статус кузова «Не проверен», неоновые ауры редких лотов.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -90,7 +90,7 @@ function refreshPlateCatalog() {
     }
 }
 
-// Форматирование марки и модели со стильными шильдиками
+// Форматирование марки и модели с аккуратными шильдиками
 function formatCarBrandBadgeHtml(carName) {
     if (!carName) return "<span>Авто</span>";
 
@@ -243,7 +243,7 @@ function refreshMarketFeedManual() {
 }
 
 // ========================================================
-// ГЕНЕРАЦИЯ ЛЕНТЫ: СТОК, ТЮНИНГ-КОРЧИ И УШАТАННЫЕ АВТО
+// ГЕНЕРАЦИЯ ЛЕНТЫ АВТОРЫНКА
 // ========================================================
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
@@ -290,28 +290,28 @@ function populateMarketFeed() {
         if (!template) continue;
 
         let dealRoll = Math.random();
-        let dealType = 'normal'; // 'normal', 'urgent', 'overprice', 'tuned_drift', 'beater_project'
+        let dealType = 'normal';
         let priceMultiplier = 0.80;
 
         let isPodborFind = false;
         let isTunedSpec = false;
         let isBeaterProject = false;
 
-        // Генерация специальных типов лотов
+        // Генерация специальных предложений
         if (hasAutopodbor && Math.random() < 0.22) {
             isPodborFind = true;
             dealType = 'urgent';
             priceMultiplier = 0.60 + Math.random() * 0.05;
         } else if (dealRoll < 0.16) {
-            // 🔥 Уличный Корч (Tuned Spec)
+            // 🔥 Боевой Корч
             isTunedSpec = true;
             dealType = 'tuned_drift';
             priceMultiplier = 1.15 + Math.random() * 0.20;
         } else if (dealRoll < 0.32) {
-            // 💥 Ушатанный авто под восстановление (Beater Project)
+            // 💥 Под восстановление
             isBeaterProject = true;
             dealType = 'beater_project';
-            priceMultiplier = 0.45 + Math.random() * 0.12; // Скидка до -55%
+            priceMultiplier = 0.45 + Math.random() * 0.12;
         } else if (dealRoll < 0.50) { 
             dealType = 'urgent';
             priceMultiplier = 0.65 + Math.random() * 0.10;
@@ -359,7 +359,6 @@ function populateMarketFeed() {
             };
         }
 
-        // Реплики продавца
         let sNote = "Машина на бодром ходу, сел и поехал.";
         let sMoodIcon = "🚗";
 
@@ -383,7 +382,6 @@ function populateMarketFeed() {
         let cName = template.name ? template.name : "Техника";
         let cPower = template.power ? template.power : 100;
         
-        // Генерация тюнинга для корча
         let carTuning = { 
             chip: 0, exhaust: false, stance: false, bodykit: false, 
             rollCage: false, dragSlicks: false, hydroHandbrake: false, 
@@ -412,7 +410,6 @@ function populateMarketFeed() {
         let cImg = cImages[0];
         let cFallback = template.fallback || getCategoryFallback(tType);
 
-        // Состояние кузова и износ
         let cCond = isBeaterProject 
             ? Math.floor(35 + Math.random() * 20) 
             : (hasHiddenDefect ? Math.floor(55 + Math.random() * 20) : Math.floor(75 + Math.random() * 20));
@@ -451,6 +448,7 @@ function populateMarketFeed() {
             isTunedSpec: isTunedSpec,
             isBeaterProject: isBeaterProject,
             autotekaChecked: false,
+            inspectedAtHood: false, // Раскрывается только после личной встречи у капота
             cooldownUntil: 0,
             stoChecked: false,
             gaugeChecked: false,
@@ -496,7 +494,6 @@ function populateMarketFeed() {
     renderMarketFeed();
 }
 
-// Переключение фото в галерее карточки
 function cycleMarketCarImage(carId, delta, event) {
     if (event) event.stopPropagation();
     const car = state.marketFeed.find(c => c && c.id === carId);
@@ -524,8 +521,15 @@ function cycleMarketCarImage(carId, delta, event) {
     tgHaptic('light');
 }
 
+function promptHiddenPlateAutotekaHint(event) {
+    if (event) event.stopPropagation();
+    playSound('tick');
+    tgHaptic('light');
+    showToast("🔒 Продавец скрыл госномер в объявлении. Купите Автотеку, чтобы узнать знак!");
+}
+
 // ========================================================
-// ОСНОВНОЙ РЕНДЕР КАРТОЧЕК РЫНКА
+// ОСНОВНОЙ РЕНДЕР КАРТОЧЕК РЫНКА (СТРОЧНЫЙ ФОРМАТ)
 // ========================================================
 function renderMarketFeed() {
     const container = document.getElementById('marketCardContainer');
@@ -574,37 +578,72 @@ function renderMarketFeed() {
         let viewedClass = car.viewed ? "viewed-card" : "";
         let autoIcon = car.autotekaChecked ? "Проверено ✓" : "5,000 ₽";
 
-        let condVal = car.condition || 80;
-        let shieldIconClass = condVal >= 80 
-            ? 'spec-tile-icon-shield' 
-            : (condVal >= 50 ? 'spec-tile-icon-shield-mid' : 'spec-tile-icon-shield-low');
-        let condColorClass = condVal >= 80 
-            ? 'color-green' 
-            : (condVal >= 50 ? 'color-amber' : 'color-red');
+        // Анимации и контурные неоновые ауры карточек
+        let cardAuraClass = "card-anim-shimmer";
+        if (car.isTunedSpec) cardAuraClass += " card-glow-tuned";
+        else if (car.isBeaterProject) cardAuraClass += " card-glow-beater";
+        else if (car.dealType === 'urgent' || car.isPodborFind) cardAuraClass += " card-glow-urgent";
 
-        // Бейджи типа предложения
-        let dealBadge = "";
+        // Состояние кузова: скрыто до личной встречи у капота
+        let isBodyKnown = !!car.inspectedAtHood;
+        let condVal = car.condition || 80;
+        let shieldIconClass = "spec-tile-icon-unknown";
+        let condTextHtml = `Кузов — <span class="color-sub font-bold">Не проверен</span>`;
+
+        if (isBodyKnown) {
+            shieldIconClass = condVal >= 80 
+                ? 'spec-tile-icon-shield' 
+                : (condVal >= 50 ? 'spec-tile-icon-shield-mid' : 'spec-tile-icon-shield-low');
+            let condColorClass = condVal >= 80 
+                ? 'color-green' 
+                : (condVal >= 50 ? 'color-amber' : 'color-red');
+            condTextHtml = `Кузов — <b class="${condColorClass}">${condVal}%</b>`;
+        }
+
+        // Госномер в строке тегов: скрыт до покупки Автотеки
+        let isPlateRevealed = !!car.autotekaChecked;
+        let plateInRowHtml = "";
+
+        if (isPlateRevealed) {
+            plateInRowHtml = `
+                <div class="plate-mini-capsule notranslate" translate="no" title="Госномер подтвержден Автотекой">
+                    ${car.plate} <span class="plate-flag-mini">RUS</span>
+                </div>
+            `;
+        } else {
+            let regionNum = (car.plate && car.plate.split(' ')[1]) ? car.plate.split(' ')[1] : "77";
+            plateInRowHtml = `
+                <div class="plate-hidden-capsule notranslate" onclick="promptHiddenPlateAutotekaHint(event)" translate="no" title="Нажмите для подсказки">
+                    <i class="fa-solid fa-lock" style="font-size:8px; margin-right:4px;"></i> • ••• •• ${regionNum}
+                </div>
+            `;
+        }
+
+        // Крупные акцентные бейджи статуса
+        let statusBadgesHtml = `<span class='tag-badge bg-tag-cyan'>${carType}</span>`;
+
         if (car.isTunedSpec) {
-            dealBadge = "<span class='tag-badge bg-tag-purple ml-1'>🔥 БОЕВОЙ КОРЧ</span>";
+            statusBadgesHtml += "<span class='tag-badge bg-tag-purple'>🔥 КОРЧ</span>";
         } else if (car.isBeaterProject) {
-            dealBadge = "<span class='tag-badge bg-tag-red ml-1'>💥 ПОД ВОССТАНОВЛЕНИЕ</span>";
+            statusBadgesHtml += "<span class='tag-badge bg-tag-red'>💥 ПОД ПРОЕКТ</span>";
         } else if (car.isPodborFind) {
-            dealBadge = "<span class='tag-badge bg-tag-green ml-1'><span class='led-dot led-green'></span> ПОДБОР -35%</span>";
+            statusBadgesHtml += "<span class='tag-badge bg-tag-green'><span class='led-dot led-green'></span> -35% ПОДБОР</span>";
         } else if (car.dealType === 'urgent') {
-            dealBadge = "<span class='tag-badge bg-tag-green ml-1'><span class='led-dot led-green'></span> СРОЧНО</span>";
+            statusBadgesHtml += "<span class='tag-badge bg-tag-green'>⚡ СРОЧНО</span>";
         } else if (car.dealType === 'overprice') {
-            dealBadge = "<span class='tag-badge bg-tag-red ml-1'><span class='led-dot led-amber'></span> ВЫСОКАЯ ЦЕНА</span>";
+            statusBadgesHtml += "<span class='tag-badge bg-tag-red'>ВЫСОКАЯ ЦЕНА</span>";
         }
 
         let pVal = evaluatePlate(car.plate);
-        let coolPlateBadge = pVal > 15000
-            ? "<span class='tag-badge badge-shimmer-gold ml-1'>🏷️ БЛАТНОЙ НОМЕР</span>"
-            : "";
+        if (isPlateRevealed && pVal > 15000) {
+            statusBadgesHtml += "<span class='tag-badge badge-shimmer-gold'>🏷️ БЛАТНОЙ</span>";
+        }
 
-        let criminalBadge = car.isStolen 
-            ? "<span class='tag-badge badge-police-strobe ml-1'>🚨 РОЗЫСК</span>" 
-            : "";
+        if (car.isStolen && isPlateRevealed) {
+            statusBadgesHtml += "<span class='tag-badge badge-police-strobe'>🚨 РОЗЫСК</span>";
+        }
 
+        // Галерея фото
         let imagesCount = Array.isArray(car.images) ? car.images.length : 1;
         let galleryDotsHtml = "";
         if (imagesCount > 1) {
@@ -628,12 +667,16 @@ function renderMarketFeed() {
         ` : "";
 
         let estimatedProfit = (car.marketValue || 0) - (car.price || 0);
-        let profitPill = estimatedProfit > 0 
-            ? `<span class="margin-potential-pill">+${estimatedProfit.toLocaleString()} ₽ маржа</span>` 
-            : `<span class="margin-potential-pill margin-negative-pill">В минус</span>`;
+        let marginBadgeHtml = estimatedProfit > 0 
+            ? `<div class="market-price-margin-row color-green">▲ +${estimatedProfit.toLocaleString()} ₽ маржа</div>`
+            : `<div class="market-price-margin-row color-red">▼ В убыток</div>`;
+
+        let odoWarningPill = (isPlateRevealed && car.rolledOdometer) 
+            ? `<span class="color-red font-bold ml-1" style="font-size:8px;">[скручен]</span>` 
+            : "";
 
         htmlContent += `
-        <div class='glass-card mb-3 ${busyClass} ${viewedClass}' id='card_${car.id}'>
+        <div class='glass-card mb-3 ${busyClass} ${viewedClass} ${cardAuraClass}' id='card_${car.id}'>
             ${viewedBadge}
             
             <div class='cooldown-timer notranslate' translate='no' style='${isBusy ? "display:flex !important;" : "display:none !important;"}'>
@@ -642,71 +685,75 @@ function renderMarketFeed() {
                 <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>${t('paid_call')} (1,000 ₽)</button>
             </div>
 
-            <!-- ОБЛОЖКА С МУЛЬТИ-ФОТО -->
+            <!-- ЧИСТАЯ ОБЛОЖКА БЕЗ ПЕРЕГРУЖАЮЩИХ ПЛАШЕК -->
             <div class='car-img-wrap'>
                 <img id="market_car_img_${car.id}" src='${carImg}' class='car-img' onerror="this.onerror=null; this.src='${fallbackUrl}';">
-                
                 ${navArrowsHtml}
                 ${galleryDotsHtml}
-
-                <div class='plate-corner'><div class='license-plate notranslate' translate='no'>${car.plate} <div class='license-flag'>RUS</div></div></div>
-                <div class='badge-tag badge-br'>
-                    <span class='tag-badge bg-tag-cyan'>${carType}</span>
-                    ${dealBadge}
-                    ${coolPlateBadge}
-                    ${criminalBadge}
-                </div>
             </div>
 
-            <!-- РЕЛЬЕФНАЯ СТРОКА С ШИЛЬДИКАМИ И ЦЕНОЙ -->
+            <!-- ВЕРХНИЙ БЛОК: ШИЛЬДИК МАРКИ, УВЕЛИЧЕННЫЕ ТЕГИ С НОМЕРОМ И ЦЕНА С МАРЖОЙ -->
             <div class="car-header-row-volumetric">
-                <div>
+                <div style="flex:1; min-width:0; margin-right:8px;">
                     ${formatCarBrandBadgeHtml(car.name)}
-                    <div class="mt-1">${profitPill}</div>
+                    
+                    <!-- СТРОКА ТЕГОВ С НОМЕРОМ В ВЫДЕЛЕННОЙ ОБЛАСТИ -->
+                    <div class="car-status-badges-row mt-1">
+                        ${statusBadgesHtml}
+                        ${plateInRowHtml}
+                    </div>
                 </div>
+
                 <div class="car-price-badge-3d">
                     <span class="car-price-label-sub">Цена продавца</span>
                     <span class="car-price-value-3d" id='price_txt_${car.id}'>${carPrice} ₽</span>
+                    ${marginBadgeHtml}
                 </div>
             </div>
 
-            <!-- ОБЪЁМНЫЕ РЕЛЬЕФНЫЕ КАПСУЛЫ ХАРАКТЕРИСТИК -->
+            <!-- СТРОЧНЫЙ ФОРМАТ ХАРАКТЕРИСТИК (МОЩНОСТЬ — 72 Л.С. В ОДНУ СТРОКУ) -->
             <div class="car-specs-grid-volumetric">
-                <div class="spec-tile-3d">
+                <!-- ПЛИТКА 1: МОЩНОСТЬ -->
+                <div class="spec-tile-3d-row">
                     <div class="spec-tile-icon-wrap spec-tile-icon-power">
                         <i class="fa-solid fa-bolt"></i>
                     </div>
-                    <div class="spec-tile-val color-amber">${car.power || 100} л.с.</div>
-                    <div class="spec-tile-sub">Мощность</div>
+                    <div class="spec-tile-row-text">
+                        Мощность — <b>${car.power || 100} л.с.</b>
+                    </div>
                 </div>
 
-                <div class="spec-tile-3d">
+                <!-- ПЛИТКА 2: ПРОБЕГ -->
+                <div class="spec-tile-3d-row">
                     <div class="spec-tile-icon-wrap spec-tile-icon-road">
                         <i class="fa-solid fa-road"></i>
                     </div>
-                    <div class="spec-tile-val color-cyan">${carMileage} км</div>
-                    <div class="spec-tile-sub">Пробег</div>
+                    <div class="spec-tile-row-text">
+                        Пробег — <b>${carMileage} км</b>${odoWarningPill}
+                    </div>
                 </div>
 
-                <div class="spec-tile-3d">
+                <!-- ПЛИТКА 3: КУЗОВ -->
+                <div class="spec-tile-3d-row">
                     <div class="spec-tile-icon-wrap ${shieldIconClass}">
-                        <i class="fa-solid fa-shield"></i>
+                        <i class="fa-solid ${isBodyKnown ? 'fa-shield' : 'fa-circle-question'}"></i>
                     </div>
-                    <div class="spec-tile-val ${condColorClass}">${condVal}%</div>
-                    <div class="spec-tile-sub">Кузов / HP</div>
+                    <div class="spec-tile-row-text">
+                        ${condTextHtml}
+                    </div>
                 </div>
             </div>
 
             ${sellerDialogHtml}
 
-            <!-- ОЦЕНКА РЫНКА И ПОТЕНЦИАЛ -->
+            <!-- ОЦЕНКА РЫНКА -->
             <div class="p-2 mb-2 flex-between" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.06);">
                 <div>
                     <span class="sub-label text-xs">Оценка вторичного рынка:</span>
                     <div class="font-bold color-cyan text-xs" style="font-size:12px;">~${carMarketVal} ₽</div>
                 </div>
                 <div class="text-right">
-                    <span class="sub-label text-xs">Потенциал сделки:</span>
+                    <span class="sub-label text-xs">Разница от оценки:</span>
                     <div class="font-bold ${estimatedProfit > 0 ? 'color-green' : 'color-red'} text-xs" style="font-size:12px;">
                         ${estimatedProfit > 0 ? '+' : ''}${estimatedProfit.toLocaleString()} ₽
                     </div>
@@ -979,6 +1026,10 @@ function openMarketDeal(carId) {
     if (carIndex === -1) return;
     const car = state.marketFeed[carIndex];
     pendingMarketCar = { car: car, carIndex: carIndex };
+
+    // Личная встреча у капота раскрывает реальное состояние кузова
+    car.inspectedAtHood = true;
+    saveState();
     
     const imgEl = document.getElementById("dealCarImg");
     if (imgEl) {
@@ -1194,7 +1245,7 @@ function attemptMarketHaggle(percent) {
     car.hagglePatience -= 1;
 
     let baseChance = percent === 5 ? 85 : (percent === 10 ? 60 : 35);
-    if (car.isBeaterProject) baseChance += 25; // С ушатанных авто легко сбивать цену
+    if (car.isBeaterProject) baseChance += 25;
     if (car.isPodborFind) baseChance += 20;
     if (car.sellerPersonality === 'hurried') baseChance += 20;
     if (car.sellerPersonality === 'aggressive') baseChance -= 20;
@@ -1434,7 +1485,7 @@ function closeGaugeModal() {
 }
 
 // ----------------------------------------------------
-// ОТЧЁТ АВТОТЕКИ
+// ОТЧЁТ АВТОТЕКИ: РАСКРЫВАЕТ ГОСНОМЕР И ИСТОРИЮ
 // ----------------------------------------------------
 function openAutotekaModal(carId) {
     if (!state.marketFeed) return;
@@ -1450,6 +1501,7 @@ function openAutotekaModal(carId) {
         if (cash < cost && !isVip) return showToast("Автотека стоит 5,000 ₽!");
         state.player.cash -= cost;
         car.autotekaChecked = true;
+        showToast("🔍 Базы ГИБДД проверены! Госномер официально подтверждён.");
         saveState();
     }
     
@@ -1499,7 +1551,7 @@ function openAutotekaModal(carId) {
             <div class='flex-between mb-2'>
                 <div>
                     <b class='color-cyan' style='font-size:13.5px;'>${cName}</b>
-                    <div class='sub-label mt-1'>Госномер: <span class='license-plate text-xs notranslate' translate='no' style='padding:2px 6px;'>${cPlate} <div class='license-flag'>RUS</div></span></div>
+                    <div class='sub-label mt-1'>Подтверждённый госномер: <span class='license-plate text-xs notranslate' translate='no' style='padding:2px 6px;'>${cPlate} <div class='license-flag'>RUS</div></span></div>
                 </div>
                 ${legalStatus}
             </div>
@@ -1612,6 +1664,7 @@ window.populateMarketFeed = populateMarketFeed;
 window.renderMarketFeed = renderMarketFeed;
 window.cycleMarketCarImage = cycleMarketCarImage;
 window.formatCarBrandBadgeHtml = formatCarBrandBadgeHtml;
+window.promptHiddenPlateAutotekaHint = promptHiddenPlateAutotekaHint;
 window.openGaugeModal = openGaugeModal;
 window.checkBodyPart = checkBodyPart;
 window.closeGaugeModal = closeGaugeModal;
