@@ -1,10 +1,9 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ГАРАНТИЙНЫЙ ШАНТАЖ (v0.7.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ГАРАНТИЙНЫЙ ШАНТАЖ (v0.7.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Детализация маржи, себестоимость выкупа и вложенных доработок,
-// честная реакция покупателей, право отказаться от подписания ДКП,
-// налог 13% только на учёт РФ и механика гарантийных разборок.
-// Изоляция окон через ModalManager, предотвращение наложений интерфейса.
+// Живые шкалы мощности и кузова, сонарный радар поиска клиента,
+// эмодзи-индикатор терпения при торге (😊🤨😤🤬), гарантийные
+// разборки за обман и официальный бланк ДКП.
 // ========================================================
 
 let dkpAutoCloseTimer = null;
@@ -50,6 +49,13 @@ function calculateLotWaitTime() {
     return Math.max(12, Math.round(baseTime * karmaFactor));
 }
 
+function getBuyerMoodEmoji(patience) {
+    if (patience >= 75) return "😊";
+    if (patience >= 50) return "🤨";
+    if (patience >= 25) return "😤";
+    return "🤬";
+}
+
 function renderSalesLot() {
     const list = document.getElementById('salesLotList');
     if (!list) return;
@@ -87,6 +93,14 @@ function renderSalesLot() {
         let totalInvested = buyCost + modsCost;
         let potentialMargin = asking - totalInvested;
 
+        // Расчет процентов шкал
+        let powerPct = Math.min(100, Math.round((cPower / 500) * 100));
+        let condVal = car.condition || 80;
+        let condClass = condVal >= 80 ? 'fill-condition-high' : (condVal >= 50 ? 'fill-condition-mid' : 'fill-condition-low');
+        let condColor = condVal >= 80 ? 'color-green' : (condVal >= 50 ? 'color-amber' : 'color-red');
+        let carMileage = (typeof car.mileage === 'number') ? car.mileage.toLocaleString() : "85 000";
+        let mileagePct = Math.min(100, Math.round(((car.mileage || 85000) / 250000) * 100));
+
         let statusBlock = "";
         if (!lot.currentBuyer) {
             let maxTime = lot.maxTimer || 120;
@@ -96,11 +110,11 @@ function renderSalesLot() {
             statusBlock = `
             <div class='p-2' style='background:#090e18; border-radius:8px; border:1px solid var(--border-glass);'>
                 <div class='flex-between text-xs mb-1'>
-                    <span id='lot_timer_text_${idx}'>Ожидание клиента: ${currentTimer}с</span>
-                    <span class='color-cyan font-bold'>Поиск покупателя</span>
+                    <span id='lot_timer_text_${idx}'>Ожидание клиента: <b>${currentTimer}с</b></span>
+                    <span class='color-cyan font-bold'><i class='fa-solid fa-satellite-dish fa-spin'></i> Сканер клиентов</span>
                 </div>
-                <div class='container-progress-wrap'>
-                    <div class='container-progress-bar' id='lot_progress_fill_${idx}' style='width:${progressPct}%;'></div>
+                <div class='telemetry-bar-bg mb-1' style='height:8px;'>
+                    <div class='telemetry-bar-fill' id='lot_progress_fill_${idx}' style='width:${progressPct}%; background: linear-gradient(90deg, #9333ea, #00f2fe); box-shadow: 0 0 10px var(--cyan-glow);'></div>
                 </div>
                 ${karmaSpeedText}
                 <button onclick='useExpressTicket(${idx})' class='btn btn-purple btn-sm w-full mt-2'>
@@ -139,12 +153,12 @@ function renderSalesLot() {
         }
 
         let regBadge = car.isRegisteredOnPlayer 
-            ? "<span class='tag-badge bg-tag-green' style='font-size:8.5px;'>УЧЁТ РФ</span>" 
-            : "<span class='tag-badge bg-tag-amber' style='font-size:8.5px;'>НА ДКП (0% НАЛОГ)</span>";
+            ? "<span class='tag-badge bg-tag-green' style='font-size:8.5px;'><span class='led-dot led-green'></span> УЧЁТ РФ</span>" 
+            : "<span class='tag-badge bg-tag-amber' style='font-size:8.5px;'><span class='led-dot led-amber'></span> НА ДКП (0% НАЛОГ)</span>";
 
         let criminalBadge = car.isStolen 
-            ? "<span class='tag-badge bg-tag-red ml-1' style='font-size:8.5px;'>В РОЗЫСКЕ</span>" 
-            : (car.unregistered ? "<span class='tag-badge bg-tag-red ml-1' style='font-size:8.5px;'>12.5.1</span>" : "");
+            ? "<span class='tag-badge badge-police-strobe ml-1' style='font-size:8.5px;'>🚨 В РОЗЫСКЕ</span>" 
+            : (car.unregistered ? "<span class='tag-badge badge-police-strobe ml-1' style='font-size:8.5px;'>12.5.1</span>" : "");
 
         html += `
         <div class='glass-card mb-3'>
@@ -158,18 +172,37 @@ function renderSalesLot() {
             </div>
 
             <div class='flex-between mb-2'>
-                <div>
-                    <h4 class='font-bold text-xs color-cyan' style='font-size:14px;'>${cName}</h4>
-                </div>
+                <h4 class='font-bold text-xs color-cyan' style='font-size:14px;'>${cName}</h4>
                 <div class='price-val text-xs color-green' style='font-size:14px;'>
                     ${asking.toLocaleString()} ₽
                 </div>
             </div>
 
-            <div class='car-spec-chips-row mb-2'>
-                <div class='car-spec-chip'><i class='fa-solid fa-bolt color-amber'></i> <b>${cPower}</b> л.с.</div>
-                <div class='car-spec-chip'><i class='fa-solid fa-road color-cyan'></i> <b>${(car.mileage || 85000).toLocaleString()}</b> км</div>
-                <div class='car-spec-chip'><i class='fa-solid fa-shield color-green'></i> <b>${car.condition || 80}%</b> кузов</div>
+            <!-- АНИМИРОВАННЫЕ ШКАЛЫ КАРТОЧКИ ПЛОЩАДКИ -->
+            <div class="car-telemetry-panel mb-2">
+                <div class="telemetry-row">
+                    <div class="telemetry-label"><i class="fa-solid fa-bolt color-amber"></i> Мощность:</div>
+                    <div class="telemetry-bar-bg">
+                        <div class="telemetry-bar-fill fill-power" style="width:${powerPct}%;"></div>
+                    </div>
+                    <div class="telemetry-val color-amber">${cPower} л.с.</div>
+                </div>
+
+                <div class="telemetry-row">
+                    <div class="telemetry-label"><i class="fa-solid fa-shield ${condColor}"></i> Кузов:</div>
+                    <div class="telemetry-bar-bg">
+                        <div class="telemetry-bar-fill ${condClass}" style="width:${condVal}%;"></div>
+                    </div>
+                    <div class="telemetry-val ${condColor}">${condVal}%</div>
+                </div>
+
+                <div class="telemetry-row">
+                    <div class="telemetry-label"><i class="fa-solid fa-road color-cyan"></i> Пробег:</div>
+                    <div class="telemetry-bar-bg">
+                        <div class="telemetry-bar-fill fill-power" style="width:${mileagePct}%; background: linear-gradient(90deg, #0284c7, #38bdf8);"></div>
+                    </div>
+                    <div class="telemetry-val color-cyan">${carMileage} км</div>
+                </div>
             </div>
 
             <!-- ФИНАНСОВЫЙ БЛОК: СЕБЕСТОИМОСТЬ, ТЮНИНГ И МАРЖА -->
@@ -324,7 +357,7 @@ function cancelSalesLot(idx) {
 }
 
 // ========================================================
-// ЛОГИКА ТОРГА С ПРОВЕРКОЙ ЧЕСТНОСТИ
+// ЛОГИКА ТОРГА С ЖИВЫМИ ЭМОДЗИ ТЕРПЕНИЯ
 // ========================================================
 function openSaleHaggleModal(idx) {
     dealIsAborted = false;
@@ -347,13 +380,8 @@ function openSaleHaggleModal(idx) {
     setTxt("saleBuyerOfferVal", currentSaleBuyer.offerPrice.toLocaleString() + " ₽");
     setTxt("saleBuyerAvatar", currentSaleBuyer.avatar);
     setTxt("saleBuyerName", currentSaleBuyer.name);
-    setTxt("saleBuyerPatienceText", currentSaleBuyer.patience + "%");
-
-    const fill = document.getElementById("saleBuyerPatienceFill");
-    if (fill) {
-        fill.style.width = currentSaleBuyer.patience + "%";
-        fill.className = currentSaleBuyer.patience > 50 ? "risk-fill risk-low" : "risk-fill risk-high";
-    }
+    
+    updateSaleBuyerPatienceUI(currentSaleBuyer.patience);
 
     const thread = document.getElementById("saleHaggleChatThread");
     if (thread) {
@@ -378,6 +406,16 @@ function openSaleHaggleModal(idx) {
 
     ModalManager.open("modalHaggleSale", { closeOthers: true });
     playSound('tick');
+}
+
+function updateSaleBuyerPatienceUI(patience) {
+    let emoji = getBuyerMoodEmoji(patience);
+    setTxt("saleBuyerPatienceText", `${emoji} ${patience}%`);
+    const fill = document.getElementById("saleBuyerPatienceFill");
+    if (fill) {
+        fill.style.width = patience + "%";
+        fill.className = patience > 50 ? "risk-fill risk-low" : (patience > 25 ? "risk-fill risk-mid" : "risk-fill risk-high");
+    }
 }
 
 function rejectBuyerHaggle() {
@@ -405,7 +443,7 @@ function attemptHaggleSale(type) {
     const car = slot.car;
     const thread = document.getElementById("saleHaggleChatThread");
 
-    // 1. Проверка на криминал (угон, 12.5.1)
+    // 1. Проверка на криминал
     let isCriminal = car.isStolen || car.unregistered;
     if (isCriminal) {
         let bustRoll = Math.random();
@@ -453,7 +491,7 @@ function attemptHaggleSale(type) {
         }
     }
 
-    // 2. Проверка на умышленный обман игрока
+    // 2. Проверка на умышленный обман
     let isIntentionalScam = !!car.rolledOdometer || !!car.hasAdditive;
     if (isIntentionalScam) {
         let scamRoll = Math.random();
@@ -561,6 +599,7 @@ function attemptHaggleSale(type) {
 
         currentSaleBuyer.offerPrice += delta;
         setTxt("saleBuyerOfferVal", currentSaleBuyer.offerPrice.toLocaleString() + " ₽");
+        spawnFloatingReward(`+${delta.toLocaleString()} ₽`);
         
         if (thread) {
             let playerLines = type === 'safe' 
@@ -578,12 +617,7 @@ function attemptHaggleSale(type) {
         let damage = type === 'safe' ? Math.floor(20 + Math.random() * 15) : Math.floor(35 + Math.random() * 20);
         currentSaleBuyer.patience = Math.max(0, currentSaleBuyer.patience - damage);
         
-        setTxt("saleBuyerPatienceText", currentSaleBuyer.patience + "%");
-        const fill = document.getElementById("saleBuyerPatienceFill");
-        if (fill) {
-            fill.style.width = currentSaleBuyer.patience + "%";
-            fill.className = currentSaleBuyer.patience > 50 ? "risk-fill risk-low" : "risk-fill risk-high";
-        }
+        updateSaleBuyerPatienceUI(currentSaleBuyer.patience);
 
         if (thread) {
             let sLines = [
@@ -802,7 +836,6 @@ function confirmSignDKP() {
             AppAutodrot.triggerBuyerReview(car);
         }
 
-        // ШАНС ГАРАНТИЙНОГО ШАНТАЖА И ОБРАТКИ ПРИ ПРОДАЖЕ ХЛАМА
         scheduleBuyerBackfireCheck(car, deal.buyer);
 
         if (typeof trackQuestProgress === 'function') {
@@ -851,7 +884,6 @@ function scheduleBuyerBackfireCheck(car, buyerName) {
     let isRisky = car.rolledOdometer || car.hasAdditive || (car.hiddenDefect && !car.repaired);
     if (!isRisky) return;
 
-    // С шансом 35% покупатель вернется на разборки спустя некоторое время
     if (Math.random() < 0.35) {
         setTimeout(() => {
             triggerBuyerBackfireEvent(car, buyerName);

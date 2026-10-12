@@ -18,6 +18,8 @@
   --purple-glow: rgba(192, 132, 252, 0.4);
   --lightning-secondary: #7928ca;
   --lightning-glow: rgba(121, 40, 202, 0.45);
+  --custom-fx-color: #00f2fe;
+  --custom-fx-glow: rgba(0, 242, 254, 0.45);
   --text-main: #f8fafc;
   --text-sub: #94a3b8;
   --radius-xl: 20px;
@@ -99,7 +101,6 @@ html, body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Базовые кнопки без браузерных артефактов */
 .btn {
   width: 100%;
   min-height: 42px;
@@ -154,8 +155,6 @@ html, body {
 .mb-3 { margin-bottom: 12px; }
 .mt-1 { margin-top: 4px; }
 .mt-2 { margin-top: 8px; }
-.ml-1 { margin-left: 4px; }
-.mr-1 { margin-right: 4px; }
 .p-1 { padding: 4px; }
 .p-2 { padding: 8px; }
 .p-3 { padding: 12px; }

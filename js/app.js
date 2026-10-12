@@ -1,12 +1,12 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, ДАШБОРД ПРОФИЛЯ & CLOUD SYNC (v0.7.0)
+// js/app.js — ЯДРО СИМУЛЯТОРА, ЧИСЛОВОЙ РОЛЛЕР & CLOUD SYNC (v0.7.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Тема иконок Cyber Black Neo, адаптивные эффекты огня/плазмы,
-// спецзаказы «ПодКлюч», Net Worth, KPI, Винрейт, Ачивки,
-// Telegram Cloud Storage, реактивные депозиты и бизнес-цикл.
+// Анимированный роллер чисел HUD, жесткий учет инвентаря Маркета,
+// темы Cyber Black Neo, кастомные эффекты огня/плазмы,
+// спецзаказы «ПодКлюч», Telegram Cloud Storage и бизнес-цикл.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.7.0";
+const CURRENT_GAME_VERSION = "v0.7.2";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -16,6 +16,11 @@ let tgUserData = null;
 let SAVE_KEY_PREFIX = "perekup_v7_";
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
+
+// Кэш предыдущих значений для плавной накрутки роллером
+let displayedCashValue = 0;
+let displayedStarsValue = 0;
+let activeNumberAnimators = {};
 
 // ========================================================
 // 1. ДИНАМИЧЕСКИЙ ВЫБОР ФОТО АВТОМОБИЛЯ ИЗ ПАПКИ МОДЕЛИ
@@ -99,7 +104,7 @@ function closeModal(id) {
 window.closeModal = closeModal;
 
 // ========================================================
-// 3. ЗВУК И ТАКТИЛЬНЫЙ ОТКЛИК (HAPTICS)
+// 3. ЗВУК, HAPTICS И АНИМИРОВАННЫЙ РОЛЛЕР ЧИСЕЛ HUD
 // ========================================================
 function tgHaptic(type = 'light') {
     try { 
@@ -189,6 +194,47 @@ function playEngineSound() {
         osc.start(now); osc.stop(now + 0.95);
         tgHaptic('medium');
     } catch(e) {}
+}
+
+// Плавная анимация накручивания чисел (Number Roll)
+function animateNumberRoll(elementId, startVal, endVal, duration = 450, isCurrency = true) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    if (activeNumberAnimators[elementId]) {
+        clearInterval(activeNumberAnimators[elementId]);
+    }
+
+    if (startVal === endVal) {
+        el.innerText = isCurrency ? endVal.toLocaleString() : endVal;
+        return;
+    }
+
+    const startTime = Date.now();
+    const diff = endVal - startVal;
+
+    // Световая вспышка изменения
+    if (diff > 0) {
+        el.style.textShadow = "0 0 16px #00e676";
+    } else {
+        el.style.textShadow = "0 0 16px #ff3366";
+    }
+
+    activeNumberAnimators[elementId] = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(1, elapsed / duration);
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+        const currentVal = Math.round(startVal + diff * easeOut);
+
+        el.innerText = isCurrency ? currentVal.toLocaleString() : currentVal;
+
+        if (progress >= 1) {
+            clearInterval(activeNumberAnimators[elementId]);
+            delete activeNumberAnimators[elementId];
+            el.innerText = isCurrency ? endVal.toLocaleString() : endVal;
+            setTimeout(() => { el.style.textShadow = ""; }, 250);
+        }
+    }, 25);
 }
 
 function spawnFloatingReward(text) {
@@ -579,7 +625,7 @@ function hexToRgba(hex, alpha = 0.5) {
 }
 
 // ========================================================
-// 7. МОДАЛЬНОЕ ОКНО КАСТОМИЗАЦИИ HUD (С CYBER BLACK NEO)
+// 7. МОДАЛЬНОЕ ОКНО КАСТОМИЗАЦИИ HUD (CYBER BLACK NEO)
 // ========================================================
 let activeCustomizerTab = 'colors';
 
@@ -1489,11 +1535,11 @@ function executeDayCycleMidnight(currentDateObj) {
 }
 
 // ========================================================
-// 13. UI И ДАШБОРД ПРОФИЛЯ
+// 13. UI И ДАШБОРД ПРОФИЛЯ С ЧИСЛОВЫМ РОЛЛЕРОМ
 // ========================================================
 function updateHeaderUI() {
-    let cash = state.player?.cash || 0;
-    let stars = state.player?.stars || 0;
+    let targetCash = state.player?.cash || 0;
+    let targetStars = state.player?.stars || 0;
     let fuel = state.player?.fuel !== undefined ? state.player.fuel : 100;
     let tck = state.player?.expressTickets || 0;
     let mTck = state.player?.maxExpressTickets || 25;
@@ -1502,8 +1548,13 @@ function updateHeaderUI() {
     let conn = state.player?.connections || 0;
     let karma = Math.max(0, Math.min(100, state.player?.karma !== undefined ? state.player.karma : 50));
 
-    setTxt('cashAmount', cash.toLocaleString());
-    setTxt('starsAmount', stars);
+    // Плавная накрутка роллером при изменении значений
+    animateNumberRoll('cashAmount', displayedCashValue, targetCash, 450, true);
+    displayedCashValue = targetCash;
+
+    animateNumberRoll('starsAmount', displayedStarsValue, targetStars, 350, false);
+    displayedStarsValue = targetStars;
+
     setTxt('fuelAmount', fuel);
     setTxt('ticketsAmount', tck + "/" + mTck);
     setTxt('playerName', pName);
@@ -1769,7 +1820,7 @@ function renderProfileAnalytics() {
                     🎨 Скин & Эффекты
                 </button>
                 <button onclick="openPatchNotesModal()" class="btn btn-dark btn-sm btn-auto" style="font-size:10px;">
-                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут v0.7.0
+                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут v0.7.2
                 </button>
             </div>
         </div>
@@ -2155,6 +2206,7 @@ window.initApp = initApp;
 window.switchTab = switchTab;
 window.saveState = saveState;
 window.updateHeaderUI = updateHeaderUI;
+window.animateNumberRoll = animateNumberRoll;
 window.showToast = showToast;
 window.openVerdictModal = openVerdictModal;
 window.renderPrizeTokensHTML = renderPrizeTokensHTML;

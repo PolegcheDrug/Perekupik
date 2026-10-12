@@ -7,6 +7,11 @@
   padding: 14px;
   margin-bottom: 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.65);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.glass-card:active {
+  transform: scale(0.992);
 }
 
 .glass-card.personal-car-card {
@@ -15,7 +20,7 @@
 }
 
 /* ========================================================
-   КОМПАКТНАЯ СЕТКА КАТЕГОРИЙ (ФИКС СКРИНШОТА 2)
+   1. КОМПАКТНАЯ СЕТКА КАТЕГОРИЙ
    ======================================================== */
 .market-categories-grid {
   display: grid !important;
@@ -78,13 +83,14 @@
   opacity: 0.6;
 }
 
-/* Компактная кнопка «Все категории» без растягивания на всю ширину */
 .market-categories-grid #catBtn-all {
-  grid-column: auto !important; /* Убран растянутый span 3 */
+  grid-column: auto !important;
   border-color: rgba(0, 242, 254, 0.3) !important;
 }
 
-/* ШИРОКИЕ ОБЛОЖКИ КАРТОЧЕК */
+/* ========================================================
+   2. ОБЛОЖКА С ИНТЕРАКТИВНОЙ ГАЛЕРЕЕЙ ФОТО
+   ======================================================== */
 .car-img-wrap {
   position: relative !important;
   width: 100% !important;
@@ -101,133 +107,305 @@
   height: 100% !important;
   object-fit: cover !important;
   display: block !important;
+  transition: transform 0.35s ease;
+}
+
+.car-img-wrap:hover .car-img {
+  transform: scale(1.025);
 }
 
 .car-img-wrap::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, transparent 55%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.2) 45%, transparent 70%);
   pointer-events: none;
 }
 
-/* ОВЕРЛЕЙ ДОЗВОНА И ТАЙМЕРА */
-.cooldown-timer {
-  position: absolute !important;
-  inset: 0 !important;
-  background: rgba(8, 13, 24, 0.92) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-  border-radius: var(--radius-xl) !important;
-  z-index: 30 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 8px !important;
-  padding: 16px !important;
-  animation: fadeIn 0.15s ease-out;
+/* Стрелочки быстрого переключения фото на карточке */
+.car-gallery-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(8, 13, 24, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  z-index: 15;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.car-gallery-nav-btn:active {
+  transform: translateY(-50%) scale(0.92);
+  background: var(--cyan);
+  color: #000;
+}
+.car-gallery-prev { left: 6px; }
+.car-gallery-next { right: 6px; }
+
+/* Индикатор количества фото */
+.car-gallery-dots {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  z-index: 15;
+  pointer-events: none;
+}
+.car-gallery-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  transition: width 0.2s ease, background 0.2s ease;
+}
+.car-gallery-dot.active {
+  width: 14px;
+  border-radius: 4px;
+  background: var(--cyan);
+  box-shadow: 0 0 6px var(--cyan-glow);
 }
 
-.timer-clock {
-  font-size: 28px !important;
-  font-weight: 900 !important;
-  color: var(--amber) !important;
-  text-shadow: 0 0 14px var(--amber-glow);
+/* Кнопка быстрого звука выхлопа */
+.car-exhaust-audio-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(8, 13, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--amber);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  cursor: pointer;
+  z-index: 16;
+  transition: transform 0.12s ease, background 0.15s ease, color 0.15s ease;
+}
+.car-exhaust-audio-btn:active {
+  transform: scale(0.9);
+  color: #fff;
+  background: var(--amber);
+  box-shadow: 0 0 10px var(--amber-glow);
 }
 
-.timer-text {
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  color: var(--text-sub) !important;
-  text-align: center !important;
+/* ========================================================
+   3. АНИМИРОВАННЫЕ ШКАЛЫ ТЕЛЕМЕТРИИ КАРТОЧКИ
+   ======================================================== */
+.car-telemetry-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: rgba(5, 8, 16, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  margin-bottom: 8px;
 }
 
-/* БЕЙДЖИ И ГОСНОМЕРА */
-.plate-corner {
-  position: absolute !important;
-  top: 8px !important;
-  left: 8px !important;
-  z-index: 10 !important;
+.telemetry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
 }
 
-.license-plate {
-  background: #ffffff !important;
-  color: #111111 !important;
-  font-family: monospace, sans-serif !important;
-  border: 2px solid #000 !important;
-  border-radius: 4px !important;
-  font-weight: 900 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  padding: 2px 6px !important;
-  font-size: 11px !important;
-  line-height: 1.1;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+.telemetry-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-sub);
+  min-width: 82px;
+  font-weight: 800;
 }
 
-.license-flag {
-  border-left: 1px solid #111 !important;
-  padding-left: 4px !important;
-  margin-left: 4px !important;
-  font-size: 8px !important;
+.telemetry-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
+.telemetry-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+/* Градиенты шкал */
+.fill-power {
+  background: linear-gradient(90deg, #0284c7 0%, #00f2fe 55%, #ffb300 85%, #ff3366 100%);
+  box-shadow: 0 0 8px var(--cyan-glow);
+}
+
+.fill-condition-high {
+  background: linear-gradient(90deg, #059669, #00e676);
+  box-shadow: 0 0 8px var(--green-glow);
+}
+
+.fill-condition-mid {
+  background: linear-gradient(90deg, #d97706, #ffb300);
+  box-shadow: 0 0 8px var(--amber-glow);
+}
+
+.fill-condition-low {
+  background: linear-gradient(90deg, #b91c1c, #ff3366);
+  box-shadow: 0 0 8px var(--red-glow);
+  animation: pulseWarningBar 1.2s infinite alternate ease-in-out;
+}
+@keyframes pulseWarningBar {
+  0% { opacity: 0.7; }
+  100% { opacity: 1; filter: brightness(1.25); }
+}
+
+.telemetry-val {
+  min-width: 52px;
+  text-align: right;
+  font-weight: 900;
+  font-size: 10px;
+}
+
+/* ========================================================
+   4. СВЕТОДИОДНЫЕ (LED) И СТРОБОСКОПИЧЕСКИЕ БЕЙДЖИ
+   ======================================================== */
 .badge-tag {
   position: absolute !important;
-  background: rgba(8, 12, 20, 0.9) !important;
+  background: rgba(8, 12, 20, 0.92) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
   padding: 3px 8px !important;
   border-radius: 6px !important;
-  font-size: 10px !important;
+  font-size: 9.5px !important;
   font-weight: 800 !important;
-  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   z-index: 10 !important;
   display: flex !important;
   align-items: center !important;
-  gap: 4px !important;
+  gap: 5px !important;
 }
 .badge-br { bottom: 8px !important; right: 8px !important; }
 .badge-tl { top: 8px !important; left: 8px !important; }
 
-.viewed-badge {
+/* Пульсирующая светодиодная точка (LED) */
+.led-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.led-green {
+  background: #00e676;
+  box-shadow: 0 0 8px #00e676;
+  animation: ledBlinkGreen 1.6s infinite ease-in-out;
+}
+@keyframes ledBlinkGreen {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.led-amber {
+  background: #ffb300;
+  box-shadow: 0 0 8px #ffb300;
+  animation: ledBlinkAmber 1.2s infinite ease-in-out;
+}
+@keyframes ledBlinkAmber {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.85); }
+}
+
+/* Стробоскопический аварийный бейдж (Розыск / 12.5.1) */
+.badge-police-strobe {
+  border-color: #ff3366 !important;
+  background: rgba(220, 38, 38, 0.25) !important;
+  color: #ff3366 !important;
+  animation: strobeRedBlue 1.2s infinite linear;
+}
+@keyframes strobeRedBlue {
+  0%, 48% {
+    box-shadow: 0 0 10px rgba(255, 51, 102, 0.7);
+    border-color: #ff3366;
+  }
+  50%, 100% {
+    box-shadow: 0 0 10px rgba(0, 242, 254, 0.7);
+    border-color: var(--cyan);
+  }
+}
+
+/* Золотой мерцающий блик (Блатной номер) */
+.badge-shimmer-gold {
+  position: relative;
+  overflow: hidden;
+  border-color: #ffd700 !important;
+  color: #ffd700 !important;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+}
+.badge-shimmer-gold::after {
+  content: '';
   position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(0, 242, 254, 0.15);
-  border: 1px solid var(--border-glow);
-  color: var(--cyan);
-  font-size: 9.5px;
-  font-weight: 800;
-  padding: 2px 7px;
-  border-radius: 6px;
-  z-index: 12;
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  top: -50%;
+  left: -60%;
+  width: 40%;
+  height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  transform: rotate(25deg);
+  animation: shimmerSweepBadge 2.8s infinite ease-in-out;
+}
+@keyframes shimmerSweepBadge {
+  0% { left: -60%; }
+  40%, 100% { left: 160%; }
 }
 
-.car-spec-chips-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-}
-
-.car-spec-chip {
-  flex: 1;
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+/* ========================================================
+   5. ЖИВЫЕ РЕПЛИКИ ПРОДАВЦА У КАПОТА
+   ======================================================== */
+.seller-dialog-bubble {
+  background: linear-gradient(135deg, rgba(14, 23, 40, 0.95), rgba(7, 12, 22, 0.95));
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-left: 3px solid var(--cyan);
   border-radius: 8px;
-  padding: 5px 6px;
-  font-size: 10px;
-  color: var(--text-sub);
+  padding: 8px 10px;
+  margin: 6px 0 8px 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  align-items: flex-start;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
-.car-spec-chip b { color: #fff; font-weight: 800; }
 
+.seller-mood-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.seller-bubble-text {
+  font-size: 10.5px;
+  font-style: italic;
+  color: #f1f5f9;
+  line-height: 1.35;
+  flex: 1;
+}
+
+/* ========================================================
+   6. ПАНЕЛЬ ЦЕНЫ И БЕЙДЖИ МАРЖИ
+   ======================================================== */
 .price-box {
   background: rgba(0, 230, 118, 0.08);
   border: 1px solid rgba(0, 230, 118, 0.25);
@@ -236,27 +414,35 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin: 10px 0;
+  margin: 8px 0;
 }
 
 .price-val {
   font-size: 16px;
   font-weight: 900;
   color: var(--green);
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.35);
 }
 
-.seller-note-card {
-  background: rgba(0, 242, 254, 0.06);
-  border-left: 3px solid var(--cyan);
+.margin-potential-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 6px;
   border-radius: 4px;
-  padding: 8px 12px;
-  font-style: italic;
-  font-size: 11px;
-  color: #e2e8f0;
-  margin: 6px 0 8px 0;
-  line-height: 1.4;
+  background: rgba(0, 230, 118, 0.12);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  color: var(--green);
+}
+.margin-negative-pill {
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: var(--red);
 }
 
+/* БОКСЫ АВТОТЕКИ */
 .autoteka-pts-card {
   background: linear-gradient(145deg, #090e18 0%, #060a12 100%);
   border: 1px solid var(--border-glow);
@@ -293,4 +479,81 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 8px;
   padding: 8px 10px;
+}
+
+.plate-corner {
+  position: absolute !important;
+  top: 8px !important;
+  left: 8px !important;
+  z-index: 10 !important;
+}
+
+.license-plate {
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-family: monospace, sans-serif !important;
+  border: 2px solid #000 !important;
+  border-radius: 4px !important;
+  font-weight: 900 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 2px 6px !important;
+  font-size: 11px !important;
+  line-height: 1.1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.license-flag {
+  border-left: 1px solid #111 !important;
+  padding-left: 4px !important;
+  margin-left: 4px !important;
+  font-size: 8px !important;
+}
+
+.viewed-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 242, 254, 0.15);
+  border: 1px solid var(--border-glow);
+  color: var(--cyan);
+  font-size: 9.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cooldown-timer {
+  position: absolute !important;
+  inset: 0 !important;
+  background: rgba(8, 13, 24, 0.92) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border-radius: var(--radius-xl) !important;
+  z-index: 30 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 16px !important;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.timer-clock {
+  font-size: 28px !important;
+  font-weight: 900 !important;
+  color: var(--amber) !important;
+  text-shadow: 0 0 14px var(--amber-glow);
+}
+
+.timer-text {
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: var(--text-sub) !important;
+  text-align: center !important;
 }

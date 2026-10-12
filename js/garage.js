@@ -1,7 +1,7 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.6.6)
+// js/garage.js — АВТОПАРК, ЛИЧНЫЙ ТРАНСПОРТ, СПОРТИВНЫЙ ТЮНИНГ (v0.7.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Окупаемый детейлинг и тюнинг, стационарный Launch OBD2,
+// Окупаемый детейлинг и тюнинг, стационарный Launch OBD2 строго по прибору,
 // конструктор страхового полиса, штрафстоянка ГИБДД (ModalManager),
 // бесплатный забор служебным эвакуатором «Шериф»,
 // малярка «Хамелеон» без следов на толщиномере и Stage Lab.
@@ -491,7 +491,7 @@ function buyGarageSlot() {
 }
 
 // ========================================================
-// 6. ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (СВЯЗКА С МАЛЯРКОЙ «ХАМЕЛЕОН»)
+// 6. ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА
 // ========================================================
 function openPreSaleModal(idx) {
     const caps = getPlayerHousingCapabilities();
@@ -505,7 +505,6 @@ function openPreSaleModal(idx) {
 
     setTxt('preSaleCarTitle', `Детейлинг-зона: <b>${car.name}</b> (${car.power || 100} л.с.)`);
 
-    // Проверка собственного малярного цеха
     const hasPaintShop = (state.businesses || []).some(b => b.id === 'paint_shop' && b.level > 0);
 
     const btnClean = document.getElementById('btnCleanPrice');
@@ -615,7 +614,6 @@ function applyPreSaleMod(type) {
         car.isRepainted = true;
         car.condition = Math.min(100, (car.condition || 60) + 30);
 
-        // БОНУС ЦЕХА «ХАМЕЛЕОН»: слой ложится в завод (115-125 мкм вместо шпакли 300+!)
         if (hasPaintShop) {
             car.bodyThickness = { hood: 115, roof: 110, doors: 120, wings: 115 };
             showToast("🎨 Цех «Хамелеон»: кузов окрашен заводским микрослоем (толщиномер покажет идеал)!");
@@ -653,7 +651,7 @@ function applyPreSaleMod(type) {
 }
 
 // ========================================================
-// 7. СПОРТИВНЫЙ ТЮНИНГ (СВЯЗКА СО STAGE LAB)
+// 7. СПОРТИВНЫЙ ТЮНИНГ
 // ========================================================
 function openTuningModal(idx) {
     if (!checkPlayerCapability('tune')) {
@@ -719,7 +717,6 @@ function renderTuningItems() {
             </div>`;
         });
     } else if (activeTuneTab === 'drag') {
-        // Скидка 70% на софт при наличии своей чип-лаборатории
         let chipDiscount = hasChipLab ? 0.30 : 1.0;
         let cCost1 = Math.round(30000 * chipDiscount);
         let cCost2 = Math.round(65000 * chipDiscount);
@@ -844,7 +841,7 @@ function updateTuneRiskMeter(car) {
 }
 
 // ========================================================
-// 8. ОСМОТР, СТАЦИОНАРНЫЙ OBD2 И РЕМОНТ
+// 8. ОСМОТР, СТАЦИОНАРНЫЙ OBD2 И РЕМОНТ (СТРОГО ПО ПРИБОРУ)
 // ========================================================
 function openCarPreviewModal(idx) {
     previewCarIndex = idx;
@@ -879,11 +876,12 @@ function openOBD2Modal() {
     const car = state.garage[previewCarIndex];
     if (!car) return;
 
+    // ЖЕСТКАЯ ПРОВЕРКА: сканер должен быть куплен
     const hasScanner = !!(state.player?.tools && (state.player.tools.obd || state.player.tools.obd_launch));
     if (!hasScanner) {
         playSound('error');
         tgHaptic('warning');
-        return showToast("⚠️ У вас нет сканера OBD2! Купите ELM327 или Launch Pro в Маркете.");
+        return showToast("⚠️ У вас нет сканера OBD2! Купите ELM327 или Launch Pro в Авто-Маркете.");
     }
 
     if (!checkPlayerCapability('obd')) {
@@ -892,14 +890,15 @@ function openOBD2Modal() {
 
     let isLaunch = !!state.player?.tools?.obd_launch;
     let toolKey = isLaunch ? 'obd_launch' : 'obd';
-    let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 50;
+    let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 0;
 
     if (wear <= 0) {
         playSound('error');
         tgHaptic('warning');
-        return showToast("⚠️ Диагностический сканер разряжен! Откалибруйте его в Маркете.");
+        return showToast("⚠️ Диагностический сканер разряжен! Откалибруйте его в Авто-Маркете.");
     }
 
+    // Списание ресурса
     state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
     saveState();
 
@@ -965,7 +964,6 @@ function renderGarageOBDFinal(car, resBox, actBox) {
     let eng = car.wear?.engine ? Math.round(car.wear.engine) : 85;
     let trans = car.wear?.transmission ? Math.round(car.wear.transmission) : 85;
 
-    // Скидка 40% на ремонт при выкупленном СТО дяди Вани
     const hasOwnSTO = (state.businesses || []).some(b => b.id === 'sto' && b.level > 0);
 
     if (car.hiddenDefect) {
@@ -1168,7 +1166,7 @@ function closeInsuranceModal() {
 }
 
 // ========================================================
-// 10. ШТРАФСТОЯНКА ГИБДД (СВЯЗКА СО СЛУЖБОЙ ЭВАКУАЦИИ «ШЕРИФ»)
+// 10. ШТРАФСТОЯНКА ГИБДД
 // ========================================================
 function openImpoundLotModal(idx) {
     activeImpoundCarIndex = idx;
@@ -1187,7 +1185,6 @@ function openImpoundLotModal(idx) {
     let scrapReward = Math.round((car.basePrice || 100000) * 0.45);
     let passes = state.player?.freeImpoundPasses || 0;
 
-    // Проверка собственной службы эвакуаторов «Шериф»
     const hasTowService = (state.businesses || []).some(b => b.id === 'tow_truck' && b.level > 0);
 
     let towServiceBlock = hasTowService ? `

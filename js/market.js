@@ -1,10 +1,8 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И СДЕЛКИ (v0.6.6)
+// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И СДЕЛКИ (v0.7.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Динамическая подгрузка фото машин из папок моделей,
-// доступ к Комфорту с 15 ур., сортировка всех категорий,
-// замеры толщиномером, диагностика Launch OBD2 и оформление ДКП.
-// Интеграция с Автоподбором (-35% дисконт) и Разборкой.
+// Живые анимированные шкалы мощности, HP кузова, мини-галерея фото
+// прямо на карточке, LED-бейджи, прогазовка и жесткий учет приборов.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -124,7 +122,7 @@ const CATEGORY_META = {
     comfort: { name: "КОМФОРТ", title: "Сегмент Комфорт", capital: "от 450 000 ₽", desc: "Седаны и кроссоверы (с 15 ур.). Идеально под выкуп для семей и таксопарков." },
     premium: { name: "ПРЕМИУМ", title: "Премиум & Люкс", capital: "от 1 200 000 ₽", desc: "Высокая чистая прибыль с одной сделки, статус и требовательные клиенты." },
     hyper: { name: "ГИПЕРКАРЫ", title: "Спорт & Экзотика", capital: "от 5 000 000 ₽", desc: "Огромная маржа, эксклюзивные клиенты и дорогие комплектующие." },
-    truck: { name: "ГРУЗОВИКИ", title: "Коммерческий транспорт", capital: "от 2 500 000 ₽", desc: "Тягачи и фургоны для крупных заказов Синдиката под ключ." },
+    truck: { name: "ГРУЗОВИКИ", title: "Коммерческий транспорт", capital: "от 2 500 000 ₽", desc: "Тягачи и фургоны для крупных заказов ПодКлюч." },
     yacht: { name: "ЯХТЫ", title: "Морской сегмент", capital: "от 15 000 000 ₽", desc: "Элитная морская техника для настоящих автомобильных олигархов." }
 };
 
@@ -207,9 +205,6 @@ function refreshMarketFeedManual() {
     showToast("Лента предложений обновлена (-5 ⛽)!");
 }
 
-// ========================================================
-// ГЕНЕРАЦИЯ ОБЪЯВЛЕНИЙ (СВЯЗКА С АВТОПОДБОРОМ И РАЗБОРКОЙ)
-// ========================================================
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
     
@@ -217,7 +212,6 @@ function populateMarketFeed() {
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
     let pool = [];
 
-    // Проверка собственной службы Автоподбора
     const hasAutopodbor = (state.businesses || []).some(b => b.id === 'autopodbor' && b.level > 0);
 
     if (cat === 'all') {
@@ -259,12 +253,11 @@ function populateMarketFeed() {
         let dealType = 'normal';
         let priceMultiplier = 0.80;
 
-        // БОНУС АВТОПОДБОРА: 25% шанс найти эксклюзив со скидкой 35%
         let isPodborFind = false;
         if (hasAutopodbor && Math.random() < 0.25) {
             isPodborFind = true;
             dealType = 'urgent';
-            priceMultiplier = 0.60 + Math.random() * 0.05; // -35-40% от рынка
+            priceMultiplier = 0.60 + Math.random() * 0.05;
         } else if (dealRoll < 0.25) { 
             dealType = 'urgent';
             priceMultiplier = 0.65 + Math.random() * 0.10;
@@ -330,10 +323,13 @@ function populateMarketFeed() {
         }
 
         let sNote = "Машина на бодром ходу, сел и поехал.";
+        let sMoodIcon = "🧔";
         if (isPodborFind) {
-            sNote = "«Срочный выкуп найден вашими автоподборщиками. Продавец отдаёт с дисконтом 35%!» 🎯";
+            sNote = "«Срочный выкуп найден вашими автоподборщиками. Продавец отдаёт с дисконтом 35%!»";
+            sMoodIcon = "🎯";
         } else if (isLuckyFind) {
-            sNote = "«Отдаю дедовский аппарат как есть, в этих ваших номерах ничего не понимаю.» (🔥 Продавец не знает цену номеров!)";
+            sNote = "«Отдаю дедовский аппарат как есть, в номерах ничего не понимаю.» (🔥 Не знает цену номеров!)";
+            sMoodIcon = "👴";
         } else if (dealType === 'overprice') {
             const overpriceNotes = [
                 "«Цена окончательная, знаю рынок. Свои цены не предлагать!»",
@@ -341,10 +337,13 @@ function populateMarketFeed() {
                 "«Машина выходного дня, торга нет совсем.»"
             ];
             sNote = overpriceNotes[Math.floor(Math.random() * overpriceNotes.length)];
+            sMoodIcon = "😎";
         } else if (dealType === 'urgent') {
-            sNote = "«Срочно нужны деньги до вечера, отдам с хорошей скидкой первому, кто приедет!»";
+            sNote = "«Срочно нужны деньги до вечера, отдам с хорошей скидкой первому покупателю!»";
+            sMoodIcon = "⚡";
         } else if (plateVal > 15000) {
             sNote = "«Продаю только вместе с красивым госномером " + genPlate + ".»";
+            sMoodIcon = "💎";
         } else if (hasHiddenDefect) {
             const riskyPhrases = [
                 "«Есть пара мелких нюансов, на езду вообще не влияет.»",
@@ -352,14 +351,20 @@ function populateMarketFeed() {
                 "«Мотор шепчет, чек иногда загорается из-за бензина.»"
             ];
             sNote = riskyPhrases[Math.floor(Math.random() * riskyPhrases.length)];
+            sMoodIcon = "🤨";
         } else if (typeof SELLER_ADS_PHRASES !== 'undefined' && SELLER_ADS_PHRASES.length > 0) {
             sNote = SELLER_ADS_PHRASES[Math.floor(Math.random() * SELLER_ADS_PHRASES.length)];
+            sMoodIcon = "🚗";
         }
 
         let cName = template.name ? template.name : "Техника";
         let cPower = template.power ? template.power : 100;
         
-        let cImg = (typeof getCarImage === 'function') ? getCarImage(template) : (template.img || "");
+        let cImages = Array.isArray(template.images) && template.images.length > 0 
+            ? [...template.images] 
+            : [template.img || "assets/cars/economy/2101/vaz-2101.jpg"];
+            
+        let cImg = cImages[0];
         let cFallback = template.fallback || getCategoryFallback(tType);
 
         let cCond = hasHiddenDefect ? Math.floor(45 + Math.random() * 25) : Math.floor(75 + Math.random() * 20);
@@ -396,6 +401,8 @@ function populateMarketFeed() {
             baseMarketValue: baseVal,
             marketValue: baseVal + plateVal,
             img: cImg,
+            images: cImages,
+            currentImageIdx: 0,
             fallback: cFallback,
             plate: genPlate,
             isStolen: isStolen,
@@ -411,6 +418,7 @@ function populateMarketFeed() {
             unavailable: false,
             hiddenDefect: defectObj,
             sellerNote: sNote,
+            sellerMoodIcon: sMoodIcon,
             condition: cCond,
             insurance: null,
             tuning: { 
@@ -448,6 +456,43 @@ function populateMarketFeed() {
     sortCurrentMarketFeed();
     saveState();
     renderMarketFeed();
+}
+
+// ========================================================
+// ПЕРЕКЛЮЧЕНИЕ ФОТО ПРЯМО НА КАРТОЧКЕ РЫНКА
+// ========================================================
+function cycleMarketCarImage(carId, delta, event) {
+    if (event) event.stopPropagation();
+    const car = state.marketFeed.find(c => c && c.id === carId);
+    if (!car || !Array.isArray(car.images) || car.images.length <= 1) return;
+
+    let len = car.images.length;
+    let curIdx = car.currentImageIdx || 0;
+    curIdx = (curIdx + delta + len) % len;
+    car.currentImageIdx = curIdx;
+    car.img = car.images[curIdx];
+
+    const imgEl = document.getElementById(`market_car_img_${car.id}`);
+    if (imgEl) imgEl.src = car.img;
+
+    const dotsContainer = document.getElementById(`gallery_dots_${car.id}`);
+    if (dotsContainer) {
+        let dots = dotsContainer.querySelectorAll('.car-gallery-dot');
+        dots.forEach((d, i) => {
+            if (i === curIdx) d.classList.add('active');
+            else d.classList.remove('active');
+        });
+    }
+
+    playSound('tick');
+    tgHaptic('light');
+}
+
+function playCarExhaustPreview(event) {
+    if (event) event.stopPropagation();
+    playEngineSound();
+    tgHaptic('medium');
+    showToast("💨 Прогазовка мотора!");
 }
 
 function renderMarketFeed() {
@@ -495,31 +540,65 @@ function renderMarketFeed() {
         let viewedBadge = car.viewed ? `<div class='viewed-badge'><i class='fa-solid fa-eye'></i> ${t('inspected')}</div>` : "";
         let busyClass = isBusy ? "busy" : "";
         let viewedClass = car.viewed ? "viewed-card" : "";
-        let sellerNoteBlock = car.sellerNote ? "<div class='seller-note-card'>" + car.sellerNote + "</div>" : "";
         let autoIcon = car.autotekaChecked ? "Проверено ✓" : "5,000 ₽";
 
+        // Расчет процентов шкал
+        let powerVal = car.power || 100;
+        let powerPct = Math.min(100, Math.round((powerVal / 500) * 100));
+
+        let condVal = car.condition || 80;
+        let condClass = condVal >= 80 ? 'fill-condition-high' : (condVal >= 50 ? 'fill-condition-mid' : 'fill-condition-low');
+        let condColor = condVal >= 80 ? 'color-green' : (condVal >= 50 ? 'color-amber' : 'color-red');
+
+        let mileagePct = Math.min(100, Math.round(((car.mileage || 85000) / 250000) * 100));
+
+        // LED и спец-бейджи
         let dealBadge = "";
         if (car.isPodborFind) {
-            dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🎯 ПОДБОР -35%</span>";
+            dealBadge = "<span class='tag-badge bg-tag-green ml-1'><span class='led-dot led-green'></span> ПОДБОР -35%</span>";
         } else if (car.dealType === 'urgent') {
-            dealBadge = "<span class='tag-badge bg-tag-green ml-1'>🔥 СРОЧНО</span>";
+            dealBadge = "<span class='tag-badge bg-tag-green ml-1'><span class='led-dot led-green'></span> СРОЧНО</span>";
         } else if (car.dealType === 'overprice') {
-            dealBadge = "<span class='tag-badge bg-tag-red ml-1'>⚠️ ВЫСОКАЯ ЦЕНА</span>";
+            dealBadge = "<span class='tag-badge bg-tag-red ml-1'><span class='led-dot led-amber'></span> ВЫСОКАЯ ЦЕНА</span>";
         }
 
         let pVal = evaluatePlate(car.plate);
         let coolPlateBadge = pVal > 15000
-            ? "<span class='tag-badge bg-tag-purple ml-1'>🏷️ БЛАТНОЙ НОМЕР</span>"
+            ? "<span class='tag-badge badge-shimmer-gold ml-1'>🏷️ БЛАТНОЙ НОМЕР</span>"
             : "";
 
-        let carName = car.name ? car.name : "Автомобиль";
-        let carPower = car.power ? car.power : 100;
-        let carPlate = car.plate ? car.plate : "ТРАНЗИТ";
+        let criminalBadge = car.isStolen 
+            ? "<span class='tag-badge badge-police-strobe ml-1'>🚨 РОЗЫСК</span>" 
+            : "";
+
+        // Галерея точек
+        let imagesCount = Array.isArray(car.images) ? car.images.length : 1;
+        let galleryDotsHtml = "";
+        if (imagesCount > 1) {
+            let dots = "";
+            for (let d = 0; d < imagesCount; d++) {
+                dots += `<div class="car-gallery-dot ${(car.currentImageIdx || 0) === d ? 'active' : ''}"></div>`;
+            }
+            galleryDotsHtml = `<div class="car-gallery-dots" id="gallery_dots_${car.id}">${dots}</div>`;
+        }
+
+        let navArrowsHtml = imagesCount > 1 ? `
+            <button class="car-gallery-nav-btn car-gallery-prev" onclick="cycleMarketCarImage('${car.id}', -1, event)">❮</button>
+            <button class="car-gallery-nav-btn car-gallery-next" onclick="cycleMarketCarImage('${car.id}', 1, event)">❯</button>
+        ` : "";
+
+        // Реплика продавца
+        let sellerDialogHtml = car.sellerNote ? `
+            <div class="seller-dialog-bubble">
+                <span class="seller-mood-icon">${car.sellerMoodIcon || '🚗'}</span>
+                <span class="seller-bubble-text">${car.sellerNote}</span>
+            </div>
+        ` : "";
 
         let estimatedProfit = (car.marketValue || 0) - (car.price || 0);
-        let profitBadge = estimatedProfit > 0 
-            ? `<div class="sub-label text-right" style="font-size:9.5px; color:var(--green);">Потенциал: <b>+${estimatedProfit.toLocaleString()} ₽</b></div>` 
-            : "";
+        let profitPill = estimatedProfit > 0 
+            ? `<span class="margin-potential-pill">+${estimatedProfit.toLocaleString()} ₽ маржа</span>` 
+            : `<span class="margin-potential-pill margin-negative-pill">В минус</span>`;
 
         htmlContent += `
         <div class='glass-card mb-3 ${busyClass} ${viewedClass}' id='card_${car.id}'>
@@ -531,27 +610,59 @@ function renderMarketFeed() {
                 <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>${t('paid_call')} (1,000 ₽)</button>
             </div>
 
+            <!-- ИНТЕРАКТИВНАЯ ОБЛОЖКА С ПЕРЕКЛЮЧАТЕЛЕМ ФОТО -->
             <div class='car-img-wrap'>
-                <img src='${carImg}' class='car-img' onerror="this.onerror=null; this.src='${fallbackUrl}';">
-                <div class='plate-corner'><div class='license-plate notranslate' translate='no'>${carPlate} <div class='license-flag'>RUS</div></div></div>
+                <img id="market_car_img_${car.id}" src='${carImg}' class='car-img' onerror="this.onerror=null; this.src='${fallbackUrl}';">
+                
+                ${navArrowsHtml}
+                ${galleryDotsHtml}
+
+                <button class="car-exhaust-audio-btn" onclick="playCarExhaustPreview(event)" title="Звук выхлопа">
+                    <i class="fa-solid fa-volume-high"></i>
+                </button>
+
+                <div class='plate-corner'><div class='license-plate notranslate' translate='no'>${car.plate} <div class='license-flag'>RUS</div></div></div>
                 <div class='badge-tag badge-br'>
                     <span class='tag-badge bg-tag-cyan'>${carType}</span>
                     ${dealBadge}
                     ${coolPlateBadge}
+                    ${criminalBadge}
                 </div>
             </div>
 
             <div class='flex-between mb-2'>
-                <h4 class='font-bold text-xs color-cyan' style='font-size:14px;'>${carName}</h4>
+                <h4 class='font-bold text-xs color-cyan' style='font-size:14.5px;'>${car.name}</h4>
+                ${profitPill}
             </div>
 
-            <div class='car-spec-chips-row mb-2'>
-                <div class='car-spec-chip'><i class='fa-solid fa-bolt color-amber'></i> <b>${carPower}</b> л.с.</div>
-                <div class='car-spec-chip'><i class='fa-solid fa-road color-cyan'></i> <b>${carMileage}</b> км</div>
-                <div class='car-spec-chip'><i class='fa-solid fa-shield color-green'></i> <b>${car.condition || 80}%</b> кузов</div>
+            <!-- АНИМИРОВАННЫЕ ШКАЛЫ ТЕЛЕМЕТРИИ -->
+            <div class="car-telemetry-panel">
+                <div class="telemetry-row">
+                    <div class="telemetry-label"><i class="fa-solid fa-bolt color-amber"></i> Мощность:</div>
+                    <div class="telemetry-bar-bg">
+                        <div class="telemetry-bar-fill fill-power" style="width:${powerPct}%;"></div>
+                    </div>
+                    <div class="telemetry-val color-amber">${powerVal} л.с.</div>
+                </div>
+
+                <div class="telemetry-row">
+                    <div class="telemetry-label"><i class="fa-solid fa-shield ${condColor}"></i> Кузов / HP:</div>
+                    <div class="telemetry-bar-bg">
+                        <div class="telemetry-bar-fill ${condClass}" style="width:${condVal}%;"></div>
+                    </div>
+                    <div class="telemetry-val ${condColor}">${condVal}%</div>
+                </div>
+
+                <div class="telemetry-row">
+                    <div class="telemetry-label"><i class="fa-solid fa-road color-cyan"></i> Пробег:</div>
+                    <div class="telemetry-bar-bg">
+                        <div class="telemetry-bar-fill fill-power" style="width:${mileagePct}%; background: linear-gradient(90deg, #0284c7, #38bdf8);"></div>
+                    </div>
+                    <div class="telemetry-val color-cyan">${carMileage} км</div>
+                </div>
             </div>
 
-            ${sellerNoteBlock}
+            ${sellerDialogHtml}
 
             <div class='price-box'>
                 <div>
@@ -561,7 +672,6 @@ function renderMarketFeed() {
                 <div class='sub-label text-right'>
                     <span class='sub-label text-xs'>${t('market_estimate')}:</span>
                     <div class='font-bold color-cyan text-xs'>~${carMarketVal} ₽</div>
-                    ${profitBadge}
                 </div>
             </div>
 
@@ -582,7 +692,7 @@ function renderMarketFeed() {
 }
 
 // ----------------------------------------------------
-// ДИАГНОСТИКА LAUNCH OBD2 У КАПОТА
+// ДИАГНОСТИКА LAUNCH OBD2 У КАПОТА (СТРОГО ПО ПРИБОРУ)
 // ----------------------------------------------------
 let isOBDScanningInProgress = false;
 
@@ -594,19 +704,23 @@ function quickOBDScanMarketCar(carId) {
     let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
 
     if (!hasScanner) {
-        let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-        if (cash < 5000) return showToast("Нужно 5,000 ₽ на выезд автоподборщика со сканером!");
-        state.player.cash -= 5000;
-        showToast("Выездной диагност прибыл к автомобилю (-5,000 ₽)");
-    } else {
-        let toolKey = state.player?.tools?.obd_launch ? 'obd_launch' : 'obd';
-        let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 50;
-        if (wear <= 0) {
-            return showToast("⚠️ Сканер разряжен! Откалибруйте его в Маркете.");
-        }
-        state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
+        playSound('error');
+        tgHaptic('warning');
+        showToast("⚠️ У вас нет сканера OBD2! Купите ELM327 или Launch в Авто-Маркете.");
+        return;
     }
 
+    let toolKey = state.player?.tools?.obd_launch ? 'obd_launch' : 'obd';
+    let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 0;
+    
+    if (wear <= 0) {
+        playSound('error');
+        tgHaptic('warning');
+        showToast("⚠️ Сканер полностью разряжен! Откалибруйте его в Авто-Маркете.");
+        return;
+    }
+
+    state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
     car.stoChecked = true;
     isOBDScanningInProgress = true;
     saveState();
@@ -882,8 +996,8 @@ function renderMarketHaggleControls() {
     let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
     const hasScrapYard = (state.businesses || []).some(b => b.id === 'razborka' && b.level > 0);
 
-    let toolIcon = hasGauge ? "✓" : "(3k)";
-    let obdIcon = hasScanner ? "Launch OBD2 ✓" : "Launch (5k)";
+    let toolIcon = hasGauge ? "✓" : "🔒 Купить";
+    let obdIcon = hasScanner ? "Launch OBD2 ✓" : "🔒 Купить OBD2";
 
     if (car.hagglePatience <= 0) {
         haggleArea.innerHTML = "<div class='text-center sub-label color-red font-bold py-2'>🚫 Продавец устал от торга и зафиксировал цену!</div>";
@@ -892,16 +1006,15 @@ function renderMarketHaggleControls() {
 
     let inspectionToolsBlock = `
         <div class="grid-2 mb-2">
-            <button onclick="openGaugeModal('${car.id}')" class="btn btn-dark btn-sm">
+            <button onclick="openGaugeModal('${car.id}')" class="btn ${hasGauge ? 'btn-dark' : 'btn-dark opacity-50'} btn-sm">
                 <i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер ${toolIcon}
             </button>
-            <button onclick="quickOBDScanMarketCar('${car.id}')" class="btn btn-dark btn-sm">
+            <button onclick="quickOBDScanMarketCar('${car.id}')" class="btn ${hasScanner ? 'btn-dark' : 'btn-dark opacity-50'} btn-sm">
                 <i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> ${obdIcon}
             </button>
         </div>
     `;
 
-    // Кнопка сбыта на разборку для проблемных авто
     let scrapOptionBtn = "";
     if (hasScrapYard && (car.isStolen || (car.hiddenDefect && car.hiddenDefect.severity === "Критическая"))) {
         let scrapPrice = Math.round(car.price * 0.60);
@@ -955,11 +1068,9 @@ function buyCarDirectToScrapYard(price) {
 
     state.player.cash -= price;
     
-    // Прибыль от разборки на запчасти (+30-50% к цене выкупа)
     let salvageYield = Math.round(price * (1.35 + Math.random() * 0.25));
     let gainedXp = 50;
 
-    // Пополнение складов предприятий деталями
     if (state.businesses) {
         let razborka = state.businesses.find(b => b.id === 'razborka');
         if (razborka) {
@@ -1044,7 +1155,7 @@ function attemptMarketHaggle(percent) {
     car.hagglePatience -= 1;
 
     let baseChance = percent === 5 ? 85 : (percent === 10 ? 60 : 35);
-    if (car.isPodborFind) baseChance += 20; // Бонус подбора
+    if (car.isPodborFind) baseChance += 20;
     if (car.sellerPersonality === 'hurried') baseChance += 25;
     if (car.sellerPersonality === 'greedy') baseChance -= 20;
 
@@ -1214,30 +1325,35 @@ function finishMarketCarBuyProcess(deal) {
 }
 
 // ----------------------------------------------------
-// ТОЛЩИНОМЕР ЛКП
+// ТОЛЩИНОМЕР ЛКП (СТРОГО ПО ПРИБОРУ)
 // ----------------------------------------------------
 function openGaugeModal(carId) { 
     activeInspectCarId = carId;
     if (!state.marketFeed) return;
     const car = state.marketFeed.find(c => c && c.id === carId);
-    if (car) car.gaugeChecked = true;
+    if (!car) return;
 
     let hasGauge = !!(state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_pro));
 
     if (!hasGauge) {
-        let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-        if (cash < 3000) return showToast("Купите толщиномер в Маркете или заплатите 3,000 ₽ за замер!");
-        state.player.cash -= 3000;
-        showToast("Замер кузова толщиномером: -3,000 ₽");
-    } else {
-        let toolKey = state.player?.tools?.gauge_pro ? 'gauge_pro' : 'gauge';
-        let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 60;
-        if (wear <= 0) {
-            showToast("⚠️ Толщиномер разряжен! Откалибруйте в Маркете.");
-        } else {
-            state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
-        }
+        playSound('error');
+        tgHaptic('warning');
+        showToast("⚠️ У вас нет толщиномера! Купите его в Авто-Маркете.");
+        return;
     }
+
+    let toolKey = state.player?.tools?.gauge_pro ? 'gauge_pro' : 'gauge';
+    let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 0;
+    
+    if (wear <= 0) {
+        playSound('error');
+        tgHaptic('warning');
+        showToast("⚠️ Батарея толщиномера села! Откалибруйте его в Авто-Маркете.");
+        return;
+    }
+
+    state.player.toolsWear[toolKey] = Math.max(0, wear - 1);
+    car.gaugeChecked = true;
 
     ['hood', 'roof', 'doors', 'wings'].forEach(part => {
         const el = document.getElementById("part-" + part);
@@ -1454,6 +1570,8 @@ window.sortCurrentMarketFeed = sortCurrentMarketFeed;
 window.refreshMarketFeedManual = refreshMarketFeedManual;
 window.populateMarketFeed = populateMarketFeed;
 window.renderMarketFeed = renderMarketFeed;
+window.cycleMarketCarImage = cycleMarketCarImage;
+window.playCarExhaustPreview = playCarExhaustPreview;
 window.openGaugeModal = openGaugeModal;
 window.checkBodyPart = checkBodyPart;
 window.closeGaugeModal = closeGaugeModal;
