@@ -145,7 +145,7 @@ const AppAutodrot = {
         let filter = this.p2pFilter || 'cars';
         let lots = [];
 
-        // 1. Пробуем получить живые лоты из Firestore
+        // 1. Получение лотов из Firestore
         if (window.FB_Bridge && window.FB_Bridge.P2P) {
             try {
                 lots = await Promise.race([
@@ -155,7 +155,7 @@ const AppAutodrot = {
             } catch(e) {}
         }
 
-        // 2. Если лотов нет или оффлайн — берём локальные либо дефолтные
+        // 2. Фолбек на локальные данные
         if (!lots || lots.length === 0) {
             if (state.p2pMarketListings && state.p2pMarketListings.length > 0) {
                 lots = state.p2pMarketListings;
@@ -194,7 +194,7 @@ const AppAutodrot = {
         }
 
         let html = "";
-        filtered.forEach((item, idx) => {
+        filtered.forEach((item) => {
             const isMy = String(item.sellerId) === String(myProfile.id) || (state.myP2PListings && state.myP2PListings.includes(item.id));
             const itemData = item.itemData || {};
 
@@ -318,12 +318,10 @@ const AppAutodrot = {
 
         state.player.cash -= lot.price;
 
-        // Фиксация финансовой операции в Во-Банке
         if (typeof logBankTransaction === 'function') {
             logBankTransaction(`P2P Покупка: ${lot.name}`, lot.price, false);
         }
 
-        // Выдаем купленный актив в инвентарь
         const itemData = lot.itemData || {};
         if (lot.type === 'car' || lot.type === 'cars') {
             let carObj = Object.assign({}, itemData, {
@@ -354,7 +352,6 @@ const AppAutodrot = {
             state.player.housingType = 'own';
         }
 
-        // Удаляем из локального списка биржи
         if (state.p2pMarketListings) {
             state.p2pMarketListings = state.p2pMarketListings.filter(l => l.id !== listingId);
         }

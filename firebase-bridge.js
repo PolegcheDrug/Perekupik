@@ -1,9 +1,11 @@
 // ========================================================
-// firebase-bridge.js — СЕТЕВОЙ ШЛЮЗ FIRESTORE & AUTH 2.0 (v0.9.0)
-// Архитектура: Firebase v10 Web SDK (ES Module)
-// Модули: Telegram Auth (Custom Token), CloudSave, P2P Market,
-// Соцсеть «M» (Лента, Друзья, Подарки, Дуэли),
-// QuickChat & Messenger, Автоклубы, Лидерборд.
+// firebase-bridge.js — СЕТЕВОЙ ШЛЮЗ FIRESTORE & AUTH 2.0 (v1.0.0)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Полная облачная экосистема (Spark Plan 100% Free):
+// 1. Cloud Cars Catalog (cars_catalog) с автоматической миграцией из data.js
+// 2. Единый реестр уникальных госномеров (registered_plates) через runTransaction
+// 3. Защищённая P2P-биржа с налогом рынка и отложенными выплатами
+// 4. Облачные сейвы, Соцсеть «M», QuickChat, Клубы и Лидерборд
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -136,9 +138,13 @@ const CANNED_PHRASES = {
 };
 
 // ========================================================
-// 2. TTL КЭШ ДЛЯ ОПТИМИЗАЦИИ ЗАПРОСОВ
+// 2. TTL КЭШ ДЛЯ ОПТИМИЗАЦИИ ЗАПРОСОВ (SPARK QUOTA PROTECT)
 // ========================================================
 const CacheManager = {
+  cloudCars: null,
+  cloudCarsTimestamp: 0,
+  CLOUD_CARS_TTL: 45000,
+
   marketLots: null,
   marketTimestamp: 0,
   MARKET_TTL: 20000,
@@ -164,7 +170,459 @@ const CacheManager = {
 };
 
 // ========================================================
-// 3. ОБЛАЧНЫЕ СОХРАНЕНИЯ (CLOUD SAVE)
+// 3. БЛОК 1: ОБЛАЧНЫЙ КАТАЛОГ АВТОМОБИЛЕЙ (CARS_CATALOG)
+// ========================================================
+const CarsCatalogManager = {
+  // Миграция локальной базы CAR_DATABASE (из data.js) в Firestore
+  async seedDefaultCarsCatalog(force = false) {
+    const isSeeded = localStorage.getItem("perekup_db_seeded_v1");
+    if (isSeeded && !force) return { success: true, message: "База уже мигрирована ранее" };
+
+    if (typeof window.CAR_DATABASE === "undefined") {
+      return { success: false, error: "Локальная база CAR_DATABASE не найдена" };
+    }
+
+    try {
+      console.log("[☁️ CarsCatalog] Запуск миграции локальных авто в Cloud Firestore...");
+      let totalMigrated = 0;
+
+      for (const [category, carsList] of Object.entries(window.CAR_DATABASE)) {
+        if (!Array.isArray(carsList)) continue;
+
+        for (const car of carsList) {
+          if (!car || !car.name) continue;
+          const carDocId = "car_" + car.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
+          const carRef = doc(db, "cars_catalog", carDocId);
+
+          const payload = {
+            id: carDocId,
+            name: car.name,
+            power: Number(car.power) || 100,
+            basePrice: Number(car.basePrice) || 100000,
+            drivetrain: car.drivetrain || "rwd",
+            type: car.type || category,
+            img: car.img || "",
+            images: Array.isArray(car.images) && car.images.length > 0 ? car.images : [car.img || ""],
+            fallback: car.fallback || "",
+            authorId: "system",
+            authorName: "Perekup Base",
+            isActive: true,
+            createdAt: Date.now()
+          };
+
+          await setDoc(carRef, payload, { merge: true });
+          totalMigrated++;
+        }
+      }
+
+      localStorage.setItem("perekup_db_seeded_v1", "true");
+      console.log(`[☁️ CarsCatalog] Миграция успешно завершена! Перенесено ${totalMigrated} моделей.`);
+      CacheManager.cloudCars = null;
+      return { success: true, count: totalMigrated };
+    } catch (e) {
+      console.error("[☁️ CarsCatalog] Ошибка миграции базы:", e);
+      return { success: false, error: e.message };
+    }
+  },
+
+  // Получить все машины из Cloud Firestore с интеграцией в CAR_DATABASE
+  async fetchCloudCars(force = false) {
+    const now = Date.now();
+    if (!force && CacheManager.cloudCars && (now - CacheManager.cloudCarsTimestamp < CacheManager.CLOUD_CARS_TTL)) {
+      return CacheManager.cloudCars;
+    }
+
+    try {
+      const q = query(collection(db, "cars_catalog"), orderBy("basePrice", "asc"), limit(200));
+      const snap = await getDocs(q);
+      const cars = [];
+
+      snap.forEach(d => {
+        const item = d.data();
+        if (item.isActive !== false) {
+          cars.push(item);
+        }
+      });
+
+      // Перезаписываем глобальный CAR_DATABASE, чтобы игра больше не использовала статичный data.js
+      if (cars.length > 0) {
+        const updatedDatabase = {
+          economy: [], scooter: [], moto: [], atv: [],
+          comfort: [], premium: [], hyper: [], truck: [], yacht: []
+        };
+
+        cars.forEach(c => {
+          const cat = c.type || "economy";
+          if (!updatedDatabase[cat]) updatedDatabase[cat] = [];
+          updatedDatabase[cat].push(c);
+        });
+
+        window.CAR_DATABASE = updatedDatabase;
+        console.log(`[☁️ CarsCatalog] Синхронизировано ${cars.length} машин из Cloud Firestore. Локальная база обновлена.`);
+      }
+
+      CacheManager.cloudCars = cars;
+      CacheManager.cloudCarsTimestamp = now;
+      return cars;
+    } catch (e) {
+      console.warn("[☁️ CarsCatalog] Сбой загрузки облачных авто, используем кэш/фолбек:", e);
+      return CacheManager.cloudCars || [];
+    }
+  },
+
+  // Создание или обновление карточки машины онлайн (из DevStudio)
+  async saveCarToCloud(carData, authorProfile) {
+    const profile = authorProfile || TelegramAuthManager.getUserProfile();
+    if (!carData || !carData.name) return { success: false, error: "Не указано название авто" };
+
+    try {
+      const carDocId = carData.id || ("car_" + carData.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_"));
+      const carRef = doc(db, "cars_catalog", carDocId);
+
+      const payload = {
+        id: carDocId,
+        name: carData.name.trim(),
+        power: Number(carData.power) || 100,
+        basePrice: Number(carData.basePrice) || 100000,
+        drivetrain: carData.drivetrain || "rwd",
+        type: carData.type || "economy",
+        img: carData.img || (carData.images && carData.images[0]) || "",
+        images: Array.isArray(carData.images) && carData.images.length > 0 ? carData.images : [carData.img || ""],
+        fallback: carData.fallback || "",
+        authorId: String(profile?.id || "unknown"),
+        authorName: profile?.name || "Перекуп",
+        isActive: true,
+        updatedAt: Date.now()
+      };
+
+      await setDoc(carRef, payload, { merge: true });
+      CacheManager.cloudCars = null;
+
+      // Мгновенно добавляем в память текущей сессии
+      if (window.CAR_DATABASE) {
+        const cat = payload.type;
+        if (!window.CAR_DATABASE[cat]) window.CAR_DATABASE[cat] = [];
+        const existingIdx = window.CAR_DATABASE[cat].findIndex(c => c.name === payload.name);
+        if (existingIdx !== -1) {
+          window.CAR_DATABASE[cat][existingIdx] = payload;
+        } else {
+          window.CAR_DATABASE[cat].unshift(payload);
+        }
+      }
+
+      return { success: true, car: payload };
+    } catch (e) {
+      console.error("[☁️ CarsCatalog] Ошибка сохранения машины в Firestore:", e);
+      return { success: false, error: e.message };
+    }
+  }
+};
+
+// ========================================================
+// 4. БЛОК 2: ЕДИНЫЙ РЕЕСТР ГОСНОМЕРОВ (REGISTERED_PLATES)
+// ========================================================
+const RegisteredPlatesManager = {
+  cleanPlateString(plateStr) {
+    if (!plateStr) return "";
+    return String(plateStr).toUpperCase().replace(/\s+/g, " ").trim();
+  },
+
+  // Проверка уникальности и резерв номера через транзакцию Firestore
+  async claimPlateAtomic(plateStr, ownerId, carId = null) {
+    const cleanPlate = this.cleanPlateString(plateStr);
+    if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) {
+      return { success: true, plate: cleanPlate, transit: true };
+    }
+
+    const docId = cleanPlate.replace(/\s+/g, "_");
+    const plateRef = doc(db, "registered_plates", docId);
+    const targetUid = ownerId || TelegramAuthManager.getVerifiedUserId();
+
+    try {
+      const result = await runTransaction(db, async (tx) => {
+        const plateSnap = await tx.get(plateRef);
+
+        if (plateSnap.exists()) {
+          const data = plateSnap.data();
+          if (data.ownerId && String(data.ownerId) !== String(targetUid) && data.status === "owned") {
+            throw new Error(`Госномер «${cleanPlate}» уже зарегистрирован за другим владельцем!`);
+          }
+        }
+
+        const payload = {
+          plate: cleanPlate,
+          ownerId: String(targetUid),
+          carId: carId ? String(carId) : null,
+          status: "owned",
+          updatedAt: Date.now()
+        };
+
+        tx.set(plateRef, payload, { merge: true });
+        return payload;
+      });
+
+      console.log(`[🏷️ Plates] Госномер «${cleanPlate}» успешно закреплен за ${targetUid}`);
+      return { success: true, plate: result.plate };
+    } catch (e) {
+      console.warn("[🏷️ Plates] Ошибка резерва номера:", e.message);
+      return { success: false, error: e.message };
+    }
+  },
+
+  // Освобождение / Снятие номера на хранение или в архив
+  async releasePlate(plateStr, ownerId, archive = false) {
+    const cleanPlate = this.cleanPlateString(plateStr);
+    if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) return true;
+
+    const docId = cleanPlate.replace(/\s+/g, "_");
+    const plateRef = doc(db, "registered_plates", docId);
+    const targetUid = ownerId || TelegramAuthManager.getVerifiedUserId();
+
+    try {
+      await runTransaction(db, async (tx) => {
+        const plateSnap = await tx.get(plateRef);
+        if (!plateSnap.exists()) return;
+
+        const data = plateSnap.data();
+        if (data.ownerId && String(data.ownerId) !== String(targetUid)) {
+          throw new Error("Вы не являетесь владельцем этого госномера!");
+        }
+
+        if (archive) {
+          tx.update(plateRef, {
+            ownerId: null,
+            carId: null,
+            status: "archived",
+            updatedAt: Date.now()
+          });
+        } else {
+          tx.update(plateRef, {
+            carId: null,
+            status: "storage",
+            updatedAt: Date.now()
+          });
+        }
+      });
+
+      return true;
+    } catch (e) {
+      console.warn("[🏷️ Plates] Ошибка освобождения номера:", e);
+      return false;
+    }
+  },
+
+  // Проверка статуса номера онлайн
+  async isPlateAvailable(plateStr) {
+    const cleanPlate = this.cleanPlateString(plateStr);
+    if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) return true;
+
+    const docId = cleanPlate.replace(/\s+/g, "_");
+    try {
+      const snap = await getDoc(doc(db, "registered_plates", docId));
+      if (!snap.exists()) return true;
+      const data = snap.data();
+      return data.status !== "owned";
+    } catch (e) {
+      return true;
+    }
+  }
+};
+
+// ========================================================
+// 5. БЛОК 3: P2P БИРЖА (НАЛОГ РЫНКА 3% И ЧЕСТНЫЕ ВЫПЛАТЫ)
+// ========================================================
+const MARKET_FEE_PERCENT = 0.03; // 3% анти-инфляционный сбор биржи
+
+const P2PMarketManager = {
+  async publishLot(lotData, sellerProfile) {
+    const profile = sellerProfile || TelegramAuthManager.getUserProfile();
+    if (!lotData || !profile?.id) return { success: false, error: "Нет данных" };
+
+    try {
+      const lotId = "lot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+      const rawPrice = Math.max(1000, parseInt(lotData.price) || 50000);
+
+      const payload = {
+        id: lotId,
+        sellerId: String(profile.id),
+        sellerName: profile.name || "Перекуп",
+        type: lotData.type,
+        name: lotData.name,
+        price: rawPrice,
+        itemData: lotData.itemData || {},
+        status: "active",
+        createdAt: Date.now()
+      };
+
+      // Если выставляется номер — помечаем статус на бирже
+      if (lotData.type === "plate" || lotData.type === "plates") {
+        const plateStr = lotData.itemData?.plate || lotData.name;
+        const clean = RegisteredPlatesManager.cleanPlateString(plateStr);
+        if (clean) {
+          const pDocId = clean.replace(/\s+/g, "_");
+          await setDoc(doc(db, "registered_plates", pDocId), {
+            plate: clean,
+            ownerId: String(profile.id),
+            status: "on_sale",
+            updatedAt: Date.now()
+          }, { merge: true });
+        }
+      }
+
+      await setDoc(doc(db, "p2p_market", lotId), payload);
+      CacheManager.marketLots = null;
+      return { success: true, lotId };
+    } catch (e) {
+      console.error("[P2P] Ошибка публикации лота:", e);
+      return { success: false, error: e.message };
+    }
+  },
+
+  async fetchLots(force = false) {
+    const now = Date.now();
+    if (!force && CacheManager.marketLots && (now - CacheManager.marketTimestamp < CacheManager.MARKET_TTL)) {
+      return CacheManager.marketLots;
+    }
+
+    try {
+      const q = query(
+        collection(db, "p2p_market"),
+        orderBy("createdAt", "desc"),
+        limit(40)
+      );
+      const snap = await getDocs(q);
+      const lots = [];
+      snap.forEach(d => {
+        const item = d.data();
+        if (item.status === "active") lots.push(item);
+      });
+
+      CacheManager.marketLots = lots;
+      CacheManager.marketTimestamp = now;
+      return lots;
+    } catch (e) {
+      console.warn("[P2P] Ошибка загрузки рынка:", e);
+      return CacheManager.marketLots || [];
+    }
+  },
+
+  async buyLotAtomic(lotId, buyerProfile, buyerCash) {
+    const profile = buyerProfile || TelegramAuthManager.getUserProfile();
+    if (!lotId || !profile?.id) return { success: false, error: "Неверные данные" };
+
+    const lotRef = doc(db, "p2p_market", String(lotId));
+    const payoutRef = doc(db, "payouts", "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
+
+    try {
+      const transactionResult = await runTransaction(db, async (tx) => {
+        const lotSnap = await tx.get(lotRef);
+        if (!lotSnap.exists()) throw new Error("Лот снят с продажи или не существует!");
+
+        const lot = lotSnap.data();
+        if (lot.status !== "active") throw new Error("Этот лот уже успел купить другой перекуп!");
+        if (lot.sellerId === String(profile.id)) throw new Error("Нельзя купить собственный лот!");
+        if (buyerCash < lot.price) throw new Error("Недостаточно денег на балансе!");
+
+        // Расчет выплаты продавцу с вычетом налога биржи
+        const marketFee = Math.round(lot.price * MARKET_FEE_PERCENT);
+        const sellerPayout = lot.price - marketFee;
+
+        tx.update(lotRef, {
+          status: "sold",
+          buyerId: String(profile.id),
+          buyerName: profile.name || "Покупатель",
+          soldAt: Date.now()
+        });
+
+        tx.set(payoutRef, {
+          sellerId: lot.sellerId,
+          buyerName: profile.name || "Покупатель",
+          amount: sellerPayout,
+          grossAmount: lot.price,
+          fee: marketFee,
+          itemTitle: lot.name,
+          claimed: false,
+          createdAt: Date.now()
+        });
+
+        // Если куплен номер — перепривязываем владельца в едином реестре
+        if (lot.type === "plate" || lot.type === "plates") {
+          const plateStr = lot.itemData?.plate || lot.name;
+          const clean = RegisteredPlatesManager.cleanPlateString(plateStr);
+          if (clean) {
+            const pDocId = clean.replace(/\s+/g, "_");
+            const plateRef = doc(db, "registered_plates", pDocId);
+            tx.set(plateRef, {
+              plate: clean,
+              ownerId: String(profile.id),
+              carId: null,
+              status: "owned",
+              updatedAt: Date.now()
+            }, { merge: true });
+          }
+        }
+
+        return lot;
+      });
+
+      CacheManager.marketLots = null;
+      return { success: true, lot: transactionResult };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async cancelLot(lotId, sellerId) {
+    const targetUid = sellerId || TelegramAuthManager.getVerifiedUserId();
+    try {
+      const lotRef = doc(db, "p2p_market", String(lotId));
+      const snap = await getDoc(lotRef);
+      if (snap.exists() && snap.data().sellerId === String(targetUid)) {
+        const lot = snap.data();
+        
+        // Возвращаем статус номера обратно владельцу
+        if (lot.type === "plate" || lot.type === "plates") {
+          const plateStr = lot.itemData?.plate || lot.name;
+          await RegisteredPlatesManager.releasePlate(plateStr, targetUid, false);
+        }
+
+        await deleteDoc(lotRef);
+        CacheManager.marketLots = null;
+        return true;
+      }
+    } catch (e) {
+      console.warn("[P2P] Ошибка отмены лота:", e);
+    }
+    return false;
+  },
+
+  async claimPendingPayouts(userId) {
+    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
+    if (!targetUid) return { totalClaimed: 0, claimedItems: [] };
+    try {
+      const q = query(collection(db, "payouts"), limit(15));
+      const snap = await getDocs(q);
+      let totalClaimed = 0;
+      const claimedItems = [];
+
+      for (const d of snap.docs) {
+        const item = d.data();
+        if (item.sellerId === String(targetUid) && !item.claimed) {
+          totalClaimed += item.amount;
+          claimedItems.push(`${item.itemTitle} (+${Number(item.amount).toLocaleString()} ₽)`);
+          await updateDoc(d.ref, { claimed: true, claimedAt: Date.now() });
+        }
+      }
+      return { totalClaimed, claimedItems };
+    } catch (e) {
+      console.warn("[P2P] Ошибка сбора выплат:", e);
+      return { totalClaimed: 0, claimedItems: [] };
+    }
+  }
+};
+
+// ========================================================
+// 6. ОБЛАЧНЫЕ СОХРАНЕНИЯ (CLOUD SAVE)
 // ========================================================
 let saveDebounceTimer = null;
 let lastSavedHash = "";
@@ -246,10 +704,9 @@ const CloudSaveManager = {
 };
 
 // ========================================================
-// 4. СОЦИАЛЬНАЯ СЕТЬ «M»: ЛЕНТА, ДРУЗЬЯ, ПОДАРКИ И ДУЭЛИ
+// 7. СОЦИАЛЬНАЯ СЕТЬ «M» (ПУЛЬС, ДРУЗЬЯ, ПОДАРКИ, ДУЭЛИ)
 // ========================================================
 const M_NetworkManager = {
-  // Публикация достижения в общую ленту «Пульс»
   async publishPost(eventData, userProfile) {
     const profile = userProfile || TelegramAuthManager.getUserProfile();
     if (!eventData || !profile?.id) return false;
@@ -261,7 +718,7 @@ const M_NetworkManager = {
         authorId: String(profile.id),
         authorName: profile.name || "Перекуп",
         avatar: profile.photoUrl || null,
-        type: eventData.type || "deal", // 'deal' | 'race' | 'jackpot' | 'barn' | 'custom'
+        type: eventData.type || "deal",
         title: eventData.title || "Сделка закрыта!",
         text: eventData.text || "",
         carName: eventData.carName || null,
@@ -281,7 +738,6 @@ const M_NetworkManager = {
     }
   },
 
-  // Получить последние посты ленты
   async fetchFeed(force = false) {
     const now = Date.now();
     if (!force && CacheManager.feed && (now - CacheManager.feedTimestamp < CacheManager.FEED_TTL)) {
@@ -303,7 +759,6 @@ const M_NetworkManager = {
     }
   },
 
-  // Поставить реакцию на пост
   async toggleReaction(postId, reactionType, userProfile) {
     const profile = userProfile || TelegramAuthManager.getUserProfile();
     if (!postId || !profile?.id) return false;
@@ -319,7 +774,6 @@ const M_NetworkManager = {
         const userReactionKey = `${profile.id}_${reactionType}`;
 
         if (reacted.includes(userReactionKey)) {
-          // Уже поставлена — снимаем
           const newReacted = reacted.filter(r => r !== userReactionKey);
           const currentCount = (data.reactions && data.reactions[reactionType]) ? data.reactions[reactionType] : 1;
           tx.update(postRef, {
@@ -327,7 +781,6 @@ const M_NetworkManager = {
             reactedUsers: newReacted
           });
         } else {
-          // Добавляем реакцию
           reacted.push(userReactionKey);
           const currentCount = (data.reactions && data.reactions[reactionType]) ? data.reactions[reactionType] : 0;
           tx.update(postRef, {
@@ -345,7 +798,6 @@ const M_NetworkManager = {
     }
   },
 
-  // Добавить в друзья напрямую по ID или юзернейму
   async addFriendDirect(myProfile, targetProfile) {
     if (!myProfile?.id || !targetProfile?.id || String(myProfile.id) === String(targetProfile.id)) {
       return { success: false, error: "Некорректный ID" };
@@ -370,7 +822,6 @@ const M_NetworkManager = {
     }
   },
 
-  // Получить список друзей игрока
   async fetchFriends(userId, force = false) {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     const now = Date.now();
@@ -401,7 +852,6 @@ const M_NetworkManager = {
     }
   },
 
-  // Отправка суточного подарка другу (10 ⛽ или 1 🎟️)
   async sendDailyGift(senderProfile, targetFriendId, giftType = "fuel") {
     const profile = senderProfile || TelegramAuthManager.getUserProfile();
     if (!profile?.id || !targetFriendId) return { success: false, error: "Ошибка данных" };
@@ -413,7 +863,7 @@ const M_NetworkManager = {
         fromId: String(profile.id),
         fromName: profile.name,
         toId: String(targetFriendId),
-        giftType: giftType, // 'fuel' (10л) или 'ticket' (1 талон)
+        giftType: giftType,
         claimed: false,
         createdAt: Date.now()
       });
@@ -424,7 +874,6 @@ const M_NetworkManager = {
     }
   },
 
-  // Сбор всех входящих подарков от друзей
   async claimIncomingGifts(userId) {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) return { totalFuel: 0, totalTickets: 0, senders: [] };
@@ -454,150 +903,7 @@ const M_NetworkManager = {
 };
 
 // ========================================================
-// 5. P2P БИРЖА С АТОМАРНОЙ ПОКУПКОЙ И ВЫПЛАТАМИ
-// ========================================================
-const P2PMarketManager = {
-  async publishLot(lotData, sellerProfile) {
-    const profile = sellerProfile || TelegramAuthManager.getUserProfile();
-    if (!lotData || !profile?.id) return { success: false, error: "Нет данных" };
-
-    try {
-      const lotId = "lot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
-      const payload = {
-        id: lotId,
-        sellerId: String(profile.id),
-        sellerName: profile.name || "Перекуп",
-        type: lotData.type,
-        name: lotData.name,
-        price: Math.max(1000, parseInt(lotData.price) || 50000),
-        itemData: lotData.itemData || {},
-        status: "active",
-        createdAt: Date.now()
-      };
-
-      await setDoc(doc(db, "p2p_market", lotId), payload);
-      CacheManager.marketLots = null;
-      return { success: true, lotId };
-    } catch (e) {
-      console.error("[P2P] Ошибка публикации лота:", e);
-      return { success: false, error: e.message };
-    }
-  },
-
-  async fetchLots(force = false) {
-    const now = Date.now();
-    if (!force && CacheManager.marketLots && (now - CacheManager.marketTimestamp < CacheManager.MARKET_TTL)) {
-      return CacheManager.marketLots;
-    }
-
-    try {
-      const q = query(
-        collection(db, "p2p_market"),
-        orderBy("createdAt", "desc"),
-        limit(40)
-      );
-      const snap = await getDocs(q);
-      const lots = [];
-      snap.forEach(d => {
-        const item = d.data();
-        if (item.status === "active") lots.push(item);
-      });
-
-      CacheManager.marketLots = lots;
-      CacheManager.marketTimestamp = now;
-      return lots;
-    } catch (e) {
-      console.warn("[P2P] Ошибка загрузки рынка:", e);
-      return CacheManager.marketLots || [];
-    }
-  },
-
-  async buyLotAtomic(lotId, buyerProfile, buyerCash) {
-    const profile = buyerProfile || TelegramAuthManager.getUserProfile();
-    if (!lotId || !profile?.id) return { success: false, error: "Неверные данные" };
-
-    const lotRef = doc(db, "p2p_market", String(lotId));
-    const payoutRef = doc(db, "payouts", "pay_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
-
-    try {
-      const transactionResult = await runTransaction(db, async (tx) => {
-        const lotSnap = await tx.get(lotRef);
-        if (!lotSnap.exists()) throw new Error("Лот снят с продажи или не существует!");
-
-        const lot = lotSnap.data();
-        if (lot.status !== "active") throw new Error("Этот лот уже успел купить другой перекуп!");
-        if (lot.sellerId === String(profile.id)) throw new Error("Нельзя купить собственный лот!");
-        if (buyerCash < lot.price) throw new Error("Недостаточно денег на балансе!");
-
-        tx.update(lotRef, {
-          status: "sold",
-          buyerId: String(profile.id),
-          buyerName: profile.name || "Покупатель",
-          soldAt: Date.now()
-        });
-
-        tx.set(payoutRef, {
-          sellerId: lot.sellerId,
-          buyerName: profile.name || "Покупатель",
-          amount: lot.price,
-          itemTitle: lot.name,
-          claimed: false,
-          createdAt: Date.now()
-        });
-
-        return lot;
-      });
-
-      CacheManager.marketLots = null;
-      return { success: true, lot: transactionResult };
-    } catch (e) {
-      return { success: false, error: e.message };
-    }
-  },
-
-  async cancelLot(lotId, sellerId) {
-    const targetUid = sellerId || TelegramAuthManager.getVerifiedUserId();
-    try {
-      const lotRef = doc(db, "p2p_market", String(lotId));
-      const snap = await getDoc(lotRef);
-      if (snap.exists() && snap.data().sellerId === String(targetUid)) {
-        await deleteDoc(lotRef);
-        CacheManager.marketLots = null;
-        return true;
-      }
-    } catch (e) {
-      console.warn("[P2P] Ошибка отмены лота:", e);
-    }
-    return false;
-  },
-
-  async claimPendingPayouts(userId) {
-    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    if (!targetUid) return { totalClaimed: 0, claimedItems: [] };
-    try {
-      const q = query(collection(db, "payouts"), limit(12));
-      const snap = await getDocs(q);
-      let totalClaimed = 0;
-      const claimedItems = [];
-
-      for (const d of snap.docs) {
-        const item = d.data();
-        if (item.sellerId === String(targetUid) && !item.claimed) {
-          totalClaimed += item.amount;
-          claimedItems.push(item.itemTitle);
-          await updateDoc(d.ref, { claimed: true, claimedAt: Date.now() });
-        }
-      }
-      return { totalClaimed, claimedItems };
-    } catch (e) {
-      console.warn("[P2P] Ошибка сбора выплат:", e);
-      return { totalClaimed: 0, claimedItems: [] };
-    }
-  }
-};
-
-// ========================================================
-// 6. МЕССЕНДЖЕР И ШАБЛОННЫЕ ДИАЛОГИ (QUICK-CHAT)
+// 8. МЕССЕНДЖЕР И ШАБЛОННЫЕ ДИАЛОГИ (QUICK-CHAT)
 // ========================================================
 const QuickChatManager = {
   getPhrasesList(filterCat = null) {
@@ -716,7 +1022,7 @@ const QuickChatManager = {
 };
 
 // ========================================================
-// 7. СООБЩЕСТВА: АВТОКЛУБЫ С КЛАНОВЫМ ОБЩАКОМ И ЧАТОМ
+// 9. СООБЩЕСТВА: АВТОКЛУБЫ С КЛАНОВЫМ ОБЩАКОМ И ЧАТОМ
 // ========================================================
 const ClubsManager = {
   async fetchClubs(force = false) {
@@ -866,7 +1172,7 @@ const ClubsManager = {
 };
 
 // ========================================================
-// 8. РЕФЕРАЛЫ TELEGRAM & СТАРТОВЫЕ БОНУСЫ
+// 10. РЕФЕРАЛЫ TELEGRAM & СТАРТОВЫЕ БОНУСЫ
 // ========================================================
 const FriendsReferralManager = {
   async handleReferralEntry(referrerId, myProfile) {
@@ -898,7 +1204,6 @@ const FriendsReferralManager = {
         createdAt: Date.now()
       });
 
-      // Автоматически добавляем друг друга в френдлист сети «M»
       await M_NetworkManager.addFriendDirect(profile, { id: referrerId, name: "Пригласивший напарник" });
 
       return { rewarded: true, bonusCash: 75000 };
@@ -910,7 +1215,7 @@ const FriendsReferralManager = {
 };
 
 // ========================================================
-// 9. ОНЛАЙН-ЛИДЕРБОРД ПЕРЕКУПОВ
+// 11. ОНЛАЙН-ЛИДЕРБОРД ПЕРЕКУПОВ
 // ========================================================
 let lastLeaderboardUpdate = 0;
 
@@ -962,7 +1267,7 @@ const LeaderboardManager = {
 };
 
 // ========================================================
-// 10. ВСПОМОГАТЕЛЬНЫЙ ПРОФИЛЬ И ЭКСПОРТ
+// 12. ВСПОМОГАТЕЛЬНЫЙ ПРОФИЛЬ И ЭКСПОРТ
 // ========================================================
 function getCurrentPlayerProfile() {
   if (currentUserProfile && verifiedUserId) {
@@ -1002,6 +1307,8 @@ window.FB_Bridge = {
   enabled: true,
   Auth: TelegramAuthManager,
   getProfile: getCurrentPlayerProfile,
+  CarsCatalog: CarsCatalogManager,
+  Plates: RegisteredPlatesManager,
   CloudSave: CloudSaveManager,
   M: M_NetworkManager,
   P2P: P2PMarketManager,
@@ -1012,4 +1319,4 @@ window.FB_Bridge = {
 };
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Bridge v0.9.0] Соцсеть «M», CloudSave, P2P, Messenger, Clubs активны 🌐");
+console.log("[☁️ FB_Bridge v1.0.0] CarsCatalog, RegisteredPlates, P2P, CloudSave активны 🌐");

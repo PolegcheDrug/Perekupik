@@ -1,7 +1,8 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ИНСПЕКЦИЯ, СТРАХОВКА И ТЮНИНГ (v0.8.5)
+// js/garage.js — АВТОПАРК, ИНСПЕКЦИЯ, СТРАХОВКА И ТЮНИНГ (v1.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Характеристики в 3 колонки слева направо (.spec-tile-3d-col),
+// Интеграция с реестром госномеров FB_Bridge.Plates,
+// характеристики в 3 колонки слева направо (.spec-tile-3d-col),
 // интерактивный лист осмотра 4-х узлов, риски езды без ОСАГО,
 // расширенный детейлинг и легализация тюнинга по ст. 12.5.1.
 // ========================================================
@@ -1641,12 +1642,21 @@ function resolveImpoundOfficialPay() {
     showToast("Штраф и эвакуация оплачены! Автомобиль возвращён.");
 }
 
-function resolveImpoundScrap(reward) {
+async function resolveImpoundScrap(reward) {
     if (activeImpoundCarIndex === null) return;
     const car = state.garage[activeImpoundCarIndex];
     if (!car || !car.isRegisteredOnPlayer) return;
 
     if (!confirm(`Сдать «${car.name}» в утиль? Автомобиль будет списан из гаража.`)) return;
+
+    // Архивация номера в облачном реестре registered_plates
+    if (window.FB_Bridge && window.FB_Bridge.Plates && car.plate && !car.plate.includes("ТРАНЗИТ")) {
+        try {
+            await window.FB_Bridge.Plates.releasePlate(car.plate, null, true);
+        } catch (e) {
+            console.warn("[Garage] Ошибка архивации номера при списании:", e);
+        }
+    }
 
     state.player.cash = (state.player.cash || 0) + reward;
     state.garage.splice(activeImpoundCarIndex, 1);
@@ -1720,7 +1730,7 @@ function confirmPutOnLot() {
 }
 
 // ========================================================
-// 13. ГОСНОМЕРА
+// 13. ГОСНОМЕРА И СВЯЗКА С CLOUD FIRESTORE
 // ========================================================
 function openChangePlateModal() {
     if (previewCarIndex === null) return;
@@ -1773,16 +1783,27 @@ function openChangePlateModal() {
     ModalManager.open('modalChangePlate');
 }
 
-function applyPlateToCar(plateStr) {
+async function applyPlateToCar(plateStr) {
     if (previewCarIndex === null) return;
     const car = state.garage[previewCarIndex];
     if (!car) return;
 
     let oldVal = car.marketValue || car.basePrice || 100000;
     let curPlate = car.customPlate || car.plate;
-    if (curPlate && curPlate !== "ТРАНЗИТ") {
+    
+    // Освобождаем старый номер в облаке, если он был
+    if (curPlate && curPlate !== "ТРАНЗИТ" && window.FB_Bridge?.Plates) {
+        await window.FB_Bridge.Plates.releasePlate(curPlate, null, false);
         if (!state.ownedPlates) state.ownedPlates = [];
         state.ownedPlates.push(curPlate);
+    }
+
+    // Закрепляем новый номер в реестре Firestore
+    if (window.FB_Bridge?.Plates) {
+        const claimRes = await window.FB_Bridge.Plates.claimPlateAtomic(plateStr, null, car.id);
+        if (!claimRes.success) {
+            return showToast(`Ошибка закрепления номера: ${claimRes.error}`);
+        }
     }
 
     car.customPlate = plateStr;
@@ -1807,7 +1828,7 @@ function applyPlateToCar(plateStr) {
     }
 }
 
-function removePlateFromCar() {
+async function removePlateFromCar() {
     if (previewCarIndex === null) return;
     const car = state.garage[previewCarIndex];
     if (!car) return;
@@ -1819,6 +1840,12 @@ function removePlateFromCar() {
     if (cash < 2000) return showToast("Нужно 2,000 ₽ на госпошлину снятия номеров!");
 
     state.player.cash -= 2000;
+
+    // Переводим номер в статус хранения в облаке
+    if (window.FB_Bridge?.Plates) {
+        await window.FB_Bridge.Plates.releasePlate(curPlate, null, false);
+    }
+
     if (!state.ownedPlates) state.ownedPlates = [];
     state.ownedPlates.push(curPlate);
 

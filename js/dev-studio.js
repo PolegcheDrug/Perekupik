@@ -1,19 +1,16 @@
 // ========================================================
-// js/dev-studio.js — ДВУХЭКРАННАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v0.6.6)
+// js/dev-studio.js — ОБЛАЧНАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v1.1.0 FIRESTORE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// 🟢 Экран 1: Создание новых карточек (Бирюзово-зеленый стиль)
-// 🟣 Экран 2: Редактирование существующих авто по классам (Фиолетово-золотой стиль)
-// ✂️ Встроенный Canvas-кроппер/подгонщик обложки, парсинг data.js,
-// рандомизатор и экспорт базы в 1 клик.
-// Гарантированная защита от null-draft и ошибок Canvas.
+// 🟢 Экран 1: Создание новых авто с прямой публикацией в Cloud Firestore
+// 🟣 Экран 2: Онлайн-редактирование характеристик и цен моделей в базе
+// ✂️ Встроенный Canvas-кроппер обложки (16:9, Base64 JPEG/WebP),
+// сохранение без коммитов в GitHub, полная работа со смартфона.
 // ========================================================
 
 const DevStudio = {
     activeScreen: 'create', // 'create' | 'edit'
     currentDraft: null,
     uploadedPhotos: [],
-    stagedBatchQueue: [],
-    originalDataJsRaw: null,
 
     // Параметры кадрирования обложки
     cropperState: {
@@ -30,7 +27,6 @@ const DevStudio = {
     selectedEditCarIndex: -1,
 
     init() {
-        this.loadBatchQueueFromStorage();
         this.resetDraft();
         this.loadCustomCarsFromStorage();
     },
@@ -122,7 +118,7 @@ const DevStudio = {
     },
 
     // ========================================================
-    // ГЛАВНЫЙ РЕНДЕР
+    // ГЛАВНЫЙ РЕНДЕР СТУДИИ
     // ========================================================
     render() {
         if (!this.currentDraft) this.resetDraft();
@@ -142,10 +138,10 @@ const DevStudio = {
                         </div>
                         <div>
                             <h3 class="font-bold text-xs" style="font-size:14px; color:${isCreate ? 'var(--cyan)' : 'var(--purple)'};">
-                                ${isCreate ? '🟢 Студия: Создание Авто' : '🟣 Редактор Базы Автотехники'}
+                                ${isCreate ? '🟢 Студия: Создание в Cloud Firestore' : '🟣 Редактор Облачной Базы'}
                             </h3>
                             <div class="sub-label" style="font-size:9px;">
-                                ${isCreate ? 'Генерация новых лотов в папку assets/' : 'Изменение характеристик, фото и цен существующих авто'}
+                                ${isCreate ? 'Публикация моделей онлайн без коммитов в репозиторий' : 'Прямое изменение характеристик и цен машин в реальном времени'}
                             </div>
                         </div>
                     </div>
@@ -155,10 +151,10 @@ const DevStudio = {
                 <!-- НАВИГАЦИОННЫЙ СЕЛЕКТОР ЭКРАНОВ -->
                 <div class="grid-2 mb-3">
                     <button onclick="DevStudio.switchScreen('create')" class="btn ${isCreate ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-weight:900;">
-                        <i class="fa-solid fa-sparkles mr-1"></i> 1. Создать новую карточку
+                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i> 1. Создать новую модель
                     </button>
                     <button onclick="DevStudio.switchScreen('edit')" class="btn ${!isCreate ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-weight:900;">
-                        <i class="fa-solid fa-list-check mr-1"></i> 2. Редактировать из базы
+                        <i class="fa-solid fa-list-check mr-1"></i> 2. Редактировать базу
                     </button>
                 </div>
 
@@ -173,24 +169,19 @@ const DevStudio = {
     },
 
     // ========================================================
-    // 🟢 ЭКРАН 1: СОЗДАНИЕ НОВЫХ КАРТОЧЕК
+    // 🟢 ЭКРАН 1: СОЗДАНИЕ В CLOUD FIRESTORE
     // ========================================================
     renderCreateScreen() {
-        const queueCount = this.stagedBatchQueue.length;
-
         return `
             <div class="glass-card p-2 mb-2 studio-box-create">
                 <div class="flex-between mb-2">
                     <div>
-                        <b class="text-xs color-cyan"><i class="fa-solid fa-file-code mr-1"></i> База проекта data.js:</b>
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-database mr-1"></i> Cloud Firestore Direct:</b>
                         <div class="sub-label" style="font-size:9px;">
-                            ${this.originalDataJsRaw ? '<span class="color-green font-bold">✓ Файл data.js загружен</span>' : 'Используется встроенная база'}
+                            <span class="color-green font-bold">✓ Онлайн-база активна (Тариф 0 ₽)</span>
                         </div>
                     </div>
-                    <button onclick="document.getElementById('studioDataFileInput').click()" class="btn btn-cyan btn-sm btn-auto" style="font-size:9.5px;">
-                        ${this.originalDataJsRaw ? 'Заменить data.js' : 'Загрузить data.js'}
-                    </button>
-                    <input type="file" id="studioDataFileInput" accept=".js" style="display:none;" onchange="DevStudio.handleDataJsFileUpload(this.files[0])">
+                    <span class="tag-badge bg-tag-green">ONLINE SYNC</span>
                 </div>
 
                 <div class="grid-2">
@@ -209,21 +200,10 @@ const DevStudio = {
             <!-- ФОРМА ХАРАКТЕРИСТИК -->
             ${this.renderCarFormFieldsHtml(true)}
 
-            <!-- ОЧЕРЕДЬ ПАКА -->
-            <div class="glass-card p-2 mb-2">
-                <div class="flex-between mb-1">
-                    <b class="text-xs color-green"><i class="fa-solid fa-layer-group mr-1"></i> Очередь для пака: ${queueCount} авто</b>
-                    ${queueCount > 0 ? `<button onclick="DevStudio.clearBatchQueue()" class="btn btn-danger btn-auto btn-sm" style="padding:2px 8px; font-size:9px;">Очистить</button>` : ''}
-                </div>
-                <div class="space-y-1 mb-2" style="max-height: 90px; overflow-y: auto;">
-                    ${this.renderBatchQueueHtml()}
-                </div>
-            </div>
-
             <!-- КНОПКИ ДЕЙСТВИЙ -->
             <div class="space-y-2 mb-2">
-                <button onclick="DevStudio.addToBatchQueue()" class="btn btn-green w-full" style="box-shadow: 0 0 16px var(--green-glow);">
-                    <i class="fa-solid fa-plus mr-1"></i> + Сохранить в очередь пака
+                <button onclick="DevStudio.publishCarToCloudFirestore()" class="btn btn-green w-full" style="box-shadow: 0 0 16px var(--green-glow); font-size:12px; padding:10px;">
+                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Опубликовать в Cloud Firestore 🚀
                 </button>
                 <div class="grid-2">
                     <button onclick="DevStudio.spawnToMarketAction()" class="btn btn-cyan btn-sm">
@@ -234,20 +214,11 @@ const DevStudio = {
                     </button>
                 </div>
             </div>
-
-            <div class="grid-2 mb-2">
-                <button onclick="DevStudio.downloadMergedDataJs()" class="btn btn-cyan btn-sm">
-                    <i class="fa-solid fa-download mr-1"></i> Скачать data.js
-                </button>
-                <button onclick="DevStudio.downloadPhotoBatch()" class="btn btn-dark btn-sm" ${this.uploadedPhotos.length === 0 ? 'disabled' : ''}>
-                    <i class="fa-solid fa-file-zipper mr-1"></i> Скачать фото (.jpg)
-                </button>
-            </div>
         `;
     },
 
     // ========================================================
-    // 🟣 ЭКРАН 2: РЕДАКТИРОВАНИЕ ИЗ БАЗЫ
+    // 🟣 ЭКРАН 2: ОНЛАЙН-РЕДАКТИРОВАНИЕ БАЗЫ
     // ========================================================
     renderEditScreen() {
         const d = this.currentDraft;
@@ -277,7 +248,7 @@ const DevStudio = {
 
         if (this.editSearchQuery.trim()) {
             const q = this.editSearchQuery.toLowerCase();
-            currentCatList = currentCatList.filter(car => car.name.toLowerCase().includes(q));
+            currentCatList = currentCatList.filter(car => car && car.name && car.name.toLowerCase().includes(q));
         }
 
         let carsSelectOptions = currentCatList.map((car, idx) => `
@@ -292,7 +263,7 @@ const DevStudio = {
 
         return `
             <div class="glass-card p-2 mb-2 studio-box-edit">
-                <b class="text-xs color-purple block mb-1"><i class="fa-solid fa-list-ul mr-1"></i> 1. Выберите авто из базы проекта:</b>
+                <b class="text-xs color-purple block mb-1"><i class="fa-solid fa-list-ul mr-1"></i> 1. Выберите авто из базы:</b>
                 
                 <div class="flex-gap mb-2" style="overflow-x:auto; padding-bottom:4px;">
                     ${classChips}
@@ -307,7 +278,7 @@ const DevStudio = {
 
                 <div>
                     <select class="chat-input" onchange="DevStudio.loadCarForEditing(parseInt(this.value))" style="font-size:11px; padding:7px 6px;">
-                        <option value="-1">-- Выберите авто для редактирования --</option>
+                        <option value="-1">-- Выберите модель для правки --</option>
                         ${carsSelectOptions}
                     </select>
                 </div>
@@ -319,7 +290,7 @@ const DevStudio = {
                         <span class="sub-label" style="font-size:8.5px;">Редактируется объект:</span>
                         <div class="text-xs font-bold color-purple">${d.name}</div>
                     </div>
-                    <span class="tag-badge bg-tag-purple">РЕЖИМ ПРАВКИ</span>
+                    <span class="tag-badge bg-tag-purple">ОНЛАЙН РЕЖИМ</span>
                 </div>
 
                 <!-- КРОППЕР И НАСТРОЙКА ОБЛОЖКИ -->
@@ -330,29 +301,29 @@ const DevStudio = {
 
                 <!-- КНОПКИ СОХРАНЕНИЯ ПРАВОК -->
                 <div class="space-y-2 mb-2">
-                    <button onclick="DevStudio.saveEditedCarToDatabase()" class="btn btn-purple w-full" style="box-shadow: 0 0 16px rgba(192,132,252,0.4);">
-                        <i class="fa-solid fa-floppy-disk mr-1"></i> Сохранить изменения в базе проекта ✓
+                    <button onclick="DevStudio.publishCarToCloudFirestore()" class="btn btn-purple w-full" style="box-shadow: 0 0 16px rgba(192,132,252,0.4); font-size:12px; padding:10px;">
+                        <i class="fa-solid fa-floppy-disk mr-1"></i> Сохранить изменения в Cloud Firestore ✓
                     </button>
                     <div class="grid-2">
                         <button onclick="DevStudio.spawnToMarketAction()" class="btn btn-cyan btn-sm">
                             <i class="fa-solid fa-store mr-1"></i> Запустить на Рынок
                         </button>
-                        <button onclick="DevStudio.downloadMergedDataJs()" class="btn btn-dark btn-sm">
-                            <i class="fa-solid fa-download mr-1"></i> Скачать data.js
+                        <button onclick="DevStudio.spawnToGarageAction()" class="btn btn-dark btn-sm">
+                            <i class="fa-solid fa-warehouse mr-1"></i> В гараж
                         </button>
                     </div>
                 </div>
             ` : `
                 <div class="glass-card text-center sub-label py-6">
                     <i class="fa-solid fa-hand-pointer color-purple mb-2" style="font-size:24px;"></i>
-                    <div>Выберите машину в списке выше, чтобы изменить её фото, цены или тюнинг.</div>
+                    <div>Выберите автомобиль из списка выше, чтобы отредактировать его параметры в реальном времени.</div>
                 </div>
             `}
         `;
     },
 
     // ========================================================
-    // ✂️ ВИДЖЕТ КАДРИРОВАНИЯ
+    // ✂️ ВИДЖЕТ КАДРИРОВАНИЯ И СЖАТИЯ ДЛЯ FIRESTORE
     // ========================================================
     renderCropperWidgetHtml(isCreate) {
         const color = isCreate ? 'var(--cyan)' : 'var(--purple)';
@@ -360,13 +331,13 @@ const DevStudio = {
         return `
             <div class="glass-card mb-2 p-2">
                 <div class="flex-between mb-1">
-                    <b class="text-xs" style="color:${color};"><i class="fa-solid fa-crop-simple mr-1"></i> Обложка: Масштаб и Обрезка (16:9)</b>
+                    <b class="text-xs" style="color:${color};"><i class="fa-solid fa-crop-simple mr-1"></i> Обложка: Кадрирование (16:9)</b>
                     <button onclick="DevStudio.resetCropperParams(); DevStudio.updateCropperCanvas();" class="btn btn-dark btn-auto btn-sm" style="font-size:8.5px; padding:2px 6px;">Сброс</button>
                 </div>
-                <div class="sub-label mb-2" style="font-size:9px;">Настройте ползунками точную позицию и нажмите «Обрезать и применить».</div>
+                <div class="sub-label mb-2" style="font-size:9px;">Загрузите фото прямо из галереи, настройте ползунками ракурс и нажмите «Обрезать и сжать».</div>
 
                 <div class="car-img-wrap" style="height: 165px; position:relative; overflow:hidden; border:1px solid ${color};">
-                    <canvas id="studioCropCanvas" width="400" height="225" style="width:100%; height:100%; display:block; object-fit:cover;"></canvas>
+                    <canvas id="studioCropCanvas" width="480" height="270" style="width:100%; height:100%; display:block; object-fit:cover;"></canvas>
                 </div>
 
                 <div class="space-y-1 my-2 text-xs">
@@ -386,10 +357,10 @@ const DevStudio = {
 
                 <div class="grid-2">
                     <button onclick="document.getElementById('studioFileInput').click()" class="btn btn-dark btn-sm">
-                        <i class="fa-solid fa-camera mr-1"></i> Сменить фото
+                        <i class="fa-solid fa-camera mr-1"></i> Выбрать фото из галереи
                     </button>
                     <button onclick="DevStudio.applyCropToDraft()" class="btn ${isCreate ? 'btn-cyan' : 'btn-purple'} btn-sm">
-                        <i class="fa-solid fa-check mr-1"></i> Обрезать и применить
+                        <i class="fa-solid fa-check mr-1"></i> Обрезать и сжать ✓
                     </button>
                 </div>
 
@@ -456,7 +427,8 @@ const DevStudio = {
         const canvas = document.getElementById('studioCropCanvas');
         if (!canvas) return;
 
-        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        // Сжатие в оптимизированный JPEG (Base64) 480x270 — вес всего 25-30 КБ (бесплатно влезает в Firestore)
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
         const d = this.currentDraft;
 
         if (this.uploadedPhotos.length > 0) {
@@ -472,11 +444,11 @@ const DevStudio = {
         this.updateDraftImagesArray();
         this.render();
         if (typeof playSound === 'function') playSound('win');
-        if (typeof showToast === 'function') showToast("✂️ Обложка успешно кадрирована в 16:9!");
+        if (typeof showToast === 'function') showToast("✂️ Обложка кадрирована и сжата для базы!");
     },
 
     // ========================================================
-    // ФОРМА ХАРАКТЕРИСТИК
+    // ФОРМА ХАРАКТЕРИСТИК МОДЕЛИ
     // ========================================================
     renderCarFormFieldsHtml(isCreate) {
         const d = this.currentDraft;
@@ -484,7 +456,7 @@ const DevStudio = {
 
         return `
             <div class="glass-card mb-2 p-2">
-                <b class="text-xs block mb-1" style="color:${color};"><i class="fa-solid fa-sliders mr-1"></i> Характеристики и пути:</b>
+                <b class="text-xs block mb-1" style="color:${color};"><i class="fa-solid fa-sliders mr-1"></i> Характеристики авто:</b>
                 
                 <div class="mb-2">
                     <span class="sub-label" style="font-size:9px;">Название марки и модели:</span>
@@ -531,17 +503,6 @@ const DevStudio = {
                     </div>
                 </div>
 
-                <div class="grid-2 mb-2">
-                    <div>
-                        <span class="sub-label" style="font-size:9px;">Папка модели:</span>
-                        <input type="text" class="chat-input" value="${d.folderPath}" oninput="DevStudio.updateField('folderPath', this.value)" style="font-size:10px; padding:6px 6px;">
-                    </div>
-                    <div>
-                        <span class="sub-label" style="font-size:9px;">Префикс файла:</span>
-                        <input type="text" class="chat-input" value="${d.baseFilename}" oninput="DevStudio.updateField('baseFilename', this.value)" style="font-size:10px; padding:6px 6px;">
-                    </div>
-                </div>
-
                 <div>
                     <span class="sub-label" style="font-size:9px;">Фраза продавца в объявлении:</span>
                     <input type="text" class="chat-input" value="${d.sellerNote}" oninput="DevStudio.updateField('sellerNote', this.value)" style="font-size:10px; padding:6px 8px;">
@@ -571,26 +532,17 @@ const DevStudio = {
         const targetCar = catList[index];
         if (!targetCar) return;
 
-        let folder = `assets/cars/${this.editFilterClass}/`;
-        let baseFile = targetCar.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        if (targetCar.img) {
-            const parts = targetCar.img.split('/');
-            if (parts.length > 1) {
-                folder = parts.slice(0, -1).join('/') + '/';
-                baseFile = parts[parts.length - 1].replace(/\.[^/.]+$/, "");
-            }
-        }
-
         this.currentDraft = {
             isExistingCar: true,
+            id: targetCar.id || ("car_" + targetCar.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_")),
             originalNameRef: targetCar.name,
             name: targetCar.name,
             type: targetCar.type || this.editFilterClass,
             power: targetCar.power || 100,
             basePrice: targetCar.basePrice || 100000,
             drivetrain: targetCar.drivetrain || 'rwd',
-            folderPath: folder,
-            baseFilename: baseFile,
+            folderPath: `assets/cars/${this.editFilterClass}/`,
+            baseFilename: targetCar.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
             images: Array.isArray(targetCar.images) ? [...targetCar.images] : (targetCar.img ? [targetCar.img] : []),
             sellerNote: "«Проверенный автомобиль из официальной базы игры.»",
             condition: 90,
@@ -608,48 +560,48 @@ const DevStudio = {
         }
     },
 
-    saveEditedCarToDatabase() {
+    // ========================================================
+    // ПРЯМАЯ ПУБЛИКАЦИЯ В CLOUD FIRESTORE
+    // ========================================================
+    async publishCarToCloudFirestore() {
         const d = this.currentDraft;
-        if (!d || !d.isExistingCar) return;
+        if (!d || !d.name.trim()) return showToast("Укажите название модели!");
 
-        const cat = d.type || this.editFilterClass;
-        if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE[cat]) return;
-
-        const idx = CAR_DATABASE[cat].findIndex(c => c.name === d.originalNameRef);
         const cover = this.getCoverImageSrc();
+        const imagesList = this.uploadedPhotos.length > 0 
+            ? this.uploadedPhotos.map(p => p.dataUrl) 
+            : (d.images && d.images.length > 0 ? d.images : [cover]);
 
-        const updatedCarObj = {
-            name: d.name,
-            power: d.power,
-            basePrice: d.basePrice,
-            drivetrain: d.drivetrain,
-            type: d.type,
-            img: d.images.length > 0 ? d.images[0] : cover,
-            images: d.images.length > 0 ? [...d.images] : [cover],
+        const carPayload = {
+            id: d.id || ("car_" + d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_")),
+            name: d.name.trim(),
+            power: Number(d.power) || 100,
+            basePrice: Number(d.basePrice) || 100000,
+            drivetrain: d.drivetrain || 'rwd',
+            type: d.type || 'economy',
+            img: imagesList[0] || cover,
+            images: imagesList,
             fallback: (typeof getCategoryFallback === 'function') ? getCategoryFallback(d.type) : cover
         };
 
-        if (idx !== -1) {
-            CAR_DATABASE[cat][idx] = updatedCarObj;
-        } else {
-            CAR_DATABASE[cat].unshift(updatedCarObj);
-        }
+        showToast("⏳ Сохранение в Cloud Firestore...");
 
-        if (this.originalDataJsRaw) {
-            const formatted = this.formatCarObjectToJsString(updatedCarObj);
-            const nameEscaped = d.originalNameRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(`\\{[\\s\\S]*?name\\s*:\\s*["']${nameEscaped}["'][\\s\\S]*?\\}`, 'm');
-            if (regex.test(this.originalDataJsRaw)) {
-                this.originalDataJsRaw = this.originalDataJsRaw.replace(regex, formatted.trim());
+        if (window.FB_Bridge && window.FB_Bridge.CarsCatalog) {
+            const res = await window.FB_Bridge.CarsCatalog.saveCarToCloud(carPayload);
+            if (res && res.success) {
+                if (typeof playSound === 'function') playSound('win');
+                if (typeof tgHaptic === 'function') tgHaptic('success');
+                showToast(`🚀 Модель «${d.name}» опубликована в Cloud Firestore!`);
+            } else {
+                this.saveCustomCarToStorage(carPayload);
+                showToast(`Сохранено локально (${res ? res.error : 'оффлайн'}).`);
             }
+        } else {
+            this.saveCustomCarToStorage(carPayload);
+            showToast(`Сохранено в локальной памяти.`);
         }
 
-        if (typeof saveState === 'function') saveState();
-        if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        if (typeof showToast === 'function') {
-            showToast(`Автомобиль «${d.name}» успешно обновлен в базе!`);
-        }
+        this.resetDraft();
         this.render();
     },
 
@@ -721,7 +673,7 @@ const DevStudio = {
         const d = this.currentDraft;
         d.images = [];
         this.uploadedPhotos.forEach(p => {
-            d.images.push(`${d.folderPath}${p.name}`);
+            d.images.push(p.dataUrl);
         });
     },
 
@@ -743,14 +695,6 @@ const DevStudio = {
     updateCategory(cat) {
         if (!this.currentDraft) this.resetDraft();
         this.currentDraft.type = cat;
-        const catFolders = {
-            economy: "assets/cars/economy/", scooter: "assets/moto/", moto: "assets/moto/",
-            atv: "assets/moto/", comfort: "assets/cars/comfort/", premium: "assets/cars/premium/",
-            hyper: "assets/cars/hyper/", truck: "assets/cars/truck/", yacht: "assets/cars/yacht/"
-        };
-        const folderPrefix = catFolders[cat] || "assets/cars/economy/";
-        this.currentDraft.folderPath = `${folderPrefix}${this.currentDraft.baseFilename}/`;
-        this.updateDraftImagesArray();
         this.render();
     },
 
@@ -787,87 +731,16 @@ const DevStudio = {
         this.render();
     },
 
-    addToBatchQueue() {
-        const d = JSON.parse(JSON.stringify(this.currentDraft));
-        const cover = this.getCoverImageSrc();
-        
-        const carObj = {
-            name: d.name,
-            power: d.power,
-            basePrice: d.basePrice,
-            drivetrain: d.drivetrain,
-            type: d.type,
-            img: d.images.length > 0 ? d.images[0] : cover,
-            images: d.images.length > 0 ? [...d.images] : [cover],
-            fallback: (typeof getCategoryFallback === 'function') ? getCategoryFallback(d.type) : cover,
-            folderPath: d.folderPath,
-            baseFilename: d.baseFilename
-        };
-
-        this.stagedBatchQueue.unshift(carObj);
-        this.saveBatchQueueToStorage();
-
-        if (typeof CAR_DATABASE !== 'undefined' && CAR_DATABASE[d.type]) {
-            CAR_DATABASE[d.type].unshift(carObj);
-        }
-
-        if (typeof showToast === 'function') {
-            showToast(`«${d.name}» добавлен в очередь пака! Всего: ${this.stagedBatchQueue.length}`);
-        }
-
-        const prevFolder = d.folderPath;
-        const prevType = d.type;
-        this.resetDraft();
-        this.currentDraft.folderPath = prevFolder;
-        this.currentDraft.type = prevType;
-        this.render();
-    },
-
-    renderBatchQueueHtml() {
-        if (this.stagedBatchQueue.length === 0) {
-            return `<div class="sub-label text-center py-1" style="font-size:9px;">Очередь пака пуста</div>`;
-        }
-        return this.stagedBatchQueue.map((item, idx) => `
-            <div class="p-1 flex-between" style="background:#060a12; border-radius:6px; font-size:9.5px;">
-                <div class="flex-gap" style="align-items:center;">
-                    <b class="color-cyan">${idx + 1}.</b>
-                    <span>${item.name}</span>
-                    <span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">${(item.type || 'economy').toUpperCase()}</span>
-                </div>
-                <button onclick="DevStudio.removeFromBatchQueue(${idx})" style="background:none; border:none; color:var(--red); cursor:pointer;">✕</button>
-            </div>
-        `).join('');
-    },
-
-    removeFromBatchQueue(idx) {
-        this.stagedBatchQueue.splice(idx, 1);
-        this.saveBatchQueueToStorage();
-        this.render();
-    },
-
-    clearBatchQueue() {
-        if (!confirm("Очистить очередь?")) return;
-        this.stagedBatchQueue = [];
-        this.saveBatchQueueToStorage();
-        this.render();
-    },
-
-    saveBatchQueueToStorage() {
-        try { localStorage.setItem('perekup_dev_batch_queue', JSON.stringify(this.stagedBatchQueue)); } catch(e) {}
-    },
-
-    loadBatchQueueFromStorage() {
-        try {
-            let data = localStorage.getItem('perekup_dev_batch_queue');
-            if (data) this.stagedBatchQueue = JSON.parse(data);
-        } catch(e) {}
-    },
-
     saveCustomCarToStorage(carObj) {
         try {
             let saved = JSON.parse(localStorage.getItem('perekup_custom_cars_catalog') || '[]');
             saved.unshift(carObj);
             localStorage.setItem('perekup_custom_cars_catalog', JSON.stringify(saved));
+            
+            let cat = carObj.type || 'economy';
+            if (typeof CAR_DATABASE !== 'undefined' && CAR_DATABASE[cat]) {
+                CAR_DATABASE[cat].unshift(carObj);
+            }
         } catch(e) {}
     },
 
@@ -945,91 +818,6 @@ const DevStudio = {
         if (typeof switchTab === 'function') switchTab('tabGarage');
         if (typeof renderGarage === 'function') renderGarage();
         if (typeof showToast === 'function') showToast(`«${d.name}» доставлен в гараж!`);
-    },
-
-    formatCarObjectToJsString(car) {
-        const cover = car.img || (car.images && car.images[0]) || `${car.folderPath}${car.baseFilename}.jpg`;
-        let imagesArrayCode = "";
-        if (car.images && car.images.length > 0) {
-            imagesArrayCode = `\n            images: [\n` + car.images.map(img => `                "${img}"`).join(',\n') + `\n            ],`;
-        } else {
-            imagesArrayCode = `\n            images: ["${cover}"],`;
-        }
-
-        return `        { 
-            name: "${car.name}", 
-            power: ${car.power}, 
-            basePrice: ${car.basePrice}, 
-            drivetrain: "${car.drivetrain}", 
-            type: "${car.type}", 
-            img: "${cover}",${imagesArrayCode}
-            fallback: CAR_FALLBACKS_BY_CATEGORY.${car.type} 
-        }`;
-    },
-
-    handleDataJsFileUpload(file) {
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            this.originalDataJsRaw = e.target.result;
-            this.render();
-            if (typeof showToast === 'function') showToast("Файл data.js загружен для слияния!");
-        };
-        reader.readAsText(file);
-    },
-
-    downloadMergedDataJs() {
-        const carsToMerge = [...this.stagedBatchQueue];
-        if (carsToMerge.length === 0 && this.uploadedPhotos.length > 0) {
-            carsToMerge.push({
-                ...this.currentDraft,
-                img: this.getCoverImageSrc(),
-                images: this.currentDraft.images.length > 0 ? this.currentDraft.images : [this.getCoverImageSrc()]
-            });
-        }
-
-        let outputContent = "";
-        if (this.originalDataJsRaw) {
-            let workingText = this.originalDataJsRaw;
-            carsToMerge.forEach(car => {
-                const targetCategory = car.type || 'economy';
-                const formattedObj = this.formatCarObjectToJsString(car);
-                const catRegex = new RegExp(`(${targetCategory}\\s*:\\s*\\[)`, 'i');
-                if (catRegex.test(workingText)) {
-                    workingText = workingText.replace(catRegex, `$1\n${formattedObj},`);
-                }
-            });
-            outputContent = workingText;
-        } else {
-            outputContent = `// ========================================================\n// data.js — ОБНОВЛЕННАЯ БАЗА АВТОТЕХНИКИ (v0.6.6)\n// ========================================================\n\nconst CAR_DATABASE = ${JSON.stringify(typeof CAR_DATABASE !== 'undefined' ? CAR_DATABASE : {}, null, 4)};\n\nwindow.CAR_DATABASE = CAR_DATABASE;\n`;
-        }
-
-        const blob = new Blob([outputContent], { type: "text/javascript;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "data.js";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        if (typeof showToast === 'function') showToast("Обновленный data.js успешно скачан!");
-    },
-
-    downloadPhotoBatch() {
-        if (this.uploadedPhotos.length === 0) return;
-        this.uploadedPhotos.forEach((photo, i) => {
-            setTimeout(() => {
-                const a = document.createElement("a");
-                a.href = photo.dataUrl;
-                a.download = photo.name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            }, i * 300);
-        });
-        if (typeof showToast === 'function') showToast(`Скачивание ${this.uploadedPhotos.length} фото началось...`);
     }
 };
 

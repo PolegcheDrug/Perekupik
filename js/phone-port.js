@@ -1,7 +1,8 @@
 // ========================================================
-// js/phone-port.js — МОРСКОЙ ПОРТ, ТЕРМИНАЛ И STORAGE WARS 2.0 (v0.9.3)
+// js/phone-port.js — МОРСКОЙ ПОРТ, ТЕРМИНАЛ И STORAGE WARS 2.0 (v1.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Живой чат аукциона с репликами ботов и аукциониста,
+// Связка с единым реестром госномеров FB_Bridge.Plates,
+// живой чат аукциона с репликами ботов и аукциониста,
 // шкала доминирования ставки, отсчёт ударов молотка,
 // одиночный торг с брокером и перенаправление дропа в Почту.
 // ========================================================
@@ -742,9 +743,9 @@ const AppPort = {
     },
 
     // ========================================================
-    // 3. ВСКРЫТИЕ КОНТЕЙНЕРА: ОТПРАВКА НАКЛАДНОЙ В ПОЧТУ
+    // 3. ВСКРЫТИЕ КОНТЕЙНЕРА И АТОМАРНАЯ СВЯЗКА С FIRESTORE
     // ========================================================
-    unpackContainerContents(containerObj, paidPrice) {
+    async unpackContainerContents(containerObj, paidPrice) {
         const possible = containerObj.possibleCars || ["Toyota Mark II (JZX90)"];
         const carName = possible[Math.floor(Math.random() * possible.length)];
 
@@ -798,6 +799,15 @@ const AppPort = {
             }
         };
 
+        // Атомарно закрепляем сгенерированный номер в облачном реестре
+        if (window.FB_Bridge && window.FB_Bridge.Plates && initialPlate && !initialPlate.includes("ТРАНЗИТ")) {
+            try {
+                await window.FB_Bridge.Plates.claimPlateAtomic(initialPlate, null, wonCar.id);
+            } catch (e) {
+                console.warn("[Port] Ошибка резерва номера карго в реестре:", e);
+            }
+        }
+
         if (typeof recalculateCarMarketValue === 'function') {
             recalculateCarMarketValue(wonCar);
         }
@@ -812,11 +822,15 @@ const AppPort = {
         state.player.cash += (foundLoot.cashVal || 0);
 
         if (foundLoot.plateStr) {
+            let cleanLootPlate = foundLoot.plateStr;
+            if (window.FB_Bridge && window.FB_Bridge.Plates) {
+                await window.FB_Bridge.Plates.claimPlateAtomic(cleanLootPlate, null, null);
+            }
             if (!state.ownedPlates) state.ownedPlates = [];
-            state.ownedPlates.push(foundLoot.plateStr);
+            state.ownedPlates.push(cleanLootPlate);
         }
 
-        // ОТПРАВКА НАКЛАДНОЙ В ПОЧТУ ИЛИ В ГАРАЖ
+        // ОТПРАВКА НАКЛАДНОЙ В ПОЧТУ
         if (typeof window.pushToMailbox === 'function') {
             window.pushToMailbox({
                 type: "car",

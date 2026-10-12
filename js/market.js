@@ -1,9 +1,9 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ (v0.9.2)
+// js/market.js — АВТОРЫНОК, РЕЕСТР НОМЕРОВ & CLOUD FIRESTORE (v1.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Убраны лишние кнопки галереи с обложки (чистый 3D-вид),
-// процедурные состояния (музейный сток, рабочий, корч, срочный),
-// характеристики в 3 колонки, тест-драйв, скрытие параметров до капота.
+// Связка с облачным реестром госномеров FB_Bridge.Plates,
+// атомарное закрепление номера при ДКП, процедурные вариации,
+// диагностика Launch OBD2, толщиномер и торг у капота.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -191,7 +191,7 @@ function sortCurrentMarketFeed() {
     });
 }
 
-function setCategory(cat) {
+async function setCategory(cat) {
     let lvl = state.player?.level ? state.player.level : 1;
     
     if (cat === 'moto' && lvl < 5) return showToast("🔒 Мотоциклы доступны с 5 уровня!");
@@ -215,10 +215,10 @@ function setCategory(cat) {
     setTxt("catInfoDesc", meta.desc);
 
     if (typeof playSound === 'function') playSound('tick');
-    populateMarketFeed();
+    await populateMarketFeed();
 }
 
-function refreshMarketFeedManual() {
+async function refreshMarketFeedManual() {
     const cost = getMarketRefreshCost();
     let pCash = (state.player && state.player.cash) ? state.player.cash : 0;
     let pFuel = (state.player && state.player.fuel !== undefined) ? state.player.fuel : 0;
@@ -237,15 +237,24 @@ function refreshMarketFeedManual() {
     }
 
     saveState();
-    populateMarketFeed();
+    await populateMarketFeed();
     renderMarketFeed();
     showToast("Лента предложений обновлена (-5 ⛽)!");
 }
 
 // ========================================================
-// ПРОЦЕДУРНЫЙ ГЕНЕРАТОР МОДИФИКАЦИЙ И ВАРИАЦИЙ АВТО
+// ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ АВТО И ОБЛАЧНАЯ БАЗА
 // ========================================================
-function populateMarketFeed() {
+async function populateMarketFeed() {
+    // 1. Подгрузка актуальных моделей из Cloud Firestore
+    if (window.FB_Bridge && window.FB_Bridge.CarsCatalog) {
+        try {
+            await window.FB_Bridge.CarsCatalog.fetchCloudCars();
+        } catch (e) {
+            console.warn("[Market] Ошибка связи с Cloud Cars, работаем с локальной базой:", e);
+        }
+    }
+
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
     
     let cat = state.activeCategory ? state.activeCategory : 'economy';
@@ -1418,7 +1427,7 @@ function finishMarketCarBuyProcessRoute(routeType) {
     finishMarketCarBuyProcess(deal);
 }
 
-function finishMarketCarBuyProcess(deal) {
+async function finishMarketCarBuyProcess(deal) {
     const car = deal.car;
     const price = deal.price;
     const carIndex = deal.carIndex;
@@ -1449,6 +1458,15 @@ function finishMarketCarBuyProcess(deal) {
         weldedDiff: false, steeringAngle: false, bucketSeats: false, 
         customWheels: false, risk1251: 0 
     };
+
+    // Атомарное закрепление номера за игроком в Cloud Firestore
+    if (window.FB_Bridge && window.FB_Bridge.Plates && newCar.plate && !newCar.plate.includes("ТРАНЗИТ")) {
+        try {
+            await window.FB_Bridge.Plates.claimPlateAtomic(newCar.plate, null, newCar.id);
+        } catch (e) {
+            console.warn("[Market] Ошибка бронирования номера в реестре:", e);
+        }
+    }
 
     if (typeof recalculateCarMarketValue === 'function') {
         recalculateCarMarketValue(newCar);

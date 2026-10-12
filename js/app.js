@@ -1,13 +1,14 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v0.9.3)
+// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v1.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Анимированный роллер чисел HUD, жесткий учет инвентаря,
 // Почта и Склад хранения (mailbox & warehouse),
+// авто-миграция локальной базы в Cloud Firestore cars_catalog,
 // темы Cyber Black Neo, кастомные эффекты огня/плазмы,
 // спецзаказы «ПодКлюч», Telegram Cloud Storage, Firestore & Refs.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.9.3";
+const CURRENT_GAME_VERSION = "v1.0.0";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -263,6 +264,30 @@ function showToast(msg) {
     t.classList.add('show');
     setTimeout(() => { t.classList.remove('show'); }, 2500);
 }
+
+// ========================================================
+// ЦЕНТРАЛИЗОВАННЫЙ ЖУРНАЛ БАНКОВСКИХ ТРАНЗАКЦИЙ
+// ========================================================
+function logBankTransaction(title, amount, isIncome) {
+    if (!state.player) state.player = {};
+    if (!Array.isArray(state.player.bankHistory)) state.player.bankHistory = [];
+
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    state.player.bankHistory.unshift({
+        id: "tx_" + Date.now() + "_" + Math.random().toString(36).substring(2, 5),
+        title: title || "Банковская операция",
+        amount: Math.round(Number(amount) || 0),
+        isIncome: !!isIncome,
+        time: timeStr
+    });
+
+    if (state.player.bankHistory.length > 35) {
+        state.player.bankHistory = state.player.bankHistory.slice(0, 35);
+    }
+}
+window.logBankTransaction = logBankTransaction;
 
 // ========================================================
 // 4. ИНТЕРАКТИВНЫЙ РЕНДЕР НАГРАД И ЖЕТОНОВ
@@ -1126,7 +1151,6 @@ function loadFromTelegramCloud(callback) {
     }
     const tgCloud = window.Telegram.WebApp.CloudStorage;
     
-    // Защита от зависания callback в старых WebView
     let hasReturned = false;
     const cloudTimeout = setTimeout(() => {
         if (!hasReturned) {
@@ -1183,14 +1207,17 @@ function loadFromTelegramCloud(callback) {
 
 async function initTelegramAuthAndStorage(callback) {
     let callbackCalled = false;
-    let refParam = null;
-
     const safeCallback = () => {
         if (!callbackCalled) {
             callbackCalled = true;
-            if (callback) callback();
+            if (typeof callback === 'function') callback();
         }
     };
+
+    const watchdogTimer = setTimeout(() => {
+        console.warn("[App] Сработал защитный таймаут инициализации.");
+        safeCallback();
+    }, 1500);
 
     try {
         if (window.Telegram?.WebApp) {
@@ -1202,52 +1229,30 @@ async function initTelegramAuthAndStorage(callback) {
                 tgUserData = tg.initDataUnsafe.user;
                 tgUserId = String(tgUserData.id);
             }
-
-            if (tg.initDataUnsafe?.start_param) {
-                let sp = String(tg.initDataUnsafe.start_param);
-                if (sp.startsWith("ref_")) {
-                    refParam = sp.replace("ref_", "");
-                }
-            }
         }
-    } catch(e) {}
-
-    // 1. Проверяем облачный сейв в Firestore
-    let cloudLoaded = false;
-    if (window.FB_Bridge && window.FB_Bridge.CloudSave) {
-        try {
-            const fbData = await Promise.race([
-                window.FB_Bridge.CloudSave.pullSave(tgUserId),
-                new Promise(resolve => setTimeout(() => resolve(null), 2500))
-            ]);
-            if (fbData && fbData.player) {
-                applyLoadedState(fbData);
-                cloudLoaded = true;
-            }
-        } catch(e) {
-            console.warn("[☁️ App] Ошибка загрузки Firestore:", e);
-        }
+    } catch (e) {
+        console.warn("Ошибка инициализации Telegram WebApp:", e);
     }
 
-    // 2. Если в Firestore сейва не было — смотрим Telegram CloudStorage или localStorage
-    if (!cloudLoaded) {
-        if (window.Telegram?.WebApp?.CloudStorage) {
-            loadFromTelegramCloud((cloudData) => {
-                if (cloudData) {
-                    applyLoadedState(cloudData);
-                } else {
-                    loadFromLocalStorage();
-                }
-                processReferralAndPayouts(refParam);
-                safeCallback();
-            });
-            return;
-        } else {
-            loadFromLocalStorage();
-        }
+    loadFromLocalStorage();
+
+    if (tgUserData && state.player) {
+        let names = [];
+        if (tgUserData.first_name) names.push(tgUserData.first_name);
+        if (tgUserData.last_name) names.push(tgUserData.last_name);
+        const fullName = names.join(' ').trim();
+
+        if (fullName) state.player.name = fullName;
+        else if (tgUserData.username) state.player.name = "@" + tgUserData.username;
+        if (tgUserData.photo_url) state.player.avatarUrl = tgUserData.photo_url;
     }
 
-    processReferralAndPayouts(refParam);
+    // Запуск разовой авто-миграции каталога авто в Cloud Firestore
+    if (window.FB_Bridge?.CarsCatalog) {
+        window.FB_Bridge.CarsCatalog.seedDefaultCarsCatalog();
+    }
+
+    clearTimeout(watchdogTimer);
     safeCallback();
 }
 
@@ -1470,6 +1475,7 @@ function resetGameData() {
         localStorage.removeItem("perekup_save_" + tgUserId);
         localStorage.removeItem('perekoop_sim_save_v105_release');
         localStorage.removeItem('perekup_last_seen_version');
+        localStorage.removeItem("perekup_db_seeded_v1");
 
         const cleanState = JSON.parse(JSON.stringify(DEFAULT_STATE));
         const cleanJson = JSON.stringify(cleanState);
@@ -1795,26 +1801,84 @@ function claimDailyReward() {
     let sDay = state.player.streakDay || 1;
     let currentReward = DAILY_REWARDS_CONFIG.find(r => r.day === sDay) || DAILY_REWARDS_CONFIG[0];
     const r = currentReward.reward;
-    if (r.cash) state.player.cash += r.cash;
-    if (r.fuel) state.player.fuel = Math.min(100, (state.player.fuel || 0) + r.fuel);
-    if (r.connections) state.player.connections = (state.player.connections || 0) + r.connections;
-    if (r.stars) state.player.stars += r.stars;
-    if (r.xp) addXp(r.xp);
-    if (r.freeImpoundPasses) state.player.freeImpoundPasses = (state.player.freeImpoundPasses || 0) + r.freeImpoundPasses;
-    if (r.tool) {
-        if (!state.player.tools) state.player.tools = {};
-        state.player.tools[r.tool] = true;
+
+    if (r.cash && typeof window.pushToMailbox === 'function') {
+        window.pushToMailbox({
+            type: "cash",
+            amount: r.cash,
+            title: `День ${sDay}: +${r.cash.toLocaleString()} ₽`,
+            sender: "Календарь наград",
+            desc: "Ежедневный денежный бонус перекупа.",
+            badge: "БОНУС"
+        });
     }
-    if (r.specialPlate) {
-        if (!state.ownedPlates) state.ownedPlates = [];
-        state.ownedPlates.push(r.specialPlate);
+    if (r.fuel && typeof window.pushToMailbox === 'function') {
+        window.pushToMailbox({
+            type: "fuel",
+            amount: r.fuel,
+            title: `Топливный талон: +${r.fuel} ⛽`,
+            sender: "Календарь наград",
+            desc: "Заправка бака из календаря подарков.",
+            badge: "ТОПЛИВО"
+        });
     }
+    if (r.connections && typeof window.pushToMailbox === 'function') {
+        window.pushToMailbox({
+            type: "connections",
+            amount: r.connections,
+            title: `Связи ПодКлюч: +${r.connections} 🤝`,
+            sender: "Календарь наград",
+            desc: "Контакты от Решалы за активную игру.",
+            badge: "СВЯЗИ"
+        });
+    }
+    if (r.stars && typeof window.pushToMailbox === 'function') {
+        window.pushToMailbox({
+            type: "stars",
+            amount: r.stars,
+            title: `Премиальные Stars: +${r.stars} ⭐`,
+            sender: "Календарь наград",
+            desc: "Звёзды перекупа из календаря.",
+            badge: "STARS"
+        });
+    }
+    if (r.freeImpoundPasses && typeof window.pushToMailbox === 'function') {
+        window.pushToMailbox({
+            type: "free_impound",
+            amount: r.freeImpoundPasses,
+            title: "Талон ГИБДД (Штрафстоянка)",
+            sender: "Календарь наград",
+            desc: "Бесплатный забор авто со штрафстоянки.",
+            badge: "ГИБДД"
+        });
+    }
+    if (r.tool && typeof window.pushToMailbox === 'function') {
+        window.pushToMailbox({
+            type: "tool",
+            toolId: r.tool,
+            title: "Диагностический Launch Pro",
+            sender: "Календарь наград",
+            desc: "Профессиональный сканер ЭБУ в ваш арсенал.",
+            badge: "ПРИБОР"
+        });
+    }
+    if (r.specialPlate && typeof window.pushToMailbox === 'function') {
+        window.pushToMailbox({
+            type: "plate",
+            plate: r.specialPlate,
+            title: `Блатной номер: ${r.specialPlate}`,
+            sender: "Календарь наград",
+            desc: "Редкий знак серии 777 в инвентарь.",
+            badge: "НОМЕР"
+        });
+    }
+
     state.player.lastClaimedDay = pDay;
     state.player.streakDay = (sDay % 7) + 1;
     saveState();
     ModalManager.close('modalDailyBonus');
     playSound('win'); tgHaptic('success');
-    openVerdictModal("БОНУС ПОЛУЧЕН! 🎁", "Вам начислено:\n" + currentReward.title, true);
+    openVerdictModal("БОНУС ОТПРАВЛЕН В ПОЧТУ! 🎁", "Ежедневная награда отправлена в приложение «Почта & Склад»:\n" + currentReward.title, true);
 }
 
 // ========================================================
@@ -1903,7 +1967,7 @@ function renderProfileAnalytics() {
                     🎨 Скин & Эффекты
                 </button>
                 <button onclick="openPatchNotesModal()" class="btn btn-dark btn-sm btn-auto" style="font-size:10px;">
-                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут v0.9.3
+                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут ${CURRENT_GAME_VERSION}
                 </button>
             </div>
         </div>
@@ -2106,13 +2170,22 @@ function initMarketScrollListener() {
 // 17. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ
 // ========================================================
 function initApp() {
-    initTelegramAuthAndStorage(() => {
+    initTelegramAuthAndStorage(async () => {
         updateHeaderUI();
         updateLevelGatesUI();
         applyLanguageToDOM();
         applyHudCustomization();
         checkRealTimeDayChange();
         
+        // Синхронизация облачной базы автомобилей
+        if (window.FB_Bridge?.CarsCatalog) {
+            try {
+                await window.FB_Bridge.CarsCatalog.fetchCloudCars();
+            } catch(e) {
+                console.warn("[App] Фолбек на локальные авто:", e);
+            }
+        }
+
         if (!state.marketFeed || state.marketFeed.length === 0 || !state.marketFeed.some(c => c && !c.unavailable)) {
             if (typeof populateMarketFeed === 'function') populateMarketFeed();
         }
@@ -2151,7 +2224,6 @@ setInterval(() => {
         checkRealTimeDayChange();
     }
 
-    // ТИК БИЗНЕСА (КАЖДЫЕ 30 СЕКУНД)
     if (gameCycleSeconds % 30 === 0 && state.businesses) {
         let bizUpdated = false;
         const staffCat = typeof BUSINESS_STAFF_CATALOG !== 'undefined' ? BUSINESS_STAFF_CATALOG : { managers: [], masters: [], security: [] };
