@@ -1,9 +1,9 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ И ТОРГ С ПОКУПАТЕЛЯМИ (v0.8.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ И ТОРГ С ПОКУПАТЕЛЯМИ (v0.8.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Полная версия: склад талонов, ускорение за Stars, генерация пула клиентов,
-// глубокий торг у капота (safe/firm) со шкалой терпения, чистая обложка
-// и строчный формат характеристик (.spec-tile-3d-row).
+// Характеристики в 3 колонки слева направо (.spec-tile-3d-col),
+// склад талонов, ускорение за Stars, расширенный пул клиентов,
+// торг у капота (safe/firm) со шкалой терпения и возврат в гараж.
 // ========================================================
 
 let activeHaggleSlotIdx = null;
@@ -238,32 +238,35 @@ function renderSalesLot() {
                 </div>
             </div>
 
-            <!-- СТРОЧНЫЙ ФОРМАТ ХАРАКТЕРИСТИК (.spec-tile-3d-row) -->
+            <!-- ХАРАКТЕРИСТИКИ СЛЕВА НАПРАВО В 3 КОЛОНКИ (.spec-tile-3d-col) -->
             <div class='car-specs-grid-volumetric'>
-                <div class='spec-tile-3d-row'>
+                <div class='spec-tile-3d-col'>
                     <div class='spec-tile-icon-wrap spec-tile-icon-power'>
                         <i class='fa-solid fa-bolt'></i>
                     </div>
-                    <div class='spec-tile-row-text'>
-                        Мощность — <b>${cPower} л.с.</b>
+                    <div class='spec-tile-col-data'>
+                        <span class='spec-tile-col-label'>Мощность</span>
+                        <b class='color-amber'>${cPower} л.с.</b>
                     </div>
                 </div>
 
-                <div class='spec-tile-3d-row'>
+                <div class='spec-tile-3d-col'>
                     <div class='spec-tile-icon-wrap spec-tile-icon-road'>
                         <i class='fa-solid fa-road'></i>
                     </div>
-                    <div class='spec-tile-row-text'>
-                        Пробег — <b>${cMileage} км</b>
+                    <div class='spec-tile-col-data'>
+                        <span class='spec-tile-col-label'>Пробег</span>
+                        <b class='color-cyan'>${cMileage} км</b>
                     </div>
                 </div>
 
-                <div class='spec-tile-3d-row'>
+                <div class='spec-tile-3d-col'>
                     <div class='spec-tile-icon-wrap ${shieldIconClass}'>
                         <i class='fa-solid fa-shield'></i>
                     </div>
-                    <div class='spec-tile-row-text'>
-                        Кузов — <b class='${condColorClass}'>${condVal}%</b>
+                    <div class='spec-tile-col-data'>
+                        <span class='spec-tile-col-label'>Кузов</span>
+                        <b class='${condColorClass}'>${condVal}%</b>
                     </div>
                 </div>
             </div>

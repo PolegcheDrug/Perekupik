@@ -1,8 +1,9 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И 3D-КАПСУЛЫ (v0.8.0)
+// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И 3D-КАПСУЛЫ (v0.8.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Увеличенный номер и теги, строчный формат характеристик,
-// статус кузова «Не проверен», неоновые ауры редких лотов.
+// Характеристики в 3 колонки слева направо, тест-драйв у капота,
+// выбор маршрута перегона (шоссе с ДПС vs дворы с ямами),
+// скрытие кузова до капота и госномера до Автотеки.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -452,6 +453,7 @@ function populateMarketFeed() {
             cooldownUntil: 0,
             stoChecked: false,
             gaugeChecked: false,
+            testDriven: false, // Флаг прохождения тест-драйва
             haggled: false,
             hagglePatience: isTunedSpec ? 3 : (isBeaterProject ? 6 : 4),
             sellerPersonality: isTunedSpec ? "aggressive" : (isBeaterProject ? "hurried" : "calm"),
@@ -529,7 +531,7 @@ function promptHiddenPlateAutotekaHint(event) {
 }
 
 // ========================================================
-// ОСНОВНОЙ РЕНДЕР КАРТОЧЕК РЫНКА (СТРОЧНЫЙ ФОРМАТ)
+// ОСНОВНОЙ РЕНДЕР КАРТОЧЕК РЫНКА (3 КОЛОНКИ СЛЕВА НАПРАВО)
 // ========================================================
 function renderMarketFeed() {
     const container = document.getElementById('marketCardContainer');
@@ -578,17 +580,17 @@ function renderMarketFeed() {
         let viewedClass = car.viewed ? "viewed-card" : "";
         let autoIcon = car.autotekaChecked ? "Проверено ✓" : "5,000 ₽";
 
-        // Анимации и контурные неоновые ауры карточек
+        // Аура карточки редких лотов
         let cardAuraClass = "card-anim-shimmer";
         if (car.isTunedSpec) cardAuraClass += " card-glow-tuned";
         else if (car.isBeaterProject) cardAuraClass += " card-glow-beater";
         else if (car.dealType === 'urgent' || car.isPodborFind) cardAuraClass += " card-glow-urgent";
 
-        // Состояние кузова: скрыто до личной встречи у капота
+        // Состояние кузова: скрыто до встречи у капота
         let isBodyKnown = !!car.inspectedAtHood;
         let condVal = car.condition || 80;
         let shieldIconClass = "spec-tile-icon-unknown";
-        let condTextHtml = `Кузов — <span class="color-sub font-bold">Не проверен</span>`;
+        let condValueHtml = `<b class="color-sub">Не проверен</b>`;
 
         if (isBodyKnown) {
             shieldIconClass = condVal >= 80 
@@ -597,10 +599,10 @@ function renderMarketFeed() {
             let condColorClass = condVal >= 80 
                 ? 'color-green' 
                 : (condVal >= 50 ? 'color-amber' : 'color-red');
-            condTextHtml = `Кузов — <b class="${condColorClass}">${condVal}%</b>`;
+            condValueHtml = `<b class="${condColorClass}">${condVal}%</b>`;
         }
 
-        // Госномер в строке тегов: скрыт до покупки Автотеки
+        // Госномер в строке тегов (скрыт до покупки Автотеки)
         let isPlateRevealed = !!car.autotekaChecked;
         let plateInRowHtml = "";
 
@@ -619,7 +621,7 @@ function renderMarketFeed() {
             `;
         }
 
-        // Крупные акцентные бейджи статуса
+        // Увеличенные акцентные бейджи
         let statusBadgesHtml = `<span class='tag-badge bg-tag-cyan'>${carType}</span>`;
 
         if (car.isTunedSpec) {
@@ -711,35 +713,38 @@ function renderMarketFeed() {
                 </div>
             </div>
 
-            <!-- СТРОЧНЫЙ ФОРМАТ ХАРАКТЕРИСТИК (МОЩНОСТЬ — 72 Л.С. В ОДНУ СТРОКУ) -->
+            <!-- ХАРАКТЕРИСТИКИ СЛЕВА НАПРАВО В 3 КОЛОНКИ -->
             <div class="car-specs-grid-volumetric">
-                <!-- ПЛИТКА 1: МОЩНОСТЬ -->
-                <div class="spec-tile-3d-row">
+                <!-- КОЛОНКА 1: МОЩНОСТЬ -->
+                <div class="spec-tile-3d-col">
                     <div class="spec-tile-icon-wrap spec-tile-icon-power">
                         <i class="fa-solid fa-bolt"></i>
                     </div>
-                    <div class="spec-tile-row-text">
-                        Мощность — <b>${car.power || 100} л.с.</b>
+                    <div class="spec-tile-col-data">
+                        <span class="spec-tile-col-label">Мощность</span>
+                        <b class="color-amber">${car.power || 100} л.с.</b>
                     </div>
                 </div>
 
-                <!-- ПЛИТКА 2: ПРОБЕГ -->
-                <div class="spec-tile-3d-row">
+                <!-- КОЛОНКА 2: ПРОБЕГ -->
+                <div class="spec-tile-3d-col">
                     <div class="spec-tile-icon-wrap spec-tile-icon-road">
                         <i class="fa-solid fa-road"></i>
                     </div>
-                    <div class="spec-tile-row-text">
-                        Пробег — <b>${carMileage} км</b>${odoWarningPill}
+                    <div class="spec-tile-col-data">
+                        <span class="spec-tile-col-label">Пробег</span>
+                        <b class="color-cyan">${carMileage} км${odoWarningPill}</b>
                     </div>
                 </div>
 
-                <!-- ПЛИТКА 3: КУЗОВ -->
-                <div class="spec-tile-3d-row">
+                <!-- КОЛОНКА 3: КУЗОВ -->
+                <div class="spec-tile-3d-col">
                     <div class="spec-tile-icon-wrap ${shieldIconClass}">
                         <i class="fa-solid ${isBodyKnown ? 'fa-shield' : 'fa-circle-question'}"></i>
                     </div>
-                    <div class="spec-tile-row-text">
-                        ${condTextHtml}
+                    <div class="spec-tile-col-data">
+                        <span class="spec-tile-col-label">Кузов</span>
+                        ${condValueHtml}
                     </div>
                 </div>
             </div>
@@ -1019,7 +1024,7 @@ function paidCallMarketCar(carId) {
 }
 
 // ----------------------------------------------------
-// ВСТРЕЧА У КАПОТА: ПРОВЕРКИ И ТОРГ
+// ВСТРЕЧА У КАПОТА: ПРОВЕРКИ, ТОРГ И ТЕСТ-ДРАЙВ
 // ----------------------------------------------------
 function openMarketDeal(carId) {
     const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
@@ -1063,8 +1068,8 @@ function openMarketDeal(carId) {
 
     const thread = document.getElementById("dealChatThread");
     if (thread) {
-        let greeting = "«Привет! Вот машина, осматривай кузов, проверяй сканером. Если всё устроит — оформим ДКП.»";
-        if (car.isTunedSpec) greeting = "«Привет! Тачка заряженная, едет боком в отсечку. Проверь выворот и прошивку!»";
+        let greeting = "«Привет! Вот машина, осматривай кузов, проверяй сканером. Можем сделать кружок на тест-драйве!»";
+        if (car.isTunedSpec) greeting = "«Привет! Тачка заряженная, едет боком в отсечку. Проверь выворот, прокатись!»";
         else if (car.isBeaterProject) greeting = "«Здорово. За такие деньги состояние сам видишь, но до сервиса доедет своим ходом.»";
         else if (car.isPodborFind) greeting = "«Здравствуйте! Мне сказали, что вы от автоподбора. Готов сразу отдать со скидкой, документы готовы.»";
         else if (car.dealType === 'urgent') greeting = "«Здорово! Мне срочно нужны деньги до вечера, готов уступить реальному покупателю!»";
@@ -1075,6 +1080,51 @@ function openMarketDeal(carId) {
     renderMarketHaggleControls();
     ModalManager.open("modalMarketDeal", { closeOthers: true });
     playSound('tick');
+}
+
+// ТЕСТ-ДРАЙВ ПЕРЕД ПОКУПКОЙ
+function startMarketTestDrive(carId) {
+    if (!pendingMarketCar) return;
+    const car = pendingMarketCar.car;
+    const thread = document.getElementById("dealChatThread");
+
+    playSound('tick');
+    tgHaptic('medium');
+
+    car.testDriven = true;
+    let driveResults = [];
+
+    // Диагностика на ходу
+    if (car.wear?.engine < 45) {
+        driveResults.push("Двигатель троит при нажатии в пол, ощущается потеря тяги.");
+    } else {
+        driveResults.push("Мотор крутится бодро, провалов и сизого дыма нет.");
+    }
+
+    if (car.wear?.transmission < 50) {
+        driveResults.push("Коробка хрустит при включении второй передачи.");
+    } else {
+        driveResults.push("Сцепление схватывает чётко, передачи включаются плавно.");
+    }
+
+    if (car.bodyThickness?.doors > 200 || car.bodyThickness?.hood > 200) {
+        driveResults.push("На кочках в салоне поскрипывает кузов.");
+    }
+
+    if (thread) {
+        thread.innerHTML += `
+            <div class="chat-msg msg-player">«Давай сделаем тестовый заезд вокруг квартала, послушаем подвеску и мотор.»</div>
+            <div class="chat-msg msg-seller">«Без проблем, садись за руль!»</div>
+            <div class="chat-msg msg-seller" style="border-left-color: var(--cyan);">
+                <b>📋 Итоги тест-драйва:</b><br>
+                ${driveResults.map(r => `• ${r}`).join('<br>')}
+            </div>`;
+        thread.scrollTop = thread.scrollHeight;
+    }
+
+    showToast("Тест-драйв проведён! Поведение машины изучено.");
+    renderMarketHaggleControls();
+    saveState();
 }
 
 function renderMarketHaggleControls() {
@@ -1095,12 +1145,15 @@ function renderMarketHaggleControls() {
     }
 
     let inspectionToolsBlock = `
-        <div class="grid-2 mb-2">
+        <div class="grid-3 mb-2">
             <button onclick="openGaugeModal('${car.id}')" class="btn ${hasGauge ? 'btn-dark' : 'btn-dark opacity-50'} btn-sm">
                 <i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер ${toolIcon}
             </button>
             <button onclick="quickOBDScanMarketCar('${car.id}')" class="btn ${hasScanner ? 'btn-dark' : 'btn-dark opacity-50'} btn-sm">
                 <i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> ${obdIcon}
+            </button>
+            <button onclick="startMarketTestDrive('${car.id}')" class="btn ${car.testDriven ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm">
+                <i class="fa-solid fa-gauge-high mr-1"></i> ${car.testDriven ? 'Прокатились ✓' : 'Тест-драйв'}
             </button>
         </div>
     `;
@@ -1290,7 +1343,7 @@ function attemptMarketHaggle(percent) {
 }
 
 // ----------------------------------------------------
-// ВЫКУП АВТО ЧЕРЕЗ БЛАНК ДКП
+// ВЫКУП АВТО ЧЕРЕЗ БЛАНК ДКП И ВЫБОР МАРШРУТА ПЕРЕГОНА
 // ----------------------------------------------------
 function confirmMarketPurchaseSuccess() {
     if (!pendingMarketCar) return;
@@ -1351,7 +1404,100 @@ function confirmRegistrationChoice(registerOnPlayer) {
         showToast("Автомобиль оставлен на ДКП без постановки на учёт (Лимит: 10 дней)!");
     }
 
-    finishMarketCarBuyProcess(activePendingDKPDeal);
+    // Выбор маршрута перегона
+    openDriveRouteChoiceModal(activePendingDKPDeal);
+}
+
+// МОДАЛЬНОЕ ОКНО ВЫБОРА МАРШРУТА ПЕРЕГОНА
+function openDriveRouteChoiceModal(deal) {
+    let modal = document.getElementById('modalRouteChoice');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalRouteChoice';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    let isReg = !!deal.isRegisteredOnPlayer;
+
+    modal.innerHTML = `
+        <div class="modal-box text-center" style="max-width: 420px;">
+            <div class="modal-glow-badge mb-1" style="color:var(--cyan); border-color:rgba(0,242,254,0.4);">
+                🚗 МАРШРУТ ПЕРЕГОНА В ГАРАЖ
+            </div>
+            <h3 class="font-bold mb-1 color-cyan">${deal.car.name}</h3>
+            <div class="sub-label mb-3">Выберите, как перегнать только что купленный автомобиль:</div>
+
+            <div class="space-y-2 mb-3 text-left">
+                <!-- ВАРИАНТ 1: ПО ШОССЕ -->
+                <div class="glass-card p-2" style="border: 1px solid var(--cyan); background: rgba(0,242,254,0.08);">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-road"></i> По широкому проспекту</b>
+                        <span class="tag-badge bg-tag-cyan">+15 XP</span>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:9.5px;">Ровный асфальт, быстрый доезд. Но на перекрёстках дежурят экипажи ДПС с камерами.</div>
+                    <div class="sub-label mb-2 color-amber" style="font-size:8.5px;">
+                        ${isReg ? '✓ Авто на учёте РФ — проверка документов пройдёт легко.' : '⚠️ Авто без номеров/страховки — риск штрафа по ст. 12.37 КоАП РФ!'}
+                    </div>
+                    <button onclick="finishMarketCarBuyProcessRoute('highway')" class="btn btn-cyan btn-sm w-full">
+                        Поехать по проспекту (Быстро)
+                    </button>
+                </div>
+
+                <!-- ВАРИАНТ 2: ПО ДВОРАМ -->
+                <div class="glass-card p-2" style="border: 1px solid var(--amber); background: rgba(255,179,0,0.08);">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-amber"><i class="fa-solid fa-signs-post"></i> Глухими дворами и промзонами</b>
+                        <span class="tag-badge bg-tag-amber">БЕЗ ДПС</span>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:9.5px;">Ни одного патруля ДПС. Но ямы и разбитая дорога могут повредить подвеску уставшей машины.</div>
+                    <button onclick="finishMarketCarBuyProcessRoute('backstreets')" class="btn btn-amber btn-sm w-full">
+                        Объехать дворами (Безопасно от ДПС)
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    ModalManager.open('modalRouteChoice');
+    playSound('tick');
+}
+
+function finishMarketCarBuyProcessRoute(routeType) {
+    ModalManager.close('modalRouteChoice');
+    if (!activePendingDKPDeal) return;
+
+    const deal = activePendingDKPDeal;
+    const car = deal.car;
+
+    // Расчёт дорожных событий при перегоне
+    if (routeType === 'highway') {
+        let dpsRoll = Math.random();
+        if (dpsRoll < 0.28 && !deal.isRegisteredOnPlayer) {
+            // Остановка ДПС при езде без регистрации/страховки
+            let fine = 800;
+            state.player.cash = Math.max(0, (state.player.cash || 0) - fine);
+            showToast(`🚔 Экипаж ДПС остановил на шоссе! Штраф за езду без полиса ОСАГО (-${fine} ₽).`);
+            playSound('error');
+            tgHaptic('error');
+        } else {
+            addXp(15);
+            showToast("Доехали по проспекту с ветерком (+15 XP)!");
+        }
+    } else {
+        // Езда по ямам
+        if (Math.random() < 0.25) {
+            car.tireWear = Math.max(10, (car.tireWear || 80) - 10);
+            if (car.wear) car.wear.engine = Math.max(10, (car.wear.engine || 80) - 5);
+            showToast("⚠️ Попали в яму во дворах! Небольшой износ шин и подвески.");
+            playSound('error');
+            tgHaptic('warning');
+        } else {
+            showToast("Успешно объехали все посты ДПС по дворам!");
+        }
+    }
+
+    finishMarketCarBuyProcess(deal);
 }
 
 function finishMarketCarBuyProcess(deal) {
@@ -1370,7 +1516,7 @@ function finishMarketCarBuyProcess(deal) {
     newCar.customPlate = car.plate;
     newCar.impounded = false;
     newCar.unregistered = false;
-    newCar.insurance = null;
+    newCar.insurance = null; // По умолчанию авто покупается без страховки!
     newCar.purchaseCost = price;
     newCar.wear = car.wear ? car.wear : { engine: 85, transmission: 85 };
     newCar.preSaleVisited = false;
@@ -1675,6 +1821,7 @@ window.openAutotekaModal = openAutotekaModal;
 window.initiateBuyMarketCar = initiateBuyMarketCar;
 window.paidCallMarketCar = paidCallMarketCar;
 window.openMarketDeal = openMarketDeal;
+window.startMarketTestDrive = startMarketTestDrive;
 window.renderMarketHaggleControls = renderMarketHaggleControls;
 window.attemptMarketHaggle = attemptMarketHaggle;
 window.attemptDefectArgueHaggle = attemptDefectArgueHaggle;
@@ -1683,6 +1830,8 @@ window.buyCarDirectToScrapYard = buyCarDirectToScrapYard;
 window.confirmMarketPurchaseSuccess = confirmMarketPurchaseSuccess;
 window.openRegistrationChoiceModal = openRegistrationChoiceModal;
 window.confirmRegistrationChoice = confirmRegistrationChoice;
+window.openDriveRouteChoiceModal = openDriveRouteChoiceModal;
+window.finishMarketCarBuyProcessRoute = finishMarketCarBuyProcessRoute;
 window.finishMarketCarBuyProcess = finishMarketCarBuyProcess;
 window.updateMarketTimers = updateMarketTimers;
 window.refreshPlateCatalog = refreshPlateCatalog;
