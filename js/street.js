@@ -1,11 +1,10 @@
 // ========================================================
-// js/street.js — СТРИТ-РЕЙСИНГ, 402М И АВТОМЕРОПРИЯТИЯ (v0.6.4)
+// js/street.js — СТРИТ-РЕЙСИНГ, 402М И АВТОМЕРОПРИЯТИЯ (v0.6.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Интерактивные зрелищные заезды (6 секунд):
 // Арена дрифта (восьмёрка с дымом), Драг 402м с ёлкой старта,
 // Стенс-шоу со стравливанием пневмы кузова в пол, шашки по МКАД.
 // Экономика усложнена: взносы выше, штрафы ДПС стали жестче.
-// Дубликат PhoneRacing вырезан (основной модуль в phone-racing.js).
 // ========================================================
 
 let currentRaceBet = 25000;
@@ -87,22 +86,22 @@ function renderStreetScreen() {
 }
 
 function selectStreetCar(idx) {
-    let parsedIdx = parseInt(idx);
+    let parsedIdx = parseInt(idx, 10);
     if (!state.garage[parsedIdx] || state.garage[parsedIdx].impounded) {
         return showToast("Этот автомобиль арестован на спецстоянке!");
     }
     state.player.selectedStreetCarIndex = parsedIdx;
     saveState();
     renderStreetScreen();
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
 }
 
 function setRaceBet(amount) {
     currentRaceBet = amount;
     window.currentRaceBet = amount;
     window.streetRaceBet = amount;
-    playSound('tick');
-    tgHaptic('light');
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
     showToast("Ставка на 402м: " + amount.toLocaleString() + " ₽");
 }
 
@@ -164,7 +163,7 @@ function launchDragRace() {
 
     let carIdx = getActiveStreetCarIndex();
     if (carIdx === -1) {
-        return showToast("Все автомобили арестованы! Заберите транспорт со штрафстоянке.");
+        return showToast("Все автомобили арестованы! Заберите транспорт со штрафстоянки.");
     }
 
     let car = state.garage[carIdx];
@@ -175,16 +174,16 @@ function launchDragRace() {
     // 1. Проверка перегрева двигателя
     let temp = car.engineTemp || 90;
     if (temp > 105) {
-        playSound('error');
-        tgHaptic('error');
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('error');
         return showToast("⚠️ Перегрев мотора (" + temp + "°C)! Остудите болид перед стартом.");
     }
 
     // 2. Проверка состояния шин
     let tires = car.tireWear !== undefined ? car.tireWear : 100;
     if (tires < 20) {
-        playSound('error');
-        tgHaptic('error');
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('error');
         return showToast("🚫 Резина стёрта в ноль! Замените комплект на СТО перед заездом.");
     }
 
@@ -236,7 +235,7 @@ function launchDragRace() {
     let rSpeed = rivalPower / 48;
 
     if (raceAnimationTimer) clearInterval(raceAnimationTimer);
-    playEngineSound();
+    if (typeof playEngineSound === 'function') playEngineSound();
 
     raceAnimationTimer = setInterval(() => {
         pPos += pSpeed;
@@ -259,7 +258,7 @@ function launchDragRace() {
                 if (isWin) {
                     let winSum = currentRaceBet * 2;
                     state.player.cash += winSum;
-                    addXp(35);
+                    if (typeof addXp === 'function') addXp(35);
                     state.player.mood = Math.min(100, (state.player.mood || 80) + 15);
                     state.player.streetCred = (state.player.streetCred || 100) + 20;
 
@@ -298,7 +297,7 @@ function checkPoliceRaid(carIdx) {
     let raids = state.player.consecutiveRaces || 0;
     let maxRaids = state.player.maxRacesBeforeRaid || 12;
 
-    if (state.player.policeImmunityDays > 0) return; // Крыша ГИБДД защищает
+    if (state.player.policeImmunityDays > 0) return;
 
     if (raids >= maxRaids) {
         state.player.consecutiveRaces = 0;
@@ -307,13 +306,12 @@ function checkPoliceRaid(carIdx) {
             car.impounded = true;
         }
 
-        playSound('error');
-        tgHaptic('error');
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('error');
         saveState();
         updateHeaderUI();
         if (typeof renderGarage === 'function') renderGarage();
         
-        // Открытие интерфейса Штрафстоянки
         if (typeof openImpoundLotModal === 'function') {
             openImpoundLotModal(carIdx);
         } else {
@@ -426,12 +424,12 @@ function participateStreetEvent(eventId) {
     if (ev.rewardConn) state.player.connections = (state.player.connections || 0) + ev.rewardConn;
     if (ev.rewardStars) state.player.stars = (state.player.stars || 0) + ev.rewardStars;
 
-    addXp(75);
+    if (typeof addXp === 'function') addXp(75);
     state.player.mood = 100;
     saveState();
     updateHeaderUI();
-    playSound('win');
-    tgHaptic('success');
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
     openVerdictModal("ПОБЕДА В МЕРОПРИЯТИИ! 🏆", `Вы взяли 1-е место в «${ev.name}»! Награда получена.`, true, ev.rewardCash);
 }
 

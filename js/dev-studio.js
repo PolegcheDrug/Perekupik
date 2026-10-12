@@ -1,5 +1,5 @@
 // ========================================================
-// js/dev-studio.js — ДВУХЭКРАННАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v0.6.5)
+// js/dev-studio.js — ДВУХЭКРАННАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v0.6.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // 🟢 Экран 1: Создание новых карточек (Бирюзово-зеленый стиль)
 // 🟣 Экран 2: Редактирование существующих авто по классам (Фиолетово-золотой стиль)
@@ -176,7 +176,6 @@ const DevStudio = {
     // 🟢 ЭКРАН 1: СОЗДАНИЕ НОВЫХ КАРТОЧЕК
     // ========================================================
     renderCreateScreen() {
-        const d = this.currentDraft;
         const queueCount = this.stagedBatchQueue.length;
 
         return `
@@ -404,6 +403,8 @@ const DevStudio = {
         const canvas = document.getElementById('studioCropCanvas');
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
         const img = new Image();
         img.crossOrigin = "anonymous";
         const coverSrc = this.getCoverImageSrc();
@@ -432,6 +433,7 @@ const DevStudio = {
         const canvas = document.getElementById('studioCropCanvas');
         if (!canvas || !this.cropperState.originalImgObj) return;
         const ctx = canvas.getContext('2d');
+        if (!ctx) return;
         const img = this.cropperState.originalImgObj;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -999,7 +1001,7 @@ const DevStudio = {
             });
             outputContent = workingText;
         } else {
-            outputContent = `// ========================================================\n// data.js — ОБНОВЛЕННАЯ БАЗА АВТОТЕХНИКИ (v0.6.4)\n// ========================================================\n\nconst CAR_DATABASE = ${JSON.stringify(typeof CAR_DATABASE !== 'undefined' ? CAR_DATABASE : {}, null, 4)};\n\nwindow.CAR_DATABASE = CAR_DATABASE;\n`;
+            outputContent = `// ========================================================\n// data.js — ОБНОВЛЕННАЯ БАЗА АВТОТЕХНИКИ (v0.6.6)\n// ========================================================\n\nconst CAR_DATABASE = ${JSON.stringify(typeof CAR_DATABASE !== 'undefined' ? CAR_DATABASE : {}, null, 4)};\n\nwindow.CAR_DATABASE = CAR_DATABASE;\n`;
         }
 
         const blob = new Blob([outputContent], { type: "text/javascript;charset=utf-8" });
@@ -1033,7 +1035,6 @@ const DevStudio = {
 
 window.DevStudio = DevStudio;
 
-// Инициализация при любом состоянии готовности документа
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { DevStudio.init(); });
 } else {

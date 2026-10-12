@@ -1,9 +1,9 @@
 // ========================================================
-// js/syndicate.js — СЕРВИС СПЕЦЗАКАЗОВ «ПОДКЛЮЧ», КЛУБЫ, ТОП (v0.6.7)
+// js/syndicate.js — СЕРВИС «ПОДКЛЮЧ», АВТОКЛУБЫ, ТОП И РЕФЕРАЛЫ (v0.8.6)
 // Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
-// Полное разделение с Autodrot: P2P и базар номеров перенесены в Autodrot.
-// Разнообразие заказов ПодКлюч: Спорт/Корчи, Корпоративные, VIP-экспорт.
-// Контракты подбираются строго под открытые уровни игрока.
+// Реальная интеграция с Cloud Firestore:
+// Онлайн автоклубы с общаком, живой глобальный лидерборд,
+// Telegram рефералы и спецзаказы ПодКлюч по уровням.
 // ========================================================
 
 let activeContractForCarSelect = null;
@@ -23,7 +23,7 @@ const AppSyndicate = {
                 <div style="width:40px;"></div>
             </div>
             <div class="phone-app-body">
-                <!-- НАВИГАЦИОННЫЕ ВКЛАДКИ «ПОДКЛЮЧ» БЕЗ ДУБЛИКАТОВ P2P -->
+                <!-- НАВИГАЦИОННЫЕ ВКЛАДКИ -->
                 <div class="grid-4 mb-2" style="grid-template-columns: repeat(4, 1fr); gap: 4px;">
                     <button onclick="switchSyndicateTab('contracts')" id="synTabBtn-contracts" class="btn ${sub === 'contracts' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:6px 2px;">
                         <i class="fa-solid fa-file-contract"></i> Заказы
@@ -64,41 +64,49 @@ const AppSyndicate = {
                     <div id="contractsList"></div>
                 </div>
 
-                <!-- 2. ЭКРАН АВТОКЛУБОВ -->
+                <!-- 2. ЭКРАН ОНЛАЙН АВТОКЛУБОВ -->
                 <div id="synScreen-clubs" style="${sub === 'clubs' ? 'display:block;' : 'display:none;'}">
-                    <div class="glass-card mb-2 p-2 flex-between">
+                    <div class="glass-card mb-2 p-2 flex-between" style="border-color: var(--purple);">
                         <div>
-                            <b class="text-xs color-cyan"><i class="fa-solid fa-users"></i> Ваш автоклуб:</b>
+                            <b class="text-xs color-purple"><i class="fa-solid fa-users"></i> Ваш автоклуб:</b>
                             <div class="font-bold text-xs color-green" id="synMyClubName">Без автоклуба</div>
                         </div>
-                        <button onclick="createClubPrompt()" class="btn btn-dark btn-auto btn-sm" style="font-size:9px;">Создать клуб</button>
+                        <button onclick="createClubPrompt()" class="btn btn-purple btn-auto btn-sm" style="font-size:9px;">Создать клуб</button>
                     </div>
                     <div id="synClubsContainer"></div>
                 </div>
 
-                <!-- 3. ЭКРАН ЛИДЕРБОРДА -->
+                <!-- 3. ЭКРАН ЖИВОГО ЛИДЕРБОРДА -->
                 <div id="synScreen-leaderboard" style="${sub === 'leaderboard' ? 'display:block;' : 'display:none;'}">
                     <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(255,215,0,0.15), #090e18); border-color:var(--amber);">
                         <div>
-                            <b class="text-xs color-amber"><i class="fa-solid fa-trophy"></i> Топ Олигархов Авторынка</b>
-                            <div class="sub-label" style="font-size:9.5px;">Рейтинг чистой прибыли перекупов</div>
+                            <b class="text-xs color-amber"><i class="fa-solid fa-trophy"></i> Топ Олигархов Авторынка (Firestore)</b>
+                            <div class="sub-label" style="font-size:9.5px;">Глобальный онлайн-рейтинг перекупов</div>
                         </div>
-                        <span class="tag-badge bg-tag-amber">LIVE ТОП</span>
+                        <button onclick="renderLeaderboard(true)" class="btn btn-dark btn-auto btn-sm" style="font-size:9px;">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                        </button>
                     </div>
                     <div id="leaderboardListContainer"></div>
                 </div>
 
-                <!-- 4. ЭКРАН ПАРТНЁРОВ И РЕФЕРАЛОВ -->
+                <!-- 4. ЭКРАН ПАРТНЁРОВ И TELEGRAM-ШЕРИНГА -->
                 <div id="synScreen-friends" style="${sub === 'friends' ? 'display:block;' : 'display:none;'}">
-                    <div class="glass-card mb-2 p-2">
+                    <div class="glass-card mb-2 p-2" style="border-color: var(--green);">
                         <div class="flex-between mb-1">
-                            <b class="text-xs color-green"><i class="fa-solid fa-user-plus"></i> Пригласить напарника (+50k ₽)</b>
-                            <span class="tag-badge bg-tag-green" id="friendsCountBadge">0 партнёров</span>
+                            <b class="text-xs color-green"><i class="fa-solid fa-user-plus"></i> Пригласить напарника (+75,000 ₽)</b>
+                            <span class="tag-badge bg-tag-green" id="friendsCountBadge">0 напарников</span>
                         </div>
-                        <div class="sub-label mb-2" style="font-size:9.5px;">Получайте процент от каждой успешной сделки приглашённых дельцов.</div>
+                        <div class="sub-label mb-2" style="font-size:9.5px;">
+                            Отправьте приглашение другу в Telegram. Как только он зайдёт в игру, оба получат по <b>+75,000 ₽</b> и <b>+1 🤝 Связь</b>!
+                        </div>
                         <div class="grid-2">
-                            <button onclick="shareReferralLink()" class="btn btn-green btn-sm">В Telegram</button>
-                            <button onclick="copyReferralLink()" class="btn btn-cyan btn-sm">Скопировать</button>
+                            <button onclick="shareReferralLink()" class="btn btn-green btn-sm">
+                                <i class="fa-brands fa-telegram mr-1"></i> Поделиться в Telegram
+                            </button>
+                            <button onclick="copyReferralLink()" class="btn btn-cyan btn-sm">
+                                <i class="fa-solid fa-copy mr-1"></i> Скопировать ссылку
+                            </button>
                         </div>
                     </div>
                     <div id="friendsListContainer"></div>
@@ -206,8 +214,8 @@ function refreshContractsManual() {
     saveState();
     updateHeaderUI();
     renderContracts();
-    playSound('tick');
-    tgHaptic('success');
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
     showToast(`Заказы «ПодКлюч» обновлены под ваши возможности (${state.player?.level || 1} ур.)!`);
 }
 
@@ -451,7 +459,7 @@ function fulfillContract(contractId, carIndex) {
     if (contract.rewardConn > 0) {
         state.player.connections = (state.player.connections || 0) + contract.rewardConn;
     }
-    addXp(contract.rewardXp || 60);
+    if (typeof addXp === 'function') addXp(contract.rewardXp || 60);
 
     if (!state.player.stats) state.player.stats = {};
     state.player.stats.sold = (state.player.stats.sold || 0) + 1;
@@ -474,9 +482,10 @@ function fulfillContract(contractId, carIndex) {
     renderContracts();
     if (typeof renderGarage === 'function') renderGarage();
 
-    playSound('win');
-    tgHaptic('success');
-    spawnFloatingReward(`+${totalPayout.toLocaleString()} ₽`);
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof spawnFloatingReward === 'function') spawnFloatingReward(`+${totalPayout.toLocaleString()} ₽`);
+    
     openVerdictModal(
         "СПЕЦЗАКАЗ ВЫПОЛНЕН! 🔑",
         `Клиент «${contract.clientName}» принял автомобиль «${car.name}» под ключ!\nВыплата: +${totalPayout.toLocaleString()} ₽ (Премия подбора: +${contract.rewardBonus.toLocaleString()} ₽)\nОпыт: +${contract.rewardXp} XP ${contract.rewardConn ? `и +${contract.rewardConn} 🤝` : ''}`,
@@ -487,37 +496,45 @@ function fulfillContract(contractId, carIndex) {
 }
 
 // ========================================================
-// 3. АВТОКЛУБЫ
+// 3. ОНЛАЙН АВТОКЛУБЫ С FIRESTORE
 // ========================================================
-function renderClubsList() {
+async function renderClubsList() {
     const container = document.getElementById('synClubsContainer');
     const myClubNameEl = document.getElementById('synMyClubName');
     if (!container) return;
 
-    let myClub = (state.player && state.player.club) ? state.player.club : null;
+    let myClub = state.player?.club || null;
     if (myClubNameEl) {
-        myClubNameEl.innerText = myClub ? myClub.name : "Без автоклуба";
+        myClubNameEl.innerText = myClub ? `${myClub.name}` : "Без автоклуба";
     }
 
-    const clubsPool = [
-        { id: "club_jdm", name: "JDM Legends Moscow", members: 42, perk: "+10% к оценке японских авто", fee: 150000 },
-        { id: "club_vaz", name: "Боевой Классика Клуб", members: 89, perk: "Бесплатный ремонт подвески на сходках", fee: 75000 },
-        { id: "club_m", name: "Bavarian Power M", members: 31, perk: "+15% к победе в заездах на 402м", fee: 350000 },
-        { id: "club_elite", name: "Синдикат Олигархов", members: 12, perk: "-25% ко всем налогам и проверкам ГИБДД", fee: 1500000 }
-    ];
+    let clubs = [];
+    if (window.FB_Bridge && window.FB_Bridge.Clubs) {
+        clubs = await window.FB_Bridge.Clubs.fetchClubs();
+    }
+
+    if (!clubs || clubs.length === 0) {
+        clubs = [
+            { id: "club_jdm", name: "JDM Legends Moscow", membersCount: 14, bank: 350000, fee: 100000, perk: "+10% к оценке японских авто" },
+            { id: "club_vaz", name: "Боевая Классика РФ", membersCount: 28, bank: 180000, fee: 50000, perk: "Бесплатный ремонт подвески на сходках" },
+            { id: "club_m", name: "Bavarian Power M", membersCount: 9, bank: 1250000, fee: 250000, perk: "+15% к победе на 402м" },
+            { id: "club_elite", name: "Синдикат Олигархов", membersCount: 5, bank: 4500000, fee: 750000, perk: "-25% ко всем налогам и проверкам" }
+        ];
+    }
 
     let html = "";
-    clubsPool.forEach(club => {
-        let isMember = myClub && myClub.id === club.id;
+    clubs.forEach(club => {
+        let isMember = myClub && String(myClub.id) === String(club.id);
         let btnContent = isMember 
             ? "<button onclick='leaveClubAction()' class='btn btn-danger btn-auto btn-sm'>Покинуть</button>"
-            : `<button onclick="joinClubAction('${club.id}', '${club.name}', ${club.fee})" class='btn btn-cyan btn-auto btn-sm'>Вступить (${(club.fee / 1000).toFixed(0)}k ₽)</button>`;
+            : `<button onclick="joinClubAction('${club.id}', '${club.name}', ${club.fee || 100000})" class='btn btn-cyan btn-auto btn-sm'>Вступить (${((club.fee || 100000) / 1000).toFixed(0)}k ₽)</button>`;
 
         html += `
-        <div class='glass-card p-2 flex-between mb-2'>
+        <div class='glass-card p-2 flex-between mb-2' style='${isMember ? "border-color:var(--green); background:rgba(0,230,118,0.06);" : ""}'>
             <div>
                 <b class='color-cyan text-xs'>${club.name}</b>
-                <div class='sub-label' style='font-size:10px;'>👥 Участников: ${club.members} | ${club.perk}</div>
+                <div class='sub-label' style='font-size:9.5px;'>👥 Участников: <b>${club.membersCount || 1}</b> • Сейф: <b class="color-green">${(club.bank || 0).toLocaleString()} ₽</b></div>
+                <div class='sub-label mt-1' style='font-size:8.5px; color:#cbd5e1;'>⭐ ${club.perk || 'Стандарт'}</div>
             </div>
             ${btnContent}
         </div>`;
@@ -526,18 +543,23 @@ function renderClubsList() {
     container.innerHTML = html;
 }
 
-function joinClubAction(clubId, clubName, fee) {
+async function joinClubAction(clubId, clubName, fee) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    if (cash < fee) return showToast("Не хватает денег на вступительный взнос!");
+    if (cash < fee) return showToast(`Не хватает денег на вступительный взнос (${fee.toLocaleString()} ₽)!`);
 
     state.player.cash -= fee;
     state.player.club = { id: clubId, name: clubName };
+
+    if (window.FB_Bridge && window.FB_Bridge.Clubs) {
+        await window.FB_Bridge.Clubs.joinClub(clubId, window.FB_Bridge.getProfile());
+    }
+
     saveState();
     updateHeaderUI();
     renderClubsList();
-    playSound('win');
-    tgHaptic('success');
-    showToast(`Вы вступили в автоклуб «${clubName}»!`);
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    showToast(`Вы вступили в автоклуб «${clubName}»! Открыт командный чат в Мессенджере.`);
 }
 
 function leaveClubAction() {
@@ -548,79 +570,112 @@ function leaveClubAction() {
     showToast("Вы покинули автоклуб.");
 }
 
-function createClubPrompt() {
+async function createClubPrompt() {
     let name = prompt("Введите название нового автоклуба:");
     if (!name || !name.trim()) return;
 
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
-    let cost = 750000;
-    if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ на регистрацию клуба!`);
+    let cost = 500000;
+    if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ на регистрацию клуба в Firestore!`);
 
     state.player.cash -= cost;
-    state.player.club = { id: "club_custom_" + Date.now(), name: name.trim() };
+
+    if (window.FB_Bridge && window.FB_Bridge.Clubs) {
+        showToast("Создание клуба в сети...");
+        let res = await window.FB_Bridge.Clubs.createClub(name, window.FB_Bridge.getProfile(), 100000);
+        if (res.success) {
+            state.player.club = { id: res.club.id, name: res.club.name };
+        } else {
+            state.player.club = { id: "club_" + Date.now(), name: name.trim() };
+        }
+    } else {
+        state.player.club = { id: "club_" + Date.now(), name: name.trim() };
+    }
+
     saveState();
     updateHeaderUI();
     renderClubsList();
-    playSound('win');
-    tgHaptic('success');
-    showToast(`Автоклуб «${name.trim()}» успешно зарегистрирован!`);
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    showToast(`Автоклуб «${name.trim()}» зарегистрирован! Вы назначены лидером синдиката.`);
 }
 
 // ========================================================
-// 4. ТОП ПЕРЕКУПОВ И ПАРТНЁРЫ
+// 4. ОНЛАЙН ЛИДЕРБОРД ПЕРЕКУПОВ
 // ========================================================
-function renderLeaderboard() {
+async function renderLeaderboard(force = false) {
     const container = document.getElementById('leaderboardListContainer');
     if (!container) return;
 
-    const leaders = [
-        { rank: 1, name: "Илюха DXF", profit: 142500000, lvl: 85, badge: "👑 ОЛИГАРХ" },
-        { rank: 2, name: "Святой Максиман", profit: 98400000, lvl: 64, badge: "⚡ ХОЗЯИН РЫНКА" },
-        { rank: 3, name: "Серёга Техно", profit: 76100000, lvl: 52, badge: "🔧 ТОП ДЕЛЕЦ" },
-        { rank: 4, name: "Жиминка Пендосовская", profit: 54000000, lvl: 41, badge: "🤖 AI ПЕРЕКУП" },
-        { 
-            rank: 5, 
-            name: (state.player && state.player.name) ? state.player.name : "Вы",
-            profit: (state.player && state.player.stats && state.player.stats.totalNetProfit) ? state.player.stats.totalNetProfit : 0,
-            lvl: (state.player && state.player.level) ? state.player.level : 1,
-            badge: "🎯 ВЫ"
-        }
-    ];
+    container.innerHTML = `<div class="sub-label text-center py-4"><i class="fa-solid fa-spinner fa-spin color-amber"></i> Загрузка таблицы лидеров Firestore...</div>`;
+
+    let leaders = [];
+    if (window.FB_Bridge && window.FB_Bridge.Leaderboard) {
+        leaders = await window.FB_Bridge.Leaderboard.fetchTop(force);
+    }
+
+    if (!leaders || leaders.length === 0) {
+        leaders = [
+            { id: "lead_1", name: "Илюха DXF", profit: 142500000, level: 85 },
+            { id: "lead_2", name: "Святой Максиман", profit: 98400000, level: 64 },
+            { id: "lead_3", name: "Серёга Техно", profit: 76100000, level: 52 },
+            { id: "lead_4", name: "Жиминка Пендосовская", profit: 54000000, level: 41 }
+        ];
+    }
+
+    // Добавляем текущего игрока, если его нет в топе
+    let myId = window.FB_Bridge ? window.FB_Bridge.getProfile().id : "me";
+    let myProfit = state.player?.stats?.totalNetProfit || 0;
+    let myLvl = state.player?.level || 1;
+    let foundMe = leaders.some(l => String(l.id) === String(myId));
+
+    if (!foundMe && myProfit > 0) {
+        leaders.push({
+            id: myId,
+            name: state.player?.name || "Вы",
+            profit: myProfit,
+            level: myLvl,
+            isMe: true
+        });
+        leaders.sort((a, b) => b.profit - a.profit);
+    }
 
     let html = "";
-    leaders.forEach(lead => {
-        let isMe = lead.rank === 5;
-        let rankColor = lead.rank === 1 ? "color-amber" : (lead.rank === 2 ? "color-cyan" : (lead.rank === 3 ? "color-purple" : ""));
+    leaders.slice(0, 30).forEach((lead, idx) => {
+        let rank = idx + 1;
+        let isMe = String(lead.id) === String(myId) || lead.isMe;
+        let rankColor = rank === 1 ? "color-amber" : (rank === 2 ? "color-cyan" : (rank === 3 ? "color-purple" : ""));
+
+        let badgeText = rank === 1 ? "👑 ТОП-1" : (rank === 2 ? "⚡ ТОП-2" : (rank === 3 ? "🔥 ТОП-3" : `Ур. ${lead.level || 1}`));
+        let badgeClass = rank <= 3 ? "bg-tag-amber" : "bg-tag-dark";
 
         html += `
-        <div class='glass-card p-2 flex-between mb-2 ${isMe ? "border-cyan" : ""}'>
+        <div class='glass-card p-2 flex-between mb-2 ${isMe ? "personal-car-card" : ""}'>
             <div class='flex-gap' style='align-items:center;'>
-                <b class='font-bold ${rankColor}' style='font-size:14px; min-width:20px;'>#${lead.rank}</b>
+                <b class='font-bold ${rankColor}' style='font-size:15px; min-width:24px;'>#${rank}</b>
                 <div>
-                    <b class='text-xs'>${lead.name}</b>
-                    <div class='sub-label' style='font-size:10px;'>Ур. ${lead.lvl} | Чистая прибыль: <span class='color-green font-bold'>${lead.profit.toLocaleString()} ₽</span></div>
+                    <b class='text-xs ${isMe ? "color-green" : ""}'>${lead.name} ${isMe ? " (Вы)" : ""}</b>
+                    <div class='sub-label' style='font-size:9.5px;'>Чистая прибыль: <span class='color-green font-bold'>${(lead.profit || 0).toLocaleString()} ₽</span></div>
                 </div>
             </div>
-            <span class='tag-badge ${isMe ? "bg-tag-cyan" : "bg-tag-amber"}'>${lead.badge}</span>
+            <span class='tag-badge ${badgeClass}'>${badgeText}</span>
         </div>`;
     });
 
     container.innerHTML = html;
 }
 
+// ========================================================
+// 5. ДРУЗЬЯ И РЕФЕРАЛЬНАЯ СИСТЕМА TELEGRAM
+// ========================================================
 function getReferralLink() {
-    let userId = "777";
-    try {
-        if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) {
-            userId = window.Telegram.WebApp.initDataUnsafe.user.id;
-        }
-    } catch(e) {}
-    return "https://t.me/PerekupSimBot?start=ref_" + userId;
+    let profile = window.FB_Bridge ? window.FB_Bridge.getProfile() : { id: "777" };
+    return "https://t.me/PerekupSimBot?start=ref_" + profile.id;
 }
 
 function shareReferralLink() {
     const link = getReferralLink();
-    const text = "Залетай со мной в «Симулятор Перекупа»! Поднимай кэш на авторынке и собирай гараж мечты.";
+    const text = "Залетай со мной в «Симулятор Перекупа»! Выкупай тачки у реальных игроков, вступай в мой автоклуб и забирай стартовые +75,000 ₽!";
     const shareUrl = "https://t.me/share/url?url=" + encodeURIComponent(link) + "&text=" + encodeURIComponent(text);
 
     try {
@@ -638,7 +693,8 @@ function copyReferralLink() {
     const link = getReferralLink();
     if (navigator.clipboard) {
         navigator.clipboard.writeText(link).then(() => {
-            showToast("Ссылка скопирована в буфер обмена!");
+            showToast("Реферальная ссылка скопирована в буфер обмена!");
+            if (typeof playSound === 'function') playSound('win');
         }).catch(() => {
             fallbackCopyText(link);
         });
@@ -653,7 +709,7 @@ function fallbackCopyText(text) {
     document.body.appendChild(textArea);
     textArea.select();
     try {
-        document.executeCommand('copy');
+        document.execCommand('copy');
         showToast("Ссылка скопирована!");
     } catch(err) {
         showToast("Не удалось скопировать.");
@@ -661,29 +717,37 @@ function fallbackCopyText(text) {
     document.body.removeChild(textArea);
 }
 
-function renderFriendsList() {
+async function renderFriendsList() {
     const container = document.getElementById('friendsListContainer');
     const badge = document.getElementById('friendsCountBadge');
     if (!container) return;
 
-    if (!state.friendsList || state.friendsList.length === 0) {
-        state.friendsList = [
-            { name: "Артем_BMW", earned: 50000, lvl: 14, date: "Сегодня" },
-            { name: "Денис_Vaz", earned: 50000, lvl: 8, date: "Вчера" }
+    let myId = window.FB_Bridge ? window.FB_Bridge.getProfile().id : null;
+    let friends = [];
+
+    // ИСПРАВЛЕНО: корректный вызов существующего метода FB_Bridge.M.fetchFriends
+    if (myId && window.FB_Bridge && window.FB_Bridge.M) {
+        friends = await window.FB_Bridge.M.fetchFriends(myId);
+    }
+
+    if (!friends || friends.length === 0) {
+        friends = [
+            { name: "Артем_BMW", reward: 75000, date: "Сегодня" },
+            { name: "Денис_Vaz", reward: 75000, date: "Вчера" }
         ];
     }
 
-    if (badge) badge.innerText = state.friendsList.length + " партнёров";
+    if (badge) badge.innerText = `${friends.length} напарников`;
 
     let html = "";
-    state.friendsList.forEach(f => {
+    friends.forEach(f => {
         html += `
         <div class='glass-card p-2 flex-between mb-2'>
             <div>
                 <b class='color-cyan text-xs'>${f.name}</b>
-                <div class='sub-label' style='font-size:10px;'>Уровень: ${f.lvl} | Приглашён: ${f.date}</div>
+                <div class='sub-label' style='font-size:9.5px;'>Приглашён: ${f.date || 'Недавно'}</div>
             </div>
-            <span class='tag-badge bg-tag-green'>+50,000 ₽ получено</span>
+            <span class='tag-badge bg-tag-green'>+${(f.reward || 75000).toLocaleString()} ₽ бонус</span>
         </div>`;
     });
 

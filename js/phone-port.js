@@ -1,9 +1,9 @@
 // ========================================================
-// js/phone-port.js — МОРСКОЙ ПОРТ, ТЕРМИНАЛ И STORAGE WARS 2.0 (v0.7.5)
+// js/phone-port.js — МОРСКОЙ ПОРТ, ТЕРМИНАЛ И STORAGE WARS 2.0 (v0.9.3)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Живой чат аукциона с репликами ботов и аукциониста,
 // шкала доминирования ставки, отсчёт ударов молотка,
-// одиночный торг с брокером и шпионский эндоскоп.
+// одиночный торг с брокером и перенаправление дропа в Почту.
 // ========================================================
 
 const AppPort = {
@@ -51,6 +51,10 @@ const AppPort = {
     },
 
     switchSubTab(tab) {
+        if (this.auctionTimerInterval) {
+            clearInterval(this.auctionTimerInterval);
+            this.auctionTimerInterval = null;
+        }
         this.activeSubTab = tab;
         if (typeof playSound === 'function') playSound('tick');
         if (typeof tgHaptic === 'function') tgHaptic('light');
@@ -65,7 +69,6 @@ const AppPort = {
 
         let pLvl = state.player?.level || 1;
         
-        // Гарантированное получение каталога из любой объявленной переменной
         let containers = [];
         if (typeof PORT_AUCTIONS_CATALOG !== 'undefined' && Array.isArray(PORT_AUCTIONS_CATALOG) && PORT_AUCTIONS_CATALOG.length > 0) {
             containers = PORT_AUCTIONS_CATALOG;
@@ -164,7 +167,6 @@ const AppPort = {
 
         let broker = brokers[Math.floor(Math.random() * brokers.length)];
 
-        // Завышенная стартовая цена брокера (+15..25%)
         let askingMarkup = 1.15 + Math.random() * 0.10;
         let startPrice = Math.round(c.cost * askingMarkup);
 
@@ -427,7 +429,7 @@ const AppPort = {
     },
 
     // ========================================================
-    // 2. STORAGE WARS 2.0: ЖИВОЙ АУКЦИОН С ЧАТОМ И ШКАЛОЙ СТАВКИ
+    // 2. STORAGE WARS 2.0: ЖИВОЙ АУКЦИОН
     // ========================================================
     renderStorageWarsContent(box) {
         if (!box) return;
@@ -490,7 +492,7 @@ const AppPort = {
             highestBidder: "Аукционист Порта",
             isPlayerLeading: false,
             timeLeft: 14,
-            hammerStrikes: 0, // 0, 1 ("Раз!"), 2 ("Два!"), 3 ("Продано!")
+            hammerStrikes: 0,
             bots: bots,
             chatLog: [
                 { from: "auctioneer", name: "Аукционист", text: `Открываем торги за лот «${c.title}». Стартовая цена: ${startBid.toLocaleString()} ₽!` }
@@ -526,7 +528,6 @@ const AppPort = {
 
                 <h3 class="font-bold text-xs color-amber mb-2" style="font-size:13px;">${c.title}</h3>
                 
-                <!-- ИНДИКАТОР ДОМИНИРОВАНИЯ СТАВКИ -->
                 <div id="swDominanceStatusBox" class="p-2 mb-2 ${auc.isPlayerLeading ? 'sw-leading-active' : 'sw-outbid-alert'}">
                     <div class="flex-between text-xs font-bold">
                         <span id="swDominanceText">${auc.isPlayerLeading ? '🟢 ВАША СТАВКА ЛИДИРУЕТ!' : '🚨 СТАВКА ПЕРЕБИТА! ВЫ ПРОИГРЫВАЕТЕ'}</span>
@@ -534,7 +535,6 @@ const AppPort = {
                     </div>
                 </div>
 
-                <!-- БЛОК СТАВКИ И ТАЙМЕРА МОЛОТКА -->
                 <div class="grid-2 mb-2" style="gap:8px;">
                     <div class="p-2 text-left" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
                         <span class="sub-label" style="font-size:8.5px;">Текущая ставка:</span>
@@ -549,13 +549,11 @@ const AppPort = {
                     </div>
                 </div>
 
-                <!-- ЖИВОЙ ЧАТ АУКЦИОНА -->
                 <div class="sub-label text-left mb-1" style="font-size:9px;">Лог торгов и выкрики участников:</div>
                 <div class="chat-thread-container mb-2" id="swAuctionChatBox" style="max-height:110px; min-height:85px; font-size:10.5px; text-align:left;">
                     ${this.renderSwChatLinesHtml()}
                 </div>
 
-                <!-- КНОПКИ ПОВЫШЕНИЯ СТАВКИ -->
                 <div class="grid-3 mb-2">
                     <button onclick="AppPort.placeSwBid(25000)" class="btn btn-amber btn-sm">+25,000 ₽</button>
                     <button onclick="AppPort.placeSwBid(50000)" class="btn btn-amber btn-sm">+50,000 ₽</button>
@@ -613,7 +611,7 @@ const AppPort = {
         auc.currentBid = newBid;
         auc.highestBidder = state.player?.name || "Игрок";
         auc.isPlayerLeading = true;
-        auc.timeLeft = Math.min(15, Math.max(8, auc.timeLeft + 4)); // Продлеваем борьбу
+        auc.timeLeft = Math.min(15, Math.max(8, auc.timeLeft + 4));
         auc.hammerStrikes = 0;
 
         this.addSwChatMessage('player', 'Вы', `Ставлю ${newBid.toLocaleString()} ₽!`);
@@ -657,7 +655,6 @@ const AppPort = {
         const auc = this.activeAuction;
         auc.timeLeft -= 1;
 
-        // Отсчёт ударов молотка в последние 6 секунд
         const strikeEl = document.getElementById('swHammerStrikeText');
         if (auc.timeLeft <= 6 && auc.timeLeft > 4) {
             auc.hammerStrikes = 1;
@@ -671,9 +668,7 @@ const AppPort = {
             if (strikeEl) strikeEl.innerText = "Идут торги...";
         }
 
-        // Шанс бота перебить ставку (активен, пока таймер > 2)
         if (auc.timeLeft > 2 && Math.random() < 0.45 && auc.bots.length > 0) {
-            // Выбираем активного бота с достаточным лимитом
             const eligibleBots = auc.bots.filter(b => (auc.currentBid < (auc.container.maxBotBudget || 1500000) * b.maxBudgetMul));
             
             if (eligibleBots.length > 0) {
@@ -687,7 +682,6 @@ const AppPort = {
                 auc.timeLeft = Math.min(15, Math.max(7, auc.timeLeft + 3));
                 auc.hammerStrikes = 0;
 
-                // Случайная дерзкая реплика бота
                 let shout = (bot.shouts && bot.shouts.length > 0) 
                     ? bot.shouts[Math.floor(Math.random() * bot.shouts.length)]
                     : "Поднимаю ставку!";
@@ -695,7 +689,6 @@ const AppPort = {
                 this.addSwChatMessage('bot', `${bot.avatar} ${bot.name}`, `${shout} (${botBid.toLocaleString()} ₽)`);
                 this.addSwChatMessage('auctioneer', 'Аукционист', `Ставку перебил ${bot.name}: ${botBid.toLocaleString()} ₽!`);
 
-                // Вспышка тревоги и звук для игрока!
                 if (typeof playSound === 'function') playSound('error');
                 if (typeof tgHaptic === 'function') tgHaptic('error');
             }
@@ -703,7 +696,6 @@ const AppPort = {
 
         this.updateSwAuctionDisplayUI();
 
-        // Финал аукциона
         if (auc.timeLeft <= 0) {
             clearInterval(this.auctionTimerInterval);
             this.auctionTimerInterval = null;
@@ -726,11 +718,10 @@ const AppPort = {
             showToast("🏆 МОЛОТОК УПАЛ! Вы выиграли контейнер на аукционе!");
             this.unpackContainerContents(auc.container, auc.currentBid);
         } else {
-            playSound('error');
-            tgHaptic('error');
+            if (typeof playSound === 'function') playSound('error');
+            if (typeof tgHaptic === 'function') tgHaptic('error');
             
-            // Чистый текст без сырых тегов <b>
-            let winnerCleanName = auc.highestBidder.replace(/<[^>]*>?/gm, '');
+            let winnerCleanName = String(auc.highestBidder).replace(/<[^>]*>?/gm, '');
             openVerdictModal(
                 "АУКЦИОН ЗАВЕРШЁН 🔨",
                 `Контейнер забрал участник ${winnerCleanName} за ${auc.currentBid.toLocaleString()} ₽.\nВашу ставку перебили в финале. В следующий раз повезёт!`,
@@ -751,26 +742,21 @@ const AppPort = {
     },
 
     // ========================================================
-    // 3. ВСКРЫТИЕ КОНТЕЙНЕРА И ГЕНЕРАЦИЯ ДРОПА
+    // 3. ВСКРЫТИЕ КОНТЕЙНЕРА: ОТПРАВКА НАКЛАДНОЙ В ПОЧТУ
     // ========================================================
     unpackContainerContents(containerObj, paidPrice) {
-        let maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
-        let curSlots = state.garage ? state.garage.length : 0;
-
         const possible = containerObj.possibleCars || ["Toyota Mark II (JZX90)"];
         const carName = possible[Math.floor(Math.random() * possible.length)];
 
-        // Случайный установленный тюнинг
         let hasChip = Math.random() < 0.45 ? (Math.random() < 0.25 ? 2 : 1) : 0;
         let hasCoilovers = Math.random() < 0.40;
         let hasWheels = Math.random() < 0.50;
         let hasRollCage = Math.random() < 0.20;
         let hasExhaust = Math.random() < 0.55;
 
-        // Состояние кузова
         let condition = Math.floor(65 + Math.random() * 32);
         if (containerObj.country === 'USA' && Math.random() < 0.30) {
-            condition = Math.floor(40 + Math.random() * 25); // Биток Copart
+            condition = Math.floor(40 + Math.random() * 25);
         }
 
         let initialPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77";
@@ -816,7 +802,6 @@ const AppPort = {
             recalculateCarMarketValue(wonCar);
         }
 
-        // Лут из багажника
         const lootPool = containerObj.lootPool || [];
         const foundLoot = lootPool[Math.floor(Math.random() * lootPool.length)] || {
             name: "Набор специнструмента в багажнике",
@@ -831,39 +816,25 @@ const AppPort = {
             state.ownedPlates.push(foundLoot.plateStr);
         }
 
-        let rewardTokens = [
-            {
-                icon: "🏎️",
-                title: "Автомобиль из контейнера",
-                value: wonCar.name,
-                desc: `Состояние: ${wonCar.condition}% | Тюнинг: Stage ${hasChip}`,
-                rarity: "token-cyan"
-            },
-            {
-                icon: foundLoot.emoji || "🎁",
-                title: "Находка в багажнике",
-                value: foundLoot.name,
-                desc: `Оценка находки: +${(foundLoot.cashVal || 0).toLocaleString()} ₽`,
-                rarity: "token-amber"
-            }
-        ];
-
-        let deliveryMsg = "";
-        if (curSlots < maxSlots) {
-            if (!state.garage) state.garage = [];
-            state.garage.push(wonCar);
-            deliveryMsg = `Автомобиль ${wonCar.name} успешно доставлен в ваш гараж!`;
-        } else {
-            let comp = Math.round(wonCar.marketValue * 0.9);
-            state.player.cash += comp;
-            deliveryMsg = `Гараж полон: автомобиль выкуплен портовыми брокерами за +${comp.toLocaleString()} ₽!`;
-            rewardTokens.push({
-                icon: "💰",
-                title: "Продажа в порту",
-                value: `+${comp.toLocaleString()} ₽`,
-                desc: "Компенсация за нехватку мест",
-                rarity: "token-green"
+        // ОТПРАВКА НАКЛАДНОЙ В ПОЧТУ ИЛИ В ГАРАЖ
+        if (typeof window.pushToMailbox === 'function') {
+            window.pushToMailbox({
+                type: "car",
+                title: `Автовоз: ${wonCar.name}`,
+                sender: `Таможенный терминал (${containerObj.country || 'Порт'})`,
+                desc: `Партия карго успешно растаможена. Выберите место стоянки: основной гараж или склад консервации. В багажнике обнаружено: ${foundLoot.name} (+${(foundLoot.cashVal || 0).toLocaleString()} ₽)!`,
+                badge: "ГРУЗ ПОРТА",
+                carData: wonCar
             });
+        } else {
+            let maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
+            let curSlots = state.garage ? state.garage.length : 0;
+            if (curSlots < maxSlots) {
+                if (!state.garage) state.garage = [];
+                state.garage.push(wonCar);
+            } else {
+                state.player.cash += wonCar.basePrice;
+            }
         }
 
         let gainedXp = 150;
@@ -876,12 +847,9 @@ const AppPort = {
         if (typeof tgHaptic === 'function') tgHaptic('success');
 
         openVerdictModal(
-            "КОНТЕЙНЕР ВСКРЫТ! 📦",
-            `${deliveryMsg}\nОпыт авторитета: +${gainedXp} XP`,
-            true,
-            null,
-            null,
-            rewardTokens
+            "ТАМОЖНЯ ОДОБРИЛА ГРУЗ! 🚢",
+            `Контейнер вскрыт. Автомобиль «${wonCar.name}» погружен на автовоз и отправлен на вашу Почту!\nНаходка в багажнике оценена в +${(foundLoot.cashVal || 0).toLocaleString()} ₽.\nОпыт авторитета: +${gainedXp} XP`,
+            true
         );
 
         this.currentDeal = null;

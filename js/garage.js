@@ -1,5 +1,5 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ИНСПЕКЦИЯ, СТРАХОВКА И ТЮНИНГ (v0.8.1)
+// js/garage.js — АВТОПАРК, ИНСПЕКЦИЯ, СТРАХОВКА И ТЮНИНГ (v0.8.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Характеристики в 3 колонки слева направо (.spec-tile-3d-col),
 // интерактивный лист осмотра 4-х узлов, риски езды без ОСАГО,
@@ -206,13 +206,10 @@ function recalculateCarMarketValue(car) {
     if (t.customWheels) currentVal += 95000;
     if (t.bodykit) currentVal += 85000;
     if (t.tinted) currentVal += 18000;
-    if (t.antichrome) currentVal += 22000;
 
     if (car.isPolished) currentVal = Math.round(currentVal * 1.12);
     if (car.isRepainted) currentVal += 45000;
     if (car.cleanInterior) currentVal += 25000;
-    if (car.polishedOptics) currentVal += 15000;
-    if (car.anticorrosion) currentVal += 30000;
 
     let engWear = car.wear?.engine !== undefined ? car.wear.engine : 85;
     let transWear = car.wear?.transmission !== undefined ? car.wear.transmission : 85;
@@ -238,7 +235,7 @@ function recalculateCarMarketValue(car) {
 }
 
 // ========================================================
-// 3. ОСНОВНОЙ РЕНДЕР ГАРАЖА (3 КОЛОНКИ СЛЕВА НАПРАВО)
+// 3. ОСНОВНОЙ РЕНДЕР ГАРАЖА
 // ========================================================
 function renderGarage() {
     const list = document.getElementById('garageList');
@@ -301,7 +298,6 @@ function renderGarage() {
             legalBadge = `<span class='tag-badge ${dkpClass}'><span class='led-dot ${ledClass}'></span> ДКП (${daysLeft}д)</span>`;
         }
 
-        // БЕЙДЖ СТРАХОВКИ С РИСКАМИ
         let insuranceBadge = "";
         if (car.insurance) {
             if (car.insurance.type === 'comprehensive' || car.insurance === 'casco') {
@@ -379,12 +375,10 @@ function renderGarage() {
 
         html += `
         <div class="glass-card mb-3 ${isPersonal ? 'personal-car-card' : ''}">
-            <!-- ЧИСТАЯ ОБЛОЖКА БЕЗ ПЕРЕГРУЖАЮЩИХ ПЛАШЕК -->
             <div class="car-img-wrap" style="height:155px;">
                 <img src="${cImg}" class="car-img" onerror="this.src='${car.fallback || 'assets/cars/economy/2101/vaz-2101.jpg'}';">
             </div>
             
-            <!-- ВЕРХНИЙ БЛОК: ШИЛЬДИК МАРКИ, УВЕЛИЧЕННЫЕ ТЕГИ С НОМЕРОМ И ЦЕНА -->
             <div class="car-header-row-volumetric">
                 <div style="flex:1; min-width:0; margin-right:8px;">
                     ${brandHeaderHtml}
@@ -407,7 +401,6 @@ function renderGarage() {
                 </div>
             </div>
 
-            <!-- ХАРАКТЕРИСТИКИ СЛЕВА НАПРАВО В 3 КОЛОНКИ (.spec-tile-3d-col) -->
             <div class="car-specs-grid-volumetric">
                 <div class="spec-tile-3d-col">
                     <div class="spec-tile-icon-wrap spec-tile-icon-power">
@@ -440,7 +433,6 @@ function renderGarage() {
                 </div>
             </div>
 
-            <!-- СТАТУС ТЮНИНГА / СТОКА -->
             <div class="car-tuning-status-capsule">
                 <div class="tuning-status-left">
                     <i class="fa-solid fa-gear color-cyan" style="font-size:12px;"></i>
@@ -523,7 +515,6 @@ function openCarPreviewModal(idx) {
     let tires = car.tireWear !== undefined ? car.tireWear : 100;
     let cond = car.condition !== undefined ? car.condition : 80;
 
-    // Статусы систем
     let bodyDesc = car.isRepainted 
         ? "Вторичный окрас кузова (шпаклёвка на арках)" 
         : (car.isPolished ? "Заводской окрас, зеркальный глянец ✓" : "Заводское ЛКП со следами эксплуатации");
@@ -561,11 +552,9 @@ function openCarPreviewModal(idx) {
                 </div>
             </div>
 
-            <!-- ИНСПЕКЦИОННЫЙ ЛИСТ: 4 ДИАГНОСТИЧЕСКИХ УЗЛА -->
             <div class="sub-label font-bold mb-1" style="font-size:9.5px;">📋 ТЕХНИЧЕСКИЙ ЛИСТ СОСТОЯНИЯ:</div>
             
             <div class="space-y-1 mb-3">
-                <!-- УЗЕЛ 1: КУЗОВ -->
                 <div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
                     <div class="flex-between text-xs mb-1">
                         <span><i class="fa-solid fa-shield color-green mr-1"></i> 1. Кузов & ЛКП:</span>
@@ -574,7 +563,6 @@ function openCarPreviewModal(idx) {
                     <div class="sub-label" style="font-size:9px;">${bodyDesc}</div>
                 </div>
 
-                <!-- УЗЕЛ 2: ПОДКАПОТКА -->
                 <div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
                     <div class="flex-between text-xs mb-1">
                         <span><i class="fa-solid fa-bolt color-amber mr-1"></i> 2. Силовой агрегат (ДВС):</span>
@@ -583,7 +571,6 @@ function openCarPreviewModal(idx) {
                     <div class="sub-label" style="font-size:9px;">${engDesc} • Т-ра: ${car.engineTemp || 90}°C</div>
                 </div>
 
-                <!-- УЗЕЛ 3: ТРАНСМИССИЯ И ШИНЫ -->
                 <div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
                     <div class="flex-between text-xs mb-1">
                         <span><i class="fa-solid fa-gear color-cyan mr-1"></i> 3. КПП и ходовая часть:</span>
@@ -592,7 +579,6 @@ function openCarPreviewModal(idx) {
                     <div class="sub-label" style="font-size:9px;">${transDesc} • Шины: ${tires}% остаток</div>
                 </div>
 
-                <!-- УЗЕЛ 4: САЛОН -->
                 <div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
                     <div class="flex-between text-xs mb-1">
                         <span><i class="fa-solid fa-chair color-purple mr-1"></i> 4. Салон и комфорт:</span>
@@ -602,7 +588,6 @@ function openCarPreviewModal(idx) {
                 </div>
             </div>
 
-            <!-- ЮРИДИЧЕСКИЙ БЛОК И СТРАХОВКА -->
             <div class="p-2 mb-3" style="background:rgba(0,242,254,0.06); border-radius:8px; border:1px solid var(--border-glow);">
                 <div class="flex-between text-xs mb-1">
                     <span class="sub-label">Госучёт:</span>
@@ -614,7 +599,6 @@ function openCarPreviewModal(idx) {
                 </div>
             </div>
 
-            <!-- БЫСТРЫЕ ДЕЙСТВИЯ -->
             <div class="grid-2 mb-2">
                 <button onclick="openInsuranceModalFromPreview()" class="btn btn-cyan btn-sm">
                     <i class="fa-solid fa-file-shield mr-1"></i> Оформить страховку
@@ -648,7 +632,7 @@ function openTuningFromPreview() {
 }
 
 // ========================================================
-// 6. СТРАХОВОЙ ДОГОВОР И ВЫЕЗД БЕЗ СТРАХОВКИ (РИСКИ)
+// 6. СТРАХОВОЙ ДОГОВОР
 // ========================================================
 function openInsuranceModalFromPreview() {
     if (previewCarIndex === null) return;
@@ -689,7 +673,6 @@ function renderInsuranceContractUI(car) {
             <div class="sub-label mb-3">Госномер: <b>${cPlate}</b></div>
 
             <div class="space-y-2 mb-3">
-                <!-- ОПЦИЯ 1: ОСАГО -->
                 <div class="p-2 glass-card selected" style="border-color:var(--green);">
                     <div class="flex-between text-xs mb-1">
                         <b class="color-green">1. Полис ОСАГО (Обязательный)</b>
@@ -698,7 +681,6 @@ function renderInsuranceContractUI(car) {
                     <div class="sub-label" style="font-size:9px;">Защита от штрафов ДПС (ст. 12.37) и покрытие ущерба чужим авто до 400,000 ₽.</div>
                 </div>
 
-                <!-- ОПЦИЯ 2: КАСКО ТОТАЛ -->
                 <div class="p-2 glass-card ${insuranceOptions.totalLoss ? 'selected' : ''}" onclick="toggleInsuranceOption('totalLoss')" style="cursor:pointer;">
                     <div class="flex-between text-xs mb-1">
                         <b class="color-amber">2. Пакет КАСКО «Тотал & Угон»</b>
@@ -707,7 +689,6 @@ function renderInsuranceContractUI(car) {
                     <div class="sub-label" style="font-size:9px;">Выплата 85% рыночной стоимости машины даже при полном уничтожении кузова.</div>
                 </div>
 
-                <!-- ОПЦИЯ 3: ПОМОЩЬ НА ДОРОГЕ -->
                 <div class="p-2 glass-card ${insuranceOptions.roadside ? 'selected' : ''}" onclick="toggleInsuranceOption('roadside')" style="cursor:pointer;">
                     <div class="flex-between text-xs mb-1">
                         <b class="color-purple">3. Служба «Эвакуация 24/7»</b>
@@ -717,7 +698,6 @@ function renderInsuranceContractUI(car) {
                 </div>
             </div>
 
-            <!-- ИТОГОВАЯ СТОИМОСТЬ -->
             <div class="p-2 mb-3 flex-between" style="background:#090e18; border-radius:8px;">
                 <span class="sub-label text-xs">Итого к оплате:</span>
                 <b class="color-green text-xs" style="font-size:14px;">${totalCash.toLocaleString()} ₽ + ${totalStars} ⭐</b>
@@ -780,30 +760,27 @@ function confirmSignInsurancePolicy(totalCash, totalStars) {
 
 function driveWithoutInsuranceWarning() {
     ModalManager.close('modalInsurance');
-    showToast("⚠️ Режим риска активирован: выезды без полиса могут привести к штрафам ДПС и судам!");
+    showToast("⚠️ Режим риска: выезды без полиса могут привести к штрафам ДПС и судам!");
     if (previewCarIndex !== null) {
         openCarPreviewModal(previewCarIndex);
     }
 }
 
-// ПРОВЕРКА РИСКОВ БЕЗ СТРАХОВКИ ПРИ УЛИЧНЫХ ЗАЕЗДАХ / ПЕРЕГОНЕ
 function checkUninsuredDriveRisk(car) {
-    if (!car || car.insurance) return true; // Страховка есть — рисков нет
+    if (!car || car.insurance) return true;
 
     let roll = Math.random();
 
     if (roll < 0.20) {
-        // Остановка ДПС
         let fine = 800;
         state.player.cash = Math.max(0, (state.player.cash || 0) - fine);
-        showToast(`🚔 Рейд ДПС «Безопасный город»! Штраф за езду без ОСАГО: -${fine} ₽.`);
+        showToast(`🚔 Рейд ДПС! Штраф за езду без ОСАГО: -${fine} ₽.`);
         playSound('error');
         tgHaptic('error');
         saveState();
         updateHeaderUI();
         return false;
     } else if (roll < 0.28) {
-        // ДТП с регрессом
         let damageCost = Math.round(75000 + Math.random() * 180000);
         state.player.cash = Math.max(0, (state.player.cash || 0) - damageCost);
         car.condition = Math.max(15, (car.condition || 80) - 25);
@@ -853,7 +830,6 @@ function openPreSaleModal(idx) {
             <div class="sub-label mb-3">Повышайте маржинальность и привлекательность для покупателей:</div>
 
             <div class="space-y-2 mb-3">
-                <!-- 1. ПОЛИРОВКА КУЗОВА -->
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-cyan">1. Абразивная полировка кузова</b>
@@ -864,7 +840,6 @@ function openPreSaleModal(idx) {
                     </button>
                 </div>
 
-                <!-- 2. ХИМЧИСТКА САЛОНА -->
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-green">2. Химчистка салона с озонацией</b>
@@ -875,7 +850,6 @@ function openPreSaleModal(idx) {
                     </button>
                 </div>
 
-                <!-- 3. ПОКРАСКА КУЗОВА -->
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-amber">3. Полный облив кузова</b>
@@ -886,7 +860,6 @@ function openPreSaleModal(idx) {
                     </button>
                 </div>
 
-                <!-- 4. ЛОКАЛЬНЫЙ ПОДКРАС СКОЛОВ -->
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-purple">4. Точечный подкрас сколов</b>
@@ -897,7 +870,6 @@ function openPreSaleModal(idx) {
                     </button>
                 </div>
 
-                <!-- 5. ПРИСАДКА В МАСЛО -->
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-red">5. Демпферная присадка в мотор</b>
@@ -908,7 +880,6 @@ function openPreSaleModal(idx) {
                     </button>
                 </div>
 
-                <!-- 6. КОРРЕКТИРОВКА ОДОМЕТРА -->
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-red">6. Смотка одометра (-50% км)</b>
@@ -1163,7 +1134,7 @@ function buyTuningMod(modId, cost, powerGain, riskGain) {
     renderTuningItems();
     playSound('win');
     tgHaptic('success');
-    showToast("Деталь установлена! Оценка авто значительно выросла.");
+    showToast("Деталь установлена! Оценка авто выросла.");
 }
 
 function buyChipStage(stage, cost, powerGain) {
@@ -1205,7 +1176,6 @@ function updateTuneRiskMeter(car) {
     riskFill.className = r > 50 ? "risk-fill risk-high" : (r > 25 ? "risk-fill risk-mid" : "risk-fill risk-low");
 }
 
-// ЛЕГАЛИЗАЦИЯ ТЮНИНГА В НАМИ / МРЭО
 function legalizeTuningModifications() {
     if (activeTuningCarIndex === null) return;
     const car = state.garage[activeTuningCarIndex];
@@ -1261,7 +1231,6 @@ function selectCarForStreetDirect(idx) {
     const car = state.garage[idx];
     if (!car) return;
 
-    // Проверка страховки перед выездом на улицы
     checkUninsuredDriveRisk(car);
 
     state.player.selectedStreetCarIndex = idx;
@@ -1760,17 +1729,23 @@ function openChangePlateModal() {
 
     ModalManager.close('modalPreview');
 
-    const list = document.getElementById('changePlateList');
-    if (!list) return;
+    let modal = document.getElementById('modalChangePlate');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalChangePlate';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
 
     let plates = state.ownedPlates || [];
+    let platesListHtml = "";
+
     if (plates.length === 0) {
-        list.innerHTML = "<div class='sub-label text-center py-4'>У вас нет свободных госномеров в инвентаре.</div>";
+        platesListHtml = "<div class='sub-label text-center py-4'>У вас нет свободных госномеров в инвентаре.</div>";
     } else {
-        let html = "";
         plates.forEach(p => {
             let pCost = (typeof calculatePlateValue === 'function') ? calculatePlateValue(p) : 0;
-            html += `
+            platesListHtml += `
             <div class="glass-card flex-between p-2 mb-1">
                 <div>
                     <span class="license-plate">${p} <div class="license-flag">RUS</div></span>
@@ -1779,8 +1754,21 @@ function openChangePlateModal() {
                 <button onclick="applyPlateToCar('${p}')" class="btn btn-cyan btn-auto btn-sm">Повесить</button>
             </div>`;
         });
-        list.innerHTML = html;
     }
+
+    modal.innerHTML = `
+        <div class="modal-box">
+            <div class="flex-between mb-2">
+                <div class="modal-glow-badge"><i class="fa-solid fa-id-card"></i> РЕГИСТРАЦИОННЫЕ ЗНАКИ</div>
+                <button onclick="ModalManager.close('modalChangePlate')" class="btn btn-dark btn-auto btn-sm">✕</button>
+            </div>
+            <button onclick="removePlateFromCar()" class="btn btn-amber mb-2 w-full">Снять номер на транзиты (-2,000 ₽)</button>
+            <div id="changePlateList" class="space-y-2 mb-2" style="max-height: 240px; overflow-y: auto;">
+                ${platesListHtml}
+            </div>
+            <button onclick="ModalManager.close('modalChangePlate')" class="btn btn-dark w-full">Отмена</button>
+        </div>
+    `;
 
     ModalManager.open('modalChangePlate');
 }

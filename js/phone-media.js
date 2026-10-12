@@ -1,8 +1,8 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v0.7.6)
+// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v0.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Уличные азартные «Напёрстки» с живым перемешиванием вместо Колеса,
-// полноформатный Супервилспин (3 приза сразу) и магнитола с эквалайзером.
+// полноформатный Супервилспин (все призы отправляются в Почту!)
 // ========================================================
 
 const PhoneMedia = {
@@ -108,20 +108,18 @@ const PhoneMedia = {
     // ----------------------------------------------------
     // 2. КЛУБ ФОРТУНЫ: СУПЕРВИЛСПИН И НАПЁРСТКИ
     // ----------------------------------------------------
-    activeFortuneTab: 'superspin', // 'superspin' | 'thimbles'
+    activeFortuneTab: 'superspin',
     isSuperSpinning: false,
 
-    // Текущие слоты 3 барабанов Супервилспина
     reelDisplay: {
         reel1: { emoji: "🚗", name: "Автопарк", desc: "Слот 1" },
         reel2: { emoji: "💰", name: "Деньги", desc: "Слот 2" },
         reel3: { emoji: "🎁", name: "Эксклюзив", desc: "Слот 3" }
     },
 
-    // Состояние игры «Напёрстки»
     thimblesState: {
-        phase: 'bet', // 'bet' | 'showing' | 'shuffling' | 'guess' | 'revealed'
-        winningIndex: 1, // 0, 1, 2
+        phase: 'bet',
+        winningIndex: 1,
         selectedIndex: null,
         currentBet: 50000,
         isFreeGame: false,
@@ -173,9 +171,6 @@ const PhoneMedia = {
         this.renderFortuneApp(document.getElementById('phoneAppContainer'));
     },
 
-    // ========================================================
-    // 2.1. РЕНДЕР СУПЕРВИЛСПИНА (3 ПРИЗА СРАЗУ)
-    // ========================================================
     renderSuperSpinContent(box, tickets, canFreeSuperSpin) {
         if (!box) return;
 
@@ -205,11 +200,10 @@ const PhoneMedia = {
                     <span class="tag-badge bg-tag-amber">ВЫДАЁТ 3 ПРИЗА СРАЗУ</span>
                 </div>
                 <div class="sub-label" style="font-size:9.5px;">
-                    Каждое вращение активирует <b>все 3 слота одновременно</b>. Вы гарантированно забираете по одной награде из каждого барабана!
+                    Каждое вращение активирует <b>все 3 слота одновременно</b>. Все выигранные призы и машины доставляются на вашу <b>Почту</b>!
                 </div>
             </div>
 
-            <!-- БЛОК 3 БАРАБАНОВ -->
             <div class="grid-3 mb-2" style="gap:6px;">
                 <div class="fortune-reel-card ${this.isSuperSpinning ? 'reel-spinning-anim' : ''}" id="fortuneReelCard1">
                     <span class="sub-label" style="font-size:8px; text-transform:uppercase;">БАРАБАН 1: ТЕХНИКА</span>
@@ -253,6 +247,10 @@ const PhoneMedia = {
         state.player.cash -= 150000;
         state.player.superSpinTickets = (state.player.superSpinTickets || 0) + 1;
 
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction("Покупка билета Супер Вилспина", 150000, false);
+        }
+
         saveState();
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
@@ -279,6 +277,9 @@ const PhoneMedia = {
 
             if (cash >= 150000) {
                 state.player.cash -= 150000;
+                if (typeof logBankTransaction === 'function') {
+                    logBankTransaction("Оплата спина Супер Вилспина", 150000, false);
+                }
             } else if (stars >= 10) {
                 state.player.stars -= 10;
             } else {
@@ -372,10 +373,8 @@ const PhoneMedia = {
     claimAllThreePrizes(p1, p2, p3) {
         let rewardTokens = [];
 
-        // 1. Барабан 1: Техника / Приборы
+        // 1. БАРАБАН 1: ТЕХНИКА / ПРИБОРЫ / ТАЛОНЫ
         if (p1.type === 'car') {
-            let maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
-            let curSlots = state.garage ? state.garage.length : 0;
             let wonPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77";
 
             let wonCar = {
@@ -400,148 +399,243 @@ const PhoneMedia = {
                 tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 }
             };
 
-            if (curSlots < maxSlots) {
-                if (!state.garage) state.garage = [];
-                state.garage.push(wonCar);
-                rewardTokens.push({
-                    icon: "🏎️",
-                    title: "Автомобиль в гараж",
-                    value: wonCar.name,
-                    desc: `Госномер ${wonPlate}`,
-                    rarity: "token-cyan"
-                });
-            } else {
-                let comp = Math.round(wonCar.marketValue * 0.85);
-                state.player.cash = (state.player.cash || 0) + comp;
-                rewardTokens.push({
-                    icon: "💰",
-                    title: "Компенсация за авто",
-                    value: `+${comp.toLocaleString()} ₽`,
-                    desc: `Гараж полон: выкуплен ${wonCar.name}`,
-                    rarity: "token-green"
+            if (typeof recalculateCarMarketValue === 'function') {
+                recalculateCarMarketValue(wonCar);
+            }
+
+            // Доставка в Почтовый ящик
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "car",
+                    title: `СуперВилспин: ${wonCar.name}`,
+                    sender: "Клуб Фортуны",
+                    desc: `Автомобиль выигран в барабане СуперВилспина! Госномер: ${wonPlate}. Распакуйте в гараж или законсервируйте на складе.`,
+                    badge: "ВИЛСПИН",
+                    carData: wonCar
                 });
             }
+
+            rewardTokens.push({
+                icon: "🏎️",
+                title: "Автомобиль в Почту",
+                value: wonCar.name,
+                desc: `Доставлен в Почтовый ящик (Госномер ${wonPlate})`,
+                rarity: "token-cyan"
+            });
         } else if (p1.type === 'tool') {
-            if (!state.player.tools) state.player.tools = {};
-            if (!state.player.toolsWear) state.player.toolsWear = {};
-            state.player.tools[p1.toolId] = true;
-            state.player.toolsWear[p1.toolId] = 80;
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "tool",
+                    toolId: p1.toolId,
+                    title: `Диагностика: ${p1.name}`,
+                    sender: "Клуб Фортуны",
+                    desc: "Профессиональный прибор из СуперВилспина. Распакуйте для добавления в арсенал.",
+                    badge: "ПРИБОР"
+                });
+            }
             rewardTokens.push({
                 icon: p1.emoji || "📱",
-                title: "Диагностический прибор",
+                title: "Прибор в Почту",
                 value: p1.name,
-                desc: "Зачислен в ваш инвентарь",
+                desc: "Отправлен посылкой в Почтовый ящик",
                 rarity: "token-purple"
             });
         } else if (p1.type === 'free_impound') {
-            state.player.freeImpoundPasses = (state.player.freeImpoundPasses || 0) + 1;
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "free_impound",
+                    amount: 1,
+                    title: "Талон ГИБДД (Штрафстоянка)",
+                    sender: "Клуб Фортуны",
+                    desc: "Официальный талон на бесплатную выдачу задержанного авто без протокола.",
+                    badge: "ГИБДД"
+                });
+            }
             rewardTokens.push({
                 icon: "🚔",
-                title: "Талон штрафстоянки",
+                title: "Талон в Почту",
                 value: "+1 Талон ГИБДД",
-                desc: "Бесплатный забор автомобиля",
+                desc: "Посылка в Почтовом ящике",
                 rarity: "token-purple"
             });
         } else if (p1.type === 'xp_bundle') {
-            if (typeof addXp === 'function') addXp(p1.amount || 150);
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "xp",
+                    amount: p1.amount || 150,
+                    title: `Пакет Опыта (+${p1.amount || 150} XP)`,
+                    sender: "Клуб Фортуны",
+                    desc: "Грамота и авторитет перекупа. Распакуйте для получения уровня.",
+                    badge: "ОПЫТ"
+                });
+            }
             rewardTokens.push({
                 icon: "🎖️",
-                title: "Пакет опыта",
+                title: "Опыт в Почту",
                 value: `+${p1.amount || 150} XP`,
-                desc: "Повышение уровня авторитета",
+                desc: "Посылка в Почтовом ящике",
                 rarity: "token-cyan"
             });
         }
 
-        // 2. Барабан 2: Валюта и ресурсы
+        // 2. БАРАБАН 2: ВАЛЮТА И РЕСУРСЫ
         if (p2.type === 'cash' || p2.type === 'jackpot') {
-            state.player.cash = (state.player.cash || 0) + p2.amount;
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "cash",
+                    amount: p2.amount,
+                    title: p2.type === 'jackpot' ? `💰 ДЖЕКПОТ ${p2.amount.toLocaleString()} ₽` : `Денежный перевод: +${p2.amount.toLocaleString()} ₽`,
+                    sender: "Клуб Фортуны",
+                    desc: "Денежный приз из барабана СуперВилспина. Распакуйте для зачисления на баланс.",
+                    badge: p2.type === 'jackpot' ? "ДЖЕКПОТ" : "ВАЛЮТА"
+                });
+            }
             rewardTokens.push({
                 icon: "💰",
-                title: p2.type === 'jackpot' ? "ДЖЕКПОТ" : "Денежный приз",
+                title: p2.type === 'jackpot' ? "ДЖЕКПОТ в Почту" : "Деньги в Почту",
                 value: `+${p2.amount.toLocaleString()} ₽`,
-                desc: "Зачислено на баланс игрока",
+                desc: "Посылка ожидает распаковки в Почте",
                 rarity: "token-green"
             });
         } else if (p2.type === 'fuel') {
-            state.player.fuel = Math.min(100, (state.player.fuel || 0) + p2.amount);
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "fuel",
+                    amount: p2.amount,
+                    title: `Канистра топлива: +${p2.amount} ⛽`,
+                    sender: "Клуб Фортуны",
+                    desc: "Топливный талон из СуперВилспина. Распакуйте для заправки бака.",
+                    badge: "ТОПЛИВО"
+                });
+            }
             rewardTokens.push({
                 icon: "⛽",
-                title: "Топливный бак",
+                title: "Топливо в Почту",
                 value: `+${p2.amount} Топлива`,
-                desc: "Заправлено в бензобак",
+                desc: "Посылка в Почтовом ящике",
                 rarity: "token-cyan"
             });
         } else if (p2.type === 'tickets') {
-            let maxT = state.player?.maxExpressTickets || 25;
-            state.player.expressTickets = Math.min(maxT, (state.player.expressTickets || 0) + p2.amount);
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "tickets",
+                    amount: p2.amount,
+                    title: `Экспресс-пропуски: +${p2.amount} 🎟️`,
+                    sender: "Клуб Фортуны",
+                    desc: "Талоны ускорения клиентов на площадке. Распакуйте в инвентарь.",
+                    badge: "ТАЛОНЫ"
+                });
+            }
             rewardTokens.push({
                 icon: "🎟️",
-                title: "Экспресс-пропуски",
+                title: "Талоны в Почту",
                 value: `+${p2.amount} Талонов`,
-                desc: "Мгновенный поиск покупателей",
+                desc: "Посылка в Почтовом ящике",
                 rarity: "token-purple"
             });
         } else if (p2.type === 'conn') {
-            state.player.connections = (state.player.connections || 0) + p2.amount;
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "connections",
+                    amount: p2.amount,
+                    title: `Теневые связи: +${p2.amount} 🤝`,
+                    sender: "Клуб Фортуны",
+                    desc: "Контакты от Решалы. Распакуйте для получения связей ПодКлюч.",
+                    badge: "СВЯЗИ"
+                });
+            }
             rewardTokens.push({
                 icon: "🤝",
-                title: "Теневые связи",
+                title: "Связи в Почту",
                 value: `+${p2.amount} Связь ПодКлюч`,
-                desc: "Услуги Решалы Артура",
+                desc: "Посылка в Почтовом ящике",
                 rarity: "token-purple"
             });
         } else if (p2.type === 'xp') {
-            if (typeof addXp === 'function') addXp(p2.amount);
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "xp",
+                    amount: p2.amount,
+                    title: `Пакет опыта: +${p2.amount} XP`,
+                    sender: "Клуб Фортуны",
+                    desc: "Распакуйте для зачисления опыта в авторитет.",
+                    badge: "ОПЫТ"
+                });
+            }
             rewardTokens.push({
                 icon: "🎖️",
-                title: "Опыт авторитета",
+                title: "Опыт в Почту",
                 value: `+${p2.amount} XP`,
-                desc: "Ранг перекупа повышен",
+                desc: "Посылка в Почтовом ящике",
                 rarity: "token-cyan"
             });
         }
 
-        // 3. Барабан 3: Эксклюзивы
+        // 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ
         if (p3.type === 'stars') {
-            state.player.stars = (state.player.stars || 0) + p3.amount;
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "stars",
+                    amount: p3.amount,
+                    title: `Премиальные Stars: +${p3.amount} ⭐`,
+                    sender: "Клуб Фортуны",
+                    desc: "Звёзды из барабана СуперВилспина. Распакуйте для зачисления на счёт.",
+                    badge: "STARS"
+                });
+            }
             rewardTokens.push({
                 icon: "⭐",
-                title: "Премиальные Stars",
+                title: "Stars в Почту",
                 value: `+${p3.amount} ⭐`,
-                desc: "Звёзды перекупа",
+                desc: "Посылка в Почтовом ящике",
                 rarity: "token-amber"
             });
         } else if (p3.type === 'plate') {
-            if (!state.ownedPlates) state.ownedPlates = [];
-            state.ownedPlates.push(p3.plate);
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "plate",
+                    plate: p3.plate,
+                    title: `Госномер: ${p3.plate}`,
+                    sender: "Клуб Фортуны",
+                    desc: "Редкий архивный госномер РФ. Распакуйте для добавления в гараж.",
+                    badge: "НОМЕР"
+                });
+            }
             rewardTokens.push({
                 icon: "🏷️",
-                title: "Блатной госномер",
+                title: "Госномер в Почту",
                 value: p3.plate,
-                desc: "Добавлен в ваш инвентарь",
+                desc: "Посылка в Почтовом ящике",
                 rarity: "token-purple"
             });
         } else if (p3.type === 'mod_cert') {
-            state.player.cash = (state.player.cash || 0) + p3.cashValue;
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "cash",
+                    amount: p3.cashValue,
+                    title: `Сертификат тюнинга: +${p3.cashValue.toLocaleString()} ₽`,
+                    sender: "Клуб Фортуны",
+                    desc: "Денежная выплата за сертификат Stage 2.",
+                    badge: "ТЮНИНГ"
+                });
+            }
             rewardTokens.push({
                 icon: "🔧",
-                title: "Сертификат на тюнинг",
-                value: p3.label,
-                desc: `Компенсировано +${p3.cashValue.toLocaleString()} ₽`,
+                title: "Сертификат в Почту",
+                value: `+${p3.cashValue.toLocaleString()} ₽`,
+                desc: "Посылка в Почтовом ящике",
                 rarity: "token-green"
             });
         }
 
         saveState();
         updateHeaderUI();
-        if (typeof renderGarage === 'function') renderGarage();
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
 
         openVerdictModal(
             "ТРОЙНОЙ КУШ СУПЕРВИЛСПИНА! 🎰",
-            "Вы выиграли сразу 3 приза со всех барабанов:",
+            "Все 3 награды успешно отправлены в приложение «Почта & Склад»:\nПерейдите в телефон, чтобы распаковать посылки!",
             true,
             null,
             null,
@@ -552,7 +646,7 @@ const PhoneMedia = {
     },
 
     // ========================================================
-    // 2.2. УЛИЧНАЯ ИГРА «НАПЁРСТКИ» ВМЕСТО КОЛЕСА УДАЧИ
+    // 2.2. УЛИЧНАЯ ИГРА «НАПЁРСТКИ»
     // ========================================================
     renderThimblesContent(box) {
         if (!box) return;
@@ -567,7 +661,6 @@ const PhoneMedia = {
         let cupsHtml = "";
         for (let i = 0; i < 3; i++) {
             let isWinner = (i === st.winningIndex);
-            let isSelected = (i === st.selectedIndex);
 
             let cupVisualClass = "thimble-cup";
             let contentUnderneath = "";
@@ -621,7 +714,7 @@ const PhoneMedia = {
                         <button onclick="PhoneMedia.setThimbleBet(250000)" class="btn ${bet === 250000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">250k ₽</button>
                     </div>
 
-                    <button onclick="PhoneMedia.startThimblesGame()" class="btn ${canFree ? 'btn-green' : 'btn-amber'} w-full">
+                    <button onclick="PhoneMedia.startThimblesGame()" class="${canFree ? 'btn-green' : 'btn-amber'} w-full">
                         ${canFree ? 'Бесплатная игра дня (1 раз в сутки) ★' : `Крутить напёрстки (${bet.toLocaleString()} ₽)`}
                     </button>
                 </div>
@@ -695,12 +788,15 @@ const PhoneMedia = {
             let cash = state.player?.cash || 0;
             if (cash < bet) return showToast(`Не хватает денег на ставку ${bet.toLocaleString()} ₽!`);
             state.player.cash -= bet;
+
+            if (typeof logBankTransaction === 'function') {
+                logBankTransaction("Ставка в напёрстках", bet, false);
+            }
         }
 
         saveState();
         updateHeaderUI();
 
-        // 1. Показываем шарик под случайным напёрстком
         const winIdx = Math.floor(Math.random() * 3);
         this.thimblesState.winningIndex = winIdx;
         this.thimblesState.selectedIndex = null;
@@ -711,7 +807,6 @@ const PhoneMedia = {
         if (typeof tgHaptic === 'function') tgHaptic('medium');
         this.renderFortuneApp(document.getElementById('phoneAppContainer'));
 
-        // 2. Через 1 секунду опускаем напёрстки и начинаем перемешивание
         setTimeout(() => {
             this.runThimblesShuffle();
         }, 1100);
@@ -731,7 +826,6 @@ const PhoneMedia = {
             step++;
             if (typeof playSound === 'function') playSound('tick');
 
-            // Случайно меняем визуальное положение
             for (let i = 0; i < 3; i++) {
                 const cupEl = document.getElementById(`thimbleCup_${i}`);
                 if (cupEl) {
@@ -744,13 +838,11 @@ const PhoneMedia = {
                 clearInterval(this.thimblesState.shuffleTimer);
                 this.thimblesState.shuffleTimer = null;
 
-                // Сброс трансформаций
                 for (let i = 0; i < 3; i++) {
                     const cupEl = document.getElementById(`thimbleCup_${i}`);
                     if (cupEl) cupEl.style.transform = 'none';
                 }
 
-                // 3. Переход в фазу угадывания
                 this.thimblesState.phase = 'guess';
                 this.thimblesState.message = "«Всё, стоп игра! Укажи пальцем, где лежит шарик!»";
                 if (typeof tgHaptic === 'function') tgHaptic('warning');
@@ -771,19 +863,33 @@ const PhoneMedia = {
 
         if (isWin) {
             let winCash = isFree ? 120000 : Math.round(bet * 2.5);
-            state.player.cash = (state.player.cash || 0) + winCash;
+
+            // Отправка выигрыша посылкой в Почту
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "cash",
+                    amount: winCash,
+                    title: `Выигрыш в напёрстках: +${winCash.toLocaleString()} ₽`,
+                    sender: "Мастер Ашот (Вокзал)",
+                    desc: `Чистый куш за победу в напёрстках! Распакуйте посылку в Почте для зачисления на счёт.`,
+                    badge: "КУШ"
+                });
+            } else {
+                state.player.cash = (state.player.cash || 0) + winCash;
+            }
+
             if (typeof addXp === 'function') addXp(45);
 
             saveState();
             updateHeaderUI();
 
-            this.thimblesState.message = `«Ай, красава! Глаз-алмаз! Забирай свои +${winCash.toLocaleString()} ₽!»`;
+            this.thimblesState.message = `«Ай, красава! Глаз-алмаз! Забирай свои +${winCash.toLocaleString()} ₽ в Почте!»`;
             if (typeof playSound === 'function') playSound('win');
             if (typeof tgHaptic === 'function') tgHaptic('success');
 
             openVerdictModal(
                 "ПОБЕДА В НАПЁРСТКАХ! 🥤",
-                `Вы раскусили фокус Алика и нашли шарик под напёрстком #${chosenIdx + 1}!\nВыигрыш: +${winCash.toLocaleString()} ₽ (+45 XP)`,
+                `Вы раскусили фокус Алика и нашли шарик под напёрстком #${chosenIdx + 1}!\nВыигрыш (+${winCash.toLocaleString()} ₽) отправлен в вашу Почту!`,
                 true,
                 winCash
             );
@@ -792,7 +898,6 @@ const PhoneMedia = {
             if (typeof playSound === 'function') playSound('error');
             if (typeof tgHaptic === 'function') tgHaptic('error');
 
-            let lossDesc = isFree ? "Бесплатная попытка сгорела." : `Ставка -${bet.toLocaleString()} ₽ досталась напёрсточнику.`;
             showToast(`Мимо! Шарик был под #${this.thimblesState.winningIndex + 1}.`);
         }
 

@@ -1,19 +1,20 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, ЧИСЛОВОЙ РОЛЛЕР & CLOUD SYNC (v0.7.2)
+// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v0.9.3)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Анимированный роллер чисел HUD, жесткий учет инвентаря Маркета,
+// Анимированный роллер чисел HUD, жесткий учет инвентаря,
+// Почта и Склад хранения (mailbox & warehouse),
 // темы Cyber Black Neo, кастомные эффекты огня/плазмы,
-// спецзаказы «ПодКлюч», Telegram Cloud Storage и бизнес-цикл.
+// спецзаказы «ПодКлюч», Telegram Cloud Storage, Firestore & Refs.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.7.2";
+const CURRENT_GAME_VERSION = "v0.9.3";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
 let tgUserId = "guest_777";
 let tgUserData = null;
-let SAVE_KEY_PREFIX = "perekup_v7_";
+let SAVE_KEY_PREFIX = "perekup_v8_";
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
 
@@ -196,7 +197,6 @@ function playEngineSound() {
     } catch(e) {}
 }
 
-// Плавная анимация накручивания чисел (Number Roll)
 function animateNumberRoll(elementId, startVal, endVal, duration = 450, isCurrency = true) {
     const el = document.getElementById(elementId);
     if (!el) return;
@@ -204,6 +204,9 @@ function animateNumberRoll(elementId, startVal, endVal, duration = 450, isCurren
     if (activeNumberAnimators[elementId]) {
         clearInterval(activeNumberAnimators[elementId]);
     }
+
+    startVal = isNaN(startVal) ? 0 : Number(startVal);
+    endVal = isNaN(endVal) ? 0 : Number(endVal);
 
     if (startVal === endVal) {
         el.innerText = isCurrency ? endVal.toLocaleString() : endVal;
@@ -213,7 +216,6 @@ function animateNumberRoll(elementId, startVal, endVal, duration = 450, isCurren
     const startTime = Date.now();
     const diff = endVal - startVal;
 
-    // Световая вспышка изменения
     if (diff > 0) {
         el.style.textShadow = "0 0 16px #00e676";
     } else {
@@ -409,7 +411,7 @@ function openVerdictModal(title, text, isSuccess, amount, profit, customTokens =
     if (amtEl) {
         if (amount && (!tokensToRender || tokensToRender.length === 0)) {
             amtEl.style.display = 'block';
-            amtEl.innerText = (amount > 0 ? "+" : "") + amount.toLocaleString() + " ₽";
+            amtEl.innerText = (amount > 0 ? "+" : "") + Number(amount).toLocaleString() + " ₽";
         } else {
             amtEl.style.display = 'none';
         }
@@ -421,10 +423,10 @@ function openVerdictModal(title, text, isSuccess, amount, profit, customTokens =
             profitEl.style.display = 'block';
             if (profit > 0) {
                 profitEl.className = 'text-xs font-bold mb-3 color-green';
-                profitEl.innerText = "Чистая прибыль: +" + profit.toLocaleString() + " ₽ 📈";
+                profitEl.innerText = "Чистая прибыль: +" + Number(profit).toLocaleString() + " ₽ 📈";
             } else if (profit < 0) {
                 profitEl.className = 'text-xs font-bold mb-3 color-red';
-                profitEl.innerText = "Убыток: " + profit.toLocaleString() + " ₽ 📉";
+                profitEl.innerText = "Убыток: " + Number(profit).toLocaleString() + " ₽ 📉";
             } else {
                 profitEl.className = 'text-xs font-bold mb-3 color-amber';
                 profitEl.innerText = "Сделка закрыта в ноль (0 ₽)";
@@ -505,20 +507,15 @@ const DEFAULT_STATE = {
         dailyQuests: [],
         dailyQuestsSuperClaimed: false,
         bankHistory: [],
-        
-        bankDeposits: [
-            {
-                id: "dep_init",
-                name: "Стартовый Перекупский",
-                principal: 100000,
-                currentAmount: 100000,
-                dailyPercent: 3.0,
-                totalDays: 7,
-                daysPassed: 0,
-                autoCompound: true,
-                startDate: Date.now()
-            }
-        ]
+        bankDeposits: [],
+
+        mailbox: [],
+        warehouse: {
+            maxCars: 6,
+            maxItems: 12,
+            cars: [],
+            items: []
+        }
     },
     garage: [], salesLot: [], contracts: [], plateCatalog: [],
     ownedPlates: ["В777ВВ 77"], registeredPlates: ["В777ВВ 77"],
@@ -531,6 +528,27 @@ const DEFAULT_STATE = {
 
 let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 window.state = state;
+
+// Глобальный маршрутизатор входящих посылок в Почтовый ящик
+window.pushToMailbox = function(mailItem) {
+    if (!state.player) state.player = {};
+    if (!Array.isArray(state.player.mailbox)) state.player.mailbox = [];
+
+    const item = Object.assign({
+        id: "mail_" + Date.now() + "_" + Math.random().toString(36).substring(2, 5),
+        type: "item",
+        title: "Посылка",
+        sender: "Служба доставки",
+        desc: "Новое поступление в почтовый ящик.",
+        date: "Только что",
+        claimed: false
+    }, mailItem);
+
+    state.player.mailbox.unshift(item);
+    saveState();
+    if (typeof PhoneManager !== 'undefined') PhoneManager.updateUnreadBadge();
+    showToast(`📦 В почту прибыло новое отправление: «${item.title}»!`);
+};
 
 function t(key) {
     let lang = state.lang || 'ru';
@@ -960,7 +978,6 @@ function trackQuestProgress(actionType, count = 1) {
 }
 
 function checkNotepadMilestones() {
-    if (typeof NOTEPAD_CAREER_GOALS === 'undefined') return;
     const s = state.player?.stats || {};
     const netProfit = s.totalNetProfit || 0;
     const sold = s.sold || 0;
@@ -1070,7 +1087,7 @@ function checkSyndicateAccessDetails() {
 }
 
 // ========================================================
-// 12. TELEGRAM CLOUD STORAGE
+// 12. TELEGRAM CLOUD, REFS & FIRESTORE STORAGE SYNC
 // ========================================================
 const CHUNK_SIZE = 2048;
 
@@ -1108,14 +1125,26 @@ function loadFromTelegramCloud(callback) {
         return;
     }
     const tgCloud = window.Telegram.WebApp.CloudStorage;
+    
+    // Защита от зависания callback в старых WebView
+    let hasReturned = false;
+    const cloudTimeout = setTimeout(() => {
+        if (!hasReturned) {
+            hasReturned = true;
+            callback(null);
+        }
+    }, 2500);
+
     tgCloud.getItem(SAVE_KEY_PREFIX + tgUserId + "_meta", (err, metaVal) => {
         if (err || !metaVal) {
-            callback(null);
+            clearTimeout(cloudTimeout);
+            if (!hasReturned) { hasReturned = true; callback(null); }
             return;
         }
         const totalChunks = parseInt(metaVal);
         if (isNaN(totalChunks) || totalChunks <= 0) {
-            callback(null);
+            clearTimeout(cloudTimeout);
+            if (!hasReturned) { hasReturned = true; callback(null); }
             return;
         }
 
@@ -1125,6 +1154,10 @@ function loadFromTelegramCloud(callback) {
         }
 
         tgCloud.getItems(keys, (gErr, values) => {
+            clearTimeout(cloudTimeout);
+            if (hasReturned) return;
+            hasReturned = true;
+
             if (gErr || !values) {
                 callback(null);
                 return;
@@ -1148,21 +1181,16 @@ function loadFromTelegramCloud(callback) {
     });
 }
 
-function initTelegramAuthAndStorage(callback) {
+async function initTelegramAuthAndStorage(callback) {
     let callbackCalled = false;
+    let refParam = null;
+
     const safeCallback = () => {
         if (!callbackCalled) {
             callbackCalled = true;
             if (callback) callback();
         }
     };
-
-    const fallbackTimer = setTimeout(() => {
-        if (!callbackCalled) {
-            loadFromLocalStorage();
-            safeCallback();
-        }
-    }, 800);
 
     try {
         if (window.Telegram?.WebApp) {
@@ -1175,37 +1203,92 @@ function initTelegramAuthAndStorage(callback) {
                 tgUserId = String(tgUserData.id);
             }
 
-            if (tg.CloudStorage && typeof tg.CloudStorage.getItem === 'function') {
-                isCloudStorageAvailable = true;
-                const statusEl = document.getElementById('cloudStorageStatus');
-                if (statusEl) {
-                    statusEl.innerText = "TG Cloud: Загрузка...";
-                    statusEl.className = "tag-badge bg-tag-cyan";
+            if (tg.initDataUnsafe?.start_param) {
+                let sp = String(tg.initDataUnsafe.start_param);
+                if (sp.startsWith("ref_")) {
+                    refParam = sp.replace("ref_", "");
                 }
-
-                loadFromTelegramCloud((cloudData) => {
-                    clearTimeout(fallbackTimer);
-                    if (cloudData) {
-                        applyLoadedState(cloudData);
-                        if (statusEl) {
-                            statusEl.innerText = "TG Cloud: Синхронно";
-                            statusEl.className = "tag-badge bg-tag-green";
-                        }
-                    } else {
-                        loadFromLocalStorage();
-                    }
-                    safeCallback();
-                });
-                return;
             }
         }
-    } catch(e) {
-        console.error("TG Init error:", e);
+    } catch(e) {}
+
+    // 1. Проверяем облачный сейв в Firestore
+    let cloudLoaded = false;
+    if (window.FB_Bridge && window.FB_Bridge.CloudSave) {
+        try {
+            const fbData = await Promise.race([
+                window.FB_Bridge.CloudSave.pullSave(tgUserId),
+                new Promise(resolve => setTimeout(() => resolve(null), 2500))
+            ]);
+            if (fbData && fbData.player) {
+                applyLoadedState(fbData);
+                cloudLoaded = true;
+            }
+        } catch(e) {
+            console.warn("[☁️ App] Ошибка загрузки Firestore:", e);
+        }
     }
 
-    clearTimeout(fallbackTimer);
-    loadFromLocalStorage();
+    // 2. Если в Firestore сейва не было — смотрим Telegram CloudStorage или localStorage
+    if (!cloudLoaded) {
+        if (window.Telegram?.WebApp?.CloudStorage) {
+            loadFromTelegramCloud((cloudData) => {
+                if (cloudData) {
+                    applyLoadedState(cloudData);
+                } else {
+                    loadFromLocalStorage();
+                }
+                processReferralAndPayouts(refParam);
+                safeCallback();
+            });
+            return;
+        } else {
+            loadFromLocalStorage();
+        }
+    }
+
+    processReferralAndPayouts(refParam);
     safeCallback();
+}
+
+function processReferralAndPayouts(refParam) {
+    if (window.FB_Bridge) {
+        if (refParam && window.FB_Bridge.Friends) {
+            setTimeout(async () => {
+                let myProfile = window.FB_Bridge.getProfile();
+                let refRes = await window.FB_Bridge.Friends.handleReferralEntry(refParam, myProfile);
+                if (refRes && refRes.rewarded) {
+                    state.player.cash = (state.player.cash || 0) + refRes.bonusCash;
+                    state.player.connections = (state.player.connections || 0) + 1;
+                    saveState();
+                    updateHeaderUI();
+                    openVerdictModal(
+                        "РЕФЕРАЛЬНЫЙ БОНУС! 🤝",
+                        `Вы перешли по приглашению напарника #${refParam}!\nВам начислено: +${refRes.bonusCash.toLocaleString()} ₽ и +1 Связь ПодКлюч.`,
+                        true,
+                        refRes.bonusCash
+                    );
+                }
+            }, 1200);
+        }
+
+        if (window.FB_Bridge.P2P) {
+            setTimeout(async () => {
+                const payoutResult = await window.FB_Bridge.P2P.claimPendingPayouts(tgUserId);
+                if (payoutResult && payoutResult.totalClaimed > 0) {
+                    state.player.cash = (state.player.cash || 0) + payoutResult.totalClaimed;
+                    saveState();
+                    updateHeaderUI();
+                    openVerdictModal(
+                        "P2P ВЫПЛАТА ПОЛУЧЕНА! 💸",
+                        `Пока вас не было, другие игроки выкупили ваши лоты:\n[${payoutResult.claimedItems.join(", ")}]\nЗачислено: +${payoutResult.totalClaimed.toLocaleString()} ₽!`,
+                        true,
+                        payoutResult.totalClaimed
+                    );
+                }
+            }, 2000);
+        }
+    }
 }
 
 function loadFromLocalStorage() {
@@ -1228,10 +1311,13 @@ function applyLoadedState(parsed) {
         if (parsed.player.crypto) state.player.crypto = { ...DEFAULT_STATE.player.crypto, ...parsed.player.crypto };
         if (parsed.player.bankReputation) state.player.bankReputation = { ...DEFAULT_STATE.player.bankReputation, ...parsed.player.bankReputation };
         if (parsed.player.phoneWidgetsCollapsed) state.player.phoneWidgetsCollapsed = { ...DEFAULT_STATE.player.phoneWidgetsCollapsed, ...parsed.player.phoneWidgetsCollapsed };
+        if (parsed.player.club) state.player.club = parsed.player.club;
         if (Array.isArray(parsed.player.phoneMessages)) state.player.phoneMessages = parsed.player.phoneMessages;
         if (Array.isArray(parsed.player.dailyQuests)) state.player.dailyQuests = parsed.player.dailyQuests;
         if (Array.isArray(parsed.player.bankHistory)) state.player.bankHistory = parsed.player.bankHistory;
         if (Array.isArray(parsed.player.bankDeposits)) state.player.bankDeposits = parsed.player.bankDeposits;
+        if (Array.isArray(parsed.player.mailbox)) state.player.mailbox = parsed.player.mailbox;
+        if (parsed.player.warehouse) state.player.warehouse = { ...DEFAULT_STATE.player.warehouse, ...parsed.player.warehouse };
     }
     if (Array.isArray(parsed.garage)) state.garage = parsed.garage;
     if (Array.isArray(parsed.salesLot)) state.salesLot = parsed.salesLot;
@@ -1283,6 +1369,14 @@ function sanitizeState() {
     if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
     if (!Array.isArray(state.player.ownedAvatarEffects)) state.player.ownedAvatarEffects = ['none'];
     if (!state.player.soundProfile) state.player.soundProfile = 'cyber';
+
+    if (!Array.isArray(state.player.mailbox)) state.player.mailbox = [];
+    if (!state.player.warehouse) {
+        state.player.warehouse = { maxCars: 6, maxItems: 12, cars: [], items: [] };
+    }
+    if (!Array.isArray(state.player.warehouse.cars)) state.player.warehouse.cars = [];
+    if (!Array.isArray(state.player.warehouse.items)) state.player.warehouse.items = [];
+    if (!state.player.warehouse.maxCars) state.player.warehouse.maxCars = 6;
 
     if (!state.player.crypto) {
         state.player.crypto = { btc: 0, eth: 0, staked: [], prices: { btc: 9500000, eth: 340000 } };
@@ -1337,6 +1431,19 @@ function saveState() {
         const fullJson = JSON.stringify(state);
         localStorage.setItem("perekup_save_" + tgUserId, fullJson);
 
+        if (window.FB_Bridge && window.FB_Bridge.CloudSave) {
+            window.FB_Bridge.CloudSave.pushSave(tgUserId, state);
+            
+            if (state.player?.stats?.totalNetProfit > 0) {
+                window.FB_Bridge.Leaderboard.updateRank(
+                    tgUserId,
+                    state.player.name,
+                    state.player.stats.totalNetProfit,
+                    state.player.level
+                );
+            }
+        }
+
         if (isCloudStorageAvailable) {
             if (cloudSaveDebounceTimer) clearTimeout(cloudSaveDebounceTimer);
             cloudSaveDebounceTimer = setTimeout(() => {
@@ -1344,18 +1451,11 @@ function saveState() {
                 saveToTelegramCloud(cloudJson, (success) => {
                     const statusEl = document.getElementById('cloudStorageStatus');
                     if (statusEl) {
-                        statusEl.innerText = success ? "TG Cloud: Синхронно" : "TG Cloud: Ошибка";
+                        statusEl.innerText = success ? "Cloud: Синхронно ✓" : "Cloud: Ошибка";
                         statusEl.className = success ? "tag-badge bg-tag-green" : "tag-badge bg-tag-red";
                     }
                 });
             }, 1800);
-        }
-
-        if (window.FB_Bridge && typeof window.FB_Bridge.CloudSave?.pushSave === 'function') {
-            window.FB_Bridge.CloudSave.pushSave(tgUserId, state);
-            if (state.player.stats?.totalNetProfit > 0) {
-                window.FB_Bridge.Leaderboard.updateMyRank(tgUserId, state.player.name, state.player.stats.totalNetProfit, state.player.level);
-            }
         }
     } catch(e) {}
     updateHeaderUI();
@@ -1374,14 +1474,12 @@ function resetGameData() {
         const cleanState = JSON.parse(JSON.stringify(DEFAULT_STATE));
         const cleanJson = JSON.stringify(cleanState);
 
-        if (isCloudStorageAvailable && window.Telegram?.WebApp?.CloudStorage) {
-            saveToTelegramCloud(cleanJson, () => {
-                console.log("TG Cloud очищен.");
-            });
+        if (window.FB_Bridge && window.FB_Bridge.CloudSave) {
+            window.FB_Bridge.CloudSave.pushSave(tgUserId, cleanState);
         }
 
-        if (window.FB_Bridge && typeof window.FB_Bridge.CloudSave?.pushSave === 'function') {
-            window.FB_Bridge.CloudSave.pushSave(tgUserId, cleanState);
+        if (isCloudStorageAvailable && window.Telegram?.WebApp?.CloudStorage) {
+            saveToTelegramCloud(cleanJson, () => {});
         }
 
         tgHaptic('warning');
@@ -1395,17 +1493,10 @@ function resetGameData() {
 }
 
 function syncCloudStorageManual() {
-    if (!isCloudStorageAvailable) return showToast("Telegram Cloud недоступен в браузере!");
-    const cloudJson = prepareStateForCloud();
-    saveToTelegramCloud(cloudJson, (success) => {
-        if (success) {
-            playSound('win'); tgHaptic('success');
-            showToast("Облако Telegram успешно синхронизировано!");
-        } else {
-            tgHaptic('error');
-            showToast("Ошибка сохранения в облако Telegram.");
-        }
-    });
+    saveState();
+    showToast("Синхронизация с облаком Firestore запущена ✓");
+    playSound('win');
+    tgHaptic('success');
 }
 
 function openSaveManagerModal() {
@@ -1548,7 +1639,6 @@ function updateHeaderUI() {
     let conn = state.player?.connections || 0;
     let karma = Math.max(0, Math.min(100, state.player?.karma !== undefined ? state.player.karma : 50));
 
-    // Плавная накрутка роллером при изменении значений
     animateNumberRoll('cashAmount', displayedCashValue, targetCash, 450, true);
     displayedCashValue = targetCash;
 
@@ -1738,7 +1828,6 @@ function renderProfileAnalytics() {
     let s = p.stats || { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
     let lvl = p.level || 1;
 
-    // Расчет совокупной капитализации (Net Worth)
     let totalCash = p.cash || 0;
     let safeCash = p.safeDeposit || 0;
     let depositsTotal = 0;
@@ -1763,20 +1852,15 @@ function renderProfileAnalytics() {
 
     let totalNetWorth = Math.round(totalCash + safeCash + depositsTotal + fleetValuation + realEstateValuation);
 
-    // Торговые показатели
     let totalSales = (s.profitableSales || 0) + (s.lossSales || 0);
     let winrate = totalSales > 0 ? Math.round(((s.profitableSales || 0) / totalSales) * 100) : 0;
-    let avgMargin = totalSales > 0 ? Math.round((s.totalNetProfit || 0) / totalSales) : 0;
 
-    // Ранг
     let rankTitle = lvl >= 50 ? "Олигарх Авторынка" : (lvl >= 30 ? "Хозяин Площадки" : (lvl >= 15 ? "Серый Делец" : "Гаражный Перекуп"));
     let rankColor = lvl >= 50 ? "color-amber" : (lvl >= 30 ? "color-purple" : "color-cyan");
 
-    // Репутация и честность
     let repRating = (p.bankReputation?.rating || 5.0).toFixed(1);
     let fairDeals = p.bankReputation?.fairDealsCount || s.profitableSales || 0;
 
-    // Ачивки
     let goals = (typeof NOTEPAD_CAREER_GOALS !== 'undefined') ? NOTEPAD_CAREER_GOALS : [];
     let achievementsHtml = goals.slice(0, 4).map(g => {
         let done = false;
@@ -1797,7 +1881,6 @@ function renderProfileAnalytics() {
     }).join('');
 
     container.innerHTML = `
-        <!-- 1. VIP ID КАРТА ПЕРЕКУПА -->
         <div class="glass-card mb-3 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.18), #090e18); border-color: var(--cyan);">
             <div class="avatar-ring mb-2" style="margin: 0 auto; width: 62px; height: 62px;">
                 <div class="avatar-glow"></div>
@@ -1820,12 +1903,11 @@ function renderProfileAnalytics() {
                     🎨 Скин & Эффекты
                 </button>
                 <button onclick="openPatchNotesModal()" class="btn btn-dark btn-sm btn-auto" style="font-size:10px;">
-                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут v0.7.2
+                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут v0.9.3
                 </button>
             </div>
         </div>
 
-        <!-- 2. СВОДКА КАПИТАЛИЗАЦИИ (NET WORTH) -->
         <div class="glass-card mb-3 p-3" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.14), #090e18); border-color: var(--green);">
             <div class="flex-between mb-1">
                 <div>
@@ -1848,7 +1930,6 @@ function renderProfileAnalytics() {
             <div class="sub-label text-right" style="font-size:9px;">Недвижимость в собственности: <b>${realEstateValuation.toLocaleString()} ₽</b></div>
         </div>
 
-        <!-- 3. БИЗНЕС-KPI И СТАТИСТИКА СДЕЛОК -->
         <div class="glass-card mb-3 p-3">
             <b class="text-xs color-cyan block mb-2"><i class="fa-solid fa-chart-pie mr-1"></i> Бизнес-KPI торговли:</b>
 
@@ -1887,7 +1968,6 @@ function renderProfileAnalytics() {
             </div>
         </div>
 
-        <!-- 4. КАРЬЕРНЫЕ ВЕХИ И АЧИВКИ -->
         <div class="glass-card mb-3 p-3">
             <div class="flex-between mb-2">
                 <b class="text-xs color-purple"><i class="fa-solid fa-trophy mr-1"></i> Карьерные достижения:</b>
@@ -1898,14 +1978,13 @@ function renderProfileAnalytics() {
             </div>
         </div>
 
-        <!-- 5. ОБЛАЧНЫЙ СИНХРОН И РЕЗЕРВ -->
         <div class="glass-card p-3" style="background:#090e18; border-color:var(--border-glass);">
             <div class="flex-between mb-2">
                 <div class="flex-gap" style="align-items:center;">
                     <i class="fa-solid fa-cloud-arrow-up color-cyan"></i>
-                    <b class="text-xs">Синхронизация данных</b>
+                    <b class="text-xs">Firestore Online Sync</b>
                 </div>
-                <span class="tag-badge bg-tag-green" id="cloudStorageStatus">TG Cloud: Активно</span>
+                <span class="tag-badge bg-tag-green" id="cloudStorageStatus">Online: Активно ✓</span>
             </div>
             <div class="grid-2 mb-2">
                 <button onclick="syncCloudStorageManual()" class="btn btn-cyan btn-sm">
@@ -2201,7 +2280,7 @@ setInterval(() => {
     }
 }, 1000);
 
-// Экспорт всех глобальных функций в window
+// Экспорт всех функций
 window.initApp = initApp;
 window.switchTab = switchTab;
 window.saveState = saveState;

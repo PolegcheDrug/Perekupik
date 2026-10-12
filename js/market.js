@@ -1,9 +1,9 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, МУЛЬТИ-ФОТО И 3D-КАПСУЛЫ (v0.8.1)
+// js/market.js — АВТОРЫНОК, ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ (v0.9.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Характеристики в 3 колонки слева направо, тест-драйв у капота,
-// выбор маршрута перегона (шоссе с ДПС vs дворы с ямами),
-// скрытие кузова до капота и госномера до Автотеки.
+// Убраны лишние кнопки галереи с обложки (чистый 3D-вид),
+// процедурные состояния (музейный сток, рабочий, корч, срочный),
+// характеристики в 3 колонки, тест-драйв, скрытие параметров до капота.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -91,7 +91,6 @@ function refreshPlateCatalog() {
     }
 }
 
-// Форматирование марки и модели с аккуратными шильдиками
 function formatCarBrandBadgeHtml(carName) {
     if (!carName) return "<span>Авто</span>";
 
@@ -176,8 +175,8 @@ function toggleMarketCategories() {
 
 function toggleMarketSortOrder() {
     marketSortOrder = marketSortOrder === 'asc' ? 'desc' : 'asc';
-    playSound('tick');
-    tgHaptic('light');
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
     showToast(marketSortOrder === 'asc' ? "Сортировка: сначала дешевле ⬆️" : "Сортировка: сначала дороже ⬇️");
     sortCurrentMarketFeed();
     renderMarketFeed();
@@ -186,8 +185,8 @@ function toggleMarketSortOrder() {
 function sortCurrentMarketFeed() {
     if (!state.marketFeed || state.marketFeed.length === 0) return;
     state.marketFeed.sort((a, b) => {
-        let pA = a.price || 0;
-        let pB = b.price || 0;
+        let pA = a?.price || 0;
+        let pB = b?.price || 0;
         return marketSortOrder === 'asc' ? pA - pB : pB - pA;
     });
 }
@@ -215,7 +214,7 @@ function setCategory(cat) {
     setTxt("catInfoPrice", "Капитал: " + meta.capital);
     setTxt("catInfoDesc", meta.desc);
 
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
     populateMarketFeed();
 }
 
@@ -244,7 +243,7 @@ function refreshMarketFeedManual() {
 }
 
 // ========================================================
-// ГЕНЕРАЦИЯ ЛЕНТЫ АВТОРЫНКА
+// ПРОЦЕДУРНЫЙ ГЕНЕРАТОР МОДИФИКАЦИЙ И ВАРИАЦИЙ АВТО
 // ========================================================
 function populateMarketFeed() {
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE) return;
@@ -290,63 +289,45 @@ function populateMarketFeed() {
         const template = shuffledPool[i % shuffledPool.length];
         if (!template) continue;
 
-        let dealRoll = Math.random();
+        let archetypeRoll = Math.random();
         let dealType = 'normal';
         let priceMultiplier = 0.80;
 
-        let isPodborFind = false;
+        let isMuseumStock = false;
         let isTunedSpec = false;
         let isBeaterProject = false;
+        let isUrgentDeal = false;
 
-        // Генерация специальных предложений
         if (hasAutopodbor && Math.random() < 0.22) {
-            isPodborFind = true;
             dealType = 'urgent';
+            isUrgentDeal = true;
             priceMultiplier = 0.60 + Math.random() * 0.05;
-        } else if (dealRoll < 0.16) {
-            // 🔥 Боевой Корч
+        } else if (archetypeRoll < 0.15) {
+            isMuseumStock = true;
+            dealType = 'museum';
+            priceMultiplier = 0.88 + Math.random() * 0.08;
+        } else if (archetypeRoll < 0.32) {
             isTunedSpec = true;
             dealType = 'tuned_drift';
-            priceMultiplier = 1.15 + Math.random() * 0.20;
-        } else if (dealRoll < 0.32) {
-            // 💥 Под восстановление
+            priceMultiplier = 1.15 + Math.random() * 0.15;
+        } else if (archetypeRoll < 0.50) {
             isBeaterProject = true;
             dealType = 'beater_project';
-            priceMultiplier = 0.45 + Math.random() * 0.12;
-        } else if (dealRoll < 0.50) { 
+            priceMultiplier = 0.48 + Math.random() * 0.12;
+        } else if (archetypeRoll < 0.75) {
+            isUrgentDeal = true;
             dealType = 'urgent';
-            priceMultiplier = 0.65 + Math.random() * 0.10;
-        } else if (dealRoll < 0.85) {
-            dealType = 'normal';
-            priceMultiplier = 0.78 + Math.random() * 0.10;
+            priceMultiplier = 0.68 + Math.random() * 0.08;
         } else {
-            dealType = 'overprice';
-            priceMultiplier = 0.95 + Math.random() * 0.15;
+            dealType = 'normal';
+            priceMultiplier = 0.80 + Math.random() * 0.08;
         }
 
-        let defectChance = isBeaterProject ? 0.90 : (dealType === 'urgent' ? 0.45 : 0.25);
-        let hasHiddenDefect = false;
-        if (typeof OBD_ERRORS !== 'undefined' && OBD_ERRORS.length > 0) {
-            if (Math.random() < defectChance) hasHiddenDefect = true;
-        }
-
-        let isStolen = Math.random() < (isBeaterProject ? 0.20 : (dealType === 'urgent' ? 0.12 : 0.05));
-        const carId = "m_" + Date.now() + "_" + i;
-        
-        let isCoolNumber = Math.random() < 0.14;
-        let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
-
-        let baseP = template.basePrice ? template.basePrice : 100000;
-        let tType = template.type ? template.type : cat;
-        const dynPrice = getDynamicPrice(baseP, tType);
-
-        const baseVal = Math.round(dynPrice * 1.15);
-        const plateVal = evaluatePlate(genPlate);
-
-        let sellerPrice = Math.round(dynPrice * priceMultiplier);
+        let defectChance = isBeaterProject ? 0.90 : (isMuseumStock ? 0.0 : (isUrgentDeal ? 0.40 : 0.20));
+        let hasHiddenDefect = (Math.random() < defectChance) && (typeof OBD_ERRORS !== 'undefined' && OBD_ERRORS.length > 0);
 
         let defectObj = null;
-        if (hasHiddenDefect && typeof OBD_ERRORS !== 'undefined') {
+        if (hasHiddenDefect) {
             const errItem = OBD_ERRORS[Math.floor(Math.random() * OBD_ERRORS.length)];
             defectObj = { 
                 code: errItem.code || "P0300",
@@ -360,24 +341,35 @@ function populateMarketFeed() {
             };
         }
 
-        let sNote = "Машина на бодром ходу, сел и поехал.";
+        let isStolen = Math.random() < (isBeaterProject ? 0.18 : (isUrgentDeal ? 0.08 : 0.04));
+        const carId = "m_" + Date.now() + "_" + i;
+        
+        let isCoolNumber = Math.random() < 0.15;
+        let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
+
+        let baseP = template.basePrice ? template.basePrice : 100000;
+        let tType = template.type ? template.type : cat;
+        const dynPrice = getDynamicPrice(baseP, tType);
+
+        const baseVal = Math.round(dynPrice * 1.15);
+        const plateVal = evaluatePlate(genPlate);
+        let sellerPrice = Math.round(dynPrice * priceMultiplier);
+
+        let sNote = "«Машина на отличном ходу, любые проверки у капота.»";
         let sMoodIcon = "🚗";
 
-        if (isTunedSpec) {
-            sNote = "«Боевой проект! Спек под дрифт/драг собран с душой: выворот, прямоток, отсечка 7500. Газ в пол и полетели!»";
+        if (isMuseumStock) {
+            sNote = "«Один хозяин с завода! Хранилась в тёплом сухом гараже, ни грамма шпаклёвки.»";
+            sMoodIcon = "🏆";
+        } else if (isTunedSpec) {
+            sNote = "«Боевой проект! Спек под дрифт собран с душой: выворот, прямоток, отсечка. Газ в пол и полетели!»";
             sMoodIcon = "🔥";
         } else if (isBeaterProject) {
-            sNote = "«Кузов требует внимания и сварки, мотор подтраивает. Отдам за копейки с торгом у капота под проект или разбор!»";
+            sNote = "«Кузов требует внимания и сварки. Отдам за копейки с торгом под проект или разбор!»";
             sMoodIcon = "🛠️";
-        } else if (isPodborFind) {
-            sNote = "«Срочный выкуп найден вашими автоподборщиками. Продавец отдаёт с дисконтом 35%!»";
-            sMoodIcon = "🎯";
-        } else if (dealType === 'urgent') {
-            sNote = "«Срочно нужны деньги до вечера, отдам с хорошей скидкой первому покупателю!»";
+        } else if (isUrgentDeal) {
+            sNote = "«Срочно нужны деньги на ипотеку, отдам с хорошим дисконтом первому, кто приедет с кэшем!»";
             sMoodIcon = "⚡";
-        } else if (dealType === 'overprice') {
-            sNote = "«Знаю рынок, вложено в два раза больше. Торга нет вообще, ценителю!»";
-            sMoodIcon = "😎";
         }
 
         let cName = template.name ? template.name : "Техника";
@@ -402,24 +394,29 @@ function populateMarketFeed() {
             cName = `${cName} [SPEC DRIFT]`;
         } else if (isBeaterProject) {
             cName = `${cName} (Под проект)`;
+        } else if (isMuseumStock) {
+            cName = `${cName} (Капсула времени)`;
         }
 
-        let cImages = Array.isArray(template.images) && template.images.length > 0 
-            ? [...template.images] 
-            : [template.img || "assets/cars/economy/2101/vaz-2101.jpg"];
+        let cImg = (Array.isArray(template.images) && template.images.length > 0)
+            ? template.images[0]
+            : (template.img || "assets/cars/economy/2101/vaz-2101.jpg");
             
-        let cImg = cImages[0];
         let cFallback = template.fallback || getCategoryFallback(tType);
 
-        let cCond = isBeaterProject 
-            ? Math.floor(35 + Math.random() * 20) 
-            : (hasHiddenDefect ? Math.floor(55 + Math.random() * 20) : Math.floor(75 + Math.random() * 20));
+        let cCond = isMuseumStock 
+            ? Math.floor(92 + Math.random() * 8)
+            : (isBeaterProject ? Math.floor(35 + Math.random() * 20) : Math.floor(65 + Math.random() * 25));
 
-        let isThickDoors = isBeaterProject ? 380 : (Math.random() > 0.4 ? 240 : 115);
-        let isThickHood = isBeaterProject ? 340 : (Math.random() > 0.5 ? 260 : 110);
+        let isThickDoors = isBeaterProject ? 380 : (isMuseumStock ? 105 : (Math.random() > 0.4 ? 240 : 115));
+        let isThickHood = isBeaterProject ? 340 : (isMuseumStock ? 110 : (Math.random() > 0.5 ? 260 : 110));
 
-        let engWear = isBeaterProject ? Math.floor(25 + Math.random() * 25) : Math.floor(70 + Math.random() * 25);
-        let transWear = isBeaterProject ? Math.floor(30 + Math.random() * 25) : Math.floor(75 + Math.random() * 20);
+        let engWear = isMuseumStock ? 95 : (isBeaterProject ? Math.floor(25 + Math.random() * 25) : Math.floor(70 + Math.random() * 25));
+        let transWear = isMuseumStock ? 95 : (isBeaterProject ? Math.floor(30 + Math.random() * 25) : Math.floor(75 + Math.random() * 20));
+
+        let mileageVal = isMuseumStock 
+            ? Math.floor(18000 + Math.random() * 25000) 
+            : (isBeaterProject ? Math.floor(180000 + Math.random() * 70000) : Math.floor(65000 + Math.random() * 60000));
 
         const firstNames = ["Игорь", "Сергей", "Владимир", "Алексей", "Дмитрий", "Андрей", "Михаил", "Максим"];
         const lastNames = ["Петров", "Кузнецов", "Смирнов", "Морозов", "Васильев", "Новиков", "Фёдоров"];
@@ -434,28 +431,26 @@ function populateMarketFeed() {
             type: tType,
             drivetrain: template.drivetrain || 'rwd',
             basePrice: baseP,
-            mileage: Math.floor(Math.random() * (isBeaterProject ? 180000 : 90000)) + 30000,
+            mileage: mileageVal,
             price: sellerPrice,
             originalAskingPrice: sellerPrice,
             baseMarketValue: baseVal,
             marketValue: baseVal + plateVal,
             img: cImg,
-            images: cImages,
-            currentImageIdx: 0,
             fallback: cFallback,
             plate: genPlate,
             isStolen: isStolen,
-            isPodborFind: isPodborFind,
+            isMuseumStock: isMuseumStock,
             isTunedSpec: isTunedSpec,
             isBeaterProject: isBeaterProject,
             autotekaChecked: false,
-            inspectedAtHood: false, // Раскрывается только после личной встречи у капота
+            inspectedAtHood: false,
             cooldownUntil: 0,
             stoChecked: false,
             gaugeChecked: false,
-            testDriven: false, // Флаг прохождения тест-драйва
+            testDriven: false,
             haggled: false,
-            hagglePatience: isTunedSpec ? 3 : (isBeaterProject ? 6 : 4),
+            hagglePatience: isTunedSpec ? 3 : (isBeaterProject ? 6 : (isMuseumStock ? 2 : 4)),
             sellerPersonality: isTunedSpec ? "aggressive" : (isBeaterProject ? "hurried" : "calm"),
             dealType: dealType,
             unavailable: false,
@@ -470,7 +465,7 @@ function populateMarketFeed() {
             rolledOdometer: isBeaterProject && Math.random() < 0.45,
             hasAdditive: isBeaterProject && Math.random() < 0.35,
             isRepainted: isBeaterProject,
-            isPolished: false,
+            isPolished: isMuseumStock,
             isPersonal: false,
             isRegisteredOnPlayer: true,
             ownershipDays: 0,
@@ -480,8 +475,8 @@ function populateMarketFeed() {
             ptsData: {
                 ownerName: ownerName,
                 ownerAvatar: ownerAvatar,
-                ownersCount: isBeaterProject ? 5 : 2,
-                ownershipYears: 2,
+                ownersCount: isMuseumStock ? 1 : (isBeaterProject ? 5 : 2),
+                ownershipYears: isMuseumStock ? 8 : 2,
                 vin: "XTA" + Math.floor(10000000000000 + Math.random() * 90000000000000),
                 ptsType: isBeaterProject ? "Дубликат ПТС ⚠️" : "Электронный (ЭПТС) ✓",
                 pledgeBank: isStolen ? "В залоге у МФО ❌" : "Залогов нет ✓",
@@ -496,42 +491,15 @@ function populateMarketFeed() {
     renderMarketFeed();
 }
 
-function cycleMarketCarImage(carId, delta, event) {
-    if (event) event.stopPropagation();
-    const car = state.marketFeed.find(c => c && c.id === carId);
-    if (!car || !Array.isArray(car.images) || car.images.length <= 1) return;
-
-    let len = car.images.length;
-    let curIdx = car.currentImageIdx || 0;
-    curIdx = (curIdx + delta + len) % len;
-    car.currentImageIdx = curIdx;
-    car.img = car.images[curIdx];
-
-    const imgEl = document.getElementById(`market_car_img_${car.id}`);
-    if (imgEl) imgEl.src = car.img;
-
-    const dotsContainer = document.getElementById(`gallery_dots_${car.id}`);
-    if (dotsContainer) {
-        let dots = dotsContainer.querySelectorAll('.car-gallery-dot');
-        dots.forEach((d, i) => {
-            if (i === curIdx) d.classList.add('active');
-            else d.classList.remove('active');
-        });
-    }
-
-    playSound('tick');
-    tgHaptic('light');
-}
-
 function promptHiddenPlateAutotekaHint(event) {
     if (event) event.stopPropagation();
-    playSound('tick');
-    tgHaptic('light');
-    showToast("🔒 Продавец скрыл госномер в объявлении. Купите Автотеку, чтобы узнать знак!");
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
+    showToast("🔒 Продавец скрыл госномер в объявлении. Закажите Автотеку, чтобы узнать знак!");
 }
 
 // ========================================================
-// ОСНОВНОЙ РЕНДЕР КАРТОЧЕК РЫНКА (3 КОЛОНКИ СЛЕВА НАПРАВО)
+// ОСНОВНОЙ РЕНДЕР КАРТОЧЕК РЫНКА
 // ========================================================
 function renderMarketFeed() {
     const container = document.getElementById('marketCardContainer');
@@ -580,17 +548,15 @@ function renderMarketFeed() {
         let viewedClass = car.viewed ? "viewed-card" : "";
         let autoIcon = car.autotekaChecked ? "Проверено ✓" : "5,000 ₽";
 
-        // Аура карточки редких лотов
         let cardAuraClass = "card-anim-shimmer";
-        if (car.isTunedSpec) cardAuraClass += " card-glow-tuned";
+        if (car.isMuseumStock) cardAuraClass += " card-glow-urgent";
+        else if (car.isTunedSpec) cardAuraClass += " card-glow-tuned";
         else if (car.isBeaterProject) cardAuraClass += " card-glow-beater";
-        else if (car.dealType === 'urgent' || car.isPodborFind) cardAuraClass += " card-glow-urgent";
 
-        // Состояние кузова: скрыто до встречи у капота
         let isBodyKnown = !!car.inspectedAtHood;
         let condVal = car.condition || 80;
         let shieldIconClass = "spec-tile-icon-unknown";
-        let condValueHtml = `<b class="color-sub">Не проверен</b>`;
+        let condValueHtml = `<b class="color-sub">У капота</b>`;
 
         if (isBodyKnown) {
             shieldIconClass = condVal >= 80 
@@ -602,13 +568,12 @@ function renderMarketFeed() {
             condValueHtml = `<b class="${condColorClass}">${condVal}%</b>`;
         }
 
-        // Госномер в строке тегов (скрыт до покупки Автотеки)
         let isPlateRevealed = !!car.autotekaChecked;
         let plateInRowHtml = "";
 
         if (isPlateRevealed) {
             plateInRowHtml = `
-                <div class="plate-mini-capsule notranslate" translate="no" title="Госномер подтвержден Автотекой">
+                <div class="plate-mini-capsule notranslate" translate="no">
                     ${car.plate} <span class="plate-flag-mini">RUS</span>
                 </div>
             `;
@@ -621,19 +586,16 @@ function renderMarketFeed() {
             `;
         }
 
-        // Увеличенные акцентные бейджи
         let statusBadgesHtml = `<span class='tag-badge bg-tag-cyan'>${carType}</span>`;
 
-        if (car.isTunedSpec) {
+        if (car.isMuseumStock) {
+            statusBadgesHtml += "<span class='tag-badge bg-tag-amber'>🏆 КАПСУЛА</span>";
+        } else if (car.isTunedSpec) {
             statusBadgesHtml += "<span class='tag-badge bg-tag-purple'>🔥 КОРЧ</span>";
         } else if (car.isBeaterProject) {
             statusBadgesHtml += "<span class='tag-badge bg-tag-red'>💥 ПОД ПРОЕКТ</span>";
-        } else if (car.isPodborFind) {
-            statusBadgesHtml += "<span class='tag-badge bg-tag-green'><span class='led-dot led-green'></span> -35% ПОДБОР</span>";
         } else if (car.dealType === 'urgent') {
             statusBadgesHtml += "<span class='tag-badge bg-tag-green'>⚡ СРОЧНО</span>";
-        } else if (car.dealType === 'overprice') {
-            statusBadgesHtml += "<span class='tag-badge bg-tag-red'>ВЫСОКАЯ ЦЕНА</span>";
         }
 
         let pVal = evaluatePlate(car.plate);
@@ -644,22 +606,6 @@ function renderMarketFeed() {
         if (car.isStolen && isPlateRevealed) {
             statusBadgesHtml += "<span class='tag-badge badge-police-strobe'>🚨 РОЗЫСК</span>";
         }
-
-        // Галерея фото
-        let imagesCount = Array.isArray(car.images) ? car.images.length : 1;
-        let galleryDotsHtml = "";
-        if (imagesCount > 1) {
-            let dots = "";
-            for (let d = 0; d < imagesCount; d++) {
-                dots += `<div class="car-gallery-dot ${(car.currentImageIdx || 0) === d ? 'active' : ''}"></div>`;
-            }
-            galleryDotsHtml = `<div class="car-gallery-dots" id="gallery_dots_${car.id}">${dots}</div>`;
-        }
-
-        let navArrowsHtml = imagesCount > 1 ? `
-            <button class="car-gallery-nav-btn car-gallery-prev" onclick="cycleMarketCarImage('${car.id}', -1, event)">❮</button>
-            <button class="car-gallery-nav-btn car-gallery-next" onclick="cycleMarketCarImage('${car.id}', 1, event)">❯</button>
-        ` : "";
 
         let sellerDialogHtml = car.sellerNote ? `
             <div class="seller-dialog-bubble">
@@ -687,19 +633,13 @@ function renderMarketFeed() {
                 <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>${t('paid_call')} (1,000 ₽)</button>
             </div>
 
-            <!-- ЧИСТАЯ ОБЛОЖКА БЕЗ ПЕРЕГРУЖАЮЩИХ ПЛАШЕК -->
             <div class='car-img-wrap'>
                 <img id="market_car_img_${car.id}" src='${carImg}' class='car-img' onerror="this.onerror=null; this.src='${fallbackUrl}';">
-                ${navArrowsHtml}
-                ${galleryDotsHtml}
             </div>
 
-            <!-- ВЕРХНИЙ БЛОК: ШИЛЬДИК МАРКИ, УВЕЛИЧЕННЫЕ ТЕГИ С НОМЕРОМ И ЦЕНА С МАРЖОЙ -->
             <div class="car-header-row-volumetric">
                 <div style="flex:1; min-width:0; margin-right:8px;">
                     ${formatCarBrandBadgeHtml(car.name)}
-                    
-                    <!-- СТРОКА ТЕГОВ С НОМЕРОМ В ВЫДЕЛЕННОЙ ОБЛАСТИ -->
                     <div class="car-status-badges-row mt-1">
                         ${statusBadgesHtml}
                         ${plateInRowHtml}
@@ -713,9 +653,7 @@ function renderMarketFeed() {
                 </div>
             </div>
 
-            <!-- ХАРАКТЕРИСТИКИ СЛЕВА НАПРАВО В 3 КОЛОНКИ -->
             <div class="car-specs-grid-volumetric">
-                <!-- КОЛОНКА 1: МОЩНОСТЬ -->
                 <div class="spec-tile-3d-col">
                     <div class="spec-tile-icon-wrap spec-tile-icon-power">
                         <i class="fa-solid fa-bolt"></i>
@@ -726,7 +664,6 @@ function renderMarketFeed() {
                     </div>
                 </div>
 
-                <!-- КОЛОНКА 2: ПРОБЕГ -->
                 <div class="spec-tile-3d-col">
                     <div class="spec-tile-icon-wrap spec-tile-icon-road">
                         <i class="fa-solid fa-road"></i>
@@ -737,7 +674,6 @@ function renderMarketFeed() {
                     </div>
                 </div>
 
-                <!-- КОЛОНКА 3: КУЗОВ -->
                 <div class="spec-tile-3d-col">
                     <div class="spec-tile-icon-wrap ${shieldIconClass}">
                         <i class="fa-solid ${isBodyKnown ? 'fa-shield' : 'fa-circle-question'}"></i>
@@ -751,7 +687,6 @@ function renderMarketFeed() {
 
             ${sellerDialogHtml}
 
-            <!-- ОЦЕНКА РЫНКА -->
             <div class="p-2 mb-2 flex-between" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.06);">
                 <div>
                     <span class="sub-label text-xs">Оценка вторичного рынка:</span>
@@ -794,8 +729,8 @@ function quickOBDScanMarketCar(carId) {
     let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
 
     if (!hasScanner) {
-        playSound('error');
-        tgHaptic('warning');
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('warning');
         showToast("⚠️ У вас нет сканера OBD2! Купите ELM327 или Launch в Авто-Маркете.");
         return;
     }
@@ -804,8 +739,8 @@ function quickOBDScanMarketCar(carId) {
     let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 0;
     
     if (wear <= 0) {
-        playSound('error');
-        tgHaptic('warning');
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('warning');
         showToast("⚠️ Сканер полностью разряжен! Откалибруйте его в Авто-Маркете.");
         return;
     }
@@ -820,8 +755,8 @@ function quickOBDScanMarketCar(carId) {
     setTxt('obd2CarTitle', `Диагностика CAN-шины: ${car.name}`);
 
     ModalManager.open("modalOBD2");
-    playSound('tick');
-    tgHaptic('medium');
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('medium');
 
     if (resBox) {
         resBox.innerHTML = `
@@ -863,7 +798,7 @@ function quickOBDScanMarketCar(carId) {
                 terminalEl.innerHTML += `<div class="obd-terminal-line ${step.type}">${step.msg}</div>`;
                 terminalEl.scrollTop = terminalEl.scrollHeight;
             }
-            playSound('tick');
+            if (typeof playSound === 'function') playSound('tick');
             currentStep++;
         } else {
             clearInterval(scanInterval);
@@ -883,8 +818,8 @@ function renderOBDFinalResults(car, resBox, actBox) {
     let trans = car.wear?.transmission ? Math.round(car.wear.transmission) : 90;
 
     if (car.hiddenDefect) {
-        playSound('error');
-        tgHaptic('error');
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('error');
         let def = car.hiddenDefect;
 
         resBox.innerHTML = `
@@ -912,8 +847,8 @@ function renderOBDFinalResults(car, resBox, actBox) {
             </button>
         `;
     } else {
-        playSound('win');
-        tgHaptic('success');
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
 
         resBox.innerHTML = `
             <div class="obd-cyber-display" style="border-color: var(--green);">
@@ -969,14 +904,14 @@ function initiateBuyMarketCar(carId) {
     if (btnBox) btnBox.innerHTML = "<button class='btn btn-dark w-full' disabled>Гудки в трубке...</button>";
     
     ModalManager.open("modalBuyCall", { closeOthers: true });
-    tgHaptic('light');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
 
     buyCallTimeoutTimer = setTimeout(() => {
         let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
         let callSuccessChance = 75;
         if (karma > 65) callSuccessChance += 15;
         if (karma < 35) callSuccessChance -= 15;
-        if (car.dealType === 'urgent' || car.isPodborFind || car.isBeaterProject) callSuccessChance += 20;
+        if (car.dealType === 'urgent' || car.isBeaterProject) callSuccessChance += 20;
         
         const roll = Math.random() * 100;
 
@@ -1017,22 +952,18 @@ function paidCallMarketCar(carId) {
     car.cooldownUntil = 0;
     saveState();
     renderMarketFeed();
-    playSound('win');
-    tgHaptic('success');
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
     showToast("Приоритетный вызов успешен! Встреча назначена.");
     openMarketDeal(carId);
 }
 
-// ----------------------------------------------------
-// ВСТРЕЧА У КАПОТА: ПРОВЕРКИ, ТОРГ И ТЕСТ-ДРАЙВ
-// ----------------------------------------------------
 function openMarketDeal(carId) {
     const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
     if (carIndex === -1) return;
     const car = state.marketFeed[carIndex];
     pendingMarketCar = { car: car, carIndex: carIndex };
 
-    // Личная встреча у капота раскрывает реальное состояние кузова
     car.inspectedAtHood = true;
     saveState();
     
@@ -1069,32 +1000,29 @@ function openMarketDeal(carId) {
     const thread = document.getElementById("dealChatThread");
     if (thread) {
         let greeting = "«Привет! Вот машина, осматривай кузов, проверяй сканером. Можем сделать кружок на тест-драйве!»";
-        if (car.isTunedSpec) greeting = "«Привет! Тачка заряженная, едет боком в отсечку. Проверь выворот, прокатись!»";
+        if (car.isMuseumStock) greeting = "«Здравствуйте! Машина в коллекционном состоянии, пылинки сдувал. Смотрите кузов.»";
+        else if (car.isTunedSpec) greeting = "«Привет! Тачка заряженная, едет боком в отсечку. Проверь выворот, прокатись!»";
         else if (car.isBeaterProject) greeting = "«Здорово. За такие деньги состояние сам видишь, но до сервиса доедет своим ходом.»";
-        else if (car.isPodborFind) greeting = "«Здравствуйте! Мне сказали, что вы от автоподбора. Готов сразу отдать со скидкой, документы готовы.»";
         else if (car.dealType === 'urgent') greeting = "«Здорово! Мне срочно нужны деньги до вечера, готов уступить реальному покупателю!»";
-        else if (car.dealType === 'overprice') greeting = "«Добрый день. Машина ухоженная, состояние отличное. Сильно сбивать цену не позволю.»";
         thread.innerHTML = "<div class='chat-msg msg-seller'>" + greeting + "</div>";
     }
 
     renderMarketHaggleControls();
     ModalManager.open("modalMarketDeal", { closeOthers: true });
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
 }
 
-// ТЕСТ-ДРАЙВ ПЕРЕД ПОКУПКОЙ
 function startMarketTestDrive(carId) {
     if (!pendingMarketCar) return;
     const car = pendingMarketCar.car;
     const thread = document.getElementById("dealChatThread");
 
-    playSound('tick');
-    tgHaptic('medium');
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('medium');
 
     car.testDriven = true;
     let driveResults = [];
 
-    // Диагностика на ходу
     if (car.wear?.engine < 45) {
         driveResults.push("Двигатель троит при нажатии в пол, ощущается потеря тяги.");
     } else {
@@ -1222,15 +1150,15 @@ function buyCarDirectToScrapYard(price) {
         }
     }
 
-    addXp(gainedXp);
+    if (typeof addXp === 'function') addXp(gainedXp);
     car.unavailable = true;
     ModalManager.close("modalMarketDeal");
     
     saveState();
     updateHeaderUI();
     renderMarketFeed();
-    playSound('win');
-    tgHaptic('success');
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
 
     openVerdictModal(
         "РАСПИЛЕН НА РАЗБОРКЕ! 🔩",
@@ -1259,8 +1187,8 @@ function attemptDefectArgueHaggle() {
         thread.scrollTop = thread.scrollHeight;
     }
 
-    playSound('win');
-    tgHaptic('success');
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
     renderMarketHaggleControls();
     saveState();
 }
@@ -1284,8 +1212,8 @@ function attemptPaintArgueHaggle() {
         thread.scrollTop = thread.scrollHeight;
     }
 
-    playSound('win');
-    tgHaptic('success');
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
     renderMarketHaggleControls();
     saveState();
 }
@@ -1299,7 +1227,7 @@ function attemptMarketHaggle(percent) {
 
     let baseChance = percent === 5 ? 85 : (percent === 10 ? 60 : 35);
     if (car.isBeaterProject) baseChance += 25;
-    if (car.isPodborFind) baseChance += 20;
+    if (car.dealType === 'urgent') baseChance += 20;
     if (car.sellerPersonality === 'hurried') baseChance += 20;
     if (car.sellerPersonality === 'aggressive') baseChance -= 20;
 
@@ -1320,8 +1248,8 @@ function attemptMarketHaggle(percent) {
                 <div class="chat-msg msg-seller">«По рукам. Уступаю ${disc.toLocaleString()} ₽, оформляем ДКП.»</div>`;
             thread.scrollTop = thread.scrollHeight;
         }
-        playSound('win');
-        tgHaptic('success');
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
     } else {
         if (thread) {
             let failReplies = [
@@ -1335,16 +1263,13 @@ function attemptMarketHaggle(percent) {
                 <div class="chat-msg msg-seller">${reply}</div>`;
             thread.scrollTop = thread.scrollHeight;
         }
-        tgHaptic('error');
+        if (typeof tgHaptic === 'function') tgHaptic('error');
     }
 
     renderMarketHaggleControls();
     saveState();
 }
 
-// ----------------------------------------------------
-// ВЫКУП АВТО ЧЕРЕЗ БЛАНК ДКП И ВЫБОР МАРШРУТА ПЕРЕГОНА
-// ----------------------------------------------------
 function confirmMarketPurchaseSuccess() {
     if (!pendingMarketCar) return;
     const car = pendingMarketCar.car;
@@ -1380,8 +1305,8 @@ function confirmMarketPurchaseSuccess() {
 function openRegistrationChoiceModal(deal) {
     activePendingDKPDeal = deal;
     ModalManager.open('modalRegistrationChoice');
-    playSound('tick');
-    tgHaptic('light');
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
 }
 
 function confirmRegistrationChoice(registerOnPlayer) {
@@ -1404,11 +1329,9 @@ function confirmRegistrationChoice(registerOnPlayer) {
         showToast("Автомобиль оставлен на ДКП без постановки на учёт (Лимит: 10 дней)!");
     }
 
-    // Выбор маршрута перегона
     openDriveRouteChoiceModal(activePendingDKPDeal);
 }
 
-// МОДАЛЬНОЕ ОКНО ВЫБОРА МАРШРУТА ПЕРЕГОНА
 function openDriveRouteChoiceModal(deal) {
     let modal = document.getElementById('modalRouteChoice');
     if (!modal) {
@@ -1429,7 +1352,6 @@ function openDriveRouteChoiceModal(deal) {
             <div class="sub-label mb-3">Выберите, как перегнать только что купленный автомобиль:</div>
 
             <div class="space-y-2 mb-3 text-left">
-                <!-- ВАРИАНТ 1: ПО ШОССЕ -->
                 <div class="glass-card p-2" style="border: 1px solid var(--cyan); background: rgba(0,242,254,0.08);">
                     <div class="flex-between mb-1">
                         <b class="text-xs color-cyan"><i class="fa-solid fa-road"></i> По широкому проспекту</b>
@@ -1444,7 +1366,6 @@ function openDriveRouteChoiceModal(deal) {
                     </button>
                 </div>
 
-                <!-- ВАРИАНТ 2: ПО ДВОРАМ -->
                 <div class="glass-card p-2" style="border: 1px solid var(--amber); background: rgba(255,179,0,0.08);">
                     <div class="flex-between mb-1">
                         <b class="text-xs color-amber"><i class="fa-solid fa-signs-post"></i> Глухими дворами и промзонами</b>
@@ -1460,7 +1381,7 @@ function openDriveRouteChoiceModal(deal) {
     `;
 
     ModalManager.open('modalRouteChoice');
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
 }
 
 function finishMarketCarBuyProcessRoute(routeType) {
@@ -1470,28 +1391,25 @@ function finishMarketCarBuyProcessRoute(routeType) {
     const deal = activePendingDKPDeal;
     const car = deal.car;
 
-    // Расчёт дорожных событий при перегоне
     if (routeType === 'highway') {
         let dpsRoll = Math.random();
         if (dpsRoll < 0.28 && !deal.isRegisteredOnPlayer) {
-            // Остановка ДПС при езде без регистрации/страховки
             let fine = 800;
             state.player.cash = Math.max(0, (state.player.cash || 0) - fine);
             showToast(`🚔 Экипаж ДПС остановил на шоссе! Штраф за езду без полиса ОСАГО (-${fine} ₽).`);
-            playSound('error');
-            tgHaptic('error');
+            if (typeof playSound === 'function') playSound('error');
+            if (typeof tgHaptic === 'function') tgHaptic('error');
         } else {
-            addXp(15);
+            if (typeof addXp === 'function') addXp(15);
             showToast("Доехали по проспекту с ветерком (+15 XP)!");
         }
     } else {
-        // Езда по ямам
         if (Math.random() < 0.25) {
             car.tireWear = Math.max(10, (car.tireWear || 80) - 10);
             if (car.wear) car.wear.engine = Math.max(10, (car.wear.engine || 80) - 5);
             showToast("⚠️ Попали в яму во дворах! Небольшой износ шин и подвески.");
-            playSound('error');
-            tgHaptic('warning');
+            if (typeof playSound === 'function') playSound('error');
+            if (typeof tgHaptic === 'function') tgHaptic('warning');
         } else {
             showToast("Успешно объехали все посты ДПС по дворам!");
         }
@@ -1516,7 +1434,7 @@ function finishMarketCarBuyProcess(deal) {
     newCar.customPlate = car.plate;
     newCar.impounded = false;
     newCar.unregistered = false;
-    newCar.insurance = null; // По умолчанию авто покупается без страховки!
+    newCar.insurance = null;
     newCar.purchaseCost = price;
     newCar.wear = car.wear ? car.wear : { engine: 85, transmission: 85 };
     newCar.preSaleVisited = false;
@@ -1544,7 +1462,7 @@ function finishMarketCarBuyProcess(deal) {
     
     pendingMarketCar = null;
     activePendingDKPDeal = null;
-    addXp(40);
+    if (typeof addXp === 'function') addXp(40);
 
     if (typeof trackQuestProgress === 'function') {
         trackQuestProgress('buy_car', 1);
@@ -1552,17 +1470,24 @@ function finishMarketCarBuyProcess(deal) {
     
     let carName = car.name ? car.name : "Авто";
     showToast("✅ " + carName + " куплен за " + price.toLocaleString() + " ₽!");
-    spawnFloatingReward("-" + price.toLocaleString() + " ₽");
+    if (typeof spawnFloatingReward === 'function') spawnFloatingReward("-" + price.toLocaleString() + " ₽");
     
+    if (window.FB_Bridge?.M && price >= 100000) {
+        window.FB_Bridge.M.publishPost({
+            type: "deal",
+            title: "Удачный выкуп у капота!",
+            text: `Только что сторговал и забрал «${carName}» в гараж за ${price.toLocaleString()} ₽!`,
+            carName: carName,
+            profit: Math.round((newCar.marketValue || price) - price)
+        });
+    }
+
     saveState();
     renderMarketFeed();
     if (typeof renderGarage === 'function') renderGarage();
     setTimeout(() => { switchTab("tabGarage"); }, 400);
 }
 
-// ----------------------------------------------------
-// ТОЛЩИНОМЕР ЛКП
-// ----------------------------------------------------
 function openGaugeModal(carId) { 
     activeInspectCarId = carId;
     if (!state.marketFeed) return;
@@ -1572,8 +1497,8 @@ function openGaugeModal(carId) {
     let hasGauge = !!(state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_pro));
 
     if (!hasGauge) {
-        playSound('error');
-        tgHaptic('warning');
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('warning');
         showToast("⚠️ У вас нет толщиномера! Купите его в Авто-Маркете.");
         return;
     }
@@ -1582,8 +1507,8 @@ function openGaugeModal(carId) {
     let wear = state.player?.toolsWear ? (state.player.toolsWear[toolKey] || 0) : 0;
     
     if (wear <= 0) {
-        playSound('error');
-        tgHaptic('warning');
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('warning');
         showToast("⚠️ Батарея толщиномера села! Откалибруйте его в Авто-Маркете.");
         return;
     }
@@ -1609,8 +1534,8 @@ function checkBodyPart(part) {
     const car = state.marketFeed.find(c => c && c.id === activeInspectCarId);
     if (!car || !car.bodyThickness) return;
     
-    playSound('tick');
-    tgHaptic('light');
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
     
     let val = car.bodyThickness[part] ? car.bodyThickness[part] : 110;
     const el = document.getElementById("part-" + part);
@@ -1626,13 +1551,10 @@ function checkBodyPart(part) {
 function closeGaugeModal() {
     ModalManager.close("modalGauge");
     activeInspectCarId = null;
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
     renderMarketHaggleControls();
 }
 
-// ----------------------------------------------------
-// ОТЧЁТ АВТОТЕКИ: РАСКРЫВАЕТ ГОСНОМЕР И ИСТОРИЮ
-// ----------------------------------------------------
 function openAutotekaModal(carId) {
     if (!state.marketFeed) return;
     const car = state.marketFeed.find(c => c && c.id === carId);
@@ -1772,7 +1694,7 @@ function openAutotekaModal(carId) {
     }
     
     ModalManager.open("modalAutoteka");
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
     renderMarketFeed();
 }
 
@@ -1800,7 +1722,7 @@ function updateMarketTimers() {
     if (needFullReRender) renderMarketFeed();
 }
 
-// Экспорт функций в глобальный объект window
+// Экспорт функций в window
 window.setCategory = setCategory;
 window.toggleMarketCategories = toggleMarketCategories;
 window.toggleMarketSortOrder = toggleMarketSortOrder;
@@ -1808,7 +1730,6 @@ window.sortCurrentMarketFeed = sortCurrentMarketFeed;
 window.refreshMarketFeedManual = refreshMarketFeedManual;
 window.populateMarketFeed = populateMarketFeed;
 window.renderMarketFeed = renderMarketFeed;
-window.cycleMarketCarImage = cycleMarketCarImage;
 window.formatCarBrandBadgeHtml = formatCarBrandBadgeHtml;
 window.promptHiddenPlateAutotekaHint = promptHiddenPlateAutotekaHint;
 window.openGaugeModal = openGaugeModal;

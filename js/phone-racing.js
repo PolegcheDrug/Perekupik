@@ -1,5 +1,5 @@
 // ========================================================
-// js/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.6.0)
+// js/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.6.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Интерактивные зрелищные заезды:
 // Арена дрифта (восьмёрка с дымом), Драг 402м с ёлкой старта,
@@ -11,6 +11,7 @@ const PhoneRacing = {
     activeAnimTimer: null,
 
     renderStreetApp(container) {
+        if (!container) return;
         let sub = this.streetSubTab || 'drift';
         let streetCred = state.player?.streetCred || 100;
         let credRank = streetCred >= 1200 ? "👑 Легенда RDS & Нелегала" : (streetCred >= 600 ? "⚡ Король Трассы" : (streetCred >= 250 ? "🏎️ Опытный Пилот" : "🔰 Новичок Спота"));
@@ -48,8 +49,8 @@ const PhoneRacing = {
 
     switchStreetSubTab(tab) {
         if (this.activeAnimTimer) clearInterval(this.activeAnimTimer);
-        playSound('tick');
-        tgHaptic('light');
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
         this.streetSubTab = tab;
         this.renderStreetApp(document.getElementById('phoneAppContainer'));
     },
@@ -101,7 +102,7 @@ const PhoneRacing = {
     },
 
     // ----------------------------------------------------
-    // 1. ДРИФТ-АРЕНА (6 СЕКУНД: ВОСЬМЕРКА С ДЫМОМ)
+    // 1. ДРИФТ-АРЕНА
     // ----------------------------------------------------
     renderDriftDiscipline(container) {
         if (!state.garage || state.garage.length === 0) {
@@ -210,8 +211,8 @@ const PhoneRacing = {
         car.engineTemp = 90;
         saveState();
         updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
         showToast("Установлен новый боевой комплект шин! Мотор остужен.");
         this.renderStreetSubScreen();
     },
@@ -221,7 +222,7 @@ const PhoneRacing = {
         if (!car) return;
         car.engineTemp = 90;
         saveState();
-        playSound('tick');
+        if (typeof playSound === 'function') playSound('tick');
         showToast("Двигатель заглушен и остыл до 90°C.");
         this.renderStreetSubScreen();
     },
@@ -249,8 +250,8 @@ const PhoneRacing = {
             car.wear.transmission = Math.max(10, (car.wear.transmission || 85) - 2.5);
         }
 
-        playSound('tick');
-        tgHaptic('medium');
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('medium');
 
         const resultsArea = document.getElementById('driftRunResultsArea');
         const cardsBox = document.getElementById('driftEventsCardsBox');
@@ -295,7 +296,7 @@ const PhoneRacing = {
         let angleBase = league === 'gp' ? 78 : (league === 'europe' ? 68 : 58);
         let speedBase = league === 'gp' ? 125 : (league === 'europe' ? 95 : 65);
 
-        playEngineSound();
+        if (typeof playEngineSound === 'function') playEngineSound();
 
         if (this.activeAnimTimer) clearInterval(this.activeAnimTimer);
 
@@ -382,7 +383,7 @@ const PhoneRacing = {
                 let sp = smokeParticles[i];
                 ctx.fillStyle = `rgba(220, 230, 242, ${sp.alpha})`;
                 ctx.beginPath();
-                ctx.arc(sp.x, sp.y, sp.radius, 0, Math.PI * 2);
+                ctx.arc(sp.x, sp.radius, sp.radius, 0, Math.PI * 2);
                 ctx.fill();
                 sp.radius += 0.3;
                 sp.alpha = Math.max(0, sp.alpha - 0.02);
@@ -429,8 +430,8 @@ const PhoneRacing = {
         if (isWin) {
             state.player.cash += reward;
             state.player.streetCred = (state.player.streetCred || 100) + repBonus;
-            playSound('win');
-            tgHaptic('success');
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
 
             resultsArea.innerHTML = `
                 <div class="glass-card p-2 text-center" style="border-color:var(--green);">
@@ -444,8 +445,8 @@ const PhoneRacing = {
             `;
         } else {
             state.player.streetCred = Math.max(10, (state.player.streetCred || 100) - 10);
-            playSound('error');
-            tgHaptic('error');
+            if (typeof playSound === 'function') playSound('error');
+            if (typeof tgHaptic === 'function') tgHaptic('error');
 
             resultsArea.innerHTML = `
                 <div class="glass-card p-2 text-center" style="border-color:var(--red);">
@@ -463,7 +464,7 @@ const PhoneRacing = {
     },
 
     // ----------------------------------------------------
-    // 2. ДРАГ 402М С РОЖДЕСТВЕНСКОЙ ЕЛКОЙ СТАРТА
+    // 2. ДРАГ 402М
     // ----------------------------------------------------
     renderDragDiscipline(container) {
         if (!state.garage || state.garage.length === 0) {
@@ -539,7 +540,7 @@ const PhoneRacing = {
     },
 
     // ----------------------------------------------------
-    // 3. СТЕНС-СХОДКА (СТРАВЛИВАНИЕ ПНЕВМЫ КУЗОВА В ПОЛ)
+    // 3. СТЕНС-СХОДКА
     // ----------------------------------------------------
     renderStanceDiscipline(container) {
         if (!state.garage || state.garage.length === 0) {
@@ -627,8 +628,8 @@ const PhoneRacing = {
         if (cash < cost) return showToast("Не хватает денег на взнос участника фестиваля!");
 
         state.player.cash -= cost;
-        playSound('tick');
-        tgHaptic('light');
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
 
         const btn = document.getElementById('btnEnterStance');
         const chassis = document.getElementById('stanceCarChassis');
@@ -643,13 +644,13 @@ const PhoneRacing = {
         setTimeout(() => {
             if (chassis) chassis.classList.add('slammed-drop');
             if (hissText) hissText.classList.add('show-hiss');
-            playSound('tick');
-            tgHaptic('medium');
+            if (typeof playSound === 'function') playSound('tick');
+            if (typeof tgHaptic === 'function') tgHaptic('medium');
         }, 1800);
 
         setTimeout(() => {
             if (flashes) flashes.classList.add('flashing-active');
-            playSound('win');
+            if (typeof playSound === 'function') playSound('win');
         }, 3400);
 
         setTimeout(() => {
@@ -657,8 +658,8 @@ const PhoneRacing = {
                 let prize = Math.round(cost * (score / 32));
                 state.player.cash += prize;
                 state.player.streetCred = (state.player.streetCred || 100) + 40;
-                playSound('win');
-                tgHaptic('success');
+                if (typeof playSound === 'function') playSound('win');
+                if (typeof tgHaptic === 'function') tgHaptic('success');
 
                 if (resBox) {
                     resBox.innerHTML = `
@@ -670,7 +671,7 @@ const PhoneRacing = {
                     `;
                 }
             } else {
-                playSound('error');
+                if (typeof playSound === 'function') playSound('error');
                 if (resBox) {
                     resBox.innerHTML = `
                         <div class="glass-card p-2 text-center" style="border-color:var(--red);">
@@ -726,8 +727,8 @@ const PhoneRacing = {
         state.player.cash -= bet;
         state.player.consecutiveRaces = (state.player.consecutiveRaces || 0) + 2;
 
-        playSound('tick');
-        tgHaptic('medium');
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('medium');
 
         const resBox = document.getElementById('sprintRunResultArea');
         if (!resBox) return;
@@ -755,8 +756,8 @@ const PhoneRacing = {
             if (Math.random() < policeRaidChance) {
                 let fine = Math.round(bet * 2.0);
                 state.player.cash = Math.max(0, state.player.cash - fine);
-                playSound('error');
-                tgHaptic('error');
+                if (typeof playSound === 'function') playSound('error');
+                if (typeof tgHaptic === 'function') tgHaptic('error');
 
                 resBox.innerHTML = `
                     <div class="glass-card p-2 text-center" style="border-color:var(--red);">
@@ -769,8 +770,8 @@ const PhoneRacing = {
                 let win = Math.round(bet * (mode === 'insane' ? 2.5 : 2.0));
                 state.player.cash += win;
                 state.player.streetCred = (state.player.streetCred || 100) + (mode === 'insane' ? 55 : 25);
-                playSound('win');
-                tgHaptic('success');
+                if (typeof playSound === 'function') playSound('win');
+                if (typeof tgHaptic === 'function') tgHaptic('success');
 
                 resBox.innerHTML = `
                     <div class="glass-card p-2 text-center" style="border-color:var(--green);">

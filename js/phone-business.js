@@ -1,7 +1,7 @@
 // ========================================================
-// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА 2.0 (v0.7.6)
+// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА 2.0 (v0.7.7)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Графические шкалы доходности, кассы и сырья вместо текста,
+// Графические шкалы доходности, кассы и сырья,
 // глубокое управление цехами, штатом сотрудников и автопарком.
 // ========================================================
 
@@ -147,7 +147,7 @@ const AppBusiness = {
             if (!b.staff) b.staff = { manager: null, master: null, security: null };
             if (!Array.isArray(b.fleet)) b.fleet = [];
             if (!b.upgrades) b.upgrades = { equipment: 0, storage: 0, marketing: 0 };
-            if (b.maxStock === undefined) b.maxStock = 100;
+            if (b.maxStock === undefined || b.maxStock <= 0) b.maxStock = 100;
             if (b.stock === undefined) b.stock = 100;
             if (b.stored === undefined) b.stored = 0;
         }
@@ -213,7 +213,7 @@ const AppBusiness = {
     },
 
     // ========================================================
-    // 1. ВКЛАДКА «ТОЧКИ»: ГРАФИЧЕСКИЕ ШКАЛЫ ВМЕСТО СУХОГО ТЕКСТА
+    // 1. ВКЛАДКА «ТОЧКИ»: ГРАФИЧЕСКИЕ ШКАЛЫ
     // ========================================================
     renderBusinessesListHtml: function() {
         var lvl = state.player ? (state.player.level || 1) : 1;
@@ -238,17 +238,14 @@ const AppBusiness = {
             var curStk = biz.stock !== undefined ? biz.stock : 100;
             var curStored = biz.stored || 0;
 
-            // Расчет процентов заполнения шкал
             var stockPct = Math.min(100, Math.round((curStk / maxStk) * 100));
             var stockBarClass = stockPct > 40 ? 'fill-biz-stock' : (stockPct > 15 ? 'fill-condition-mid' : 'risk-high');
             var stockColor = stockPct > 40 ? 'color-green' : (stockPct > 15 ? 'color-amber' : 'color-red');
 
-            // Шкала эффективности (бонусы от персонала, оборудования и автопарка)
             var multiplier = this.calculateBusinessMultiplier(biz);
             var effPct = Math.min(100, Math.round((multiplier / 2.5) * 100));
             var bonusPctText = Math.round((multiplier - 1) * 100);
 
-            // Наполненность кассы относительно трёхдневного дохода точки
             var safeCapacity = Math.max(50000, calculatedIncome * 3);
             var cashFillPct = Math.min(100, Math.round((curStored / safeCapacity) * 100));
 
@@ -350,7 +347,7 @@ const AppBusiness = {
     },
 
     // ========================================================
-    // 2. ВКЛАДКА «ЦЕХ»: ДЕТАЛЬНАЯ ПАНЕЛЬ С ГРАФИЧЕСКИМИ БАРАМИ
+    // 2. ВКЛАДКА «ЦЕХ»: МОДЕРНИЗАЦИЯ
     // ========================================================
     renderBusinessDetailHtml: function() {
         var biz = state.businesses[this.selectedBizIndex];
@@ -379,12 +376,12 @@ const AppBusiness = {
         var maxStk = biz.maxStock || 100;
         var curStk = biz.stock !== undefined ? biz.stock : 100;
         var curStored = biz.stored || 0;
-        var calcIncome = this.calculateBusinessIncome(biz);
 
         var stockPct = Math.min(100, Math.round((curStk / maxStk) * 100));
         var stockColor = stockPct > 40 ? 'color-green' : (stockPct > 15 ? 'color-amber' : 'color-red');
         var stockBarClass = stockPct > 40 ? 'fill-biz-stock' : (stockPct > 15 ? 'fill-condition-mid' : 'risk-high');
 
+        var calcIncome = this.calculateBusinessIncome(biz);
         var safeCapacity = Math.max(50000, calcIncome * 3);
         var cashPct = Math.min(100, Math.round((curStored / safeCapacity) * 100));
 
@@ -395,7 +392,6 @@ const AppBusiness = {
                 '</div>' +
                 '<div class="sub-label mb-2" style="font-size:9.5px;">' + (biz.desc || biz.perk || 'Промышленный объект сети.') + '</div>' +
                 
-                '<!-- ГРАФИЧЕСКИЕ ШКАЛЫ ЦЕХА -->' +
                 '<div class="grid-2 my-2" style="gap:6px;">' +
                     '<div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">' +
                         '<div class="flex-between text-xs mb-1">' +
@@ -419,7 +415,6 @@ const AppBusiness = {
                 '</div>' +
             '</div>' +
 
-            '<!-- МОДЕРНИЗАЦИЯ ЦЕХА -->' +
             '<div class="glass-card mb-2 p-2">' +
                 '<div class="flex-between mb-1">' +
                     '<div>' +

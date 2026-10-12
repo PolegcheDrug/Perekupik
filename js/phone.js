@@ -1,12 +1,12 @@
 // ========================================================
-// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v0.7.4)
+// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v0.9.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Полный комплект встроенных экранов:
 // 1. Autodrot   2. Во-Банк    3. Бизнес      4. Жильё
 // 5. Решала     6. ПодКлюч    7. САРАИ       8. Порт
 // 9. ДПС Радар  10. Стрит     11. Маркет     12. Фортуна
-// 13. СМС/ЧАТ (LIVE) 14. Госуслуги 15. Магнитола 16. Блокнот
-// 17. DEV (PIN: 3172) + Автономный Маркет, Сараи и Мессенджер
+// 13. «M» (Соцсеть, Пульс, Друзья, Чаты)
+// 14. ПОЧТА/СКЛАД 15. Госуслуги 16. Магнитола 17. Блокнот 18. DEV (3172)
 // ========================================================
 
 const PhoneManager = {
@@ -34,6 +34,7 @@ const PhoneManager = {
 
     updateUnreadBadge() {
         const smsBadge = document.getElementById('phoneAppSmsBadge');
+        const postBadge = document.getElementById('phoneAppPostBadge');
         const navBadge = document.getElementById('phoneNavBadge');
         let unreadCount = 0;
 
@@ -41,14 +42,25 @@ const PhoneManager = {
             unreadCount = state.player.phoneMessages.filter(m => m && m.unread).length;
         }
 
+        let unreadMail = 0;
+        if (state.player && Array.isArray(state.player.mailbox)) {
+            unreadMail = state.player.mailbox.filter(m => m && !m.claimed).length;
+        }
+
         if (smsBadge) {
             smsBadge.style.display = unreadCount > 0 ? 'block' : 'none';
             smsBadge.innerText = unreadCount;
         }
 
+        if (postBadge) {
+            postBadge.style.display = unreadMail > 0 ? 'block' : 'none';
+            postBadge.innerText = unreadMail;
+        }
+
+        let total = unreadCount + unreadMail;
         if (navBadge) {
-            navBadge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
-            navBadge.innerText = unreadCount;
+            navBadge.style.display = total > 0 ? 'inline-block' : 'none';
+            navBadge.innerText = total;
         }
     },
 
@@ -58,9 +70,35 @@ const PhoneManager = {
         if (!appContainer) return;
 
         this.currentApp = appId;
-        if (homeScreen) homeScreen.style.display = 'none';
-        appContainer.style.display = 'flex';
+
+        // Принудительное переключение видимости контейнеров
+        if (homeScreen) {
+            homeScreen.style.setProperty('display', 'none', 'important');
+        }
+        appContainer.style.setProperty('display', 'flex', 'important');
         appContainer.innerHTML = '';
+
+        // 0. Приложение «Почта & Склад»
+        if (appId === 'post' || appId === 'mailbox' || appId === 'warehouse') {
+            if (window.AppPost && typeof window.AppPost.render === 'function') {
+                window.AppPost.render(appContainer);
+                this.afterAppOpened();
+                return;
+            }
+        }
+
+        // 1. Приложение «M» (Соцсеть, Пульс, Друзья, Чаты покупателей)
+        if (appId === 'messages' || appId === 'm') {
+            if (window.AppM && typeof window.AppM.render === 'function') {
+                window.AppM.render(appContainer);
+            } else if (window.AppMessenger && typeof window.AppMessenger.render === 'function') {
+                window.AppMessenger.render(appContainer);
+            } else {
+                this.renderGenericFallback(appId, appContainer);
+            }
+            this.afterAppOpened();
+            return;
+        }
 
         if (appId === 'shop') {
             AppShop.render(appContainer);
@@ -80,12 +118,6 @@ const PhoneManager = {
             return;
         }
 
-        if (appId === 'messages') {
-            AppMessenger.render(appContainer);
-            this.afterAppOpened();
-            return;
-        }
-
         const externalModule = this.getExternalModule(appId);
         if (externalModule && typeof externalModule.render === 'function') {
             try {
@@ -101,6 +133,8 @@ const PhoneManager = {
             case 'dev':
                 if (window.AppDev && typeof window.AppDev.render === 'function') {
                     window.AppDev.render(appContainer);
+                } else {
+                    this.renderGenericFallback(appId, appContainer);
                 }
                 break;
             case 'fortune':
@@ -208,10 +242,12 @@ const PhoneManager = {
             radar: window.AppRadar,
             street: window.PhoneRacing,
             fortune: window.PhoneMedia,
-            messages: window.AppMessenger,
+            messages: window.AppM || window.AppMessenger,
+            m: window.AppM || window.AppMessenger,
             gosuslugi: window.AppGosuslugi,
             radio: window.PhoneMedia,
-            notepad: window.AppNotepad
+            notepad: window.AppNotepad,
+            post: window.AppPost
         };
         return registry[appId] || null;
     },
@@ -227,11 +263,11 @@ const PhoneManager = {
         const appContainer = document.getElementById('phoneAppContainer');
 
         if (appContainer) {
-            appContainer.style.display = 'none';
+            appContainer.style.setProperty('display', 'none', 'important');
             appContainer.innerHTML = '';
         }
         if (homeScreen) {
-            homeScreen.style.display = 'block';
+            homeScreen.style.setProperty('display', 'block', 'important');
         }
 
         this.renderDailyQuestsWidget();
@@ -501,256 +537,33 @@ const PhoneManager = {
 };
 
 // ========================================================
-// АВТОНОМНЫЙ СМС МЕССЕНДЖЕР (AppMessenger)
-// ========================================================
-const AppMessenger = {
-    activeChatId: null,
-
-    getSeedMessages() {
-        return [
-            {
-                id: "msg_dps",
-                sender: "🚨 ДПС Инфоканал",
-                avatar: "🚔",
-                time: "10:15",
-                unread: true,
-                badgeColor: "bg-tag-red",
-                chatHistory: [
-                    { from: "them", text: "Внимание! Сегодня по городу усиление по 12.5.1 (прямотоки, заварка, каркасы)[cite: 1]! Тормозят всех на парковках." },
-                    { from: "them", text: "Экипаж с мобильным постом стоит на выезде из промзоны." }
-                ]
-            },
-            {
-                id: "msg_artem",
-                sender: "Артём (Покупатель)",
-                avatar: "🧔",
-                time: "09:40",
-                unread: true,
-                badgeColor: "bg-tag-cyan",
-                chatHistory: [
-                    { from: "them", text: "Привет! По машине с авторынка: одометр точно родной? Launch подключать будем?" },
-                    { from: "me", text: "Привет, любые проверки за твой счёт у капота, скрывать нечего." },
-                    { from: "them", text: "Отлично, подъеду через пару часов с толщиномером." }
-                ]
-            },
-            {
-                id: "msg_razborka",
-                sender: "Разборка «Последний путь»",
-                avatar: "🔩",
-                time: "Вчера",
-                unread: false,
-                badgeColor: "bg-tag-amber",
-                chatHistory: [
-                    { from: "them", text: "Здорово! Если будут битые или тотальные машины под распил — вези к нам, заберём сразу с дисконтом." }
-                ]
-            },
-            {
-                id: "msg_bank",
-                sender: "Банк «Во-Банк»",
-                avatar: "💳",
-                time: "Вчера",
-                unread: false,
-                badgeColor: "bg-tag-green",
-                chatHistory: [
-                    { from: "them", text: "Вам предодобрен кредитный лимит перекупа с льготным периодом! Ознакомьтесь в приложении Банк." }
-                ]
-            }
-        ];
-    },
-
-    ensureMessages() {
-        if (!state.player) state.player = {};
-        if (!Array.isArray(state.player.phoneMessages) || state.player.phoneMessages.length === 0) {
-            state.player.phoneMessages = this.getSeedMessages();
-            if (typeof saveState === 'function') saveState();
-        }
-    },
-
-    render(container) {
-        if (!container) return;
-        this.ensureMessages();
-
-        if (this.activeChatId) {
-            this.renderChatConversation(container);
-            return;
-        }
-
-        const messages = state.player.phoneMessages || [];
-        let listHtml = "";
-
-        if (messages.length === 0) {
-            listHtml = `<div class="sub-label text-center py-6">У вас нет входящих сообщений.</div>`;
-        } else {
-            messages.forEach(m => {
-                const history = m.chatHistory || [];
-                const lastMsg = history.length > 0 ? history[history.length - 1].text : (m.preview || "");
-                const isUnread = !!m.unread;
-
-                listHtml += `
-                    <div onclick="AppMessenger.openChat('${m.id}')" class="glass-card p-2 flex-between mb-2" style="cursor:pointer; border-color:${isUnread ? 'var(--cyan)' : 'var(--border-glass)'};">
-                        <div class="flex-gap" style="align-items:center; flex:1; min-width:0;">
-                            <div class="avatar" style="width:38px; height:38px; min-width:38px; font-size:18px;">
-                                ${m.avatar || '💬'}
-                            </div>
-                            <div style="flex:1; min-width:0; margin-left:4px;">
-                                <div class="flex-between">
-                                    <b class="text-xs ${isUnread ? 'color-cyan' : ''}" style="font-size:11.5px;">${m.sender}</b>
-                                    <span class="sub-label" style="font-size:9px;">${m.time || ''}</span>
-                                </div>
-                                <div class="sub-label mt-1" style="font-size:9.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    ${lastMsg}
-                                </div>
-                            </div>
-                        </div>
-                        ${isUnread ? '<div class="led-dot led-green ml-2"></div>' : ''}
-                    </div>
-                `;
-            });
-        }
-
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title color-cyan"><i class="fa-solid fa-comments mr-1"></i> СМС Мессенджер</div>
-                <div style="width:40px;"></div>
-            </div>
-
-            <div class="phone-app-body">
-                <div class="space-y-1">
-                    ${listHtml}
-                </div>
-            </div>
-        `;
-    },
-
-    openChat(msgId) {
-        this.activeChatId = msgId;
-        const msg = (state.player.phoneMessages || []).find(m => m && m.id === msgId);
-        if (msg && msg.unread) {
-            msg.unread = false;
-            if (typeof saveState === 'function') saveState();
-            if (typeof PhoneManager !== 'undefined') PhoneManager.updateUnreadBadge();
-        }
-        if (typeof playSound === 'function') playSound('tick');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    backToList() {
-        this.activeChatId = null;
-        if (typeof playSound === 'function') playSound('tick');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    renderChatConversation(container) {
-        const msg = (state.player.phoneMessages || []).find(m => m && m.id === this.activeChatId);
-        if (!msg) {
-            this.activeChatId = null;
-            this.render(container);
-            return;
-        }
-
-        const history = msg.chatHistory || [];
-        let chatLinesHtml = "";
-
-        history.forEach(item => {
-            const isMe = item.from === 'me';
-            chatLinesHtml += `
-                <div class="chat-msg ${isMe ? 'msg-player' : 'msg-seller'}" style="margin-bottom:6px;">
-                    ${item.text}
-                </div>
-            `;
-        });
-
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="AppMessenger.backToList()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Диалоги</button>
-                <div class="phone-app-title">${msg.avatar || '💬'} ${msg.sender}</div>
-                <div style="width:40px;"></div>
-            </div>
-
-            <div class="phone-app-body">
-                <div class="chat-thread-container mb-2" style="flex:1; max-height:none; min-height:280px; overflow-y:auto;" id="messengerChatBox">
-                    ${chatLinesHtml}
-                </div>
-
-                <div class="flex-gap">
-                    <input type="text" id="messengerReplyInput" placeholder="Ответить в чате..." class="glass-card p-2" style="flex:1; font-size:11px; color:#fff; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; outline:none;">
-                    <button onclick="AppMessenger.sendReply()" class="btn btn-cyan btn-sm btn-auto">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-
-        const box = document.getElementById('messengerChatBox');
-        if (box) box.scrollTop = box.scrollHeight;
-    },
-
-    sendReply() {
-        const input = document.getElementById('messengerReplyInput');
-        if (!input || !input.value.trim() || !this.activeChatId) return;
-
-        const text = input.value.trim();
-        input.value = "";
-
-        const msg = (state.player.phoneMessages || []).find(m => m && m.id === this.activeChatId);
-        if (!msg) return;
-
-        if (!msg.chatHistory) msg.chatHistory = [];
-        msg.chatHistory.push({ from: "me", text: text });
-
-        if (typeof playSound === 'function') playSound('tick');
-        if (typeof tgHaptic === 'function') tgHaptic('light');
-
-        if (typeof saveState === 'function') saveState();
-        this.renderChatConversation(document.getElementById('phoneAppContainer'));
-
-        // Автоответ от собеседника через 1.2с
-        setTimeout(() => {
-            const replies = [
-                "Понял тебя. Скоро буду на месте.",
-                "Договорились, на связи!",
-                "Принял, держи в курсе."
-            ];
-            const answer = replies[Math.floor(Math.random() * replies.length)];
-            msg.chatHistory.push({ from: "them", text: answer });
-            if (typeof saveState === 'function') saveState();
-            if (this.activeChatId === msg.id) {
-                this.renderChatConversation(document.getElementById('phoneAppContainer'));
-                if (typeof playSound === 'function') playSound('tick');
-            }
-        }, 1200);
-    }
-};
-
-// ========================================================
 // ВСТРОЕННЫЙ МОДУЛЬ «НАХОДКИ В САРАЯХ» (AppBarn)
 // ========================================================
 const DEFAULT_BARN_TIERS = [
     { 
         tier: 1, reqLvl: 1, cost: 35000, reqStars: 2, title: "🏚️ Сарай в СНТ «Заря»", 
-        desc: "Дачный кооператив. Старый деревянный сарай среди яблонь. Советская классика и архивные номера[cite: 1].", 
+        desc: "Дачный кооператив. Старый деревянный сарай среди яблонь. Советская классика и архивные номера.", 
         classGrade: "barn-grade-1", rareIdx: 0,
         img: "assets/barns/barn_tier1.jpg",
         fallback: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?auto=format&fit=crop&w=600&q=80"
     },
     { 
         tier: 2, reqLvl: 7, cost: 120000, reqStars: 5, title: "🏢 Заброшенный бокс ГСК-4", 
-        desc: "Кооператив возле промзоны. Ржавые ворота, сухой бетон. Янгтаймеры и советский инструмент[cite: 1].", 
+        desc: "Кооператив возле промзоны. Ржавые ворота, сухой бетон. Янгтаймеры и советский инструмент.", 
         classGrade: "barn-grade-2", rareIdx: 1,
         img: "assets/barns/barn_tier2.jpg",
         fallback: "https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?auto=format&fit=crop&w=600&q=80"
     },
     { 
         tier: 3, reqLvl: 15, cost: 350000, reqStars: 10, title: "🏭 Ангар механического завода", 
-        desc: "Закрытый цех советского завода. Высокие потолки, пыльные чехлы и JDM легенды 90-х[cite: 1].", 
+        desc: "Закрытый цех советского завода. Высокие потолки, пыльные чехлы и JDM легенды 90-х.", 
         classGrade: "barn-grade-3", rareIdx: 2,
         img: "assets/barns/barn_tier3.jpg",
         fallback: "https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=600&q=80"
     },
     { 
         tier: 4, reqLvl: 25, cost: 850000, reqStars: 20, title: "🏛️ Коллекционный бункер", 
-        desc: "Опечатанный подземный паркинг банка. Раритетные спорткары, редчайшие госномера и джекпоты[cite: 1]!", 
+        desc: "Опечатанный подземный паркинг банка. Раритетные спорткары, редчайшие госномера и джекпоты!", 
         classGrade: "barn-grade-4", rareIdx: 4,
         img: "assets/barns/barn_tier4.jpg",
         fallback: "https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=600&q=80"
@@ -921,47 +734,68 @@ const AppBarn = {
                 recalculateCarMarketValue(wonCar);
             }
 
-            let carDeliveryMsg = "";
-            if (curSlots < maxSlots) {
-                if (!state.garage) state.garage = [];
-                state.garage.push(wonCar);
-                carDeliveryMsg = `В пыли под брезентом найден: <b>${wonCar.name}</b>!<br>Госномер: <b>${wonPlate}</b>.<br>Автомобиль эвакуирован в ваш гараж!`;
+            // Перенаправление в Почтовый ящик
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "car",
+                    title: `Капсула времени: ${wonCar.name}`,
+                    sender: `Служба эвакуации (${tier.title})`,
+                    desc: `Автомобиль успешно извлечён из заброшенного бокса! Госномер: ${wonPlate}. Выберите место размещения: гараж или склад консервации.`,
+                    badge: "САРАЙ",
+                    carData: wonCar
+                });
             } else {
-                let comp = Math.round(wonCar.marketValue * 0.9);
-                state.player.cash += comp;
-                carDeliveryMsg = `Найден <b>${wonCar.name}</b>!<br>Гараж полон: автомобиль продан коллекционерам на месте за <b>+${comp.toLocaleString()} ₽</b>!`;
+                let carDeliveryMsg = "";
+                if (curSlots < maxSlots) {
+                    if (!state.garage) state.garage = [];
+                    state.garage.push(wonCar);
+                } else {
+                    let comp = Math.round(wonCar.marketValue * 0.9);
+                    state.player.cash += comp;
+                }
             }
 
             let gainedXp = 120;
-            addXp(gainedXp);
+            if (typeof addXp === 'function') addXp(gainedXp);
 
             saveState();
             updateHeaderUI();
             if (typeof renderGarage === 'function') renderGarage();
-            playSound('win');
-            tgHaptic('success');
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
 
             openVerdictModal(
                 "ЛЕГЕНДАРНАЯ НАХОДКА В САРАЕ! 🏚️",
-                `${carDeliveryMsg}\nОпыт авторитета: +${gainedXp} XP`,
+                `Найден редкий автомобиль <b>${wonCar.name}</b> (отправлен в Почту)!\nОпыт авторитета: +${gainedXp} XP`,
                 true
             );
         } else if (roll < 0.60) {
             let coolPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А001МР 77";
             let plateVal = (typeof calculatePlateValue === 'function') ? calculatePlateValue(coolPlate) : 75000;
 
-            if (!state.ownedPlates) state.ownedPlates = [];
-            state.ownedPlates.push(coolPlate);
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "plate",
+                    title: `Архивный знак: ${coolPlate}`,
+                    sender: "Разведка заброшек",
+                    desc: `На стене гаража обнаружен советский госномер! Оценка знака: ~${plateVal.toLocaleString()} ₽.`,
+                    badge: "НОМЕР",
+                    plate: coolPlate
+                });
+            } else {
+                if (!state.ownedPlates) state.ownedPlates = [];
+                state.ownedPlates.push(coolPlate);
+            }
 
             let bonusCash = Math.round(tier.cost * 0.6);
             state.player.cash += bonusCash;
             let gainedXp = 60;
-            addXp(gainedXp);
+            if (typeof addXp === 'function') addXp(gainedXp);
 
             saveState();
             updateHeaderUI();
-            playSound('win');
-            tgHaptic('success');
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
 
             openVerdictModal(
                 "АРХИВНЫЙ ГОСНОМЕР НАЙДЕН! 🏷️",
@@ -973,7 +807,7 @@ const AppBarn = {
             let winCash = Math.round(tier.cost * (1.35 + Math.random() * 0.45));
             let gainedXp = 50;
             state.player.cash += winCash;
-            addXp(gainedXp);
+            if (typeof addXp === 'function') addXp(gainedXp);
 
             if (state.businesses) {
                 state.businesses.forEach(b => {
@@ -983,8 +817,8 @@ const AppBarn = {
 
             saveState();
             updateHeaderUI();
-            playSound('win');
-            tgHaptic('success');
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
 
             openVerdictModal(
                 "СОВЕТСКИЙ ИНСТРУМЕНТ И З/Ч! 🔩",
@@ -994,11 +828,11 @@ const AppBarn = {
             );
         } else {
             let gainedXp = 25;
-            addXp(gainedXp);
+            if (typeof addXp === 'function') addXp(gainedXp);
             saveState();
             updateHeaderUI();
-            playSound('error');
-            tgHaptic('error');
+            if (typeof playSound === 'function') playSound('error');
+            if (typeof tgHaptic === 'function') tgHaptic('error');
 
             openVerdictModal(
                 "ПУСТОЙ САРАЙ 💨",
@@ -1367,7 +1201,7 @@ const AppNotepad = {
         container.innerHTML = `
             <div class="phone-app-header">
                 <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title"><i class="fa-solid fa-note-sticky color-amber mr-1"></i> Блокнот Целей</div>
+                <div class="phone-app-title color-amber"><i class="fa-solid fa-note-sticky mr-1"></i> Блокнот Целей</div>
                 <div style="width:40px;"></div>
             </div>
             <div class="phone-app-body">
@@ -1393,7 +1227,6 @@ window.PhoneManager = PhoneManager;
 window.AppNotepad = AppNotepad;
 window.AppShop = AppShop;
 window.AppBarn = AppBarn;
-window.AppMessenger = AppMessenger;
 
 document.addEventListener('DOMContentLoaded', () => {
     PhoneManager.init();

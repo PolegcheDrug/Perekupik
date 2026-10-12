@@ -1,7 +1,7 @@
 // ========================================================
-// js/phone-dev.js — СЕКРЕТНОЕ ПРИЛОЖЕНИЕ «DEV» В PEREKUP OS (v0.6.4)
+// js/phone-dev.js — СЕКРЕТНОЕ ПРИЛОЖЕНИЕ «DEV» В PEREKUP OS (v0.6.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Доступ по PIN-коду (Yo), консоль дебага, накрутка ресурсов,
+// Доступ по PIN-коду (3172), консоль дебага, накрутка ресурсов,
 // управление рынком, ДПС, автопарком и встроенная Авто-Студия.
 // ========================================================
 
@@ -12,6 +12,7 @@ const AppDev = {
     activeSubTab: "studio", // 'studio' | 'resources' | 'sandbox' | 'database'
 
     render(container) {
+        if (!container) return;
         if (!this.isAuthenticated) {
             this.renderLockScreen(container);
         } else {
@@ -26,7 +27,7 @@ const AppDev = {
         let dotsHtml = "";
         for (let i = 0; i < 4; i++) {
             let isFilled = i < this.enteredPin.length;
-            dotsHtml += `<div class="dev-pin-dot ${isFilled ? 'filled' : ''}"></div>`;
+            dotsHtml += `<div class="dev-pin-dot ${isFilled ? 'filled' : ''}" id="devDot_${i}"></div>`;
         }
 
         container.innerHTML = `
@@ -44,7 +45,7 @@ const AppDev = {
                     <b class="text-xs color-green" style="font-size: 13px; letter-spacing: 1px;">PEREKUP OS // ROOT ACCESS</b>
                     <div class="sub-label mb-3" style="font-size: 9.5px;">Введите 4-значный системный PIN-код разработчика:</div>
 
-                    <div class="dev-pin-dots-row mb-3">
+                    <div class="dev-pin-dots-row mb-3" id="devPinDotsContainer">
                         ${dotsHtml}
                     </div>
 
@@ -70,28 +71,45 @@ const AppDev = {
         `;
     },
 
+    updatePinDotsUI() {
+        for (let i = 0; i < 4; i++) {
+            const dot = document.getElementById(`devDot_${i}`);
+            if (dot) {
+                if (i < this.enteredPin.length) dot.classList.add('filled');
+                else dot.classList.remove('filled');
+            }
+        }
+    },
+
     pressKey(num) {
         if (this.enteredPin.length >= 4) return;
         this.enteredPin += num;
         if (typeof playSound === 'function') playSound('tick');
         if (typeof tgHaptic === 'function') tgHaptic('light');
 
+        const errEl = document.getElementById('devPinErrorMsg');
+        if (errEl) errEl.innerText = "";
+
+        this.updatePinDotsUI();
+
         if (this.enteredPin.length === 4) {
-            this.verifyPin();
-        } else {
-            this.render(document.getElementById('phoneAppContainer'));
+            setTimeout(() => this.verifyPin(), 120);
         }
     },
 
     clearPin() {
         this.enteredPin = "";
-        this.render(document.getElementById('phoneAppContainer'));
+        this.updatePinDotsUI();
+        const errEl = document.getElementById('devPinErrorMsg');
+        if (errEl) errEl.innerText = "";
     },
 
     backspacePin() {
         if (this.enteredPin.length > 0) {
             this.enteredPin = this.enteredPin.slice(0, -1);
-            this.render(document.getElementById('phoneAppContainer'));
+            this.updatePinDotsUI();
+            const errEl = document.getElementById('devPinErrorMsg');
+            if (errEl) errEl.innerText = "";
         }
     },
 
@@ -107,9 +125,9 @@ const AppDev = {
             if (typeof playSound === 'function') playSound('error');
             if (typeof tgHaptic === 'function') tgHaptic('error');
             this.enteredPin = "";
-            this.render(document.getElementById('phoneAppContainer'));
+            this.updatePinDotsUI();
             const errEl = document.getElementById('devPinErrorMsg');
-            if (errEl) errEl.innerText = "❌ Ошибка авторизации: неверный PIN-код!";
+            if (errEl) errEl.innerText = "❌ Ошибка: неверный PIN-код!";
         }
     },
 
@@ -117,7 +135,7 @@ const AppDev = {
         this.isAuthenticated = false;
         this.enteredPin = "";
         this.render(document.getElementById('phoneAppContainer'));
-        if (typeof showToast === 'function') showToast("Сессия DEV завершена.");
+        if (typeof showToast === 'function') showToast("Сессия DEV заблокирована.");
     },
 
     switchTab(tab) {
@@ -166,26 +184,30 @@ const AppDev = {
     },
 
     // --------------------------------------------------------
-    // ВКЛАДКА 1: АВТО-СТУДИЯ (ИНТЕГРАЦИЯ С DEVSTUDIO)
+    // ВКЛАДКА 1: АВТО-СТУДИЯ
     // --------------------------------------------------------
     renderStudioTab() {
+        const queueCount = (typeof DevStudio !== 'undefined' && DevStudio.stagedBatchQueue) 
+            ? DevStudio.stagedBatchQueue.length 
+            : 0;
+
         return `
             <div class="glass-card p-3 mb-2" style="background: radial-gradient(circle at 50% 0%, rgba(0,242,254,0.15), #090e18); border-color: var(--cyan);">
                 <div class="flex-between mb-1">
                     <b class="text-xs color-cyan" style="font-size:13px;"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Авто-Студия Карточек</b>
-                    <span class="tag-badge bg-tag-cyan">v0.6.4</span>
+                    <span class="tag-badge bg-tag-cyan">v0.6.5</span>
                 </div>
                 <div class="sub-label mb-3" style="font-size:9.5px;">
                     Создание новых лотов из галереи телефона, кадрирование обложек в 16:9, редактирование существующих машин и экспорт в data.js.
                 </div>
 
                 <div class="space-y-2">
-                    <button onclick="DevStudio.switchScreen('create'); DevStudio.open();" class="btn btn-cyan w-full" style="box-shadow: 0 0 16px var(--cyan-glow);">
-                        <i class="fa-solid fa-plus-circle mr-1"></i> Открыть Создание Нового Авто (Экран 1)
+                    <button onclick="if(typeof DevStudio !== 'undefined'){ DevStudio.switchScreen('create'); DevStudio.open(); }" class="btn btn-cyan w-full" style="box-shadow: 0 0 16px var(--cyan-glow);">
+                        <i class="fa-solid fa-plus-circle mr-1"></i> Создать Новое Авто (Экран 1)
                     </button>
 
-                    <button onclick="DevStudio.switchScreen('edit'); DevStudio.open();" class="btn btn-purple w-full" style="box-shadow: 0 0 16px rgba(192,132,252,0.3);">
-                        <i class="fa-solid fa-pen-to-square mr-1"></i> Открыть Редактор Базы по Классам (Экран 2)
+                    <button onclick="if(typeof DevStudio !== 'undefined'){ DevStudio.switchScreen('edit'); DevStudio.open(); }" class="btn btn-purple w-full" style="box-shadow: 0 0 16px rgba(192,132,252,0.3);">
+                        <i class="fa-solid fa-pen-to-square mr-1"></i> Редактор Базы Автотехники (Экран 2)
                     </button>
                 </div>
             </div>
@@ -193,15 +215,15 @@ const AppDev = {
             <div class="glass-card p-2 mb-2">
                 <div class="flex-between mb-1">
                     <b class="text-xs color-amber"><i class="fa-solid fa-layer-group"></i> Очередь экспорта пака:</b>
-                    <span class="tag-badge bg-tag-amber">${DevStudio.stagedBatchQueue.length} в буфере</span>
+                    <span class="tag-badge bg-tag-amber">${queueCount} в буфере</span>
                 </div>
                 <div class="sub-label mb-2" style="font-size:9px;">Все созданные и отредактированные машины готовы к слиянию.</div>
                 
                 <div class="grid-2">
-                    <button onclick="DevStudio.downloadMergedDataJs()" class="btn btn-green btn-sm" ${DevStudio.stagedBatchQueue.length === 0 ? 'disabled' : ''}>
+                    <button onclick="if(typeof DevStudio !== 'undefined') DevStudio.downloadMergedDataJs()" class="btn btn-green btn-sm" ${queueCount === 0 ? 'disabled' : ''}>
                         Скачать data.js
                     </button>
-                    <button onclick="DevStudio.clearBatchQueue(); AppDev.render(document.getElementById('phoneAppContainer'));" class="btn btn-dark btn-sm" ${DevStudio.stagedBatchQueue.length === 0 ? 'disabled' : ''}>
+                    <button onclick="if(typeof DevStudio !== 'undefined'){ DevStudio.clearBatchQueue(); AppDev.render(document.getElementById('phoneAppContainer')); }" class="btn btn-dark btn-sm" ${queueCount === 0 ? 'disabled' : ''}>
                         Очистить очередь
                     </button>
                 </div>
@@ -262,17 +284,17 @@ const AppDev = {
     },
 
     // --------------------------------------------------------
-    // ВКЛАДКА 3: ДЕБАГ-САНДБОКС (МИР И МЕХАНИКИ)
+    // ВКЛАДКА 3: ДЕБАГ-САНДБОКС
     // --------------------------------------------------------
     renderSandboxTab() {
         return `
             <div class="glass-card p-2 mb-2">
                 <b class="text-xs color-cyan block mb-2"><i class="fa-solid fa-arrows-rotate mr-1"></i> Авторынок и Тренды:</b>
                 <div class="space-y-1">
-                    <button onclick="populateMarketFeed(); showToast('Рынок принудительно перегенерирован!');" class="btn btn-dark btn-sm w-full">
+                    <button onclick="if(typeof populateMarketFeed === 'function') populateMarketFeed(); showToast('Рынок принудительно перегенерирован!');" class="btn btn-dark btn-sm w-full">
                         Респавн авторынка (Бесплатно)
                     </button>
-                    <button onclick="triggerMarketNewsEvent()" class="btn btn-cyan btn-sm w-full">
+                    <button onclick="if(typeof triggerMarketNewsEvent === 'function') triggerMarketNewsEvent();" class="btn btn-cyan btn-sm w-full">
                         Случайная рыночная новость (Взлёт/Спад цен)
                     </button>
                 </div>
@@ -282,7 +304,7 @@ const AppDev = {
                 <b class="text-xs color-red block mb-2"><i class="fa-solid fa-shield-halved mr-1"></i> ДПС, Розыск и Штрафы:</b>
                 <div class="space-y-1">
                     <button onclick="AppDev.clearPoliceHeat()" class="btn btn-dark btn-sm w-full">
-                        Сбросить розыск ДПС на 0 + Вечный иммунитет на 5 дн.
+                        Сбросить розыск ДПС на 0 + Иммунитет на 5 дн.
                     </button>
                     <button onclick="AppDev.freeAllImpoundCars()" class="btn btn-green btn-sm w-full">
                         Забрать все машины со спецстоянки без штрафов
@@ -293,7 +315,7 @@ const AppDev = {
             <div class="glass-card p-2">
                 <b class="text-xs color-amber block mb-2"><i class="fa-solid fa-clock mr-1"></i> Время и Суточный цикл:</b>
                 <div class="space-y-1">
-                    <button onclick="executeDayCycleMidnight(new Date()); showToast('🌙 Симуляция ночи: проценты и доход начислены!');" class="btn btn-amber btn-sm w-full">
+                    <button onclick="if(typeof executeDayCycleMidnight === 'function') executeDayCycleMidnight(new Date()); showToast('🌙 Симуляция ночи: проценты и доход начислены!');" class="btn btn-amber btn-sm w-full">
                         Перемотать день вперед (00:00 Начисление кассы и вкладов)
                     </button>
                 </div>
@@ -309,42 +331,41 @@ const AppDev = {
             <div class="glass-card p-2 mb-2">
                 <b class="text-xs color-cyan block mb-2"><i class="fa-solid fa-database mr-1"></i> Дамп локального сохранения:</b>
                 <div class="grid-2 mb-2">
-                    <button onclick="openSaveManagerModal()" class="btn btn-dark btn-sm">Код сейва (Base64)</button>
-                    <button onclick="syncCloudStorageManual()" class="btn btn-cyan btn-sm">Синхрон с TG Cloud</button>
+                    <button onclick="if(typeof openSaveManagerModal === 'function') openSaveManagerModal();" class="btn btn-dark btn-sm">Код сейва (Base64)</button>
+                    <button onclick="if(typeof syncCloudStorageManual === 'function') syncCloudStorageManual();" class="btn btn-cyan btn-sm">Синхрон с TG Cloud</button>
                 </div>
             </div>
 
             <div class="glass-card p-2" style="border: 1px solid var(--red);">
                 <b class="text-xs color-red block mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Опасная зона:</b>
                 <div class="sub-label mb-2" style="font-size:9px;">Полное удаление прогресса игры и локальных кэшей.</div>
-                <button onclick="resetGameData()" class="btn btn-danger btn-sm w-full">
+                <button onclick="if(typeof resetGameData === 'function') resetGameData();" class="btn btn-danger btn-sm w-full">
                     Полный Wipe и сброс прогресса до нуля
                 </button>
             </div>
         `;
     },
 
-    // ========================================================
-    // ДЕЙСТВИЯ И ДЕБАГ-МЕТОДЫ
-    // ========================================================
     refreshHeader() {
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         if (typeof renderProfileAnalytics === 'function') renderProfileAnalytics();
     },
 
     restoreAllStats() {
+        if (!state.player) state.player = {};
         state.player.fuel = 100;
         state.player.hunger = 100;
         state.player.mood = 100;
         state.player.expressTickets = state.player.maxExpressTickets || 25;
         saveState();
         this.refreshHeader();
-        playSound('win');
-        tgHaptic('success');
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
         showToast("Топливо, сытость и кураж восстановлены на 100%!");
     },
 
     giveAllTools() {
+        if (!state.player) state.player = {};
         if (!state.player.tools) state.player.tools = {};
         if (!state.player.toolsWear) state.player.toolsWear = {};
         ['gauge', 'gauge_pro', 'obd', 'obd_launch', 'endoscope', 'compressor', 'battery_tester'].forEach(id => {
@@ -352,19 +373,20 @@ const AppDev = {
             state.player.toolsWear[id] = 100;
         });
         saveState();
-        playSound('win');
-        tgHaptic('success');
-        showToast("Все диагностические приборы добавлены с 100% ресурсом!");
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast("Все диагностические приборы добавлены со 100% ресурсом!");
     },
 
     clearPoliceHeat() {
+        if (!state.player) state.player = {};
         state.player.consecutiveRaces = 0;
         state.player.policeImmunityDays = 5;
         state.player.trafficFines = 0;
         saveState();
         this.refreshHeader();
-        playSound('win');
-        tgHaptic('success');
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
         showToast("Внимание ДПС сброшено на 0. Получен иммунитет на 5 дней!");
     },
 
@@ -381,8 +403,8 @@ const AppDev = {
         }
         saveState();
         if (typeof renderGarage === 'function') renderGarage();
-        playSound('win');
-        tgHaptic('success');
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
         showToast(`Со спецстоянки вызволено ${count} автомобилей!`);
     }
 };
