@@ -1,7 +1,7 @@
 // ========================================================
-// js/garage.js — АВТОПАРК, ОБЪЁМНЫЕ ВИДЖЕТЫ И ТЮНИНГ (v0.7.3)
+// js/garage.js — АВТОПАРК, ОБЪЁМНЫЕ ВИДЖЕТЫ И ТЮНИНГ (v0.7.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// 3D-капсулы характеристик, рельефный блок оценки, окупаемый тюнинг,
+// 3D-капсулы характеристик, шильдики марок, окупаемый тюнинг,
 // стационарный Launch OBD2 строго по прибору, полисы ОСАГО/КАСКО
 // и забор машин со спецстоянки ГИБДД через ModalManager.
 // ========================================================
@@ -231,7 +231,7 @@ function recalculateCarMarketValue(car) {
 }
 
 // ========================================================
-// 3. ОСНОВНОЙ РЕНДЕР ГАРАЖА (ОБЪЁМНЫЕ 3D-КАПСУЛЫ)
+// 3. ОСНОВНОЙ РЕНДЕР ГАРАЖА
 // ========================================================
 function renderGarage() {
     const list = document.getElementById('garageList');
@@ -318,7 +318,6 @@ function renderGarage() {
             ? `<span class='tag-badge bg-tag-red ml-1'><i class='fa-solid fa-circle-notch'></i> СЛИК ${tireVal}%</span>`
             : "";
 
-        // Расчёт состояния кузова для иконки
         let condVal = car.condition !== undefined ? car.condition : 80;
         let shieldIconClass = condVal >= 80 
             ? 'spec-tile-icon-shield' 
@@ -328,6 +327,10 @@ function renderGarage() {
             : (condVal >= 50 ? 'color-amber' : 'color-red');
 
         let modsIconsHtml = renderCarModsBadges(car);
+
+        let brandHeaderHtml = (typeof formatCarBrandBadgeHtml === 'function') 
+            ? formatCarBrandBadgeHtml(cName) 
+            : `<div class="car-title-plate">${cName}</div>`;
 
         let actionControlBlock = "";
         if (isImpounded) {
@@ -381,16 +384,18 @@ function renderGarage() {
                 </div>
             </div>
             
-            <!-- РЕЛЬЕФНАЯ СТРОКА ЗАГОЛОВКА И ЦЕНЫ -->
+            <!-- РЕЛЬЕФНАЯ СТРОКА С ШИЛЬДИКАМИ И ЦЕНОЙ -->
             <div class="car-header-row-volumetric">
-                <div class="car-title-plate">${cName}</div>
+                <div>
+                    ${brandHeaderHtml}
+                </div>
                 <div class="car-price-badge-3d">
                     <span class="car-price-label-sub">Оценка рынка</span>
                     <span class="car-price-value-3d">${cPrice} ₽</span>
                 </div>
             </div>
 
-            <!-- ОБЪЁМНЫЕ РЕЛЬЕФНЫЕ КАПСУЛЫ ХАРАКТЕРИСТИК (ВМЕСТО ПЛОСКОГО СПИСКА) -->
+            <!-- ОБЪЁМНЫЕ РЕЛЬЕФНЫЕ КАПСУЛЫ ХАРАКТЕРИСТИК -->
             <div class="car-specs-grid-volumetric">
                 <div class="spec-tile-3d">
                     <div class="spec-tile-icon-wrap spec-tile-icon-power">

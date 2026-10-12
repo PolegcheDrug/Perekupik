@@ -1,5 +1,8 @@
 // ========================================================
-// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА (v0.6.7)
+// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА 2.0 (v0.7.6)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Графические шкалы доходности, кассы и сырья вместо текста,
+// глубокое управление цехами, штатом сотрудников и автопарком.
 // ========================================================
 
 if (typeof window.BUSINESS_UPGRADES_BRANCHES === 'undefined') {
@@ -165,6 +168,12 @@ const AppBusiness = {
     calculateBusinessIncome: function(biz) {
         if (!biz || biz.level <= 0) return 0;
         var base = (biz.income || 1000) * biz.level;
+        var bonusMul = this.calculateBusinessMultiplier(biz);
+        return Math.round(base * bonusMul);
+    },
+
+    calculateBusinessMultiplier: function(biz) {
+        if (!biz) return 1.0;
         var bonusMul = 1.0;
 
         if (biz.staff && typeof BUSINESS_STAFF_CATALOG !== 'undefined') {
@@ -200,9 +209,12 @@ const AppBusiness = {
             }
         }
 
-        return Math.round(base * bonusMul);
+        return bonusMul;
     },
 
+    // ========================================================
+    // 1. ВКЛАДКА «ТОЧКИ»: ГРАФИЧЕСКИЕ ШКАЛЫ ВМЕСТО СУХОГО ТЕКСТА
+    // ========================================================
     renderBusinessesListHtml: function() {
         var lvl = state.player ? (state.player.level || 1) : 1;
         var html = "";
@@ -225,6 +237,20 @@ const AppBusiness = {
             var maxStk = biz.maxStock || 100;
             var curStk = biz.stock !== undefined ? biz.stock : 100;
             var curStored = biz.stored || 0;
+
+            // Расчет процентов заполнения шкал
+            var stockPct = Math.min(100, Math.round((curStk / maxStk) * 100));
+            var stockBarClass = stockPct > 40 ? 'fill-biz-stock' : (stockPct > 15 ? 'fill-condition-mid' : 'risk-high');
+            var stockColor = stockPct > 40 ? 'color-green' : (stockPct > 15 ? 'color-amber' : 'color-red');
+
+            // Шкала эффективности (бонусы от персонала, оборудования и автопарка)
+            var multiplier = this.calculateBusinessMultiplier(biz);
+            var effPct = Math.min(100, Math.round((multiplier / 2.5) * 100));
+            var bonusPctText = Math.round((multiplier - 1) * 100);
+
+            // Наполненность кассы относительно трёхдневного дохода точки
+            var safeCapacity = Math.max(50000, calculatedIncome * 3);
+            var cashFillPct = Math.min(100, Math.round((curStored / safeCapacity) * 100));
 
             var actionBlock = "";
             if (isLocked) {
@@ -263,7 +289,6 @@ const AppBusiness = {
             }
 
             var iconClass = defaultIcons[biz.id] || 'fa-briefcase';
-            var progressPct = Math.min(100, Math.round((curStk / maxStk) * 100));
 
             html += 
                 '<div class="glass-card mb-3 p-2">' +
@@ -276,19 +301,47 @@ const AppBusiness = {
                             (isOwned ? 'Ур. ' + biz.level : 'Доступно') +
                         '</span>' +
                     '</div>' +
-                    '<div class="flex-between mb-2">' +
-                        '<span class="sub-label" style="font-size:9.5px;">Доходность: <b class="color-green">+' + calculatedIncome.toLocaleString() + ' ₽/день</b></span>' +
-                        (isOwned ? '<span class="sub-label" style="font-size:9.5px;">В кассе: <b class="color-cyan">' + curStored.toLocaleString() + ' ₽</b></span>' : '') +
-                    '</div>' +
-                    '<div class="sub-label mb-1" style="font-size:9px; color:#cbd5e1;">⭐ Перк: <b>' + (biz.perk || '') + '</b></div>' +
+
+                    '<div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">' + (biz.desc || '') + '</div>' +
+
                     (isOwned ? (
-                        '<div class="flex-between sub-label mb-1" style="font-size:9px;">' +
-                            '<span>Запас сырья: <b>' + curStk + ' / ' + maxStk + '%</b></span>' +
-                        '</div>' +
-                        '<div class="biz-progress-track mb-2">' +
-                            '<div class="biz-progress-fill ' + (curStk > 20 ? 'fill-biz-stock' : 'risk-high') + '" style="width:' + progressPct + '%;"></div>' +
+                        '<div class="car-telemetry-panel mb-2" style="background:#090e18; border-radius:10px; padding:8px; border:1px solid rgba(255,255,255,0.06);">' +
+                            '<!-- ШКАЛА 1: ДОХОДНОСТЬ И ЭФФЕКТИВНОСТЬ -->' +
+                            '<div class="telemetry-row mb-1">' +
+                                '<div class="telemetry-label" style="font-size:9px;"><i class="fa-solid fa-bolt color-green"></i> Доходность:</div>' +
+                                '<div class="telemetry-bar-bg" style="height:7px;">' +
+                                    '<div class="telemetry-bar-fill" style="width:' + effPct + '%; background: linear-gradient(90deg, #10b981, #00e676); box-shadow: 0 0 8px rgba(0,230,118,0.4);"></div>' +
+                                '</div>' +
+                                '<div class="telemetry-val color-green" style="font-size:10px; font-weight:900;">+' + calculatedIncome.toLocaleString() + ' ₽/д ' + (bonusPctText > 0 ? '(+' + bonusPctText + '%)' : '') + '</div>' +
+                            '</div>' +
+
+                            '<!-- ШКАЛА 2: НАКОПЛЕНИЕ В КАССЕ -->' +
+                            '<div class="telemetry-row mb-1">' +
+                                '<div class="telemetry-label" style="font-size:9px;"><i class="fa-solid fa-vault color-cyan"></i> В кассе:</div>' +
+                                '<div class="telemetry-bar-bg" style="height:7px;">' +
+                                    '<div class="telemetry-bar-fill" style="width:' + cashFillPct + '%; background: linear-gradient(90deg, #0284c7, #00f2fe); box-shadow: 0 0 8px var(--cyan-glow);"></div>' +
+                                '</div>' +
+                                '<div class="telemetry-val color-cyan" style="font-size:10px; font-weight:900;">' + curStored.toLocaleString() + ' ₽</div>' +
+                            '</div>' +
+
+                            '<!-- ШКАЛА 3: ЗАПАС СЫРЬЯ НА СКЛАДЕ -->' +
+                            '<div class="telemetry-row">' +
+                                '<div class="telemetry-label" style="font-size:9px;"><i class="fa-solid fa-boxes-stacked ' + stockColor + '"></i> Склад сырья:</div>' +
+                                '<div class="telemetry-bar-bg" style="height:7px;">' +
+                                    '<div class="telemetry-bar-fill ' + stockBarClass + '" style="width:' + stockPct + '%;"></div>' +
+                                '</div>' +
+                                '<div class="telemetry-val ' + stockColor + '" style="font-size:10px; font-weight:900;">' + curStk + ' / ' + maxStk + '%</div>' +
+                            '</div>' +
                         '</div>'
-                    ) : '') +
+                    ) : (
+                        '<div class="flex-between p-2 mb-2" style="background:#090e18; border-radius:8px;">' +
+                            '<span class="sub-label text-xs">Базовый доход:</span>' +
+                            '<b class="color-green text-xs">+' + calculatedIncome.toLocaleString() + ' ₽/день</b>' +
+                        '</div>'
+                    )) +
+
+                    '<div class="sub-label mb-2" style="font-size:9px; color:#cbd5e1;">⭐ Перк: <b>' + (biz.perk || 'Стандарт') + '</b></div>' +
+
                     actionBlock +
                 '</div>';
         }
@@ -296,6 +349,9 @@ const AppBusiness = {
         return html;
     },
 
+    // ========================================================
+    // 2. ВКЛАДКА «ЦЕХ»: ДЕТАЛЬНАЯ ПАНЕЛЬ С ГРАФИЧЕСКИМИ БАРАМИ
+    // ========================================================
     renderBusinessDetailHtml: function() {
         var biz = state.businesses[this.selectedBizIndex];
         if (!biz || biz.level <= 0) {
@@ -320,50 +376,85 @@ const AppBusiness = {
         var stCost = nextSt ? Math.round(baseCost * nextSt.costMul) : 0;
         var mkCost = nextMk ? Math.round(baseCost * nextMk.costMul) : 0;
 
+        var maxStk = biz.maxStock || 100;
+        var curStk = biz.stock !== undefined ? biz.stock : 100;
+        var curStored = biz.stored || 0;
+        var calcIncome = this.calculateBusinessIncome(biz);
+
+        var stockPct = Math.min(100, Math.round((curStk / maxStk) * 100));
+        var stockColor = stockPct > 40 ? 'color-green' : (stockPct > 15 ? 'color-amber' : 'color-red');
+        var stockBarClass = stockPct > 40 ? 'fill-biz-stock' : (stockPct > 15 ? 'fill-condition-mid' : 'risk-high');
+
+        var safeCapacity = Math.max(50000, calcIncome * 3);
+        var cashPct = Math.min(100, Math.round((curStored / safeCapacity) * 100));
+
         return '<div class="glass-card mb-2 p-2" style="border-left: 3px solid var(--green);">' +
                 '<div class="flex-between mb-1">' +
                     '<b class="text-xs color-green">' + biz.name + ' (Ур. ' + biz.level + ')</b>' +
-                    '<span class="tag-badge bg-tag-green">Цех активен</span>' +
+                    '<span class="tag-badge bg-tag-green">ЦЕХ АКТИВЕН</span>' +
                 '</div>' +
                 '<div class="sub-label mb-2" style="font-size:9.5px;">' + (biz.desc || biz.perk || 'Промышленный объект сети.') + '</div>' +
-                '<div class="flex-between text-xs p-1" style="background:#090e18; border-radius:6px;">' +
-                    '<span>Касса точки: <b class="color-green">' + (biz.stored || 0).toLocaleString() + ' ₽</b></span>' +
-                    '<span>Склад: <b class="color-amber">' + (biz.stock || 0) + ' / ' + (biz.maxStock || 100) + '%</b></span>' +
+                
+                '<!-- ГРАФИЧЕСКИЕ ШКАЛЫ ЦЕХА -->' +
+                '<div class="grid-2 my-2" style="gap:6px;">' +
+                    '<div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">' +
+                        '<div class="flex-between text-xs mb-1">' +
+                            '<span class="sub-label"><i class="fa-solid fa-vault color-cyan"></i> Касса:</span>' +
+                            '<b class="color-green">' + curStored.toLocaleString() + ' ₽</b>' +
+                        '</div>' +
+                        '<div class="telemetry-bar-bg" style="height:6px;">' +
+                            '<div class="telemetry-bar-fill" style="width:' + cashPct + '%; background: linear-gradient(90deg, #0284c7, #00f2fe);"></div>' +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">' +
+                        '<div class="flex-between text-xs mb-1">' +
+                            '<span class="sub-label"><i class="fa-solid fa-boxes-stacked ' + stockColor + '"></i> Склад:</span>' +
+                            '<b class="' + stockColor + '">' + curStk + ' / ' + maxStk + '%</b>' +
+                        '</div>' +
+                        '<div class="telemetry-bar-bg" style="height:6px;">' +
+                            '<div class="telemetry-bar-fill ' + stockBarClass + '" style="width:' + stockPct + '%;"></div>' +
+                        '</div>' +
+                    '</div>' +
                 '</div>' +
             '</div>' +
+
+            '<!-- МОДЕРНИЗАЦИЯ ЦЕХА -->' +
             '<div class="glass-card mb-2 p-2">' +
                 '<div class="flex-between mb-1">' +
                     '<div>' +
                         '<b class="text-xs color-cyan"><i class="fa-solid fa-screwdriver-wrench"></i> Оснащение цеха</b>' +
                         '<div class="sub-label" style="font-size:9px;">Уровень апгрейда: <b>' + eqLvl + '/3</b></div>' +
                     '</div>' +
-                    (nextEq ? '<span class="price-val text-xs">' + eqCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">МАКСИМУМ</span>') +
+                    (nextEq ? '<span class="price-val text-xs color-green">' + eqCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">МАКСИМУМ</span>') +
                 '</div>' +
-                '<div class="sub-label mb-2" style="font-size:9.5px;">' + (nextEq ? nextEq.name : 'Установлены топовые посты и компьютерные 3D-стенды (+45% чека)') + '</div>' +
+                '<div class="sub-label mb-2" style="font-size:9.5px;">' + (nextEq ? nextEq.name : 'Установлены топовые посты и компьютерные 3D-стенды (+45% к выручке)') + '</div>' +
                 '<button onclick="AppBusiness.upgradeBranchAction(\'equipment\', ' + eqCost + ')" class="btn btn-cyan btn-sm w-full"' + (!nextEq ? ' disabled' : '') + '>' +
                     (nextEq ? 'Прокачать оснащение (' + (eqCost / 1000).toFixed(0) + 'k ₽)' : 'Оборудование максимального класса ✓') +
                 '</button>' +
             '</div>' +
+
             '<div class="glass-card mb-2 p-2">' +
                 '<div class="flex-between mb-1">' +
                     '<div>' +
                         '<b class="text-xs color-amber"><i class="fa-solid fa-boxes-stacked"></i> Склад и логистика</b>' +
                         '<div class="sub-label" style="font-size:9px;">Уровень склада: <b>' + stLvl + '/3</b></div>' +
                     '</div>' +
-                    (nextSt ? '<span class="price-val text-xs">' + stCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">МАКСИМУМ</span>') +
+                    (nextSt ? '<span class="price-val text-xs color-green">' + stCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">МАКСИМУМ</span>') +
                 '</div>' +
                 '<div class="sub-label mb-2" style="font-size:9.5px;">' + (nextSt ? nextSt.name : 'Складской терминал вмещает до 500% сырья без простоев') + '</div>' +
                 '<button onclick="AppBusiness.upgradeBranchAction(\'storage\', ' + stCost + ')" class="btn btn-amber btn-sm w-full"' + (!nextSt ? ' disabled' : '') + '>' +
                     (nextSt ? 'Расширить склад (' + (stCost / 1000).toFixed(0) + 'k ₽)' : 'Склады максимальной ёмкости ✓') +
                 '</button>' +
             '</div>' +
+
             '<div class="glass-card mb-2 p-2">' +
                 '<div class="flex-between mb-1">' +
                     '<div>' +
                         '<b class="text-xs color-purple"><i class="fa-solid fa-bullhorn"></i> Маркетинг и вывеска</b>' +
                         '<div class="sub-label" style="font-size:9px;">Уровень рекламы: <b>' + mkLvl + '/3</b></div>' +
                     '</div>' +
-                    (nextMk ? '<span class="price-val text-xs">' + mkCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">МАКСИМУМ</span>') +
+                    (nextMk ? '<span class="price-val text-xs color-green">' + mkCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">МАКСИМУМ</span>') +
                 '</div>' +
                 '<div class="sub-label mb-2" style="font-size:9.5px;">' + (nextMk ? nextMk.name : 'Прямые контракты с автоклубами города (+40% клиентов)') + '</div>' +
                 '<button onclick="AppBusiness.upgradeBranchAction(\'marketing\', ' + mkCost + ')" class="btn btn-purple btn-sm w-full"' + (!nextMk ? ' disabled' : '') + '>' +

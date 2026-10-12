@@ -1,9 +1,8 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО И СУПЕРВИЛСПИН (v0.7.3)
+// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v0.7.6)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Полноценный Супервилспин: одновременное вращение 3 барабанов,
-// гарантированная выдача СРАЗУ 3 ПРИЗОВ за 1 билет с анимацией токенов,
-// классическое Колесо Фортуны и авто-магнитола с эквалайзером.
+// Уличные азартные «Напёрстки» с живым перемешиванием вместо Колеса,
+// полноформатный Супервилспин (3 приза сразу) и магнитола с эквалайзером.
 // ========================================================
 
 const PhoneMedia = {
@@ -95,28 +94,40 @@ const PhoneMedia = {
     prevStation() {
         this.activeStationIndex = (this.activeStationIndex - 1 + this.stations.length) % this.stations.length;
         this.radioPlaying = true;
-        playSound('tick');
+        if (typeof playSound === 'function') playSound('tick');
         this.renderRadioApp(document.getElementById('phoneAppContainer'));
     },
 
     nextStation() {
         this.activeStationIndex = (this.activeStationIndex + 1) % this.stations.length;
         this.radioPlaying = true;
-        playSound('tick');
+        if (typeof playSound === 'function') playSound('tick');
         this.renderRadioApp(document.getElementById('phoneAppContainer'));
     },
 
     // ----------------------------------------------------
-    // 2. КЛУБ ФОРТУНЫ & СУПЕРВИЛСПИН (3 ПРИЗА ЗА РАЗ)
+    // 2. КЛУБ ФОРТУНЫ: СУПЕРВИЛСПИН И НАПЁРСТКИ
     // ----------------------------------------------------
-    activeFortuneTab: 'superspin', // 'superspin' | 'wheel'
+    activeFortuneTab: 'superspin', // 'superspin' | 'thimbles'
     isSuperSpinning: false,
 
-    // Текущие отображаемые слоты на 3 барабанах
+    // Текущие слоты 3 барабанов Супервилспина
     reelDisplay: {
         reel1: { emoji: "🚗", name: "Автопарк", desc: "Слот 1" },
         reel2: { emoji: "💰", name: "Деньги", desc: "Слот 2" },
         reel3: { emoji: "🎁", name: "Эксклюзив", desc: "Слот 3" }
+    },
+
+    // Состояние игры «Напёрстки»
+    thimblesState: {
+        phase: 'bet', // 'bet' | 'showing' | 'shuffling' | 'guess' | 'revealed'
+        winningIndex: 1, // 0, 1, 2
+        selectedIndex: null,
+        currentBet: 50000,
+        isFreeGame: false,
+        shuffleStep: 0,
+        shuffleTimer: null,
+        message: "«Кручу-верчу, запутать хочу! Ставь кэш и следи за шариком!»"
     },
 
     renderFortuneApp(container) {
@@ -139,8 +150,8 @@ const PhoneMedia = {
                     <button onclick="PhoneMedia.switchFortuneTab('superspin')" class="btn ${sub === 'superspin' ? 'btn-amber' : 'btn-dark'} btn-sm">
                         <i class="fa-solid fa-dice"></i> СуперВилспин 🎰
                     </button>
-                    <button onclick="PhoneMedia.switchFortuneTab('wheel')" class="btn ${sub === 'wheel' ? 'btn-cyan' : 'btn-dark'} btn-sm">
-                        <i class="fa-solid fa-dharmachakra"></i> Колесо Удачи
+                    <button onclick="PhoneMedia.switchFortuneTab('thimbles')" class="btn ${sub === 'thimbles' ? 'btn-cyan' : 'btn-dark'} btn-sm">
+                        <i class="fa-solid fa-hat-wizard"></i> Напёрстки 🥤
                     </button>
                 </div>
 
@@ -151,20 +162,20 @@ const PhoneMedia = {
         if (sub === 'superspin') {
             this.renderSuperSpinContent(document.getElementById('fortuneTabContentBox'), tickets, canFreeSuperSpin);
         } else {
-            this.renderClassicWheelContent(document.getElementById('fortuneTabContentBox'));
+            this.renderThimblesContent(document.getElementById('fortuneTabContentBox'));
         }
     },
 
     switchFortuneTab(tab) {
-        if (this.isSuperSpinning) return;
+        if (this.isSuperSpinning || this.thimblesState.phase === 'shuffling') return;
         this.activeFortuneTab = tab;
-        playSound('tick');
+        if (typeof playSound === 'function') playSound('tick');
         this.renderFortuneApp(document.getElementById('phoneAppContainer'));
     },
 
-    // ----------------------------------------------------
-    // РЕНДЕР СУПЕРВИЛСПИНА С 3 ОДНОВРЕМЕННЫМИ БАРАБАНАМИ
-    // ----------------------------------------------------
+    // ========================================================
+    // 2.1. РЕНДЕР СУПЕРВИЛСПИНА (3 ПРИЗА СРАЗУ)
+    // ========================================================
     renderSuperSpinContent(box, tickets, canFreeSuperSpin) {
         if (!box) return;
 
@@ -244,15 +255,12 @@ const PhoneMedia = {
 
         saveState();
         updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
         showToast("Билет СуперВилспина куплен! (+1 🎟️)");
         this.renderFortuneApp(document.getElementById('phoneAppContainer'));
     },
 
-    // ----------------------------------------------------
-    // ОДНОВРЕМЕННОЕ ВРАЩЕНИЕ 3 БАРАБАНОВ С ВЫДАЧЕЙ ВСЕХ 3 ПРИЗОВ
-    // ----------------------------------------------------
     startTripleSuperSpin() {
         if (this.isSuperSpinning) return;
 
@@ -294,7 +302,6 @@ const PhoneMedia = {
         const pool2 = tiers.reelResources;
         const pool3 = tiers.reelExclusives;
 
-        // Финальные победители в каждом барабане
         const prize1 = pool1[Math.floor(Math.random() * pool1.length)];
         const prize2 = pool2[Math.floor(Math.random() * pool2.length)];
         const prize3 = pool3[Math.floor(Math.random() * pool3.length)];
@@ -302,9 +309,8 @@ const PhoneMedia = {
         let spinCount = 0;
         const spinInterval = setInterval(() => {
             spinCount++;
-            playSound('tick');
+            if (typeof playSound === 'function') playSound('tick');
 
-            // Мерцание промежуточными случайными элементами
             const r1 = pool1[Math.floor(Math.random() * pool1.length)];
             const r2 = pool2[Math.floor(Math.random() * pool2.length)];
             const r3 = pool3[Math.floor(Math.random() * pool3.length)];
@@ -322,7 +328,6 @@ const PhoneMedia = {
                 setTxt('reelName3', r3.label || "Эксклюзив");
             }
 
-            // Остановка Барабана 1
             if (spinCount === 13) {
                 setTxt('reelEmoji1', prize1.emoji || "🏎️");
                 setTxt('reelName1', prize1.name || "Авто");
@@ -332,10 +337,9 @@ const PhoneMedia = {
                     c1.style.borderColor = "var(--cyan)";
                     c1.style.boxShadow = "0 0 16px var(--cyan-glow)";
                 }
-                tgHaptic('medium');
+                if (typeof tgHaptic === 'function') tgHaptic('medium');
             }
 
-            // Остановка Барабана 2
             if (spinCount === 19) {
                 setTxt('reelEmoji2', "💰");
                 setTxt('reelName2', prize2.label || "Валюта");
@@ -345,10 +349,9 @@ const PhoneMedia = {
                     c2.style.borderColor = "var(--green)";
                     c2.style.boxShadow = "0 0 16px var(--green-glow)";
                 }
-                tgHaptic('medium');
+                if (typeof tgHaptic === 'function') tgHaptic('medium');
             }
 
-            // Остановка Барабана 3 и финал
             if (spinCount >= 25) {
                 clearInterval(spinInterval);
                 setTxt('reelEmoji3', prize3.emoji || "⭐");
@@ -366,13 +369,10 @@ const PhoneMedia = {
         }, 110);
     },
 
-    // ----------------------------------------------------
-    // НАЧИСЛЕНИЕ ВСЕХ 3 ПРИЗОВ СРАЗУ В ИНВЕНТАРЬ
-    // ----------------------------------------------------
     claimAllThreePrizes(p1, p2, p3) {
         let rewardTokens = [];
 
-        // 1. Обработка Барабана 1 (Техника / Приборы)
+        // 1. Барабан 1: Техника / Приборы
         if (p1.type === 'car') {
             let maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
             let curSlots = state.garage ? state.garage.length : 0;
@@ -453,7 +453,7 @@ const PhoneMedia = {
             });
         }
 
-        // 2. Обработка Барабана 2 (Валюта и ресурсы)
+        // 2. Барабан 2: Валюта и ресурсы
         if (p2.type === 'cash' || p2.type === 'jackpot') {
             state.player.cash = (state.player.cash || 0) + p2.amount;
             rewardTokens.push({
@@ -502,7 +502,7 @@ const PhoneMedia = {
             });
         }
 
-        // 3. Обработка Барабана 3 (Эксклюзивы)
+        // 3. Барабан 3: Эксклюзивы
         if (p3.type === 'stars') {
             state.player.stars = (state.player.stars || 0) + p3.amount;
             rewardTokens.push({
@@ -531,33 +531,14 @@ const PhoneMedia = {
                 desc: `Компенсировано +${p3.cashValue.toLocaleString()} ₽`,
                 rarity: "token-green"
             });
-        } else if (p3.type === 'free_impound') {
-            state.player.freeImpoundPasses = (state.player.freeImpoundPasses || 0) + 1;
-            rewardTokens.push({
-                icon: "🚔",
-                title: "Талон штрафстоянки",
-                value: "+1 Талон ГИБДД",
-                desc: "Бесплатный забор автомобиля",
-                rarity: "token-purple"
-            });
-        } else if (p3.type === 'fine') {
-            state.player.cash = Math.max(0, (state.player.cash || 0) - p3.penaltyCash);
-            rewardTokens.push({
-                icon: "👮",
-                title: "Штраф за тонировку",
-                value: `-${p3.penaltyCash.toLocaleString()} ₽`,
-                desc: "Протокол ДПС у капота",
-                rarity: "token-red"
-            });
         }
 
         saveState();
         updateHeaderUI();
         if (typeof renderGarage === 'function') renderGarage();
-        playSound('win');
-        tgHaptic('success');
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
 
-        // Открытие единого окна со всеми 3 наградами
         openVerdictModal(
             "ТРОЙНОЙ КУШ СУПЕРВИЛСПИНА! 🎰",
             "Вы выиграли сразу 3 приза со всех барабанов:",
@@ -570,71 +551,251 @@ const PhoneMedia = {
         this.renderFortuneApp(document.getElementById('phoneAppContainer'));
     },
 
-    // ----------------------------------------------------
-    // РЕНДЕР КЛАССИЧЕСКОГО КОЛЕСА УДАЧИ
-    // ----------------------------------------------------
-    renderClassicWheelContent(box) {
+    // ========================================================
+    // 2.2. УЛИЧНАЯ ИГРА «НАПЁРСТКИ» ВМЕСТО КОЛЕСА УДАЧИ
+    // ========================================================
+    renderThimblesContent(box) {
         if (!box) return;
 
         let curDay = state.player?.day || 1;
         let lastDay = state.player?.lastFreeSpinDay || 0;
         let canFree = lastDay < curDay;
 
-        box.innerHTML = `
-            <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.16), #090e18);">
-                <div class="radar-spinner-ring mb-2" style="width:72px; height:72px; border-width:3px; border-top-color:var(--cyan); border-right-color:var(--green);">
-                    <div class="radar-spinner-center" style="font-size:24px;">🎡</div>
-                </div>
-                <h3 class="font-bold text-xs color-cyan" style="font-size:15px;">Колесо Фортуны</h3>
-                <div class="sub-label mb-3" style="font-size:9.5px;">Классический спин с денежными призами, полным баком топлива и джекпотом 1,000,000 ₽!</div>
+        const st = this.thimblesState;
+        let bet = st.currentBet;
 
-                <button onclick="PhoneMedia.spinClassicWheel()" class="btn ${canFree ? 'btn-green' : 'btn-cyan'} w-full mb-2">
-                    ${canFree ? 'Бесплатный спин дня ★' : 'Крутить за 50,000 ₽'}
-                </button>
+        let cupsHtml = "";
+        for (let i = 0; i < 3; i++) {
+            let isWinner = (i === st.winningIndex);
+            let isSelected = (i === st.selectedIndex);
+
+            let cupVisualClass = "thimble-cup";
+            let contentUnderneath = "";
+
+            if (st.phase === 'showing') {
+                if (isWinner) {
+                    cupVisualClass += " thimble-lifted";
+                    contentUnderneath = `<div class="thimble-ball-item">⚽</div>`;
+                }
+            } else if (st.phase === 'shuffling') {
+                cupVisualClass += " thimble-shuffling";
+            } else if (st.phase === 'guess') {
+                cupVisualClass += " thimble-clickable";
+            } else if (st.phase === 'revealed') {
+                cupVisualClass += " thimble-lifted";
+                if (isWinner) {
+                    contentUnderneath = `<div class="thimble-ball-item thimble-ball-win">⚽</div>`;
+                } else {
+                    contentUnderneath = `<div class="thimble-empty-item">💨</div>`;
+                }
+            }
+
+            cupsHtml += `
+                <div class="thimble-slot-wrap" onclick="PhoneMedia.selectThimbleCup(${i})">
+                    <div class="${cupVisualClass}" id="thimbleCup_${i}">
+                        <div class="thimble-cap-top"></div>
+                        <div class="thimble-cap-body">
+                            <span style="font-size:26px;">🥤</span>
+                        </div>
+                    </div>
+                    <div class="thimble-content-base">
+                        ${contentUnderneath}
+                    </div>
+                    <div class="sub-label mt-1" style="font-size:9px;">Напёрсток #${i + 1}</div>
+                </div>
+            `;
+        }
+
+        let controlArea = "";
+        if (st.phase === 'bet' || st.phase === 'revealed') {
+            controlArea = `
+                <div class="glass-card p-2 mb-2">
+                    <div class="flex-between text-xs mb-1">
+                        <span class="sub-label font-bold">Выберите ставку на кон:</span>
+                        <span class="color-amber font-bold">Коэффициент: x2.5 💰</span>
+                    </div>
+                    <div class="grid-4 mb-2">
+                        <button onclick="PhoneMedia.setThimbleBet(25000)" class="btn ${bet === 25000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">25k ₽</button>
+                        <button onclick="PhoneMedia.setThimbleBet(50000)" class="btn ${bet === 50000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">50k ₽</button>
+                        <button onclick="PhoneMedia.setThimbleBet(100000)" class="btn ${bet === 100000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">100k ₽</button>
+                        <button onclick="PhoneMedia.setThimbleBet(250000)" class="btn ${bet === 250000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">250k ₽</button>
+                    </div>
+
+                    <button onclick="PhoneMedia.startThimblesGame()" class="btn ${canFree ? 'btn-green' : 'btn-amber'} w-full">
+                        ${canFree ? 'Бесплатная игра дня (1 раз в сутки) ★' : `Крутить напёрстки (${bet.toLocaleString()} ₽)`}
+                    </button>
+                </div>
+            `;
+        } else if (st.phase === 'shuffling') {
+            controlArea = `
+                <div class="p-2 mb-2 text-center" style="background:#090e18; border-radius:10px; border:1px solid var(--amber);">
+                    <div class="price-val color-amber mb-1" style="font-size:16px;"><i class="fa-solid fa-arrows-rotate fa-spin"></i> Алик перемешивает напёрстки...</div>
+                    <div class="sub-label" style="font-size:9.5px;">Следите за стаканом внимательно!</div>
+                </div>
+            `;
+        } else if (st.phase === 'guess') {
+            controlArea = `
+                <div class="p-2 mb-2 text-center" style="background:rgba(0, 242, 254, 0.12); border-radius:10px; border:1px solid var(--cyan);">
+                    <b class="text-xs color-cyan block mb-1">🎯 НАЖМИТЕ НА НАПЁРСТОК, ГДЕ СПРЯТАН ШАРИК!</b>
+                    <div class="sub-label" style="font-size:9px;">Один клик решает всё. Выигрыш составит +${Math.round(bet * 2.5).toLocaleString()} ₽</div>
+                </div>
+            `;
+        }
+
+        box.innerHTML = `
+            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.16), #090e18); border-color: var(--cyan);">
+                <div class="flex-between mb-1">
+                    <div class="flex-gap" style="align-items:center;">
+                        <span style="font-size:20px;">🧢</span>
+                        <div>
+                            <b class="text-xs color-cyan">Уличные Напёрстки у вокзала</b>
+                            <div class="sub-label" style="font-size:8.5px;">Мастер стаканчиков Ашот</div>
+                        </div>
+                    </div>
+                    <span class="tag-badge bg-tag-amber">x2.5 КУШ</span>
+                </div>
+                <div class="seller-dialog-bubble my-1" style="margin:4px 0;">
+                    <span class="seller-mood-icon">🧔</span>
+                    <span class="seller-bubble-text" id="thimblesDialogueText">${st.message}</span>
+                </div>
             </div>
+
+            <!-- ИГРОВОЙ СТОЛ С 3 НАПЁРСТКАМИ -->
+            <div class="thimbles-stage-board mb-2">
+                <div class="grid-3" style="gap:10px;">
+                    ${cupsHtml}
+                </div>
+            </div>
+
+            ${controlArea}
         `;
     },
 
-    spinClassicWheel() {
+    setThimbleBet(amount) {
+        if (this.thimblesState.phase !== 'bet' && this.thimblesState.phase !== 'revealed') return;
+        this.thimblesState.currentBet = amount;
+        if (typeof playSound === 'function') playSound('tick');
+        this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+    },
+
+    startThimblesGame() {
+        if (this.thimblesState.phase === 'shuffling' || this.thimblesState.phase === 'showing') return;
+
         let curDay = state.player?.day || 1;
         let lastDay = state.player?.lastFreeSpinDay || 0;
         let canFree = lastDay < curDay;
 
-        if (!canFree) {
-            let cash = state.player?.cash || 0;
-            if (cash < 50000) return showToast("Нужно 50,000 ₽ для вращения колеса!");
-            state.player.cash -= 50000;
-        } else {
+        let bet = this.thimblesState.currentBet;
+
+        if (canFree) {
+            this.thimblesState.isFreeGame = true;
             state.player.lastFreeSpinDay = curDay;
-        }
-
-        const sectors = (typeof WHEEL_SECTORS !== 'undefined') ? WHEEL_SECTORS : [
-            { label: "+100k ₽", type: "cash", amount: 100000 }
-        ];
-
-        const won = sectors[Math.floor(Math.random() * sectors.length)];
-
-        if (won.type === 'cash' || won.type === 'jackpot') {
-            state.player.cash = (state.player.cash || 0) + won.amount;
-        } else if (won.type === 'stars') {
-            state.player.stars = (state.player.stars || 0) + won.amount;
-        } else if (won.type === 'fuel') {
-            state.player.fuel = 100;
-        } else if (won.type === 'conn') {
-            state.player.connections = (state.player.connections || 0) + won.amount;
-        } else if (won.type === 'tickets') {
-            let maxT = state.player?.maxExpressTickets || 25;
-            state.player.expressTickets = Math.min(maxT, (state.player.expressTickets || 0) + won.amount);
-        } else if (won.type === 'impound') {
-            state.player.freeImpoundPasses = (state.player.freeImpoundPasses || 0) + 1;
+        } else {
+            this.thimblesState.isFreeGame = false;
+            let cash = state.player?.cash || 0;
+            if (cash < bet) return showToast(`Не хватает денег на ставку ${bet.toLocaleString()} ₽!`);
+            state.player.cash -= bet;
         }
 
         saveState();
         updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
 
-        openVerdictModal("ПРИЗ КОЛЕСА ФОРТУНЫ! 🎡", `Вам выпал сектор:\n${won.label}!`, true);
+        // 1. Показываем шарик под случайным напёрстком
+        const winIdx = Math.floor(Math.random() * 3);
+        this.thimblesState.winningIndex = winIdx;
+        this.thimblesState.selectedIndex = null;
+        this.thimblesState.phase = 'showing';
+        this.thimblesState.message = `«Вот он, родной, под напёрстком #${winIdx + 1}! Глаз не спускай!»`;
+
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('medium');
+        this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+
+        // 2. Через 1 секунду опускаем напёрстки и начинаем перемешивание
+        setTimeout(() => {
+            this.runThimblesShuffle();
+        }, 1100);
+    },
+
+    runThimblesShuffle() {
+        this.thimblesState.phase = 'shuffling';
+        this.thimblesState.message = "«Кручу-верчу, шарик спрятать хочу! Следи за руками!»";
+        this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+
+        let step = 0;
+        const totalSteps = 8;
+
+        if (this.thimblesState.shuffleTimer) clearInterval(this.thimblesState.shuffleTimer);
+
+        this.thimblesState.shuffleTimer = setInterval(() => {
+            step++;
+            if (typeof playSound === 'function') playSound('tick');
+
+            // Случайно меняем визуальное положение
+            for (let i = 0; i < 3; i++) {
+                const cupEl = document.getElementById(`thimbleCup_${i}`);
+                if (cupEl) {
+                    let offset = (Math.random() * 16 - 8).toFixed(0);
+                    cupEl.style.transform = `translateX(${offset}px)`;
+                }
+            }
+
+            if (step >= totalSteps) {
+                clearInterval(this.thimblesState.shuffleTimer);
+                this.thimblesState.shuffleTimer = null;
+
+                // Сброс трансформаций
+                for (let i = 0; i < 3; i++) {
+                    const cupEl = document.getElementById(`thimbleCup_${i}`);
+                    if (cupEl) cupEl.style.transform = 'none';
+                }
+
+                // 3. Переход в фазу угадывания
+                this.thimblesState.phase = 'guess';
+                this.thimblesState.message = "«Всё, стоп игра! Укажи пальцем, где лежит шарик!»";
+                if (typeof tgHaptic === 'function') tgHaptic('warning');
+                this.renderFortuneApp(document.getElementById('phoneAppContainer'));
+            }
+        }, 170);
+    },
+
+    selectThimbleCup(chosenIdx) {
+        if (this.thimblesState.phase !== 'guess') return;
+
+        this.thimblesState.selectedIndex = chosenIdx;
+        this.thimblesState.phase = 'revealed';
+
+        const isWin = (chosenIdx === this.thimblesState.winningIndex);
+        const bet = this.thimblesState.currentBet;
+        const isFree = this.thimblesState.isFreeGame;
+
+        if (isWin) {
+            let winCash = isFree ? 120000 : Math.round(bet * 2.5);
+            state.player.cash = (state.player.cash || 0) + winCash;
+            if (typeof addXp === 'function') addXp(45);
+
+            saveState();
+            updateHeaderUI();
+
+            this.thimblesState.message = `«Ай, красава! Глаз-алмаз! Забирай свои +${winCash.toLocaleString()} ₽!»`;
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
+
+            openVerdictModal(
+                "ПОБЕДА В НАПЁРСТКАХ! 🥤",
+                `Вы раскусили фокус Алика и нашли шарик под напёрстком #${chosenIdx + 1}!\nВыигрыш: +${winCash.toLocaleString()} ₽ (+45 XP)`,
+                true,
+                winCash
+            );
+        } else {
+            this.thimblesState.message = `«Мимо, перекуп! Шарик-то был под #${this.thimblesState.winningIndex + 1}! В следующий раз повезёт.»`;
+            if (typeof playSound === 'function') playSound('error');
+            if (typeof tgHaptic === 'function') tgHaptic('error');
+
+            let lossDesc = isFree ? "Бесплатная попытка сгорела." : `Ставка -${bet.toLocaleString()} ₽ досталась напёрсточнику.`;
+            showToast(`Мимо! Шарик был под #${this.thimblesState.winningIndex + 1}.`);
+        }
+
         this.renderFortuneApp(document.getElementById('phoneAppContainer'));
     }
 };
