@@ -1,37 +1,42 @@
 // ========================================================
-// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.6.7)
+// data.js — БАЗА ДАННЫХ ИГРЫ «СИМУЛЯТОР ПЕРЕКУПА» (v0.7.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Спецзаказы «ПодКлюч», сектора Колеса Фортуны,
-// расширенная аналитика профиля, база авто и предприятий.
+// Кибер-неоновые темы иконок, кастомные огненные/глитч эффекты,
+// Storage Wars в Порту, гарантийные разборки с покупателями,
+// спецзаказы «ПодКлюч» и полная база транспорта с папками фото.
 // ========================================================
 
 const GAME_METADATA = {
-    version: "v0.6.7",
-    build: 275,
+    version: "v0.7.0",
+    build: 280,
     authors: "Tak Toje, Max, Sergo, gemini, Илья Чепиль",
-    releaseDate: "2026-10-16",
+    releaseDate: "2026-10-18",
     patchNotes: [
         {
-            title: "📊 Аналитический дашборд профиля",
-            text: "Полный редизайн экрана профиля: финансовые KPI, торговый винрейт, капитализация активов, индекс добросовестности и карьерные ачивки."
+            title: "🖤 Тема Cyber Black Neo",
+            text: "Все иконки смартфона Perekup OS теперь могут переключаться в угольно-черный матовый неоновый стиль, идентичный терминалу DEV."
         },
         {
-            title: "🔑 Сервис спецзаказов «ПодКлюч»",
-            text: "Синдикат преобразован в сервис подбора «ПодКлюч». Удалены дубликаты биржи, добавлены вариативные контракты (Корчи, Корпоративные, Коллекционные, Срочные)."
+            title: "🔥 Огненные, плазменные и глитч-эффекты",
+            text: "Добавлены анимированные ауры аватаров и стили ника, динамически подстраивающие свой цвет под выбранный оттенок темы или Color Picker."
         },
         {
-            title: "⚡ Полный апгрейд Autodrot",
-            text: "Autodrot стал единым маркетплейсом: P2P техника, редкие госномера, готовый бизнес, недвижимость, горячий выкуп и отзывы покупателей."
+            title: "🚢 Битвы за контейнеры (Storage Wars)",
+            text: "В приложении «Порт» запущены интерактивные слепые торги против ботов-перекупов с таймером, повышением ставок и блефом."
         },
         {
-            title: "🎡 Фикс Колеса Фортуны",
-            text: "Исправлена отрисовка секторов классического VIP-колеса, устранён пустой чёрный экран на мобильных устройствах."
+            title: "⚖️ Гарантийный шантаж и обратка",
+            text: "Продажа машин с присадками или скруткой пробега теперь несет реальный риск разборок с покупателем и юристами у ворот бокса."
+        },
+        {
+            title: "📱 Компактная сетка категорий авторынка",
+            text: "Громоздкая плитка «Все категории» заменена аккуратным компактным фильтром без загромождения экрана."
         }
     ]
 };
 
 // ========================================================
-// 0. СЕКТОРА КЛАССИЧЕСКОГО КОЛЕСА ФОРТУНЫ (ФИКС БАГА CANVAS)
+// 0. СЕКТОРА КЛАССИЧЕСКОГО КОЛЕСА ФОРТУНЫ
 // ========================================================
 const WHEEL_SECTORS = [
     { label: "+100k ₽", type: "cash", amount: 100000, color: "#10b981", textColor: "#000000" },
@@ -64,22 +69,29 @@ const HUD_SOLID_COLORS = [
 const NICKNAME_EFFECTS_CATALOG = [
     { id: "none", name: "Статичный", desc: "Классический чистый белый текст без анимации.", cost: 0, reqStars: 0, className: "nick-fx-none" },
     { id: "lightning_spark", name: "Грозовой разряд (Молнии)", desc: "Электрические импульсы и неоновые разряды по буквам ника.", cost: 200000, reqStars: 12, className: "nick-fx-lightning" },
+    { id: "fire_flame", name: "Огненный шлейф форсажа", desc: "Языки пламени и раскаленный хвост выхлопа по буквам ника.", cost: 240000, reqStars: 14, className: "nick-fx-fire" },
+    { id: "plasma_pulse", name: "Кибер-плазма", desc: "Плазменный перелив с динамической сменой неонового оттенка.", cost: 280000, reqStars: 16, className: "nick-fx-plasma" },
+    { id: "matrix_glitch_pro", name: "Матричный RGB-глитч Pro", desc: "Глитч со смещением цветовых каналов и цифровыми артефактами.", cost: 350000, reqStars: 20, className: "nick-fx-matrix-glitch" },
     { id: "shimmer", name: "Бегущий блик (Shimmer)", desc: "Переливающаяся световая волна по буквам ника.", cost: 75000, reqStars: 5, className: "nick-fx-shimmer" },
     { id: "neon_pulse", name: "Неоновое дыхание", desc: "Плавная мягкая пульсация яркости в цвет выбранного стиля.", cost: 120000, reqStars: 8, className: "nick-fx-neon-pulse" },
     { id: "gold_shine", name: "Золотой отлив Олигарха", desc: "Богатый металлический золотой блеск с мерцанием.", cost: 250000, reqStars: 15, className: "nick-fx-gold-shine" },
-    { id: "cyber_glitch", name: "Кибер-глитч", desc: "Легкий киберпанк-сдвиг цветов и хроматическая аберрация.", cost: 350000, reqStars: 20, className: "nick-fx-glitch" }
+    { id: "cyber_glitch", name: "Кибер-глитч", desc: "Легкий киберпанк-сдвиг цветов и хроматическая аберрация.", cost: 180000, reqStars: 10, className: "nick-fx-glitch" }
 ];
 
 const AVATAR_EFFECTS_CATALOG = [
     { id: "none", name: "Базовое кольцо", desc: "Аккуратная статичная рамка цвета интерфейса.", cost: 0, reqStars: 0, className: "avatar-fx-none" },
     { id: "lightning_shield", name: "Электро-щит Теслы", desc: "Сверкающие дуги молний вокруг аватара перекупа.", cost: 220000, reqStars: 15, className: "avatar-fx-lightning" },
+    { id: "fire_vortex", name: "Огненный смерч Дрифта", desc: "Вращающийся огненный вихрь с раскаленными частицами.", cost: 260000, reqStars: 16, className: "avatar-fx-fire-vortex" },
+    { id: "plasma_shield", name: "Плазменное силовое поле", desc: "Мощная аура плазмы с адаптацией под текущий цвет HUD.", cost: 290000, reqStars: 18, className: "avatar-fx-plasma" },
+    { id: "glitch_holo", name: "Голографический глитч-щит", desc: "Дрожащая цифровая голограмма со сдвигом кадров.", cost: 320000, reqStars: 20, className: "avatar-fx-glitch" },
     { id: "neon_breath", name: "Неоновый импульс", desc: "Плавное пульсирующее кольцо с мягким свечением.", cost: 85000, reqStars: 5, className: "avatar-fx-neon-breath" },
-    { id: "fire_drift", name: "Огненная аура Дрифта", desc: "Вспышки языков пламени и раскаленный янтарный контур.", cost: 180000, reqStars: 10, className: "avatar-fx-fire" },
+    { id: "fire_drift", name: "Огненная аура", desc: "Вспышки языков пламени и раскаленный янтарный контур.", cost: 180000, reqStars: 10, className: "avatar-fx-fire" },
     { id: "gold_halo", name: "Золотой ореол ПодКлюч", desc: "Премиальное вращающееся кольцо из чистого золота.", cost: 300000, reqStars: 20, className: "avatar-fx-gold" },
     { id: "cyber_matrix", name: "Матричный щит", desc: "Вращающиеся шестеренки и цифровой защитный ореол.", cost: 450000, reqStars: 25, className: "avatar-fx-matrix" }
 ];
 
 const HUD_THEMES_CATALOG = [
+    { id: "cyber_black_neo", name: "Cyber Black Neo (Матовый DEV)", desc: "Все иконки телефона и блоки получают черно-неоновый матовый стиль консоли DEV.", colorId: "green", cost: 380000, reqStars: 20, reqLevel: 10, isCyberIcons: true },
     { id: "lightning_storm", name: "Lightning Storm (Гроза)", desc: "Электрический сине-фиолетовый неон с искрами молний на HUD и телефоне.", colorId: "lightning", cost: 300000, reqStars: 15, reqLevel: 7, isLightning: true },
     { id: "cyber_neon", name: "Cyber Neon", desc: "Бирюзовый неоновый стиль с глубоким контрастным черным фоном.", colorId: "cyan", cost: 0, reqStars: 0, reqLevel: 1 },
     { id: "tokyo_drift", name: "Tokyo Drift", desc: "Агрессивный рубиновый акцент с янтарным свечением.", colorId: "red", cost: 150000, reqStars: 5, reqLevel: 5 },
@@ -153,8 +165,8 @@ function calculatePlateValue(plateStr) {
 // ========================================================
 const I18N_TRANSLATIONS = {
     ru: {
-        classes_title: "Классы автотехники",
-        cat_all: "Все категории",
+        classes_title: "Классы техники",
+        cat_all: "Все",
         cat_economy: "Эконом",
         cat_scooter: "Скутеры",
         cat_moto: "Мото",
@@ -185,7 +197,7 @@ const I18N_TRANSLATIONS = {
     },
     en: {
         classes_title: "Vehicle Classes",
-        cat_all: "All Categories",
+        cat_all: "All",
         cat_economy: "Economy",
         cat_scooter: "Scooters",
         cat_moto: "Motorcycles",
@@ -229,7 +241,7 @@ const CAR_FALLBACKS_BY_CATEGORY = {
 };
 
 // ========================================================
-// 4. БАЗА ДАННЫХ АВТОТЕХНИКИ
+// 4. БАЗА ДАННЫХ АВТОТЕХНИКИ (С ГАЛЕРЕЯМИ)
 // ========================================================
 const CAR_DATABASE = {
     economy: [
@@ -409,7 +421,7 @@ async function loadExternalCarDatabase(jsonUrl) {
 }
 
 // ========================================================
-// 5. НЕДВИЖИМОСТЬ, БОКСЫ И МАСТЕРСКИЕ
+// 5. НЕДВИЖИМОСТЬ И БОКСЫ
 // ========================================================
 const HOUSING_LIST = [
     { 
@@ -858,7 +870,7 @@ const BUSINESS_FLEET_CATALOG = [
 ];
 
 // ========================================================
-// 7. САРАИ, ВИЛСПИНЫ И МАГАЗИН
+// 7. САРАИ, СУПЕР-ВИЛСПИНЫ И МАГАЗИН
 // ========================================================
 const BARN_TIERS_CONFIG = [
     { 
@@ -979,6 +991,58 @@ const HOUSING_INTERIOR_CATALOG = [
     { id: "home_cctv", name: "📹 Система видеонаблюдения периметра", cost: 140000, reqStars: 8, perk: "Снижает шанс ночного угона авто из гаража до 0%" }
 ];
 
+// ========================================================
+// 8. STORAGE WARS (АУКЦИОН КОНТЕЙНЕРОВ РЕАЛЬНОГО ВРЕМЕНИ)
+// ========================================================
+const STORAGE_WARS_CONTAINERS = [
+    {
+        id: "sw_copart_muscle",
+        title: "Контейнер Copart #502 (США)",
+        badge: "Маслкары & Джипы",
+        baseBid: 320000,
+        estValue: "500,000 — 1,200,000 ₽",
+        riskLevel: "Средний",
+        desc: "Закрытый 40-футовый контейнер из порта Лос-Анджелеса. Сквозь щели виден широкий бампер и резина на литье.",
+        possibleCars: ["Ford Focus III", "Chevrolet Cruze", "BRP Can-Am Maverick X3"],
+        scrapChance: 0.20,
+        img: "assets/containers/usa.jpg",
+        fallback: "https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+        id: "sw_kobe_jdm",
+        title: "Контейнер Кобе #911 (Япония)",
+        badge: "JDM & Турбо",
+        baseBid: 450000,
+        estValue: "700,000 — 2,400,000 ₽",
+        riskLevel: "Умеренный",
+        desc: "Прямой груз с аукциона USS Tokyo. Характерные кованые диски и японские наклейки на стеклах.",
+        possibleCars: ["Toyota Mark II (JZX90)", "Toyota Chaser (X100)", "Yamaha MT-07"],
+        scrapChance: 0.15,
+        img: "assets/containers/japan.jpg",
+        fallback: "https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=600&q=80"
+    },
+    {
+        id: "sw_dubai_super",
+        title: "Контейнер Дубай #777 (ОАЭ)",
+        badge: "Суперкары & Люкс",
+        baseBid: 1200000,
+        estValue: "2,000,000 — 6,500,000 ₽",
+        riskLevel: "Высокий",
+        desc: "Опечатанный бокс таможенного терминала Аль-Авир. Карбоновые элементы и спортивные диффузоры.",
+        possibleCars: ["BMW X5 (G05)", "Mercedes G63 AMG «Гелик»", "Porsche Cayenne (PO536)"],
+        scrapChance: 0.25,
+        img: "assets/containers/dubai.jpg",
+        fallback: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=600&q=80"
+    }
+];
+
+const STORAGE_WARS_BOTS = [
+    { name: "Барыга Алик", avatar: "🧔", maxBudgetMul: 1.45, bluffChance: 0.35, aggro: "moderate" },
+    { name: "Мажор Влад", avatar: "🕺", maxBudgetMul: 2.10, bluffChance: 0.50, aggro: "aggressive" },
+    { name: "Дед Михалыч", avatar: "👴", maxBudgetMul: 1.25, bluffChance: 0.10, aggro: "calm" },
+    { name: "Перекуп Семён", avatar: "🕶️", maxBudgetMul: 1.65, bluffChance: 0.40, aggro: "moderate" }
+];
+
 const CONTAINER_ITEMS = [
     { 
         id: 'japan', name: 'Японский Контейнер', cost: 150000, reqStars: 5, timer: 30, minLevel: 12, 
@@ -1018,6 +1082,39 @@ const CONTAINER_ITEMS = [
     }
 ];
 
+// ========================================================
+// 9. ГАРАНТИЙНЫЙ ШАНТАЖ И РАЗБОРКИ С ПОКУПАТЕЛЯМИ
+// ========================================================
+const BUYER_BACKFIRE_EVENTS = [
+    {
+        id: "ev_scam_lawyer",
+        trigger: "rolledOdometer",
+        title: "Досудебная претензия по одометру",
+        desc: "Покупатель загнал авто к официальному дилеру и выявил факт скрутки пробега на 50%! Требует компенсацию или подаёт в суд.",
+        penaltyCash: 65000,
+        penaltyKarma: 15,
+        reshalaCostConn: 1
+    },
+    {
+        id: "ev_scam_motor_knock",
+        trigger: "hasAdditive",
+        title: "Разборка у капота: мотор застучал",
+        desc: "Залитая в масло присадка выработалась через 80 км. Разгневанный покупатель приехал с друзьями требовать возврат денег.",
+        penaltyCash: 90000,
+        penaltyKarma: 20,
+        reshalaCostConn: 2
+    },
+    {
+        id: "ev_scam_defect_dtc",
+        trigger: "hiddenDefect",
+        title: "Скрытый дефект трансмиссии",
+        desc: "Коробка ушла в аварийный режим. Клиент грозится слить негативные отзывы на Autodrot и вызвать полицию.",
+        penaltyCash: 45000,
+        penaltyKarma: 10,
+        reshalaCostConn: 1
+    }
+];
+
 const SELLER_ADS_PHRASES = [
     "«Дедушка ездил только летом на дачу!»", 
     "«Сел и поехал, мотор шепчет.»", 
@@ -1036,7 +1133,7 @@ const SELLER_ADS_PHRASES = [
 ];
 
 // ========================================================
-// 8. РАЦИОН И АКТИВНОСТИ ПЕРЕКУПА
+// 10. РАЦИОН И АКТИВНОСТИ ПЕРЕКУПА
 // ========================================================
 const DIETS = [
     { id: 'water', name: 'Вода из кулера', category: 'fast', cost: 0, hunger: 5, mood: -20, desc: 'Бесплатно в боксе, но силы тают на глазах' },
@@ -1225,10 +1322,9 @@ const BUYERS_CATALOG = {
 };
 
 // ========================================================
-// 9. КОНТРАКТЫ СЕРВИСА «ПОДКЛЮЧ» (РАСШИРЕННОЕ РАЗНООБРАЗИЕ)
+// 11. КОНТРАКТЫ СЕРВИСА «ПОДКЛЮЧ»
 // ========================================================
 const PODKLYUCH_CONTRACT_TEMPLATES = [
-    // --- 1. КОРПОРАТИВНЫЕ И ТАКСОПАРКИ ---
     {
         type: 'taxi_economy',
         categoryTag: 'fleet',
@@ -1275,8 +1371,6 @@ const PODKLYUCH_CONTRACT_TEMPLATES = [
         rewardConn: 2,
         rewardXp: 145
     },
-
-    // --- 2. СПОРТИВНЫЕ ПРОЕКТЫ И КОРЧИ ---
     {
         type: 'winter_drift_init',
         categoryTag: 'sport',
@@ -1348,8 +1442,6 @@ const PODKLYUCH_CONTRACT_TEMPLATES = [
         rewardConn: 3,
         rewardXp: 220
     },
-
-    // --- 3. СЛУЖБЫ ДОСТАВКИ И КУРЬЕРЫ ---
     {
         type: 'moto_courier',
         categoryTag: 'express',
@@ -1372,8 +1464,6 @@ const PODKLYUCH_CONTRACT_TEMPLATES = [
         rewardConn: 1,
         rewardXp: 75
     },
-
-    // --- 4. ПРЕМИАЛЬНЫЙ ЭСКОРТ И ДЕПУТАТСКИЕ ГАРАЖИ ---
     {
         type: 'vip_escort',
         categoryTag: 'vip',
@@ -1396,8 +1486,6 @@ const PODKLYUCH_CONTRACT_TEMPLATES = [
         rewardConn: 3,
         rewardXp: 290
     },
-
-    // --- 5. ЭКСПОРТ И ЭЛИТНЫЕ КОЛЛЕКЦИИ ---
     {
         type: 'arab_export',
         categoryTag: 'vip',
@@ -1448,7 +1536,7 @@ const PODKLYUCH_CONTRACT_TEMPLATES = [
 const SYNDICATE_CONTRACT_TEMPLATES = PODKLYUCH_CONTRACT_TEMPLATES;
 
 // ========================================================
-// 10. АВТОМЕРОПРИЯТИЯ И ГОНОЧНЫЕ ТРЕКИ
+// 12. АВТОМЕРОПРИЯТИЯ И ГОНОЧНЫЕ ТРЕКИ
 // ========================================================
 const STREET_EVENTS_DATA = [
     {
@@ -1513,7 +1601,10 @@ window.BARN_FINDS = BARN_FINDS;
 window.SUPER_SPIN_TIERS = SUPER_SPIN_TIERS;
 window.SHOP_CATALOG = SHOP_CATALOG;
 window.HOUSING_INTERIOR_CATALOG = HOUSING_INTERIOR_CATALOG;
+window.STORAGE_WARS_CONTAINERS = STORAGE_WARS_CONTAINERS;
+window.STORAGE_WARS_BOTS = STORAGE_WARS_BOTS;
 window.CONTAINER_ITEMS = CONTAINER_ITEMS;
+window.BUYER_BACKFIRE_EVENTS = BUYER_BACKFIRE_EVENTS;
 window.SELLER_ADS_PHRASES = SELLER_ADS_PHRASES;
 window.DIETS = DIETS;
 window.LIFE_ACTIVITIES = LIFE_ACTIVITIES;

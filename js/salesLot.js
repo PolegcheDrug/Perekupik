@@ -1,9 +1,9 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ЧЕСТНЫЙ ТОРГ (v0.6.1)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, КАРМА И ГАРАНТИЙНЫЙ ШАНТАЖ (v0.7.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Детализация маржи, себестоимость выкупа и вложенных доработок,
-// честная реакция покупателей, гарантированная прибыль от перепродажи,
-// право отказаться от подписания ДКП, налог 13% только на учёт РФ.
+// честная реакция покупателей, право отказаться от подписания ДКП,
+// налог 13% только на учёт РФ и механика гарантийных разборок.
 // Изоляция окон через ModalManager, предотвращение наложений интерфейса.
 // ========================================================
 
@@ -78,7 +78,7 @@ function renderSalesLot() {
         let car = lot.car;
         let cName = car.name || "Автомобиль";
         let cPower = car.power || 100;
-        let cImg = car.img || "assets/cars/economy/vaz-2107.jpg";
+        let cImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
         let cPlate = car.customPlate || car.plate || "ТРАНЗИТ";
         let asking = lot.askingPrice || 100000;
 
@@ -149,7 +149,7 @@ function renderSalesLot() {
         html += `
         <div class='glass-card mb-3'>
             <div class='car-img-wrap' style='height: 140px;'>
-                <img src='${cImg}' class='car-img' onerror="this.src='assets/cars/economy/vaz-2107.jpg'">
+                <img src='${cImg}' class='car-img' onerror="this.src='assets/cars/economy/2101/vaz-2101.jpg'">
                 <div class='plate-corner'><div class='license-plate'>${cPlate} <div class='license-flag'>RUS</div></div></div>
                 <div class='badge-tag badge-br'>
                     ${regBadge}
@@ -336,7 +336,7 @@ function openSaleHaggleModal(idx) {
     const car = slot.car;
 
     const imgEl = document.getElementById("saleCarImg");
-    if (imgEl) imgEl.src = car.img ? car.img : "assets/cars/economy/vaz-2107.jpg";
+    if (imgEl) imgEl.src = car.img ? car.img : "assets/cars/economy/2101/vaz-2101.jpg";
     
     let buyCost = car.purchaseCost || car.basePrice || 100000;
     let modsCost = calculateCarUpgradesCost(car);
@@ -484,10 +484,6 @@ function attemptHaggleSale(type) {
             updateHeaderUI();
             tgHaptic('error');
             playSound('error');
-
-            if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.pushBuyerFollowupSMS === 'function') {
-                PhoneManager.pushBuyerFollowupSMS(car.name, true, currentSaleBuyer.name);
-            }
 
             setTimeout(() => {
                 ModalManager.close("modalHaggleSale");
@@ -806,9 +802,8 @@ function confirmSignDKP() {
             AppAutodrot.triggerBuyerReview(car);
         }
 
-        if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.pushBuyerFollowupSMS === 'function') {
-            PhoneManager.pushBuyerFollowupSMS(car.name, false, deal.buyer);
-        }
+        // ШАНС ГАРАНТИЙНОГО ШАНТАЖА И ОБРАТКИ ПРИ ПРОДАЖЕ ХЛАМА
+        scheduleBuyerBackfireCheck(car, deal.buyer);
 
         if (typeof trackQuestProgress === 'function') {
             trackQuestProgress('sell_car', 1);
@@ -848,6 +843,97 @@ function confirmSignDKP() {
     }, 1000);
 }
 
+// ========================================================
+// МЕХАНИКА «ГАРАНТИЙНЫЙ ШАНТАЖ И ОБРАТКА»
+// ========================================================
+function scheduleBuyerBackfireCheck(car, buyerName) {
+    if (!car) return;
+    let isRisky = car.rolledOdometer || car.hasAdditive || (car.hiddenDefect && !car.repaired);
+    if (!isRisky) return;
+
+    // С шансом 35% покупатель вернется на разборки спустя некоторое время
+    if (Math.random() < 0.35) {
+        setTimeout(() => {
+            triggerBuyerBackfireEvent(car, buyerName);
+        }, 15000 + Math.random() * 25000);
+    }
+}
+
+function triggerBuyerBackfireEvent(car, buyerName) {
+    const events = (typeof BUYER_BACKFIRE_EVENTS !== 'undefined') ? BUYER_BACKFIRE_EVENTS : [];
+    let matchedEv = null;
+
+    if (car.rolledOdometer) {
+        matchedEv = events.find(e => e.trigger === 'rolledOdometer');
+    } else if (car.hasAdditive) {
+        matchedEv = events.find(e => e.trigger === 'hasAdditive');
+    } else if (car.hiddenDefect) {
+        matchedEv = events.find(e => e.trigger === 'hiddenDefect');
+    }
+
+    if (!matchedEv) {
+        matchedEv = events[0] || {
+            title: "Претензия по автомобилю",
+            desc: "Покупатель обнаружил скрытый дефект и требует компенсацию!",
+            penaltyCash: 50000,
+            penaltyKarma: 15,
+            reshalaCostConn: 1
+        };
+    }
+
+    playSound('error');
+    tgHaptic('error');
+
+    let conn = state.player?.connections || 0;
+
+    let resBox = document.getElementById('garageEventActions');
+    setTxt('garageEventEmoji', "⚖️");
+    setTxt('garageEventBadge', "ПРЕТЕНЗИЯ КЛИЕНТА");
+    setTxt('garageEventTitle', matchedEv.title);
+    setTxt('garageEventDesc', `Покупатель <b>${buyerName}</b> приехал с претензией к вашему боксу:<br>«${matchedEv.desc}»`);
+    setTxt('garageEventCarName', `${car.name} (${car.customPlate || car.plate || "ТРАНЗИТ"})`);
+
+    if (resBox) {
+        resBox.innerHTML = `
+            <div class="space-y-2">
+                <button onclick="resolveBuyerBackfire('pay', ${matchedEv.penaltyCash}, ${matchedEv.penaltyKarma})" class="btn btn-danger btn-sm w-full">
+                    Выплатить неустойку (-${matchedEv.penaltyCash.toLocaleString()} ₽) 💸
+                </button>
+                <button onclick="resolveBuyerBackfire('reshala', 0, 0, ${matchedEv.reshalaCostConn})" class="btn btn-purple btn-sm w-full" ${conn < matchedEv.reshalaCostConn ? 'disabled' : ''}>
+                    Подключить Решалу Артура (${matchedEv.reshalaCostConn} 🤝) 🕶️
+                </button>
+                <button onclick="resolveBuyerBackfire('ignore', 0, ${matchedEv.penaltyKarma * 2})" class="btn btn-dark btn-sm w-full">
+                    Послать подальше (-${matchedEv.penaltyKarma * 2} Кармы & Слив отзывов)
+                </button>
+            </div>
+        `;
+    }
+
+    ModalManager.open('modalGarageEvent');
+}
+
+function resolveBuyerBackfire(action, cashPenalty, karmaPenalty, connCost = 1) {
+    if (action === 'pay') {
+        state.player.cash = Math.max(0, (state.player.cash || 0) - cashPenalty);
+        state.player.karma = Math.max(0, (state.player.karma || 50) - karmaPenalty);
+        showToast(`Вы выплатили компенсацию (-${cashPenalty.toLocaleString()} ₽). Конфликт улажен.`);
+    } else if (action === 'reshala') {
+        state.player.connections = Math.max(0, (state.player.connections || 0) - connCost);
+        showToast("Решала Артур доходчиво объяснил клиенту, что претензии не принимаются! 🤝");
+    } else {
+        state.player.karma = Math.max(0, (state.player.karma || 50) - karmaPenalty);
+        if (state.player.p2pReputation) {
+            state.player.p2pReputation.rating = Math.max(1.0, (state.player.p2pReputation.rating || 5.0) - 0.5);
+            state.player.p2pReputation.badReviews = (state.player.p2pReputation.badReviews || 0) + 1;
+        }
+        showToast("Вы проигнорировали клиента. Он слил рейтинг вашего салона в ноль!");
+    }
+
+    ModalManager.close('modalGarageEvent');
+    saveState();
+    updateHeaderUI();
+}
+
 function confirmSaleFromHaggleModal() {
     if (dealIsAborted || activeHaggleLotIndex === null) return;
     ModalManager.close("modalHaggleSale");
@@ -870,3 +956,6 @@ window.openDKPModal = openDKPModal;
 window.abortDKPDeal = abortDKPDeal;
 window.confirmSignDKP = confirmSignDKP;
 window.confirmSaleFromHaggleModal = confirmSaleFromHaggleModal;
+window.scheduleBuyerBackfireCheck = scheduleBuyerBackfireCheck;
+window.triggerBuyerBackfireEvent = triggerBuyerBackfireEvent;
+window.resolveBuyerBackfire = resolveBuyerBackfire;

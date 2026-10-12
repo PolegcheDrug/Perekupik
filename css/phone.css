@@ -1,5 +1,5 @@
 /* ========================================================
-   css/phone.css — ОБОЛОЧКА PEREKUP OS И ПРИЛОЖЕНИЯ (v0.6.4)
+   css/phone.css — ОБОЛОЧКА PEREKUP OS И ПРИЛОЖЕНИЯ (v0.7.0)
    ======================================================== */
 
 .phone-device-wrapper {
@@ -274,18 +274,9 @@
   border: 1px solid rgba(0, 230, 118, 0.25);
 }
 
-.quest-super-reward-banner {
-  background: radial-gradient(circle at 50% 0%, rgba(255, 215, 0, 0.12) 0%, rgba(9, 14, 24, 0.95) 100%);
-  border: 1px solid rgba(255, 215, 0, 0.35);
-  border-radius: 10px;
-  padding: 8px 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 4px;
-}
-
-/* СЕТКА ИКОНОК PEREKUP OS */
+/* ========================================================
+   СЕТКА ИКОНОК И ТЕМА «CYBER BLACK NEO» (КАК ДЕВ-ИКОНКА)
+   ======================================================== */
 .phone-home-grid {
   display: grid !important;
   grid-template-columns: repeat(4, 1fr) !important;
@@ -315,8 +306,24 @@
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.55);
   position: relative;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* ТЕМА CYBER BLACK NEO ДЛЯ ВСЕХ ИКОНОК */
+.theme-cyber-icons .phone-app-icon,
+.phone-device-wrapper.theme-cyber-icons .phone-app-icon {
+  background: linear-gradient(135deg, #090e18, #03050a) !important;
+  border: 1.5px solid var(--cyan) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7), 0 0 10px var(--cyan-glow) !important;
+  color: var(--cyan) !important;
+}
+.theme-cyber-icons .phone-app-icon i,
+.phone-device-wrapper.theme-cyber-icons .phone-app-icon i {
+  color: var(--cyan) !important;
+  filter: drop-shadow(0 0 4px var(--cyan-glow));
+}
+
+/* Стандартные градиенты, если тема выключена */
 .phone-app-icon.bg-cyan { background: linear-gradient(135deg, #00f2fe, #0284c7) !important; }
 .phone-app-icon.bg-green { background: linear-gradient(135deg, #00e676, #059669) !important; }
 .phone-app-icon.bg-emerald { background: linear-gradient(135deg, #10b981, #047857) !important; }
@@ -334,7 +341,7 @@
 .phone-app-icon.bg-radio { background: linear-gradient(135deg, #a855f7, #ec4899) !important; }
 .phone-app-icon.bg-notepad { background: linear-gradient(135deg, #64748b, #334155) !important; }
 
-/* 17-Я ИКОНКА DEV ТЕРМИНАЛА */
+/* Иконка DEV всегда в кибер-стиле */
 .phone-app-icon.bg-dev-terminal {
   background: linear-gradient(135deg, #090e18, #020408) !important;
   border: 1.5px solid var(--green) !important;
@@ -352,6 +359,7 @@
   padding: 1px 5px;
   border-radius: 10px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  z-index: 10;
 }
 
 .phone-app-label {

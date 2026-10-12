@@ -1,19 +1,19 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, ДАШБОРД ПРОФИЛЯ & CLOUD SYNC (v0.6.7)
+// js/app.js — ЯДРО СИМУЛЯТОРА, ДАШБОРД ПРОФИЛЯ & CLOUD SYNC (v0.7.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Стильный аналитический профиль игрока (Net Worth, KPI, Винрейт, Ачивки),
-// мульти-фото авто из папок, спецзаказы «ПодКлюч»,
+// Тема иконок Cyber Black Neo, адаптивные эффекты огня/плазмы,
+// спецзаказы «ПодКлюч», Net Worth, KPI, Винрейт, Ачивки,
 // Telegram Cloud Storage, реактивные депозиты и бизнес-цикл.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v0.6.7";
+const CURRENT_GAME_VERSION = "v0.7.0";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
 
 let tgUserId = "guest_777";
 let tgUserData = null;
-let SAVE_KEY_PREFIX = "perekup_v6_";
+let SAVE_KEY_PREFIX = "perekup_v7_";
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
 
@@ -425,6 +425,7 @@ const DEFAULT_STATE = {
         mortgage: null,
         
         hudColorId: 'lightning',
+        themePresetId: 'default',
         customHexColor: null,
         nickEffect: 'none',
         avatarEffect: 'none',
@@ -501,6 +502,7 @@ function applyHudCustomization() {
     const root = document.documentElement;
     const curColorId = state.player?.hudColorId || 'lightning';
     const customHex = state.player?.customHexColor;
+    const isCyberThemeActive = state.player?.themePresetId === 'cyber_black_neo';
 
     let targetHex = "#00f2fe";
     let targetSecondaryHex = "#7928ca";
@@ -522,9 +524,17 @@ function applyHudCustomization() {
     root.style.setProperty('--cyan-glow', targetGlow);
     root.style.setProperty('--border-glow', hexToRgba(targetHex, 0.35));
     root.style.setProperty('--lightning-secondary', targetSecondaryHex);
+    root.style.setProperty('--custom-fx-color', targetHex);
+    root.style.setProperty('--custom-fx-glow', targetGlow);
 
     const phoneDevice = document.querySelector('.phone-device-wrapper');
     if (phoneDevice) {
+        if (isCyberThemeActive) {
+            phoneDevice.classList.add('theme-cyber-icons');
+        } else {
+            phoneDevice.classList.remove('theme-cyber-icons');
+        }
+
         if (isLightningTheme) {
             phoneDevice.classList.add('theme-lightning-active');
             phoneDevice.style.borderColor = targetHex;
@@ -569,7 +579,7 @@ function hexToRgba(hex, alpha = 0.5) {
 }
 
 // ========================================================
-// 7. МОДАЛЬНОЕ ОКНО КАСТОМИЗАЦИИ HUD
+// 7. МОДАЛЬНОЕ ОКНО КАСТОМИЗАЦИИ HUD (С CYBER BLACK NEO)
 // ========================================================
 let activeCustomizerTab = 'colors';
 
@@ -595,6 +605,7 @@ function renderHudCustomizerContent() {
     const ownedNicks = state.player?.ownedNickEffects || ['none'];
     const ownedAvatars = state.player?.ownedAvatarEffects || ['none'];
     const sProfile = state.player?.soundProfile || 'cyber';
+    const isCyberTheme = state.player?.themePresetId === 'cyber_black_neo';
 
     let bodyHtml = "";
 
@@ -614,6 +625,16 @@ function renderHudCustomizerContent() {
         });
 
         bodyHtml = `
+            <div class="glass-card p-2 mb-2 flex-between" style="background:#090e18; border-color: ${isCyberTheme ? 'var(--green)' : 'var(--border-glass)'};">
+                <div>
+                    <b class="text-xs color-green"><i class="fa-solid fa-terminal"></i> Тема «Cyber Black Neo»</b>
+                    <div class="sub-label" style="font-size:9px;">Матовые черные иконки с неоновой подсветкой, как в DEV</div>
+                </div>
+                <button onclick="toggleCyberIconsThemeAction()" class="btn ${isCyberTheme ? 'btn-green' : 'btn-dark'} btn-sm btn-auto">
+                    ${isCyberTheme ? 'ВКЛЮЧЕНА ✓' : 'ВКЛЮЧИТЬ'}
+                </button>
+            </div>
+
             <div class="sub-label mb-2" style="font-size:10px;">Выберите неоновый цвет контуров, HUD и корпуса телефона:</div>
             <div class="hud-colors-palette-grid mb-3">
                 ${colorsGrid}
@@ -696,7 +717,7 @@ function renderHudCustomizerContent() {
             </div>
 
             <div class="grid-3 mb-2">
-                <button onclick="switchCustomizerTab('colors')" class="btn ${activeCustomizerTab === 'colors' ? 'btn-cyan' : 'btn-dark'} btn-sm">🎨 Цвет</button>
+                <button onclick="switchCustomizerTab('colors')" class="btn ${activeCustomizerTab === 'colors' ? 'btn-cyan' : 'btn-dark'} btn-sm">🎨 Скин</button>
                 <button onclick="switchCustomizerTab('nick')" class="btn ${activeCustomizerTab === 'nick' ? 'btn-cyan' : 'btn-dark'} btn-sm">✨ Ник</button>
                 <button onclick="switchCustomizerTab('avatar')" class="btn ${activeCustomizerTab === 'avatar' ? 'btn-cyan' : 'btn-dark'} btn-sm">👤 Аватар</button>
             </div>
@@ -718,6 +739,16 @@ function renderHudCustomizerContent() {
             <button onclick="ModalManager.close('modalHudCustomizer')" class="btn btn-cyan w-full">Применить и закрыть ✓</button>
         </div>
     `;
+}
+
+function toggleCyberIconsThemeAction() {
+    state.player.themePresetId = state.player.themePresetId === 'cyber_black_neo' ? 'default' : 'cyber_black_neo';
+    saveState();
+    applyHudCustomization();
+    renderHudCustomizerContent();
+    playSound('win');
+    tgHaptic('success');
+    showToast(state.player.themePresetId === 'cyber_black_neo' ? "Тема Cyber Black Neo активирована!" : "Тема иконок возвращена к классической.");
 }
 
 function setHudSolidColor(colorId) {
@@ -1200,6 +1231,7 @@ function sanitizeState() {
     if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
     
     if (!state.player.hudColorId) state.player.hudColorId = 'lightning';
+    if (!state.player.themePresetId) state.player.themePresetId = 'default';
     if (!state.player.nickEffect) state.player.nickEffect = 'none';
     if (!state.player.avatarEffect) state.player.avatarEffect = 'none';
     if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
@@ -1737,7 +1769,7 @@ function renderProfileAnalytics() {
                     🎨 Скин & Эффекты
                 </button>
                 <button onclick="openPatchNotesModal()" class="btn btn-dark btn-sm btn-auto" style="font-size:10px;">
-                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут v0.6.7
+                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут v0.7.0
                 </button>
             </div>
         </div>
@@ -2141,6 +2173,7 @@ window.switchCustomizerTab = switchCustomizerTab;
 window.renderHudCustomizerContent = renderHudCustomizerContent;
 window.setHudSolidColor = setHudSolidColor;
 window.setHudCustomHexColor = setHudCustomHexColor;
+window.toggleCyberIconsThemeAction = toggleCyberIconsThemeAction;
 window.buyNickEffectAction = buyNickEffectAction;
 window.setNickEffectAction = setNickEffectAction;
 window.buyAvatarEffectAction = buyAvatarEffectAction;
