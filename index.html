@@ -66,7 +66,7 @@
             </div>
           </div>
 
-          <!-- Правая зона: Растянутый до середины баланс и валюты под ним в стиле stat-pill (справа налево) -->
+          <!-- Правая зона: Растянутый до середины баланс и валюты под ним в стиле stat-pill (строго в один ряд) -->
           <div class="wallet-dashboard">
             <div class="wallet-capsule-box" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Открыть Во-Банк">
               <div class="cash-val">
@@ -74,7 +74,7 @@
               </div>
             </div>
 
-            <!-- Валюты в стиле stat-pill, выстроенные справа налево -->
+            <!-- Валюты в стиле stat-pill, выстроенные в один ряд справа налево -->
             <div class="wallet-stats-row">
               <button type="button" class="stat-pill stat-pill-note" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты">
                 <i class="fa-solid fa-money-bill-wave"></i> <span id="starsAmount">15</span>
@@ -876,6 +876,7 @@
           <button type="button" onclick="AppM.selectP2PListingType('housing')" id="btnP2PTypeHouse" class="btn btn-dark btn-sm">Жильё</button>
         </div>
         <select id="p2pItemSelect" onchange="AppM.onP2PItemSelected(this.value)" style="width:100%; background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; color:#fff; font-size:12px; margin-bottom:8px;"></select>
+        <div id="p2pItemPreviewBox" style="display:none; margin-bottom:8px;"></div>
         <input type="number" id="p2pPriceInput" placeholder="Цена в рублях ₽" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;" min="1000">
         <div class="grid-2">
           <button onclick="AppM.confirmCreateP2PListing()" class="btn btn-green">Выставить в облако ☁️</button>
