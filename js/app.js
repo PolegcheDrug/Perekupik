@@ -1,17 +1,12 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v1.2.2)
+// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v1.2.3)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Анимированный роллер чисел HUD, жесткий учет инвентаря,
-// Почта и Склад хранения (mailbox & warehouse),
-// неоновые банкноты, билеты СуперВилспина с пульсацией >5 шт,
-// интерактивные окна ограничения уровня с прогресс-баром,
-// авто-миграция локальной базы в Cloud Firestore cars_catalog,
-// темы Cyber Black Neo, кастомные эффекты огня/плазмы,
-// спецзаказы «ПодКлюч», Telegram Cloud Storage, Firestore & Refs.
-// Полная синхронизация с P2P-экосистемой M+ PRO Hub.
+// ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
+// Анимированный роллер чисел HUD, учет инвентаря, Почта/Склад,
+// неоновые банкноты, кастомизация HUD, анимированные ники и ауры аватаров.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v1.2.2";
+const CURRENT_GAME_VERSION = "v1.2.3";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -26,6 +21,39 @@ let isCloudStorageAvailable = false;
 let displayedCashValue = 0;
 let displayedStarsValue = 0;
 let activeNumberAnimators = {};
+
+// ========================================================
+// КАТАЛОГИ КАСТОМИЗАЦИИ HUD, НИКНЕЙМОВ И АВАТАРОК
+// ========================================================
+const HUD_SOLID_COLORS = [
+    { id: 'lightning', name: 'Cyber Neon (Молния)', hex: '#00f2fe', secondaryHex: '#7928ca', glow: 'rgba(0, 242, 254, 0.45)', isLightning: true },
+    { id: 'sakura', name: 'Tokyo Sakura (Дрифт)', hex: '#f43f5e', secondaryHex: '#c084fc', glow: 'rgba(244, 63, 94, 0.45)', isLightning: false },
+    { id: 'gold', name: 'Syndicate Gold (Олигарх)', hex: '#ffd700', secondaryHex: '#b45309', glow: 'rgba(255, 215, 0, 0.45)', isLightning: false },
+    { id: 'redline', name: 'Redline Beast (Алый)', hex: '#ff3366', secondaryHex: '#991b1b', glow: 'rgba(255, 51, 102, 0.45)', isLightning: false },
+    { id: 'matrix', name: 'Matrix Emerald (Терминал)', hex: '#00e676', secondaryHex: '#064e3b', glow: 'rgba(0, 230, 118, 0.45)', isLightning: false },
+    { id: 'frost', name: 'Arctic Frost (Лазурь)', hex: '#38bdf8', secondaryHex: '#1d4ed8', glow: 'rgba(56, 189, 248, 0.45)', isLightning: false }
+];
+window.HUD_SOLID_COLORS = HUD_SOLID_COLORS;
+
+const NICKNAME_EFFECTS_CATALOG = [
+    { id: 'none', name: 'Классический белый', className: '', desc: 'Стандартный читаемый никнейм', cost: 0, reqStars: 0 },
+    { id: 'lightning_spark', name: '⚡ Неоновый перелив', className: 'nick-fx-lightning', desc: 'Светящиеся переливы кибер-электричества', cost: 75000, reqStars: 2 },
+    { id: 'fire_flicker', name: '🔥 Пламя отсечки', className: 'nick-fx-fire', desc: 'Огненное мерцание прямо из прямотока', cost: 120000, reqStars: 3 },
+    { id: 'gold_shimmer', name: '👑 Золотой слиток', className: 'nick-fx-gold', desc: 'Блеск чистого золота Синдиката', cost: 250000, reqStars: 5 },
+    { id: 'matrix_scan', name: '💻 Цифровой код', className: 'nick-fx-matrix', desc: 'Неоновые терминальные символы', cost: 95000, reqStars: 2 },
+    { id: 'sakura_drift', name: '🌸 Tokyo Sakura', className: 'nick-fx-sakura', desc: 'Нежный розово-пурпурный градиент JDM', cost: 140000, reqStars: 4 }
+];
+window.NICKNAME_EFFECTS_CATALOG = NICKNAME_EFFECTS_CATALOG;
+
+const AVATAR_EFFECTS_CATALOG = [
+    { id: 'none', name: 'Стандартный ободок', className: '', desc: 'Базовое кольцо аватара', cost: 0, reqStars: 0 },
+    { id: 'lightning_shield', name: '⚡ Кольцо молний', className: 'avatar-fx-lightning-ring', desc: 'Вращающееся неоновое кольцо 24/7', cost: 90000, reqStars: 2 },
+    { id: 'fire_shield', name: '🔥 Огненная плазма', className: 'avatar-fx-fire-ring', desc: 'Пульсирующий огненный ореол вокруг фото', cost: 135000, reqStars: 3 },
+    { id: 'gold_shield', name: '👑 Корона Синдиката', className: 'avatar-fx-gold-ring', desc: 'Вращающаяся золотая аура успеха', cost: 300000, reqStars: 6 },
+    { id: 'matrix_shield', name: '💻 Кибер-щит', className: 'avatar-fx-matrix-ring', desc: 'Зелёный импульс хакерского Launch', cost: 110000, reqStars: 2 },
+    { id: 'sakura_shield', name: '🌸 Лепестки Сакуры', className: 'avatar-fx-sakura-ring', desc: 'Вращающийся японский градиент', cost: 150000, reqStars: 4 }
+];
+window.AVATAR_EFFECTS_CATALOG = AVATAR_EFFECTS_CATALOG;
 
 // ========================================================
 // 1. ДИНАМИЧЕСКИЙ ВЫБОР ФОТО АВТОМОБИЛЯ ИЗ ПАПКИ МОДЕЛИ
@@ -268,9 +296,6 @@ function showToast(msg) {
     setTimeout(() => { t.classList.remove('show'); }, 2500);
 }
 
-// ========================================================
-// ЦЕНТРАЛИЗОВАННЫЙ ЖУРНАЛ БАНКОВСКИХ ТРАНЗАКЦИЙ
-// ========================================================
 function logBankTransaction(title, amount, isIncome) {
     if (!state.player) state.player = {};
     if (!Array.isArray(state.player.bankHistory)) state.player.bankHistory = [];
@@ -405,12 +430,9 @@ function extractPrizesFromText(text) {
     return tokens;
 }
 
-// --------------------------------------------------------
-// ИНТЕРАКТИВНОЕ ОКНО БЛОКИРОВКИ ПО УРОВНЮ
-// --------------------------------------------------------
 function openLevelGateModal(appName, reqLevel, customDesc = null) {
-    safePlaySound('error');
-    safeTgHaptic('warning');
+    playSound('error');
+    tgHaptic('warning');
 
     let curLvl = state.player?.level || 1;
     let curXp = state.player?.xp || 0;
@@ -443,7 +465,6 @@ function openLevelGateModal(appName, reqLevel, customDesc = null) {
                 ${customDesc || defaultDesc}
             </p>
 
-            <!-- ИНТЕРАКТИВНАЯ КАРТОЧКА ПРОГРЕССА АВТОРИТЕТА -->
             <div class="p-2 mb-3 text-left" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
                 <div class="flex-between text-xs mb-1">
                     <span class="sub-label">Текущий ранг перекупа:</span>
@@ -560,6 +581,7 @@ const DEFAULT_STATE = {
         baseSlots: 2, vip: false, vipPro: false, lastFreeSpinDay: 0, lastFreeSuperSpinDay: 0,
         club: null, karma: 50, streetCred: 100, superSpinTickets: 1,
         freeImpoundPasses: 0,
+        traderTitle: "Быстрый выкуп за кэш 💸",
         phoneWidgetsCollapsed: { biz: false, quests: false },
         stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0, scandalsAvoided: 0, bestSingleMargin: 0 },
         hunger: 80, mood: 85, loanDebt: 0, taxDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
@@ -627,7 +649,6 @@ const DEFAULT_STATE = {
 let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 window.state = state;
 
-// Глобальный маршрутизатор входящих посылок в Почтовый ящик
 window.pushToMailbox = function(mailItem) {
     if (!state.player) state.player = {};
     if (!Array.isArray(state.player.mailbox)) state.player.mailbox = [];
@@ -674,7 +695,7 @@ function applyHudCustomization() {
     if (customHex) {
         targetHex = customHex;
         targetGlow = hexToRgba(customHex, 0.45);
-    } else if (typeof HUD_SOLID_COLORS !== 'undefined') {
+    } else {
         const found = HUD_SOLID_COLORS.find(c => c.id === curColorId) || HUD_SOLID_COLORS[0];
         targetHex = found.hex;
         targetSecondaryHex = found.secondaryHex || "#0284c7";
@@ -708,9 +729,10 @@ function applyHudCustomization() {
         }
     }
 
+    // Применение анимации ника
     const nameEl = document.getElementById('playerName');
-    const nickFxId = state.player?.nickEffect || (isLightningTheme ? 'lightning_spark' : 'none');
-    if (nameEl && typeof NICKNAME_EFFECTS_CATALOG !== 'undefined') {
+    const nickFxId = state.player?.nickEffect || 'none';
+    if (nameEl) {
         NICKNAME_EFFECTS_CATALOG.forEach(fx => {
             if (fx.className) nameEl.classList.remove(fx.className);
         });
@@ -720,15 +742,16 @@ function applyHudCustomization() {
         }
     }
 
+    // Применение ауры аватара
     const ringEl = document.querySelector('.avatar-ring');
-    const avatarFxId = state.player?.avatarEffect || (isLightningTheme ? 'lightning_shield' : 'none');
-    if (ringEl && typeof AVATAR_EFFECTS_CATALOG !== 'undefined') {
+    const avatarFxId = state.player?.avatarEffect || 'none';
+    if (ringEl) {
         AVATAR_EFFECTS_CATALOG.forEach(fx => {
             if (fx.className) ringEl.classList.remove(fx.className);
         });
-        const activeFx = AVATAR_EFFECTS_CATALOG.find(fx => fx.id === avatarFxId);
-        if (activeFx && activeFx.className) {
-            ringEl.classList.add(activeFx.className);
+        const activeAvatarFx = AVATAR_EFFECTS_CATALOG.find(fx => fx.id === avatarFxId);
+        if (activeAvatarFx && activeAvatarFx.className) {
+            ringEl.classList.add(activeAvatarFx.className);
         }
     }
 }
@@ -741,7 +764,7 @@ function hexToRgba(hex, alpha = 0.5) {
 }
 
 // ========================================================
-// 7. МОДАЛЬНОЕ ОКНО КАСТОМИЗАЦИИ HUD (CYBER BLACK NEO)
+// 7. МОДАЛЬНОЕ ОКНО КАСТОМИЗАЦИИ HUD (СКИНОМ, НИКОМ И АВАТАРОМ)
 // ========================================================
 let activeCustomizerTab = 'colors';
 
@@ -773,9 +796,9 @@ function renderHudCustomizerContent() {
 
     if (activeCustomizerTab === 'colors') {
         let colorsGrid = "";
-        (typeof HUD_SOLID_COLORS !== 'undefined' ? HUD_SOLID_COLORS : []).forEach(c => {
+        HUD_SOLID_COLORS.forEach(c => {
             const isSel = curColorId === c.id && !state.player?.customHexColor;
-            let lightningBadge = c.isLightning ? `<span class="tag-badge bg-tag-purple" style="font-size:7px; position:absolute; top:-4px; left:-4px;">⚡ МОЛНИИ</span>` : "";
+            let lightningBadge = c.isLightning ? `<span class="tag-badge bg-tag-purple" style="font-size:7px; position:absolute; top:-4px; left:-4px;">⚡ НЕОН</span>` : "";
             colorsGrid += `
                 <div class="color-palette-tile ${isSel ? 'selected' : ''}" onclick="setHudSolidColor('${c.id}')" style="--tile-color:${c.hex}; position:relative;">
                     ${lightningBadge}
@@ -797,7 +820,7 @@ function renderHudCustomizerContent() {
                 </button>
             </div>
 
-            <div class="sub-label mb-2" style="font-size:10px;">Выберите неоновый цвет контуров, HUD и корпуса телефона:</div>
+            <div class="sub-label mb-2" style="font-size:10px;">Выберите цветовую схему HUD, рамок и смартфона:</div>
             <div class="hud-colors-palette-grid mb-3">
                 ${colorsGrid}
             </div>
@@ -811,7 +834,7 @@ function renderHudCustomizerContent() {
         `;
     } else if (activeCustomizerTab === 'nick') {
         let listHtml = "";
-        (typeof NICKNAME_EFFECTS_CATALOG !== 'undefined' ? NICKNAME_EFFECTS_CATALOG : []).forEach(fx => {
+        NICKNAME_EFFECTS_CATALOG.forEach(fx => {
             const isOwned = ownedNicks.includes(fx.id);
             const isCur = curNickFx === fx.id;
 
@@ -821,7 +844,7 @@ function renderHudCustomizerContent() {
             } else if (isOwned) {
                 actionBtn = `<button onclick="setNickEffectAction('${fx.id}')" class="btn btn-cyan btn-sm btn-auto">Выбрать</button>`;
             } else {
-                let starsTxt = fx.reqStars ? ` + ${fx.reqStars} ⭐` : "";
+                let starsTxt = fx.reqStars ? ` + ${fx.reqStars} 💵` : "";
                 actionBtn = `<button onclick="buyNickEffectAction('${fx.id}', ${fx.cost}, ${fx.reqStars})" class="btn btn-green btn-sm btn-auto">${fx.cost.toLocaleString()} ₽${starsTxt}</button>`;
             }
 
@@ -841,7 +864,7 @@ function renderHudCustomizerContent() {
         bodyHtml = `<div class="sub-label mb-2" style="font-size:10px;">Анимированные эффекты для имени перекупа:</div><div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto;">${listHtml}</div>`;
     } else if (activeCustomizerTab === 'avatar') {
         let listHtml = "";
-        (typeof AVATAR_EFFECTS_CATALOG !== 'undefined' ? AVATAR_EFFECTS_CATALOG : []).forEach(fx => {
+        AVATAR_EFFECTS_CATALOG.forEach(fx => {
             const isOwned = ownedAvatars.includes(fx.id);
             const isCur = curAvatarFx === fx.id;
 
@@ -851,7 +874,7 @@ function renderHudCustomizerContent() {
             } else if (isOwned) {
                 actionBtn = `<button onclick="setAvatarEffectAction('${fx.id}')" class="btn btn-cyan btn-sm btn-auto">Выбрать</button>`;
             } else {
-                let starsTxt = fx.reqStars ? ` + ${fx.reqStars} ⭐` : "";
+                let starsTxt = fx.reqStars ? ` + ${fx.reqStars} 💵` : "";
                 actionBtn = `<button onclick="buyAvatarEffectAction('${fx.id}', ${fx.cost}, ${fx.reqStars})" class="btn btn-green btn-sm btn-auto">${fx.cost.toLocaleString()} ₽${starsTxt}</button>`;
             }
 
@@ -898,7 +921,7 @@ function renderHudCustomizerContent() {
                 </div>
             </div>
 
-            <button onclick="ModalManager.close('modalHudCustomizer')" class="btn btn-cyan w-full">Применить и закрыть ✓</button>
+            <button onclick="ModalManager.close('modalHudCustomizer')" class="btn btn-cyan w-full font-bold">Применить и закрыть ✓</button>
         </div>
     `;
 }
@@ -1446,6 +1469,7 @@ function sanitizeState() {
     if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
     if (!Array.isArray(state.player.ownedAvatarEffects)) state.player.ownedAvatarEffects = ['none'];
     if (!state.player.soundProfile) state.player.soundProfile = 'cyber';
+    if (!state.player.traderTitle) state.player.traderTitle = "Быстрый выкуп за кэш 💸";
 
     if (!Array.isArray(state.player.mailbox)) state.player.mailbox = [];
     if (!state.player.warehouse) {
@@ -1737,7 +1761,6 @@ function updateHeaderUI() {
     setTxt('connectionsText', conn);
     setTxt('karmaText', karma);
 
-    // Анимация пульсации, если банкнот или билетов супервилспина > 5 штук
     const banknotePill = document.getElementById('hudBanknotePill');
     if (banknotePill) {
         if (targetStars > 5) {
@@ -2016,7 +2039,7 @@ function renderProfileAnalytics() {
     let totalSales = (s.profitableSales || 0) + (s.lossSales || 0);
     let winrate = totalSales > 0 ? Math.round(((s.profitableSales || 0) / totalSales) * 100) : 0;
 
-    let rankTitle = lvl >= 50 ? "Олигарх Авторынка" : (lvl >= 30 ? "Хозяин Площадки" : (lvl >= 15 ? "Серый Делец" : "Гаражный Перекуп"));
+    let rankTitle = p.traderTitle || (lvl >= 50 ? "Олигарх Авторынка" : (lvl >= 30 ? "Хозяин Площадки" : (lvl >= 15 ? "Серый Делец" : "Гаражный Перекуп")));
     let rankColor = lvl >= 50 ? "color-amber" : (lvl >= 30 ? "color-purple" : "color-cyan");
 
     let repRating = (p.bankReputation?.rating || 5.0).toFixed(1);
@@ -2274,7 +2297,6 @@ function initApp() {
         applyHudCustomization();
         checkRealTimeDayChange();
         
-        // Синхронизация облачной базы автомобилей
         if (window.FB_Bridge?.CarsCatalog) {
             try {
                 await window.FB_Bridge.CarsCatalog.fetchCloudCars();
@@ -2320,7 +2342,6 @@ setInterval(() => {
         checkRealTimeDayChange();
     }
 
-    // Бизнес-кассы и доходы
     if (gameCycleSeconds % 30 === 0 && state.businesses) {
         let bizUpdated = false;
         const staffCat = typeof BUSINESS_STAFF_CATALOG !== 'undefined' ? BUSINESS_STAFF_CATALOG : { managers: [], masters: [], security: [] };
@@ -2375,14 +2396,12 @@ setInterval(() => {
         }
     }
 
-    // Голод и кураж
     if (gameCycleSeconds % 45 === 0 && state.player) {
         state.player.hunger = Math.max(0, (state.player.hunger || 80) - 1);
         state.player.mood = Math.max(0, (state.player.mood || 85) - 1);
         updateHeaderUI();
     }
 
-    // Остывание двигателей
     if (gameCycleSeconds % 10 === 0 && state.garage) {
         state.garage.forEach(car => {
             if (car && car.engineTemp && car.engineTemp > 90) {
@@ -2391,14 +2410,13 @@ setInterval(() => {
         });
     }
 
-    // Таймеры авторынка
     const mTab = document.getElementById('tabMarket');
     if (mTab && mTab.classList.contains('active') && typeof updateMarketTimers === 'function') {
         updateMarketTimers();
     }
 }, 1000);
 
-// Экспорт всех функций
+// Экспорт всех глобальных функций
 window.initApp = initApp;
 window.switchTab = switchTab;
 window.saveState = saveState;
