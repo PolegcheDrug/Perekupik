@@ -1,9 +1,9 @@
 // ========================================================
-// js/dev-studio.js — ОБЛАЧНАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v1.3.0)
+// js/dev-studio.js — ОБЛАЧНАЯ АВТО-СТУДИЯ ПЕРЕКУПА (v1.4.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// 🟢 Экран 1: Создание новых авто с настраиваемым именем
-// 🟣 Экран 2: Переименование и онлайн-редактирование моделей из базы
-// ✂️ Встроенный Canvas-кроппер обложки (16:9), гибкая смена названий.
+// 🟢 Экран 1: Создание новых авто с ручным контролем путей GitHub
+// 🟣 Экран 2: Переименование, инспекция и прямое изменение путей фото
+// ✂️ Кроппер 16:9 с рабочим сбросом и валидацией ссылок
 // ========================================================
 
 const DevStudio = {
@@ -11,7 +11,6 @@ const DevStudio = {
     currentDraft: null,
     uploadedPhotos: [],
 
-    // Параметры кадрирования обложки
     cropperState: {
         zoom: 1.0,
         offsetY: 0,
@@ -20,7 +19,6 @@ const DevStudio = {
         originalImgObj: null
     },
 
-    // Состояние экрана редактирования
     editFilterClass: 'economy',
     editSearchQuery: '',
     selectedEditCarIndex: -1,
@@ -42,22 +40,13 @@ const DevStudio = {
             drivetrain: "rwd",
             folderPath: "assets/cars/economy/2101/",
             baseFilename: "vaz_2101",
-            images: [],
+            customImgPath: "assets/cars/economy/2101/vaz-2101.jpg",
+            images: ["assets/cars/economy/2101/vaz-2101.jpg"],
             sellerNote: "«Дедушка ездил только летом на дачу, сел и поехал.»",
             condition: 85,
             mileage: 72000,
             plate: "В777ВВ 77",
-            tuning: {
-                chip: 0,
-                exhaust: false,
-                stance: false,
-                bodykit: false,
-                weldedDiff: false,
-                steeringAngle: false,
-                hydroHandbrake: false,
-                rollCage: false,
-                dragSlicks: false
-            },
+            tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, weldedDiff: false, steeringAngle: false, hydroHandbrake: false, rollCage: false, dragSlicks: false },
             defectCode: "none",
             thickness: { hood: 110, roof: 100, doors: 115, wings: 110 }
         };
@@ -66,13 +55,36 @@ const DevStudio = {
     },
 
     resetCropperParams() {
+        const savedImg = this.cropperState ? this.cropperState.originalImgObj : null;
         this.cropperState = {
             zoom: 1.0,
             offsetY: 0,
             offsetX: 0,
             rotation: 0,
-            originalImgObj: null
+            originalImgObj: savedImg
         };
+    },
+
+    resetCropperUI() {
+        this.resetCropperParams();
+
+        const zoomEl = document.getElementById('cropRangeZoom');
+        const yEl = document.getElementById('cropRangeY');
+        const xEl = document.getElementById('cropRangeX');
+
+        if (zoomEl) zoomEl.value = "1.0";
+        if (yEl) yEl.value = "0";
+        if (xEl) xEl.value = "0";
+
+        if (this.cropperState.originalImgObj) {
+            this.updateCropperCanvas();
+        } else {
+            this.initCropperCanvasPreview();
+        }
+
+        if (typeof showToast === 'function') {
+            showToast("Положение и масштаб сброшены!");
+        }
     },
 
     open() {
@@ -117,9 +129,6 @@ const DevStudio = {
         if (typeof tgHaptic === 'function') tgHaptic('light');
     },
 
-    // ========================================================
-    // ГЛАВНЫЙ РЕНДЕР СТУДИИ
-    // ========================================================
     render() {
         if (!this.currentDraft) this.resetDraft();
         const container = document.getElementById('devStudioContent');
@@ -130,7 +139,6 @@ const DevStudio = {
 
         container.innerHTML = `
             <div class="dev-studio-container ${themeClass}">
-                <!-- ШАПКА С ПЕРЕКЛЮЧАТЕЛЕМ ЭКРАНОВ -->
                 <div class="flex-between mb-2 pb-2" style="border-bottom: 1px solid var(--border-glass);">
                     <div class="flex-gap" style="align-items:center;">
                         <div class="category-header-icon ${isCreate ? 'icon-create-style' : 'icon-edit-style'}">
@@ -138,23 +146,22 @@ const DevStudio = {
                         </div>
                         <div>
                             <h3 class="font-bold text-xs" style="font-size:14px; color:${isCreate ? 'var(--cyan)' : 'var(--purple)'};">
-                                ${isCreate ? '🟢 Создание новой модели' : '🟣 Редактирование и переименование'}
+                                ${isCreate ? '🟢 Создание новой модели' : '🟣 Редактирование и пути GitHub'}
                             </h3>
                             <div class="sub-label" style="font-size:9px;">
-                                ${isCreate ? 'Добавление новой машины в базу Firestore' : 'Изменение названий, цен и характеристик в реальном времени'}
+                                ${isCreate ? 'Добавление новой машины в базу Firestore' : 'Просмотр и ручное изменение путей к файлам на GitHub'}
                             </div>
                         </div>
                     </div>
-                    <button onclick="DevStudio.close()" class="btn btn-dark btn-auto btn-sm">✕</button>
+                    <button type="button" onclick="DevStudio.close()" class="btn btn-dark btn-auto btn-sm">✕</button>
                 </div>
 
-                <!-- НАВИГАЦИОННЫЙ СЕЛЕКТОР ЭКРАНОВ -->
                 <div class="grid-2 mb-3">
-                    <button onclick="DevStudio.switchScreen('create')" class="btn ${isCreate ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-weight:900;">
+                    <button type="button" onclick="DevStudio.switchScreen('create')" class="btn ${isCreate ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-weight:900;">
                         <i class="fa-solid fa-cloud-arrow-up mr-1"></i> 1. Создать новую
                     </button>
-                    <button onclick="DevStudio.switchScreen('edit')" class="btn ${!isCreate ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-weight:900;">
-                        <i class="fa-solid fa-list-check mr-1"></i> 2. Редактировать / Переименовать
+                    <button type="button" onclick="DevStudio.switchScreen('edit')" class="btn ${!isCreate ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-weight:900;">
+                        <i class="fa-solid fa-list-check mr-1"></i> 2. Редактировать базу
                     </button>
                 </div>
 
@@ -168,20 +175,17 @@ const DevStudio = {
         }, 60);
     },
 
-    // ========================================================
-    // 🟢 ЭКРАН 1: СОЗДАНИЕ В CLOUD FIRESTORE
-    // ========================================================
     renderCreateScreen() {
         const d = this.currentDraft;
         const slug = d.baseFilename || d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
         const category = d.type || "economy";
-        const targetPath = `assets/cars/${category}/${slug}/${slug}.jpg`;
+        const targetPath = d.customImgPath || `assets/cars/${category}/${slug}/${slug}.jpg`;
 
         return `
             <div class="glass-card p-2 mb-2 studio-box-create">
                 <div class="flex-between mb-1">
                     <div>
-                        <b class="text-xs color-cyan"><i class="fa-brands fa-github mr-1"></i> Путь в репозитории:</b>
+                        <b class="text-xs color-cyan"><i class="fa-brands fa-github mr-1"></i> Путь сохранения на GitHub:</b>
                         <div class="sub-label" style="font-size:9px;">
                             Картинка будет загружаться по адресу: <b class="color-amber">${targetPath}</b>
                         </div>
@@ -190,31 +194,27 @@ const DevStudio = {
                 </div>
 
                 <div class="grid-2 mt-2">
-                    <button onclick="DevStudio.randomizeDraftParameters()" class="btn btn-cyan btn-sm">
-                        <i class="fa-solid fa-dice mr-1"></i> Рандомизировать параметры 🎲
+                    <button type="button" onclick="DevStudio.randomizeDraftParameters()" class="btn btn-cyan btn-sm">
+                        <i class="fa-solid fa-dice mr-1"></i> Рандом параметры 🎲
                     </button>
-                    <button onclick="DevStudio.applyPreset('drift')" class="btn btn-dark btn-sm" style="font-size:9.5px;">
+                    <button type="button" onclick="DevStudio.applyPreset('drift')" class="btn btn-dark btn-sm" style="font-size:9.5px;">
                         💨 Пресет «Корч»
                     </button>
                 </div>
             </div>
 
-            <!-- КРОППЕР И НАСТРОЙКА ОБЛОЖКИ -->
             ${this.renderCropperWidgetHtml(true)}
-
-            <!-- ФОРМА ХАРАКТЕРИСТИК И НАЗВАНИЯ -->
             ${this.renderCarFormFieldsHtml(true)}
 
-            <!-- КНОПКИ ДЕЙСТВИЙ -->
             <div class="space-y-2 mb-2">
-                <button onclick="DevStudio.publishCarToCloudFirestore()" class="btn btn-green w-full" style="box-shadow: 0 0 16px var(--green-glow); font-size:12px; padding:10px;">
-                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Опубликовать карточку в Firestore 🚀
+                <button type="button" onclick="DevStudio.publishCarToCloudFirestore()" class="btn btn-green w-full" style="box-shadow: 0 0 16px var(--green-glow); font-size:12px; padding:10px;">
+                    <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Опубликовать в Cloud Firestore 🚀
                 </button>
                 <div class="grid-2">
-                    <button onclick="DevStudio.spawnToMarketAction()" class="btn btn-cyan btn-sm">
+                    <button type="button" onclick="DevStudio.spawnToMarketAction()" class="btn btn-cyan btn-sm">
                         <i class="fa-solid fa-store mr-1"></i> Тест на Рынке
                     </button>
-                    <button onclick="DevStudio.spawnToGarageAction()" class="btn btn-dark btn-sm">
+                    <button type="button" onclick="DevStudio.spawnToGarageAction()" class="btn btn-dark btn-sm">
                         <i class="fa-solid fa-warehouse mr-1"></i> Тест в Гараже
                     </button>
                 </div>
@@ -222,9 +222,6 @@ const DevStudio = {
         `;
     },
 
-    // ========================================================
-    // 🟣 ЭКРАН 2: ОНЛАЙН-РЕДАКТИРОВАНИЕ И ПЕРЕИМЕНОВАНИЕ
-    // ========================================================
     renderEditScreen() {
         const d = this.currentDraft;
         const classes = [
@@ -240,7 +237,7 @@ const DevStudio = {
         ];
 
         let classChips = classes.map(c => `
-            <button onclick="DevStudio.selectEditClassFilter('${c.id}')" 
+            <button type="button" onclick="DevStudio.selectEditClassFilter('${c.id}')" 
                     class="btn ${this.editFilterClass === c.id ? 'btn-purple' : 'btn-dark'} btn-sm btn-auto" 
                     style="font-size:9px; padding:4px 8px;">
                 ${c.name}
@@ -298,22 +295,17 @@ const DevStudio = {
                     <span class="tag-badge bg-tag-purple">ОНЛАЙН РЕЖИМ</span>
                 </div>
 
-                <!-- КРОППЕР И НАСТРОЙКА ОБЛОЖКИ -->
-                ${this.renderCropperWidgetHtml(false)}
+                ${this.renderCropperWidgetHtml(false)}${this.renderCarFormFieldsHtml(false)}
 
-                <!-- ФОРМА ХАРАКТЕРИСТИК И ПЕРЕИМЕНОВАНИЯ -->
-                ${this.renderCarFormFieldsHtml(false)}
-
-                <!-- КНОПКИ СОХРАНЕНИЯ ПРАВОК -->
                 <div class="space-y-2 mb-2">
-                    <button onclick="DevStudio.publishCarToCloudFirestore()" class="btn btn-purple w-full" style="box-shadow: 0 0 16px rgba(192,132,252,0.4); font-size:12px; padding:10px;">
-                        <i class="fa-solid fa-floppy-disk mr-1"></i> Сохранить изменения и имя в Firestore ✓
+                    <button type="button" onclick="DevStudio.publishCarToCloudFirestore()" class="btn btn-purple w-full" style="box-shadow: 0 0 16px rgba(192,132,252,0.4); font-size:12px; padding:10px;">
+                        <i class="fa-solid fa-floppy-disk mr-1"></i> Сохранить изменения в Firestore ✓
                     </button>
                     <div class="grid-2">
-                        <button onclick="DevStudio.spawnToMarketAction()" class="btn btn-cyan btn-sm">
+                        <button type="button" onclick="DevStudio.spawnToMarketAction()" class="btn btn-cyan btn-sm">
                             <i class="fa-solid fa-store mr-1"></i> Запустить на Рынок
                         </button>
-                        <button onclick="DevStudio.spawnToGarageAction()" class="btn btn-dark btn-sm">
+                        <button type="button" onclick="DevStudio.spawnToGarageAction()" class="btn btn-dark btn-sm">
                             <i class="fa-solid fa-warehouse mr-1"></i> В гараж
                         </button>
                     </div>
@@ -321,15 +313,12 @@ const DevStudio = {
             ` : `
                 <div class="glass-card text-center sub-label py-6">
                     <i class="fa-solid fa-hand-pointer color-purple mb-2" style="font-size:24px;"></i>
-                    <div>Выберите автомобиль из списка выше, чтобы отредактировать его название, цену или характеристики.</div>
+                    <div>Выберите модель из списка выше, чтобы отредактировать её имя, путь к картинке или параметры.</div>
                 </div>
             `}
         `;
     },
 
-    // ========================================================
-    // ✂️ ВИДЖЕТ КАДРИРОВАНИЯ
-    // ========================================================
     renderCropperWidgetHtml(isCreate) {
         const color = isCreate ? 'var(--cyan)' : 'var(--purple)';
 
@@ -362,7 +351,7 @@ const DevStudio = {
 
                 <div class="grid-2">
                     <button type="button" onclick="document.getElementById('studioFileInput').click()" class="btn btn-dark btn-sm">
-                        <i class="fa-solid fa-camera mr-1"></i> Выбрать фото
+                        <i class="fa-solid fa-camera mr-1"></i> Выбрать файл
                     </button>
                     <button type="button" onclick="DevStudio.applyCropToDraft()" class="btn ${isCreate ? 'btn-cyan' : 'btn-purple'} btn-sm">
                         <i class="fa-solid fa-check mr-1"></i> Применить ракурс ✓
@@ -375,93 +364,6 @@ const DevStudio = {
         `;
     },
 
-    resetCropperParams() {
-        const currentImg = this.cropperState ? this.cropperState.originalImgObj : null;
-        this.cropperState = {
-            zoom: 1.0,
-            offsetY: 0,
-            offsetX: 0,
-            rotation: 0,
-            originalImgObj: currentImg // Картинка не удаляется, сбрасываются только координаты
-        };
-    },
-
-    resetCropperUI() {
-        this.resetCropperParams();
-
-        const zoomEl = document.getElementById('cropRangeZoom');
-        const yEl = document.getElementById('cropRangeY');
-        const xEl = document.getElementById('cropRangeX');
-
-        if (zoomEl) zoomEl.value = "1.0";
-        if (yEl) yEl.value = "0";
-        if (xEl) xEl.value = "0";
-
-        if (this.cropperState.originalImgObj) {
-            this.updateCropperCanvas();
-        } else {
-            this.initCropperCanvasPreview();
-        }
-
-        if (typeof showToast === 'function') {
-            showToast("Положение и масштаб сброшены!");
-        }
-    },
-
-    handleCropParamChange(param, val) {
-        this.cropperState[param] = val;
-        this.updateCropperCanvas();
-    },
-
-    updateCropperCanvas() {
-        const canvas = document.getElementById('studioCropCanvas');
-        if (!canvas || !this.cropperState.originalImgObj) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        const img = this.cropperState.originalImgObj;
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#090e18";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.save();
-        ctx.translate(canvas.width / 2 + this.cropperState.offsetX, canvas.height / 2 + this.cropperState.offsetY);
-        ctx.scale(this.cropperState.zoom, this.cropperState.zoom);
-
-        const aspect = img.width / img.height;
-        let drawW = canvas.width;
-        let drawH = canvas.width / aspect;
-
-        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-        ctx.restore();
-    },
-
-    applyCropToDraft() {
-        const canvas = document.getElementById('studioCropCanvas');
-        if (!canvas) return;
-
-        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        const d = this.currentDraft;
-
-        if (this.uploadedPhotos.length > 0) {
-            this.uploadedPhotos[0].dataUrl = croppedDataUrl;
-        } else {
-            this.uploadedPhotos.unshift({
-                name: `${d.baseFilename}.jpg`,
-                originalName: "preview.jpg",
-                dataUrl: croppedDataUrl
-            });
-        }
-
-        this.updateDraftImagesArray();
-        this.render();
-        if (typeof playSound === 'function') playSound('win');
-        if (typeof showToast === 'function') showToast("Ракурс применён для предпросмотра!");
-    },
-
-    // ========================================================
-    // ФОРМА ХАРАКТЕРИСТИК И ПЕРЕИМЕНОВАНИЯ МОДЕЛИ
-    // ========================================================
     renderCarFormFieldsHtml(isCreate) {
         const d = this.currentDraft;
         const color = isCreate ? 'var(--cyan)' : 'var(--purple)';
@@ -473,9 +375,27 @@ const DevStudio = {
                 <div class="mb-2">
                     <div class="flex-between mb-1">
                         <span class="sub-label" style="font-size:9px;">Название марки и модели (Имя карточки):</span>
-                        <span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">РЕДАКТИРУЕМОЕ</span>
+                        <span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">ИМЯ</span>
                     </div>
-                    <input type="text" class="chat-input" value="${d.name}" oninput="DevStudio.updateField('name', this.value)" placeholder="Например: ВАЗ-2107 «Семёрка»" style="font-size:12px; font-weight:800; padding:7px 8px; border-color:var(--cyan);">
+                    <input type="text" class="chat-input" value="${d.name}" oninput="DevStudio.updateField('name', this.value)" placeholder="Например: Lada Priora" style="font-size:12px; font-weight:800; padding:7px 8px; border-color:var(--cyan);">
+                </div>
+
+                <!-- ПОЛЕ ПРОСМОТРА И РУЧНОГО ВВОДА ПУТИ КАРТИНКИ -->
+                <div class="mb-2 p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
+                    <div class="flex-between mb-1">
+                        <span class="sub-label" style="font-size:9px;">Путь к картинке в репозитории GitHub:</span>
+                        <button type="button" onclick="DevStudio.testCurrentImgPath()" class="btn btn-dark btn-auto btn-sm" style="font-size:8px; padding:2px 6px;">
+                            <i class="fa-solid fa-arrow-up-right-from-square mr-1"></i> Проверить ссылку
+                        </button>
+                    </div>
+                    <input type="text" id="studioCustomImgPathInput" class="chat-input" 
+                           value="${d.customImgPath || ''}" 
+                           oninput="DevStudio.updateCustomImgPath(this.value)" 
+                           placeholder="assets/cars/economy/priora/priora.jpg" 
+                           style="font-size:11px; font-family:monospace; color:var(--amber); padding:6px 8px;">
+                    <div class="sub-label mt-1" style="font-size:8.5px;">
+                        Пример: <code>assets/cars/economy/priora/priora.jpg</code> (или полная прямая ссылка https://...).
+                    </div>
                 </div>
 
                 <div class="grid-2 mb-2">
@@ -526,6 +446,20 @@ const DevStudio = {
         `;
     },
 
+    updateCustomImgPath(val) {
+        if (!this.currentDraft) this.resetDraft();
+        this.currentDraft.customImgPath = val.trim();
+        this.currentDraft.images = [val.trim()];
+        this.initCropperCanvasPreview();
+    },
+
+    testCurrentImgPath() {
+        const path = this.currentDraft?.customImgPath;
+        if (!path) return showToast("Укажите путь к изображению!");
+        const fullUrl = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(path) : path;
+        window.open(fullUrl, '_blank');
+    },
+
     selectEditClassFilter(catId) {
         this.editFilterClass = catId;
         this.selectedEditCarIndex = -1;
@@ -547,22 +481,27 @@ const DevStudio = {
         const targetCar = catList[index];
         if (!targetCar) return;
 
-        // Сохраняем исходный ID, чтобы при переименовании не плодить дубликаты
         const stableId = targetCar.id || ("car_" + targetCar.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, '_'));
         const slug = targetCar.baseFilename || targetCar.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, '_');
+
+        let rawImgPath = targetCar.img || "";
+        if (Array.isArray(targetCar.images) && targetCar.images.length > 0) {
+            rawImgPath = targetCar.images[0];
+        }
 
         this.currentDraft = {
             isExistingCar: true,
             id: stableId,
             originalNameRef: targetCar.name,
-            name: targetCar.name, // Текущее редактируемое имя
+            name: targetCar.name,
             type: targetCar.type || this.editFilterClass,
             power: targetCar.power || 100,
             basePrice: targetCar.basePrice || 100000,
             drivetrain: targetCar.drivetrain || 'rwd',
             folderPath: `assets/cars/${this.editFilterClass}/${slug}/`,
             baseFilename: slug,
-            images: Array.isArray(targetCar.images) ? [...targetCar.images] : (targetCar.img ? [targetCar.img] : []),
+            customImgPath: rawImgPath,
+            images: Array.isArray(targetCar.images) ? [...targetCar.images] : (rawImgPath ? [rawImgPath] : []),
             sellerNote: targetCar.sellerNote || "«Проверенный автомобиль из официальной базы игры.»",
             condition: targetCar.condition || 90,
             mileage: targetCar.mileage || 65000,
@@ -575,13 +514,10 @@ const DevStudio = {
         this.uploadedPhotos = [];
         this.render();
         if (typeof showToast === 'function') {
-            showToast(`Загружены параметры модели: «${targetCar.name}»! Теперь её можно переименовать.`);
+            showToast(`Загружена: «${targetCar.name}». Путь к фото: ${rawImgPath}`);
         }
     },
 
-    // ========================================================
-    // СОХРАНЕНИЕ / ПЕРЕИМЕНОВАНИЕ В CLOUD FIRESTORE
-    // ========================================================
     async publishCarToCloudFirestore() {
         const d = this.currentDraft;
         if (!d || !d.name.trim()) return showToast("Укажите название модели!");
@@ -589,24 +525,26 @@ const DevStudio = {
         const cleanName = d.name.trim();
         const category = d.type || "economy";
         
-        // Для существующей машины сохраняем ее стабильный ID документа в Firestore
         const docId = d.id || ("car_" + cleanName.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_"));
         const slug = d.baseFilename || cleanName.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
         
-        let generatedPath = `assets/cars/${category}/${slug}/${slug}.jpg`;
-        if (d.isExistingCar && d.images && d.images[0] && !d.images[0].startsWith("data:")) {
-            generatedPath = d.images[0];
+        let targetPath = d.customImgPath && d.customImgPath.trim() !== "" 
+            ? d.customImgPath.trim() 
+            : `assets/cars/${category}/${slug}/${slug}.jpg`;
+
+        if (d.images && d.images[0] && d.images[0].startsWith("data:")) {
+            targetPath = d.images[0];
         }
 
         const carPayload = {
             id: docId,
-            name: cleanName, // Обновленное имя сохраняется в базе
+            name: cleanName,
             power: Number(d.power) || 100,
             basePrice: Number(d.basePrice) || 100000,
             drivetrain: d.drivetrain || "rwd",
             type: category,
-            img: generatedPath,
-            images: [generatedPath],
+            img: targetPath,
+            images: [targetPath],
             fallback: (typeof getCategoryFallback === 'function') ? getCategoryFallback(category) : "",
             authorId: String(window.FB_Bridge?.getProfile()?.id || "admin"),
             authorName: window.FB_Bridge?.getProfile()?.name || "Перекуп",
@@ -614,7 +552,7 @@ const DevStudio = {
             updatedAt: Date.now()
         };
 
-        showToast("⏳ Сохранение карточки в Cloud Firestore...");
+        showToast("⏳ Сохранение в Cloud Firestore...");
 
         if (window.FB_Bridge && window.FB_Bridge.CarsCatalog) {
             const res = await window.FB_Bridge.CarsCatalog.saveCarToCloud(carPayload);
@@ -622,7 +560,6 @@ const DevStudio = {
                 if (typeof playSound === 'function') playSound('win');
                 if (typeof tgHaptic === 'function') tgHaptic('success');
 
-                // Синхронизируем локальный CAR_DATABASE в памяти
                 if (window.CAR_DATABASE && window.CAR_DATABASE[category]) {
                     const foundIdx = window.CAR_DATABASE[category].findIndex(c => c.id === docId || c.name === d.originalNameRef);
                     if (foundIdx !== -1) {
@@ -632,7 +569,7 @@ const DevStudio = {
                     }
                 }
 
-                alert(`✅ Модель «${cleanName}» сохранена в Cloud Firestore!\n\nПуть для файла в репозитории GitHub:\n📁 ${generatedPath}`);
+                alert(`✅ Модель «${cleanName}» сохранена!\n\nПуть к картинке на GitHub:\n📁 ${targetPath}`);
             } else {
                 this.saveCustomCarToStorage(carPayload);
                 showToast(`Сохранено локально (${res ? res.error : 'оффлайн'}).`);
@@ -686,7 +623,7 @@ const DevStudio = {
         if (!box) return;
 
         if (this.uploadedPhotos.length === 0) {
-            box.innerHTML = `<div class="sub-label text-center py-2" style="grid-column:span 4; font-size:9.5px;">Фото не выбраны</div>`;
+            box.innerHTML = `<div class="sub-label text-center py-2" style="grid-column:span 4; font-size:9.5px;">Локальные фото не выбраны</div>`;
             return;
         }
 
@@ -698,7 +635,7 @@ const DevStudio = {
                 <span class="tag-badge ${idx === 0 ? 'bg-tag-cyan' : 'bg-tag-dark'}" style="position:absolute; bottom:2px; left:2px; font-size:7px; padding:1px 3px;">
                     ${idx === 0 ? 'ОБЛОЖКА' : '#' + idx}
                 </span>
-                <button onclick="DevStudio.removePhoto(${idx})" style="position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); color:#ff3366; border:none; border-radius:4px; font-size:9px; padding:1px 4px; cursor:pointer;">✕</button>
+                <button type="button" onclick="DevStudio.removePhoto(${idx})" style="position:absolute; top:2px; right:2px; background:rgba(0,0,0,0.6); color:#ff3366; border:none; border-radius:4px; font-size:9px; padding:1px 4px; cursor:pointer;">✕</button>
             </div>`;
         });
         box.innerHTML = html;
@@ -722,12 +659,88 @@ const DevStudio = {
         if (this.uploadedPhotos && this.uploadedPhotos.length > 0 && this.uploadedPhotos[0].dataUrl) {
             return this.uploadedPhotos[0].dataUrl;
         }
-        if (this.currentDraft && this.currentDraft.images && this.currentDraft.images.length > 0) {
-            let path = this.currentDraft.images[0];
+        if (this.currentDraft && this.currentDraft.customImgPath) {
+            let path = this.currentDraft.customImgPath;
             return (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(path) : path;
         }
         let defPath = "assets/cars/economy/2101/vaz-2101.jpg";
         return (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(defPath) : defPath;
+    },
+
+    initCropperCanvasPreview() {
+        const canvas = document.getElementById('studioCropCanvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        const coverSrc = this.getCoverImageSrc();
+
+        img.onload = () => {
+            this.cropperState.originalImgObj = img;
+            this.updateCropperCanvas();
+        };
+        img.onerror = () => {
+            ctx.fillStyle = "#090e18";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#ff3366";
+            ctx.font = "11px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("⚠️ Картинка не найдена по указанному пути", canvas.width / 2, canvas.height / 2);
+        };
+        img.src = coverSrc;
+    },
+
+    handleCropParamChange(param, val) {
+        this.cropperState[param] = val;
+        this.updateCropperCanvas();
+    },
+
+    updateCropperCanvas() {
+        const canvas = document.getElementById('studioCropCanvas');
+        if (!canvas || !this.cropperState.originalImgObj) return;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const img = this.cropperState.originalImgObj;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#090e18";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.save();
+        ctx.translate(canvas.width / 2 + this.cropperState.offsetX, canvas.height / 2 + this.cropperState.offsetY);
+        ctx.scale(this.cropperState.zoom, this.cropperState.zoom);
+
+        const aspect = img.width / img.height;
+        let drawW = canvas.width;
+        let drawH = canvas.width / aspect;
+
+        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        ctx.restore();
+    },
+
+    applyCropToDraft() {
+        const canvas = document.getElementById('studioCropCanvas');
+        if (!canvas) return;
+
+        const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        const d = this.currentDraft;
+
+        if (this.uploadedPhotos.length > 0) {
+            this.uploadedPhotos[0].dataUrl = croppedDataUrl;
+        } else {
+            this.uploadedPhotos.unshift({
+                name: `${d.baseFilename}.jpg`,
+                originalName: "preview.jpg",
+                dataUrl: croppedDataUrl
+            });
+        }
+
+        this.updateDraftImagesArray();
+        this.render();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof showToast === 'function') showToast("Ракурс применён для предпросмотра!");
     },
 
     updateField(field, val) {
@@ -804,7 +817,7 @@ const DevStudio = {
         const d = this.currentDraft;
         const slug = d.baseFilename || d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
         const category = d.type || "economy";
-        const path = `assets/cars/${category}/${slug}/${slug}.jpg`;
+        const path = d.customImgPath || `assets/cars/${category}/${slug}/${slug}.jpg`;
 
         const lot = {
             id: "m_custom_" + Date.now(),
@@ -844,7 +857,7 @@ const DevStudio = {
 
         const slug = d.baseFilename || d.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
         const category = d.type || "economy";
-        const path = `assets/cars/${category}/${slug}/${slug}.jpg`;
+        const path = d.customImgPath || `assets/cars/${category}/${slug}/${slug}.jpg`;
 
         const wonCar = {
             id: "garage_custom_" + Date.now(),
