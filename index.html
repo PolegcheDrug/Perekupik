@@ -915,13 +915,24 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- 1. ПОДКЛЮЧЕНИЕ СЕТЕВОГО МОДУЛЯ FIREBASE (ES-МОДУЛЬ) -->
-    <script type="module" src="firebase-bridge.js?v=320"></script>
+    <script type="module" src="firebase-bridge.js?v=330"></script>
 
     <!-- 2. АВТОЗАГРУЗЧИК ОСТАЛЬНЫХ СКРИПТОВ ИГРЫ -->
     <script>
       (function() {
-        const modules = [
-          'data.js',
+        // Сигнал готовности для Telegram WebView на Android
+        if (window.Telegram?.WebApp) {
+          try {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+          } catch (e) {}
+        }
+
+        const CACHE_VER = '330';
+
+        // data.js находится в корне, остальные скрипты — в папке js/
+        const rootModules = ['data.js'];
+        const jsModules = [
           'app.js',
           'phone.js',
           'phone-bank.js',
@@ -946,32 +957,31 @@
           'dev-studio.js'
         ];
 
-        function loadModule(name) {
+        function loadScript(path) {
           return new Promise((resolve) => {
-            const s1 = document.createElement('script');
-            // Проверяем сначала корень с версией v=320
-            s1.src = name + '?v=320';
-            s1.onload = () => resolve(true);
-            s1.onerror = () => {
-              s1.remove();
-              // Если в корне нет, пробуем подпапку js/
-              const s2 = document.createElement('script');
-              s2.src = 'js/' + name + '?v=320';
-              s2.onload = () => resolve(true);
-              s2.onerror = () => {
-                console.warn('[Loader] Не удалось загрузить ' + name);
-                resolve(false);
-              };
-              document.body.appendChild(s2);
+            const s = document.createElement('script');
+            s.src = path + '?v=' + CACHE_VER;
+            s.onload = () => resolve(true);
+            s.onerror = () => {
+              console.warn('[Loader] Ошибка загрузки скрипта: ' + path);
+              resolve(false);
             };
-            document.body.appendChild(s1);
+            document.body.appendChild(s);
           });
         }
 
         async function initAllModules() {
-          for (const mod of modules) {
-            await loadModule(mod);
+          // 1. Загрузка data.js из корня
+          for (const name of rootModules) {
+            await loadScript(name);
           }
+
+          // 2. Прямая загрузка остальных модулей из папки js/
+          for (const name of jsModules) {
+            await loadScript('js/' + name);
+          }
+
+          // 3. Инициализация приложения
           if (typeof initApp === 'function') {
             initApp();
           }
