@@ -178,3 +178,119 @@ html, body {
 .bg-tag-green { background: #063518; color: var(--green); }
 .bg-tag-purple { background: #32134d; color: var(--purple); }
 .bg-tag-red { background: #3b050d; color: var(--red); }
+.bg-tag-dark { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; }
+
+/* ========================================================
+   АНИМАЦИИ И ЭФФЕКТЫ ДЛЯ НИКНЕЙМА
+   ======================================================== */
+.nick-fx-lightning {
+  background: linear-gradient(90deg, #00f2fe, #fff, #c084fc, #00f2fe);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: nickLightningSweep 2.5s infinite linear;
+  filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.75));
+}
+@keyframes nickLightningSweep {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+
+.nick-fx-fire {
+  background: linear-gradient(90deg, #ff3366, #ffb300, #ff5722, #ffb300);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: nickFireFlicker 2s infinite ease-in-out alternate;
+  filter: drop-shadow(0 0 8px rgba(255, 87, 34, 0.85));
+}
+@keyframes nickFireFlicker {
+  0% { background-position: 0% 50%; filter: drop-shadow(0 0 4px #ff3366); }
+  100% { background-position: 100% 50%; filter: drop-shadow(0 0 10px #ffb300); }
+}
+
+.nick-fx-gold {
+  background: linear-gradient(135deg, #ffd700 0%, #fff7b2 40%, #d4af37 70%, #fff 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: nickGoldShimmer 3s infinite ease-in-out;
+  filter: drop-shadow(0 0 7px rgba(255, 215, 0, 0.7));
+}
+@keyframes nickGoldShimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.nick-fx-matrix {
+  color: #00e676 !important;
+  text-shadow: 0 0 8px rgba(0, 230, 118, 0.9), 0 0 16px rgba(0, 230, 118, 0.4);
+  animation: nickMatrixScan 1.8s infinite alternate ease-in-out;
+}
+@keyframes nickMatrixScan {
+  0% { filter: brightness(1); letter-spacing: 0px; }
+  100% { filter: brightness(1.35); letter-spacing: 0.4px; }
+}
+
+.nick-fx-sakura {
+  background: linear-gradient(90deg, #f43f5e, #fb7185, #c084fc, #f43f5e);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: nickSakuraDrift 3.5s infinite linear;
+  filter: drop-shadow(0 0 7px rgba(244, 63, 94, 0.7));
+}
+@keyframes nickSakuraDrift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 250% 50%; }
+}
+
+/* ========================================================
+   АУРЫ И АНИМАЦИИ ДЛЯ КОЛЬЦА АВАТАРА
+   ======================================================== */
+.avatar-fx-lightning-ring .avatar-fx-glow {
+  background: conic-gradient(from 0deg, var(--cyan), var(--purple), #fff, var(--cyan));
+  animation: spinAvatarRing 2.4s linear infinite;
+  opacity: 0.85;
+  filter: blur(5px);
+}
+@keyframes spinAvatarRing {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.avatar-fx-fire-ring .avatar-fx-glow {
+  background: radial-gradient(circle, rgba(255, 87, 34, 0.9) 0%, rgba(255, 51, 102, 0.8) 60%, transparent 100%);
+  animation: pulseFireAvatar 1.5s infinite alternate ease-in-out;
+  opacity: 0.9;
+  filter: blur(6px);
+}
+@keyframes pulseFireAvatar {
+  0% { transform: scale(0.92); opacity: 0.65; }
+  100% { transform: scale(1.15); opacity: 1; }
+}
+
+.avatar-fx-gold-ring .avatar-fx-glow {
+  background: conic-gradient(from 180deg, #ffd700, #fff, #b45309, #ffd700);
+  animation: spinAvatarRing 4s linear infinite;
+  opacity: 0.85;
+  filter: blur(5px);
+}
+
+.avatar-fx-matrix-ring .avatar-fx-glow {
+  background: radial-gradient(circle, rgba(0, 230, 118, 0.9) 0%, rgba(16, 185, 129, 0.3) 70%, transparent 100%);
+  animation: pulseMatrixAvatar 1.4s infinite alternate ease-in-out;
+  opacity: 0.9;
+  filter: blur(6px);
+}
+@keyframes pulseMatrixAvatar {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  100% { transform: scale(1.12); opacity: 0.95; }
+}
+
+.avatar-fx-sakura-ring .avatar-fx-glow {
+  background: conic-gradient(from 90deg, #f43f5e, #fb7185, #c084fc, #f43f5e);
+  animation: spinAvatarRing 3s linear infinite;
+  opacity: 0.85;
+  filter: blur(5px);
+}
