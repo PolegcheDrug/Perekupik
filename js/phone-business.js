@@ -1,7 +1,8 @@
 // ========================================================
-// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА 2.0 (v0.7.7)
+// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА 2.0 (v0.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Графические шкалы доходности, кассы и сырья,
+// Восстановлены визуальные обложки предприятий и цехов,
+// графические шкалы доходности, кассы и сырья,
 // глубокое управление цехами, штатом сотрудников и автопарком.
 // ========================================================
 
@@ -213,7 +214,7 @@ const AppBusiness = {
     },
 
     // ========================================================
-    // 1. ВКЛАДКА «ТОЧКИ»: ГРАФИЧЕСКИЕ ШКАЛЫ
+    // 1. ВКЛАДКА «ТОЧКИ»: С ОБЛОЖКАМИ И ШКАЛАМИ
     // ========================================================
     renderBusinessesListHtml: function() {
         var lvl = state.player ? (state.player.level || 1) : 1;
@@ -224,6 +225,20 @@ const AppBusiness = {
             tow_truck: 'fa-truck-pickup', paint_shop: 'fa-paint-roller', detailing: 'fa-spray-can-sparkles',
             chip_tuning: 'fa-microchip', razborka: 'fa-car-burst', autopodbor: 'fa-magnifying-glass-chart',
             taxi: 'fa-taxi', customs_hub: 'fa-ship'
+        };
+
+        var fallbackMap = {
+            wash: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80',
+            shina: 'https://images.unsplash.com/photo-1578844251758-2f71da64c96f?auto=format&fit=crop&w=600&q=80',
+            sto: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
+            tow_truck: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80',
+            paint_shop: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80',
+            chip_tuning: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
+            detailing: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80',
+            razborka: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?auto=format&fit=crop&w=600&q=80',
+            autopodbor: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80',
+            taxi: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80',
+            customs_hub: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80'
         };
 
         for (var idx = 0; idx < state.businesses.length; idx++) {
@@ -249,12 +264,16 @@ const AppBusiness = {
             var safeCapacity = Math.max(50000, calculatedIncome * 3);
             var cashFillPct = Math.min(100, Math.round((curStored / safeCapacity) * 100));
 
+            var rawImg = biz.img || ('assets/business/' + biz.id + '.jpg');
+            var bizImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
+            var fallbackImg = biz.fallback || fallbackMap[biz.id] || 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80';
+
             var actionBlock = "";
             if (isLocked) {
                 actionBlock = '<button class="btn btn-dark btn-sm w-full opacity-50" disabled>С ' + biz.minLevel + ' уровня авторитета</button>';
             } else if (!isOwned) {
                 actionBlock = 
-                    '<button onclick="AppBusiness.buyNewBusinessAction(' + idx + ')" class="btn btn-cyan btn-sm w-full">' +
+                    '<button onclick="AppBusiness.buyNewBusinessAction(' + idx + ')" class="btn btn-cyan btn-sm w-full font-bold">' +
                         'Купить объект (' + (cost / 1000).toFixed(0) + 'k ₽ + ' + (biz.reqStars || 0) + ' ⭐)' +
                     '</button>';
             } else {
@@ -289,21 +308,28 @@ const AppBusiness = {
 
             html += 
                 '<div class="glass-card mb-3 p-2">' +
+                    '<!-- ВОССТАНОВЛЕННАЯ ОБЛОЖКА БИЗНЕСА -->' +
+                    '<div class="car-img-wrap mb-2" style="height:130px; position:relative;">' +
+                        '<img src="' + bizImg + '" class="car-img" onerror="this.onerror=null; this.src=\'' + fallbackImg + '\';">' +
+                        '<div class="badge-tag badge-br">' +
+                            '<span class="tag-badge ' + (isOwned ? 'bg-tag-green' : 'bg-tag-amber') + '">' +
+                                (isOwned ? 'Ур. ' + biz.level : 'ДОСТУПНО') +
+                            '</span>' +
+                        '</div>' +
+                    '</div>' +
+
                     '<div class="flex-between mb-1">' +
                         '<div>' +
-                            '<b class="text-xs color-green"><i class="fa-solid ' + iconClass + ' mr-1"></i> ' + biz.name + '</b>' +
+                            '<b class="text-xs color-green" style="font-size:13px;"><i class="fa-solid ' + iconClass + ' mr-1"></i> ' + biz.name + '</b>' +
                             staffBadge +
                         '</div>' +
-                        '<span class="tag-badge ' + (isOwned ? 'bg-tag-green' : 'bg-tag-amber') + '">' +
-                            (isOwned ? 'Ур. ' + biz.level : 'Доступно') +
-                        '</span>' +
+                        '<span class="tag-badge bg-tag-green">+' + calculatedIncome.toLocaleString() + ' ₽/д</span>' +
                     '</div>' +
 
                     '<div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">' + (biz.desc || '') + '</div>' +
 
                     (isOwned ? (
                         '<div class="car-telemetry-panel mb-2" style="background:#090e18; border-radius:10px; padding:8px; border:1px solid rgba(255,255,255,0.06);">' +
-                            '<!-- ШКАЛА 1: ДОХОДНОСТЬ И ЭФФЕКТИВНОСТЬ -->' +
                             '<div class="telemetry-row mb-1">' +
                                 '<div class="telemetry-label" style="font-size:9px;"><i class="fa-solid fa-bolt color-green"></i> Доходность:</div>' +
                                 '<div class="telemetry-bar-bg" style="height:7px;">' +
@@ -312,7 +338,6 @@ const AppBusiness = {
                                 '<div class="telemetry-val color-green" style="font-size:10px; font-weight:900;">+' + calculatedIncome.toLocaleString() + ' ₽/д ' + (bonusPctText > 0 ? '(+' + bonusPctText + '%)' : '') + '</div>' +
                             '</div>' +
 
-                            '<!-- ШКАЛА 2: НАКОПЛЕНИЕ В КАССЕ -->' +
                             '<div class="telemetry-row mb-1">' +
                                 '<div class="telemetry-label" style="font-size:9px;"><i class="fa-solid fa-vault color-cyan"></i> В кассе:</div>' +
                                 '<div class="telemetry-bar-bg" style="height:7px;">' +
@@ -321,7 +346,6 @@ const AppBusiness = {
                                 '<div class="telemetry-val color-cyan" style="font-size:10px; font-weight:900;">' + curStored.toLocaleString() + ' ₽</div>' +
                             '</div>' +
 
-                            '<!-- ШКАЛА 3: ЗАПАС СЫРЬЯ НА СКЛАДЕ -->' +
                             '<div class="telemetry-row">' +
                                 '<div class="telemetry-label" style="font-size:9px;"><i class="fa-solid fa-boxes-stacked ' + stockColor + '"></i> Склад сырья:</div>' +
                                 '<div class="telemetry-bar-bg" style="height:7px;">' +

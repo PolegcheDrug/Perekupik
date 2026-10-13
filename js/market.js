@@ -1,10 +1,11 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, РЕЕСТР НОМЕРОВ & ЧИСТЫЕ НАЗВАНИЯ (v1.0.2)
+// js/market.js — АВТОРЫНОК, РЕЕСТР НОМЕРОВ & ЗЕРКАЛЬНЫЙ ТОРГ (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Убраны текстовые дублирования в названиях (капсулы, корчи),
-// загрузка фото напрямую из GitHub Raw (resolveCarAssetUrl),
+// ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
+// Чистые названия марок, GitHub Raw (resolveCarAssetUrl),
 // связка с облачным реестром госномеров FB_Bridge.Plates,
-// атомарное закрепление номера при ДКП, Launch OBD2 и торг у капота.
+// атомарное закрепление номера при ДКП, Launch OBD2, толщиномер,
+// зеркальная шкала риска срыва сделки и NPC-заказы.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -244,7 +245,7 @@ async function refreshMarketFeedManual() {
 }
 
 // ========================================================
-// ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ АВТО (ЧИСТЫЕ НАЗВАНИЯ)
+// ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ АВТО (ЧИСТЫЕ НАЗВАНИЯ + NPC ЗАКАЗЫ)
 // ========================================================
 async function populateMarketFeed() {
     if (window.FB_Bridge && window.FB_Bridge.CarsCatalog) {
@@ -381,7 +382,6 @@ async function populateMarketFeed() {
             sMoodIcon = "⚡";
         }
 
-        // Чистое имя модели: не приписываем [SPEC DRIFT], (Под проект) или (Капсула времени)
         let cName = template.name ? template.name : "Техника";
         let cPower = template.power ? template.power : 100;
         
@@ -429,6 +429,8 @@ async function populateMarketFeed() {
         const ownerName = `${lastNames[Math.floor(Math.random() * lastNames.length)]} ${firstNames[Math.floor(Math.random() * firstNames.length)]}.`;
         const ownerAvatar = ownerAvatars[Math.floor(Math.random() * ownerAvatars.length)];
 
+        let maxPatience = isTunedSpec ? 3 : (isBeaterProject ? 6 : (isMuseumStock ? 2 : 4));
+
         state.marketFeed.push({
             id: carId,
             name: cName,
@@ -455,7 +457,8 @@ async function populateMarketFeed() {
             gaugeChecked: false,
             testDriven: false,
             haggled: false,
-            hagglePatience: isTunedSpec ? 3 : (isBeaterProject ? 6 : (isMuseumStock ? 2 : 4)),
+            hagglePatience: maxPatience,
+            maxHagglePatience: maxPatience,
             sellerPersonality: isTunedSpec ? "aggressive" : (isBeaterProject ? "hurried" : "calm"),
             dealType: dealType,
             unavailable: false,
@@ -592,7 +595,6 @@ function renderMarketFeed() {
             `;
         }
 
-        // Статусные плашки под заголовком
         let statusBadgesHtml = `<span class='tag-badge bg-tag-cyan'>${carType}</span>`;
 
         if (car.isMuseumStock) {
@@ -1063,6 +1065,9 @@ function startMarketTestDrive(carId) {
     saveState();
 }
 
+// ----------------------------------------------------
+// ЗЕРКАЛЬНАЯ ШКАЛА ТОРГА У КАПОТА С РАСЧЁТОМ РИСКОВ
+// ----------------------------------------------------
 function renderMarketHaggleControls() {
     const haggleArea = document.getElementById("dealHaggleArea");
     if (!haggleArea || !pendingMarketCar) return;
@@ -1075,8 +1080,18 @@ function renderMarketHaggleControls() {
     let toolIcon = hasGauge ? "✓" : "🔒 Купить";
     let obdIcon = hasScanner ? "Launch OBD2 ✓" : "🔒 Купить OBD2";
 
-    if (car.hagglePatience <= 0) {
-        haggleArea.innerHTML = "<div class='text-center sub-label color-red font-bold py-2'>🚫 Продавец устал от торга и зафиксировал цену!</div>";
+    let maxP = car.maxHagglePatience || 4;
+    let curP = car.hagglePatience !== undefined ? car.hagglePatience : maxP;
+    let patiencePct = Math.round((curP / maxP) * 100);
+    let pColor = patiencePct > 60 ? "color-green" : (patiencePct > 30 ? "color-amber" : "color-red");
+
+    if (curP <= 0) {
+        haggleArea.innerHTML = `
+            <div class='text-center p-2 mb-2' style="background:rgba(255,51,102,0.1); border-radius:8px; border:1px solid var(--red);">
+                <b class="color-red text-xs block mb-1">🚫 ПРОДАВЕЦ УСТАЛ ОТ ТОРГА И ЗАФИКСИРОВАЛ ЦЕНУ!</b>
+                <div class="sub-label" style="font-size:9px;">Дальнейшие попытки сбить цену приведут к срыву встречи.</div>
+            </div>
+        `;
         return;
     }
 
@@ -1107,34 +1122,44 @@ function renderMarketHaggleControls() {
     if (car.stoChecked && car.hiddenDefect) {
         inspectionBonusBtn = `
         <button onclick="attemptDefectArgueHaggle()" class="btn btn-purple btn-sm w-full mb-2">
-            🔍 Ткнуть в ошибку ${car.hiddenDefect.code || 'DTC'}: «${car.hiddenDefect.text.slice(0, 30)}...» (-15%)
+            🔍 Ткнуть в ошибку ${car.hiddenDefect.code || 'DTC'}: -15% цены (Риск: 25%)
         </button>`;
     } else if (car.gaugeChecked && (car.bodyThickness.doors > 200 || car.bodyThickness.hood > 200)) {
         inspectionBonusBtn = `
         <button onclick="attemptPaintArgueHaggle()" class="btn btn-amber btn-sm w-full mb-2">
-            🎨 Показать слой шпаклёвки на приборе (>200 мкм) (-10%)
+            🎨 Показать слой шпаклёвки на приборе (>200 мкм): -10% цены (Риск: 20%)
         </button>`;
     }
 
     haggleArea.innerHTML = `
-        <div class="risk-meter-box mb-2">
-            <div class="flex-between text-xs">
+        <!-- НЕОНОВАЯ ШКАЛА ТЕРПЕНИЯ ПРОДАВЦА -->
+        <div class="mb-2 p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
+            <div class="flex-between text-xs mb-1">
                 <span>Терпение продавца:</span>
-                <b class="${car.hagglePatience > 2 ? 'color-green' : 'color-red'}">${car.hagglePatience} попыток</b>
+                <b class="${pColor}">${patiencePct}% (${curP} попыток)</b>
+            </div>
+            <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
+                <div style="width:${patiencePct}%; height:100%; background: ${patiencePct > 60 ? 'var(--green)' : (patiencePct > 30 ? 'var(--amber)' : 'var(--red)')}; transition:width 0.3s ease;"></div>
             </div>
         </div>
+
         ${inspectionToolsBlock}
         ${scrapOptionBtn}
         ${inspectionBonusBtn}
-        <div class="grid-3">
-            <button onclick="attemptMarketHaggle(5)" class="btn btn-dark btn-sm">
-                -5%<br><span class="color-green text-xs">Мягко</span>
+
+        <!-- КНОПКИ ТОРГА С ЯВНЫМ РАСЧЕТОМ РИСКА -->
+        <div class="grid-3 mb-1">
+            <button onclick="attemptMarketHaggle(5, 15)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                <div class="font-bold color-green text-xs">-5% скидка</div>
+                <div class="sub-label" style="font-size:8px;">Риск: 15%</div>
             </button>
-            <button onclick="attemptMarketHaggle(10)" class="btn btn-dark btn-sm">
-                -10%<br><span class="color-amber text-xs">По факту</span>
+            <button onclick="attemptMarketHaggle(10, 35)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                <div class="font-bold color-amber text-xs">-10% по факту</div>
+                <div class="sub-label" style="font-size:8px;">Риск: 35%</div>
             </button>
-            <button onclick="attemptMarketHaggle(18)" class="btn btn-dark btn-sm">
-                -18%<br><span class="color-red text-xs">Жёстко</span>
+            <button onclick="attemptMarketHaggle(18, 65)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                <div class="font-bold color-red text-xs">-18% жестко</div>
+                <div class="sub-label" style="font-size:8px;">Риск: 65%</div>
             </button>
         </div>`;
 }
@@ -1183,7 +1208,7 @@ function attemptDefectArgueHaggle() {
 
     let discount = Math.round(car.price * 0.15);
     car.price = Math.max(10000, car.price - discount);
-    car.hagglePatience -= 1;
+    car.hagglePatience = Math.max(0, (car.hagglePatience || 1) - 1);
     car.stoChecked = false;
 
     setTxt("dealCarPrice", car.price.toLocaleString() + " ₽");
@@ -1208,7 +1233,7 @@ function attemptPaintArgueHaggle() {
 
     let discount = Math.round(car.price * 0.10);
     car.price = Math.max(10000, car.price - discount);
-    car.hagglePatience -= 1;
+    car.hagglePatience = Math.max(0, (car.hagglePatience || 1) - 1);
     car.gaugeChecked = false;
 
     setTxt("dealCarPrice", car.price.toLocaleString() + " ₽");
@@ -1226,26 +1251,58 @@ function attemptPaintArgueHaggle() {
     saveState();
 }
 
-function attemptMarketHaggle(percent) {
+function attemptMarketHaggle(percent, failRisk = 25) {
     if (!pendingMarketCar) return;
     const car = pendingMarketCar.car;
     if (car.hagglePatience <= 0) return showToast("Продавец больше не торгуется!");
 
     car.hagglePatience -= 1;
+    const thread = document.getElementById("dealChatThread");
 
-    let baseChance = percent === 5 ? 85 : (percent === 10 ? 60 : 35);
-    if (car.isBeaterProject) baseChance += 25;
-    if (car.dealType === 'urgent') baseChance += 20;
-    if (car.sellerPersonality === 'hurried') baseChance += 20;
-    if (car.sellerPersonality === 'aggressive') baseChance -= 20;
+    let actualRisk = failRisk;
+    if (car.sellerPersonality === 'hurried') actualRisk -= 10;
+    if (car.sellerPersonality === 'aggressive') actualRisk += 15;
+    if (car.isBeaterProject) actualRisk -= 15;
+    if (car.dealType === 'urgent') actualRisk -= 10;
 
     let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
     let lvl = (state.player && state.player.level) ? state.player.level : 1;
-    
-    let finalChance = baseChance + (lvl * 0.5) + ((karma - 50) * 0.3);
-    const thread = document.getElementById("dealChatThread");
+    actualRisk = Math.max(5, Math.min(95, actualRisk - (lvl * 0.4) - ((karma - 50) * 0.25)));
 
-    if (Math.random() * 100 <= finalChance) {
+    let roll = Math.random() * 100;
+
+    if (roll < actualRisk) {
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('error');
+
+        if (car.hagglePatience <= 0 || roll < 12) {
+            if (thread) {
+                thread.innerHTML += `
+                    <div class="chat-msg msg-player">«Скидывай ${percent}%, у меня деньги на руках!»</div>
+                    <div class="chat-msg msg-seller" style="border-left-color:var(--red);">«Ты надоел торговаться, машина снята с продажи! Я поехал.»</div>
+                `;
+                thread.scrollTop = thread.scrollHeight;
+            }
+            car.unavailable = true;
+            showToast("🚫 Продавец психанул, сел в машину и уехал!");
+            setTimeout(() => { ModalManager.close("modalMarketDeal"); renderMarketFeed(); }, 1200);
+            return;
+        } else {
+            if (thread) {
+                let failReplies = [
+                    "«Никаких скидок, цена и так по низу рынка!»",
+                    "«Не устраивает цена — ищи другой вариант на площадке.»",
+                    "«Ты надоел торговаться, больше ни копейки не скину!»"
+                ];
+                let reply = failReplies[Math.floor(Math.random() * failReplies.length)];
+                thread.innerHTML += `
+                    <div class="chat-msg msg-player">«Скидывай ${percent}%, слишком много просишь!»</div>
+                    <div class="chat-msg msg-seller">${reply}</div>`;
+                thread.scrollTop = thread.scrollHeight;
+            }
+            showToast("Продавец отказался снижать цену!");
+        }
+    } else {
         let disc = Math.round(car.price * (percent / 100));
         car.price = Math.max(10000, car.price - disc);
         setTxt("dealCarPrice", car.price.toLocaleString() + " ₽");
@@ -1253,25 +1310,12 @@ function attemptMarketHaggle(percent) {
         if (thread) {
             thread.innerHTML += `
                 <div class="chat-msg msg-player">«Скинь ${percent}%, забираю прямо сейчас за наличку без лишних вопросов.»</div>
-                <div class="chat-msg msg-seller">«По рукам. Уступаю ${disc.toLocaleString()} ₽, оформляем ДКП.»</div>`;
+                <div class="chat-msg msg-seller" style="border-left-color:var(--green);">«По рукам. Уступаю ${disc.toLocaleString()} ₽, оформляем ДКП.»</div>`;
             thread.scrollTop = thread.scrollHeight;
         }
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
-    } else {
-        if (thread) {
-            let failReplies = [
-                "«Никаких скидок, цена и так по низу рынка!»",
-                "«Не устраивает цена — ищи другой вариант на площадке.»",
-                "«Ты надоел торговаться, больше ни копейки не скину!»"
-            ];
-            let reply = failReplies[Math.floor(Math.random() * failReplies.length)];
-            thread.innerHTML += `
-                <div class="chat-msg msg-player">«Скидывай ${percent}%, слишком много просишь!»</div>
-                <div class="chat-msg msg-seller">${reply}</div>`;
-            thread.scrollTop = thread.scrollHeight;
-        }
-        if (typeof tgHaptic === 'function') tgHaptic('error');
+        showToast(`Успешный торг! Скинуто -${disc.toLocaleString()} ₽`);
     }
 
     renderMarketHaggleControls();
@@ -1458,7 +1502,6 @@ async function finishMarketCarBuyProcess(deal) {
         customWheels: false, risk1251: 0 
     };
 
-    // Атомарное закрепление номера за игроком в Cloud Firestore
     if (window.FB_Bridge && window.FB_Bridge.Plates && newCar.plate && !newCar.plate.includes("ТРАНЗИТ")) {
         try {
             await window.FB_Bridge.Plates.claimPlateAtomic(newCar.plate, null, newCar.id);

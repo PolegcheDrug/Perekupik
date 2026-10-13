@@ -1,11 +1,12 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v1.0.0)
+// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Анимированный роллер чисел HUD, жесткий учет инвентаря,
 // Почта и Склад хранения (mailbox & warehouse),
 // авто-миграция локальной базы в Cloud Firestore cars_catalog,
 // темы Cyber Black Neo, кастомные эффекты огня/плазмы,
 // спецзаказы «ПодКлюч», Telegram Cloud Storage, Firestore & Refs.
+// Отвязан дублирующий таймер salesLot во избежание сбоев поиска.
 // ========================================================
 
 const CURRENT_GAME_VERSION = "v1.0.0";
@@ -1882,7 +1883,7 @@ function claimDailyReward() {
 }
 
 // ========================================================
-// 14. ПОЛНОСТЬЮ ПЕРЕРАБОТАННЫЙ АНАЛИТИЧЕСКИЙ ПРОФИЛЬ ПЕРЕКУПА
+// 14. АНАЛИТИЧЕСКИЙ ПРОФИЛЬ ПЕРЕКУПА
 // ========================================================
 function renderProfileAnalytics() {
     const container = document.getElementById('profileDashboardContainer');
@@ -1915,7 +1916,6 @@ function renderProfileAnalytics() {
     }
 
     let totalNetWorth = Math.round(totalCash + safeCash + depositsTotal + fleetValuation + realEstateValuation);
-
     let totalSales = (s.profitableSales || 0) + (s.lossSales || 0);
     let winrate = totalSales > 0 ? Math.round(((s.profitableSales || 0) / totalSales) * 100) : 0;
 
@@ -2167,7 +2167,7 @@ function initMarketScrollListener() {
 }
 
 // ========================================================
-// 17. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ
+// 17. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ (БЕЗ КОНФЛИКТА SALESLOT)
 // ========================================================
 function initApp() {
     initTelegramAuthAndStorage(async () => {
@@ -2218,12 +2218,12 @@ let gameCycleSeconds = 0;
 
 setInterval(() => {
     gameCycleSeconds++;
-    let lotChanged = false;
 
     if (gameCycleSeconds % 60 === 0) {
         checkRealTimeDayChange();
     }
 
+    // Бизнес-кассы и доходы
     if (gameCycleSeconds % 30 === 0 && state.businesses) {
         let bizUpdated = false;
         const staffCat = typeof BUSINESS_STAFF_CATALOG !== 'undefined' ? BUSINESS_STAFF_CATALOG : { managers: [], masters: [], security: [] };
@@ -2278,12 +2278,14 @@ setInterval(() => {
         }
     }
 
+    // Голод и кураж
     if (gameCycleSeconds % 45 === 0 && state.player) {
         state.player.hunger = Math.max(0, (state.player.hunger || 80) - 1);
         state.player.mood = Math.max(0, (state.player.mood || 85) - 1);
         updateHeaderUI();
     }
 
+    // Остывание двигателей
     if (gameCycleSeconds % 10 === 0 && state.garage) {
         state.garage.forEach(car => {
             if (car && car.engineTemp && car.engineTemp > 90) {
@@ -2292,60 +2294,7 @@ setInterval(() => {
         });
     }
 
-    if (state.salesLot && state.salesLot.length > 0) {
-        for (let i = 0; i < state.salesLot.length; i++) {
-            let slot = state.salesLot[i];
-            if (!slot) continue;
-
-            if (!slot.currentBuyer) {
-                if (slot.timer === undefined || isNaN(slot.timer) || slot.maxTimer === undefined || isNaN(slot.maxTimer)) {
-                    let t = (typeof calculateLotWaitTime === 'function') ? calculateLotWaitTime() : 60;
-                    slot.maxTimer = t;
-                    slot.timer = t;
-                }
-
-                if (slot.timer > 0) {
-                    slot.timer -= 1;
-                    const progressBar = document.getElementById("lot_progress_fill_" + i);
-                    const timerText = document.getElementById("lot_timer_text_" + i);
-                    if (progressBar) {
-                        let pct = Math.max(0, Math.min(100, ((slot.maxTimer - slot.timer) / slot.maxTimer) * 100));
-                        progressBar.style.width = pct + "%";
-                    }
-                    if (timerText) timerText.innerText = "Ожидание клиента: " + slot.timer + "с";
-                }
-
-                if (slot.timer <= 0) {
-                    if (typeof generateBuyerForSlot === 'function') generateBuyerForSlot(slot);
-                    lotChanged = true;
-                }
-            } else {
-                if (slot.buyerTimerLeft === undefined || isNaN(slot.buyerTimerLeft)) {
-                    slot.buyerTimerLeft = 120;
-                }
-                
-                if (slot.buyerTimerLeft > 0) {
-                    slot.buyerTimerLeft -= 1;
-                    const buyerTimeText = document.getElementById("lot_buyer_timer_" + i);
-                    if (buyerTimeText) buyerTimeText.innerText = "⏳ " + slot.buyerTimerLeft + "с";
-                }
-
-                if (slot.buyerTimerLeft <= 0) {
-                    slot.currentBuyer = null;
-                    let t = (typeof calculateLotWaitTime === 'function') ? calculateLotWaitTime() : 60;
-                    slot.maxTimer = t;
-                    slot.timer = t;
-                    lotChanged = true;
-                }
-            }
-        }
-    }
-    
-    const sTab = document.getElementById('tabSalesLot');
-    if (lotChanged && sTab && sTab.classList.contains('active') && typeof renderSalesLot === 'function') {
-        renderSalesLot();
-    }
-    
+    // Таймеры авторынка
     const mTab = document.getElementById('tabMarket');
     if (mTab && mTab.classList.contains('active') && typeof updateMarketTimers === 'function') {
         updateMarketTimers();

@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v0.9.2</title>
+    <title>Симулятор Перекупа v1.0.0</title>
     
     <!-- Модульные CSS-стили с принудительным сбросом кэша -->
-    <link rel="stylesheet" href="css/base.css?v=320">
-    <link rel="stylesheet" href="css/hud.css?v=320">
-    <link rel="stylesheet" href="css/market.css?v=320">
-    <link rel="stylesheet" href="css/phone.css?v=320">
-    <link rel="stylesheet" href="css/modals.css?v=320">
-    <link rel="stylesheet" href="css/nav.css?v=320">
+    <link rel="stylesheet" href="css/base.css?v=340">
+    <link rel="stylesheet" href="css/hud.css?v=340">
+    <link rel="stylesheet" href="css/market.css?v=340">
+    <link rel="stylesheet" href="css/phone.css?v=340">
+    <link rel="stylesheet" href="css/modals.css?v=340">
+    <link rel="stylesheet" href="css/nav.css?v=340">
     
     <!-- Внешние библиотеки -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -277,10 +277,13 @@
                 <div id="phoneDailyQuestsWidget" class="phone-quests-widget mb-3"></div>
 
                 <div class="phone-home-grid mb-2">
-                  <!-- РЯД 1 -->
-                  <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('autodrot')">
-                    <div class="phone-app-icon bg-cyan"><i class="fa-solid fa-bolt"></i></div>
-                    <span class="phone-app-label">Autodrot</span>
+                  <!-- РЯД 1: ЕДИНЫЙ ХАБ «СЕТЬ М & AUTODROT», БАНК, БИЗНЕС, ЖИЛЬЕ -->
+                  <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('m')">
+                    <div class="phone-app-icon bg-m-network">
+                      <span class="m-app-icon-letter">M</span>
+                      <span id="phoneAppSmsBadge" class="phone-app-badge" style="display:none;">0</span>
+                    </div>
+                    <span class="phone-app-label color-cyan font-bold">Сеть «M» & P2P</span>
                   </div>
 
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('bank')">
@@ -341,14 +344,6 @@
                   </div>
 
                   <!-- РЯД 4 -->
-                  <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('m')">
-                    <div class="phone-app-icon bg-m-network">
-                      <span class="m-app-icon-letter">M</span>
-                      <span id="phoneAppSmsBadge" class="phone-app-badge" style="display:none;">0</span>
-                    </div>
-                    <span class="phone-app-label color-cyan font-bold">Сеть «M»</span>
-                  </div>
-
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('post')">
                     <div class="phone-app-icon bg-post-office">
                       <i class="fa-solid fa-boxes-packing"></i>
@@ -367,12 +362,12 @@
                     <span class="phone-app-label">Магнитола</span>
                   </div>
 
-                  <!-- РЯД 5 -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('notepad')">
                     <div class="phone-app-icon bg-notepad"><i class="fa-solid fa-note-sticky"></i></div>
                     <span class="phone-app-label">Блокнот</span>
                   </div>
 
+                  <!-- РЯД 5 -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('dev')">
                     <div class="phone-app-icon bg-dev-terminal">
                       <i class="fa-solid fa-terminal color-green"></i>
@@ -446,17 +441,17 @@
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v0.9.2</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v1.0.0</div>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #320 (Полная синхронизация сетевой базы и GitHub Assets)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #340 (Единый P2P-хаб, фикс таймеров и обложек)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>📱 Приложения телефона:</b> Полностью устранён баг с неоткрывающимися приложениями на экранах мобильных устройств.</div>
-          <div class="patch-item"><b>📦 Почта & Склад:</b> Доставка капсул времени, раритетных авто и призов в единый хаб хранения.</div>
-          <div class="patch-item"><b>🤝 Сеть «M» и быстрые ДКП:</b> Полноценный онлайн через Firestore, реплики торга и мгновенное подписание договоров.</div>
+          <div class="patch-item"><b>⚡ Единый хаб Сети «M» & Autodrot:</b> Объединённый онлайн-рынок и чат торга с кнопками риска.</div>
+          <div class="patch-item"><b>🏢 Недвижимость и Боксы:</b> Исправлена аренда/покупка и возвращены визуальные обложки домов.</div>
+          <div class="patch-item"><b>🏪 Площадка продаж:</b> Восстановлен плавный таймер поиска, мгновенный пропуск и торг прямо у капота.</div>
         </div>
-        <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">Отлично, в игру!</button>
+        <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
       </div>
     </div>
 
@@ -735,8 +730,6 @@
       </div>
     </div>
 
-    <div id="modalHaggleSale" class="modal-overlay"></div>
-
     <div id="modalAutoteka" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -862,7 +855,7 @@
       </div>
     </div>
 
-    <!-- МОДАЛКА ВЫСТАВЛЕНИЯ НА P2P AUTODROT -->
+    <!-- МОДАЛКА ВЫСТАВЛЕНИЯ НА P2P БИРЖУ -->
     <div id="modalCreateP2P" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -870,44 +863,16 @@
           <button onclick="closeModal('modalCreateP2P')" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="grid-4 mb-2">
-          <button type="button" onclick="AppAutodrot.selectP2PListingType('cars')" id="btnP2PTypeCar" class="btn btn-cyan btn-sm">Авто</button>
-          <button type="button" onclick="AppAutodrot.selectP2PListingType('plates')" id="btnP2PTypePlate" class="btn btn-dark btn-sm">Номер</button>
-          <button type="button" onclick="AppAutodrot.selectP2PListingType('business')" id="btnP2PTypeBiz" class="btn btn-dark btn-sm">Бизнес</button>
-          <button type="button" onclick="AppAutodrot.selectP2PListingType('housing')" id="btnP2PTypeHouse" class="btn btn-dark btn-sm">Жильё</button>
+          <button type="button" onclick="AppM.selectP2PListingType('cars')" id="btnP2PTypeCar" class="btn btn-cyan btn-sm">Авто</button>
+          <button type="button" onclick="AppM.selectP2PListingType('plates')" id="btnP2PTypePlate" class="btn btn-dark btn-sm">Номер</button>
+          <button type="button" onclick="AppM.selectP2PListingType('business')" id="btnP2PTypeBiz" class="btn btn-dark btn-sm">Бизнес</button>
+          <button type="button" onclick="AppM.selectP2PListingType('housing')" id="btnP2PTypeHouse" class="btn btn-dark btn-sm">Жильё</button>
         </div>
-        <select id="p2pItemSelect" onchange="AppAutodrot.onP2PItemSelected(this.value)" style="width:100%; background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; color:#fff; font-size:12px; margin-bottom:8px;"></select>
+        <select id="p2pItemSelect" onchange="AppM.onP2PItemSelected(this.value)" style="width:100%; background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; color:#fff; font-size:12px; margin-bottom:8px;"></select>
         <input type="number" id="p2pPriceInput" placeholder="Цена в рублях ₽" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;" min="1000">
         <div class="grid-2">
-          <button onclick="AppAutodrot.confirmCreateP2PListing()" class="btn btn-green">Выставить в облако ☁️</button>
+          <button onclick="AppM.confirmCreateP2PListing()" class="btn btn-green">Выставить в облако ☁️</button>
           <button onclick="closeModal('modalCreateP2P')" class="btn btn-dark">Отмена</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- МОДАЛКА ШАБЛОННОГО ОНЛАЙН-ЧАТА P2P С ПРОДАВЦОМ -->
-    <div id="modalP2PChat" class="modal-overlay">
-      <div class="modal-box chat-deal-box" style="max-width: 440px;">
-        <div class="flex-between mb-1 pb-1" style="border-bottom: 1px solid rgba(255,255,255,0.08);">
-          <div class="flex-gap" style="align-items:center;">
-            <div class="avatar" style="width:34px; height:34px; font-size:16px;">💬</div>
-            <div>
-              <div class="font-bold text-xs color-cyan" id="p2pChatSellerTitle">Продавец</div>
-              <div class="sub-label" style="font-size:8.5px;" id="p2pChatLotSubtitle">Лот: Автомобиль</div>
-            </div>
-          </div>
-          <button onclick="closeModal('modalP2PChat')" class="btn btn-dark btn-auto btn-sm">✕</button>
-        </div>
-
-        <div class="chat-thread-container mb-2" id="p2pChatMessagesBox" style="min-height: 140px; max-height: 190px;"></div>
-
-        <div class="sub-label mb-1" style="font-size:9px;">Выберите фразу для отправки (Quick-Chat):</div>
-        <div class="p2p-canned-chips-container mb-2" id="p2pCannedChipsBox" style="max-height: 120px; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 4px;"></div>
-
-        <div class="grid-2 mt-1">
-          <button id="p2pChatBuyBtn" onclick="" class="btn btn-green btn-sm">
-            <i class="fa-solid fa-handshake mr-1"></i> Купить лот сейчас
-          </button>
-          <button onclick="closeModal('modalP2PChat')" class="btn btn-dark btn-sm">Закрыть</button>
         </div>
       </div>
     </div>
@@ -915,12 +880,11 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- 1. ПОДКЛЮЧЕНИЕ СЕТЕВОГО МОДУЛЯ FIREBASE (ES-МОДУЛЬ) -->
-    <script type="module" src="firebase-bridge.js?v=330"></script>
+    <script type="module" src="firebase-bridge.js?v=340"></script>
 
-    <!-- 2. АВТОЗАГРУЗЧИК ОСТАЛЬНЫХ СКРИПТОВ ИГРЫ -->
+    <!-- 2. АВТОЗАГРУЗЧИК СКРИПТОВ ИГРЫ -->
     <script>
       (function() {
-        // Сигнал готовности для Telegram WebView на Android
         if (window.Telegram?.WebApp) {
           try {
             window.Telegram.WebApp.ready();
@@ -928,15 +892,13 @@
           } catch (e) {}
         }
 
-        const CACHE_VER = '330';
+        const CACHE_VER = '340';
 
-        // data.js находится в корне, остальные скрипты — в папке js/
         const rootModules = ['data.js'];
         const jsModules = [
           'app.js',
           'phone.js',
           'phone-bank.js',
-          'phone-autodrot.js',
           'phone-m.js',
           'phone-post.js',
           'phone-gosuslugi.js',
@@ -971,17 +933,12 @@
         }
 
         async function initAllModules() {
-          // 1. Загрузка data.js из корня
           for (const name of rootModules) {
             await loadScript(name);
           }
-
-          // 2. Прямая загрузка остальных модулей из папки js/
           for (const name of jsModules) {
             await loadScript('js/' + name);
           }
-
-          // 3. Инициализация приложения
           if (typeof initApp === 'function') {
             initApp();
           }

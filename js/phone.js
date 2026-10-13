@@ -1,12 +1,12 @@
 // ========================================================
-// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v0.9.2)
+// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Полный комплект встроенных экранов:
-// 1. Autodrot   2. Во-Банк    3. Бизнес      4. Жильё
+// 1. «M & P2P» (Единый объединённый хаб)
+// 2. Во-Банк    3. Бизнес      4. Жильё
 // 5. Решала     6. ПодКлюч    7. САРАИ       8. Порт
 // 9. ДПС Радар  10. Стрит     11. Маркет     12. Фортуна
-// 13. «M» (Соцсеть, Пульс, Друзья, Чаты)
-// 14. ПОЧТА/СКЛАД 15. Госуслуги 16. Магнитола 17. Блокнот 18. DEV (3172)
+// 13. ПОЧТА/СКЛАД 14. Госуслуги 15. Магнитола 16. Блокнот 17. DEV (3172)
 // ========================================================
 
 const PhoneManager = {
@@ -71,33 +71,33 @@ const PhoneManager = {
 
         this.currentApp = appId;
 
-        // Принудительное переключение видимости контейнеров
         if (homeScreen) {
             homeScreen.style.setProperty('display', 'none', 'important');
         }
         appContainer.style.setProperty('display', 'flex', 'important');
         appContainer.innerHTML = '';
 
-        // 0. Приложение «Почта & Склад»
+        // Единый объединённый сетевой P2P-хаб: Autodrot + M
+        if (appId === 'messages' || appId === 'm' || appId === 'autodrot') {
+            if (window.AppM && typeof window.AppM.render === 'function') {
+                if (appId === 'autodrot') {
+                    window.AppM.activeTab = 'market';
+                }
+                window.AppM.render(appContainer);
+            } else {
+                this.renderGenericFallback(appId, appContainer);
+            }
+            this.afterAppOpened();
+            return;
+        }
+
+        // Приложение «Почта & Склад»
         if (appId === 'post' || appId === 'mailbox' || appId === 'warehouse') {
             if (window.AppPost && typeof window.AppPost.render === 'function') {
                 window.AppPost.render(appContainer);
                 this.afterAppOpened();
                 return;
             }
-        }
-
-        // 1. Приложение «M» (Соцсеть, Пульс, Друзья, Чаты покупателей)
-        if (appId === 'messages' || appId === 'm') {
-            if (window.AppM && typeof window.AppM.render === 'function') {
-                window.AppM.render(appContainer);
-            } else if (window.AppMessenger && typeof window.AppMessenger.render === 'function') {
-                window.AppMessenger.render(appContainer);
-            } else {
-                this.renderGenericFallback(appId, appContainer);
-            }
-            this.afterAppOpened();
-            return;
         }
 
         if (appId === 'shop') {
@@ -125,7 +125,7 @@ const PhoneManager = {
                 this.afterAppOpened();
                 return;
             } catch(e) {
-                console.warn(`[Phone] Сбой внешнего модуля ${appId}, переключение на встроенный:`, e);
+                console.warn(`[Phone] Сбой модуля ${appId}, откат:`, e);
             }
         }
 
@@ -165,13 +165,6 @@ const PhoneManager = {
                     this.renderRadioApp(appContainer);
                 }
                 break;
-            case 'autodrot':
-                if (window.AppAutodrot && typeof window.AppAutodrot.render === 'function') {
-                    window.AppAutodrot.render(appContainer);
-                } else {
-                    this.renderAutodrotApp(appContainer);
-                }
-                break;
             case 'bank':
                 if (window.AppBank && typeof window.AppBank.render === 'function') {
                     window.AppBank.render(appContainer);
@@ -187,7 +180,9 @@ const PhoneManager = {
                 }
                 break;
             case 'housing':
-                if (window.AppHousing && typeof window.AppHousing.render === 'function') {
+                if (window.PhoneHousing && typeof window.PhoneHousing.renderHousingApp === 'function') {
+                    window.PhoneHousing.renderHousingApp(appContainer);
+                } else if (window.AppHousing && typeof window.AppHousing.render === 'function') {
                     window.AppHousing.render(appContainer);
                 } else {
                     this.renderHousingApp(appContainer);
@@ -232,9 +227,9 @@ const PhoneManager = {
         const registry = {
             dev: window.AppDev,
             bank: window.AppBank,
-            autodrot: window.AppAutodrot,
+            autodrot: window.AppM,
             business: window.AppBusiness,
-            housing: window.AppHousing,
+            housing: window.PhoneHousing || window.AppHousing,
             reshala: window.AppDarknet,
             syndicate: window.AppSyndicate || window.AppPodklyuch,
             barn: window.AppBarn,
@@ -242,8 +237,8 @@ const PhoneManager = {
             radar: window.AppRadar,
             street: window.PhoneRacing,
             fortune: window.PhoneMedia,
-            messages: window.AppM || window.AppMessenger,
-            m: window.AppM || window.AppMessenger,
+            messages: window.AppM,
+            m: window.AppM,
             gosuslugi: window.AppGosuslugi,
             radio: window.PhoneMedia,
             notepad: window.AppNotepad,
@@ -321,12 +316,6 @@ const PhoneManager = {
         }
     },
 
-    renderAutodrotApp(container) {
-        if (window.AppAutodrot && typeof window.AppAutodrot.render === 'function') {
-            window.AppAutodrot.render(container);
-        }
-    },
-
     renderBankApp(container) {
         if (window.AppBank && typeof window.AppBank.render === 'function') {
             window.AppBank.render(container);
@@ -340,7 +329,9 @@ const PhoneManager = {
     },
 
     renderHousingApp(container) {
-        if (window.AppHousing && typeof window.AppHousing.render === 'function') {
+        if (window.PhoneHousing && typeof window.PhoneHousing.renderHousingApp === 'function') {
+            window.PhoneHousing.renderHousingApp(container);
+        } else if (window.AppHousing && typeof window.AppHousing.render === 'function') {
             window.AppHousing.render(container);
         }
     },
@@ -734,7 +725,6 @@ const AppBarn = {
                 recalculateCarMarketValue(wonCar);
             }
 
-            // Перенаправление в Почтовый ящик
             if (typeof window.pushToMailbox === 'function') {
                 window.pushToMailbox({
                     type: "car",
@@ -745,7 +735,6 @@ const AppBarn = {
                     carData: wonCar
                 });
             } else {
-                let carDeliveryMsg = "";
                 if (curSlots < maxSlots) {
                     if (!state.garage) state.garage = [];
                     state.garage.push(wonCar);
