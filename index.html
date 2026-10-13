@@ -25,7 +25,7 @@
       <header class="hud-header">
         <div class="hud-card hud-top-row">
           
-          <!-- Левая зона: Аватар и капсула никнейма с опытом -->
+          <!-- Левая зона: Аватар и капсула никнейма (расширена до середины) -->
           <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль и аналитику">
             <div class="avatar-ring">
               <div class="avatar-glow"></div>
@@ -66,7 +66,7 @@
             </div>
           </div>
 
-          <!-- Правая зона: Капсула кошелька и ресурсы -->
+          <!-- Правая зона: Растянутый до середины баланс и валюты под ним в стиле stat-pill (справа налево) -->
           <div class="wallet-dashboard">
             <div class="wallet-capsule-box" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Открыть Во-Банк">
               <div class="cash-val">
@@ -74,29 +74,23 @@
               </div>
             </div>
 
-            <!-- Ресурсные пиллы: Неоновая банкнота, СуперВилспин, Топливо, Экспресс-талоны -->
-            <div class="wallet-sub">
-              <!-- 1. Неоновая банкнота -->
-              <button type="button" class="resource-pill note-pill" id="hudBanknotePill" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты (Обменник)">
-                <i class="fa-solid fa-money-bill-wave note-icon-glow"></i> <span id="starsAmount">15</span>
+            <!-- Валюты в стиле stat-pill, выстроенные справа налево -->
+            <div class="wallet-stats-row">
+              <button type="button" class="stat-pill stat-pill-note" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты">
+                <i class="fa-solid fa-money-bill-wave"></i> <span id="starsAmount">15</span>
               </button>
-
-              <!-- 2. Билеты СуперВилспина -->
-              <button type="button" class="resource-pill superspin-pill" id="hudSuperSpinPill" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('fortune'); }, 100);" title="Билеты СуперВилспина (Клуб Фортуны)">
-                <i class="fa-solid fa-dharmachakra superspin-icon-glow"></i> <span id="superSpinTicketsAmount">1</span>
+              <button type="button" class="stat-pill stat-pill-superspin" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('fortune'); }, 100);" title="Билеты СуперВилспина">
+                <i class="fa-solid fa-dharmachakra"></i> <span id="superSpinTicketsAmount">1</span>
               </button>
-
-              <!-- 3. Топливо -->
-              <button type="button" class="resource-pill fuel-pill" onclick="refuelAction('cash')" title="Заправить бак">
+              <button type="button" class="stat-pill stat-pill-fuel" onclick="refuelAction('cash')" title="Заправить бак">
                 <i class="fa-solid fa-gas-pump"></i> <span id="fuelAmount">100</span><span class="res-max">/100</span>
               </button>
-
-              <!-- 4. Экспресс-талоны -->
-              <button type="button" class="resource-pill ticket-pill" onclick="upgradeExpressCapacity()" title="Экспресс-талоны">
+              <button type="button" class="stat-pill stat-pill-ticket" onclick="upgradeExpressCapacity()" title="Экспресс-талоны">
                 <i class="fa-solid fa-ticket"></i> <span id="ticketsAmount">25/25</span>
               </button>
             </div>
           </div>
+
         </div>
 
         <!-- Нижний ряд: Состояние потребностей и кнопки быстрых действий -->
