@@ -1,6 +1,7 @@
 // ========================================================
-// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.2.0)
+// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.2.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
 // Полный комплект встроенных экранов с системой уровней и платных доступов:
 // 1. «M & P2P» (Единый объединённый хаб)
 // 2. Во-Банк    3. Бизнес      4. Жильё
@@ -71,7 +72,6 @@ const PhoneManager = {
         if (!state.player) return true;
         if (!state.player.unlockedApps) state.player.unlockedApps = [];
 
-        // Карта соответствия appId с ключами в APP_ACCESS_CONFIG
         const accessKeyMap = {
             'barn': 'barn',
             'containers': 'containers',
@@ -89,10 +89,8 @@ const PhoneManager = {
         const pLvl = state.player.level || 1;
         const isUnlocked = state.player.unlockedApps.includes(configKey);
 
-        // Если приложение уже разблокировано игроком
         if (isUnlocked) return true;
 
-        // Если уровень недостаточен — открываем интерактивное окно блокировки
         if (pLvl < config.minLevel) {
             if (typeof window.openLevelGateModal === 'function') {
                 window.openLevelGateModal(config.name, config.minLevel);
@@ -102,16 +100,14 @@ const PhoneManager = {
             return false;
         }
 
-        // Если уровень достаточен, но сервис платный — показываем окно покупки доступа
         this.showAppUnlockPrompt(appId, configKey, config);
         return false;
     },
 
     showAppUnlockPrompt(appId, configKey, config) {
-        const pLvl = state.player?.level || 1;
         const cash = state.player?.cash || 0;
         const stars = state.player?.stars || 0;
-        const tickets = state.player?.tickets || 0;
+        const tickets = state.player?.expressTickets || 0;
 
         const hasCash = cash >= (config.costCash || 0);
         const hasStars = stars >= (config.costStars || 0);
@@ -119,7 +115,7 @@ const PhoneManager = {
 
         let priceList = [];
         if (config.costCash > 0) priceList.push(`${config.costCash.toLocaleString()} ₽`);
-        if (config.costStars > 0) priceList.push(`${config.costStars} ⭐ звёзд`);
+        if (config.costStars > 0) priceList.push(`${config.costStars} 💵 банкнот`);
         if (config.costTickets > 0) priceList.push(`${config.costTickets} 🎫 билетов`);
 
         const priceText = priceList.length > 0 ? priceList.join(' + ') : 'Бесплатно';
@@ -156,12 +152,12 @@ const PhoneManager = {
                     </div>
                     <div class="flex-between" style="font-size:9.5px; color:#94a3b8;">
                         <span>Ваш баланс:</span>
-                        <span>${cash.toLocaleString()} ₽ | ${stars} ⭐ | ${tickets} 🎫</span>
+                        <span>${cash.toLocaleString()} ₽ | ${stars} 💵 | ${tickets} 🎫</span>
                     </div>
                 </div>
 
                 <div class="space-y-2">
-                    <button onclick="PhoneManager.confirmUnlockAppAction('${appId}', '${configKey}')" class="btn ${canUnlock ? 'btn-green' : 'btn-dark opacity-50'} sm w-full font-bold" ${canUnlock ? '' : 'disabled'}>
+                    <button onclick="PhoneManager.confirmUnlockAppAction('${appId}', '${configKey}')" class="btn ${canUnlock ? 'btn-green' : 'btn-dark opacity-50'} btn-sm w-full font-bold" ${canUnlock ? '' : 'disabled'}>
                         ${canUnlock ? `Оплатить и открыть (${priceText}) ✓` : 'Недостаточно средств для оплаты'}
                     </button>
                     <button onclick="ModalManager.close('modalAppUnlockPrompt')" class="btn btn-dark btn-sm w-full">
@@ -181,15 +177,15 @@ const PhoneManager = {
 
         const cash = state.player?.cash || 0;
         const stars = state.player?.stars || 0;
-        const tickets = state.player?.tickets || 0;
+        const tickets = state.player?.expressTickets || 0;
 
         if (cash < (config.costCash || 0)) return showToast("Не хватает денег для оплаты!");
-        if (stars < (config.costStars || 0)) return showToast("Не хватает звёзд ⭐ для оплаты!");
+        if (stars < (config.costStars || 0)) return showToast("Не хватает банкнот 💵 для оплаты!");
         if (tickets < (config.costTickets || 0)) return showToast("Не хватает билетов 🎫 для оплаты!");
 
         if (config.costCash > 0) state.player.cash -= config.costCash;
         if (config.costStars > 0) state.player.stars -= config.costStars;
-        if (config.costTickets > 0) state.player.tickets -= config.costTickets;
+        if (config.costTickets > 0) state.player.expressTickets -= config.costTickets;
 
         if (!state.player.unlockedApps) state.player.unlockedApps = [];
         if (!state.player.unlockedApps.includes(configKey)) {
@@ -207,7 +203,6 @@ const PhoneManager = {
     },
 
     openApp(appId) {
-        // Проверка уровней и платных входов
         if (!this.checkAppAccess(appId)) {
             return;
         }
@@ -224,7 +219,6 @@ const PhoneManager = {
         appContainer.style.setProperty('display', 'flex', 'important');
         appContainer.innerHTML = '';
 
-        // Единый объединённый сетевой P2P-хаб: Autodrot + M
         if (appId === 'messages' || appId === 'm' || appId === 'autodrot') {
             if (window.AppM && typeof window.AppM.render === 'function') {
                 if (appId === 'autodrot') {
@@ -238,7 +232,6 @@ const PhoneManager = {
             return;
         }
 
-        // Приложение «Почта & Склад»
         if (appId === 'post' || appId === 'mailbox' || appId === 'warehouse') {
             if (window.AppPost && typeof window.AppPost.render === 'function') {
                 window.AppPost.render(appContainer);
@@ -738,7 +731,7 @@ const AppBarn = {
 
         barnTiers.forEach(tier => {
             let isLvlLocked = pLvl < tier.reqLvl;
-            let starsTxt = tier.reqStars ? ` + ${tier.reqStars} ⭐` : "";
+            let starsTxt = tier.reqStars ? ` + ${tier.reqStars} 💵` : "";
             
             let btnClass = "btn btn-amber btn-sm w-full";
             let btnText = `Взломать и обыскать (${(tier.cost / 1000).toFixed(0)}k ₽${starsTxt})`;
@@ -826,7 +819,7 @@ const AppBarn = {
         let reqStars = tier.reqStars || 0;
 
         if (cash < tier.cost) return showToast("Не хватает рублей на вскрытие сарая!");
-        if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+        if (stars < reqStars) return showToast(`Нужно ${reqStars} 💵 банкнот!`);
 
         state.player.cash -= tier.cost;
         state.player.stars -= reqStars;
@@ -1054,7 +1047,7 @@ const AppShop = {
                     ? state.player.toolsWear[t.id] 
                     : (t.maxUses || 50);
                 let maxUses = t.maxUses || 50;
-                let starsTxt = t.reqStars ? ` + ${t.reqStars} ⭐` : "";
+                let starsTxt = t.reqStars ? ` + ${t.reqStars} 💵` : "";
 
                 let actionBlock = "";
                 if (!isOwned) {
@@ -1094,7 +1087,7 @@ const AppShop = {
             `;
 
             consumables.forEach(c => {
-                let starsTxt = c.reqStars ? ` + ${c.reqStars} ⭐` : "";
+                let starsTxt = c.reqStars ? ` + ${c.reqStars} 💵` : "";
                 html += `
                 <div class="glass-card p-2 flex-between mb-2">
                     <div style="flex:1; margin-right:8px;">
@@ -1125,7 +1118,7 @@ const AppShop = {
                 if (p.id === 'gps_tracker') isOwned = !!state.player.hasGpsTracker;
                 if (p.id === 'customs_pass') isOwned = !!state.player.hasCustomsPass;
 
-                let starsTxt = p.reqStars ? ` + ${p.reqStars} ⭐` : "";
+                let starsTxt = p.reqStars ? ` + ${p.reqStars} 💵` : "";
                 let actionBtn = isOwned
                     ? `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Оформлено ✓</button>`
                     : `<button onclick="AppShop.buyDocAction('${p.id}', ${p.cost}, ${p.reqStars || 0})" class="btn btn-purple btn-sm btn-auto">Оформить (${(p.cost / 1000).toFixed(0)}k ₽${starsTxt})</button>`;
@@ -1156,7 +1149,7 @@ const AppShop = {
 
             items.forEach(item => {
                 let isOwned = state.player.furniture.includes(item.id);
-                let starsTxt = item.reqStars ? ` + ${item.reqStars} ⭐` : "";
+                let starsTxt = item.reqStars ? ` + ${item.reqStars} 💵` : "";
                 let actionBtn = isOwned
                     ? `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Установлено ✓</button>`
                     : `<button onclick="AppShop.buyFurnitureAction('${item.id}', ${item.cost}, ${item.reqStars || 0})" class="btn btn-green btn-sm btn-auto">Купить (${(item.cost / 1000).toFixed(0)}k ₽${starsTxt})</button>`;
@@ -1180,7 +1173,7 @@ const AppShop = {
         let stars = state.player?.stars || 0;
 
         if (cash < cost) return showToast("Не хватает рублей на покупку прибора!");
-        if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+        if (stars < reqStars) return showToast(`Нужно ${reqStars} 💵 банкнот!`);
 
         state.player.cash -= cost;
         state.player.stars -= reqStars;
@@ -1224,7 +1217,7 @@ const AppShop = {
         let stars = state.player?.stars || 0;
 
         if (cash < cost) return showToast("Не хватает денег на партию сырья!");
-        if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+        if (stars < reqStars) return showToast(`Нужно ${reqStars} 💵 банкнот!`);
 
         state.player.cash -= cost;
         state.player.stars -= reqStars;
@@ -1255,7 +1248,7 @@ const AppShop = {
         let stars = state.player?.stars || 0;
 
         if (cash < cost) return showToast("Не хватает денег на оформление документа!");
-        if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+        if (stars < reqStars) return showToast(`Нужно ${reqStars} 💵 банкнот!`);
 
         state.player.cash -= cost;
         state.player.stars -= reqStars;
@@ -1287,7 +1280,7 @@ const AppShop = {
         let stars = state.player?.stars || 0;
 
         if (cash < cost) return showToast("Не хватает денег на покупку мебели!");
-        if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+        if (stars < reqStars) return showToast(`Нужно ${reqStars} 💵 банкнот!`);
 
         state.player.cash -= cost;
         state.player.stars -= reqStars;
