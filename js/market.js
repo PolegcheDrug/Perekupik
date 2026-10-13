@@ -1,11 +1,11 @@
 // ========================================================
-// js/market.js — АВТОРЫНОК, РЕЕСТР НОМЕРОВ & ЗЕРКАЛЬНЫЙ ТОРГ (v1.1.0)
+// js/market.js — АВТОРЫНОК, РЕЕСТР НОМЕРОВ & P2P-ИНТЕГРАЦИЯ (v1.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
-// Чистые названия марок, GitHub Raw (resolveCarAssetUrl),
-// связка с облачным реестром госномеров FB_Bridge.Plates,
-// атомарное закрепление номера при ДКП, Launch OBD2, толщиномер,
-// зеркальная шкала риска срыва сделки и NPC-заказы.
+// Интеграция P2P лотов игроков в общую ленту авторынка,
+// динамическая подсветка никнеймов эффектами тем (nick-fx-*),
+// синхронизированные спецификации, Launch OBD2, толщиномер,
+// Автотека, выбор маршрута перегона и официальный бланк ДКП.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -245,7 +245,7 @@ async function refreshMarketFeedManual() {
 }
 
 // ========================================================
-// ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ АВТО (ЧИСТЫЕ НАЗВАНИЯ + NPC ЗАКАЗЫ)
+// ПРОЦЕДУРНЫЙ ГЕНЕРАТОР ВАРИАЦИЙ АВТО (ЧИСТЫЕ НАЗВАНИЯ + P2P ЛОТЫ)
 // ========================================================
 async function populateMarketFeed() {
     if (window.FB_Bridge && window.FB_Bridge.CarsCatalog) {
@@ -293,6 +293,61 @@ async function populateMarketFeed() {
     }
 
     state.marketFeed = [];
+
+    // 1. ИНТЕГРАЦИЯ ЛОТОВ ИГРОКОВ ИЗ P2P БИРЖИ В ОБЩИЙ РЫНОК
+    if (state.p2pMarketListings && state.p2pMarketListings.length > 0) {
+        state.p2pMarketListings.forEach(p2pLot => {
+            if (p2pLot.type === 'car' || p2pLot.type === 'cars') {
+                let p2pCarData = p2pLot.itemData || {};
+                let carType = p2pCarData.type || 'economy';
+                
+                if (cat === 'all' || cat === carType) {
+                    state.marketFeed.push({
+                        id: p2pLot.id || ("p2p_feed_" + Date.now()),
+                        isP2PUserListing: true,
+                        sellerPlayerName: p2pLot.sellerName || "Игрок P2P",
+                        sellerNickEffectClass: p2pLot.sellerNickEffect || (state.player?.nickEffect ? `nick-fx-${state.player.nickEffect}` : "nick-fx-lightning"),
+                        name: p2pLot.name,
+                        power: p2pCarData.power || 100,
+                        type: carType,
+                        drivetrain: p2pCarData.drivetrain || 'rwd',
+                        basePrice: p2pLot.price,
+                        mileage: p2pCarData.mileage || 65000,
+                        price: p2pLot.price,
+                        originalAskingPrice: p2pLot.price,
+                        baseMarketValue: p2pLot.price,
+                        marketValue: Math.round(p2pLot.price * 1.15),
+                        img: p2pCarData.img || "assets/cars/economy/2101/vaz-2101.jpg",
+                        fallback: getCategoryFallback(carType),
+                        plate: p2pCarData.plate || "О777ОО 77",
+                        isStolen: false,
+                        isMuseumStock: false,
+                        isTunedSpec: true,
+                        isBeaterProject: false,
+                        autotekaChecked: true,
+                        inspectedAtHood: false,
+                        cooldownUntil: 0,
+                        stoChecked: false,
+                        gaugeChecked: false,
+                        testDriven: false,
+                        haggled: false,
+                        hagglePatience: 4,
+                        maxHagglePatience: 4,
+                        sellerPersonality: "calm",
+                        dealType: "p2p",
+                        unavailable: false,
+                        sellerNote: `«Автомобиль выставлен реальным перекупом ${p2pLot.sellerName || 'на P2P бирже'}. Состояние соответствует описанию.»`,
+                        sellerMoodIcon: "💼",
+                        condition: p2pCarData.condition || 85,
+                        tuning: p2pCarData.tuning || { chip: 1, weldedDiff: false, steeringAngle: false, risk1251: 0 },
+                        wear: p2pCarData.wear || { engine: 85, transmission: 85 },
+                        bodyThickness: p2pCarData.bodyThickness || { hood: 110, roof: 100, doors: 115, wings: 110 }
+                    });
+                }
+            }
+        });
+    }
+
     const feedCount = Math.min(10, Math.max(6, shuffledPool.length));
 
     for (let i = 0; i < feedCount; i++) {
@@ -507,7 +562,7 @@ function promptHiddenPlateAutotekaHint(event) {
 }
 
 // ========================================================
-// ОСНОВНОЙ РЕНДЕР КАРТОЧЕК РЫНКА
+// ОСНОВНОЙ РЕНДЕР КАРТОЧЕК РЫНКА (С ПОДСВЕТКОЙ ТЕМЫ ПРОДАВЦА)
 // ========================================================
 function renderMarketFeed() {
     const container = document.getElementById('marketCardContainer');
@@ -558,11 +613,12 @@ function renderMarketFeed() {
         let autoIcon = car.autotekaChecked ? "Проверено ✓" : "5,000 ₽";
 
         let cardAuraClass = "card-anim-shimmer";
-        if (car.isMuseumStock) cardAuraClass += " card-glow-urgent";
+        if (car.isP2PUserListing) cardAuraClass += " personal-car-card";
+        else if (car.isMuseumStock) cardAuraClass += " card-glow-urgent";
         else if (car.isTunedSpec) cardAuraClass += " card-glow-tuned";
         else if (car.isBeaterProject) cardAuraClass += " card-glow-beater";
 
-        let isBodyKnown = !!car.inspectedAtHood;
+        let isBodyKnown = !!car.inspectedAtHood || car.isP2PUserListing;
         let condVal = car.condition || 80;
         let shieldIconClass = "spec-tile-icon-unknown";
         let condValueHtml = `<b class="color-sub">У капота</b>`;
@@ -577,7 +633,7 @@ function renderMarketFeed() {
             condValueHtml = `<b class="${condColorClass}">${condVal}%</b>`;
         }
 
-        let isPlateRevealed = !!car.autotekaChecked;
+        let isPlateRevealed = !!car.autotekaChecked || car.isP2PUserListing;
         let plateInRowHtml = "";
 
         if (isPlateRevealed) {
@@ -597,7 +653,9 @@ function renderMarketFeed() {
 
         let statusBadgesHtml = `<span class='tag-badge bg-tag-cyan'>${carType}</span>`;
 
-        if (car.isMuseumStock) {
+        if (car.isP2PUserListing) {
+            statusBadgesHtml += "<span class='tag-badge bg-tag-green font-bold'>ИГРОК P2P</span>";
+        } else if (car.isMuseumStock) {
             statusBadgesHtml += "<span class='tag-badge bg-tag-amber'>🏆 КАПСУЛА</span>";
         } else if (car.isTunedSpec) {
             statusBadgesHtml += "<span class='tag-badge bg-tag-purple'>🔥 КОРЧ</span>";
@@ -614,6 +672,17 @@ function renderMarketFeed() {
 
         if (car.isStolen && isPlateRevealed) {
             statusBadgesHtml += "<span class='tag-badge badge-police-strobe'>🚨 РОЗЫСК</span>";
+        }
+
+        // Подсветка никнейма продавца активной темой игрока
+        let sellerNameRowHtml = "";
+        if (car.isP2PUserListing) {
+            let fxClass = car.sellerNickEffectClass || "nick-fx-lightning";
+            sellerNameRowHtml = `
+                <div class="sub-label mb-1" style="font-size:9px;">
+                    Продавец: <b class="font-bold ${fxClass}" style="font-size:11px;">${car.sellerPlayerName}</b>
+                </div>
+            `;
         }
 
         let sellerDialogHtml = car.sellerNote ? `
@@ -649,6 +718,7 @@ function renderMarketFeed() {
             <div class="car-header-row-volumetric">
                 <div style="flex:1; min-width:0; margin-right:8px;">
                     ${formatCarBrandBadgeHtml(car.name)}
+                    ${sellerNameRowHtml}
                     <div class="car-status-badges-row mt-1">
                         ${statusBadgesHtml}
                         ${plateInRowHtml}
@@ -715,7 +785,7 @@ function renderMarketFeed() {
                 </button>
             </div>
 
-            <button onclick="initiateBuyMarketCar('${car.id}')" class="btn btn-cyan w-full">
+            <button onclick="initiateBuyMarketCar('${car.id}')" class="btn btn-cyan w-full font-bold">
                 <i class="fa-solid fa-phone mr-1"></i> Позвонить и назначить встречу
             </button>
         </div>`;
@@ -1002,15 +1072,16 @@ function openMarketDeal(carId) {
     for (let k = 0; k < carId.length; k++) numSum += carId.charCodeAt(k);
     const randIdx = numSum % avatars.length;
     
-    const sellerTitle = names[randIdx];
+    const sellerTitle = car.sellerPlayerName ? car.sellerPlayerName : names[randIdx];
     pendingMarketCar.sellerName = sellerTitle;
-    setTxt("dealSellerAvatar", avatars[randIdx]);
+    setTxt("dealSellerAvatar", car.sellerMoodIcon || avatars[randIdx]);
     setTxt("dealSellerName", sellerTitle + " (Продавец у капота)");
 
     const thread = document.getElementById("dealChatThread");
     if (thread) {
         let greeting = "«Привет! Вот машина, осматривай кузов, проверяй сканером. Можем сделать кружок на тест-драйве!»";
-        if (car.isMuseumStock) greeting = "«Здравствуйте! Машина в коллекционном состоянии, пылинки сдувал. Смотрите кузов.»";
+        if (car.isP2PUserListing) greeting = `«Здорово! Я реальный владелец. Смотри машину, любые проверки за твой счёт.»`;
+        else if (car.isMuseumStock) greeting = "«Здравствуйте! Машина в коллекционном состоянии, пылинки сдувал. Смотрите кузов.»";
         else if (car.isTunedSpec) greeting = "«Привет! Тачка заряженная, едет боком в отсечку. Проверь выворот, прокатись!»";
         else if (car.isBeaterProject) greeting = "«Здорово. За такие деньги состояние сам видишь, но до сервиса доедет своим ходом.»";
         else if (car.dealType === 'urgent') greeting = "«Здорово! Мне срочно нужны деньги до вечера, готов уступить реальному покупателю!»";

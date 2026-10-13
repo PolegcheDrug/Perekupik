@@ -1,34 +1,34 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ТОРГ У КАПОТА И M+ (v2.0.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v2.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// 1. Полное разделение клиентов: «У капота» (Офлайн) vs «В сети M+» (Онлайн)
-// 2. Исправленный синхронный таймер поиска без зацикливания
-// 3. Мгновенный пропуск за талоны и Stars с гарантированным вызовом
-// 4. Инлайн-торг у капота прямо внутри карточки без оверлеев
-// 5. Синхронизация цены лота и текущего предложения покупателя
+// ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
+// 1. На карточке лота только 2 кнопки: ТОРГ (или Открыть M+) и ОТКАЗ
+// 2. Отдельное стильное модальное окно торга у капота (как при покупке)
+// 3. Автоматические системные проверки клиента в ленте чата (ЛКП, ЭБУ)
+// 4. Неоновая шкала терпения, кнопки риска и заключение ДКП
 // ========================================================
 
 let salesLotTimerInterval = null;
+let activeSalesLotHaggleIndex = null;
 
-// Психотипы покупателей площадки
 const BUYER_ARCHETYPES = [
     { 
         id: "student", 
         name: "Макс (Студент)", 
         avatar: "🧢", 
-        patience: 5, 
+        patience: 4, 
         riskTolerance: "low", 
-        moodPhrase: "«Ищу первую тачку подкопить опыт. Денег впритык!»",
-        inspectionSkill: "low" // Редко замечает скрытые дефекты
+        moodPhrase: "«Ищу первую тачку подкопить опыт. Денег впритык, уступи немного!»",
+        inspectionSkill: "low"
     },
     { 
         id: "podbor", 
         name: "Олег (Автоподбор)", 
         avatar: "🔎", 
-        patience: 6, 
+        patience: 5, 
         riskTolerance: "mid", 
-        moodPhrase: "«Проверяю каждый болт и зазор толщиномером. Есть ли торг?»",
-        inspectionSkill: "high" // Всегда тычет в окрасы и дефекты
+        moodPhrase: "«Здравствуйте. Осматриваю авто под ключ для клиента. Давайте проверим кузов и диагностику.»",
+        inspectionSkill: "high"
     },
     { 
         id: "perekup", 
@@ -36,7 +36,7 @@ const BUYER_ARCHETYPES = [
         avatar: "🧔", 
         patience: 3, 
         riskTolerance: "high", 
-        moodPhrase: "«Заберу быстро за наличку прямо сейчас с хорошим дисконтом!»",
+        moodPhrase: "«Салам! Заберу за наличку прямо сейчас, но скинь по-братски!»",
         inspectionSkill: "mid"
     },
     { 
@@ -45,7 +45,7 @@ const BUYER_ARCHETYPES = [
         avatar: "🕶️", 
         patience: 4, 
         riskTolerance: "high", 
-        moodPhrase: "«Документы в порядке? Деньги на руках, без лишних вопросов.»",
+        moodPhrase: "«Машина на ходу, документы чистые? Если сойдёмся в цене — забираю.»",
         inspectionSkill: "mid"
     },
     { 
@@ -54,7 +54,7 @@ const BUYER_ARCHETYPES = [
         avatar: "👨‍👩‍👦", 
         patience: 5, 
         riskTolerance: "low", 
-        moodPhrase: "«Нужна надёжная машина на каждый день для семьи и дачи.»",
+        moodPhrase: "«Нужна надёжная машина для семьи на каждый день. Главное чтобы без сюрпризов.»",
         inspectionSkill: "low"
     }
 ];
@@ -102,7 +102,6 @@ function renderSalesLot() {
         let margin = askingPrice - purchaseCost;
         let marginClass = margin >= 0 ? "color-green" : "color-red";
 
-        // Единая нормализация таймеров поиска
         if (lot.timer === undefined || isNaN(lot.timer)) {
             lot.timer = (lot.maxTimer && !isNaN(lot.maxTimer)) ? lot.maxTimer : 60;
         }
@@ -161,10 +160,17 @@ function renderSalesLot() {
             } else {
                 statusBadgeHtml = `<span class="tag-badge bg-tag-green"><span class="led-dot led-green"></span> КЛИЕНТ У КАПОТА!</span>`;
             }
-            waitSectionHtml = renderActiveBuyerBlockHtml(lot, idx);
+            waitSectionHtml = renderBuyerCardActions(lot, idx);
         }
 
         let plateText = car.customPlate || car.plate || "ТРАНЗИТ";
+        let condVal = car.condition || 85;
+        let shieldIconClass = condVal >= 80 
+            ? 'spec-tile-icon-shield' 
+            : (condVal >= 50 ? 'spec-tile-icon-shield-mid' : 'spec-tile-icon-shield-low');
+        let condColorClass = condVal >= 80 
+            ? 'color-green' 
+            : (condVal >= 50 ? 'color-amber' : 'color-red');
 
         html += `
             <div class="glass-card mb-3 ${hasBuyer ? 'card-glow-deal' : ''}" id="sales_lot_card_${idx}">
@@ -193,29 +199,47 @@ function renderSalesLot() {
                     </div>
                 </div>
 
+                <!-- ОБЪЕМНЫЕ ПЛАШКИ СПЕЦИФИКАЦИЙ -->
                 <div class="car-specs-grid-volumetric mb-2">
                     <div class="spec-tile-3d-col">
-                        <span class="spec-tile-col-label">Мощность</span>
-                        <b class="color-amber">${car.power || 100} л.с.</b>
+                        <div class="spec-tile-icon-wrap spec-tile-icon-power">
+                            <i class="fa-solid fa-bolt"></i>
+                        </div>
+                        <div class="spec-tile-col-data">
+                            <span class="spec-tile-col-label">Мощность</span>
+                            <b class="color-amber">${car.power || 100} л.с.</b>
+                        </div>
                     </div>
+
                     <div class="spec-tile-3d-col">
-                        <span class="spec-tile-col-label">Пробег</span>
-                        <b class="color-cyan">${(car.mileage || 85000).toLocaleString()} км</b>
+                        <div class="spec-tile-icon-wrap spec-tile-icon-road">
+                            <i class="fa-solid fa-road"></i>
+                        </div>
+                        <div class="spec-tile-col-data">
+                            <span class="spec-tile-col-label">Пробег</span>
+                            <b class="color-cyan">${(car.mileage || 85000).toLocaleString()} км</b>
+                        </div>
                     </div>
+
                     <div class="spec-tile-3d-col">
-                        <span class="spec-tile-col-label">Кузов</span>
-                        <b class="color-green">${car.condition || 85}%</b>
+                        <div class="spec-tile-icon-wrap ${shieldIconClass}">
+                            <i class="fa-solid fa-shield"></i>
+                        </div>
+                        <div class="spec-tile-col-data">
+                            <span class="spec-tile-col-label">Кузов</span>
+                            <b class="${condColorClass}">${condVal}%</b>
+                        </div>
                     </div>
                 </div>
 
                 <div class="flex-between mb-2">
-                    <span class="text-xs sub-label">Статус площадки:</span>
+                    <span class="text-xs sub-label">Статус лота:</span>
                     ${statusBadgeHtml}
                 </div>
 
                 ${waitSectionHtml}
 
-                <button onclick="reclaimCarFromLot(${idx})" class="btn btn-dark btn-sm w-full mt-2" ${lot.isHaggling ? 'disabled' : ''}>
+                <button onclick="reclaimCarFromLot(${idx})" class="btn btn-dark btn-sm w-full mt-2">
                     <i class="fa-solid fa-rotate-left mr-1"></i> Забрать обратно в гараж
                 </button>
             </div>
@@ -226,19 +250,69 @@ function renderSalesLot() {
 }
 
 // --------------------------------------------------------
-// ГЕНЕРАТОР ПОКУПАТЕЛЯ: ОФЛАЙН (У КАПОТА) ИЛИ ОНЛАЙН (В M+)
+// ЛОГИЧЕСКИЙ БЛОК: СТРОГО 2 КНОПКИ НА КАРТОЧКЕ
 // --------------------------------------------------------
+function renderBuyerCardActions(lot, idx) {
+    const buyer = lot.currentBuyer || lot.buyer;
+    if (!buyer) return "";
+
+    const car = lot.car || lot;
+    const askingPrice = lot.askingPrice || car.price || 100000;
+    const currentPriceOffer = buyer.currentOffer || buyer.offeredPrice || Math.round(askingPrice * 0.85);
+    const isOnlineChat = buyer.dealType === 'chat';
+
+    return `
+        <div class="p-2 mb-2" style="background:#060a14; border-radius:12px; border:1px solid rgba(0, 242, 254, 0.3);">
+            <div class="flex-between mb-2">
+                <div class="flex-gap" style="align-items:center;">
+                    <span style="font-size:24px;">${buyer.avatar}</span>
+                    <div>
+                        <b class="text-xs color-cyan" style="font-size:12px;">${buyer.name}</b>
+                        <div class="sub-label" style="font-size:8.5px;">
+                            ${isOnlineChat ? '📩 Написал в мессенджере M+' : '🚗 Стоит перед вами у капота'} • <span class="color-amber">⏳ ${lot.buyerTimerLeft || 120}с</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-right">
+                    <span class="sub-label" style="font-size:8px;">ПРЕДЛОЖЕНИЕ:</span>
+                    <div class="price-val color-green" style="font-size:15px;">${currentPriceOffer.toLocaleString()} ₽</div>
+                </div>
+            </div>
+
+            <div class="seller-dialog-bubble my-2" style="border-left: 3px solid var(--cyan); background: rgba(0, 242, 254, 0.04); padding: 8px 10px; border-radius: 8px;">
+                <span class="seller-mood-icon">${buyer.avatar}</span>
+                <span class="seller-bubble-text" style="font-size:10px; line-height:1.35; color:#f1f5f9;">${buyer.lastReply}</span>
+            </div>
+
+            <!-- СТРОГО 2 КНОПКИ: ДИАЛОГ ИЛИ ОТКАЗ -->
+            <div class="grid-2 mt-2" style="gap:6px;">
+                ${isOnlineChat ? `
+                    <button onclick="openLotBuyerInNetworkM(${idx})" class="btn btn-cyan btn-sm font-bold" style="padding:8px 0; font-size:11px;">
+                        <i class="fa-solid fa-comment-dots mr-1"></i> ОТКРЫТЬ M+ 💬
+                    </button>
+                ` : `
+                    <button onclick="openLotHoodHaggleModal(${idx})" class="btn btn-amber btn-sm font-bold" style="padding:8px 0; font-size:11px;">
+                        <i class="fa-solid fa-comments-dollar mr-1"></i> ТОРГ 🗣️
+                    </button>
+                `}
+                <button onclick="rejectLotBuyer(${idx})" class="btn btn-danger btn-sm font-bold" style="padding:8px 0; font-size:11px;">
+                    ✕ ОТКАЗ
+                </button>
+            </div>
+        </div>
+    `;
+}
+
 function generateRandomLotBuyer(car, askingPrice) {
     const archetype = BUYER_ARCHETYPES[Math.floor(Math.random() * BUYER_ARCHETYPES.length)];
     const discountRatio = 0.83 + Math.random() * 0.11;
     const offeredPrice = Math.round(askingPrice * discountRatio);
-
-    // 50% шанс, что покупатель пишет онлайн в M+, 50% — приехал очно к капоту
-    const isOnlineChat = Math.random() < 0.50;
+    const isOnlineChat = Math.random() < 0.40;
 
     let initialDialogue = archetype.moodPhrase;
     if (isOnlineChat) {
-        initialDialogue = `«Здравствуйте! Пишу по вашему объявлению. Готов забрать за ${offeredPrice.toLocaleString()} ₽, если договоримся!»`;
+        initialDialogue = `«Здравствуйте! Увидел объявление на «${car.name}». За ${offeredPrice.toLocaleString()} ₽ отдадите?»`;
     }
 
     return {
@@ -253,11 +327,14 @@ function generateRandomLotBuyer(car, askingPrice) {
         initialOfferedPrice: offeredPrice,
         currentOffer: offeredPrice,
         lastReply: initialDialogue,
-        dealType: isOnlineChat ? "chat" : "hood"
+        dealType: isOnlineChat ? "chat" : "hood",
+        dialogHistory: [
+            { from: 'them', text: initialDialogue }
+        ],
+        inspectionsDone: { gauge: false, obd: false, testDrive: false }
     };
 }
 
-// Синхронизация чата в мессенджер M+
 function syncBuyerToMNetwork(lot, idx) {
     if (!lot || !lot.buyer || lot.buyer.dealType !== 'chat') return;
     if (!state.player) state.player = {};
@@ -291,220 +368,244 @@ function syncBuyerToMNetwork(lot, idx) {
     }
 }
 
-// --------------------------------------------------------
-// ОТРИСОВКА БЛОКА ПОКУПАТЕЛЯ: У КАПОТА ИЛИ ЧЕРЕЗ M+
-// --------------------------------------------------------
-function renderActiveBuyerBlockHtml(lot, idx) {
-    const buyer = lot.currentBuyer || lot.buyer;
-    if (!buyer) return "";
+// ========================================================
+// МОДАЛЬНОЕ ОКНО ТОРГА У КАПОТА (СТИЛЬ КАК ПРИ ПОКУПКЕ)
+// ========================================================
+function openLotHoodHaggleModal(idx) {
+    activeSalesLotHaggleIndex = idx;
+    const lot = state.salesLot[idx];
+    if (!lot || !lot.buyer) return;
+
+    let modal = document.getElementById('modalLotHoodDeal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalLotHoodDeal';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    renderLotHoodHaggleModalContent();
+    ModalManager.open('modalLotHoodDeal');
+    if (typeof playSound === 'function') playSound('tick');
+}
+
+function renderLotHoodHaggleModalContent() {
+    const modal = document.getElementById('modalLotHoodDeal');
+    if (!modal || activeSalesLotHaggleIndex === null) return;
+
+    const lot = state.salesLot[activeSalesLotHaggleIndex];
+    if (!lot || !lot.buyer) {
+        ModalManager.close('modalLotHoodDeal');
+        return;
+    }
 
     const car = lot.car || lot;
-    const askingPrice = lot.askingPrice || car.price || 100000;
-    const purchaseCost = car.purchaseCost || Math.round(askingPrice * 0.75);
-    const currentPriceOffer = buyer.currentOffer || buyer.offeredPrice || Math.round(askingPrice * 0.85);
-    const netProfit = currentPriceOffer - purchaseCost;
+    const buyer = lot.buyer;
+    const currentOffer = buyer.currentOffer || buyer.offeredPrice;
 
-    let patiencePct = Math.round((buyer.patience / buyer.maxPatience) * 100);
+    let rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
+    let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
+    let plateText = car.customPlate || car.plate || "ТРАНЗИТ";
+
+    let patience = buyer.patience !== undefined ? buyer.patience : 4;
+    let maxPatience = buyer.maxPatience || 4;
+    let patiencePct = Math.round((patience / maxPatience) * 100);
     let patienceColor = patiencePct > 60 ? "color-green" : (patiencePct > 30 ? "color-amber" : "color-red");
+    let progressBg = patiencePct > 60 ? "var(--green)" : (patiencePct > 30 ? "var(--amber)" : "var(--red)");
 
-    const isOnlineChat = buyer.dealType === 'chat';
+    let historyHtml = (buyer.dialogHistory || []).map(m => `
+        <div class="chat-msg ${m.from === 'me' ? 'msg-player' : 'msg-seller'}" style="margin-bottom:6px;">
+            ${m.text}
+        </div>
+    `).join('');
 
-    // ВАРИАНТ 1: ПОКУПАТЕЛЬ НАПИСАЛ В M+ (ОНЛАЙН СДЕЛКА)
-    if (isOnlineChat) {
-        return `
-            <div class="p-2 mb-2" style="background:rgba(0, 242, 254, 0.04); border-radius:10px; border:1px solid rgba(0, 242, 254, 0.35);">
-                <div class="flex-between mb-1">
-                    <div class="flex-gap" style="align-items:center;">
-                        <span style="font-size:22px;">${buyer.avatar}</span>
-                        <div>
-                            <b class="text-xs color-cyan">${buyer.name}</b>
-                            <div class="sub-label" style="font-size:9px;">
-                                Написал в M+ • <span class="color-amber" id="lot_buyer_timer_${idx}">⏳ ${lot.buyerTimerLeft || 120}с</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="text-right">
-                        <span class="sub-label" style="font-size:8.5px;">ПРЕДЛОЖЕНИЕ В ЧАТЕ:</span>
-                        <div class="price-val color-green" style="font-size:15px;">${currentPriceOffer.toLocaleString()} ₽</div>
-                    </div>
-                </div>
-
-                <div class="seller-dialog-bubble my-2">
-                    <span class="seller-mood-icon">${buyer.avatar}</span>
-                    <span class="seller-bubble-text">${buyer.lastReply}</span>
-                </div>
-
-                <div class="flex-between text-xs px-1 mb-2">
-                    <span class="sub-label">Чистая маржа с продажи:</span>
-                    <b class="${netProfit >= 0 ? 'color-green' : 'color-red'}">${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString()} ₽</b>
-                </div>
-
-                <!-- Кнопки для онлайн-сделки: прямой переход в чат M+ -->
-                <div class="grid-2" style="gap:6px;">
-                    <button onclick="openLotBuyerInNetworkM(${idx})" class="btn btn-cyan btn-sm font-bold">
-                        <i class="fa-solid fa-comment-dots mr-1"></i> ПЕРЕЙТИ В ЧАТ M+ 💬
-                    </button>
-                    <button onclick="rejectLotBuyer(${idx})" class="btn btn-danger btn-sm">
-                        ✕ ОТКЛОНИТЬ ЗАПРОС
-                    </button>
-                </div>
+    let actionButtonsGrid = "";
+    if (patience <= 0) {
+        actionButtonsGrid = `
+            <div class="p-2 mb-2 text-center" style="background:rgba(255,51,102,0.1); border-radius:10px; border:1px solid var(--red);">
+                <b class="color-red text-xs block mb-1">🚫 ПОКУПАТЕЛЬ УСТАЛ ОТ ТОРГА И ЗАФИКСИРОВАЛ ЦЕНУ!</b>
+                <div class="sub-label" style="font-size:9px;">Дальнейшие попытки сбить цену приведут к срыву сделки.</div>
             </div>
         `;
-    }
+    } else {
+        actionButtonsGrid = `
+            <div class="grid-3 mb-2" style="gap:4px;">
+                <button onclick="executeModalHaggleStep(5, 15)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                    <div class="font-bold color-green text-xs" style="font-size:9.5px;">-5% СКИДКА</div>
+                    <div class="sub-label" style="font-size:7.5px;">РИСК: 15%</div>
+                </button>
 
-    // ВАРИАНТ 2: ПОКУПАТЕЛЬ СТОИТ У КАПОТА (ОФЛАЙН СДЕЛКА)
-    let haggleControlsHtml = "";
-    if (lot.isHaggling) {
-        haggleControlsHtml = `
-            <div class="p-2 my-2" style="background:#090e18; border-radius:10px; border:1px solid var(--amber);">
-                <div class="flex-between text-xs mb-1">
-                    <b class="color-amber"><i class="fa-solid fa-comments-dollar mr-1"></i> Выберите стратегию торга у капота:</b>
-                    <span class="sub-label font-bold">Риск срыва:</span>
-                </div>
+                <button onclick="executeModalHaggleStep(10, 35)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                    <div class="font-bold color-amber text-xs" style="font-size:9.5px;">-10% ПО ФАКТУ</div>
+                    <div class="sub-label" style="font-size:7.5px;">РИСК: 35%</div>
+                </button>
 
-                <div class="space-y-1 mb-2">
-                    <button onclick="executeLotHaggleStep(${idx}, 'body')" class="btn btn-dark btn-sm w-full text-left flex-between" style="padding:6px 10px;">
-                        <span>🛡️ Обосновать по кузову (+2% к цене)</span>
-                        <span class="tag-badge bg-tag-green" style="font-size:8px;">РИСК 15%</span>
-                    </button>
-
-                    <button onclick="executeLotHaggleStep(${idx}, 'rare')" class="btn btn-dark btn-sm w-full text-left flex-between" style="padding:6px 10px;">
-                        <span>🔥 Давить на эксклюзив (+6% к цене)</span>
-                        <span class="tag-badge bg-tag-amber" style="font-size:8px;">РИСК 40%</span>
-                    </button>
-
-                    <button onclick="executeLotHaggleStep(${idx}, 'firm')" class="btn btn-dark btn-sm w-full text-left flex-between" style="padding:6px 10px;">
-                        <span>⚡ Без торга, уже есть покупатель (+10%)</span>
-                        <span class="tag-badge bg-tag-red" style="font-size:8px;">РИСК 70%</span>
-                    </button>
-                </div>
-
-                <button onclick="toggleLotHaggleMode(${idx}, false)" class="btn btn-dark btn-sm w-full" style="font-size:10px;">
-                    Скрыть торг / Назад к предложению
+                <button onclick="executeModalHaggleStep(18, 65)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                    <div class="font-bold color-red text-xs" style="font-size:9.5px;">-18% ЖЕСТКО</div>
+                    <div class="sub-label" style="font-size:7.5px;">РИСК: 65%</div>
                 </button>
             </div>
         `;
     }
 
-    return `
-        <div class="p-2 mb-2" style="background:rgba(0, 242, 254, 0.04); border-radius:10px; border:1px solid rgba(0, 242, 254, 0.25);">
-            <div class="flex-between mb-1">
+    modal.innerHTML = `
+        <div class="modal-box chat-deal-box" style="max-width:440px;">
+            <div class="chat-header-bar flex-between mb-2">
                 <div class="flex-gap" style="align-items:center;">
-                    <span style="font-size:22px;">${buyer.avatar}</span>
+                    <div class="chat-avatar-circle" style="font-size:20px;">${buyer.avatar}</div>
                     <div>
-                        <b class="text-xs color-cyan">${buyer.name}</b>
-                        <div class="sub-label" style="font-size:9px;">
-                            Терпение: <b class="${patienceColor}">${patiencePct}%</b> • <span class="color-amber" id="lot_buyer_timer_${idx}">⏳ ${lot.buyerTimerLeft || 120}с</span>
-                        </div>
+                        <div class="font-bold text-xs">${buyer.name} (Покупатель у капота)</div>
+                        <div class="text-xs color-green">● Личная встреча у капота</div>
                     </div>
                 </div>
+                <button onclick="closeModal('modalLotHoodDeal')" class="btn btn-dark btn-auto btn-sm">✕</button>
+            </div>
 
-                <div class="text-right">
-                    <span class="sub-label" style="font-size:8.5px;">ПРЕДЛОЖЕНИЕ:</span>
-                    <div class="price-val color-green" style="font-size:15px;">${currentPriceOffer.toLocaleString()} ₽</div>
+            <!-- КАРТОЧКА ПРЕВЬЮ АВТОМОБИЛЯ -->
+            <div class="deal-car-preview-card mb-2">
+                <img src="${carImg}" class="deal-car-thumb" onerror="this.src='assets/cars/economy/2101/vaz-2101.jpg';">
+                <div style="flex:1;">
+                    <div class="font-bold text-xs">${car.name}</div>
+                    <div class="text-xs sub-label">Пробег: ${(car.mileage || 85000).toLocaleString()} км / Госномер: ${plateText}</div>
+                    <div class="price-val text-xs color-green" id="modalLotDealPrice">${currentOffer.toLocaleString()} ₽</div>
                 </div>
             </div>
 
-            <div class="seller-dialog-bubble my-2">
-                <span class="seller-mood-icon">${buyer.avatar}</span>
-                <span class="seller-bubble-text">${buyer.lastReply}</span>
+            <!-- ЛЕНТА ПЕРЕГОВОРОВ И ПРОВЕРОК -->
+            <div class="chat-thread-container mb-2" id="modalLotChatThread" style="max-height:160px; min-height:120px; overflow-y:auto; padding:8px;">
+                ${historyHtml}
             </div>
 
-            <div class="flex-between text-xs px-1 mb-2">
-                <span class="sub-label">Чистая маржа с продажи:</span>
-                <b class="${netProfit >= 0 ? 'color-green' : 'color-red'}">${netProfit >= 0 ? '+' : ''}${netProfit.toLocaleString()} ₽</b>
+            <!-- НЕОНОВАЯ ШКАЛА ТЕРПЕНИЯ -->
+            <div class="mb-2 p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+                <div class="flex-between text-xs mb-1" style="font-size:9.5px;">
+                    <span>Терпение покупателя:</span>
+                    <b class="${patienceColor}">${patiencePct}% (${patience} попыток)</b>
+                </div>
+                <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
+                    <div style="width:${patiencePct}%; height:100%; background:${progressBg}; transition:width 0.3s ease;"></div>
+                </div>
             </div>
 
-            ${haggleControlsHtml}
+            <!-- КНОПКИ ТОРГА -->
+            ${actionButtonsGrid}
 
-            <!-- Офлайн-кнопки у капота: ДКП, Торг, Отказ -->
-            <div class="grid-3" style="gap:5px;">
-                <button onclick="acceptLotBuyerDeal(${idx})" class="btn btn-green btn-sm" style="font-weight:900;">
-                    <i class="fa-solid fa-handshake mr-1"></i> ДКП 🤝
+            <!-- ГЛАВНЫЕ КНОПКИ ДЕЙСТВИЯ -->
+            <div class="grid-2" style="gap:6px;">
+                <button onclick="closeModal('modalLotHoodDeal')" class="btn btn-dark">
+                    УЕХАТЬ СО ВСТРЕЧИ 🚗
                 </button>
-
-                <button onclick="toggleLotHaggleMode(${idx}, true)" class="btn ${lot.isHaggling ? 'btn-dark' : 'btn-amber'} btn-sm">
-                    <i class="fa-solid fa-comments-dollar mr-1"></i> ТОРГ
-                </button>
-
-                <button onclick="rejectLotBuyer(${idx})" class="btn btn-danger btn-sm">
-                    ✕ ОТКАЗ
+                <button onclick="confirmLotHoodDKP()" class="btn btn-green font-bold">
+                    ОФОРМИТЬ ДКП 🤝
                 </button>
             </div>
         </div>
     `;
+
+    const thread = document.getElementById('modalLotChatThread');
+    if (thread) thread.scrollTop = thread.scrollHeight;
 }
 
-function toggleLotHaggleMode(idx, show) {
-    if (!state.salesLot[idx]) return;
-    state.salesLot[idx].isHaggling = show;
-    renderSalesLot();
-    if (typeof playSound === 'function') playSound('tick');
-}
+function executeModalHaggleStep(percent, failRisk) {
+    if (activeSalesLotHaggleIndex === null) return;
+    const lot = state.salesLot[activeSalesLotHaggleIndex];
+    if (!lot || !lot.buyer) return;
 
-function executeLotHaggleStep(idx, strategy) {
-    const lot = state.salesLot[idx];
-    if (!lot) return;
-    const buyer = lot.currentBuyer || lot.buyer;
-    if (!buyer) return;
-
-    if (buyer.patience <= 0) {
-        return showToast("Покупатель потерял терпение и больше не торгуется!");
-    }
+    const car = lot.car || lot;
+    const buyer = lot.buyer;
+    if (buyer.patience <= 0) return showToast("Покупатель больше не торгуется!");
 
     buyer.patience -= 1;
+    if (!buyer.dialogHistory) buyer.dialogHistory = [];
 
-    let bonusPct = 0.02;
-    let failRisk = 0.15;
-    let failMsg = "«Не вижу здесь идеала, кузов требует внимания. Больше не накину!»";
+    let actualRisk = failRisk;
+    if (buyer.riskTolerance === 'high') actualRisk -= 10;
+    if (buyer.riskTolerance === 'low') actualRisk += 15;
 
-    if (strategy === 'rare') {
-        bonusPct = 0.06;
-        failRisk = 0.40;
-        failMsg = "«Эксклюзив? Не смеши, таких на рынке полно. Либо по моей цене, либо я ухожу!»";
-    } else if (strategy === 'firm') {
-        bonusPct = 0.10;
-        failRisk = 0.70;
-        failMsg = "«Ну и продавай своей очереди, а я пошёл искать дальше!»";
+    let karma = state.player?.karma !== undefined ? state.player.karma : 50;
+    let lvl = state.player?.level || 1;
+    actualRisk = Math.max(5, Math.min(95, actualRisk - (lvl * 0.3) - ((karma - 50) * 0.2)));
+
+    // СЛУЧАЙНАЯ ПРОВЕРКА МАШИНЫ ПОКУПАТЕЛЕМ В ПРОЦЕССЕ ТОРГА
+    let inspectionTriggerRoll = Math.random();
+    let inspectionMessage = "";
+
+    if (inspectionTriggerRoll < 0.35 && !buyer.inspectionsDone.gauge) {
+        buyer.inspectionsDone.gauge = true;
+        let isRepainted = car.condition < 70 || car.bodyThickness?.doors > 200 || car.bodyThickness?.hood > 200;
+        if (isRepainted) {
+            let pen = Math.round((buyer.currentOffer || buyer.offeredPrice) * 0.05);
+            buyer.currentOffer = Math.max(10000, (buyer.currentOffer || buyer.offeredPrice) - pen);
+            inspectionMessage = `🔍 <i>[Покупатель достал толщиномер]</i>: «На приборе 280 мкм, шпаклёвка! Минус ${pen.toLocaleString()} ₽ за неродной окрас.»`;
+        } else {
+            inspectionMessage = `🔍 <i>[Покупатель достал толщиномер]</i>: «Проверил арки и капот — везде заводской слой, отлично!»`;
+        }
+    } else if (inspectionTriggerRoll < 0.65 && !buyer.inspectionsDone.obd) {
+        buyer.inspectionsDone.obd = true;
+        let hasErr = !!car.hiddenDefect || (car.wear?.engine < 50);
+        if (hasErr) {
+            let pen = Math.round((buyer.currentOffer || buyer.offeredPrice) * 0.06);
+            buyer.currentOffer = Math.max(10000, (buyer.currentOffer || buyer.offeredPrice) - pen);
+            inspectionMessage = `💻 <i>[Покупатель подключил Launch OBD2]</i>: «В блоке DME висит ошибка по смеси! Скидывай ${pen.toLocaleString()} ₽ на сервис.»`;
+        } else {
+            inspectionMessage = `💻 <i>[Покупатель подключил Launch OBD2]</i>: «Ошибок в памяти ЭБУ нет, блоки чистые.»`;
+        }
     }
 
-    let roll = Math.random();
+    let roll = Math.random() * 100;
 
-    if (roll < failRisk) {
+    buyer.dialogHistory.push({ from: 'me', text: `«Скинь ${percent}%, у меня деньги на руках — забираю прямо сейчас!»` });
+
+    if (inspectionMessage) {
+        buyer.dialogHistory.push({ from: 'them', text: inspectionMessage });
+    }
+
+    if (roll < actualRisk) {
         if (typeof playSound === 'function') playSound('error');
         if (typeof tgHaptic === 'function') tgHaptic('error');
 
-        if (buyer.patience <= 0 || roll < 0.25) {
-            showToast(`🚫 ${buyer.name} хлопнул дверью и ушёл!`);
+        if (buyer.patience <= 0 || roll < 12) {
+            buyer.dialogHistory.push({ from: 'them', text: `«Ты надоел торговаться, машина снята с продажи! Я поехал.»` });
+            showToast("🚫 Покупатель психанул и уехал со встречи!");
             lot.currentBuyer = null;
             lot.buyer = null;
-            lot.isHaggling = false;
             lot.timer = 50;
             lot.maxTimer = 50;
+            setTimeout(() => {
+                ModalManager.close('modalLotHoodDeal');
+                renderSalesLot();
+            }, 1200);
             saveState();
-            renderSalesLot();
+            renderLotHoodHaggleModalContent();
             return;
         } else {
-            buyer.lastReply = failMsg;
-            showToast("Торг не удался! Покупатель упёрся.");
+            buyer.dialogHistory.push({ from: 'them', text: `«Никаких скидок, цена и так по низу рынка за это состояние!»` });
+            showToast("Покупатель отказался снижать цену!");
         }
     } else {
-        let car = lot.car || lot;
         let askingPrice = lot.askingPrice || car.price || 100000;
-        let increaseAmount = Math.round(askingPrice * bonusPct);
+        let raiseAmount = Math.round(askingPrice * (percent / 100));
 
-        buyer.currentOffer = Math.min(askingPrice, (buyer.currentOffer || buyer.offeredPrice) + increaseAmount);
+        buyer.currentOffer = Math.min(askingPrice, (buyer.currentOffer || buyer.offeredPrice) + raiseAmount);
         buyer.offeredPrice = buyer.currentOffer;
-        buyer.lastReply = `«Ладно, твоя взяла! Накидываю +${increaseAmount.toLocaleString()} ₽, оформляем?»`;
+        buyer.lastReply = `«По рукам. Уступаю и накидываю +${raiseAmount.toLocaleString()} ₽, оформляем ДКП?»`;
+        buyer.dialogHistory.push({ from: 'them', text: `«По рукам. Уступаю +${raiseAmount.toLocaleString()} ₽, оформляем ДКП!»` });
 
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast(`Покупатель согласился! Предложение: ${buyer.currentOffer.toLocaleString()} ₽`);
+        showToast(`Успешный торг! Предложение выросло на +${raiseAmount.toLocaleString()} ₽`);
     }
 
     saveState();
+    renderLotHoodHaggleModalContent();
     renderSalesLot();
+}
+
+function confirmLotHoodDKP() {
+    if (activeSalesLotHaggleIndex === null) return;
+    const idx = activeSalesLotHaggleIndex;
+    ModalManager.close('modalLotHoodDeal');
+    acceptLotBuyerDeal(idx);
 }
 
 function acceptLotBuyerDeal(idx) {
@@ -556,6 +657,7 @@ function finishSalesLotDeal(idx, price, profit) {
     }
 
     state.salesLot.splice(idx, 1);
+    activeSalesLotHaggleIndex = null;
     saveState();
     updateHeaderUI();
     renderSalesLot();
@@ -577,10 +679,10 @@ function rejectLotBuyer(idx) {
 
     lot.currentBuyer = null;
     lot.buyer = null;
-    lot.isHaggling = false;
     lot.timer = 45;
     lot.maxTimer = 45;
 
+    activeSalesLotHaggleIndex = null;
     saveState();
     renderSalesLot();
     if (typeof playSound === 'function') playSound('tick');
@@ -597,7 +699,6 @@ function openLotBuyerInNetworkM(idx) {
     const safeCarName = String(car.name || 'car').replace(/[^a-zа-я0-9]/gi, '_');
     const dialogId = `dlg_buyer_slot_${idx}_${safeCarName}`;
 
-    // Гарантируем синхронизацию входящего диалога
     syncBuyerToMNetwork(lot, idx);
 
     if (typeof switchTab === 'function') switchTab('tabPhone');
@@ -651,6 +752,9 @@ function updateSalesLotTimers() {
                 lot.buyer = null;
                 lot.timer = 50;
                 lot.maxTimer = 50;
+                if (activeSalesLotHaggleIndex === idx) {
+                    ModalManager.close('modalLotHoodDeal');
+                }
                 needReRender = true;
             }
         }
@@ -679,7 +783,6 @@ function speedUpLotSearch(idx, type) {
     let car = lot.car || lot;
     let askingPrice = lot.askingPrice || car.price || 100000;
 
-    // Мгновенный вызов покупателя
     lot.timer = 0;
     lot.currentBuyer = generateRandomLotBuyer(car, askingPrice);
     lot.buyer = lot.currentBuyer;
@@ -757,8 +860,10 @@ window.initSalesLotTimer = initSalesLotTimer;
 window.updateSalesLotTimers = updateSalesLotTimers;
 window.speedUpLotSearch = speedUpLotSearch;
 window.reclaimCarFromLot = reclaimCarFromLot;
-window.toggleLotHaggleMode = toggleLotHaggleMode;
-window.executeLotHaggleStep = executeLotHaggleStep;
+window.openLotHoodHaggleModal = openLotHoodHaggleModal;
+window.renderLotHoodHaggleModalContent = renderLotHoodHaggleModalContent;
+window.executeModalHaggleStep = executeModalHaggleStep;
+window.confirmLotHoodDKP = confirmLotHoodDKP;
 window.acceptLotBuyerDeal = acceptLotBuyerDeal;
 window.finishSalesLotDeal = finishSalesLotDeal;
 window.rejectLotBuyer = rejectLotBuyer;

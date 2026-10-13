@@ -1,15 +1,15 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v1.1.0)
+// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v1.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Анимированный роллер чисел HUD, жесткий учет инвентаря,
 // Почта и Склад хранения (mailbox & warehouse),
 // авто-миграция локальной базы в Cloud Firestore cars_catalog,
 // темы Cyber Black Neo, кастомные эффекты огня/плазмы,
 // спецзаказы «ПодКлюч», Telegram Cloud Storage, Firestore & Refs.
-// Отвязан дублирующий таймер salesLot во избежание сбоев поиска.
+// Полная синхронизация с P2P-экосистемой M+ PRO Hub.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v1.0.0";
+const CURRENT_GAME_VERSION = "v1.2.0";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -147,13 +147,13 @@ function playSound(type) {
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(320, now);
                 g.gain.setValueAtTime(0.04, now);
-                g.gain.linearRampToValueAtTime(0, now + 0.015);
+                g.linearRampToValueAtTime(0, now + 0.015);
                 osc.start(now); osc.stop(now + 0.015);
             } else {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(800, now);
                 g.gain.setValueAtTime(0.05, now);
-                g.gain.linearRampToValueAtTime(0, now + 0.03);
+                g.linearRampToValueAtTime(0, now + 0.03);
                 osc.start(now); osc.stop(now + 0.03);
             }
         } else if (type === 'win') {
@@ -161,9 +161,9 @@ function playSound(type) {
             const g = audioCtx.createGain();
             osc.connect(g); g.connect(audioCtx.destination);
             osc.frequency.setValueAtTime(440, now);
-            osc.frequency.exponentialRampToValueAtTime(880, now + 0.2);
+            osc.exponentialRampToValueAtTime(880, now + 0.2);
             g.gain.setValueAtTime(0.2, now);
-            g.gain.linearRampToValueAtTime(0, now + 0.25);
+            g.linearRampToValueAtTime(0, now + 0.25);
             osc.start(now); osc.stop(now + 0.25);
         } else if (type === 'error') {
             const osc = audioCtx.createOscillator();
@@ -173,7 +173,7 @@ function playSound(type) {
             osc.frequency.setValueAtTime(160, now);
             osc.exponentialRampToValueAtTime(50, now + 0.3);
             g.gain.setValueAtTime(0.15, now);
-            g.gain.linearRampToValueAtTime(0, now + 0.3);
+            g.linearRampToValueAtTime(0, now + 0.3);
             osc.start(now); osc.stop(now + 0.3);
         }
     } catch(e) {}
@@ -193,7 +193,7 @@ function playEngineSound() {
         osc.exponentialRampToValueAtTime(520, now + 0.45);
         osc.exponentialRampToValueAtTime(140, now + 0.9);
         g.gain.setValueAtTime(0.25, now);
-        g.gain.linearRampToValueAtTime(0, now + 0.95);
+        g.linearRampToValueAtTime(0, now + 0.95);
         osc.start(now); osc.stop(now + 0.95);
         tgHaptic('medium');
     } catch(e) {}
@@ -1248,7 +1248,6 @@ async function initTelegramAuthAndStorage(callback) {
         if (tgUserData.photo_url) state.player.avatarUrl = tgUserData.photo_url;
     }
 
-    // Запуск разовой авто-миграции каталога авто в Cloud Firestore
     if (window.FB_Bridge?.CarsCatalog) {
         window.FB_Bridge.CarsCatalog.seedDefaultCarsCatalog();
     }
@@ -2167,7 +2166,7 @@ function initMarketScrollListener() {
 }
 
 // ========================================================
-// 17. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ (БЕЗ КОНФЛИКТА SALESLOT)
+// 17. ИНИЦИАЛИЗАЦИЯ И ИГРОВОЙ ЦИКЛ
 // ========================================================
 function initApp() {
     initTelegramAuthAndStorage(async () => {
