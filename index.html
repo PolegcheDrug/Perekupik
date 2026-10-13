@@ -894,7 +894,13 @@
 
         const CACHE_VER = '340';
 
-        const rootModules = ['data.js'];
+        // 4 разделенных модуля баз данных игры в строгой очередности
+        const rootModules = [
+          'data_core.js',
+          'data_cars.js',
+          'data_economy.js',
+          'data_activities.js'
+        ];
         const jsModules = [
           'app.js',
           'phone.js',
