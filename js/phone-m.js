@@ -1,8 +1,10 @@
 // ========================================================
-// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.5.4)
+// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.6.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
-// Интеграция P2P биржи с единым окном торга через openP2PDealModal
+// 1. Интеграция с базой реплик data_dialogues.js
+// 2. Кнопка «Заключить ДКП» строго внизу под тактикой торга
+// 3. Динамический чат, селектор имущества и P2P Биржа с мини-обложками и тюнингом
 // ========================================================
 
 const AppM = {
@@ -312,7 +314,6 @@ const AppM = {
     },
 
     executeChatHaggle(msgId, percent, failRisk) {
-        let dialogueDb = (typeof DIALOGUES_DATABASE !== 'undefined') ? DIALOGUES_DATABASE : null;
         let msg = (state.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
 
@@ -397,187 +398,6 @@ const AppM = {
         let msg = (state.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
 
-        let slotIdx = msg.carIndex !== undefined ? msg.carIndex : 0;
-        let slot = state.salesLot ? state.salesLot[slotIdx] : null;
-
-        if (slot) {
-            let buyer = slot.currentBuyer || slot.buyer;
-            let finalPrice = msg.offerPrice || buyer?.currentOffer || slot.askingPrice;
-
-            if (typeof finishSalesLotDeal === 'function') {
-                let car = slot.car || slot;
-                let purchaseCost = car.purchaseCost || Math.round(finalPrice * 0.75);
-                let profit = finalPrice - purchaseCost;
-                finishSalesLotDeal(slotIdx, finalPrice, profit);
-            }
-        } else {
-            let car = msg.carData || {};
-            let price = msg.offerPrice || 100000;
-            state.player.cash = (state.player.cash || 0) + price;
-            if (!state.player.stats) state.player.stats = {};
-            state.player.stats.sold = (state.player.stats.sold || 0) + 1;
-            if (typeof addXp === 'function') addXp(40);
-            saveState();
-            updateHeaderUI();
-            openVerdictModal("СДЕЛКА В M+ ЗАКРЫТА! 🤝", `Покупатель ${msg.sender} выкупил ${car.name || 'авто'} за ${Number(price).toLocaleString()} ₽!`, true, price);
-        }
-
-        state.player.phoneMessages = state.player.phoneMessages.filter(m => m.id !== msgId);
-        saveState();
-        this.activeDialogId = null;
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    // ========================================================
-    // 2. ВКЛАДКА: «P2P БИРЖА»
-    // ========================================================
-    renderMarketScreen(container) {
-        if (!container) return;
-        let f = this.marketFilter || 'cars';
-        let pLvl = state.player?.level || 1;
-
-        container.innerHTML = `
-            <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.12), #090e18); border-color: rgba(0, 230, 118, 0.35);">
-                <div>
-                    <b class="text-xs color-green"><i class="fa-solid fa-globe mr-1"></i> Онлайн P2P Биржа имущества</b>
-                    <div class="sub-label" style="font-size:8.5px;">Торговля машинами, номерами, бизнесом и жильём</div>
-                </div>
-                <button onclick="AppM.openCreateListingModal()" class="btn btn-green btn-auto btn-sm" style="font-size:9px; padding:4px 8px;">
-                    + Выставить
-                </button>
-            </div>
-
-            <!-- ФИЛЬТРЫ ИМУЩЕСТВА С ПРОВЕРКОЙ УРОВНЕЙ -->
-            <div class="grid-4 mb-2">
-                <button onclick="AppM.setMarketFilter('cars')" class="btn ${f === 'cars' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">🚗 Авто</button>
-                <button onclick="AppM.setMarketFilter('plates')" class="btn ${f === 'plates' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">${pLvl >= 3 ? '🏷 Номера' : '🔒 Номера (3 ур.)'}</button>
-                <button onclick="AppM.setMarketFilter('housing')" class="btn ${f === 'housing' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">${pLvl >= 4 ? '🏠 Жильё' : '🔒 Жильё (4 ур.)'}</button>
-                <button onclick="AppM.setMarketFilter('business')" class="btn ${f === 'business' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">${pLvl >= 6 ? '💼 Бизнес' : '🔒 Бизнес (6 ур.)'}</button>
-            </div>
-
-            <div id="p2pLotsArea">
-                ${this.renderP2PLotsHtml(f)}
-            </div>
-        `;
-    },
-
-    setMarketFilter(filter) {
-        let pLvl = state.player?.level || 1;
-        if (filter === 'plates' && pLvl < 3) return showToast("Категория «Номера» на бирже доступна с 3 уровня!");
-        if (filter === 'housing' && pLvl < 4) return showToast("Категория «Жильё» на бирже доступна с 4 уровня!");
-        if (filter === 'business' && pLvl < 6) return showToast("Категория «Бизнес» на бирже доступна с 6 уровня!");
-
-        this.marketFilter = filter;
-        if (typeof playSound === 'function') playSound('tick');
-        this.renderMarketScreen(document.getElementById('mHubSubContentBox'));
-    },
-
-    renderP2PLotsHtml(filter) {
-        let lots = state.p2pMarketListings || [];
-        if (lots.length === 0) {
-            lots = [
-                { id: "demo_c1", sellerId: "bot_1", sellerName: "Maga_GTI", type: "cars", name: "VW Golf VI GTI (Stage 2)", price: 1850000, itemData: { plate: "О777ОО 77", power: 260, condition: 85, img: "assets/cars/comfort/golf6/golf6.jpg" } },
-                { id: "demo_p1", sellerId: "bot_2", sellerName: "Major_Vova", type: "plates", name: "Госномер А777АА 77", price: 1500000, itemData: { plate: "А777АА 77" } },
-                { id: "demo_b1", sellerId: "bot_3", sellerName: "Serega_STO", type: "business", name: "Автомойка 24/7 (Ур. 2)", price: 420000, itemData: { bizId: "wash", level: 2, income: 1800, img: "assets/business/wash.jpg" } },
-                { id: "demo_h1", sellerId: "bot_4", sellerName: "Oligarch_77", type: "housing", name: "Бокс в ГСК-7 (Сухой)", price: 1750000, itemData: { houseId: "gsk_box", slots: 2, img: "assets/houses/garage.jpg" } }
-            ];
-            state.p2pMarketListings = lots;
-        }
-
-        let filtered = lots.filter(l => {
-            if (filter === 'cars') return l.type === 'car' || l.type === 'cars';
-            if (filter === 'plates') return l.type === 'plate' || l.type === 'plates';
-            return l.type === filter;
-        });
-
-        if (filtered.length === 0) {
-            return `<div class="glass-card text-center sub-label py-6">В категории «${filter.toUpperCase()}» активных лотов пока нет.</div>`;
-        }
-
-        return filtered.map(item => {
-            let myId = String(state.player?.name || 'me');
-            let isMine = String(item.sellerName) === myId;
-
-            let actionBtn = isMine 
-                ? `<button onclick="AppM.cancelP2PListing('${item.id}')" class="btn btn-danger btn-sm w-full">Снять с продажи</button>`
-                : `<button onclick="openP2PDealModal('${item.id}')" class="btn btn-green btn-sm w-full font-bold">Торговаться / Купить за ${Number(item.price).toLocaleString()} ₽ 🤝</button>`;
-
-            let descText = "";
-            let imgBlockHtml = "";
-
-            if (item.type === 'cars' || item.type === 'car') {
-                let rawImg = item.itemData?.img || item.img || "assets/cars/economy/2101/vaz-2101.jpg";
-                let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
-                let fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(item.itemData?.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
-
-                descText = `${item.itemData?.power || 100} л.с. • Госномер: ${item.itemData?.plate || 'ТРАНЗИТ'} • Кузов: ${item.itemData?.condition || 85}%`;
-                imgBlockHtml = `
-                    <div class="car-img-wrap mb-2" style="height:120px; position:relative;">
-                        <img src="${carImg}" class="car-img" onerror="this.onerror=null; this.src='${fallbackImg}';">
-                        <div class="badge-tag badge-br">
-                            <span class="tag-badge bg-tag-cyan">АВТО P2P</span>
-                        </div>
-                    </div>
-                `;
-            } else if (item.type === 'plates' || item.type === 'plate') {
-                let plateStr = item.itemData?.plate || item.name;
-                descText = `Официальный архивный регистрационный знак РФ`;
-                imgBlockHtml = `
-                    <div class="p-3 mb-2 text-center" style="background:#050914; border-radius:10px; border:1px solid rgba(192, 132, 252, 0.4);">
-                        <div class="license-plate" style="font-size:16px; padding:4px 12px; display:inline-block;">
-                            ${plateStr} <span class="license-flag">RUS</span>
-                        </div>
-                    </div>
-                `;
-            } else if (item.type === 'business') {
-                let rawImg = item.itemData?.img || "assets/business/wash.jpg";
-                let bizImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
-                descText = `Пассивный доход: +${Number(item.itemData?.income || 1000).toLocaleString()} ₽/день • Готовый цех`;
-                imgBlockHtml = `
-                    <div class="car-img-wrap mb-2" style="height:120px; position:relative;">
-                        <img src="${bizImg}" class="car-img" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80';">
-                        <div class="badge-tag badge-br">
-                            <span class="tag-badge bg-tag-green">БИЗНЕС P2P</span>
-                        </div>
-                    </div>
-                `;
-            } else if (item.type === 'housing') {
-                let rawImg = item.itemData?.img || "assets/houses/garage.jpg";
-                let houseImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
-                descText = `Гаражные места: +${item.itemData?.slots || 1} боксов в собственность • Кураж`;
-                imgBlockHtml = `
-                    <div class="car-img-wrap mb-2" style="height:120px; position:relative;">
-                        <img src="${houseImg}" class="car-img" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?auto=format&fit=crop&w=600&q=80';">
-                        <div class="badge-tag badge-br">
-                            <span class="tag-badge bg-tag-amber">ЖИЛЬЁ P2P</span>
-                        </div>
-                    </div>
-                `;
-            }
-
-            return `
-                <div onclick="openP2PDealModal('${item.id}')" class="glass-card mb-3 p-2 cursor-pointer" style="border-left: 3px solid var(--green); background:#090e18;">
-                    ${imgBlockHtml}
-
-                    <div class="flex-between mb-1">
-                        <div>
-                            <b class="text-xs color-cyan" style="font-size:12.5px;">${item.name}</b>
-                            <div class="sub-label" style="font-size:8.5px;">Продавец: <b class="color-amber">${item.sellerName || 'Перекуп'}</b></div>
-                        </div>
-                        <span class="price-val text-xs color-green">${Number(item.price).toLocaleString()} ₽</span>
-                    </div>
-                    <div class="sub-label mb-2" style="font-size:9.5px; color:#cbd5e1;">${descText}</div>
-                    ${actionBtn}
-                </div>
-            `;
-        }).join('');
-    },
-
-    dealAcceptFromChat(msgId) {
-        let msg = (state.player?.phoneMessages || []).find(m => m && m.id === msgId);
-        if (!msg) return;
-
-        // Корректная обработка заключения ДКП для P2P-биржи прямо из чата
         if (msg.isP2PMarket && msg.p2pId) {
             let lot = (state.p2pMarketListings || []).find(l => l.id === msg.p2pId);
             let finalPrice = msg.offerPrice || lot?.price || 100000;
@@ -620,7 +440,6 @@ const AppM = {
             return;
         }
 
-        // Стандартный блок для NPC площадки...
         let slotIdx = msg.carIndex !== undefined ? msg.carIndex : 0;
         let slot = state.salesLot ? state.salesLot[slotIdx] : null;
 
@@ -653,11 +472,264 @@ const AppM = {
     },
 
     // ========================================================
+    // 2. ВКЛАДКА: «P2P БИРЖА» И ВЫБОР ИМУЩЕСТВА ДЛЯ ПРОДАЖИ
+    // ========================================================
+    renderMarketScreen(container) {
+        if (!container) return;
+        let f = this.marketFilter || 'cars';
+        let pLvl = state.player?.level || 1;
+
+        container.innerHTML = `
+            <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.12), #090e18); border-color: rgba(0, 230, 118, 0.35);">
+                <div>
+                    <b class="text-xs color-green"><i class="fa-solid fa-globe mr-1"></i> Онлайн P2P Биржа имущества</b>
+                    <div class="sub-label" style="font-size:8.5px;">Торговля машинами, номерами, бизнесом и жильём</div>
+                </div>
+                <button onclick="AppM.openCreateListingModal()" class="btn btn-green btn-auto btn-sm" style="font-size:9px; padding:4px 8px;">
+                    + Выставить
+                </button>
+            </div>
+
+            <div class="grid-4 mb-2">
+                <button onclick="AppM.setMarketFilter('cars')" class="btn ${f === 'cars' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">🚗 Авто</button>
+                <button onclick="AppM.setMarketFilter('plates')" class="btn ${f === 'plates' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">${pLvl >= 3 ? '🏷 Номера' : '🔒 Номера (3 ур.)'}</button>
+                <button onclick="AppM.setMarketFilter('housing')" class="btn ${f === 'housing' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">${pLvl >= 4 ? '🏠 Жильё' : '🔒 Жильё (4 ур.)'}</button>
+                <button onclick="AppM.setMarketFilter('business')" class="btn ${f === 'business' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">${pLvl >= 6 ? '💼 Бизнес' : '🔒 Бизнес (6 ур.)'}</button>
+            </div>
+
+            <div id="p2pLotsArea">
+                ${this.renderP2PLotsHtml(f)}
+            </div>
+        `;
+    },
+
+    setMarketFilter(filter) {
+        let pLvl = state.player?.level || 1;
+        if (filter === 'plates' && pLvl < 3) return showToast("Категория «Номера» на бирже доступна с 3 уровня!");
+        if (filter === 'housing' && pLvl < 4) return showToast("Категория «Жильё» на бирже доступна с 4 уровня!");
+        if (filter === 'business' && pLvl < 6) return showToast("Категория «Бизнес» на бирже доступна с 6 уровня!");
+
+        this.marketFilter = filter;
+        if (typeof playSound === 'function') playSound('tick');
+        this.renderMarketScreen(document.getElementById('mHubSubContentBox'));
+    },
+
+    renderP2PLotsHtml(filter) {
+        let lots = state.p2pMarketListings || [];
+        if (lots.length === 0) {
+            lots = [
+                { id: "demo_c1", sellerId: "bot_1", sellerName: "Maga_GTI", type: "cars", name: "VW Golf VI GTI (Stage 2)", price: 1850000, itemData: { plate: "О777ОО 77", power: 260, condition: 85, img: "assets/cars/comfort/golf6/golf6.jpg", tuning: { chip: 2 } } }
+            ];
+            state.p2pMarketListings = lots;
+        }
+
+        let filtered = lots.filter(l => {
+            if (filter === 'cars') return l.type === 'car' || l.type === 'cars';
+            if (filter === 'plates') return l.type === 'plate' || l.type === 'plates';
+            return l.type === filter;
+        });
+
+        if (filtered.length === 0) {
+            return `<div class="glass-card text-center sub-label py-6">В категории «${filter.toUpperCase()}» активных лотов пока нет.</div>`;
+        }
+
+        return filtered.map(item => {
+            let myId = String(state.player?.name || 'me');
+            let isMine = String(item.sellerName) === myId;
+
+            let actionBtn = isMine 
+                ? `<button onclick="AppM.cancelP2PListing('${item.id}')" class="btn btn-danger btn-sm w-full">Снять с продажи</button>`
+                : `<button onclick="openP2PDealModal('${item.id}')" class="btn btn-green btn-sm w-full font-bold">Торговаться / Купить за ${Number(item.price).toLocaleString()} ₽ 🤝</button>`;
+
+            let descText = "";
+            let imgBlockHtml = "";
+
+            if (item.type === 'cars' || item.type === 'car') {
+                let rawImg = item.itemData?.img || item.img || "assets/cars/economy/2101/vaz-2101.jpg";
+                let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
+                let fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(item.itemData?.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
+
+                let plateStr = item.itemData?.plate ? `<span class="license-plate" style="font-size:9.5px; padding:1px 5px;">${item.itemData.plate}</span>` : '';
+                let tuningObj = item.itemData?.tuning || {};
+                let tuningCount = Object.keys(tuningObj).length;
+                let tuningDesc = tuningCount > 0 ? `⚡ Тюнинг (модификаций: ${tuningCount})` : '📦 Стоковое состояние';
+
+                descText = `Мощность: <b>${item.itemData?.power || 100} л.с.</b> • Кузов: ${item.itemData?.condition || 85}%<br>${tuningDesc}`;
+
+                imgBlockHtml = `
+                    <div class="car-img-wrap mb-2" style="height:110px; position:relative; border-radius:10px; overflow:hidden;">
+                        <img src="${carImg}" class="car-img" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
+                        <div class="badge-tag badge-tl" style="top:6px; left:6px;">${plateStr}</div>
+                        <div class="badge-tag badge-br"><span class="tag-badge bg-tag-cyan">АВТО P2P</span></div>
+                    </div>
+                `;
+            } else {
+                descText = `Официальный лот категории ${item.type.toUpperCase()}`;
+                imgBlockHtml = `
+                    <div class="p-3 mb-2 text-center" style="background:#050914; border-radius:10px; border:1px solid rgba(0, 242, 254, 0.3);">
+                        <b class="color-cyan">${item.name}</b>
+                    </div>
+                `;
+            }
+
+            return `
+                <div onclick="openP2PDealModal('${item.id}')" class="glass-card mb-3 p-2 cursor-pointer" style="border-left: 3px solid var(--green); background:#090e18;">
+                    ${imgBlockHtml}
+                    <div class="flex-between mb-1">
+                        <div>
+                            <b class="text-xs color-cyan" style="font-size:12px;">${item.name}</b>
+                            <div class="sub-label" style="font-size:8.5px;">Продавец: <b class="color-amber">${item.sellerName || 'Игрок'}</b></div>
+                        </div>
+                        <span class="price-val text-xs color-green">${Number(item.price).toLocaleString()} ₽</span>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:9.5px; color:#cbd5e1; line-height:1.3;">${descText}</div>
+                    ${actionBtn}
+                </div>
+            `;
+        }).join('');
+    },
+
+    selectP2PListingType(type) {
+        this.selectedListingType = type;
+        ['cars', 'plates', 'business', 'housing'].forEach(t => {
+            let elMap = { cars: 'btnP2PTypeCar', plates: 'btnP2PTypePlate', business: 'btnP2PTypeBiz', housing: 'btnP2PTypeHouse' };
+            let btn = document.getElementById(elMap[t]);
+            if (btn) {
+                btn.className = t === type ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
+            }
+        });
+        this.populateP2PItemSelect(type);
+    },
+
+    populateP2PItemSelect(type) {
+        let sel = document.getElementById('p2pItemSelect');
+        if (!sel) return;
+
+        let optionsHtml = '<option value="">-- Выберите объект для продажи --</option>';
+
+        if (type === 'cars' || type === 'car') {
+            let garage = state.garage || [];
+            if (garage.length === 0) {
+                optionsHtml = '<option value="">В гараже нет свободных авто</option>';
+            } else {
+                garage.forEach((car, idx) => {
+                    let plateStr = car.plate ? `[${car.plate}]` : '[Б/Н]';
+                    optionsHtml += `<option value="${idx}">${car.name || 'Авто'} ${plateStr} — Мощность: ${car.power || 100} л.с.</option>`;
+                });
+            }
+        } else if (type === 'plates' || type === 'plate') {
+            let plates = state.ownedPlates || ['А777АА 77', 'О777ОО 77'];
+            plates.forEach((plate, idx) => {
+                optionsHtml += `<option value="${idx}">Госномер: ${plate}</option>`;
+            });
+        } else if (type === 'business') {
+            let bizList = state.businesses || [];
+            bizList.forEach((b, idx) => {
+                optionsHtml += `<option value="${b.id || idx}">${b.name || 'Бизнес'} (Ур. ${b.level || 1})</option>`;
+            });
+        } else if (type === 'housing') {
+            let houses = state.player?.ownedHouses || ['gsk_box'];
+            houses.forEach((h, idx) => {
+                optionsHtml += `<option value="${h}">Объект недвижимости: ${h}</option>`;
+            });
+        }
+
+        sel.innerHTML = optionsHtml;
+    },
+
+    onP2PItemSelected(val) {
+        let priceInput = document.getElementById('p2pPriceInput');
+        if (!priceInput || val === "") return;
+
+        if (this.selectedListingType === 'cars') {
+            let car = (state.garage || [])[parseInt(val, 10)];
+            if (car) {
+                priceInput.value = Math.round((car.price || car.marketValue || 150000) * 1.15);
+            }
+        } else if (this.selectedListingType === 'plates') {
+            priceInput.value = 500000;
+        } else if (this.selectedListingType === 'business') {
+            priceInput.value = 1000000;
+        } else if (this.selectedListingType === 'housing') {
+            priceInput.value = 1500000;
+        }
+    },
+
+    confirmCreateP2PListing() {
+        let sel = document.getElementById('p2pItemSelect');
+        let priceInput = document.getElementById('p2pPriceInput');
+        if (!sel || !priceInput) return;
+
+        let val = sel.value;
+        let price = parseInt(priceInput.value, 10);
+
+        if (val === "" || isNaN(price) || price <= 500) {
+            return showToast("Выберите объект и укажите корректную стоимость!");
+        }
+
+        if (!state.p2pMarketListings) state.p2pMarketListings = [];
+
+        let type = this.selectedListingType;
+        let newListing = {
+            id: "p2p_item_" + Date.now(),
+            sellerName: state.player?.name || 'Перекуп #777',
+            type: type,
+            price: price,
+            itemData: {}
+        };
+
+        if (type === 'cars') {
+            let idx = parseInt(val, 10);
+            let car = state.garage[idx];
+            if (!car) return showToast("Автомобиль не найден в гараже!");
+
+            newListing.name = car.name;
+            newListing.itemData = Object.assign({}, car);
+            
+            state.garage.splice(idx, 1);
+            if (typeof renderGarage === 'function') renderGarage();
+        } else if (type === 'plates') {
+            let plates = state.ownedPlates || ['А777АА 77'];
+            let plateStr = plates[parseInt(val, 10)] || 'В777ВВ 77';
+            newListing.name = `Госномер ${plateStr}`;
+            newListing.itemData = { plate: plateStr };
+            
+            state.ownedPlates = plates.filter((_, i) => i !== parseInt(val, 10));
+        } else if (type === 'business') {
+            newListing.name = `Бизнес (${val})`;
+            newListing.itemData = { bizId: val, level: 2, income: 2500 };
+        } else if (type === 'housing') {
+            newListing.name = `Недвижимость (${val})`;
+            newListing.itemData = { houseId: val, slots: 2 };
+        }
+
+        state.p2pMarketListings.unshift(newListing);
+        saveState();
+        updateHeaderUI();
+        
+        if (typeof ModalManager !== 'undefined') {
+            ModalManager.close('modalCreateP2P');
+        } else {
+            let m = document.getElementById('modalCreateP2P');
+            if (m) m.classList.remove('active');
+        }
+
+        showToast("Лот успешно выставлен на онлайн-биржу! ☁️");
+        this.renderMarketScreen(document.getElementById('mHubSubContentBox'));
+    },
+
+    cancelP2PListing(lotId) {
+        state.p2pMarketListings = (state.p2pMarketListings || []).filter(l => l.id !== lotId);
+        saveState();
+        showToast("Лот снят с P2P биржи.");
+        this.renderMarketScreen(document.getElementById('mHubSubContentBox'));
+    },
+
+    // ========================================================
     // 3. ВКЛАДКА: «АВТОКЛУБЫ»
     // ========================================================
     renderClubsScreen(container) {
         if (!container) return;
-
         let myClub = state.player?.club;
         let pLvl = state.player?.level || 1;
 
@@ -703,10 +775,7 @@ const AppM = {
                     + Создать клуб
                 </button>
             </div>
-
-            <div class="space-y-1">
-                ${clubListHtml}
-            </div>
+            <div class="space-y-1">${clubListHtml}</div>
         `;
     },
 
@@ -837,47 +906,24 @@ const AppM = {
         saveState();
         updateHeaderUI();
 
-        let hotCar = null;
-
-        if (pLvl < 4) {
-            hotCar = {
-                id: "insider_" + Date.now(),
-                name: "ВАЗ-2106 «Шаха» (Дрифт-Спек от друга)",
-                power: 95,
-                type: "economy",
-                drivetrain: "rwd",
-                basePrice: 110000,
-                price: 65000,
-                baseMarketValue: 120000,
-                marketValue: 125000,
-                img: "assets/cars/economy/2106/vaz-2106.jpg",
-                fallback: "assets/cars/economy/2101/vaz-2101.jpg",
-                plate: "О777ЕЕ 77",
-                condition: 86,
-                wear: { engine: 88, transmission: 90 },
-                tuning: { chip: 1, weldedDiff: true, steeringAngle: true, risk1251: 0 },
-                purchaseCost: 65000
-            };
-        } else {
-            hotCar = {
-                id: "insider_" + Date.now(),
-                name: "Toyota Mark II JZX90 (Инсайд от напарника)",
-                power: 180,
-                type: "comfort",
-                drivetrain: "rwd",
-                basePrice: 450000,
-                price: 260000,
-                baseMarketValue: 450000,
-                marketValue: 450000,
-                img: "assets/cars/comfort/golf6/golf6.jpg",
-                fallback: "assets/cars/economy/2101/vaz-2101.jpg",
-                plate: "В777ВВ 77",
-                condition: 82,
-                wear: { engine: 85, transmission: 85 },
-                tuning: { chip: 1, weldedDiff: true, steeringAngle: true, risk1251: 0 },
-                purchaseCost: 260000
-            };
-        }
+        let hotCar = {
+            id: "insider_" + Date.now(),
+            name: "Toyota Mark II JZX90 (Инсайд от напарника)",
+            power: 180,
+            type: "comfort",
+            drivetrain: "rwd",
+            basePrice: 450000,
+            price: 260000,
+            baseMarketValue: 450000,
+            marketValue: 450000,
+            img: "assets/cars/comfort/golf6/golf6.jpg",
+            fallback: "assets/cars/economy/2101/vaz-2101.jpg",
+            plate: "В777ВВ 77",
+            condition: 82,
+            wear: { engine: 85, transmission: 85 },
+            tuning: { chip: 1, weldedDiff: true, steeringAngle: true, risk1251: 0 },
+            purchaseCost: 260000
+        };
 
         if (!state.marketFeed) state.marketFeed = [];
         state.marketFeed.unshift(hotCar);
@@ -957,9 +1003,6 @@ const AppM = {
         `;
     },
 
-    // --------------------------------------------------------
-    // СИНХРОНИЗАЦИЯ СЛОТОВ ПЛОЩАДКИ ПРОДАЖ В СООБЩЕНИЯ
-    // --------------------------------------------------------
     syncSalesLotBuyersToMessages() {
         if (!state.player) state.player = {};
         if (!state.player.phoneMessages) state.player.phoneMessages = [];
@@ -1005,8 +1048,10 @@ const AppM = {
         if (typeof ModalManager !== 'undefined') {
             ModalManager.open('modalCreateP2P');
         } else {
-            showToast("Откройте гараж для выставления автомобиля!");
+            let m = document.getElementById('modalCreateP2P');
+            if (m) m.classList.add('active');
         }
+        this.selectP2PListingType('cars');
     }
 };
 
