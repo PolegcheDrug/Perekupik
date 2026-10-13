@@ -1,9 +1,10 @@
 // ========================================================
-// js/phone-bank.js — БАНК «ВО-БАНК ОНЛАЙН» (v2.1.0)
+// js/phone-bank.js — БАНК «ВО-БАНК ОНЛАЙН» (v2.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
-// Восстановлено электронное табло курсов валют и крипты,
-// конвертер Stars/RUB, вклады с капитализацией, кредиты и ипотека.
+// Электронное табло курсов валют, конвертер Stars/RUB,
+// кредитная линейка перекупа для перехода в Комфорт,
+// депозитный сейф и история транзакций.
 // ========================================================
 
 const AppBank = {
@@ -99,8 +100,10 @@ const AppBank = {
             resultVal = inputVal * 100000;
         }
 
+        const superWheelStars = window.WHEEL_CONFIG?.superWheel?.costStars || 60;
+
         container.innerHTML = `
-            <!-- ВОССТАНОВЛЕННОЕ ТАБЛО КУРСОВ ВАЛЮТ ЦБ & БИРЖИ -->
+            <!-- ТАБЛО КУРСОВ ВАЛЮТ ЦБ & БИРЖИ -->
             <div class="glass-card mb-2 p-2" style="background:#050914; border:1px solid rgba(0, 242, 254, 0.35);">
                 <div class="flex-between mb-1">
                     <span class="sub-label font-bold" style="font-size:8.5px; color:#94a3b8;"><i class="fa-solid fa-chart-line color-cyan mr-1"></i> ТАБЛО КОТИРОВОК ЦБ РФ & КРИПТОВАЛЮТ</span>
@@ -198,14 +201,14 @@ const AppBank = {
                 </button>
             </div>
 
-            <!-- ПОКУПКА БИЛЕТОВ СУПЕР ВИЛСПИНА -->
+            <!-- ПОКУПКА БИЛЕТОВ СУПЕР ВИЛСПИНА С ОБНОВЛЕННОЙ СТОИМОСТЬЮ -->
             <div class="glass-card p-2 flex-between" style="border-left: 3px solid var(--green); background:#090e18;">
                 <div>
                     <div class="font-bold text-xs color-green"><i class="fa-solid fa-ticket-simple mr-1"></i> Билет «Супер Вилспин»</div>
                     <div class="sub-label" style="font-size:8.5px;">На балансе: <b>${superSpinTickets} шт.</b></div>
                 </div>
                 <button onclick="AppBank.buySuperSpinTicketAction()" class="btn btn-green btn-auto btn-sm font-bold" style="font-size:9.5px; padding:5px 10px;">
-                    КУПИТЬ (300K + 30 ⭐)
+                    КУПИТЬ (150K или ${superWheelStars} ⭐)
                 </button>
             </div>
         `;
@@ -282,18 +285,22 @@ const AppBank = {
     },
 
     buySuperSpinTicketAction() {
+        const starCost = window.WHEEL_CONFIG?.superWheel?.costStars || 60;
         let cash = state.player?.cash || 0;
         let stars = state.player?.stars || 0;
 
-        if (cash < 300000) return showToast("Нужно 300,000 ₽ на покупку билета!");
-        if (stars < 30) return showToast("Нужно 30 Stars ⭐ на покупку билета!");
+        if (cash >= 150000) {
+            state.player.cash -= 150000;
+        } else if (stars >= starCost) {
+            state.player.stars -= starCost;
+        } else {
+            return showToast(`Нужно 150,000 ₽ или ${starCost} Stars ⭐ на покупку билета!`);
+        }
 
-        state.player.cash -= 300000;
-        state.player.stars -= 30;
         state.player.superSpinTickets = (state.player.superSpinTickets || 0) + 1;
 
         if (typeof logBankTransaction === 'function') {
-            logBankTransaction(`Покупка билета Супер Вилспин`, 300000, false);
+            logBankTransaction(`Покупка билета Супер Вилспин`, 150000, false);
         }
 
         saveState();
@@ -420,31 +427,68 @@ const AppBank = {
         `;
     },
 
+    // --------------------------------------------------------
+    // УМНАЯ КРЕДИТНАЯ ЛИНЕЙКА ДЛЯ ПЕРЕХОДА В КОМФОРТ
+    // --------------------------------------------------------
     renderLoanScreen(container) {
         if (!container) return;
         let debt = state.player?.loanDebt || 0;
+        let lvl = state.player?.level || 1;
+
+        let options = [
+            { id: "starter", title: "Стартовый овердрафт", amount: 150000, repay: 165000, minLvl: 1, desc: "Быстрый выкуп первой классики под ремонт" },
+            { id: "comfort", title: "Займ «Шаг в Комфорт»", amount: 500000, repay: 550000, minLvl: 4, desc: "Хватает на покупку Solaris или Focus на авторынке" },
+            { id: "pro", title: "Бизнес-кредит перекупа", amount: 1500000, repay: 1680000, minLvl: 8, desc: "Оптовый выкуп автопарков и редких янгтаймеров" }
+        ];
+
+        let loanCardsHtml = options.map(opt => {
+            let isLocked = lvl < opt.minLvl;
+            return `
+                <div class="glass-card p-2 mb-2" style="background:#070b14; border-color:${isLocked ? 'rgba(255,255,255,0.06)' : 'var(--cyan)'};">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan">${opt.title}</b>
+                        <b class="price-val color-green text-xs">+${opt.amount.toLocaleString()} ₽</b>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:9px;">${opt.desc} • К возврату: <b>${opt.repay.toLocaleString()} ₽</b></div>
+                    <button onclick="AppBank.takeTierLoanAction(${opt.amount}, ${opt.repay})" class="btn ${isLocked ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm w-full" ${isLocked || debt > 0 ? 'disabled' : ''}>
+                        ${isLocked ? `🔒 С ${opt.minLvl} уровня` : (debt > 0 ? 'Есть активный долг' : 'Оформить займ')}
+                    </button>
+                </div>
+            `;
+        }).join('');
+
         container.innerHTML = `
-            <div class="glass-card mb-2 p-3 text-center" style="background:#090e18;">
+            <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(255,51,102,0.12), #090e18); border-color: ${debt > 0 ? 'var(--red)' : 'var(--border-glass)'};">
                 <span class="sub-label text-xs">Текущая задолженность по кредиту:</span>
-                <div class="price-val color-red my-1" style="font-size:22px;">${debt.toLocaleString()} ₽</div>
-                <div class="sub-label" style="font-size:8.5px;">Ставка: 2% в полночь на остаток долга</div>
+                <div class="price-val ${debt > 0 ? 'color-red' : 'color-green'} my-1" style="font-size:22px;">${debt.toLocaleString()} ₽</div>
+                <div class="sub-label" style="font-size:8.5px;">Начисление: 2% в полночь на остаток задолженности</div>
             </div>
+
             ${debt > 0 ? `
-                <button onclick="AppBank.repayLoanAction()" class="btn btn-green w-full font-bold">Погасить кредит (${debt.toLocaleString()} ₽)</button>
-            ` : `
-                <button onclick="AppBank.takeLoanAction()" class="btn btn-cyan w-full font-bold">Взять быстрый займ (500,000 ₽)</button>
-            `}
+                <button onclick="AppBank.repayLoanAction()" class="btn btn-green w-full font-bold mb-3">
+                    Погасить долг (${debt.toLocaleString()} ₽) ✓
+                </button>
+            ` : ''}
+
+            <div class="sub-label mb-1" style="font-size:9.5px;">Доступные кредитные программы Во-Банка:</div>
+            ${loanCardsHtml}
         `;
     },
 
-    takeLoanAction() {
+    takeTierLoanAction(amount, repayAmount) {
         if ((state.player?.loanDebt || 0) > 0) return showToast("У вас уже есть непогашенный займ!");
-        state.player.cash = (state.player.cash || 0) + 500000;
-        state.player.loanDebt = 550000;
+        state.player.cash = (state.player.cash || 0) + amount;
+        state.player.loanDebt = repayAmount;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Зачисление кредита`, amount, true);
+        }
+
         saveState();
         updateHeaderUI();
         playSound('win');
-        showToast("Кредит 500,000 ₽ зачислен на баланс!");
+        tgHaptic('success');
+        showToast(`Кредит ${amount.toLocaleString()} ₽ зачислен на баланс!`);
         this.renderLoanScreen(document.getElementById('bankSubContentBox'));
     },
 
@@ -455,9 +499,15 @@ const AppBank = {
 
         state.player.cash -= debt;
         state.player.loanDebt = 0;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Полное погашение кредита`, debt, false);
+        }
+
         saveState();
         updateHeaderUI();
         playSound('win');
+        tgHaptic('success');
         showToast("Кредит полностью закрыт!");
         this.renderLoanScreen(document.getElementById('bankSubContentBox'));
     },
@@ -467,8 +517,8 @@ const AppBank = {
         container.innerHTML = `
             <div class="glass-card text-center sub-label py-6">
                 <i class="fa-solid fa-house-chimney color-teal mb-2" style="font-size:26px;"></i>
-                <div>Ипотечные программы доступны для коттеджей и пентхаусов.</div>
-                <div class="text-xs mt-1">Ознакомьтесь с объектами в приложении «Жильё».</div>
+                <div>Ипотечные программы доступны для коттеджей, боксов и пентхаусов.</div>
+                <div class="text-xs mt-1">Ознакомьтесь с объектами в приложении «Жильё & Боксы».</div>
             </div>
         `;
     }

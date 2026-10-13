@@ -1,5 +1,8 @@
 // ========================================================
-// js/market-deal.js — ЗВОНКИ, ВСТРЕЧА У КАПОТА И ТОРГ
+// js/market-deal.js — ЗВОНКИ, ВСТРЕЧА У КАПОТА И ТОРГ (v3.6.0)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
+// Интеграция P2P биржи и звонков в единое окно чата/торга M+
 // ========================================================
 
 let pendingMarketCar = null;
@@ -11,7 +14,15 @@ function initiateBuyMarketCar(carId) {
         buyCallTimeoutTimer = null;
     }
 
-    const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
+    // Проверяем, это лот с P2P биржи (state.p2pMarketListings) или обычный рынок (state.marketFeed)
+    let p2pItem = (state.p2pMarketListings || []).find(l => l && l.id === carId);
+    if (p2pItem) {
+        // Открываем точно такой же интерфейс чата/торга как в M+ Hub для P2P лотов
+        openP2PDealModal(p2pItem);
+        return;
+    }
+
+    const carIndex = (state.marketFeed || []).findIndex(c => c && c.id === carId);
     if (carIndex === -1) return;
     const car = state.marketFeed[carIndex];
     car.viewed = true;
@@ -72,12 +83,185 @@ function initiateBuyMarketCar(carId) {
     }, 700);
 }
 
+// ========================================================
+// js/market-deal.js — ЕДИНОЕ ОКНО ТОРГА ДЛЯ P2P БИРЖИ
+// ========================================================
+
+function openP2PDealModal(p2pId) {
+    let p2pItem = (state.p2pMarketListings || []).find(l => l && l.id === p2pId);
+    if (!p2pItem) return showToast("Лот не найден на бирже!");
+
+    if (!state.player) state.player = {};
+    if (!state.player.phoneMessages) state.player.phoneMessages = [];
+
+    let dialogId = `p2p_deal_${p2pItem.id}`;
+    let existingMsg = state.player.phoneMessages.find(m => m.id === dialogId);
+
+    let askingPrice = p2pItem.price || 100000;
+    let initialOffer = p2pItem.currentOffer || Math.round(askingPrice * 0.85);
+
+    if (!existingMsg) {
+        existingMsg = {
+            id: dialogId,
+            category: 'p2p_market',
+            sender: `${p2pItem.sellerName || 'Игрок P2P'}`,
+            time: "Сейчас",
+            unread: false,
+            viewed: true,
+            isP2PMarket: true,
+            p2pId: p2pItem.id,
+            carData: {
+                name: p2pItem.name || 'Имущество P2P',
+                img: p2pItem.itemData?.img || p2pItem.img || "assets/cars/economy/2101/vaz-2101.jpg",
+                type: p2pItem.type || 'economy',
+                price: askingPrice
+            },
+            askingPrice: askingPrice,
+            offerPrice: initialOffer,
+            patience: p2pItem.patience !== undefined ? p2pItem.patience : 4,
+            maxPatience: 4,
+            chatHistory: [
+                { from: 'them', text: `Здорово! Пишу по объявлению на «${p2pItem.name}». Готов обсудить условия сделки.` }
+            ]
+        };
+        state.player.phoneMessages.unshift(existingMsg);
+    }
+
+    saveState();
+
+    // Переходим в приложение M+ прямо на экран этого диалога, точь-в-точь как с NPC
+    if (typeof switchTab === 'function') switchTab('tabPhone');
+    setTimeout(() => {
+        if (typeof PhoneManager !== 'undefined') {
+            PhoneManager.openApp('m');
+        }
+        if (typeof AppM !== 'undefined') {
+            AppM.activeTab = 'chats';
+            AppM.activeDialogId = dialogId;
+            let container = document.getElementById('phoneAppContainer');
+            if (container) AppM.render(container);
+        }
+    }, 100);
+}
+
+function executeP2PHaggle(p2pId, percent, failRisk) {
+    let p2pItem = (state.p2pMarketListings || []).find(l => l && l.id === p2pId);
+    if (!p2pItem) return;
+
+    if (p2pItem.patience <= 0) {
+        return showToast("Продавец на бирже отказался продолжать диалог!");
+    }
+
+    p2pItem.patience -= 1;
+    let pctVal = Math.round((p2pItem.patience / 4) * 100);
+
+    let pBar = document.getElementById("p2pPatienceBar");
+    let pLabel = document.getElementById("p2pPatienceLabel");
+    if (pBar) pBar.style.width = `${pctVal}%`;
+    if (pLabel) pLabel.innerText = `${pctVal}% (${p2pItem.patience} попытки)`;
+
+    let roll = Math.random() * 100;
+    let historyBox = document.getElementById("p2pDynamicChatHistory");
+
+    if (roll < failRisk) {
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('error');
+
+        if (historyBox) {
+            historyBox.innerHTML += `
+                <div class="chat-msg msg-player" style="margin-bottom:6px;">Скидывай ${percent}%, забираю прямо сейчас!</div>
+                <div class="chat-msg msg-seller" style="margin-bottom:6px;">«Много хочешь! Такая цена меня не устраивает.»</div>
+            `;
+        }
+        showToast("Продавец отклонил предложение по скидке!");
+    } else {
+        let asking = p2pItem.price;
+        let discount = Math.round(asking * (percent / 100));
+        p2pItem.currentOffer = Math.max(Math.round(asking * 0.5), p2pItem.currentOffer - discount);
+
+        let offerEl = document.getElementById("p2pCurOfferVal");
+        let btnTextEl = document.getElementById("p2pBtnOfferText");
+        let formatted = Number(p2pItem.currentOffer).toLocaleString();
+        if (offerEl) offerEl.innerText = `${formatted} ₽`;
+        if (btnTextEl) btnTextEl.innerText = formatted;
+
+        if (historyBox) {
+            historyBox.innerHTML += `
+                <div class="chat-msg msg-player" style="margin-bottom:6px;">Давай подвинься на ${percent}%, оформляем сделку на бирже!</div>
+                <div class="chat-msg msg-seller" style="margin-bottom:6px;">«Ладно, уступаю в цене, забирай за ${formatted} ₽ 🤝»</div>
+            `;
+        }
+
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast("Успешный торг! Цена лота на бирже снижена.");
+    }
+
+    let scrollBox = document.getElementById("p2pChatScrollBox");
+    if (scrollBox) scrollBox.scrollTop = scrollBox.scrollHeight;
+
+    saveState();
+}
+
+function finalizeP2PDeal(p2pId) {
+    let p2pItem = (state.p2pMarketListings || []).find(l => l && l.id === p2pId);
+    if (!p2pItem) return;
+
+    let finalPrice = p2pItem.currentOffer || p2pItem.price;
+    let cash = state.player?.cash || 0;
+
+    if (cash < finalPrice) {
+        return showToast(`Не хватает денег! Нужно: ${Number(finalPrice).toLocaleString()} ₽`);
+    }
+
+    state.player.cash -= finalPrice;
+
+    if (p2pItem.type === 'cars' || p2pItem.type === 'car') {
+        if (!state.garage) state.garage = [];
+        state.garage.push(Object.assign({}, p2pItem.itemData, { id: "p2p_" + Date.now(), purchaseCost: finalPrice }));
+        if (typeof renderGarage === 'function') renderGarage();
+    } else if (p2pItem.type === 'plates' || p2pItem.type === 'plate') {
+        if (!state.ownedPlates) state.ownedPlates = [];
+        state.ownedPlates.push(p2pItem.itemData?.plate || p2pItem.name);
+    } else if (p2pItem.type === 'business') {
+        let biz = (state.businesses || []).find(b => b.id === (p2pItem.itemData?.bizId || p2pItem.id));
+        if (biz) {
+            biz.level = Math.max(biz.level || 0, p2pItem.itemData?.level || 1);
+            biz.stock = 100;
+        }
+    } else if (p2pItem.type === 'housing') {
+        let hId = p2pItem.itemData?.houseId || 'gsk_box';
+        if (!state.player.ownedHouses) state.player.ownedHouses = [];
+        if (!state.player.ownedHouses.includes(hId)) state.player.ownedHouses.push(hId);
+        state.player.housingId = hId;
+        state.player.housingType = 'own';
+    }
+
+    state.p2pMarketListings = (state.p2pMarketListings || []).filter(l => l.id !== p2pId);
+    saveState();
+    updateHeaderUI();
+    ModalManager.close("modalMarketDeal");
+    
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+
+    if (typeof openVerdictModal === 'function') {
+        openVerdictModal("P2P СДЕЛКА ЗАКРЫТА! 🤝", `Вы выторговали и выкупили «${p2pItem.name}» за ${Number(finalPrice).toLocaleString()} ₽!`, true, finalPrice);
+    } else {
+        showToast("Сделка на бирже успешно закрыта!");
+    }
+
+    if (typeof AppM !== 'undefined' && AppM.renderMarketScreen) {
+        AppM.renderMarketScreen(document.getElementById('mHubSubContentBox'));
+    }
+}
+
 function paidCallMarketCar(carId) {
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
     if (cash < 1000) return showToast("Не хватает 1,000 ₽ на приоритетный дозвон!");
     state.player.cash -= 1000;
     
-    const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
+    const carIndex = (state.marketFeed || []).findIndex(c => c && c.id === carId);
     if (carIndex === -1) return;
     const car = state.marketFeed[carIndex];
 
@@ -91,7 +275,7 @@ function paidCallMarketCar(carId) {
 }
 
 function openMarketDeal(carId) {
-    const carIndex = state.marketFeed.findIndex(c => c && c.id === carId);
+    const carIndex = (state.marketFeed || []).findIndex(c => c && c.id === carId);
     if (carIndex === -1) return;
     const car = state.marketFeed[carIndex];
     pendingMarketCar = { car: car, carIndex: carIndex };
@@ -172,10 +356,6 @@ function startMarketTestDrive(carId) {
         driveResults.push("Сцепление схватывает чётко, передачи включаются плавно.");
     }
 
-    if (car.bodyThickness?.doors > 200 || car.bodyThickness?.hood > 200) {
-        driveResults.push("На кочках в салоне поскрипывает кузов.");
-    }
-
     if (thread) {
         thread.innerHTML += `
             <div class="chat-msg msg-player">«Давай сделаем тестовый заезд вокруг квартала, послушаем подвеску и мотор.»</div>
@@ -248,7 +428,7 @@ function renderMarketHaggleControls() {
         <button onclick="attemptDefectArgueHaggle()" class="btn btn-purple btn-sm w-full mb-2">
             🔍 Ткнуть в ошибку ${car.hiddenDefect.code || 'DTC'}: -15% цены (Риск: 25%)
         </button>`;
-    } else if (car.gaugeChecked && (car.bodyThickness.doors > 200 || car.bodyThickness.hood > 200)) {
+    } else if (car.gaugeChecked && (car.bodyThickness?.doors > 200 || car.bodyThickness?.hood > 200)) {
         inspectionBonusBtn = `
         <button onclick="attemptPaintArgueHaggle()" class="btn btn-amber btn-sm w-full mb-2">
             🎨 Показать слой шпаклёвки на приборе (>200 мкм): -10% цены (Риск: 20%)
@@ -271,17 +451,17 @@ function renderMarketHaggleControls() {
         ${inspectionBonusBtn}
 
         <div class="grid-3 mb-1">
-            <button onclick="attemptMarketHaggle(5, 15)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                <div class="font-bold color-green text-xs">-5% скидка</div>
-                <div class="sub-label" style="font-size:8px;">Риск: 15%</div>
+            <button onclick="attemptMarketHaggle(5, 12)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                <div class="font-bold color-green text-xs">-5% на дорогу</div>
+                <div class="sub-label" style="font-size:8px;">Риск: 12%</div>
             </button>
-            <button onclick="attemptMarketHaggle(10, 35)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+            <button onclick="attemptMarketHaggle(10, 30)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
                 <div class="font-bold color-amber text-xs">-10% по факту</div>
-                <div class="sub-label" style="font-size:8px;">Риск: 35%</div>
+                <div class="sub-label" style="font-size:8px;">Риск: 30%</div>
             </button>
-            <button onclick="attemptMarketHaggle(18, 65)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+            <button onclick="attemptMarketHaggle(18, 60)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
                 <div class="font-bold color-red text-xs">-18% жестко</div>
-                <div class="sub-label" style="font-size:8px;">Риск: 65%</div>
+                <div class="sub-label" style="font-size:8px;">Риск: 60%</div>
             </button>
         </div>`;
 }
@@ -448,6 +628,9 @@ function attemptMarketHaggle(percent, failRisk = 25) {
 
 Object.assign(window, {
     initiateBuyMarketCar,
+    openP2PDealModal,
+    executeP2PHaggle,
+    finalizeP2PDeal,
     paidCallMarketCar,
     openMarketDeal,
     startMarketTestDrive,

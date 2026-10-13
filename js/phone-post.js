@@ -1,5 +1,5 @@
 // ========================================================
-// js/phone-post.js — ПОЧТА & СКЛАДСКОЙ ХАБ ПЕРЕКУПА (v0.9.4)
+// js/phone-post.js — ПОЧТА & СКЛАДСКОЙ ХАБ ПЕРЕКУПА (v0.9.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // 2 раздела:
 // 1. «Почта / Доставка» — распаковка ВСЕХ ресурсов и авто с записью в банк!
@@ -107,15 +107,12 @@ const AppPost = {
 
         if (mail.length === 0) {
             container.innerHTML = 
-                '<div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.12), #090e18);">' +
-                    '<div style="font-size:32px; margin-bottom:6px;">📭</div>' +
-                    '<b class="text-xs color-cyan block mb-1">Почтовый ящик пуст</b>' +
-                    '<div class="sub-label mb-3" style="font-size:9.5px;">' +
-                        'Сюда поступают посылки из СуперВилспина, Находок в сараях, Ежедневных наград и сети «M».' +
+                '<div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.12), #090e18); border-color: rgba(0, 242, 254, 0.25);">' +
+                    '<div style="font-size:36px; margin-bottom:8px;">📭</div>' +
+                    '<b class="text-xs color-cyan block mb-1" style="font-size:13px;">Почтовый ящик пуст</b>' +
+                    '<div class="sub-label" style="font-size:10px; line-height:1.4; color:#94a3b8;">' +
+                        'Сюда поступают посылки из СуперВилспина, находок в сараях, грузы из Порта, ежедневные награды и покупки из сети «M+».' +
                     '</div>' +
-                    '<button onclick="AppPost.generateTestStarterMail()" class="btn btn-dark btn-sm btn-auto" style="font-size:9.5px;">' +
-                        '📦 Получить тестовую посылку' +
-                    '</button>' +
                 '</div>';
             return;
         }
@@ -518,24 +515,6 @@ const AppPost = {
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
         showToast("Вместимость склада увеличена до " + state.player.warehouse.maxCars + " мест!");
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    generateTestStarterMail: function() {
-        this.ensureDataStructures();
-        state.player.mailbox.push({
-            id: "mail_test_" + Date.now(),
-            type: "cash",
-            title: "Премиальный грант",
-            sender: "Служба доставки",
-            desc: "Приветственный бонус от синдиката автоперекупов!",
-            amount: 50000,
-            badge: "БОНУС",
-            date: "Только что",
-            claimed: false
-        });
-        saveState();
-        if (typeof playSound === 'function') playSound('win');
         this.render(document.getElementById('phoneAppContainer'));
     }
 };

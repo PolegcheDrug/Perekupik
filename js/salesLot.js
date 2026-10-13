@@ -1,5 +1,5 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v2.2.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v2.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
 // 1. На карточке лота только 2 кнопки: ТОРГ (или Открыть M+) и ОТКАЗ
@@ -306,7 +306,7 @@ function renderBuyerCardActions(lot, idx) {
 
 function generateRandomLotBuyer(car, askingPrice) {
     const archetype = BUYER_ARCHETYPES[Math.floor(Math.random() * BUYER_ARCHETYPES.length)];
-    const discountRatio = 0.83 + Math.random() * 0.11;
+    const discountRatio = 0.82 + Math.random() * 0.12;
     const offeredPrice = Math.round(askingPrice * discountRatio);
     const isOnlineChat = Math.random() < 0.40;
 
@@ -430,19 +430,19 @@ function renderLotHoodHaggleModalContent() {
     } else {
         actionButtonsGrid = `
             <div class="grid-3 mb-2" style="gap:4px;">
-                <button onclick="executeModalHaggleStep(5, 15)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                    <div class="font-bold color-green text-xs" style="font-size:9.5px;">-5% СКИДКА</div>
-                    <div class="sub-label" style="font-size:7.5px;">РИСК: 15%</div>
+                <button onclick="executeModalHaggleStep(4, 12)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                    <div class="font-bold color-green text-xs" style="font-size:9.5px;">-4% НА ДОРОГУ</div>
+                    <div class="sub-label" style="font-size:7.5px;">РИСК: 12%</div>
                 </button>
 
-                <button onclick="executeModalHaggleStep(10, 35)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                    <div class="font-bold color-amber text-xs" style="font-size:9.5px;">-10% ПО ФАКТУ</div>
-                    <div class="sub-label" style="font-size:7.5px;">РИСК: 35%</div>
+                <button onclick="executeModalHaggleStep(8, 30)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                    <div class="font-bold color-amber text-xs" style="font-size:9.5px;">-8% ПО ФАКТУ</div>
+                    <div class="sub-label" style="font-size:7.5px;">РИСК: 30%</div>
                 </button>
 
-                <button onclick="executeModalHaggleStep(18, 65)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                    <div class="font-bold color-red text-xs" style="font-size:9.5px;">-18% ЖЕСТКО</div>
-                    <div class="sub-label" style="font-size:7.5px;">РИСК: 65%</div>
+                <button onclick="executeModalHaggleStep(15, 60)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                    <div class="font-bold color-red text-xs" style="font-size:9.5px;">-15% ЖЕСТКО</div>
+                    <div class="sub-label" style="font-size:7.5px;">РИСК: 60%</div>
                 </button>
             </div>
         `;
@@ -822,7 +822,7 @@ function reclaimCarFromLot(idx) {
 
 function buyGarageSlot() {
     let slots = state.player?.garageSlots || 2;
-    let cost = 150000 + (slots - 2) * 200000;
+    let cost = 120000 + (slots - 2) * 160000;
 
     let cash = state.player?.cash || 0;
     if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ на расширение бокса!`);
@@ -839,7 +839,7 @@ function buyGarageSlot() {
 
 function upgradeExpressCapacity() {
     let cap = state.player?.maxExpressTickets || 25;
-    let cost = 75000;
+    let cost = 65000;
 
     let cash = state.player?.cash || 0;
     if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ на расширение квоты талонов!`);

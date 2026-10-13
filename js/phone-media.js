@@ -1,9 +1,9 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v1.1.0)
+// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v1.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Реальные онлайн-потоки Радио Рекорд & Record Rock (HTTPS Live),
 // Уличные азартные «Напёрстки» с живым перемешиванием вместо Колеса,
-// полноформатный Супервилспин (все призы отправляются в Почту!)
+// полноформатный Супервилспин с обновленной экономикой (+50 звёзд)
 // ========================================================
 
 const PhoneMedia = {
@@ -314,6 +314,8 @@ const PhoneMedia = {
     renderSuperSpinContent(box, tickets, canFreeSuperSpin) {
         if (!box) return;
 
+        const starCost = (window.WHEEL_CONFIG?.superWheel?.costStars) || 60;
+
         let spinBtnText = "";
         let spinBtnClass = "btn btn-amber w-full";
         let isBtnDisabled = false;
@@ -329,7 +331,7 @@ const PhoneMedia = {
             spinBtnText = `КРУТИТЬ (Осталось билетов: ${tickets} 🎟️)`;
             spinBtnClass = "btn btn-amber w-full";
         } else {
-            spinBtnText = "КУПИТЬ БИЛЕТ (150,000 ₽ или 10 ⭐)";
+            spinBtnText = `КУПИТЬ СПИН (150,000 ₽ или ${starCost} ⭐)`;
             spinBtnClass = "btn btn-purple w-full";
         }
 
@@ -374,17 +376,25 @@ const PhoneMedia = {
                     <div class="sub-label" style="font-size:9px;">На балансе: <b>${tickets} шт</b></div>
                 </div>
                 <button onclick="PhoneMedia.buySuperSpinTicket()" class="btn btn-dark btn-sm btn-auto" ${this.isSuperSpinning ? 'disabled' : ''}>
-                    +1 Билет (150k ₽)
+                    +1 Билет (150k ₽ / ${starCost} ⭐)
                 </button>
             </div>
         `;
     },
 
     buySuperSpinTicket() {
+        const starCost = (window.WHEEL_CONFIG?.superWheel?.costStars) || 60;
         let cash = state.player?.cash || 0;
-        if (cash < 150000) return showToast("Нужно 150,000 ₽ на покупку билета!");
+        let stars = state.player?.stars || 0;
 
-        state.player.cash -= 150000;
+        if (cash >= 150000) {
+            state.player.cash -= 150000;
+        } else if (stars >= starCost) {
+            state.player.stars -= starCost;
+        } else {
+            return showToast(`Нужно 150,000 ₽ или ${starCost} ⭐ на покупку билета!`);
+        }
+
         state.player.superSpinTickets = (state.player.superSpinTickets || 0) + 1;
 
         if (typeof logBankTransaction === 'function') {
@@ -402,6 +412,7 @@ const PhoneMedia = {
     startTripleSuperSpin() {
         if (this.isSuperSpinning) return;
 
+        const starCost = (window.WHEEL_CONFIG?.superWheel?.costStars) || 60;
         const curDay = state.player?.day || 1;
         const lastFreeDay = state.player?.lastFreeSuperSpinDay || 0;
         const canFree = lastFreeDay < curDay;
@@ -420,10 +431,10 @@ const PhoneMedia = {
                 if (typeof logBankTransaction === 'function') {
                     logBankTransaction("Оплата спина Супер Вилспина", 150000, false);
                 }
-            } else if (stars >= 10) {
-                state.player.stars -= 10;
+            } else if (stars >= starCost) {
+                state.player.stars -= starCost;
             } else {
-                return showToast("Не хватает 150,000 ₽ или 10 Stars ⭐ для запуска!");
+                return showToast(`Не хватает 150,000 ₽ или ${starCost} Stars ⭐ для запуска!`);
             }
         }
 

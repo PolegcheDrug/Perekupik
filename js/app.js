@@ -1,15 +1,17 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v1.2.0)
+// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v1.2.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Анимированный роллер чисел HUD, жесткий учет инвентаря,
 // Почта и Склад хранения (mailbox & warehouse),
+// неоновые банкноты, билеты СуперВилспина с пульсацией >5 шт,
+// интерактивные окна ограничения уровня с прогресс-баром,
 // авто-миграция локальной базы в Cloud Firestore cars_catalog,
 // темы Cyber Black Neo, кастомные эффекты огня/плазмы,
 // спецзаказы «ПодКлюч», Telegram Cloud Storage, Firestore & Refs.
 // Полная синхронизация с P2P-экосистемой M+ PRO Hub.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v1.2.0";
+const CURRENT_GAME_VERSION = "v1.2.2";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -331,14 +333,14 @@ function extractPrizesFromText(text) {
                 desc: 'Зачислено на баланс игрока',
                 rarity: 'token-green'
             });
-        } else if (trimLine.includes('⭐') || trimLine.toLowerCase().includes('stars')) {
-            let match = trimLine.match(/([+\-]?\d+)\s*(⭐|stars)/i);
+        } else if (trimLine.includes('⭐') || trimLine.toLowerCase().includes('stars') || trimLine.toLowerCase().includes('банкнот')) {
+            let match = trimLine.match(/([+\-]?\d+)\s*(⭐|stars|банкнот)/i);
             tokens.push({
-                icon: '⭐',
-                title: 'Звёзды Stars',
-                value: match ? '+' + match[1] + ' ⭐' : trimLine,
+                icon: '💵',
+                title: 'Неоновые банкноты',
+                value: match ? '+' + match[1] + ' 💵' : trimLine,
                 desc: 'Премиальная валюта перекупа',
-                rarity: 'token-amber'
+                rarity: 'token-green'
             });
         } else if (trimLine.includes('XP') || trimLine.toLowerCase().includes('опыт')) {
             let match = trimLine.match(/([+\-]?\d+)\s*XP/i);
@@ -389,12 +391,12 @@ function extractPrizesFromText(text) {
                 desc: 'Заправка в бензобак',
                 rarity: 'token-cyan'
             });
-        } else if (trimLine.includes('🎟️') || trimLine.toLowerCase().includes('талон')) {
+        } else if (trimLine.includes('🎟️') || trimLine.toLowerCase().includes('талон') || trimLine.toLowerCase().includes('билет')) {
             tokens.push({
                 icon: '🎟️',
-                title: 'Экспресс-талоны',
+                title: 'Экспресс-талоны / Билеты',
                 value: trimLine.replace('🎟️', '').trim(),
-                desc: 'Мгновенный поиск покупателя',
+                desc: 'Талоны ускорения или суперспинов',
                 rarity: 'token-purple'
             });
         }
@@ -402,6 +404,76 @@ function extractPrizesFromText(text) {
 
     return tokens;
 }
+
+// --------------------------------------------------------
+// ИНТЕРАКТИВНОЕ ОКНО БЛОКИРОВКИ ПО УРОВНЮ
+// --------------------------------------------------------
+function openLevelGateModal(appName, reqLevel, customDesc = null) {
+    safePlaySound('error');
+    safeTgHaptic('warning');
+
+    let curLvl = state.player?.level || 1;
+    let curXp = state.player?.xp || 0;
+    let maxXp = state.player?.maxXp || 120;
+    let xpPercent = Math.min(100, Math.round((curXp / maxXp) * 100));
+
+    let modal = document.getElementById('modalLevelGate');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalLevelGate';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    let defaultDesc = `Доступ к разделу <b>«${appName}»</b> открывается перекупам с <b>${reqLevel} уровня авторитета</b>.<br>Зарабатывайте опыт, покупая, восстанавливая и продавая машины на авторынке!`;
+
+    modal.innerHTML = `
+        <div class="modal-box text-center" style="max-width: 410px; border-color: var(--cyan); background: radial-gradient(circle at 50% 0%, #151d2f 0%, #070a10 85%);">
+            <div class="radar-spinner-ring mb-2" style="border-top-color: var(--cyan); border-right-color: var(--purple); margin: 0 auto 10px auto;">
+                <div class="radar-spinner-center" style="font-size:24px;">🔒</div>
+            </div>
+
+            <div class="modal-glow-badge mb-1" style="color:var(--cyan); border-color:var(--cyan); background:rgba(0,242,254,0.1); display:inline-block;">
+                ТРЕБУЕТСЯ УРОВЕНЬ ${reqLevel}
+            </div>
+
+            <h3 class="font-bold mb-1 color-cyan" style="font-size:16px;">${appName}</h3>
+            
+            <p class="sub-label mb-3" style="font-size:11px; line-height:1.45; color:#cbd5e1; padding: 0 6px;">
+                ${customDesc || defaultDesc}
+            </p>
+
+            <!-- ИНТЕРАКТИВНАЯ КАРТОЧКА ПРОГРЕССА АВТОРИТЕТА -->
+            <div class="p-2 mb-3 text-left" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
+                <div class="flex-between text-xs mb-1">
+                    <span class="sub-label">Текущий ранг перекупа:</span>
+                    <b class="color-amber">Уровень ${curLvl} из ${reqLevel}</b>
+                </div>
+
+                <div class="xp-bar-wrap my-1" style="width:100%; height:8px; background:rgba(255,255,255,0.06); border-radius:6px; overflow:hidden;">
+                    <div class="xp-bar-fill" style="width: ${xpPercent}%; height:100%; background: linear-gradient(90deg, var(--cyan), var(--green));"></div>
+                </div>
+
+                <div class="flex-between" style="font-size:9.5px; color:#94a3b8;">
+                    <span>Прогресс до след. ур: ${curXp}/${maxXp} XP</span>
+                    <span class="color-cyan font-bold">${xpPercent}%</span>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <button onclick="ModalManager.close('modalLevelGate'); switchTab('tabMarket');" class="btn btn-cyan btn-sm w-full font-bold">
+                    <i class="fa-solid fa-store mr-1"></i> На авторынок (Качать опыт)
+                </button>
+                <button onclick="ModalManager.close('modalLevelGate')" class="btn btn-dark btn-sm w-full">
+                    Понятно
+                </button>
+            </div>
+        </div>
+    `;
+
+    ModalManager.open('modalLevelGate', { closeOthers: true });
+}
+window.openLevelGateModal = openLevelGateModal;
 
 function openVerdictModal(title, text, isSuccess, amount, profit, customTokens = null) {
     tgHaptic(isSuccess ? 'success' : 'error');
@@ -867,7 +939,7 @@ function buyNickEffectAction(fxId, cost, reqStars = 0) {
     let stars = state.player?.stars || 0;
 
     if (cash < cost) return showToast("Не хватает рублей на покупку эффекта ника!");
-    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+    if (stars < reqStars) return showToast(`Нужно ${reqStars} 💵 банкнот!`);
 
     state.player.cash -= cost;
     state.player.stars -= reqStars;
@@ -902,7 +974,7 @@ function buyAvatarEffectAction(fxId, cost, reqStars = 0) {
     let stars = state.player?.stars || 0;
 
     if (cash < cost) return showToast("Не хватает рублей на покупку ауры аватарки!");
-    if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+    if (stars < reqStars) return showToast(`Нужно ${reqStars} 💵 банкнот!`);
 
     state.player.cash -= cost;
     state.player.stars -= reqStars;
@@ -1637,6 +1709,7 @@ function executeDayCycleMidnight(currentDateObj) {
 function updateHeaderUI() {
     let targetCash = state.player?.cash || 0;
     let targetStars = state.player?.stars || 0;
+    let targetSuperSpinTickets = state.player?.superSpinTickets || 0;
     let fuel = state.player?.fuel !== undefined ? state.player.fuel : 100;
     let tck = state.player?.expressTickets || 0;
     let mTck = state.player?.maxExpressTickets || 25;
@@ -1645,18 +1718,43 @@ function updateHeaderUI() {
     let conn = state.player?.connections || 0;
     let karma = Math.max(0, Math.min(100, state.player?.karma !== undefined ? state.player.karma : 50));
 
+    // Накрутка наличных
     animateNumberRoll('cashAmount', displayedCashValue, targetCash, 450, true);
     displayedCashValue = targetCash;
 
+    // Накрутка неоновых банкнот
     animateNumberRoll('starsAmount', displayedStarsValue, targetStars, 350, false);
     displayedStarsValue = targetStars;
 
+    // Билеты супервилспина
+    setTxt('superSpinTicketsAmount', targetSuperSpinTickets);
+
+    // Топливо и талоны
     setTxt('fuelAmount', fuel);
     setTxt('ticketsAmount', tck + "/" + mTck);
     setTxt('playerName', pName);
     setTxt('playerLvl', "Ур. " + lvl);
     setTxt('connectionsText', conn);
     setTxt('karmaText', karma);
+
+    // Анимация пульсации, если банкнот или билетов супервилспина > 5 штук
+    const banknotePill = document.getElementById('hudBanknotePill');
+    if (banknotePill) {
+        if (targetStars > 5) {
+            banknotePill.classList.add('res-pulse-active');
+        } else {
+            banknotePill.classList.remove('res-pulse-active');
+        }
+    }
+
+    const superSpinPill = document.getElementById('hudSuperSpinPill');
+    if (superSpinPill) {
+        if (targetSuperSpinTickets > 5) {
+            superSpinPill.classList.add('res-pulse-active');
+        } else {
+            superSpinPill.classList.remove('res-pulse-active');
+        }
+    }
     
     const pPhoto = document.getElementById('playerTgPhoto');
     const dIcon = document.getElementById('defaultAvatarIcon');
@@ -1754,7 +1852,7 @@ function adjustResource(type, delta) {
         showToast((delta > 0 ? "+" : "") + delta + " Ур");
     } else if (type === 'stars') {
         state.player.stars = Math.max(0, (state.player.stars || 0) + delta);
-        showToast((delta > 0 ? "+" : "") + delta + " Stars ⭐");
+        showToast((delta > 0 ? "+" : "") + delta + " 💵 Банкнот");
     } else if (type === 'tickets') {
         let max = state.player.maxExpressTickets || 25;
         state.player.expressTickets = Math.max(0, Math.min(max, (state.player.expressTickets || 0) + delta));
@@ -1836,10 +1934,10 @@ function claimDailyReward() {
         window.pushToMailbox({
             type: "stars",
             amount: r.stars,
-            title: `Премиальные Stars: +${r.stars} ⭐`,
+            title: `Неоновые банкноты: +${r.stars} 💵`,
             sender: "Календарь наград",
-            desc: "Звёзды перекупа из календаря.",
-            badge: "STARS"
+            desc: "Премиальные банкноты перекупа из календаря.",
+            badge: "ВАЛЮТА"
         });
     }
     if (r.freeImpoundPasses && typeof window.pushToMailbox === 'function') {
@@ -2308,6 +2406,7 @@ window.updateHeaderUI = updateHeaderUI;
 window.animateNumberRoll = animateNumberRoll;
 window.showToast = showToast;
 window.openVerdictModal = openVerdictModal;
+window.openLevelGateModal = openLevelGateModal;
 window.renderPrizeTokensHTML = renderPrizeTokensHTML;
 window.extractPrizesFromText = extractPrizesFromText;
 window.playSound = playSound;

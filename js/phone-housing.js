@@ -1,8 +1,9 @@
 // ========================================================
-// js/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v1.4.0)
+// js/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v1.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Восстановлены фото-обложки недвижимости, синхронизация с
-// базой data.js, покупка, аренда, перки и интерьер.
+// Полная синхронизация с расширенным каталогом HOUSING_LIST:
+// Промежуточные боксы ГСК, навесы, квартиры, учет звёзд,
+// аренда, покупка, пассивные перки куража и обустройство интерьера.
 // ========================================================
 
 const PhoneHousing = {
@@ -14,64 +15,88 @@ const PhoneHousing = {
         }
         return [
             { 
-                id: 'trailer', name: 'Бытовка на стройплощадке', category: 'street', rent: 800, buyPrice: 450000, 
-                slots: 0, moodBonus: -5, minLevel: 1, perk: 'Только ночлег. Доработки и тюнинг невозможны.', 
+                id: 'trailer', name: 'Бытовка на стройплощадке', category: 'street', rent: 600, buyPrice: 350000, reqStars: 0,
+                slots: 0, moodBonus: -5, minLevel: 1, perk: 'Только ночлег. Доработки и ремонт невозможны.', 
                 desc: 'Временный строительный вагончик у обочины. Сквозняки, верстака нет. Автомобили стоят под открытым небом.', 
                 img: 'assets/houses/trailer.jpg', fallback: 'https://images.unsplash.com/photo-1590725140246-201552a488c9?auto=format&fit=crop&w=600&q=80'
             },
             { 
-                id: 'room', name: 'Комната в общежитии', category: 'living', rent: 2500, buyPrice: 1800000, 
-                slots: 1, moodBonus: 5, minLevel: 2, perk: 'Одно машиноместо во дворе. Разрешена замена масла.', 
-                desc: 'Комната в спальном районе. Автомобиль стоит под окнами. Мелкий сервисный ремонт разрешён.', 
+                id: 'shed_yard', name: 'Навес у частного дома', category: 'street', rent: 1400, buyPrice: 750000, reqStars: 5,
+                slots: 1, moodBonus: 0, minLevel: 2, perk: '1 машиноместо под навесом. Доступна замена масел и свечей.', 
+                desc: 'Деревянный навес от дождя. Есть розетка 220V и базовый набор гаечных ключей.', 
                 img: 'assets/houses/room.jpg', fallback: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=600&q=80'
             },
             { 
-                id: 'gsk_box', name: 'Стандартный бокс в ГСК-7', category: 'box', rent: 9000, buyPrice: 1600000, 
+                id: 'room', name: 'Комната в общежитии + Двор', category: 'living', rent: 2200, buyPrice: 1300000, reqStars: 8,
+                slots: 1, moodBonus: 4, minLevel: 3, perk: 'Одно машиноместо во дворе. Разрешена замена расходников.', 
+                desc: 'Комната в спальном районе. Автомобиль стоит под окнами на асфальте.', 
+                img: 'assets/houses/room.jpg', fallback: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=600&q=80'
+            },
+            { 
+                id: 'gsk_box', name: 'Стандартный бокс в ГСК-7', category: 'box', rent: 6500, buyPrice: 1500000, reqStars: 12,
                 slots: 2, moodBonus: 8, minLevel: 4, perk: 'Смотровая яма, электричество 220V, верстак со слесарными тисками.', 
-                desc: 'Настоящее логово перекупа! Сухая яма, верстак и диодное освещение. Открывает корчевание и диагностику ЭБУ.', 
+                desc: 'Настоящее логово перекупа! Сухая яма, верстак и диодное освещение. Открывает диагностику и тюнинг.', 
                 img: 'assets/houses/garage.jpg', fallback: 'https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?auto=format&fit=crop&w=600&q=80'
             },
             { 
-                id: 'khrusch', name: 'Убитая "Хрущевка"', category: 'living', rent: 15000, buyPrice: 4500000, 
-                slots: 1, moodBonus: 10, minLevel: 6, perk: 'Уютный сон, быстрое восстановление настроения, парковка во дворе.', 
-                desc: 'Бабушкин ремонт, старый скрипучий паркет, зато своя ванна и кухня. Машина паркуется во дворе под фонарём.', 
+                id: 'khrusch', name: 'Квартира в "Хрущевке"', category: 'living', rent: 12000, buyPrice: 3800000, reqStars: 15,
+                slots: 1, moodBonus: 10, minLevel: 5, perk: 'Уютный сон, быстрое восстановление настроения (+10).', 
+                desc: 'Своя кухня, душ и спокойный сон. Машина паркуется во дворе под фонарём.', 
                 img: 'assets/houses/khrusch.jpg', fallback: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=600&q=80'
             },
             { 
-                id: 'garage', name: 'Двойной бокс с ямой и печкой', category: 'box', rent: 22000, buyPrice: 3200000, 
-                slots: 3, moodBonus: 14, minLevel: 8, perk: 'Сварка, полировальный пост, печь на отработке и 3 свободных машиноместа.', 
-                desc: 'Широкий бокс с печью, верстаком, компрессором и мойкой. Позволяет готовить тачки к продаже под ключ.', 
+                id: 'garage', name: 'Двойной бокс с ямой и печкой', category: 'box', rent: 18000, buyPrice: 2900000, reqStars: 20,
+                slots: 3, moodBonus: 14, minLevel: 7, perk: 'Сварка, полировальный пост, печь на отработке и 3 свободных машиноместа.', 
+                desc: 'Широкий бокс с печью, верстаком, компрессором и мойкой. Позволяет готовить тачки под ключ.', 
                 img: 'assets/houses/garage.jpg', fallback: 'https://images.unsplash.com/photo-1616423640778-28d1b53229bd?auto=format&fit=crop&w=600&q=80'
             },
             { 
-                id: 'dvushka', name: 'Двушка в спальном районе', category: 'living', rent: 28000, buyPrice: 8500000, 
-                slots: 2, moodBonus: 18, minLevel: 14, perk: 'Закреплённое парковочное место со шлагбаумом во дворе.', 
+                id: 'dvushka', name: 'Двушка в спальном районе', category: 'living', rent: 26000, buyPrice: 7500000, reqStars: 25,
+                slots: 2, moodBonus: 18, minLevel: 10, perk: 'Закреплённое парковочное место со шлагбаумом во дворе.', 
                 desc: 'Кирпичный дом, стеклопакеты, видеонаблюдение за парковкой. Высокий комфорт проживания.', 
                 img: 'assets/houses/dvushka.jpg', fallback: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80'
             },
             { 
-                id: 'workshop_pro', name: 'Тюнинг-Ангар с подъёмником', category: 'box', rent: 55000, buyPrice: 12000000, 
-                slots: 5, moodBonus: 22, minLevel: 20, perk: 'Двухстоечный подъёмник, камера обдува, скидка 20% на услуги Решалы!', 
+                id: 'workshop_pro', name: 'Тюнинг-Ангар с подъёмником', category: 'box', rent: 48000, buyPrice: 11000000, reqStars: 35,
+                slots: 5, moodBonus: 22, minLevel: 15, perk: 'Двухстоечный подъёмник, камера обдува, скидка 20% на услуги Решалы!', 
                 desc: 'Коммерческий цех в промзоне. Подъёмник, мощная приточка, возможность отмывать VIN дешевле.', 
                 img: 'assets/houses/workshop.jpg', fallback: 'https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=600&q=80'
             },
             { 
-                id: 'cottage', name: 'Коттедж за городом с гаражом', category: 'estate', rent: 75000, buyPrice: 24000000, 
-                slots: 7, moodBonus: 35, minLevel: 32, perk: 'Свой закрытый двор на 7 авто, тёплый гараж, зона отдыха и барбекю.', 
+                id: 'euro_treshka', name: 'Евро-трешка (Новостройка)', category: 'living', rent: 42000, buyPrice: 15000000, reqStars: 40,
+                slots: 3, moodBonus: 28, minLevel: 20, perk: 'Подземный теплый паркинг с детейлинг-постом и зарядкой.', 
+                desc: 'ЖК комфорт-класса. Закрытый двор, охраняемый подземный паркинг, автомойка в цоколе.', 
+                img: 'assets/houses/treshka.jpg', fallback: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80'
+            },
+            { 
+                id: 'cottage', name: 'Коттедж за городом с гаражом', category: 'estate', rent: 70000, buyPrice: 22000000, reqStars: 55,
+                slots: 7, moodBonus: 35, minLevel: 28, perk: 'Свой закрытый двор на 7 авто, тёплый гараж, зона отдыха и барбекю.', 
                 desc: 'Собственный участок, трёхфазная сеть 380V, смотровая яма и мойка высокого давления.', 
                 img: 'assets/houses/cottage.jpg', fallback: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=600&q=80'
             },
             { 
-                id: 'penthouse', name: 'Пентхаус в Москва-Сити', category: 'estate', rent: 280000, buyPrice: 150000000, 
-                slots: 8, moodBonus: 55, minLevel: 65, perk: 'Личный VIP-бокс на -3 этаже Башни с охраной, консьержем и мойкой.', 
+                id: 'loft', name: 'Дизайнерский Лофт в центре', category: 'living', rent: 90000, buyPrice: 35000000, reqStars: 75,
+                slots: 4, moodBonus: 40, minLevel: 35, perk: '+40% настроения каждый день, персональные места на VIP-паркинге.', 
+                desc: 'Красный кирпич, панорамные окна на набережную, стильный интерьер для отдыха автоолигарха.', 
+                img: 'assets/houses/loft.jpg', fallback: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80'
+            },
+            { 
+                id: 'penthouse', name: 'Пентхаус в Москва-Сити', category: 'estate', rent: 250000, buyPrice: 140000000, reqStars: 110,
+                slots: 8, moodBonus: 55, minLevel: 50, perk: 'Личный VIP-бокс на -3 этаже Башни с охраной, консьержем и мойкой.', 
                 desc: 'Панорамный вид с 65 этажа, консьерж-сервис, охраняемый подземный гаражный комплекс.', 
                 img: 'assets/houses/penthouse.jpg', fallback: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'
             },
             { 
-                id: 'villa', name: 'Особняк на Рублёвке', category: 'estate', rent: 650000, buyPrice: 480000000, 
-                slots: 18, moodBonus: 85, minLevel: 85, perk: 'Свой автосервисный цех, малярная камера, охрана ЧОП, скидка 35% у Решалы!', 
+                id: 'villa', name: 'Особняк на Рублёвке', category: 'estate', rent: 600000, buyPrice: 420000000, reqStars: 160,
+                slots: 18, moodBonus: 85, minLevel: 70, perk: 'Свой автосервисный цех, малярная камера, охрана ЧОП, скидка 35% у Решалы!', 
                 desc: 'Гектар соснового бора, собственный автосервис на 4 поста, малярная камера и ангар для редких лотов.', 
                 img: 'assets/houses/villa.jpg', fallback: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=600&q=80'
+            },
+            { 
+                id: 'island', name: 'Частный остров с виллой', category: 'estate', rent: 2000000, buyPrice: 1200000000, reqStars: 300,
+                slots: 35, moodBonus: 100, minLevel: 90, perk: 'Полный иммунитет от проверок ГИБДД, личный пирс для яхт и скидка 50% у Решалы!', 
+                desc: 'Абсолютная автономия в нейтральных водах. Свой порт, вертолётная площадка и музей для гиперкаров.', 
+                img: 'assets/houses/island.jpg', fallback: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'
             }
         ];
     },
@@ -150,6 +175,8 @@ const PhoneHousing = {
             let rent = h.rent || h.rentPerDay || 0;
             let slots = h.slots !== undefined ? h.slots : (h.slotsBonus || 0);
             let mood = h.moodBonus || 0;
+            let reqStars = h.reqStars || 0;
+            let starsTxt = reqStars > 0 ? ` + ${reqStars} ⭐` : "";
 
             let rawImg = h.img || 'assets/houses/trailer.jpg';
             let houseImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
@@ -166,7 +193,7 @@ const PhoneHousing = {
                 actionBtn = `
                     <div class="grid-2" style="gap:6px;">
                         <button onclick="PhoneHousing.buyHouse('${h.id}')" class="btn btn-green btn-sm" style="font-weight:900;">
-                            Купить (${price.toLocaleString()} ₽)
+                            Купить (${price.toLocaleString()} ₽${starsTxt})
                         </button>
                         <button onclick="PhoneHousing.rentHouse('${h.id}')" class="btn btn-dark btn-sm">
                             Аренда (${rent.toLocaleString()} ₽/д)
@@ -179,7 +206,6 @@ const PhoneHousing = {
 
             return `
                 <div class="glass-card p-3 mb-2" style="border-left: 3px solid ${catColor}; background: ${isCurrent ? 'rgba(45, 212, 191, 0.08)' : '#090e18'};">
-                    <!-- ВОССТАНОВЛЕННАЯ ОБЛОЖКА ОБЪЕКТА -->
                     <div class="car-img-wrap mb-2" style="height:130px; position:relative;">
                         <img src="${houseImg}" class="car-img" onerror="this.onerror=null; this.src='${fallbackImg}';">
                         <div class="badge-tag badge-br">
@@ -193,7 +219,7 @@ const PhoneHousing = {
                         <div>
                             <b class="text-xs" style="color:${isCurrent ? 'var(--teal)' : '#fff'}; font-size:13px;">${h.name}</b>
                             <div class="sub-label" style="font-size:9px;">
-                                ${isOwned ? 'В собственности ✓' : `Цена: ${price.toLocaleString()} ₽`}
+                                ${isOwned ? 'В собственности ✓' : `Покупка: ${price.toLocaleString()} ₽${starsTxt}`}
                             </div>
                         </div>
                         <span class="tag-badge bg-tag-cyan">+${slots} боксов</span>
@@ -223,7 +249,13 @@ const PhoneHousing = {
         const interiorItems = state.player.interior?.[currentHouse.id] || [];
         const catalogItems = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.homeItems) 
             ? SHOP_CATALOG.homeItems 
-            : INTERIOR_ITEMS;
+            : [
+                { id: "home_ps5", name: "Игровая консоль PlayStation 5", cost: 75000, reqStars: 5, perk: "+25% настроения в полночь" },
+                { id: "home_leather_sofa", name: "Кожаный диван в клиентскую зону", cost: 120000, reqStars: 8, perk: "+15% к восстановлению сил" },
+                { id: "home_garage_lift", name: "Гидравлический автоподъёмник (4т)", cost: 320000, reqStars: 20, perk: "Ускоряет ремонт на 50%" },
+                { id: "home_safe_valberg", name: "Огнеупорный сейф перекупа", cost: 180000, reqStars: 10, perk: "100% защита заначки наличных" },
+                { id: "home_cctv", name: "Система видеонаблюдения 4K", cost: 140000, reqStars: 8, perk: "Снижает риск угона до 0%" }
+            ];
 
         let interiorListHtml = catalogItems.map(item => {
             const hasItem = interiorItems.includes(item.id);
@@ -280,7 +312,9 @@ const PhoneHousing = {
         if (!target) return;
 
         let price = target.buyPrice || target.price || 0;
+        let reqStars = target.reqStars || 0;
         let cash = state.player.cash || 0;
+        let stars = state.player.stars || 0;
 
         if (cash < price) {
             if (typeof playSound === 'function') playSound('error');
@@ -288,7 +322,15 @@ const PhoneHousing = {
             return showToast(`Не хватает денег на покупку! Нужно: ${price.toLocaleString()} ₽`);
         }
 
+        if (stars < reqStars) {
+            if (typeof playSound === 'function') playSound('error');
+            if (typeof tgHaptic === 'function') tgHaptic('error');
+            return showToast(`Требуется ${reqStars} Stars ⭐!`);
+        }
+
         state.player.cash -= price;
+        if (reqStars > 0) state.player.stars -= reqStars;
+
         if (!state.player.ownedHouses.includes(houseId)) {
             state.player.ownedHouses.push(houseId);
         }

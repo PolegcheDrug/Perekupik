@@ -1,9 +1,9 @@
 // ========================================================
-// js/syndicate.js — СЕРВИС «ПОДКЛЮЧ», АВТОКЛУБЫ, ТОП И РЕФЕРАЛЫ (v0.8.6)
+// js/syndicate.js — СЕРВИС «ПОДКЛЮЧ», АВТОКЛУБЫ, ТОП И РЕФЕРАЛЫ (v0.8.7)
 // Разработчики: Илья Чепиль (DXF) & Perekup Dev Team
 // Реальная интеграция с Cloud Firestore:
-// Онлайн автоклубы с общаком, живой глобальный лидерборд,
-// Telegram рефералы и спецзаказы ПодКлюч по уровням.
+// Лицензия «ПодКлюч» за 500,000 ₽ (с 6 ур.), онлайн автоклубы с общаком,
+// глобальный лидерборд, Telegram рефералы и спецзаказы ПодКлюч.
 // ========================================================
 
 let activeContractForCarSelect = null;
@@ -158,13 +158,74 @@ function filterPodklyuchContracts(filter) {
 // ========================================================
 function getUnlockedCategoriesForPlayer(lvl) {
     let list = ['economy', 'scooter'];
-    if (lvl >= 5) list.push('moto');
-    if (lvl >= 8) list.push('atv');
-    if (lvl >= 15) list.push('comfort');
-    if (lvl >= 30) list.push('premium');
-    if (lvl >= 50) list.push('hyper', 'truck');
-    if (lvl >= 100) list.push('yacht');
+    if (lvl >= 4) list.push('moto');
+    if (lvl >= 7) list.push('atv');
+    if (lvl >= 10) list.push('comfort');
+    if (lvl >= 25) list.push('premium');
+    if (lvl >= 45) list.push('hyper', 'truck');
+    if (lvl >= 85) list.push('yacht');
     return list;
+}
+
+function checkSyndicateAccessDetails() {
+    let playerLvl = state.player?.level || 1;
+    let cash = state.player?.cash || 0;
+    let tools = state.player?.tools || {};
+    let unlocked = state.player?.unlockedApps || [];
+
+    const cfg = window.APP_ACCESS_CONFIG?.autopodbor_order || {
+        minLevel: 6,
+        costCash: 500000
+    };
+
+    let hasLvl = playerLvl >= cfg.minLevel;
+    let hasLicense = unlocked.includes('autopodbor_order');
+    let hasLaunch = !!(tools.obd_launch);
+    let hasGauge = !!(tools.gauge || tools.gauge_pro);
+    let hasEndoscope = !!(tools.endoscope);
+    let canAfford = cash >= cfg.costCash;
+
+    let isFullAccess = hasLvl && hasLicense && hasLaunch;
+
+    return {
+        isFullAccess,
+        hasLvl,
+        hasLicense,
+        hasLaunch,
+        hasGauge,
+        hasEndoscope,
+        canAfford,
+        lvl: playerLvl,
+        reqLvl: cfg.minLevel,
+        costCash: cfg.costCash
+    };
+}
+
+function unlockPodklyuchLicenseAction() {
+    const access = checkSyndicateAccessDetails();
+    if (!access.hasLvl) {
+        return showToast(`Лицензия доступна только с ${access.reqLvl} уровня авторитета!`);
+    }
+    if (!access.canAfford) {
+        return showToast(`Не хватает денег на лицензию! Нужно: ${access.costCash.toLocaleString()} ₽`);
+    }
+
+    state.player.cash -= access.costCash;
+    if (!state.player.unlockedApps) state.player.unlockedApps = [];
+    if (!state.player.unlockedApps.includes('autopodbor_order')) {
+        state.player.unlockedApps.push('autopodbor_order');
+    }
+
+    if (typeof logBankTransaction === 'function') {
+        logBankTransaction("Лицензия «ПодКлюч»", access.costCash, false);
+    }
+
+    saveState();
+    updateHeaderUI();
+    renderContracts();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    showToast("Лицензия «ПодКлюч» оформлена! Доступ к заказам открыт.");
 }
 
 function generateContracts() {
@@ -177,7 +238,7 @@ function generateContracts() {
     let unlockedCats = getUnlockedCategoriesForPlayer(playerLvl);
 
     let matchedPool = pool.filter(t => {
-        let minLvl = t.minPlayerLevel || 7;
+        let minLvl = t.minPlayerLevel || 6;
         let maxLvl = t.maxPlayerLevel || 100;
         let lvlOk = playerLvl >= minLvl && playerLvl <= maxLvl;
         let hasUnlockedClass = t.reqs.allowedClasses.some(c => unlockedCats.includes(c));
@@ -185,7 +246,7 @@ function generateContracts() {
     });
 
     if (matchedPool.length === 0) {
-        matchedPool = pool.filter(t => (t.minPlayerLevel || 7) <= playerLvl);
+        matchedPool = pool.filter(t => (t.minPlayerLevel || 6) <= playerLvl);
     }
     if (matchedPool.length === 0) {
         matchedPool = pool.slice(0, 4);
@@ -224,25 +285,32 @@ function renderContracts() {
     const lock = document.getElementById('contractsLockCover');
     if (!list) return;
 
-    const access = (typeof checkSyndicateAccessDetails === 'function') 
-        ? checkSyndicateAccessDetails() 
-        : { isFullAccess: ((state.player?.level || 1) >= 7), hasLvl: ((state.player?.level || 1) >= 7), hasEndoscope: true, hasGauge: true, hasLaunch: true, hasStars: true, lvl: state.player?.level || 1, stars: state.player?.stars || 0 };
+    const access = checkSyndicateAccessDetails();
 
     if (!access.isFullAccess) {
         if (lock) {
             lock.style.display = 'block';
+
+            let licenseBtn = "";
+            if (!access.hasLicense) {
+                licenseBtn = access.hasLvl
+                    ? `<button onclick="unlockPodklyuchLicenseAction()" class="btn btn-green btn-sm w-full mb-2">Оформить лицензию (${access.costCash.toLocaleString()} ₽)</button>`
+                    : `<button class="btn btn-dark btn-sm w-full opacity-50 mb-2" disabled>Требуется ${access.reqLvl} уровень</button>`;
+            }
+
             lock.innerHTML = `
                 <div class="glass-card text-center p-3 mb-2" style="border: 1px solid var(--purple);">
-                    <div style="font-size:32px; margin-bottom:6px;">🔒</div>
-                    <h4 class="font-bold color-purple mb-1">Сервис «ПодКлюч» опечатан</h4>
-                    <p class="sub-label mb-2" style="font-size:9.5px;">Для выполнения заказов VIP-клиентов требуется подтвердить статус эксперта и оборудование:</p>
+                    <div style="font-size:32px; margin-bottom:6px;">🔑</div>
+                    <h4 class="font-bold color-purple mb-1">Сервис «ПодКлюч» заблокирован</h4>
+                    <p class="sub-label mb-2" style="font-size:9.5px;">Для выполнения официальных заказов клиентов требуется подтвердить лицензию эксперта и приборы:</p>
                     <div class="space-y-1 text-left p-2 mb-2" style="background:#090e18; border-radius:8px; font-size:9.5px;">
-                        <div class="flex-between"><span>• Авторитет: <b>7+ ур</b></span> <b class="${access.hasLvl ? 'color-green' : 'color-red'}">${access.hasLvl ? '✓ Да' : '✗ Нет (' + access.lvl + '/7)'}</b></div>
-                        <div class="flex-between"><span>• HD Видеоэндоскоп</span> <b class="${access.hasEndoscope ? 'color-green' : 'color-red'}">${access.hasEndoscope ? '✓ В наличии' : '✗ Купить'}</b></div>
-                        <div class="flex-between"><span>• Толщиномер ЛКП</span> <b class="${access.hasGauge ? 'color-green' : 'color-red'}">${access.hasGauge ? '✓ В наличии' : '✗ Купить'}</b></div>
-                        <div class="flex-between"><span>• Сканер Launch Pro</span> <b class="${access.hasLaunch ? 'color-green' : 'color-red'}">${access.hasLaunch ? '✓ В наличии' : '✗ Купить'}</b></div>
-                        <div class="flex-between"><span>• Депозит: <b>5+ Stars ⭐</b></span> <b class="${access.hasStars ? 'color-green' : 'color-red'}">${access.hasStars ? '✓ Да' : '✗ Нет (' + access.stars + '/5)'}</b></div>
+                        <div class="flex-between"><span>• Авторитет: <b>${access.reqLvl}+ ур</b></span> <b class="${access.hasLvl ? 'color-green' : 'color-red'}">${access.hasLvl ? '✓ Да' : '✗ Нет (' + access.lvl + '/' + access.reqLvl + ')'}</b></div>
+                        <div class="flex-between"><span>• Лицензия сервиса (500,000 ₽)</span> <b class="${access.hasLicense ? 'color-green' : 'color-red'}">${access.hasLicense ? '✓ Оплачена' : '✗ Требуется'}</b></div>
+                        <div class="flex-between"><span>• Сканер Launch Pro Pad</span> <b class="${access.hasLaunch ? 'color-green' : 'color-red'}">${access.hasLaunch ? '✓ В наличии' : '✗ Купить в Маркете'}</b></div>
+                        <div class="flex-between"><span>• Толщиномер ЛКП</span> <b class="${access.hasGauge ? 'color-green' : 'color-amber'}">${access.hasGauge ? '✓ В наличии' : '⚠️ Желателен'}</b></div>
+                        <div class="flex-between"><span>• HD Видеоэндоскоп</span> <b class="${access.hasEndoscope ? 'color-green' : 'color-amber'}">${access.hasEndoscope ? '✓ В наличии' : '⚠️ Желателен'}</b></div>
                     </div>
+                    ${licenseBtn}
                     <button onclick="PhoneManager.openApp('shop')" class="btn btn-cyan btn-sm w-full">Купить приборы в Маркете</button>
                 </div>
             `;
@@ -296,7 +364,7 @@ function renderContracts() {
                     <div class="chat-avatar-circle" style="font-size:20px; width:30px; height:30px;">${c.avatar}</div>
                     <div>
                         <b class="text-xs color-cyan">${c.clientName}</b>
-                        <div class="sub-label" style="font-size:8.5px;">Допуск: ${c.minPlayerLevel || 7}+ ур.</div>
+                        <div class="sub-label" style="font-size:8.5px;">Допуск: ${c.minPlayerLevel || 6}+ ур.</div>
                     </div>
                 </div>
                 <span class="tag-badge ${tagClass}">${c.categoryTitle || 'Спецзаказ'}</span>
@@ -725,7 +793,6 @@ async function renderFriendsList() {
     let myId = window.FB_Bridge ? window.FB_Bridge.getProfile().id : null;
     let friends = [];
 
-    // ИСПРАВЛЕНО: корректный вызов существующего метода FB_Bridge.M.fetchFriends
     if (myId && window.FB_Bridge && window.FB_Bridge.M) {
         friends = await window.FB_Bridge.M.fetchFriends(myId);
     }
@@ -755,6 +822,8 @@ async function renderFriendsList() {
 }
 
 // Экспорт функций в window
+window.checkSyndicateAccessDetails = checkSyndicateAccessDetails;
+window.unlockPodklyuchLicenseAction = unlockPodklyuchLicenseAction;
 window.renderSyndicateHub = renderSyndicateHub;
 window.switchSyndicateTab = switchSyndicateTab;
 window.filterPodklyuchContracts = filterPodklyuchContracts;

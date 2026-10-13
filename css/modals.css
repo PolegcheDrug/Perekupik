@@ -26,7 +26,9 @@
 #modalHudCustomizer,
 #modalImpoundLot,
 #modalPortBrokerDeal,
-#modalStorageWars {
+#modalStorageWars,
+#modalLevelGate,
+#modalAppUnlockPrompt {
   z-index: 5500 !important;
 }
 
@@ -111,6 +113,67 @@
 }
 
 /* ========================================================
+   КАСТОМИЗАЦИЯ ТЕМЫ (HUD CUSTOMIZER)
+   ======================================================== */
+.hud-colors-palette-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 8px !important;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 4px;
+  margin-bottom: 12px;
+}
+
+.color-palette-tile {
+  background: rgba(14, 22, 38, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 10px !important;
+  padding: 8px 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+}
+
+.color-palette-tile:hover {
+  background: rgba(20, 32, 54, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.color-palette-tile.selected {
+  border-color: var(--cyan) !important;
+  background: rgba(0, 242, 254, 0.12) !important;
+  box-shadow: 0 0 12px var(--cyan-glow) !important;
+}
+
+.color-palette-swatch {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 6px !important;
+  flex-shrink: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+}
+
+.color-palette-name {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  color: #fff !important;
+  flex: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.color-check {
+  font-size: 11px !important;
+  color: var(--cyan) !important;
+}
+
+/* ========================================================
    ИНДИКАТОРЫ STORAGE WARS 2.0 (ШКАЛА ДОМИНИРОВАНИЯ)
    ======================================================== */
 .sw-leading-active {
@@ -152,6 +215,9 @@
   100% { transform: scale(1); }
 }
 
+/* ========================================================
+   ОКНО ТОРГА И ЧАТА
+   ======================================================== */
 .chat-deal-box {
   padding: 14px !important;
   background: 
@@ -160,11 +226,11 @@
   border: 1.5px solid var(--cyan) !important;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.95), 0 0 25px var(--cyan-glow) !important;
   border-radius: var(--radius-xl) !important;
-  max-width: 430px !important;
+  max-width: 440px !important;
   width: 100% !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 8px !important;
+  gap: 10px !important;
   max-height: calc(100dvh - 24px) !important;
   overflow-y: auto !important;
 }
@@ -177,19 +243,16 @@
   border: 1px solid var(--border-glow) !important;
   border-radius: var(--radius-md) !important;
   padding: 8px 12px !important;
-  height: 78px !important;
-  min-height: 78px !important;
-  max-height: 82px !important;
+  min-height: 70px !important;
   overflow: hidden !important;
   flex-shrink: 0 !important;
 }
 
 .deal-car-thumb {
-  width: 90px !important;
-  height: 62px !important;
-  min-width: 90px !important;
-  max-width: 90px !important;
-  max-height: 62px !important;
+  width: 85px !important;
+  height: 56px !important;
+  min-width: 85px !important;
+  max-width: 85px !important;
   border-radius: 8px !important;
   object-fit: cover !important;
   border: 1px solid var(--border-glass) !important;
@@ -202,23 +265,24 @@
   display: flex !important;
   flex-direction: column !important;
   gap: 8px !important;
-  min-height: 75px !important;
-  max-height: 120px !important;
+  flex: 1 1 auto !important;
+  min-height: 140px !important;
+  max-height: 380px !important;
   overflow-y: auto !important;
-  padding: 6px 8px !important;
-  background: rgba(5, 8, 15, 0.75) !important;
-  border-radius: 10px !important;
-  border: 1px solid rgba(255, 255, 255, 0.05) !important;
-  flex-shrink: 0 !important;
+  padding: 10px 10px !important;
+  background: rgba(5, 8, 15, 0.85) !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
 }
 
 .chat-msg {
-  padding: 8px 12px !important;
+  padding: 9px 13px !important;
   border-radius: 12px !important;
-  font-size: 11.5px !important;
-  line-height: 1.35 !important;
-  max-width: 92% !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  max-width: 88% !important;
   word-break: break-word !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
 }
 
 .msg-seller {
@@ -231,7 +295,7 @@
 
 .msg-player {
   align-self: flex-end !important;
-  background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(2, 132, 199, 0.35)) !important;
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.25), rgba(2, 132, 199, 0.45)) !important;
   border-right: 3px solid var(--green) !important;
   color: #fff !important;
   border-bottom-right-radius: 2px !important;
@@ -620,7 +684,6 @@
   transition: all 0.2s ease !important;
 }
 
-/* 7-й финальный день занимает всю нижнюю строку */
 .daily-streak-day:nth-child(7) {
   grid-column: span 3 !important;
   background: linear-gradient(135deg, rgba(255, 179, 0, 0.15), rgba(9, 14, 24, 0.95)) !important;
@@ -641,7 +704,6 @@
   margin: 3px 0 !important;
 }
 
-/* Уже полученный день */
 .daily-streak-day.claimed {
   background: rgba(0, 230, 118, 0.06) !important;
   border-color: rgba(0, 230, 118, 0.3) !important;
@@ -651,7 +713,6 @@
   color: var(--green) !important;
 }
 
-/* Текущий активный день с неоновой пульсацией */
 .daily-streak-day.current {
   background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.22), #090e18) !important;
   border: 1.5px solid var(--cyan) !important;
@@ -668,7 +729,6 @@
   100% { box-shadow: 0 0 20px var(--cyan-glow), inset 0 0 12px rgba(0, 242, 254, 0.25); }
 }
 
-/* Статусные значки */
 .daily-streak-day div:last-child {
   font-size: 13px !important;
   margin-top: 2px !important;

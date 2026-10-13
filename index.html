@@ -6,13 +6,13 @@
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v1.0.0</title>
     
-    <!-- Модульные CSS-стили с принудительным сбросом кэша -->
-    <link rel="stylesheet" href="css/base.css?v=340">
-    <link rel="stylesheet" href="css/hud.css?v=340">
-    <link rel="stylesheet" href="css/market.css?v=340">
-    <link rel="stylesheet" href="css/phone.css?v=340">
-    <link rel="stylesheet" href="css/modals.css?v=340">
-    <link rel="stylesheet" href="css/nav.css?v=340">
+    <!-- Модульные CSS-стили с принудительным сбросом кэша v=345 -->
+    <link rel="stylesheet" href="css/base.css?v=345">
+    <link rel="stylesheet" href="css/hud.css?v=345">
+    <link rel="stylesheet" href="css/market.css?v=345">
+    <link rel="stylesheet" href="css/phone.css?v=345">
+    <link rel="stylesheet" href="css/modals.css?v=345">
+    <link rel="stylesheet" href="css/nav.css?v=345">
     
     <!-- Внешние библиотеки -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -72,15 +72,26 @@
               <div class="cash-val">
                 <span id="cashAmount">150,000</span> <span class="currency-sign">₽</span>
               </div>
-              <div class="stars-val">
-                <span id="starsAmount">15</span> <i class="fa-solid fa-star star-icon-animated"></i>
-              </div>
             </div>
 
+            <!-- Ресурсные пиллы: Неоновая банкнота, СуперВилспин, Топливо, Экспресс-талоны -->
             <div class="wallet-sub">
+              <!-- 1. Неоновая банкнота -->
+              <button type="button" class="resource-pill note-pill" id="hudBanknotePill" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты (Обменник)">
+                <i class="fa-solid fa-money-bill-wave note-icon-glow"></i> <span id="starsAmount">15</span>
+              </button>
+
+              <!-- 2. Билеты СуперВилспина -->
+              <button type="button" class="resource-pill superspin-pill" id="hudSuperSpinPill" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('fortune'); }, 100);" title="Билеты СуперВилспина (Клуб Фортуны)">
+                <i class="fa-solid fa-dharmachakra superspin-icon-glow"></i> <span id="superSpinTicketsAmount">1</span>
+              </button>
+
+              <!-- 3. Топливо -->
               <button type="button" class="resource-pill fuel-pill" onclick="refuelAction('cash')" title="Заправить бак">
                 <i class="fa-solid fa-gas-pump"></i> <span id="fuelAmount">100</span><span class="res-max">/100</span>
               </button>
+
+              <!-- 4. Экспресс-талоны -->
               <button type="button" class="resource-pill ticket-pill" onclick="upgradeExpressCapacity()" title="Экспресс-талоны">
                 <i class="fa-solid fa-ticket"></i> <span id="ticketsAmount">25/25</span>
               </button>
@@ -277,7 +288,7 @@
                 <div id="phoneDailyQuestsWidget" class="phone-quests-widget mb-3"></div>
 
                 <div class="phone-home-grid mb-2">
-                  <!-- РЯД 1: ЕДИНЫЙ ХАБ «СЕТЬ М & AUTODROT», БАНК, БИЗНЕС, ЖИЛЬЕ -->
+                  <!-- РЯД 1 -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('m')">
                     <div class="phone-app-icon bg-m-network">
                       <span class="m-app-icon-letter">M</span>
@@ -437,6 +448,8 @@
     <div id="modalImpoundLot" class="modal-overlay"></div>
     <div id="modalPortBrokerDeal" class="modal-overlay"></div>
     <div id="modalStorageWars" class="modal-overlay"></div>
+    <div id="modalLevelGate" class="modal-overlay"></div>
+    <div id="modalAppUnlockPrompt" class="modal-overlay"></div>
 
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
@@ -445,7 +458,7 @@
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #340 (Единый P2P-хаб, фикс таймеров и обложек)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #345 (Единый P2P-хаб, фикс таймеров и обложек)</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
           <div class="patch-item"><b>⚡ Единый хаб Сети «M» & Autodrot:</b> Объединённый онлайн-рынок и чат торга с кнопками риска.</div>
           <div class="patch-item"><b>🏢 Недвижимость и Боксы:</b> Исправлена аренда/покупка и возвращены визуальные обложки домов.</div>
@@ -880,7 +893,7 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- 1. ПОДКЛЮЧЕНИЕ СЕТЕВОГО МОДУЛЯ FIREBASE (ES-МОДУЛЬ) -->
-    <script type="module" src="firebase-bridge.js?v=340"></script>
+    <script type="module" src="firebase-bridge.js?v=345"></script>
 
     <!-- 2. АВТОЗАГРУЗЧИК СКРИПТОВ ИГРЫ -->
     <script>
@@ -892,7 +905,7 @@
           } catch (e) {}
         }
 
-        const CACHE_VER = '340';
+        const CACHE_VER = '345';
 
         // Модули баз данных игры (включая призовой транспорт Barn)
         const rootModules = [

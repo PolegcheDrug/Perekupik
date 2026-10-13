@@ -11,7 +11,7 @@ const CATEGORY_META = {
     scooter: { name: "СКУТЕРЫ", title: "Городские Скутеры", capital: "от 25 000 ₽", desc: "Дешёвый вход, быстрые сделки и сезонный спрос молодёжи." },
     moto: { name: "МОТО", title: "Спортбайки & Классика", capital: "от 120 000 ₽", desc: "Высокая сезонная маржа, проверка геометрии рамы и вилки." },
     atv: { name: "КВАДРО", title: "Квадроциклы 4x4", capital: "от 180 000 ₽", desc: "Техника для бездорожья. Частые скрытые дефекты ходовой." },
-    comfort: { name: "КОМФОРТ", title: "Сегмент Комфорт", capital: "от 450 000 ₽", desc: "Седаны и кроссоверы (с 15 ур.). Идеально под выкуп для семей и таксопарков." },
+    comfort: { name: "КОМФОРТ", title: "Сегмент Комфорт", capital: "от 450 000 ₽", desc: "Седаны и кроссоверы (с 10 ур.). Идеально под выкуп для семей и таксопарков." },
     premium: { name: "ПРЕМИУМ", title: "Премиум & Люкс", capital: "от 1 200 000 ₽", desc: "Высокая чистая прибыль с одной сделки, статус и требовательные клиенты." },
     hyper: { name: "ГИПЕРКАРЫ", title: "Спорт & Экзотика", capital: "от 5 000 000 ₽", desc: "Огромная маржа, эксклюзивные клиенты и дорогие комплектующие." },
     truck: { name: "ГРУЗОВИКИ", title: "Коммерческий транспорт", capital: "от 2 500 000 ₽", desc: "Тягачи и фургоны для крупных заказов ПодКлюч." },
@@ -155,15 +155,16 @@ async function populateMarketFeed() {
     let pool = [];
 
     const hasAutopodbor = (state.businesses || []).some(b => b.id === 'autopodbor' && b.level > 0);
+    const econConfig = window.MARKET_ECONOMY_CONFIG || { urgentSaleChance: 0.08, hiddenDefectChance: 0.28 };
 
     if (cat === 'all') {
         let allowedCategories = ['economy', 'scooter'];
-        if (lvl >= 5) allowedCategories.push('moto');
-        if (lvl >= 8) allowedCategories.push('atv');
-        if (lvl >= 15) allowedCategories.push('comfort');
-        if (lvl >= 30) allowedCategories.push('premium');
-        if (lvl >= 50) allowedCategories.push('hyper', 'truck');
-        if (lvl >= 100) allowedCategories.push('yacht');
+        if (lvl >= 4) allowedCategories.push('moto');
+        if (lvl >= 7) allowedCategories.push('atv');
+        if (lvl >= 10) allowedCategories.push('comfort');
+        if (lvl >= 25) allowedCategories.push('premium');
+        if (lvl >= 45) allowedCategories.push('hyper', 'truck');
+        if (lvl >= 85) allowedCategories.push('yacht');
 
         allowedCategories.forEach(cKey => {
             if (CAR_DATABASE[cKey] && Array.isArray(CAR_DATABASE[cKey])) {
@@ -248,39 +249,37 @@ async function populateMarketFeed() {
 
         let archetypeRoll = Math.random();
         let dealType = 'normal';
-        let priceMultiplier = 0.80;
+        let priceMultiplier = 0.82;
 
         let isMuseumStock = false;
         let isTunedSpec = false;
         let isBeaterProject = false;
         let isUrgentDeal = false;
 
-        if (hasAutopodbor && Math.random() < 0.22) {
+        let urgentThreshold = hasAutopodbor ? 0.22 : (econConfig.urgentSaleChance || 0.08);
+
+        if (Math.random() < urgentThreshold) {
             dealType = 'urgent';
             isUrgentDeal = true;
-            priceMultiplier = 0.60 + Math.random() * 0.05;
-        } else if (archetypeRoll < 0.15) {
+            priceMultiplier = 0.62 + Math.random() * 0.06;
+        } else if (archetypeRoll < 0.14) {
             isMuseumStock = true;
             dealType = 'museum';
-            priceMultiplier = 0.88 + Math.random() * 0.08;
-        } else if (archetypeRoll < 0.32) {
+            priceMultiplier = 0.88 + Math.random() * 0.07;
+        } else if (archetypeRoll < 0.30) {
             isTunedSpec = true;
             dealType = 'tuned_drift';
-            priceMultiplier = 1.15 + Math.random() * 0.15;
-        } else if (archetypeRoll < 0.50) {
+            priceMultiplier = 1.10 + Math.random() * 0.15;
+        } else if (archetypeRoll < 0.52) {
             isBeaterProject = true;
             dealType = 'beater_project';
-            priceMultiplier = 0.48 + Math.random() * 0.12;
-        } else if (archetypeRoll < 0.75) {
-            isUrgentDeal = true;
-            dealType = 'urgent';
-            priceMultiplier = 0.68 + Math.random() * 0.08;
+            priceMultiplier = 0.44 + Math.random() * 0.11;
         } else {
             dealType = 'normal';
-            priceMultiplier = 0.80 + Math.random() * 0.08;
+            priceMultiplier = 0.78 + Math.random() * 0.10;
         }
 
-        let defectChance = isBeaterProject ? 0.90 : (isMuseumStock ? 0.0 : (isUrgentDeal ? 0.40 : 0.20));
+        let defectChance = isBeaterProject ? 0.85 : (isMuseumStock ? 0.0 : (isUrgentDeal ? 0.45 : (econConfig.hiddenDefectChance || 0.28)));
         let hasHiddenDefect = (Math.random() < defectChance) && (typeof OBD_ERRORS !== 'undefined' && OBD_ERRORS.length > 0);
 
         let defectObj = null;
@@ -298,7 +297,7 @@ async function populateMarketFeed() {
             };
         }
 
-        let isStolen = Math.random() < (isBeaterProject ? 0.18 : (isUrgentDeal ? 0.08 : 0.04));
+        let isStolen = Math.random() < (isBeaterProject ? 0.16 : (isUrgentDeal ? 0.08 : 0.03));
         const carId = "m_" + Date.now() + "_" + i;
         
         let isCoolNumber = Math.random() < 0.15;
@@ -325,7 +324,7 @@ async function populateMarketFeed() {
             sNote = "«Кузов требует внимания и сварки. Отдам за копейки с торгом под проект или разбор!»";
             sMoodIcon = "🛠️";
         } else if (isUrgentDeal) {
-            sNote = "«Срочно нужны деньги на ипотеку, отдам с хорошим дисконтом первому, кто приедет с кэшем!»";
+            sNote = "«Срочно нужны деньги на закрытие долга, отдам с хорошим дисконтом первому, кто приедет с кэшем!»";
             sMoodIcon = "⚡";
         }
 

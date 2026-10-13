@@ -1,7 +1,7 @@
 // ========================================================
-// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.0.0)
+// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Полный комплект встроенных экранов:
+// Полный комплект встроенных экранов с системой уровней и платных доступов:
 // 1. «M & P2P» (Единый объединённый хаб)
 // 2. Во-Банк    3. Бизнес      4. Жильё
 // 5. Решала     6. ПодКлюч    7. САРАИ       8. Порт
@@ -64,7 +64,154 @@ const PhoneManager = {
         }
     },
 
+    // --------------------------------------------------------
+    // ПРОВЕРКА ДОСТУПА ПО УРОВНЯМ И ПЛАТНЫМ РАЗБЛОКИРОВКАМ
+    // --------------------------------------------------------
+    checkAppAccess(appId) {
+        if (!state.player) return true;
+        if (!state.player.unlockedApps) state.player.unlockedApps = [];
+
+        // Карта соответствия appId с ключами в APP_ACCESS_CONFIG
+        const accessKeyMap = {
+            'barn': 'barn',
+            'containers': 'containers',
+            'syndicate': 'autopodbor_order',
+            'street': 'street',
+            'reshala': 'darknet'
+        };
+
+        const configKey = accessKeyMap[appId];
+        if (!configKey) return true;
+
+        const config = (window.APP_ACCESS_CONFIG && window.APP_ACCESS_CONFIG[configKey]) ? window.APP_ACCESS_CONFIG[configKey] : null;
+        if (!config) return true;
+
+        const pLvl = state.player.level || 1;
+        const isUnlocked = state.player.unlockedApps.includes(configKey);
+
+        // Если приложение уже разблокировано игроком
+        if (isUnlocked) return true;
+
+        // Если уровень недостаточен — открываем интерактивное окно блокировки
+        if (pLvl < config.minLevel) {
+            if (typeof window.openLevelGateModal === 'function') {
+                window.openLevelGateModal(config.name, config.minLevel);
+            } else {
+                showToast(`Сервис доступен с ${config.minLevel} уровня!`);
+            }
+            return false;
+        }
+
+        // Если уровень достаточен, но сервис платный — показываем окно покупки доступа
+        this.showAppUnlockPrompt(appId, configKey, config);
+        return false;
+    },
+
+    showAppUnlockPrompt(appId, configKey, config) {
+        const pLvl = state.player?.level || 1;
+        const cash = state.player?.cash || 0;
+        const stars = state.player?.stars || 0;
+        const tickets = state.player?.tickets || 0;
+
+        const hasCash = cash >= (config.costCash || 0);
+        const hasStars = stars >= (config.costStars || 0);
+        const hasTickets = tickets >= (config.costTickets || 0);
+
+        let priceList = [];
+        if (config.costCash > 0) priceList.push(`${config.costCash.toLocaleString()} ₽`);
+        if (config.costStars > 0) priceList.push(`${config.costStars} ⭐ звёзд`);
+        if (config.costTickets > 0) priceList.push(`${config.costTickets} 🎫 билетов`);
+
+        const priceText = priceList.length > 0 ? priceList.join(' + ') : 'Бесплатно';
+        const canUnlock = hasCash && hasStars && hasTickets;
+
+        let modal = document.getElementById('modalAppUnlockPrompt');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalAppUnlockPrompt';
+            modal.className = 'modal-overlay';
+            document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+            <div class="modal-box text-center" style="max-width: 410px; border-color: var(--cyan); background: radial-gradient(circle at 50% 0%, #151d2f 0%, #070a10 85%);">
+                <div class="radar-spinner-ring mb-2" style="border-top-color: var(--cyan); border-right-color: var(--green); margin: 0 auto 10px auto;">
+                    <div class="radar-spinner-center" style="font-size:24px;">🔑</div>
+                </div>
+
+                <div class="modal-glow-badge mb-1" style="color:var(--cyan); border-color:var(--cyan); background:rgba(0,242,254,0.1); display:inline-block;">
+                    РАЗБЛОКИРОВКА СЕРВИСА
+                </div>
+
+                <h3 class="font-bold mb-1 color-cyan" style="font-size:16px;">${config.name}</h3>
+                
+                <p class="sub-label mb-3" style="font-size:11px; line-height:1.45; color:#cbd5e1; padding: 0 6px;">
+                    ${config.desc || 'Получите постоянный доступ к данному разделу сервиса.'}
+                </p>
+
+                <div class="p-2 mb-3 text-left" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
+                    <div class="flex-between text-xs mb-1">
+                        <span class="sub-label">Стоимость лицензии:</span>
+                        <b class="color-green" style="font-size:13px;">${priceText}</b>
+                    </div>
+                    <div class="flex-between" style="font-size:9.5px; color:#94a3b8;">
+                        <span>Ваш баланс:</span>
+                        <span>${cash.toLocaleString()} ₽ | ${stars} ⭐ | ${tickets} 🎫</span>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <button onclick="PhoneManager.confirmUnlockAppAction('${appId}', '${configKey}')" class="btn ${canUnlock ? 'btn-green' : 'btn-dark opacity-50'} sm w-full font-bold" ${canUnlock ? '' : 'disabled'}>
+                        ${canUnlock ? `Оплатить и открыть (${priceText}) ✓` : 'Недостаточно средств для оплаты'}
+                    </button>
+                    <button onclick="ModalManager.close('modalAppUnlockPrompt')" class="btn btn-dark btn-sm w-full">
+                        Отмена
+                    </button>
+                </div>
+            </div>
+        `;
+
+        ModalManager.open('modalAppUnlockPrompt', { closeOthers: true });
+        if (typeof playSound === 'function') playSound('tick');
+    },
+
+    confirmUnlockAppAction(appId, configKey) {
+        const config = (window.APP_ACCESS_CONFIG && window.APP_ACCESS_CONFIG[configKey]) ? window.APP_ACCESS_CONFIG[configKey] : null;
+        if (!config) return;
+
+        const cash = state.player?.cash || 0;
+        const stars = state.player?.stars || 0;
+        const tickets = state.player?.tickets || 0;
+
+        if (cash < (config.costCash || 0)) return showToast("Не хватает денег для оплаты!");
+        if (stars < (config.costStars || 0)) return showToast("Не хватает звёзд ⭐ для оплаты!");
+        if (tickets < (config.costTickets || 0)) return showToast("Не хватает билетов 🎫 для оплаты!");
+
+        if (config.costCash > 0) state.player.cash -= config.costCash;
+        if (config.costStars > 0) state.player.stars -= config.costStars;
+        if (config.costTickets > 0) state.player.tickets -= config.costTickets;
+
+        if (!state.player.unlockedApps) state.player.unlockedApps = [];
+        if (!state.player.unlockedApps.includes(configKey)) {
+            state.player.unlockedApps.push(configKey);
+        }
+
+        ModalManager.close('modalAppUnlockPrompt');
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast(`Сервис «${config.name}» успешно разблокирован!`);
+        
+        this.openApp(appId);
+    },
+
     openApp(appId) {
+        // Проверка уровней и платных входов
+        if (!this.checkAppAccess(appId)) {
+            return;
+        }
+
         const homeScreen = document.getElementById('phoneHomeScreen');
         const appContainer = document.getElementById('phoneAppContainer');
         if (!appContainer) return;
@@ -298,7 +445,7 @@ const PhoneManager = {
             <div class="phone-app-body">
                 <div class="glass-card p-3 mb-2">
                     <b class="text-xs color-purple block mb-1">Связи: ${conn} 🤝</b>
-                    <div class="sub-label">Услуги урегулирования споров и отмыва документов.</div>
+                    <div class="sub-label">Услуги урегулирования споров, снятия арестов и отмыва документов.</div>
                 </div>
             </div>
         `;
@@ -532,7 +679,7 @@ const PhoneManager = {
 // ========================================================
 const DEFAULT_BARN_TIERS = [
     { 
-        tier: 1, reqLvl: 1, cost: 35000, reqStars: 2, title: "🏚️ Сарай в СНТ «Заря»", 
+        tier: 1, reqLvl: 3, cost: 35000, reqStars: 2, title: "🏚️ Сарай в СНТ «Заря»", 
         desc: "Дачный кооператив. Старый деревянный сарай среди яблонь. Советская классика и архивные номера.", 
         classGrade: "barn-grade-1", rareIdx: 0,
         img: "assets/barns/barn_tier1.jpg",

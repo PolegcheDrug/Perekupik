@@ -1,6 +1,6 @@
 // ========================================================
-// data_cars.js — БАЗА ДАННЫХ АВТОТЕХНИКИ (С МУЛЬТИ-ФОТО)
-// 10 дополнительных картинок для каждого вида транспорта
+// data_cars.js — БАЗА ДАННЫХ АВТОТЕХНИКИ (С МУЛЬТИ-ФОТО И ВИЛКОЙ ЦЕН)
+// 10 картинок для каждой модели с динамической вариацией цены и комплектации
 // ========================================================
 
 const CAR_FALLBACKS_BY_CATEGORY = {
@@ -20,7 +20,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2101 «Копейка»", 
             power: 64, 
-            basePrice: 75000, 
+            basePrice: 65000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/2101/vaz-2101.jpg",
@@ -42,7 +43,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2105 «Пятерка»", 
             power: 71, 
-            basePrice: 85000, 
+            basePrice: 78000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/2105/vaz-2105.jpg",
@@ -64,7 +66,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2106 «Шестерка»", 
             power: 75, 
-            basePrice: 90000, 
+            basePrice: 82000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.38 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/2106/vaz-2106.jpg",
@@ -86,7 +89,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2107 «Семёрка»", 
             power: 74, 
-            basePrice: 110000, 
+            basePrice: 98000, 
+            priceVariation: { minMultiplier: 0.78, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/2107/vaz-2107.jpg",
@@ -108,7 +112,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2108 «Зубило»", 
             power: 70, 
-            basePrice: 120000, 
+            basePrice: 105000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/2108/vaz-2108.jpg",
@@ -117,7 +122,6 @@ const CAR_DATABASE = {
                 "assets/cars/economy/2108/vaz-2108_1.jpg",
                 "assets/cars/economy/2108/vaz-2108_2.jpg",
                 "assets/cars/economy/2108/vaz-2108_3.jpg",
-                "assets/cars/economy/2108/vaz-2108_4.jpg",
                 "assets/cars/economy/2108/vaz-2108_4.jpg",
                 "assets/cars/economy/2108/vaz-2108_5.jpg",
                 "assets/cars/economy/2108/vaz-2108_6.jpg",
@@ -131,7 +135,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2109 «Девятка»", 
             power: 72, 
-            basePrice: 135000, 
+            basePrice: 118000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/2109/vaz-2109.jpg",
@@ -153,7 +158,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-21099 «Дуплет»", 
             power: 78, 
-            basePrice: 145000, 
+            basePrice: 125000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/21099/vaz-21099.jpg",
@@ -175,7 +181,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2110 «Десятка»", 
             power: 89, 
-            basePrice: 155000, 
+            basePrice: 135000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/2110/vaz-2110.jpg",
@@ -197,7 +204,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2112 «Двенашка»", 
             power: 91, 
-            basePrice: 165000, 
+            basePrice: 145000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/2112/vaz-2112.jpg",
@@ -219,7 +227,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2114 «Четырка»", 
             power: 81, 
-            basePrice: 160000, 
+            basePrice: 142000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/2114/vaz-2114.jpg",
@@ -241,7 +250,8 @@ const CAR_DATABASE = {
         { 
             name: "ВАЗ-2115 «Пятнашка»", 
             power: 81, 
-            basePrice: 165000, 
+            basePrice: 148000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/2115/vaz-2115.jpg",
@@ -263,7 +273,8 @@ const CAR_DATABASE = {
         { 
             name: "Audi A6 C5", 
             power: 165, 
-            basePrice: 390000, 
+            basePrice: 360000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/a6c5/a6c5.jpg",
@@ -285,7 +296,8 @@ const CAR_DATABASE = {
         { 
             name: "Nissan Almera Classic", 
             power: 107, 
-            basePrice: 440000, 
+            basePrice: 390000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/almera/almera.jpg",
@@ -307,7 +319,8 @@ const CAR_DATABASE = {
         { 
             name: "Audi 80 B4 «Бочка»", 
             power: 90, 
-            basePrice: 240000, 
+            basePrice: 210000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/audi80/audi80.jpg",
@@ -329,7 +342,8 @@ const CAR_DATABASE = {
         { 
             name: "Mitsubishi Carisma", 
             power: 103, 
-            basePrice: 280000, 
+            basePrice: 240000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/carisma/carisma.jpg",
@@ -351,7 +365,8 @@ const CAR_DATABASE = {
         { 
             name: "Porsche Cayenne (Старый)", 
             power: 250, 
-            basePrice: 550000, 
+            basePrice: 480000, 
+            priceVariation: { minMultiplier: 0.65, maxMultiplier: 1.45 },
             drivetrain: "awd", 
             type: "economy", 
             img: "assets/cars/economy/cayenne_old/cayenne_old.jpg",
@@ -373,7 +388,8 @@ const CAR_DATABASE = {
         { 
             name: "Toyota Chaser (X100)", 
             power: 200, 
-            basePrice: 590000, 
+            basePrice: 520000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.45 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/chaser/chaser.jpg",
@@ -395,7 +411,8 @@ const CAR_DATABASE = {
         { 
             name: "Chevrolet Niva", 
             power: 80, 
-            basePrice: 340000, 
+            basePrice: 290000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "awd", 
             type: "economy", 
             img: "assets/cars/economy/chevy_niva/chevy_niva.jpg",
@@ -417,7 +434,8 @@ const CAR_DATABASE = {
         { 
             name: "BMW E34 520i", 
             power: 150, 
-            basePrice: 290000, 
+            basePrice: 250000, 
+            priceVariation: { minMultiplier: 0.65, maxMultiplier: 1.45 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/e34/e34.jpg",
@@ -439,7 +457,8 @@ const CAR_DATABASE = {
         { 
             name: "BMW E36 318i", 
             power: 115, 
-            basePrice: 340000, 
+            basePrice: 290000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/e36/e36.jpg",
@@ -461,7 +480,8 @@ const CAR_DATABASE = {
         { 
             name: "BMW 7 Series (E38)", 
             power: 193, 
-            basePrice: 420000, 
+            basePrice: 380000, 
+            priceVariation: { minMultiplier: 0.65, maxMultiplier: 1.45 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/e38/e38.jpg",
@@ -483,7 +503,8 @@ const CAR_DATABASE = {
         { 
             name: "Ford Focus I", 
             power: 100, 
-            basePrice: 320000, 
+            basePrice: 280000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/focus1/focus1.jpg",
@@ -505,7 +526,8 @@ const CAR_DATABASE = {
         { 
             name: "Lada Granta I", 
             power: 87, 
-            basePrice: 380000, 
+            basePrice: 340000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/granta/granta.jpg",
@@ -527,7 +549,8 @@ const CAR_DATABASE = {
         { 
             name: "ИЖ-2126 «Ода»", 
             power: 73, 
-            basePrice: 65000, 
+            basePrice: 58000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/izh/izh.jpg",
@@ -549,7 +572,8 @@ const CAR_DATABASE = {
         { 
             name: "Lada Kalina I", 
             power: 81, 
-            basePrice: 240000, 
+            basePrice: 210000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/kalina/kalina.jpg",
@@ -571,7 +595,8 @@ const CAR_DATABASE = {
         { 
             name: "Mitsubishi Lancer IX", 
             power: 98, 
-            basePrice: 410000, 
+            basePrice: 360000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/lancer9/lancer9.jpg",
@@ -593,7 +618,8 @@ const CAR_DATABASE = {
         { 
             name: "Chevrolet Lanos", 
             power: 86, 
-            basePrice: 190000, 
+            basePrice: 170000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/lanos/lanos.jpg",
@@ -615,7 +641,8 @@ const CAR_DATABASE = {
         { 
             name: "Renault Logan I", 
             power: 75, 
-            basePrice: 370000, 
+            basePrice: 320000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/logan/logan.jpg",
@@ -637,7 +664,8 @@ const CAR_DATABASE = {
         { 
             name: "Daewoo Matiz", 
             power: 51, 
-            basePrice: 130000, 
+            basePrice: 110000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/matiz/matiz.jpg",
@@ -659,7 +687,8 @@ const CAR_DATABASE = {
         { 
             name: "Москвич-412", 
             power: 75, 
-            basePrice: 55000, 
+            basePrice: 48000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/moskvich/moskvich.jpg",
@@ -681,7 +710,8 @@ const CAR_DATABASE = {
         { 
             name: "Daewoo Nexia", 
             power: 80, 
-            basePrice: 170000, 
+            basePrice: 150000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/nexia/nexia.jpg",
@@ -703,7 +733,8 @@ const CAR_DATABASE = {
         { 
             name: "Нива 2121 4x4", 
             power: 83, 
-            basePrice: 280000, 
+            basePrice: 250000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "economy", 
             img: "assets/cars/economy/niva/niva.jpg",
@@ -725,7 +756,8 @@ const CAR_DATABASE = {
         { 
             name: "Skoda Octavia Tour", 
             power: 102, 
-            basePrice: 310000, 
+            basePrice: 280000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/octavia/octavia.jpg",
@@ -747,7 +779,8 @@ const CAR_DATABASE = {
         { 
             name: "Ока (ВАЗ-1111)", 
             power: 33, 
-            basePrice: 45000, 
+            basePrice: 38000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/oka/oka.jpg",
@@ -769,7 +802,8 @@ const CAR_DATABASE = {
         { 
             name: "Range Rover P38", 
             power: 218, 
-            basePrice: 380000, 
+            basePrice: 340000, 
+            priceVariation: { minMultiplier: 0.60, maxMultiplier: 1.50 },
             drivetrain: "awd", 
             type: "economy", 
             img: "assets/cars/economy/p38/p38.jpg",
@@ -791,7 +825,8 @@ const CAR_DATABASE = {
         { 
             name: "Lada Priora", 
             power: 98, 
-            basePrice: 310000, 
+            basePrice: 280000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/priora/priora.jpg",
@@ -813,7 +848,8 @@ const CAR_DATABASE = {
         { 
             name: "Renault Sandero I", 
             power: 84, 
-            basePrice: 420000, 
+            basePrice: 380000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "economy", 
             img: "assets/cars/economy/sandero/sandero.jpg",
@@ -835,7 +871,8 @@ const CAR_DATABASE = {
         { 
             name: "УАЗ 469 «Бобик»", 
             power: 75, 
-            basePrice: 150000, 
+            basePrice: 135000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "economy", 
             img: "assets/cars/economy/uaz469/uaz469.jpg",
@@ -857,7 +894,8 @@ const CAR_DATABASE = {
         { 
             name: "ГАЗ-3110 «Волга»", 
             power: 130, 
-            basePrice: 140000, 
+            basePrice: 125000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/volga/volga.jpg",
@@ -879,7 +917,8 @@ const CAR_DATABASE = {
         { 
             name: "ГАЗ-31105 «Волга»", 
             power: 137, 
-            basePrice: 210000, 
+            basePrice: 185000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/volga105/volga105.jpg",
@@ -901,7 +940,8 @@ const CAR_DATABASE = {
         { 
             name: "Mercedes S-Class (W140)", 
             power: 231, 
-            basePrice: 480000, 
+            basePrice: 440000, 
+            priceVariation: { minMultiplier: 0.65, maxMultiplier: 1.45 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/w140/w140.jpg",
@@ -923,7 +963,8 @@ const CAR_DATABASE = {
         { 
             name: "Mercedes W202 C180", 
             power: 122, 
-            basePrice: 310000, 
+            basePrice: 280000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/w202/w202.jpg",
@@ -945,7 +986,8 @@ const CAR_DATABASE = {
         { 
             name: "Mercedes W210 «Лупатый»", 
             power: 136, 
-            basePrice: 350000, 
+            basePrice: 310000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/w210/w210.jpg",
@@ -967,7 +1009,8 @@ const CAR_DATABASE = {
         { 
             name: "ЗАЗ-968М «Запорожец»", 
             power: 40, 
-            basePrice: 40000, 
+            basePrice: 35000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "rwd", 
             type: "economy", 
             img: "assets/cars/economy/zaz/zaz.jpg",
@@ -991,7 +1034,8 @@ const CAR_DATABASE = {
         { 
             name: "Honda Dio AF34", 
             power: 7, 
-            basePrice: 45000, 
+            basePrice: 42000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "scooter", 
             img: "assets/moto/dio/dio.jpg", 
@@ -1013,7 +1057,8 @@ const CAR_DATABASE = {
         { 
             name: "Yamaha Jog ZR", 
             power: 8, 
-            basePrice: 55000, 
+            basePrice: 52000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "scooter", 
             img: "assets/moto/jog/jog.jpg", 
@@ -1035,7 +1080,8 @@ const CAR_DATABASE = {
         { 
             name: "Suzuki Lets 2", 
             power: 6, 
-            basePrice: 38000, 
+            basePrice: 35000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "scooter", 
             img: "assets/moto/lets/lets.jpg", 
@@ -1057,7 +1103,8 @@ const CAR_DATABASE = {
         { 
             name: "Honda Tact AF24", 
             power: 6, 
-            basePrice: 42000, 
+            basePrice: 39000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "scooter", 
             img: "assets/moto/tact/tact.jpg", 
@@ -1079,7 +1126,8 @@ const CAR_DATABASE = {
         { 
             name: "Vespa Primavera 150", 
             power: 13, 
-            basePrice: 220000, 
+            basePrice: 195000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "scooter", 
             img: "assets/moto/vespa/vespa.jpg", 
@@ -1103,7 +1151,8 @@ const CAR_DATABASE = {
         { 
             name: "Иж Юпитер-5 с люлькой", 
             power: 24, 
-            basePrice: 85000, 
+            basePrice: 78000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/jupiter/jupiter.jpg", 
@@ -1125,7 +1174,8 @@ const CAR_DATABASE = {
         { 
             name: "Ява-350 (638)", 
             power: 26, 
-            basePrice: 120000, 
+            basePrice: 110000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/jawa/jawa.jpg", 
@@ -1147,7 +1197,8 @@ const CAR_DATABASE = {
         { 
             name: "Bajaj Pulsar NS200", 
             power: 25, 
-            basePrice: 240000, 
+            basePrice: 220000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/pulsar/pulsar.jpg", 
@@ -1169,7 +1220,8 @@ const CAR_DATABASE = {
         { 
             name: "Kawasaki Ninja 300", 
             power: 39, 
-            basePrice: 450000, 
+            basePrice: 420000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/ninja/ninja.jpg", 
@@ -1191,7 +1243,8 @@ const CAR_DATABASE = {
         { 
             name: "Honda CB400 Super Four", 
             power: 53, 
-            basePrice: 370000, 
+            basePrice: 340000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/cb400/cb400.jpg", 
@@ -1213,7 +1266,8 @@ const CAR_DATABASE = {
         { 
             name: "Yamaha MT-07", 
             power: 74, 
-            basePrice: 890000, 
+            basePrice: 840000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/mt07/mt07.jpg", 
@@ -1235,7 +1289,8 @@ const CAR_DATABASE = {
         { 
             name: "KTM 390 Duke", 
             power: 44, 
-            basePrice: 560000, 
+            basePrice: 520000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/duke/duke.jpg", 
@@ -1257,7 +1312,8 @@ const CAR_DATABASE = {
         { 
             name: "Harley-Davidson Iron 883", 
             power: 51, 
-            basePrice: 1250000, 
+            basePrice: 1180000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/iron883/iron883.jpg", 
@@ -1279,7 +1335,8 @@ const CAR_DATABASE = {
         { 
             name: "BMW R1250GS Adventure", 
             power: 136, 
-            basePrice: 2600000, 
+            basePrice: 2450000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/gs1250/gs1250.jpg", 
@@ -1301,7 +1358,8 @@ const CAR_DATABASE = {
         { 
             name: "Yamaha YZF-R1", 
             power: 200, 
-            basePrice: 2200000, 
+            basePrice: 2100000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/r1/r1.jpg", 
@@ -1323,7 +1381,8 @@ const CAR_DATABASE = {
         { 
             name: "Ducati Panigale V4", 
             power: 214, 
-            basePrice: 3400000, 
+            basePrice: 3200000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "moto", 
             img: "assets/moto/ducati/ducati.jpg", 
@@ -1347,7 +1406,8 @@ const CAR_DATABASE = {
         { 
             name: "CFMOTO CFORCE 500", 
             power: 35, 
-            basePrice: 620000, 
+            basePrice: 580000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "awd", 
             type: "atv", 
             img: "assets/moto/cforce/cforce.jpg", 
@@ -1369,7 +1429,8 @@ const CAR_DATABASE = {
         { 
             name: "Stels Guepard 850", 
             power: 71, 
-            basePrice: 950000, 
+            basePrice: 890000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "awd", 
             type: "atv", 
             img: "assets/moto/guepard/guepard.jpg", 
@@ -1391,7 +1452,8 @@ const CAR_DATABASE = {
         { 
             name: "Yamaha Grizzly 700", 
             power: 49, 
-            basePrice: 1400000, 
+            basePrice: 1350000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "awd", 
             type: "atv", 
             img: "assets/moto/grizzly/grizzly.jpg", 
@@ -1413,7 +1475,8 @@ const CAR_DATABASE = {
         { 
             name: "BRP Can-Am Maverick X3", 
             power: 195, 
-            basePrice: 3600000, 
+            basePrice: 3400000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "atv", 
             img: "assets/moto/maverick/maverick.jpg", 
@@ -1437,7 +1500,8 @@ const CAR_DATABASE = {
         { 
             name: "Hyundai Solaris I", 
             power: 123, 
-            basePrice: 680000, 
+            basePrice: 620000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/solaris/solaris.jpg", 
@@ -1459,7 +1523,8 @@ const CAR_DATABASE = {
         { 
             name: "Kia Rio 3", 
             power: 123, 
-            basePrice: 710000, 
+            basePrice: 650000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/rio/rio.jpg", 
@@ -1481,7 +1546,8 @@ const CAR_DATABASE = {
         { 
             name: "VW Polo Sedan", 
             power: 110, 
-            basePrice: 870000, 
+            basePrice: 780000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/polo/polo.jpg", 
@@ -1503,7 +1569,8 @@ const CAR_DATABASE = {
         { 
             name: "Skoda Rapid", 
             power: 110, 
-            basePrice: 920000, 
+            basePrice: 840000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/rapid/rapid.jpg", 
@@ -1525,7 +1592,8 @@ const CAR_DATABASE = {
         { 
             name: "Ford Focus III", 
             power: 125, 
-            basePrice: 970000, 
+            basePrice: 890000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/focus/focus.jpg", 
@@ -1547,7 +1615,8 @@ const CAR_DATABASE = {
         { 
             name: "Chevrolet Cruze", 
             power: 109, 
-            basePrice: 790000, 
+            basePrice: 720000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/cruze/cruze.jpg", 
@@ -1569,7 +1638,8 @@ const CAR_DATABASE = {
         { 
             name: "Skoda Octavia A7 1.8 TSI", 
             power: 180, 
-            basePrice: 1450000, 
+            basePrice: 1350000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/octavia/octavia.jpg", 
@@ -1591,7 +1661,8 @@ const CAR_DATABASE = {
         { 
             name: "VW Golf VI GTI", 
             power: 211, 
-            basePrice: 1550000, 
+            basePrice: 1450000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.40 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/golf6/golf6.jpg", 
@@ -1613,7 +1684,8 @@ const CAR_DATABASE = {
         { 
             name: "Toyota Camry XV50", 
             power: 181, 
-            basePrice: 1950000, 
+            basePrice: 1850000, 
+            priceVariation: { minMultiplier: 0.78, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/camry/camry.jpg", 
@@ -1635,7 +1707,8 @@ const CAR_DATABASE = {
         { 
             name: "Kia Optima (JF)", 
             power: 188, 
-            basePrice: 1900000, 
+            basePrice: 1780000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/optima/optima.jpg", 
@@ -1657,7 +1730,8 @@ const CAR_DATABASE = {
         { 
             name: "Kia K5", 
             power: 194, 
-            basePrice: 2450000, 
+            basePrice: 2350000, 
+            priceVariation: { minMultiplier: 0.78, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/k5/k5.jpg", 
@@ -1679,7 +1753,8 @@ const CAR_DATABASE = {
         { 
             name: "Mazda 6 (GJ)", 
             power: 192, 
-            basePrice: 2150000, 
+            basePrice: 2050000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "fwd", 
             type: "comfort", 
             img: "assets/cars/comfort/mazda6/mazda6.jpg", 
@@ -1701,7 +1776,8 @@ const CAR_DATABASE = {
         { 
             name: "Toyota RAV4 (XA40)", 
             power: 150, 
-            basePrice: 2350000, 
+            basePrice: 2200000, 
+            priceVariation: { minMultiplier: 0.78, maxMultiplier: 1.30 },
             drivetrain: "awd", 
             type: "comfort", 
             img: "assets/cars/comfort/rav4/rav4.jpg", 
@@ -1723,7 +1799,8 @@ const CAR_DATABASE = {
         { 
             name: "Mazda CX-5", 
             power: 194, 
-            basePrice: 2400000, 
+            basePrice: 2250000, 
+            priceVariation: { minMultiplier: 0.78, maxMultiplier: 1.30 },
             drivetrain: "awd", 
             type: "comfort", 
             img: "assets/cars/comfort/cx5/cx5.jpg", 
@@ -1745,7 +1822,8 @@ const CAR_DATABASE = {
         { 
             name: "Geely Monjaro", 
             power: 238, 
-            basePrice: 3300000, 
+            basePrice: 3100000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.25 },
             drivetrain: "awd", 
             type: "comfort", 
             img: "assets/cars/comfort/monjaro/monjaro.jpg", 
@@ -1769,7 +1847,8 @@ const CAR_DATABASE = {
         { 
             name: "BMW 3 Series (G20)", 
             power: 190, 
-            basePrice: 3600000, 
+            basePrice: 3400000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "premium", 
             img: "assets/cars/premium/g20/g20.jpg", 
@@ -1791,7 +1870,8 @@ const CAR_DATABASE = {
         { 
             name: "BMW 5 Series (G30)", 
             power: 249, 
-            basePrice: 4200000, 
+            basePrice: 4100000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/g30/g30.jpg", 
@@ -1813,7 +1893,8 @@ const CAR_DATABASE = {
         { 
             name: "Mercedes E-Class (W213)", 
             power: 249, 
-            basePrice: 4400000, 
+            basePrice: 4300000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/w213/w213.jpg", 
@@ -1835,7 +1916,8 @@ const CAR_DATABASE = {
         { 
             name: "Audi A6 (C8)", 
             power: 245, 
-            basePrice: 4300000, 
+            basePrice: 4200000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/a6/a6.jpg", 
@@ -1857,7 +1939,8 @@ const CAR_DATABASE = {
         { 
             name: "BMW M340i xDrive", 
             power: 387, 
-            basePrice: 5100000, 
+            basePrice: 4900000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.40 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/bmw_m340i/bmw_m_340i.jpeg", 
@@ -1879,7 +1962,8 @@ const CAR_DATABASE = {
         { 
             name: "Mercedes C63s AMG", 
             power: 510, 
-            basePrice: 5600000, 
+            basePrice: 5400000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.40 },
             drivetrain: "rwd", 
             type: "premium", 
             img: "assets/cars/premium/c63/mercedes_c_c63_w205_sedan.jpeg", 
@@ -1901,7 +1985,8 @@ const CAR_DATABASE = {
         { 
             name: "Porsche Macan GTS", 
             power: 440, 
-            basePrice: 7800000, 
+            basePrice: 7500000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/macan/macan.jpg", 
@@ -1923,7 +2008,8 @@ const CAR_DATABASE = {
         { 
             name: "BMW X5 (G05)", 
             power: 340, 
-            basePrice: 8900000, 
+            basePrice: 8600000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/x5/x5.jpg", 
@@ -1945,7 +2031,8 @@ const CAR_DATABASE = {
         { 
             name: "BMW X6 (G06)", 
             power: 340, 
-            basePrice: 9400000, 
+            basePrice: 9100000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/x6/x6.jpg", 
@@ -1967,7 +2054,8 @@ const CAR_DATABASE = {
         { 
             name: "Porsche Cayenne (PO536)", 
             power: 340, 
-            basePrice: 11000000, 
+            basePrice: 10500000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/cayenne/cayenne_new.jpg", 
@@ -1989,7 +2077,8 @@ const CAR_DATABASE = {
         { 
             name: "Toyota Land Cruiser 300", 
             power: 415, 
-            basePrice: 12500000, 
+            basePrice: 12000000, 
+            priceVariation: { minMultiplier: 0.82, maxMultiplier: 1.30 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/lc300/lc300.jpg", 
@@ -2011,7 +2100,8 @@ const CAR_DATABASE = {
         { 
             name: "Mercedes S-Class (W223)", 
             power: 367, 
-            basePrice: 16500000, 
+            basePrice: 15800000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/w223/w223.jpg", 
@@ -2033,7 +2123,8 @@ const CAR_DATABASE = {
         { 
             name: "Mercedes G63 AMG «Гелик»", 
             power: 585, 
-            basePrice: 18500000, 
+            basePrice: 17800000, 
+            priceVariation: { minMultiplier: 0.82, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/g63/mercedes_g63amg.jpg", 
@@ -2055,7 +2146,8 @@ const CAR_DATABASE = {
         { 
             name: "Audi RS6 Avant (C8)", 
             power: 600, 
-            basePrice: 14500000, 
+            basePrice: 13900000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "premium", 
             img: "assets/cars/premium/rs6/rs6.jpg", 
@@ -2079,7 +2171,8 @@ const CAR_DATABASE = {
         { 
             name: "Nissan GT-R R35 Nismo", 
             power: 600, 
-            basePrice: 14000000, 
+            basePrice: 13500000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "hyper", 
             img: "assets/cars/hyper/gtr/gtr.jpg", 
@@ -2101,7 +2194,8 @@ const CAR_DATABASE = {
         { 
             name: "Porsche 911 GT3 RS (992)", 
             power: 525, 
-            basePrice: 32000000, 
+            basePrice: 31000000, 
+            priceVariation: { minMultiplier: 0.85, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "hyper", 
             img: "assets/cars/hyper/911/911.jpg", 
@@ -2123,7 +2217,8 @@ const CAR_DATABASE = {
         { 
             name: "Lamborghini Huracan EVO", 
             power: 640, 
-            basePrice: 38000000, 
+            basePrice: 36000000, 
+            priceVariation: { minMultiplier: 0.85, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "hyper", 
             img: "assets/cars/hyper/huracan/huracan.jpg", 
@@ -2145,7 +2240,8 @@ const CAR_DATABASE = {
         { 
             name: "Ferrari SF90 Stradale", 
             power: 1000, 
-            basePrice: 78000000, 
+            basePrice: 75000000, 
+            priceVariation: { minMultiplier: 0.85, maxMultiplier: 1.35 },
             drivetrain: "awd", 
             type: "hyper", 
             img: "assets/cars/hyper/sf90/sf90.jpg", 
@@ -2167,7 +2263,8 @@ const CAR_DATABASE = {
         { 
             name: "McLaren 720S", 
             power: 720, 
-            basePrice: 34000000, 
+            basePrice: 32000000, 
+            priceVariation: { minMultiplier: 0.85, maxMultiplier: 1.35 },
             drivetrain: "rwd", 
             type: "hyper", 
             img: "assets/cars/hyper/mclaren/mclaren.jpg", 
@@ -2189,7 +2286,8 @@ const CAR_DATABASE = {
         { 
             name: "Bugatti Chiron Sport", 
             power: 1500, 
-            basePrice: 380000000, 
+            basePrice: 360000000, 
+            priceVariation: { minMultiplier: 0.90, maxMultiplier: 1.30 },
             drivetrain: "awd", 
             type: "hyper", 
             img: "assets/cars/hyper/chiron/chiron.jpg", 
@@ -2213,7 +2311,8 @@ const CAR_DATABASE = {
         { 
             name: "ЗИЛ-130 Самосвал", 
             power: 150, 
-            basePrice: 280000, 
+            basePrice: 260000, 
+            priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
             drivetrain: "rwd", 
             type: "truck", 
             img: "assets/cars/truck/zil/zil.jpg", 
@@ -2235,7 +2334,8 @@ const CAR_DATABASE = {
         { 
             name: "ГАЗель NEXT Рефрижератор", 
             power: 149, 
-            basePrice: 1950000, 
+            basePrice: 1850000, 
+            priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "truck", 
             img: "assets/cars/truck/gazel/gazel.jpg", 
@@ -2257,7 +2357,8 @@ const CAR_DATABASE = {
         { 
             name: "КАМАЗ-54901 Тягач", 
             power: 460, 
-            basePrice: 7800000, 
+            basePrice: 7500000, 
+            priceVariation: { minMultiplier: 0.78, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "truck", 
             img: "assets/cars/truck/kamaz/kamaz.jpg", 
@@ -2279,7 +2380,8 @@ const CAR_DATABASE = {
         { 
             name: "Scania R500 V8", 
             power: 500, 
-            basePrice: 11000000, 
+            basePrice: 10500000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "truck", 
             img: "assets/cars/truck/scania/scania.jpg", 
@@ -2301,7 +2403,8 @@ const CAR_DATABASE = {
         { 
             name: "Volvo FH16 750", 
             power: 750, 
-            basePrice: 16500000, 
+            basePrice: 15800000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.30 },
             drivetrain: "rwd", 
             type: "truck", 
             img: "assets/cars/truck/volvo/volvo.jpg", 
@@ -2325,7 +2428,8 @@ const CAR_DATABASE = {
         { 
             name: "Гидроцикл Yamaha FX SVHO", 
             power: 250, 
-            basePrice: 1950000, 
+            basePrice: 1850000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.30 },
             drivetrain: "jet", 
             type: "yacht", 
             img: "assets/cars/yacht/yamaha/yamaha.jpg", 
@@ -2347,7 +2451,8 @@ const CAR_DATABASE = {
         { 
             name: "Катер Bayliner VR5", 
             power: 200, 
-            basePrice: 4800000, 
+            basePrice: 4500000, 
+            priceVariation: { minMultiplier: 0.80, maxMultiplier: 1.30 },
             drivetrain: "prop", 
             type: "yacht", 
             img: "assets/cars/yacht/bayliner/bayliner.jpg", 
@@ -2369,7 +2474,8 @@ const CAR_DATABASE = {
         { 
             name: "Azimut Atlantis 45", 
             power: 880, 
-            basePrice: 78000000, 
+            basePrice: 75000000, 
+            priceVariation: { minMultiplier: 0.85, maxMultiplier: 1.30 },
             drivetrain: "prop", 
             type: "yacht", 
             img: "assets/cars/yacht/azimut/azimut.jpg", 

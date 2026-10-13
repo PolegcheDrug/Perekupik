@@ -1,5 +1,5 @@
 // ========================================================
-// js/garage-calc.js — РАСЧЁТЫ, КОНФИГУРАЦИИ И БЕЙДЖИ ГАРАЖА
+// js/garage-calc.js — РАСЧЁТЫ, КОНФИГУРАЦИИ И БЕЙДЖИ ГАРАЖА (v1.1.0)
 // ========================================================
 
 const INSURANCE_CONFIG = {
@@ -12,25 +12,25 @@ const INSURANCE_CONFIG = {
 
 const TUNING_CONFIG = {
     engine: [
-        { id: 'coldIntake', name: '🌪️ Холодный впуск K&N', baseCost: 28000, power: 12, risk: 5, desc: '+12 л.с., сочный звук впуска (+32k ₽ к цене).' },
-        { id: 'intercooler', name: '❄️ Фронтальный интеркулер', baseCost: 42000, power: 15, risk: 5, desc: 'Стабильный буст в жару (+48k ₽ к цене).' }
+        { id: 'coldIntake', name: '🌪️ Холодный впуск K&N', baseCost: 26000, power: 12, risk: 5, desc: '+12 л.с., сочный звук впуска (+32k ₽ к цене).' },
+        { id: 'intercooler', name: '❄️ Фронтальный интеркулер', baseCost: 38000, power: 15, risk: 5, desc: 'Стабильный буст в жару (+48k ₽ к цене).' }
     ],
     drift: [
-        { id: 'weldedDiff', name: '🔩 Заварка редуктора', baseCost: 12000, power: 0, risk: 5, desc: 'Блокировка задней оси для дрифта (+22k ₽ к цене).' },
-        { id: 'steeringAngle', name: '📐 Красноярский выворот', baseCost: 25000, power: 0, risk: 10, desc: 'Сошки и рычаги для глубокого угла (+45k ₽ к цене).' },
-        { id: 'hydroHandbrake', name: '🕹️ Гидроручник с цилиндром Wilwood', baseCost: 35000, power: 0, risk: 15, desc: 'Мгновенный срыв задней оси в занос (+60k ₽ к цене).' },
-        { id: 'bucketSeats', name: '💺 Спортивные ковши с омологацией', baseCost: 45000, power: 0, risk: 5, desc: 'Жёсткая фиксация в перегрузках (+75k ₽ к цене).' }
+        { id: 'weldedDiff', name: '🔩 Заварка редуктора', baseCost: 10000, power: 0, risk: 5, desc: 'Блокировка задней оси для дрифта (+22k ₽ к цене).' },
+        { id: 'steeringAngle', name: '📐 Красноярский выворот', baseCost: 22000, power: 0, risk: 10, desc: 'Сошки и рычаги для глубокого угла (+45k ₽ к цене).' },
+        { id: 'hydroHandbrake', name: '🕹️ Гидроручник с цилиндром Wilwood', baseCost: 32000, power: 0, risk: 15, desc: 'Мгновенный срыв задней оси в занос (+58k ₽ к цене).' },
+        { id: 'bucketSeats', name: '💺 Спортивные ковши с омологацией', baseCost: 40000, power: 0, risk: 5, desc: 'Жёсткая фиксация в перегрузках (+70k ₽ к цене).' }
     ],
     drag: [
-        { id: 'dragSlicks', name: '🛞 Полуслики Toyo R888R', baseCost: 45000, power: 0, risk: 5, desc: 'Максимальный зацеп на старте (+70k ₽ к цене).' },
-        { id: 'rollCage', name: '🛡️ Вварной каркас безопасности', baseCost: 85000, power: 0, risk: 25, desc: 'Жёсткость кузова и безопасность (+140k ₽ к цене).' }
+        { id: 'dragSlicks', name: '🛞 Полуслики Toyo R888R', baseCost: 42000, power: 0, risk: 5, desc: 'Максимальный зацеп на старте (+65k ₽ к цене).' },
+        { id: 'rollCage', name: '🛡️ Вварной каркас безопасности', baseCost: 78000, power: 0, risk: 25, desc: 'Жёсткость кузова и безопасность (+130k ₽ к цене).' }
     ],
     style: [
-        { id: 'stance', name: '🏎️ 4-контурная пневмоподвеска', baseCost: 75000, power: 0, risk: 15, desc: 'Дроп кузова в пол на сходках (+120k ₽ к цене).' },
-        { id: 'customWheels', name: '✨ Кованые диски Work Meister', baseCost: 60000, power: 0, risk: 5, desc: 'Широкая полка и правильный натяг (+95k ₽ к цене).' },
-        { id: 'bodykit', name: '🌪️ Обвес Rocket Bunny', baseCost: 50000, power: 0, risk: 10, desc: 'Фендеры и дактейл (+85k ₽ к цене).' },
-        { id: 'tinted', name: '🕶️ Тонировка «в круг» 5%', baseCost: 12000, power: 0, risk: 20, desc: 'Дерзкий вид, внимание молодёжи (+18k ₽ к цене).' },
-        { id: 'exhaust', name: '💨 Спортивная трасса 76мм', baseCost: 35000, power: 0, risk: 15, desc: 'Басистый выхлоп и отстрелы (+55k ₽ к цене).' }
+        { id: 'stance', name: '🏎️ 4-контурная пневмоподвеска', baseCost: 70000, power: 0, risk: 15, desc: 'Дроп кузова в пол на сходках (+115k ₽ к цене).' },
+        { id: 'customWheels', name: '✨ Кованые диски Work Meister', baseCost: 55000, power: 0, risk: 5, desc: 'Широкая полка и правильный натяг (+90k ₽ к цене).' },
+        { id: 'bodykit', name: '🌪️ Обвес Rocket Bunny', baseCost: 48000, power: 0, risk: 10, desc: 'Фендеры и дактейл (+80k ₽ к цене).' },
+        { id: 'tinted', name: '🕶️ Тонировка «в круг» 5%', baseCost: 10000, power: 0, risk: 20, desc: 'Дерзкий вид, внимание молодёжи (+18k ₽ к цене).' },
+        { id: 'exhaust', name: '💨 Спортивная трасса 76мм', baseCost: 32000, power: 0, risk: 15, desc: 'Басистый выхлоп и отстрелы (+52k ₽ к цене).' }
     ]
 };
 
@@ -117,41 +117,46 @@ function recalculateCarMarketValue(car) {
     const base = Number(car.baseMarketValue || car.basePrice || 100000);
     const cond = (car.condition !== undefined) ? Number(car.condition) : 80;
     
-    const condMultiplier = 0.70 + (cond / 100) * 0.45;
+    // Плавный расчет цены: убитый кузов дешевле, идеальный дает справедливую надбавку
+    const condMultiplier = 0.68 + (cond / 100) * 0.46;
     let currentVal = Math.round(base * condMultiplier);
 
     const t = car.tuning || {};
-    if (t.chip === 1) currentVal += 50000;
-    else if (t.chip === 2) currentVal += 115000;
-    else if (t.chip >= 3) currentVal += 290000;
+    if (t.chip === 1) currentVal += 45000;
+    else if (t.chip === 2) currentVal += 105000;
+    else if (t.chip >= 3) currentVal += 260000;
 
     const tuningBonusMap = {
         coldIntake: 32000, intercooler: 48000, weldedDiff: 22000,
-        steeringAngle: 45000, hydroHandbrake: 60000, bucketSeats: 75000,
-        dragSlicks: 70000, rollCage: 140000, exhaust: 55000,
-        stance: 120000, customWheels: 95000, bodykit: 85000, tinted: 18000
+        steeringAngle: 45000, hydroHandbrake: 58000, bucketSeats: 70000,
+        dragSlicks: 65000, rollCage: 130000, exhaust: 52000,
+        stance: 115000, customWheels: 90000, bodykit: 80000, tinted: 18000
     };
 
     Object.keys(tuningBonusMap).forEach(key => {
         if (t[key]) currentVal += tuningBonusMap[key];
     });
 
+    // Надбавки за предпродажную подготовку
     if (car.isPolished) currentVal = Math.round(currentVal * 1.12);
     if (car.isRepainted) currentVal += 45000;
     if (car.cleanInterior) currentVal += 25000;
 
+    // Штрафы за износ основных агрегатов
     const engWear = car.wear?.engine !== undefined ? Number(car.wear.engine) : 85;
     const transWear = car.wear?.transmission !== undefined ? Number(car.wear.transmission) : 85;
-    if (engWear < 40) currentVal = Math.round(currentVal * 0.88);
-    if (transWear < 40) currentVal = Math.round(currentVal * 0.92);
+    if (engWear < 40) currentVal = Math.round(currentVal * 0.86);
+    if (transWear < 40) currentVal = Math.round(currentVal * 0.90);
     
     const tires = car.tireWear !== undefined ? Number(car.tireWear) : 100;
     if (tires < 25) currentVal = Math.max(10000, currentVal - 15000);
 
+    // Скрытые дефекты снижают рыночную стоимость
     if (car.hiddenDefect && !car.hasAdditive) {
-        currentVal = Math.max(10000, currentVal - Math.round((car.hiddenDefect.cost || 15000) * 0.8));
+        currentVal = Math.max(10000, currentVal - Math.round((car.hiddenDefect.cost || 15000) * 0.85));
     }
 
+    // Бонус за красивый или архивный госномер
     const plateStr = car.customPlate || car.plate || "ТРАНЗИТ";
     if (typeof calculatePlateValue === 'function') {
         currentVal += calculatePlateValue(plateStr);

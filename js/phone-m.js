@@ -1,11 +1,8 @@
 // ========================================================
-// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.4.0)
+// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.5.4)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
-// 1. Широкоформатные обложки авто в разделе торга (как на бирже)
-// 2. Индикатор статуса просмотра лота («ПРОСМОТРЕНО» / «НОВОЕ»)
-// 3. Дистанционный торг с кнопками риска и 100% синхронизацией цен
-// 4. Полноценная P2P Биржа, Автоклубы, Напарники и Пульс
+// Интеграция P2P биржи с единым окном торга через openP2PDealModal
 // ========================================================
 
 const AppM = {
@@ -96,7 +93,7 @@ const AppM = {
     },
 
     // ========================================================
-    // 1. ВКЛАДКА: «ТОРГ В ЧАТАХ» (С ОБЛОЖКАМИ И СТАТУСОМ ПРОСМОТРА)
+    // 1. ВКЛАДКА: «ТОРГ В ЧАТАХ»
     // ========================================================
     renderChatsScreen(container) {
         if (!container) return;
@@ -142,7 +139,6 @@ const AppM = {
             let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
             let fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(carData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
 
-            // Живая синхронизация цены из лота площадки
             let priceText = "";
             if (m.carIndex !== undefined && state.salesLot?.[m.carIndex]) {
                 let slot = state.salesLot[m.carIndex];
@@ -153,14 +149,12 @@ const AppM = {
                 priceText = `${Number(m.offerPrice).toLocaleString()} ₽`;
             }
 
-            // Бейджи статуса просмотра
             let viewStatusBadge = isUnread 
                 ? `<span class="tag-badge bg-tag-red" style="font-weight:900;"><span class="led-dot led-red"></span> НОВОЕ</span>`
                 : (isViewed ? `<span class="tag-badge bg-tag-dark" style="border-color:rgba(255,255,255,0.2);"><i class="fa-solid fa-eye color-cyan mr-1"></i> ПРОСМОТРЕНО</span>` : '');
 
             return `
                 <div onclick="AppM.openDialog('${m.id}')" class="glass-card mb-3 p-2 cursor-pointer ${isUnread ? 'card-glow-deal' : ''}" style="border-left: 3px solid ${isUnread ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}; background: #090e18;">
-                    <!-- ШИРОКОФОРМАТНАЯ ОБЛОЖКА КАК НА БИРЖЕ -->
                     <div class="car-img-wrap mb-2" style="height:120px; position:relative; border-radius:10px; overflow:hidden;">
                         <img src="${carImg}" class="car-img" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
                         <div class="badge-tag badge-br">
@@ -196,7 +190,7 @@ const AppM = {
     },
 
     // --------------------------------------------------------
-    // ДИАЛОГ СДЕЛКИ: ТАКТИКА ТОРГА С РИСКАМИ И ОФОРМЛЕНИЕ ДКП
+    // ДИАЛОГ СДЕЛКИ: КНОПКА ДКП СТРОГО ВНИЗУ ПОД ТАКТИКОЙ ТОРГА
     // --------------------------------------------------------
     renderConversationScreen(container) {
         let msg = (state.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
@@ -206,11 +200,9 @@ const AppM = {
             return;
         }
 
-        // Помечаем диалог просмотренным
         msg.unread = false;
         msg.viewed = true;
 
-        // Синхронизация цен из слота площадки продаж
         let slot = (msg.carIndex !== undefined && state.salesLot?.[msg.carIndex]) ? state.salesLot[msg.carIndex] : null;
         let car = slot?.car || msg.carData || {};
         let buyerObj = slot?.currentBuyer || slot?.buyer || null;
@@ -241,7 +233,7 @@ const AppM = {
         `).join('');
 
         container.innerHTML = `
-            <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.4);">
+            <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.4); flex-shrink: 0;">
                 <button onclick="AppM.closeDialog()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
                 <div style="text-align:center;">
                     <div class="phone-app-title text-xs font-bold">${msg.sender}</div>
@@ -250,66 +242,67 @@ const AppM = {
                 <div style="width:40px;"></div>
             </div>
 
-            <div class="phone-app-body flex-col" style="justify-content: space-between;">
-                <!-- КАРТОЧКА ОБСУЖДАЕМОГО ЛОТА С ОБЛОЖКОЙ -->
-                <div class="glass-card mb-2 p-2" style="border: 1.5px solid var(--green); background: #060a14;">
-                    <div class="deal-car-preview-card mb-2" style="height:64px;">
-                        <img src="${carImg}" class="deal-car-thumb" style="width:72px; height:50px; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
+            <div class="phone-app-body" style="display:flex; flex-direction:column; height: calc(100% - 46px); min-height: 0; padding: 4px 6px 8px 6px; gap: 6px;">
+                <!-- ВЕРХНЯЯ КАРТОЧКА: СВОДКА ЛОТА БЕЗ КНОПКИ ДКП -->
+                <div class="glass-card p-2" style="border: 1.5px solid var(--green); background: #060a14; margin-bottom: 0; flex-shrink: 0;">
+                    <div class="deal-car-preview-card" style="height:56px; min-height:56px; padding: 4px 8px;">
+                        <img src="${carImg}" class="deal-car-thumb" style="width:68px; height:46px; min-width:68px; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
                         <div style="flex:1; min-width:0;">
                             <div class="flex-between">
-                                <b class="text-xs color-cyan block" style="font-size:12px;">${car.name || 'Автомобиль'}</b>
-                                <span class="tag-badge bg-tag-green">ЛОТ СИНХРОНЕН</span>
+                                <b class="text-xs color-cyan block" style="font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${car.name || 'Автомобиль'}</b>
+                                <span class="tag-badge bg-tag-green" style="font-size:7.5px;">ЛОТ СИНХРОНЕН</span>
                             </div>
-                            <div class="sub-label mt-1" style="font-size:9px;">
+                            <div class="sub-label mt-1" style="font-size:8.5px;">
                                 Цена в объявлении: <b>${Number(askingPrice).toLocaleString()} ₽</b>
                             </div>
                             <div class="flex-between mt-1">
-                                <span class="sub-label" style="font-size:8.5px;">Текущий оффер:</span>
+                                <span class="sub-label" style="font-size:8px;">Оффер покупателя:</span>
                                 <b class="color-green text-xs" style="font-size:12px;">${Number(currentOffer).toLocaleString()} ₽</b>
                             </div>
                         </div>
                     </div>
 
-                    <div class="flex-between text-xs px-1 mb-2">
-                        <span class="sub-label">Чистая прибыль по ДКП:</span>
-                        <b class="${netProfit >= 0 ? 'color-green' : 'color-red'}">${netProfit >= 0 ? '+' : ''}${Number(netProfit).toLocaleString()} ₽</b>
+                    <div class="flex-between text-xs px-1 mt-1">
+                        <span class="sub-label" style="font-size:8.5px;">Чистая прибыль по сделке:</span>
+                        <b class="${netProfit >= 0 ? 'color-green' : 'color-red'}" style="font-size:9.5px;">${netProfit >= 0 ? '+' : ''}${Number(netProfit).toLocaleString()} ₽</b>
                     </div>
-
-                    <button onclick="AppM.dealAcceptFromChat('${msg.id}')" class="btn btn-green btn-sm w-full font-bold" style="padding:8px 0; font-size:11px;">
-                        <i class="fa-solid fa-handshake mr-1"></i> Заключить ДКП за ${Number(currentOffer).toLocaleString()} ₽ 🤝
-                    </button>
                 </div>
 
-                <!-- ОКНО ПЕРЕПИСКИ -->
-                <div class="chat-thread-container mb-2" id="mChatScrollBox" style="flex:1; min-height:130px; max-height:190px; overflow-y:auto; padding:8px;">
+                <!-- ОКНО ПЕРЕПИСКИ: ГИБКИЙ СКРОЛЛ НА ВСЮ ВЫСОТУ -->
+                <div class="chat-thread-container" id="mChatScrollBox" style="flex: 1 1 auto; min-height: 120px; max-height: none; overflow-y:auto; padding:8px; background:#04070e; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
                     ${messagesHtml}
                 </div>
 
-                <!-- ИНТЕРАКТИВНЫЕ КНОПКИ ТАКТИКИ ТОРГА -->
-                <div class="p-2" style="background:#090e18; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
-                    <div class="flex-between text-xs mb-1">
-                        <span class="sub-label font-bold">Терпение клиента в чате:</span>
-                        <b class="${patienceColor}">${patiencePct}% (${patience} попытки)</b>
+                <!-- НИЖНИЙ БЛОК: ТАКТИКА ТОРГА И КНОПКА ДКП В САМОМ НИЗУ -->
+                <div class="p-2" style="background:#090e18; border-radius:12px; border:1px solid rgba(255,255,255,0.08); flex-shrink: 0; display:flex; flex-direction:column; gap:5px;">
+                    <div class="flex-between text-xs">
+                        <span class="sub-label font-bold" style="font-size:9px;">Терпение клиента в чате:</span>
+                        <b class="${patienceColor}" style="font-size:9px;">${patiencePct}% (${patience} попытки)</b>
                     </div>
-                    <div style="height:5px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; margin-bottom:8px;">
+                    <div style="height:4px; background:rgba(255,255,255,0.06); border-radius:2px; overflow:hidden;">
                         <div style="width:${patiencePct}%; height:100%; background:${patiencePct > 50 ? 'var(--green)' : (patiencePct > 25 ? 'var(--amber)' : 'var(--red)')}; transition:width 0.3s ease;"></div>
                     </div>
 
-                    <div class="sub-label mb-1" style="font-size:8px; text-transform:uppercase; font-weight:800; color:#94a3b8;">Тактика торга в чате:</div>
-                    <div class="grid-3" style="gap:5px;">
-                        <button onclick="AppM.executeChatHaggle('${msg.id}', 3, 10)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                            <div class="font-bold color-green text-xs" style="font-size:9.5px;">-3% НА ДОРОГУ</div>
-                            <div class="sub-label" style="font-size:7.5px;">РИСК: 10%</div>
+                    <div class="sub-label" style="font-size:8px; text-transform:uppercase; font-weight:800; color:#94a3b8; margin-top:2px;">Тактика торга в чате:</div>
+                    <div class="grid-3" style="gap:4px;">
+                        <button onclick="AppM.executeChatHaggle('${msg.id}', 3, 10)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
+                            <div class="font-bold color-green text-xs" style="font-size:8.5px;">-3% НА ДОРОГУ</div>
+                            <div class="sub-label" style="font-size:7px;">РИСК: 10%</div>
                         </button>
-                        <button onclick="AppM.executeChatHaggle('${msg.id}', 6, 30)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                            <div class="font-bold color-amber text-xs" style="font-size:9.5px;">-6% ПО ФАКТУ</div>
-                            <div class="sub-label" style="font-size:7.5px;">РИСК: 30%</div>
+                        <button onclick="AppM.executeChatHaggle('${msg.id}', 6, 28)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
+                            <div class="font-bold color-amber text-xs" style="font-size:8.5px;">-6% ПО ФАКТУ</div>
+                            <div class="sub-label" style="font-size:7px;">РИСК: 28%</div>
                         </button>
-                        <button onclick="AppM.executeChatHaggle('${msg.id}', 10, 65)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                            <div class="font-bold color-red text-xs" style="font-size:9.5px;">БЕЗ СКИДОК</div>
-                            <div class="sub-label" style="font-size:7.5px;">РИСК: 65%</div>
+                        <button onclick="AppM.executeChatHaggle('${msg.id}', 10, 60)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
+                            <div class="font-bold color-red text-xs" style="font-size:8.5px;">БЕЗ СКИДОК</div>
+                            <div class="sub-label" style="font-size:7px;">РИСК: 60%</div>
                         </button>
                     </div>
+
+                    <!-- ФИНАЛЬНАЯ КНОПКА ЗАКЛЮЧЕНИЯ ДКП В САМОМ НИЗУ -->
+                    <button onclick="AppM.dealAcceptFromChat('${msg.id}')" class="btn btn-green btn-sm w-full font-bold mt-1" style="padding:9px 0; font-size:11px; box-shadow:0 0 14px var(--green-glow);">
+                        <i class="fa-solid fa-handshake mr-1"></i> ЗАКЛЮЧИТЬ ДКП ЗА ${Number(currentOffer).toLocaleString()} ₽ 🤝
+                    </button>
                 </div>
             </div>
         `;
@@ -319,6 +312,7 @@ const AppM = {
     },
 
     executeChatHaggle(msgId, percent, failRisk) {
+        let dialogueDb = (typeof DIALOGUES_DATABASE !== 'undefined') ? DIALOGUES_DATABASE : null;
         let msg = (state.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
 
@@ -333,17 +327,21 @@ const AppM = {
         if (buyer) buyer.patience -= 1;
         msg.patience = (currentPatience - 1);
 
+        let lvl = state.player?.level || 1;
+        let karma = state.player?.karma || 50;
+        let adjustedRisk = Math.max(5, Math.min(90, failRisk - (lvl * 0.5) - ((karma - 50) * 0.2)));
+
         let roll = Math.random() * 100;
         if (!msg.chatHistory) msg.chatHistory = [];
 
-        if (roll < failRisk) {
+        if (roll < adjustedRisk) {
             if (typeof playSound === 'function') playSound('error');
             if (typeof tgHaptic === 'function') tgHaptic('error');
 
             msg.chatHistory.push({ from: 'me', text: `Скидывай ещё ${percent}%, заберу прямо сейчас!` });
             msg.chatHistory.push({ from: 'them', text: `«Не устраивает цена — ищи другую тачку. Я на такое не пойду!»` });
 
-            if (msg.patience <= 0 || roll < 15) {
+            if (msg.patience <= 0 || roll < 12) {
                 msg.chatHistory.push({ from: 'them', text: `«С вами каши не сваришь. Сделки не будет!»` });
                 showToast("Покупатель прервал сделку!");
                 if (slot) {
@@ -431,11 +429,12 @@ const AppM = {
     },
 
     // ========================================================
-    // 2. ВКЛАДКА: «P2P БИРЖА» (ОБЛОЖКИ ДЛЯ ВСЕХ КАТЕГОРИЙ)
+    // 2. ВКЛАДКА: «P2P БИРЖА»
     // ========================================================
     renderMarketScreen(container) {
         if (!container) return;
         let f = this.marketFilter || 'cars';
+        let pLvl = state.player?.level || 1;
 
         container.innerHTML = `
             <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.12), #090e18); border-color: rgba(0, 230, 118, 0.35);">
@@ -448,12 +447,12 @@ const AppM = {
                 </button>
             </div>
 
-            <!-- ФИЛЬТРЫ ИМУЩЕСТВА -->
+            <!-- ФИЛЬТРЫ ИМУЩЕСТВА С ПРОВЕРКОЙ УРОВНЕЙ -->
             <div class="grid-4 mb-2">
                 <button onclick="AppM.setMarketFilter('cars')" class="btn ${f === 'cars' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">🚗 Авто</button>
-                <button onclick="AppM.setMarketFilter('plates')" class="btn ${f === 'plates' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">🏷 Номера</button>
-                <button onclick="AppM.setMarketFilter('business')" class="btn ${f === 'business' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">💼 Бизнес</button>
-                <button onclick="AppM.setMarketFilter('housing')" class="btn ${f === 'housing' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">🏠 Жильё</button>
+                <button onclick="AppM.setMarketFilter('plates')" class="btn ${f === 'plates' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">${pLvl >= 3 ? '🏷 Номера' : '🔒 Номера (3 ур.)'}</button>
+                <button onclick="AppM.setMarketFilter('housing')" class="btn ${f === 'housing' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">${pLvl >= 4 ? '🏠 Жильё' : '🔒 Жильё (4 ур.)'}</button>
+                <button onclick="AppM.setMarketFilter('business')" class="btn ${f === 'business' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">${pLvl >= 6 ? '💼 Бизнес' : '🔒 Бизнес (6 ур.)'}</button>
             </div>
 
             <div id="p2pLotsArea">
@@ -463,6 +462,11 @@ const AppM = {
     },
 
     setMarketFilter(filter) {
+        let pLvl = state.player?.level || 1;
+        if (filter === 'plates' && pLvl < 3) return showToast("Категория «Номера» на бирже доступна с 3 уровня!");
+        if (filter === 'housing' && pLvl < 4) return showToast("Категория «Жильё» на бирже доступна с 4 уровня!");
+        if (filter === 'business' && pLvl < 6) return showToast("Категория «Бизнес» на бирже доступна с 6 уровня!");
+
         this.marketFilter = filter;
         if (typeof playSound === 'function') playSound('tick');
         this.renderMarketScreen(document.getElementById('mHubSubContentBox'));
@@ -496,7 +500,7 @@ const AppM = {
 
             let actionBtn = isMine 
                 ? `<button onclick="AppM.cancelP2PListing('${item.id}')" class="btn btn-danger btn-sm w-full">Снять с продажи</button>`
-                : `<button onclick="AppM.directBuyP2PLot('${item.id}')" class="btn btn-green btn-sm w-full font-bold">Купить за ${Number(item.price).toLocaleString()} ₽ 🤝</button>`;
+                : `<button onclick="openP2PDealModal('${item.id}')" class="btn btn-green btn-sm w-full font-bold">Торговаться / Купить за ${Number(item.price).toLocaleString()} ₽ 🤝</button>`;
 
             let descText = "";
             let imgBlockHtml = "";
@@ -552,7 +556,7 @@ const AppM = {
             }
 
             return `
-                <div class="glass-card mb-3 p-2" style="border-left: 3px solid var(--green); background:#090e18;">
+                <div onclick="openP2PDealModal('${item.id}')" class="glass-card mb-3 p-2 cursor-pointer" style="border-left: 3px solid var(--green); background:#090e18;">
                     ${imgBlockHtml}
 
                     <div class="flex-between mb-1">
@@ -569,73 +573,113 @@ const AppM = {
         }).join('');
     },
 
-    directBuyP2PLot(lotId) {
-        let lot = (state.p2pMarketListings || []).find(l => l.id === lotId);
-        if (!lot) return showToast("Лот не найден!");
+    dealAcceptFromChat(msgId) {
+        let msg = (state.player?.phoneMessages || []).find(m => m && m.id === msgId);
+        if (!msg) return;
 
-        let cash = state.player?.cash || 0;
-        if (cash < lot.price) return showToast(`Не хватает денег! Нужно: ${Number(lot.price).toLocaleString()} ₽`);
+        // Корректная обработка заключения ДКП для P2P-биржи прямо из чата
+        if (msg.isP2PMarket && msg.p2pId) {
+            let lot = (state.p2pMarketListings || []).find(l => l.id === msg.p2pId);
+            let finalPrice = msg.offerPrice || lot?.price || 100000;
+            let cash = state.player?.cash || 0;
 
-        state.player.cash -= lot.price;
-
-        if (lot.type === 'car' || lot.type === 'cars') {
-            if (!state.garage) state.garage = [];
-            state.garage.push(Object.assign({}, lot.itemData, { id: "p2p_" + Date.now(), purchaseCost: lot.price }));
-            if (typeof renderGarage === 'function') renderGarage();
-        } else if (lot.type === 'plate' || lot.type === 'plates') {
-            if (!state.ownedPlates) state.ownedPlates = [];
-            state.ownedPlates.push(lot.itemData?.plate || lot.name);
-        } else if (lot.type === 'business') {
-            let biz = (state.businesses || []).find(b => b.id === (lot.itemData?.bizId || lot.id));
-            if (biz) {
-                biz.level = Math.max(biz.level || 0, lot.itemData?.level || 1);
-                biz.stock = 100;
+            if (cash < finalPrice) {
+                return showToast(`Не хватает денег! Нужно: ${Number(finalPrice).toLocaleString()} ₽`);
             }
-            showToast("Бизнес перешёл под ваше управление!");
-        } else if (lot.type === 'housing') {
-            let hId = lot.itemData?.houseId || 'gsk_box';
-            if (!state.player.ownedHouses) state.player.ownedHouses = [];
-            if (!state.player.ownedHouses.includes(hId)) state.player.ownedHouses.push(hId);
-            state.player.housingId = hId;
-            state.player.housingType = 'own';
-            showToast("Объект недвижимости оформлен в вашу собственность!");
+
+            state.player.cash -= finalPrice;
+            if (lot) {
+                if (lot.type === 'car' || lot.type === 'cars') {
+                    if (!state.garage) state.garage = [];
+                    state.garage.push(Object.assign({}, lot.itemData, { id: "p2p_" + Date.now(), purchaseCost: finalPrice }));
+                    if (typeof renderGarage === 'function') renderGarage();
+                } else if (lot.type === 'plate' || lot.type === 'plates') {
+                    if (!state.ownedPlates) state.ownedPlates = [];
+                    state.ownedPlates.push(lot.itemData?.plate || lot.name);
+                } else if (lot.type === 'business') {
+                    let biz = (state.businesses || []).find(b => b.id === (lot.itemData?.bizId || lot.id));
+                    if (biz) {
+                        biz.level = Math.max(biz.level || 0, lot.itemData?.level || 1);
+                        biz.stock = 100;
+                    }
+                }
+                state.p2pMarketListings = state.p2pMarketListings.filter(l => l.id !== msg.p2pId);
+            }
+
+            state.player.phoneMessages = state.player.phoneMessages.filter(m => m.id !== msgId);
+            saveState();
+            updateHeaderUI();
+            this.activeDialogId = null;
+            this.render(document.getElementById('phoneAppContainer'));
+
+            if (typeof openVerdictModal === 'function') {
+                openVerdictModal("P2P СДЕЛКА ЗАКРЫТА! 🤝", `Вы выкупили лот за ${Number(finalPrice).toLocaleString()} ₽!`, true, finalPrice);
+            } else {
+                showToast("Сделка на бирже успешно закрыта!");
+            }
+            return;
         }
 
-        state.p2pMarketListings = state.p2pMarketListings.filter(l => l.id !== lotId);
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        openVerdictModal("P2P СДЕЛКА ЗАКРЫТА! 🤝", `Вы выкупили «${lot.name}» за ${Number(lot.price).toLocaleString()} ₽!`, true, lot.price);
-        this.renderMarketScreen(document.getElementById('mHubSubContentBox'));
-    },
+        // Стандартный блок для NPC площадки...
+        let slotIdx = msg.carIndex !== undefined ? msg.carIndex : 0;
+        let slot = state.salesLot ? state.salesLot[slotIdx] : null;
 
-    cancelP2PListing(lotId) {
-        state.p2pMarketListings = (state.p2pMarketListings || []).filter(l => l.id !== lotId);
+        if (slot) {
+            let buyer = slot.currentBuyer || slot.buyer;
+            let finalPrice = msg.offerPrice || buyer?.currentOffer || slot.askingPrice;
+
+            if (typeof finishSalesLotDeal === 'function') {
+                let car = slot.car || slot;
+                let purchaseCost = car.purchaseCost || Math.round(finalPrice * 0.75);
+                let profit = finalPrice - purchaseCost;
+                finishSalesLotDeal(slotIdx, finalPrice, profit);
+            }
+        } else {
+            let car = msg.carData || {};
+            let price = msg.offerPrice || 100000;
+            state.player.cash = (state.player.cash || 0) + price;
+            if (!state.player.stats) state.player.stats = {};
+            state.player.stats.sold = (state.player.stats.sold || 0) + 1;
+            if (typeof addXp === 'function') addXp(40);
+            saveState();
+            updateHeaderUI();
+            openVerdictModal("СДЕЛКА В M+ ЗАКРЫТА! 🤝", `Покупатель ${msg.sender} выкупил ${car.name || 'авто'} за ${Number(price).toLocaleString()} ₽!`, true, price);
+        }
+
+        state.player.phoneMessages = state.player.phoneMessages.filter(m => m.id !== msgId);
         saveState();
-        showToast("Лот снят с P2P биржи.");
-        this.renderMarketScreen(document.getElementById('mHubSubContentBox'));
+        this.activeDialogId = null;
+        this.render(document.getElementById('phoneAppContainer'));
     },
 
     // ========================================================
-    // 3. ВКЛАДКА: «АВТОКЛУБЫ» (СИНДИКАТЫ В M+)
+    // 3. ВКЛАДКА: «АВТОКЛУБЫ»
     // ========================================================
     renderClubsScreen(container) {
         if (!container) return;
 
         let myClub = state.player?.club;
+        let pLvl = state.player?.level || 1;
+
         let clubs = [
-            { id: "club_jdm", name: "JDM Legends Moscow", members: 14, bank: 450000, fee: 100000, perk: "+10% к оценке японских авто" },
-            { id: "club_vaz", name: "Боевая Классика РФ", members: 28, bank: 220000, fee: 50000, perk: "Бесплатный ремонт подвески на сходках" },
-            { id: "club_m", name: "Bavarian Power M", members: 9, bank: 1850000, fee: 250000, perk: "+15% к победе на 402м" },
-            { id: "club_syndicate", name: "Синдикат Олигархов", members: 4, bank: 6200000, fee: 750000, perk: "-25% ко всем налогам и проверкам" }
+            { id: "club_vaz", name: "Боевая Классика РФ", minLvl: 2, members: 28, bank: 220000, fee: 35000, perk: "Бесплатный ремонт подвески на сходках" },
+            { id: "club_jdm", name: "JDM Legends Moscow", minLvl: 4, members: 14, bank: 450000, fee: 80000, perk: "+10% к оценке японских авто" },
+            { id: "club_m", name: "Bavarian Power M", minLvl: 7, members: 9, bank: 1850000, fee: 200000, perk: "+15% к победе на 402м" },
+            { id: "club_syndicate", name: "Синдикат Олигархов", minLvl: 12, members: 4, bank: 6200000, fee: 600000, perk: "-25% ко всем налогам и проверкам" }
         ];
 
         let clubListHtml = clubs.map(c => {
             let isMember = myClub && myClub.id === c.id;
-            let btn = isMember 
-                ? `<button onclick="AppM.leaveClubAction()" class="btn btn-danger btn-sm btn-auto">Покинуть</button>`
-                : `<button onclick="AppM.joinClubAction('${c.id}', '${c.name}', ${c.fee})" class="btn btn-purple btn-sm btn-auto">Вступить (${(c.fee/1000).toFixed(0)}k ₽)</button>`;
+            let isLvlLocked = pLvl < c.minLvl;
+
+            let btn = "";
+            if (isMember) {
+                btn = `<button onclick="AppM.leaveClubAction()" class="btn btn-danger btn-sm btn-auto">Покинуть</button>`;
+            } else if (isLvlLocked) {
+                btn = `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>🔒 С ${c.minLvl} ур.</button>`;
+            } else {
+                btn = `<button onclick="AppM.joinClubAction('${c.id}', '${c.name}', ${c.fee}, ${c.minLvl})" class="btn btn-purple btn-sm btn-auto">Вступить (${(c.fee/1000).toFixed(0)}k ₽)</button>`;
+            }
 
             return `
                 <div class="glass-card mb-2 p-2 flex-between" style="border-left: 3px solid var(--purple); background:#090e18;">
@@ -666,7 +710,10 @@ const AppM = {
         `;
     },
 
-    joinClubAction(clubId, clubName, fee) {
+    joinClubAction(clubId, clubName, fee, minLvl) {
+        let pLvl = state.player?.level || 1;
+        if (pLvl < (minLvl || 1)) return showToast(`Вступление в этот клуб доступно с ${minLvl} уровня!`);
+
         let cash = state.player?.cash || 0;
         if (cash < fee) return showToast(`Не хватает денег на взнос (${fee.toLocaleString()} ₽)!`);
 
@@ -689,11 +736,14 @@ const AppM = {
     },
 
     createClubPrompt() {
+        let pLvl = state.player?.level || 1;
+        if (pLvl < 5) return showToast("Создание своего автоклуба доступно с 5 уровня!");
+
         let name = prompt("Название нового автоклуба:", "Turbo Syndicate");
         if (!name || !name.trim()) return;
 
         let cash = state.player?.cash || 0;
-        let cost = 300000;
+        let cost = 250000;
         if (cash < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽ на регистрацию клуба!`);
 
         state.player.cash -= cost;
@@ -707,7 +757,7 @@ const AppM = {
     },
 
     // ========================================================
-    // 4. ВКЛАДКА: «НАПАРНИКИ» (ДРУЗЬЯ, ИНСАЙДЫ, ДУЭЛИ)
+    // 4. ВКЛАДКА: «НАПАРНИКИ»
     // ========================================================
     renderFriendsScreen(container) {
         if (!container) return;
@@ -782,28 +832,52 @@ const AppM = {
         let conn = state.player?.connections || 0;
         if (conn < 1) return showToast("Нужна хотя бы 1 Теневая Связь 🤝!");
 
+        let pLvl = state.player?.level || 1;
         state.player.connections -= 1;
         saveState();
         updateHeaderUI();
 
-        let hotCar = {
-            id: "insider_" + Date.now(),
-            name: "Toyota Mark II JZX90 (Инсайд от напарника)",
-            power: 180,
-            type: "comfort",
-            drivetrain: "rwd",
-            basePrice: 450000,
-            price: 260000,
-            baseMarketValue: 450000,
-            marketValue: 450000,
-            img: "assets/cars/comfort/golf6/golf6.jpg",
-            fallback: "assets/cars/economy/2101/vaz-2101.jpg",
-            plate: "В777ВВ 77",
-            condition: 82,
-            wear: { engine: 85, transmission: 85 },
-            tuning: { chip: 1, weldedDiff: true, steeringAngle: true, risk1251: 0 },
-            purchaseCost: 260000
-        };
+        let hotCar = null;
+
+        if (pLvl < 4) {
+            hotCar = {
+                id: "insider_" + Date.now(),
+                name: "ВАЗ-2106 «Шаха» (Дрифт-Спек от друга)",
+                power: 95,
+                type: "economy",
+                drivetrain: "rwd",
+                basePrice: 110000,
+                price: 65000,
+                baseMarketValue: 120000,
+                marketValue: 125000,
+                img: "assets/cars/economy/2106/vaz-2106.jpg",
+                fallback: "assets/cars/economy/2101/vaz-2101.jpg",
+                plate: "О777ЕЕ 77",
+                condition: 86,
+                wear: { engine: 88, transmission: 90 },
+                tuning: { chip: 1, weldedDiff: true, steeringAngle: true, risk1251: 0 },
+                purchaseCost: 65000
+            };
+        } else {
+            hotCar = {
+                id: "insider_" + Date.now(),
+                name: "Toyota Mark II JZX90 (Инсайд от напарника)",
+                power: 180,
+                type: "comfort",
+                drivetrain: "rwd",
+                basePrice: 450000,
+                price: 260000,
+                baseMarketValue: 450000,
+                marketValue: 450000,
+                img: "assets/cars/comfort/golf6/golf6.jpg",
+                fallback: "assets/cars/economy/2101/vaz-2101.jpg",
+                plate: "В777ВВ 77",
+                condition: 82,
+                wear: { engine: 85, transmission: 85 },
+                tuning: { chip: 1, weldedDiff: true, steeringAngle: true, risk1251: 0 },
+                purchaseCost: 260000
+            };
+        }
 
         if (!state.marketFeed) state.marketFeed = [];
         state.marketFeed.unshift(hotCar);
@@ -811,7 +885,7 @@ const AppM = {
 
         playSound('win');
         tgHaptic('success');
-        openVerdictModal("ИНСАЙД ПОЛУЧЕН! ⚡", "Напарник нашёл срочный Mark II по низу рынка за 260,000 ₽! Лот выведен на первую строчку Авторынка.", true);
+        openVerdictModal("ИНСАЙД ПОЛУЧЕН! ⚡", `Напарник нашёл «${hotCar.name}» с дисконтом 40% за ${hotCar.price.toLocaleString()} ₽! Лот выведен на первую строчку Авторынка.`, true);
     },
 
     shareTelegramInvite() {
@@ -844,7 +918,7 @@ const AppM = {
                 </div>
                 <div class="font-bold text-xs mb-1">Закрыта жирная сделка у капота!</div>
                 <div class="sub-label mb-2" style="font-size:9.5px; color:#f1f5f9;">
-                    Выкупил Mark II в обвесе, скинул цену за скол на крыле и продал с чистой маржой +160,000 ₽!
+                    Выкупил тачку в обвесе, скинул цену за скол на крыле и продал с чистой маржой +120,000 ₽!
                 </div>
                 <div class="m-reactions-row">
                     <button class="m-reaction-btn">🔥 <span>18</span></button>

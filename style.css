@@ -232,6 +232,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   background: rgba(255, 255, 255, 0.08);
   border-radius: 6px;
   overflow: hidden;
+  position: relative;
 }
 
 .xp-bar-fill {
@@ -239,6 +240,24 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   width: 50%;
   background: linear-gradient(90deg, var(--cyan), var(--green));
   transition: width 0.4s ease;
+  position: relative;
+  box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+.xp-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: xpShimmer 2s infinite;
+}
+
+@keyframes xpShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 .user-stats-row {
@@ -275,40 +294,32 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   background: rgba(8, 13, 24, 0.85);
   border: 1px solid rgba(0, 230, 118, 0.35);
   border-radius: 10px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
+  align-items: center;
+  justify-content: center;
 }
 .wallet-capsule-box:active { transform: scale(0.97); }
 
 .cash-val {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 900;
   color: var(--green);
-  text-shadow: 0 0 10px rgba(0, 230, 118, 0.4);
-}
-
-.stars-val {
-  font-size: 11px;
-  font-weight: 900;
-  color: var(--amber);
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  text-shadow: 0 0 12px rgba(0, 230, 118, 0.45);
+  letter-spacing: 0.3px;
 }
 
 .wallet-sub {
   display: flex;
   align-items: center;
   gap: 5px;
+  flex-wrap: nowrap;
 }
 
 .resource-pill {
   font-size: 9.5px;
   font-weight: 900;
-  padding: 4px 8px;
+  padding: 4px 7px;
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
@@ -316,9 +327,51 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   background: rgba(10, 15, 26, 0.85);
   cursor: pointer;
   border: 1px solid transparent;
+  transition: all 0.2s ease;
+  white-space: nowrap;
 }
+.resource-pill:active { transform: scale(0.94); }
+
 .fuel-pill { color: #38bdf8; border-color: rgba(56, 189, 248, 0.3); }
 .ticket-pill { color: var(--purple); border-color: rgba(192, 132, 252, 0.3); }
+
+/* Неоновая банкнота перекупа */
+.note-pill {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+.note-icon-glow {
+  color: #34d399;
+  filter: drop-shadow(0 0 4px #10b981);
+}
+
+/* Билет СуперВилспина */
+.superspin-pill {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.superspin-icon-glow {
+  color: #fbbf24;
+  filter: drop-shadow(0 0 4px #f59e0b);
+}
+
+/* Анимация пульсации при > 5 штук */
+.res-pulse-active {
+  animation: neonPulseGlow 1.8s infinite alternate ease-in-out !important;
+}
+
+@keyframes neonPulseGlow {
+  0% {
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.1);
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 14px currentColor, inset 0 0 8px currentColor;
+    transform: scale(1.05);
+  }
+}
 
 .hud-bottom-row {
   display: flex;
@@ -399,7 +452,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 10px 14px 75px 14px !important; /* Важно: отступ снизу под бар */
+  padding: 10px 14px 75px 14px !important;
   position: relative;
   z-index: 10;
 }
@@ -894,7 +947,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 .modal-overlay.active { display: flex !important; }
 
-#modalOBD2, #modalGauge, #modalInsurance, #modalChangePlate, #modalTuning, #modalNeedGarage, #modalDealVerdict, #modalHudCustomizer {
+#modalOBD2, #modalGauge, #modalInsurance, #modalChangePlate, #modalTuning, #modalNeedGarage, #modalDealVerdict, #modalHudCustomizer, #modalLevelGate, #modalAppUnlockPrompt {
   z-index: 5500 !important;
 }
 
@@ -932,14 +985,24 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border-radius: 50%;
   border: 3px solid rgba(0, 242, 254, 0.15);
   border-top-color: var(--cyan);
+  border-right-color: var(--green);
   animation: spinRing 1.2s infinite linear;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 @keyframes spinRing { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-.radar-spinner-center { font-size: 20px; }
+.radar-spinner-center {
+  font-size: 20px;
+  animation: lockBob 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes lockBob {
+  0% { transform: scale(0.95); filter: drop-shadow(0 0 4px var(--cyan-glow)); }
+  100% { transform: scale(1.08); filter: drop-shadow(0 0 14px var(--cyan)); }
+}
 
 /* Экран торга у капота */
 .chat-deal-box {

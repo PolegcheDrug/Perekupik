@@ -1,10 +1,10 @@
 // ========================================================
-// js/phone-port.js — МОРСКОЙ ПОРТ, ТЕРМИНАЛ И STORAGE WARS 2.0 (v1.0.0)
+// js/phone-port.js — МОРСКОЙ ПОРТ, ТЕРМИНАЛ И STORAGE WARS 2.0 (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Связка с единым реестром госномеров FB_Bridge.Plates,
 // живой чат аукциона с репликами ботов и аукциониста,
 // шкала доминирования ставки, отсчёт ударов молотка,
-// одиночный торг с брокером и перенаправление дропа в Почту.
+// одиночный торг с брокером, списание билетов/монет и доставка в Почту.
 // ========================================================
 
 const AppPort = {
@@ -89,16 +89,17 @@ const AppPort = {
         }
 
         let cardsHtml = containers.map((c, idx) => {
-            let reqLevel = c.reqLvl || c.minLevel || 1;
+            let reqLevel = c.reqLvl || c.minLevel || 5;
             let isLocked = pLvl < reqLevel;
             let starsTxt = c.reqStars ? ` + ${c.reqStars} ⭐` : "";
+            let ticketsTxt = c.reqTickets ? ` + ${c.reqTickets} 🎫` : "";
             let countryFlag = c.flagEmoji || (c.country === 'JAPAN' ? '🇯🇵' : (c.country === 'USA' ? '🇺🇸' : (c.country === 'UAE' ? '🇦🇪' : (c.country === 'GERMANY' ? '🇩🇪' : '🚢'))));
             let gradeBadge = c.auctionGrade || c.badge || "Grade 4B";
 
             let btnAction = isLocked
                 ? `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>🔒 С ${reqLevel} уровня авторитета</button>`
                 : `<button onclick="AppPort.startDirectContainerDeal(${idx})" class="btn btn-cyan btn-sm w-full">
-                    <i class="fa-solid fa-handshake"></i> Торговаться у ворот (${(c.cost / 1000).toFixed(0)}k ₽${starsTxt})
+                    <i class="fa-solid fa-handshake"></i> Торговаться у ворот (${(c.cost / 1000).toFixed(0)}k ₽${starsTxt}${ticketsTxt})
                    </button>`;
 
             return `
@@ -417,13 +418,17 @@ const AppPort = {
 
         let cash = state.player?.cash || 0;
         let stars = state.player?.stars || 0;
+        let tickets = state.player?.tickets || 0;
         let reqStars = c.reqStars || 0;
+        let reqTickets = c.reqTickets || 0;
 
         if (cash < finalPrice) return showToast("Не хватает денег на выкуп контейнера!");
         if (stars < reqStars) return showToast(`Нужно ${reqStars} Stars ⭐!`);
+        if (tickets < reqTickets) return showToast(`Нужно ${reqTickets} Билетов 🎫!`);
 
         state.player.cash -= finalPrice;
-        state.player.stars -= reqStars;
+        if (reqStars > 0) state.player.stars -= reqStars;
+        if (reqTickets > 0) state.player.tickets -= reqTickets;
 
         ModalManager.close('modalPortBrokerDeal');
         this.unpackContainerContents(c, finalPrice);
@@ -435,32 +440,44 @@ const AppPort = {
     renderStorageWarsContent(box) {
         if (!box) return;
 
+        let pLvl = state.player?.level || 1;
         let containers = (typeof STORAGE_WARS_CONTAINERS !== 'undefined' && Array.isArray(STORAGE_WARS_CONTAINERS))
             ? STORAGE_WARS_CONTAINERS
             : [];
 
-        let listHtml = containers.map((c, idx) => `
-            <div class="glass-card mb-3 p-2">
-                <div class="car-img-wrap mb-2" style="height:125px; position:relative;">
-                    <img src="${c.img || ''}" class="car-img" onerror="this.onerror=null; this.src='${c.fallback || ''}';">
-                    <div class="badge-tag badge-br">
-                        <span class="tag-badge bg-tag-amber">Storage Wars</span>
-                        <span class="tag-badge bg-tag-cyan ml-1">${c.country || 'PORT'}</span>
+        let listHtml = containers.map((c, idx) => {
+            let reqLevel = c.minLevel || c.reqLvl || 5;
+            let isLocked = pLvl < reqLevel;
+            let ticketsBadge = c.reqTickets ? ` + ${c.reqTickets} 🎫` : "";
+            let starsBadge = c.reqStars ? ` + ${c.reqStars} ⭐` : "";
+
+            let btnAction = isLocked
+                ? `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>🔒 Доступно с ${reqLevel} уровня</button>`
+                : `<button onclick="AppPort.startStorageWarsAuction(${idx})" class="btn btn-amber btn-sm w-full">
+                    <i class="fa-solid fa-gavel"></i> Войти в торги с ботами (Live${ticketsBadge}${starsBadge})
+                   </button>`;
+
+            return `
+                <div class="glass-card mb-3 p-2" style="border-color: ${isLocked ? 'rgba(255,255,255,0.06)' : 'var(--amber)'};">
+                    <div class="car-img-wrap mb-2" style="height:125px; position:relative;">
+                        <img src="${c.img || ''}" class="car-img" onerror="this.onerror=null; this.src='${c.fallback || ''}';">
+                        <div class="badge-tag badge-br">
+                            <span class="tag-badge bg-tag-amber">Storage Wars</span>
+                            <span class="tag-badge bg-tag-cyan ml-1">${c.country || 'PORT'}</span>
+                        </div>
                     </div>
+
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-amber" style="font-size:12.5px;">${c.title}</b>
+                        <span class="price-val text-xs color-green">Старт: ${(c.baseBid || c.cost).toLocaleString()} ₽</span>
+                    </div>
+
+                    <div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">${c.desc}</div>
+
+                    ${btnAction}
                 </div>
-
-                <div class="flex-between mb-1">
-                    <b class="text-xs color-amber" style="font-size:12.5px;">${c.title}</b>
-                    <span class="price-val text-xs color-green">Старт: ${(c.baseBid || c.cost).toLocaleString()} ₽</span>
-                </div>
-
-                <div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">${c.desc}</div>
-
-                <button onclick="AppPort.startStorageWarsAuction(${idx})" class="btn btn-amber btn-sm w-full">
-                    <i class="fa-solid fa-gavel"></i> Войти в торги с ботами (Live)
-                </button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
         box.innerHTML = `
             <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(255, 179, 0, 0.16), #090e18); border-color: var(--amber);">
@@ -483,6 +500,24 @@ const AppPort = {
         let containers = (typeof STORAGE_WARS_CONTAINERS !== 'undefined') ? STORAGE_WARS_CONTAINERS : [];
         let c = containers[idx];
         if (!c) return;
+
+        let pLvl = state.player?.level || 1;
+        let reqLevel = c.minLevel || c.reqLvl || 5;
+        if (pLvl < reqLevel) {
+            return showToast(`Этот аукцион открывается с ${reqLevel} уровня!`);
+        }
+
+        let tickets = state.player?.tickets || 0;
+        let reqTickets = c.reqTickets || 0;
+        if (reqTickets > 0 && tickets < reqTickets) {
+            return showToast(`Для участия в торгах нужно ${reqTickets} Билетов 🎫!`);
+        }
+
+        let stars = state.player?.stars || 0;
+        let reqStars = c.reqStars || 0;
+        if (reqStars > 0 && stars < reqStars) {
+            return showToast(`Нужно ${reqStars} Stars ⭐!`);
+        }
 
         let bots = (typeof STORAGE_WARS_BOTS !== 'undefined') ? JSON.parse(JSON.stringify(STORAGE_WARS_BOTS)) : [];
         let startBid = c.baseBid || c.cost || 300000;
@@ -716,6 +751,11 @@ const AppPort = {
 
         if (auc.isPlayerLeading) {
             state.player.cash -= auc.currentBid;
+            let reqTickets = auc.container.reqTickets || 0;
+            let reqStars = auc.container.reqStars || 0;
+            if (reqTickets > 0) state.player.tickets = Math.max(0, (state.player.tickets || 0) - reqTickets);
+            if (reqStars > 0) state.player.stars = Math.max(0, (state.player.stars || 0) - reqStars);
+
             showToast("🏆 МОЛОТОК УПАЛ! Вы выиграли контейнер на аукционе!");
             this.unpackContainerContents(auc.container, auc.currentBid);
         } else {
