@@ -337,9 +337,9 @@ const DevStudio = {
             <div class="glass-card mb-2 p-2">
                 <div class="flex-between mb-1">
                     <b class="text-xs" style="color:${color};"><i class="fa-solid fa-crop-simple mr-1"></i> Предпросмотр ракурса (16:9)</b>
-                    <button onclick="DevStudio.resetCropperParams(); DevStudio.updateCropperCanvas();" class="btn btn-dark btn-auto btn-sm" style="font-size:8.5px; padding:2px 6px;">Сброс</button>
+                    <button type="button" onclick="DevStudio.resetCropperUI()" class="btn btn-dark btn-auto btn-sm" style="font-size:8.5px; padding:2px 8px; cursor:pointer;">Сброс</button>
                 </div>
-                <div class="sub-label mb-2" style="font-size:9px;">Вы можете загрузить тестовое фото для предпросмотра ракурса в игре.</div>
+                <div class="sub-label mb-2" style="font-size:9px;">Настройте зум и смещение для кадрирования. Кнопка «Сброс» вернет вид по умолчанию.</div>
 
                 <div class="car-img-wrap" style="height: 165px; position:relative; overflow:hidden; border:1px solid ${color};">
                     <canvas id="studioCropCanvas" width="480" height="270" style="width:100%; height:100%; display:block; object-fit:cover;"></canvas>
@@ -348,23 +348,23 @@ const DevStudio = {
                 <div class="space-y-1 my-2 text-xs">
                     <div class="flex-between">
                         <span class="sub-label" style="font-size:9px;">Масштаб (Zoom):</span>
-                        <input type="range" min="0.5" max="2.5" step="0.05" value="${this.cropperState.zoom}" oninput="DevStudio.handleCropParamChange('zoom', parseFloat(this.value))" style="width:65%;">
+                        <input type="range" id="cropRangeZoom" min="0.5" max="2.5" step="0.05" value="${this.cropperState.zoom}" oninput="DevStudio.handleCropParamChange('zoom', parseFloat(this.value))" style="width:65%;">
                     </div>
                     <div class="flex-between">
                         <span class="sub-label" style="font-size:9px;">Сдвиг по вертикали (Y):</span>
-                        <input type="range" min="-150" max="150" step="2" value="${this.cropperState.offsetY}" oninput="DevStudio.handleCropParamChange('offsetY', parseInt(this.value))" style="width:65%;">
+                        <input type="range" id="cropRangeY" min="-150" max="150" step="2" value="${this.cropperState.offsetY}" oninput="DevStudio.handleCropParamChange('offsetY', parseInt(this.value))" style="width:65%;">
                     </div>
                     <div class="flex-between">
                         <span class="sub-label" style="font-size:9px;">Сдвиг по горизонтали (X):</span>
-                        <input type="range" min="-150" max="150" step="2" value="${this.cropperState.offsetX}" oninput="DevStudio.handleCropParamChange('offsetX', parseInt(this.value))" style="width:65%;">
+                        <input type="range" id="cropRangeX" min="-150" max="150" step="2" value="${this.cropperState.offsetX}" oninput="DevStudio.handleCropParamChange('offsetX', parseInt(this.value))" style="width:65%;">
                     </div>
                 </div>
 
                 <div class="grid-2">
-                    <button onclick="document.getElementById('studioFileInput').click()" class="btn btn-dark btn-sm">
+                    <button type="button" onclick="document.getElementById('studioFileInput').click()" class="btn btn-dark btn-sm">
                         <i class="fa-solid fa-camera mr-1"></i> Выбрать фото
                     </button>
-                    <button onclick="DevStudio.applyCropToDraft()" class="btn ${isCreate ? 'btn-cyan' : 'btn-purple'} btn-sm">
+                    <button type="button" onclick="DevStudio.applyCropToDraft()" class="btn ${isCreate ? 'btn-cyan' : 'btn-purple'} btn-sm">
                         <i class="fa-solid fa-check mr-1"></i> Применить ракурс ✓
                     </button>
                 </div>
@@ -375,29 +375,37 @@ const DevStudio = {
         `;
     },
 
-    initCropperCanvasPreview() {
-        const canvas = document.getElementById('studioCropCanvas');
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+    resetCropperParams() {
+        const currentImg = this.cropperState ? this.cropperState.originalImgObj : null;
+        this.cropperState = {
+            zoom: 1.0,
+            offsetY: 0,
+            offsetX: 0,
+            rotation: 0,
+            originalImgObj: currentImg // Картинка не удаляется, сбрасываются только координаты
+        };
+    },
 
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        const coverSrc = this.getCoverImageSrc();
+    resetCropperUI() {
+        this.resetCropperParams();
 
-        img.onload = () => {
-            this.cropperState.originalImgObj = img;
+        const zoomEl = document.getElementById('cropRangeZoom');
+        const yEl = document.getElementById('cropRangeY');
+        const xEl = document.getElementById('cropRangeX');
+
+        if (zoomEl) zoomEl.value = "1.0";
+        if (yEl) yEl.value = "0";
+        if (xEl) xEl.value = "0";
+
+        if (this.cropperState.originalImgObj) {
             this.updateCropperCanvas();
-        };
-        img.onerror = () => {
-            ctx.fillStyle = "#090e18";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = "#38bdf8";
-            ctx.font = "12px sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText("📷 Фото из репозитория GitHub", canvas.width / 2, canvas.height / 2);
-        };
-        img.src = coverSrc;
+        } else {
+            this.initCropperCanvasPreview();
+        }
+
+        if (typeof showToast === 'function') {
+            showToast("Положение и масштаб сброшены!");
+        }
     },
 
     handleCropParamChange(param, val) {

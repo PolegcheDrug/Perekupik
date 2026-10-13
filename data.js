@@ -5,8 +5,8 @@
 // учет инвентаря, Storage Wars, Порт, ПодКлюч и автопарк.
 // ========================================================
 
-// ВНИМАНИЕ: Укажите здесь свой логин и репозиторий GitHub
-const GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/polegchedrug/Perekupik/main/";
+// ВНИМАНИЕ: точный регистр букв репозитория
+const GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/PolegcheDrug/Perekupik/main/";
 
 function resolveCarAssetUrl(path) {
     if (!path) return "";

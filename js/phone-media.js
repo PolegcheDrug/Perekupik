@@ -1,30 +1,124 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v0.8.0)
+// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Реальные онлайн-потоки Радио Рекорд & Record Rock (HTTPS Live),
 // Уличные азартные «Напёрстки» с живым перемешиванием вместо Колеса,
 // полноформатный Супервилспин (все призы отправляются в Почту!)
 // ========================================================
 
 const PhoneMedia = {
     // ----------------------------------------------------
-    // 1. АВТО-МАГНИТОЛА И КАССЕТНЫЙ ПЛЕЕР
+    // 1. АВТО-МАГНИТОЛА И ЖИВОЕ ОНЛАЙН-РАДИО
     // ----------------------------------------------------
     radioPlaying: false,
     activeStationIndex: 0,
+    volume: 0.75,
+    audioElement: null,
+
     stations: [
-        { name: "Perekup FM", genre: "Phonk / Drift", freq: "104.2 FM", icon: "fa-bolt" },
-        { name: "Retro Wave Radio", genre: "Synthwave 80s", freq: "98.7 FM", icon: "fa-compact-disc" },
-        { name: "Garage Deep Bass", genre: "House & Bass", freq: "101.5 FM", icon: "fa-headphones" },
-        { name: "Дорожный Патруль", genre: "Авторадио / Новости", freq: "107.0 FM", icon: "fa-radio" }
+        { 
+            name: "Радио Рекорд", 
+            genre: "EDM / Club Dance", 
+            freq: "106.3 FM", 
+            icon: "fa-bolt",
+            color: "#ff0055",
+            streamUrl: "https://radiorecord.hostingradio.ru/rr_128.mp3",
+            backupUrl: "https://radiorecord.hostingradio.ru/rr_96.aacp"
+        },
+        { 
+            name: "Record Rock", 
+            genre: "Rock & Alternative", 
+            freq: "102.8 FM", 
+            icon: "fa-guitar",
+            color: "#ff4400",
+            streamUrl: "https://radiorecord.hostingradio.ru/rock_128.mp3",
+            backupUrl: "https://radiorecord.hostingradio.ru/rock_96.aacp"
+        },
+        { 
+            name: "Record Pirate Station", 
+            genre: "Drum & Bass / Jungle", 
+            freq: "104.2 FM", 
+            icon: "fa-skull",
+            color: "#00f2fe",
+            streamUrl: "https://radiorecord.hostingradio.ru/ps_128.mp3",
+            backupUrl: "https://radiorecord.hostingradio.ru/ps_96.aacp"
+        },
+        { 
+            name: "Record Black Rap", 
+            genre: "Hip-Hop / Drift Trap", 
+            freq: "98.7 FM", 
+            icon: "fa-fire",
+            color: "#ffd700",
+            streamUrl: "https://radiorecord.hostingradio.ru/rap_128.mp3",
+            backupUrl: "https://radiorecord.hostingradio.ru/rap_96.aacp"
+        },
+        { 
+            name: "DFM Dance", 
+            genre: "Dance / House", 
+            freq: "107.0 FM", 
+            icon: "fa-headphones",
+            color: "#9333ea",
+            streamUrl: "https://dfm.hostingradio.ru/dfm128.mp3",
+            backupUrl: "https://dfm.hostingradio.ru/dfm96.aacp"
+        }
     ],
+
+    initAudioEngine() {
+        if (!this.audioElement) {
+            this.audioElement = new Audio();
+            this.audioElement.preload = "none";
+            this.audioElement.crossOrigin = "anonymous";
+            this.audioElement.volume = this.volume;
+
+            this.audioElement.addEventListener("playing", () => {
+                this.radioPlaying = true;
+                this.syncRadioUI();
+            });
+
+            this.audioElement.addEventListener("pause", () => {
+                this.radioPlaying = false;
+                this.syncRadioUI();
+            });
+
+            this.audioElement.addEventListener("error", (e) => {
+                console.warn("[Radio Engine] Ошибка основного потока, переключение на резервный...", e);
+                const st = this.stations[this.activeStationIndex];
+                if (st && st.backupUrl && this.audioElement.src !== st.backupUrl) {
+                    this.audioElement.src = st.backupUrl;
+                    this.audioElement.play().catch(() => {});
+                } else {
+                    this.radioPlaying = false;
+                    this.syncRadioUI();
+                    if (typeof showToast === 'function') {
+                        showToast("Не удалось подключиться к радиопотоку.");
+                    }
+                }
+            });
+        }
+    },
+
+    syncRadioUI() {
+        const btn = document.getElementById('radioMainPlayBtn');
+        const eq = document.querySelector('.radio-equalizer-bars');
+        if (btn) {
+            btn.className = `btn ${this.radioPlaying ? 'btn-red' : 'btn-purple'} btn-sm`;
+            btn.innerHTML = `<i class="fa-solid ${this.radioPlaying ? 'fa-pause' : 'fa-play'}"></i> ${this.radioPlaying ? 'Пауза' : 'В эфир'}`;
+        }
+        if (eq) {
+            if (this.radioPlaying) eq.classList.add('playing');
+            else eq.classList.remove('playing');
+        }
+    },
 
     renderRadioApp(container) {
         if (!container) return;
-        const cur = this.stations[this.activeStationIndex];
+        this.initAudioEngine();
+
+        const cur = this.stations[this.activeStationIndex] || this.stations[0];
         const isPlay = this.radioPlaying;
 
         let stationsHtml = this.stations.map((st, i) => `
-            <div onclick="PhoneMedia.selectRadioStation(${i})" class="glass-card p-2 flex-between mb-1 station-row ${i === this.activeStationIndex ? 'active-station' : ''}" style="cursor:pointer;">
+            <div onclick="PhoneMedia.selectRadioStation(${i})" class="glass-card p-2 flex-between mb-1 station-row ${i === this.activeStationIndex ? 'active-station' : ''}" style="cursor:pointer; border-left: 3px solid ${st.color || 'var(--cyan)'};">
                 <div class="flex-gap" style="align-items:center;">
                     <i class="fa-solid ${st.icon} ${i === this.activeStationIndex ? 'color-cyan' : 'sub-label'}"></i>
                     <div>
@@ -53,14 +147,23 @@ const PhoneMedia = {
                     </div>
 
                     <div class="text-center my-2">
-                        <div class="sub-label" style="font-size:10px;">ВОСПРОИЗВЕДЕНИЕ:</div>
+                        <div class="sub-label" style="font-size:10px;">ВОСПРОИЗВЕДЕНИЕ В ЭФИРЕ:</div>
                         <h3 class="font-bold text-xs color-cyan" style="font-size:16px;">${cur.name}</h3>
                         <div class="sub-label color-amber font-bold" style="font-size:11px;">${cur.freq} • ${cur.genre}</div>
                     </div>
 
+                    <!-- ПОЛЗУНОК ГРОМКОСТИ -->
+                    <div class="flex-between text-xs my-2 px-2" style="align-items:center; gap:8px;">
+                        <i class="fa-solid fa-volume-low sub-label"></i>
+                        <input type="range" min="0" max="1" step="0.05" value="${this.volume}" 
+                               oninput="PhoneMedia.setRadioVolume(this.value)" 
+                               style="flex:1; accent-color: var(--cyan); height: 4px; cursor:pointer;">
+                        <i class="fa-solid fa-volume-high color-cyan"></i>
+                    </div>
+
                     <div class="flex-between mt-3 pt-2" style="border-top:1px dashed rgba(255,255,255,0.08);">
                         <button onclick="PhoneMedia.prevStation()" class="btn btn-dark btn-sm btn-auto"><i class="fa-solid fa-backward-step"></i></button>
-                        <button onclick="PhoneMedia.toggleRadioPlay()" class="btn ${isPlay ? 'btn-red' : 'btn-purple'} btn-sm" style="max-width:140px;">
+                        <button id="radioMainPlayBtn" onclick="PhoneMedia.toggleRadioPlay()" class="btn ${isPlay ? 'btn-red' : 'btn-purple'} btn-sm" style="max-width:140px;">
                             <i class="fa-solid ${isPlay ? 'fa-pause' : 'fa-play'}"></i> ${isPlay ? 'Пауза' : 'В эфир'}
                         </button>
                         <button onclick="PhoneMedia.nextStation()" class="btn btn-dark btn-sm btn-auto"><i class="fa-solid fa-forward-step"></i></button>
@@ -75,17 +178,58 @@ const PhoneMedia = {
         `;
     },
 
+    setRadioVolume(val) {
+        this.volume = parseFloat(val);
+        if (this.audioElement) {
+            this.audioElement.volume = this.volume;
+        }
+    },
+
     toggleRadioPlay() {
-        this.radioPlaying = !this.radioPlaying;
+        this.initAudioEngine();
+        const st = this.stations[this.activeStationIndex];
+
+        if (this.radioPlaying) {
+            this.audioElement.pause();
+            this.radioPlaying = false;
+            this.syncRadioUI();
+            if (typeof showToast === 'function') showToast("Радио приостановлено.");
+        } else {
+            if (!this.audioElement.src || this.audioElement.src === "" || !this.audioElement.src.includes("hostingradio.ru")) {
+                this.audioElement.src = st.streamUrl;
+            }
+            this.audioElement.play().then(() => {
+                this.radioPlaying = true;
+                this.syncRadioUI();
+                if (typeof showToast === 'function') showToast(`В эфире: «${st.name}» 📻`);
+            }).catch(err => {
+                console.warn("[Radio] Автозапуск блокирован браузером:", err);
+                if (typeof showToast === 'function') {
+                    showToast("Нажмите еще раз для разрешения звука в браузере!");
+                }
+            });
+        }
+
         if (typeof playSound === 'function') playSound('tick');
         if (typeof tgHaptic === 'function') tgHaptic('medium');
-        showToast(this.radioPlaying ? "Радио запущено в фоновом режиме 📻" : "Радио приостановлено.");
-        this.renderRadioApp(document.getElementById('phoneAppContainer'));
     },
 
     selectRadioStation(idx) {
         this.activeStationIndex = idx;
-        this.radioPlaying = true;
+        this.initAudioEngine();
+
+        const st = this.stations[idx];
+        this.audioElement.src = st.streamUrl;
+
+        this.audioElement.play().then(() => {
+            this.radioPlaying = true;
+            this.syncRadioUI();
+            if (typeof showToast === 'function') showToast(`В эфире: «${st.name}»!`);
+        }).catch(() => {
+            this.radioPlaying = false;
+            this.syncRadioUI();
+        });
+
         if (typeof playSound === 'function') playSound('tick');
         if (typeof tgHaptic === 'function') tgHaptic('light');
         this.renderRadioApp(document.getElementById('phoneAppContainer'));
@@ -93,16 +237,12 @@ const PhoneMedia = {
 
     prevStation() {
         this.activeStationIndex = (this.activeStationIndex - 1 + this.stations.length) % this.stations.length;
-        this.radioPlaying = true;
-        if (typeof playSound === 'function') playSound('tick');
-        this.renderRadioApp(document.getElementById('phoneAppContainer'));
+        this.selectRadioStation(this.activeStationIndex);
     },
 
     nextStation() {
         this.activeStationIndex = (this.activeStationIndex + 1) % this.stations.length;
-        this.radioPlaying = true;
-        if (typeof playSound === 'function') playSound('tick');
-        this.renderRadioApp(document.getElementById('phoneAppContainer'));
+        this.selectRadioStation(this.activeStationIndex);
     },
 
     // ----------------------------------------------------
