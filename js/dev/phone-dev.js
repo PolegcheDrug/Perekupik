@@ -11,7 +11,7 @@
 // ========================================================
 
 const AppDev = {
-    DEV_PIN: "3172",
+    DEV_PIN: 0852",
     isAuthenticated: false,
     enteredPin: "",
     activeSubTab: "studio", // 'studio' | 'resources' | 'sandbox' | 'data_check' | 'logs' | 'state' | 'firestore'
