@@ -6,13 +6,13 @@
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v2.1.0</title>
 
-    <!-- Модульные CSS-стили с принудительным сбросом кэша v=401 -->
-    <link rel="stylesheet" href="css/base.css?v=401">
-    <link rel="stylesheet" href="css/hud.css?v=401">
-    <link rel="stylesheet" href="css/market.css?v=401">
-    <link rel="stylesheet" href="css/phone.css?v=401">
-    <link rel="stylesheet" href="css/modals.css?v=401">
-    <link rel="stylesheet" href="css/nav.css?v=401">
+    <!-- Модульные CSS-стили с принудительным сбросом кэша v=402 -->
+    <link rel="stylesheet" href="css/base.css?v=402">
+    <link rel="stylesheet" href="css/hud.css?v=402">
+    <link rel="stylesheet" href="css/market.css?v=402">
+    <link rel="stylesheet" href="css/phone.css?v=402">
+    <link rel="stylesheet" href="css/modals.css?v=402">
+    <link rel="stylesheet" href="css/nav.css?v=402">
 
     <!-- Внешние библиотеки -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -47,7 +47,7 @@
             💡 Если вы играете через Telegram — просто откройте бота заново.
           </div>
           <div class="pc-auth-version">
-            v2.1.0 // BUILD 401
+            v2.1.0 // BUILD 402
           </div>
         </div>
       </div>
@@ -75,7 +75,7 @@
 
         <div class="pc-auth-footer">
           <div class="pc-auth-version">
-            v2.1.0 // BUILD 401
+            v2.1.0 // BUILD 402
           </div>
         </div>
       </div>
@@ -112,7 +112,6 @@
                 </div>
               </div>
 
-              <!-- ⭐ v2.1.0: ОБЪЕДИНЕННАЯ СТРОКА СТАТОВ И ВАЛЮТ -->
               <div class="user-stats-row">
                 <div class="stat-pill stat-pill-conn" title="Теневые связи">
                   <i class="fa-solid fa-handshake"></i> <span id="connectionsText">1</span>
@@ -475,7 +474,10 @@
       </nav>
     </div>
 
-    <!-- МОДАЛЬНЫЕ ОКНА -->
+    <!-- ========================================================== -->
+    <!-- МОДАЛЬНЫЕ ОКНА — СТАТИЧЕСКИЕ                               -->
+    <!-- ========================================================== -->
+
     <div id="modalDevStudio" class="modal-overlay">
       <div class="modal-box" style="max-width: 440px; max-height: calc(100dvh - 20px);">
         <div id="devStudioContent"></div>
@@ -483,7 +485,6 @@
     </div>
 
     <div id="modalHudCustomizer" class="modal-overlay"></div>
-    <div id="modalBusinessCustomize" class="modal-overlay"></div>
     <div id="modalNeedGarage" class="modal-overlay"></div>
     <div id="modalImpoundLot" class="modal-overlay"></div>
     <div id="modalPortBrokerDeal" class="modal-overlay"></div>
@@ -491,11 +492,13 @@
     <div id="modalStorageWarsP2P" class="modal-overlay"></div>
     <div id="modalLevelGate" class="modal-overlay"></div>
     <div id="modalAppUnlockPrompt" class="modal-overlay"></div>
+    <div id="modalBackfire" class="modal-overlay"></div>
+    <div id="modalInspectionChoice" class="modal-overlay"></div>
+
+    <!-- ⭐ v2.6.0: добавлены заглушки для бизнес-модалок -->
     <div id="modalBizCrisis" class="modal-overlay"></div>
     <div id="modalBizCustomize" class="modal-overlay"></div>
     <div id="modalBizSell" class="modal-overlay"></div>
-    <div id="modalBackfire" class="modal-overlay"></div>
-    <div id="modalInspectionChoice" class="modal-overlay"></div>
 
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
@@ -504,12 +507,13 @@
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #401</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #402</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>🔧 ФИКС бага с кнопкой ДКП:</b> теперь показывает точную причину (гараж полон/нет денег).</div>
-          <div class="patch-item"><b>📊 Визуальная шкала терпения продавца:</b> зелёная/жёлтая/красная + подсказки.</div>
-          <div class="patch-item"><b>🎯 Подсказки шансов торга:</b> на кнопках видно вероятность успеха.</div>
-          <div class="patch-item"><b>☁️ Настройка Firestore:</b> TTL, cleanup, статистика.</div>
+          <div class="patch-item"><b>🔧 ФИКС ДКП:</b> кнопка «Оформить ДКП» / «Подписать ДКП» теперь работает надёжно.</div>
+          <div class="patch-item"><b>🏢 ФИКС Бизнес-Сети:</b> карточки предприятий отображаются корректно.</div>
+          <div class="patch-item"><b>📬 ФИКС Почты:</b> распаковка писем работает по ID, а не по индексу.</div>
+          <div class="patch-item"><b>🏠 Бонус жилья:</b> кураж от недвижимости применяется ежедневно.</div>
+          <div class="patch-item"><b>🏦 Во-Банк:</b> защита от двойного обмена и кредита.</div>
           <div class="patch-item"><b>🔧 DEV-режим для ПК:</b> игра без Telegram (пароль).</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
@@ -721,18 +725,6 @@
       </div>
     </div>
 
-    <div id="modalHomeInterior" class="modal-overlay">
-      <div class="modal-box">
-        <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-couch"></i> ИНТЕРЬЕР И ПЕРКИ</div>
-          <button onclick="closeModal('modalHomeInterior')" class="btn btn-dark btn-auto btn-sm">✕</button>
-        </div>
-        <div id="homeInteriorHeader" class="text-xs color-amber mb-2 font-bold"></div>
-        <div id="homeInteriorItemsList" class="space-y-2 mb-3" style="max-height: 280px; overflow-y: auto;"></div>
-        <button onclick="closeModal('modalHomeInterior')" class="btn btn-dark w-full">Закрыть</button>
-      </div>
-    </div>
-
     <div id="modalTuning" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
@@ -915,7 +907,6 @@
       </div>
     </div>
 
-    <!-- МОДАЛКА P2P БИРЖИ -->
     <div id="modalCreateP2P" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -1094,7 +1085,7 @@
     </style>
 
     <!-- 1. ПОДКЛЮЧЕНИЕ FIREBASE (ES-МОДУЛЬ) -->
-    <script type="module" src="firebase-bridge.js?v=401"></script>
+    <script type="module" src="firebase-bridge.js?v=402"></script>
 
     <!-- 2. АВТОЗАГРУЗЧИК СКРИПТОВ ИГРЫ -->
     <script>
@@ -1204,7 +1195,7 @@
             } catch (e) {}
           }
 
-          const CACHE_VER = '401';
+          const CACHE_VER = '402';
 
           const rootModules = [
             'data_core.js',
@@ -1225,9 +1216,13 @@
             'data_activities_quests.js',
             'data_activities_life.js',
             'data-defects.js',
-            'data_cars_helpers.js'
+            'data_cars_helpers.js',
+            'data_dialogues.js'
           ];
 
+          // ⭐ v2.6.0: phone-business.js переставлен ПЕРЕД phone-m.js,
+          // чтобы window.BUSINESS_COVER_SKINS / VIP_STICKERS уже были
+          // определены, когда phone-m.js рендерит P2P-лоты бизнеса.
           const jsModules = [
             'audio-fx.js',
             'theme-manager.js',
@@ -1240,11 +1235,11 @@
             'm-hub/m-leaderboard.js',
             'm-hub/m-events.js',
             'm-hub/m-clubs.js',
+            'phone-business.js',       // ⭐ ПЕРЕД phone-m.js
             'phone-m.js',
             'phone-post.js',
             'phone-gosuslugi.js',
             'phone-darknet.js',
-            'phone-business.js',
             'phone-housing.js',
             'phone-port.js',
             'storage-wars-p2p.js',

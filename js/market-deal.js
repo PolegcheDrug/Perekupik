@@ -1,13 +1,12 @@
 // ========================================================
-// js/market-deal.js — ТОРГ У КАПОТА 4.4.0 (v4.4.0)
+// js/market-deal.js — ТОРГ У КАПОТА 4.6.0 (v4.6.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v4.4.0 (ФИНАЛЬНЫЙ ФИКС ДКП):
-//   - Ре-биндинг кнопок modalDKP через onclick (защита от кэша DOM)
-//   - Сброс _dealActionPending при открытии модалки ДКП
-//   - Диагностика в window: __getDKPState(), __resetDKPFlags()
-//   - finishMarketCarBuyProcess: guaranteed finally-reset
-//   - abortDKPDeal чистит все флаги и pendingMarketCar
-//   - Более понятные сообщения об ошибках при отсутствии сделки
+// ⭐ v4.6.0 (КОМПАКТНЫЙ ДКП):
+//   - Сокращены размеры бланка, padding, шрифты.
+//   - Убраны лишние разделы (паспорт, адрес).
+//   - Компактная печать и подписи.
+//   - Улучшена читаемость на маленьких экранах.
+// ⭐ v4.5.0: интерактивный бланк с печатью, PDF, оспариванием.
 // ========================================================
 
 let pendingMarketCar = null;
@@ -20,9 +19,6 @@ if (typeof window.__DKP_PENDING__ !== 'boolean') {
 
 let _activeDKPDeal = null;
 
-// ========================================================
-// ⭐ v4.4.0: ДИАГНОСТИЧЕСКИЕ УТИЛИТЫ
-// ========================================================
 window.__getDKPState = function() {
     return {
         _activeDKPDeal: _activeDKPDeal,
@@ -353,8 +349,6 @@ function renderMarketHaggleControls() {
         return;
     }
 
-    // ⭐ v4.4.0: убрана кнопка «Проверить авто (5 уровней)»
-    // ⭐ v4.4.0: кнопки толщиномера/OBD2 показываются ТОЛЬКО если есть прибор
     let inspectionToolsBlock = "";
 
     if (hasGauge || hasScanner) {
@@ -382,7 +376,6 @@ function renderMarketHaggleControls() {
             </div>
         `;
     } else {
-        // У игрока нет ни одного прибора — показываем только тест-драйв
         inspectionToolsBlock = `
             <div class="mb-2">
                 <button onclick="startMarketTestDrive('${car.id}')" class="btn ${car.testDriven ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm w-full">
@@ -727,13 +720,10 @@ function attemptMarketHaggle(percent, failRisk = 25) {
 }
 
 // ========================================================
-// ⭐ v4.4.0: НАЧАЛО ПОКУПКИ (кнопка «Оформить ДКП 🤝»)
+// НАЧАЛО ПОКУПКИ (кнопка «Оформить ДКП 🤝»)
 // ========================================================
 function confirmMarketPurchaseSuccess() {
-    if (_dealActionPending) {
-        console.log('[Market] confirmMarketPurchaseSuccess уже в процессе');
-        return;
-    }
+    if (_dealActionPending) return;
 
     if (!pendingMarketCar || !pendingMarketCar.car) {
         showToast("❌ Данные об автомобиле недоступны.");
@@ -776,7 +766,7 @@ function confirmMarketPurchaseSuccess() {
 }
 
 // ========================================================
-// ⭐ v4.4.0: МОДАЛКА ВЫБОРА РЕГИСТРАЦИИ (МРЭО vs ДКП)
+// МОДАЛКА ВЫБОРА РЕГИСТРАЦИИ (МРЭО vs ДКП)
 // ========================================================
 function openRegistrationChoiceModal(deal) {
     if (!deal || !deal.car) return showToast("Ошибка данных сделки");
@@ -814,7 +804,7 @@ function confirmRegistrationChoice(registerOnPlayer) {
 }
 
 // ========================================================
-// ⭐ v4.4.0: МОДАЛКА ОФОРМЛЕНИЯ ДКП (БЛАНК)
+// ⭐ v4.6.0: КОМПАКТНЫЙ БЛАНК ДКП
 // ========================================================
 function openDKPModal(deal) {
     if (!deal || !deal.car) {
@@ -832,82 +822,233 @@ function openDKPModal(deal) {
     const buyerName = deal.buyer || (state.player?.name) || "Перекуп #777";
     const sellerName = deal.seller || "Продавец";
 
-    if (typeof setTxt === 'function') {
-        setTxt('dkpSellerName', sellerName);
-        setTxt('dkpBuyerName', buyerName);
-        setTxt('dkpCarTitle', car.name || "Автомобиль");
-        setTxt('dkpCarSpecs', `Мощность: ${car.power || 100} л.с. | Пробег: ${(car.mileage || 0).toLocaleString()} км`);
-        setTxt('dkpCarPlate', car.customPlate || car.plate || "ТРАНЗИТ");
-        setTxt('dkpPriceAmount', `${price.toLocaleString()} ₽`);
-    }
+    const hasLegalDefect = !!(car.legalDefect && !car._legalResolved);
+    const legalDefectInfo = hasLegalDefect
+        ? (typeof LEGAL_DEFECTS !== 'undefined' ? LEGAL_DEFECTS.find(l => l.id === car.legalDefect.id) : null)
+        : null;
 
-    const profitEl = document.getElementById('dkpNetProfitBadge');
-    if (profitEl) {
-        if (deal.type === 'sale') {
-            const purchaseCost = car.purchaseCost || Math.round(price * 0.75);
-            const profit = price - purchaseCost;
-            profitEl.style.display = 'block';
-            if (profit > 0) {
-                profitEl.className = 'text-xs text-center font-bold mb-2 color-green';
-                profitEl.innerText = `Чистая прибыль: +${profit.toLocaleString()} ₽ 📈`;
-            } else if (profit < 0) {
-                profitEl.className = 'text-xs text-center font-bold mb-2 color-red';
-                profitEl.innerText = `Убыток: ${profit.toLocaleString()} ₽ 📉`;
-            } else {
-                profitEl.className = 'text-xs text-center font-bold mb-2 color-amber';
-                profitEl.innerText = `Сделка в ноль`;
-            }
-        } else {
-            profitEl.style.display = 'none';
-        }
-    }
+    const dkpModal = document.getElementById('modalDKP');
+    if (!dkpModal) return;
 
-    // Сброс визуала кнопок
-    const stamp = document.getElementById('dkpOfficialStamp');
-    if (stamp) stamp.classList.remove('stamp-approved');
-    if (typeof setTxt === 'function') setTxt('dkpBuyerSig', '✍️ Ожидает...');
+    const contractNum = `МРЭО-${String(Date.now()).slice(-6)}-${car.id ? car.id.slice(-3) : '777'}`;
+    const contractDate = new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const carVIN = car.vin || `XTA${String(car.id || '2107000').slice(-13).padEnd(13, '0')}`;
+
+    dkpModal.innerHTML = `
+        <div class="modal-box dkp-official-blank" style="max-width: 420px;">
+            <div class="dkp-watermark">МРЭО РФ</div>
+            <div class="dkp-watermark dkp-watermark-2">ГИБДД</div>
+
+            <div class="dkp-blank-border">
+                <!-- ШАПКА -->
+                <div class="dkp-header text-center mb-2">
+                    <div class="dkp-title-small">МИНИСТЕРСТВО ВНУТРЕННИХ ДЕЛ РФ</div>
+                    <h3 class="dkp-title-main mb-1">ДОГОВОР КУПЛИ-ПРОДАЖИ ТС</h3>
+                    <div class="dkp-contract-num">№ <b>${contractNum}</b> от <b>${contractDate}</b></div>
+                </div>
+
+                <!-- 1. ПРОДАВЕЦ + ПОКУПАТЕЛЬ (объединены в 2 колонки) -->
+                <div class="dkp-section-compact">
+                    <div class="dkp-two-col">
+                        <div>
+                            <div class="dkp-section-title">ПРОДАВЕЦ</div>
+                            <div class="dkp-row-compact">
+                                <b class="dkp-value" id="dkpSellerName">${sellerName}</b>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="dkp-section-title">ПОКУПАТЕЛЬ</div>
+                            <div class="dkp-row-compact">
+                                <b class="dkp-value color-cyan" id="dkpBuyerName">${buyerName}</b>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. ТС -->
+                <div class="dkp-section-compact">
+                    <div class="dkp-section-title">ТРАНСПОРТНОЕ СРЕДСТВО</div>
+                    <div class="dkp-row-compact">
+                        <span class="dkp-label">Модель:</span>
+                        <b class="dkp-value color-amber" id="dkpCarTitle">${car.name || "Автомобиль"}</b>
+                    </div>
+                    <div class="dkp-row-compact">
+                        <span class="dkp-label">VIN:</span>
+                        <span class="dkp-value-mono color-cyan">${carVIN}</span>
+                    </div>
+                    <div class="dkp-row-compact">
+                        <span class="dkp-label">Мощность / Пробег:</span>
+                        <b class="dkp-value">${car.power || 100} л.с. / ${(car.mileage || 0).toLocaleString()} км</b>
+                    </div>
+                    <div class="dkp-row-compact">
+                        <span class="dkp-label">Госномер:</span>
+                        <span class="license-plate" style="font-size:10px; padding:1px 6px;" id="dkpCarPlate">${car.customPlate || car.plate || "ТРАНЗИТ"}</span>
+                    </div>
+                </div>
+
+                <!-- 3. ЦЕНА -->
+                <div class="dkp-section-compact dkp-price-line-highlight">
+                    <div class="dkp-row-compact">
+                        <span class="dkp-label">СУММА:</span>
+                        <b class="price-val color-green" style="font-size:15px;" id="dkpPriceAmount">${price.toLocaleString()} ₽</b>
+                    </div>
+                    <div class="dkp-row-compact">
+                        <span class="dkp-label">Учёт:</span>
+                        <b class="dkp-value color-amber">${deal.isRegisteredOnPlayer ? '✅ МРЭО' : '📄 ДКП'}</b>
+                    </div>
+                </div>
+
+                ${hasLegalDefect ? `
+                    <div class="dkp-legal-warning dkp-compact-warning">
+                        <b class="text-xs color-red">⚠️ ЮРИДИЧЕСКАЯ ПРОБЛЕМА: ${legalDefectInfo?.name || ''}</b>
+                    </div>
+                ` : ''}
+
+                <!-- ПОДПИСИ -->
+                <div class="dkp-signatures-area dkp-compact-sigs">
+                    <div class="dkp-sig-col">
+                        <span class="dkp-sig-label">Продавец:</span>
+                        <div class="dkp-handwrite" id="dkpSellerSig">✓ Подписано</div>
+                        <div class="dkp-sig-date">${contractDate}</div>
+                    </div>
+                    <div class="dkp-sig-col text-right">
+                        <span class="dkp-sig-label">Покупатель:</span>
+                        <div class="dkp-handwrite" id="dkpBuyerSig">✍️ Ожидает...</div>
+                        <div class="dkp-sig-date" id="dkpBuyerSigDate">—</div>
+                    </div>
+                    <div id="dkpOfficialStamp" class="official-mreo-stamp">
+                        <div class="stamp-inner">
+                            <span>МРЭО ГИБДД</span>
+                            <span>ЗАРЕГИСТРИРОВАНО</span>
+                            <span>РФ</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- КНОПКИ -->
+                <div class="mt-2">
+                    <button id="btnSignDKP" onclick="confirmSignDKP()" class="btn btn-green w-full font-bold btn-sm">
+                        ✍️ ПОДПИСАТЬ ДОГОВОР
+                    </button>
+
+                    <div class="grid-2 mt-1" style="gap:6px;">
+                        <button onclick="downloadDKPPDF()" class="btn btn-dark btn-sm">
+                            <i class="fa-solid fa-download mr-1"></i> PDF
+                        </button>
+                        ${hasLegalDefect ? `
+                            <button onclick="disputeDKP()" class="btn btn-danger btn-sm">
+                                <i class="fa-solid fa-gavel mr-1"></i> Оспорить
+                            </button>
+                        ` : `
+                            <button onclick="abortDKPDeal()" class="btn btn-dark btn-sm">
+                                <i class="fa-solid fa-xmark mr-1"></i> Отмена
+                            </button>
+                        `}
+                    </div>
+
+                    <button id="btnAbortDKP" onclick="abortDKPDeal()" class="btn btn-danger btn-sm w-full mt-1" style="${hasLegalDefect ? '' : 'display:none;'}">
+                        ❌ Разорвать сделку
+                    </button>
+                    <button id="btnCloseDKP" onclick="closeModal('modalDKP')" class="btn btn-dark w-full mt-1" style="display:none;">Готово</button>
+                </div>
+            </div>
+        </div>
+    `;
 
     ModalManager.open('modalDKP', { closeOthers: true });
     if (typeof playSound === 'function') playSound('tick');
 
-    // ⭐ v4.4.0: Гарантированный ре-биндинг кнопок после открытия модалки
-    // (защита от кэша DOM и потери обработчиков)
     setTimeout(() => {
         const btnSign = document.getElementById('btnSignDKP');
         const btnAbort = document.getElementById('btnAbortDKP');
         const btnClose = document.getElementById('btnCloseDKP');
 
-        if (btnSign) {
-            btnSign.onclick = confirmSignDKP;
-            btnSign.style.display = 'block';
-            btnSign.disabled = false;
-        }
-        if (btnAbort) {
-            btnAbort.onclick = abortDKPDeal;
-            btnAbort.style.display = 'block';
-            btnAbort.disabled = false;
-        }
-        if (btnClose) {
-            btnClose.style.display = 'none';
-        }
+        if (btnSign) { btnSign.onclick = confirmSignDKP; btnSign.style.display = 'block'; btnSign.disabled = false; }
+        if (btnAbort) { btnAbort.onclick = abortDKPDeal; btnAbort.style.display = hasLegalDefect ? 'block' : 'none'; }
+        if (btnClose) { btnClose.style.display = 'none'; }
 
-        console.log('[DKP] Модалка открыта, кнопки ре-биндингнуты. State:', window.__getDKPState());
+        console.log('[DKP] Модалка открыта, кнопки ре-биндингнуты.');
     }, 50);
 }
 
 // ========================================================
-// ⭐ v4.4.0: ПОДПИСАНИЕ ДКП
+// СКАЧАТЬ PDF (ИМИТАЦИЯ)
+// ========================================================
+function downloadDKPPDF() {
+    if (typeof showToast === 'function') {
+        showToast("📄 Договор сохранён в буфер обмена (PDF-имитация)");
+    }
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+
+    if (_activeDKPDeal && _activeDKPDeal.car) {
+        const car = _activeDKPDeal.car;
+        const contractText = `
+ДОГОВОР КУПЛИ-ПРОДАЖИ ТС
+Дата: ${new Date().toLocaleDateString('ru-RU')}
+Продавец: ${_activeDKPDeal.seller || 'Продавец'}
+Покупатель: ${_activeDKPDeal.buyer || 'Покупатель'}
+Автомобиль: ${car.name}
+VIN: ${car.vin || '—'}
+Госномер: ${car.customPlate || car.plate || 'ТРАНЗИТ'}
+Цена: ${(_activeDKPDeal.price || 0).toLocaleString()} ₽
+        `.trim();
+
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(contractText).catch(() => {});
+        }
+    }
+}
+
+// ========================================================
+// ОСПОРИТЬ ДКП
+// ========================================================
+function disputeDKP() {
+    if (!_activeDKPDeal || !_activeDKPDeal.car) return;
+
+    const car = _activeDKPDeal.car;
+
+    if (typeof showToast === 'function') {
+        showToast("⚖️ Вы вызвали юриста для оспаривания сделки...");
+    }
+
+    const hasConnections = (state.player?.connections || 0) >= 1;
+    const hasMoney = (state.player?.cash || 0) >= 100000;
+
+    if (hasConnections && Math.random() < 0.6) {
+        state.player.connections -= 1;
+        if (typeof showToast === 'function') showToast("🤝 Решала уладил юридические проблемы (-1 связь)!");
+        car.legalDefect = null;
+        car._legalResolved = true;
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        setTimeout(() => { openDKPModal(_activeDKPDeal); }, 800);
+    } else if (hasMoney) {
+        state.player.cash -= 100000;
+        car.legalDefect = null;
+        car._legalResolved = true;
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction('Юридическое сопровождение ДКП', 100000, false);
+        }
+        if (typeof showToast === 'function') showToast("💸 Юрист уладил проблемы (-100,000 ₽)!");
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        setTimeout(() => { openDKPModal(_activeDKPDeal); }, 800);
+    } else {
+        if (typeof showToast === 'function') showToast("❌ Не хватает ни связей, ни денег для оспаривания!");
+        if (typeof playSound === 'function') playSound('error');
+        if (typeof tgHaptic === 'function') tgHaptic('error');
+    }
+}
+
+// ========================================================
+// ПОДПИСАНИЕ ДКП
 // ========================================================
 function confirmSignDKP() {
     console.log('[DKP] confirmSignDKP вызван. State:', window.__getDKPState());
 
-    // Проверка флага блокировки
-    if (window.__DKP_PENDING__) {
-        console.warn('[DKP] confirmSignDKP: __DKP_PENDING__=true, вызов проигнорирован');
-        return;
-    }
+    if (window.__DKP_PENDING__) return;
 
-    // Проверка активной сделки
     if (!_activeDKPDeal) {
         showToast("❌ Ошибка: сделка потеряна");
         ModalManager.close('modalDKP');
@@ -921,10 +1062,27 @@ function confirmSignDKP() {
 
     const stamp = document.getElementById('dkpOfficialStamp');
     if (stamp) stamp.classList.add('stamp-approved');
-    if (typeof setTxt === 'function') setTxt('dkpBuyerSig', '✓ Подписано');
+
+    const buyerSig = document.getElementById('dkpBuyerSig');
+    const buyerSigDate = document.getElementById('dkpBuyerSigDate');
+    const today = new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    if (buyerSig) buyerSig.innerText = '✓ Подписано';
+    if (buyerSigDate) buyerSigDate.innerText = today;
 
     if (typeof playSound === 'function') playSound('win');
     if (typeof tgHaptic === 'function') tgHaptic('success');
+
+    const btnClose = document.getElementById('btnCloseDKP');
+    if (btnClose) {
+        setTimeout(() => {
+            btnClose.style.display = 'block';
+            btnClose.onclick = () => {
+                ModalManager.close('modalDKP');
+                closeModal('modalDKP');
+            };
+        }, 800);
+    }
 
     setTimeout(() => {
         ModalManager.close('modalDKP');
@@ -946,13 +1104,11 @@ function confirmSignDKP() {
         _activeDKPDeal = null;
         window.__DKP_PENDING__ = false;
         _dealActionPending = false;
-
-        console.log('[DKP] Сделка завершена, флаги сброшены');
-    }, 700);
+    }, 1500);
 }
 
 // ========================================================
-// ⭐ v4.4.0: ОТМЕНА ДКП
+// ОТМЕНА ДКП
 // ========================================================
 function abortDKPDeal() {
     ModalManager.close('modalDKP');
@@ -966,7 +1122,7 @@ function abortDKPDeal() {
 }
 
 // ========================================================
-// ⭐ v4.4.0: ФИНАЛИЗАЦИЯ ПОКУПКИ В ГАРАЖ
+// ФИНАЛИЗАЦИЯ ПОКУПКИ В ГАРАЖ
 // ========================================================
 function finishMarketCarBuyProcess(deal) {
     if (!deal || !deal.carId) {
@@ -1174,7 +1330,7 @@ function resolveBackfire(carId, action) {
 }
 
 // ========================================================
-// ЭКСПОРТ В WINDOW
+// ЭКСПОРТ
 // ========================================================
 Object.assign(window, {
     initiateBuyMarketCar,
@@ -1193,6 +1349,8 @@ Object.assign(window, {
     openDKPModal,
     confirmSignDKP,
     abortDKPDeal,
+    downloadDKPPDF,
+    disputeDKP,
     _triggerBuyerBackfire,
     resolveBackfire
 });
@@ -1201,4 +1359,4 @@ window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v4.4.0] Ре-биндинг кнопок ДКП + диагностика + guaranteed reset ✓');
+console.log('[🤝 market-deal v4.6.0] Компактный ДКП + PDF + оспаривание ✓');

@@ -1,22 +1,20 @@
 // ========================================================
-// js/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.4.0)
+// js/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.6.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.6.0 (ФИКСАЦИЯ КАРТИНКИ):
+//   - В renderGarage используется ФИКСИРОВАННАЯ car.img,
+//     а не случайная из car.images. Это гарантирует, что
+//     машина показывает одну и ту же картинку везде:
+//     в Почте → Гараж → P2P → Продажа.
+//   - Fallback: если car.img пуст, берём car.images[0].
+// ⭐ v1.5.0:
+//   - Обложка car-img-wrap увеличена до 190px.
+//   - Плитки характеристик компактнее (min-height 38px).
+//   - Уменьшены вертикальные отступы.
 // ⭐ v1.4.0:
-//   - ФИКС: _sortGarageCars() возвращает [{car, originalIdx}]
-//     вместо простого массива — теперь клики по карточкам
-//     всегда открывают правильную машину (не путаются при
-//     дубликатах в гараже).
+//   - ФИКС: _sortGarageCars() возвращает [{car, originalIdx}].
 //   - ФИКС: confirmPutOnLot() удаляет по uid, не по индексу.
-//   - ФИКС: selectCarForStreetDirect / togglePersonalCar
-//     защищены от битого idx.
-//   - ФИКС: корректный расчёт originalIdx без indexOf().
 //   - Карточка машины имеет data-car-uid для отладки.
-// ⭐ v1.3.0:
-//   - Отображение рейтинга A/B/C/D/F в карточке
-//   - Кнопка «Смотреть отчёт» для быстрой инспекции
-//   - Улучшенная сортировка (личные → по цене)
-//   - Бейдж «Проблемы» при дефектах/юр.проблемах
-//   - DEV-режим совместим
 // ========================================================
 
 window.previewCarIndex = null;
@@ -61,6 +59,23 @@ function safeGetCar(idx) {
     if (idx === null || idx === undefined || !state?.garage) return null;
     if (idx < 0 || idx >= state.garage.length) return null;
     return state.garage[idx] || null;
+}
+
+// ⭐ v1.6.0: получаем ФИКСИРОВАННУЮ картинку машины
+// (car.img уже выбрана при выпадении/покупке и не должна меняться)
+function _getFixedCarImage(car) {
+    if (!car) return "assets/cars/economy/2101/vaz-2101.jpg";
+
+    // 1. Основная фиксированная картинка
+    if (car.img) return car.img;
+
+    // 2. Fallback: первая из галереи
+    if (Array.isArray(car.images) && car.images.length > 0) {
+        return car.images[0];
+    }
+
+    // 3. Хардкод
+    return "assets/cars/economy/2101/vaz-2101.jpg";
 }
 
 // ========================================================
@@ -147,32 +162,27 @@ function openNeedGarageModal(actionTitle = "Тюнинг и доработки")
 function _sortGarageCars() {
     if (!Array.isArray(state.garage)) return [];
 
-    // ⭐ v1.4.0: сохраняем originalIdx для каждой машины
     const indexed = state.garage.map((car, idx) => ({ car, originalIdx: idx }));
 
     indexed.sort((a, b) => {
-        // Личные всегда сверху
         const aPers = a.car?.isPersonal ? 1 : 0;
         const bPers = b.car?.isPersonal ? 1 : 0;
         if (aPers !== bPers) return bPers - aPers;
 
-        // Капсулы времени — на второе место
         const aMus = a.car?.isMuseumStock ? 1 : 0;
         const bMus = b.car?.isMuseumStock ? 1 : 0;
         if (aMus !== bMus) return bMus - aMus;
 
-        // Затем по рыночной цене (дорогие сверху)
         const aVal = a.car?.marketValue || a.car?.basePrice || 0;
         const bVal = b.car?.marketValue || b.car?.basePrice || 0;
         return bVal - aVal;
     });
 
-    // ⭐ v1.4.0: возвращаем массив пар {car, originalIdx}
     return indexed;
 }
 
 // ========================================================
-// ГЛАВНЫЙ РЕНДЕР ГАРАЖА
+// ГЛАВНЫЙ РЕНДЕР ГАРАЖА (⭐ v1.6.0: ФИКСАЦИЯ КАРТИНКИ)
 // ========================================================
 function renderGarage() {
     const list = document.getElementById('garageList');
@@ -202,7 +212,6 @@ function renderGarage() {
 
     let html = "";
 
-    // ⭐ v1.4.0: получаем отсортированные пары {car, originalIdx}
     const sortedPairs = _sortGarageCars();
 
     sortedPairs.forEach((pair, visualIdx) => {
@@ -215,14 +224,15 @@ function renderGarage() {
 
         const cName = escapeHtml(car.name || "Автомобиль");
         const cPower = car.power || 100;
-        const rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
+
+        // ⭐ v1.6.0: ФИКСИРОВАННАЯ картинка (не случайная!)
+        const rawImg = _getFixedCarImage(car);
+
         const cPlate = escapeHtml(car.customPlate || car.plate || "ТРАНЗИТ");
         const cPrice = (car.marketValue || car.basePrice || 100000).toLocaleString();
 
-        // Рейтинг A/B/C/D/F
         const grade = getCarConditionGrade(car);
 
-        // КАСКАДНЫЙ ФОЛБЕК ФОТО
         const carImgAttrs = (typeof buildCarImageAttrs === 'function')
             ? buildCarImageAttrs(rawImg, car)
             : `src="${rawImg}" onerror="this.onerror=null; this.src='${car.fallback || 'assets/cars/economy/2101/vaz-2101.jpg'}'"`;
@@ -272,7 +282,6 @@ function renderGarage() {
         const tireVal = car.tireWear !== undefined ? car.tireWear : 100;
         const tireBadge = tireVal < 35 ? `<span class='tag-badge bg-tag-red'>🛞 ${tireVal}%</span>` : "";
 
-        // Бейджи дефектов
         let defectsBadge = "";
         const mechDefects = car.mechanicalDefects || [];
         const revealedDefects = car._revealedDefects || [];
@@ -311,7 +320,6 @@ function renderGarage() {
             ? formatCarBrandBadgeHtml(car.name || "Автомобиль")
             : `<div class="car-title-plate">${cName}</div>`;
 
-        // Блок действий
         let actionControlBlock = "";
         if (isImpounded) {
             actionControlBlock = `
@@ -347,7 +355,6 @@ function renderGarage() {
             `;
         }
 
-        // Блок известных проблем
         let knownDefectsBlock = '';
         if (knownMechCount > 0 || revealedLegal) {
             const knownList = mechDefects.filter(d => revealedDefects.includes(d.id));
@@ -375,12 +382,11 @@ function renderGarage() {
             `;
         }
 
-        // ⭐ v1.4.0: data-car-uid для отладки
         const carUid = car.uid || car.id || ('car_idx_' + originalIdx);
 
         html += `
         <div class="glass-card mb-3 ${isPersonal ? 'personal-car-card' : ''}" data-car-idx="${originalIdx}" data-car-uid="${escapeHtml(carUid)}">
-            <div class="car-img-wrap" style="height:155px;">
+            <div class="car-img-wrap" style="height:190px;">
                 <img ${carImgAttrs} class="car-img">
             </div>
 
@@ -407,34 +413,34 @@ function renderGarage() {
                 </div>
             </div>
 
-            <div class="car-specs-grid-volumetric">
-                <div class="spec-tile-3d-col">
-                    <div class="spec-tile-icon-wrap spec-tile-icon-power">
+            <div class="car-specs-grid-volumetric" style="margin-bottom: 6px !important;">
+                <div class="spec-tile-3d-col" style="min-height: 38px; padding: 4px 6px;">
+                    <div class="spec-tile-icon-wrap spec-tile-icon-power" style="width: 18px; height: 18px; font-size: 9px;">
                         <i class="fa-solid fa-bolt"></i>
                     </div>
                     <div class="spec-tile-col-data">
-                        <span class="spec-tile-col-label">Мощность</span>
-                        <b class="color-amber">${cPower} л.с.</b>
+                        <span class="spec-tile-col-label" style="font-size: 7.5px;">Мощность</span>
+                        <b class="color-amber" style="font-size: 10px;">${cPower} л.с.</b>
                     </div>
                 </div>
 
-                <div class="spec-tile-3d-col">
-                    <div class="spec-tile-icon-wrap spec-tile-icon-road">
+                <div class="spec-tile-3d-col" style="min-height: 38px; padding: 4px 6px;">
+                    <div class="spec-tile-icon-wrap spec-tile-icon-road" style="width: 18px; height: 18px; font-size: 9px;">
                         <i class="fa-solid fa-road"></i>
                     </div>
                     <div class="spec-tile-col-data">
-                        <span class="spec-tile-col-label">Пробег</span>
-                        <b class="color-cyan">${(car.mileage || 85000).toLocaleString()} км</b>
+                        <span class="spec-tile-col-label" style="font-size: 7.5px;">Пробег</span>
+                        <b class="color-cyan" style="font-size: 10px;">${(car.mileage || 85000).toLocaleString()} км</b>
                     </div>
                 </div>
 
-                <div class="spec-tile-3d-col">
-                    <div class="spec-tile-icon-wrap ${shieldIconClass}">
+                <div class="spec-tile-3d-col" style="min-height: 38px; padding: 4px 6px;">
+                    <div class="spec-tile-icon-wrap ${shieldIconClass}" style="width: 18px; height: 18px; font-size: 9px;">
                         <i class="fa-solid fa-shield"></i>
                     </div>
                     <div class="spec-tile-col-data">
-                        <span class="spec-tile-col-label">Кузов</span>
-                        <b class="${condColorClass}">${condVal}% <span style="font-size:8px; opacity:0.85;">(${grade.grade})</span></b>
+                        <span class="spec-tile-col-label" style="font-size: 7.5px;">Кузов</span>
+                        <b class="${condColorClass}" style="font-size: 10px;">${condVal}% <span style="font-size:8px; opacity:0.85;">(${grade.grade})</span></b>
                     </div>
                 </div>
             </div>
@@ -476,7 +482,6 @@ function openCarPreviewModal(idx) {
     const tires = car.tireWear !== undefined ? Number(car.tireWear) : 100;
     const cond = car.condition !== undefined ? Number(car.condition) : 80;
 
-    // Рейтинг
     const grade = getCarConditionGrade(car);
 
     const bodyDesc = car.isRepainted
@@ -503,7 +508,6 @@ function openCarPreviewModal(idx) {
         ? (car.insurance.type === 'comprehensive' ? "<b class='color-green'>КАСКО (Полное покрытие)</b>" : "<b class='color-cyan'>ОСАГО (Действует)</b>")
         : "<b class='color-red'>Отсутствует (Езда на свой страх и риск!)</b>";
 
-    // Блок дефектов
     const mechDefects = car.mechanicalDefects || [];
     const revealedDefects = car._revealedDefects || [];
     const revealedLegal = car._revealedLegal || null;
@@ -725,7 +729,6 @@ function openPutOnLotModal(idx) {
     safePlaySound('tick');
 }
 
-// ⭐ v1.4.0: удаление по uid, не по индексу
 function confirmPutOnLot() {
     const idx = window.currentLotPutIndex;
     if (idx === undefined || idx === null) return;
@@ -736,12 +739,10 @@ function confirmPutOnLot() {
     const price = parseInt(askInput?.value || 0, 10);
     if (isNaN(price) || price <= 0) return safeShowToast("Укажите корректную цену продажи!");
 
-    // ⭐ v1.4.0: удаляем по uid, чтобы избежать проблем при сдвиге индексов
     const carUid = window.currentLotPutUid || car.uid || car.id;
     let liveIdx = state.garage.findIndex(c => c && (c.uid === carUid || c.id === carUid));
 
     if (liveIdx === -1) {
-        // Fallback на индекс
         liveIdx = idx;
     }
 
@@ -774,7 +775,6 @@ function confirmPutOnLot() {
     safeTgHaptic('success');
     safeShowToast(`«${car.name}» выставлен на площадку продажи!`);
 
-    // Чистим временные переменные
     window.currentLotPutIndex = null;
     window.currentLotPutUid = null;
 }
@@ -795,7 +795,8 @@ Object.assign(window, {
     buyGarageSlot,
     openPutOnLotModal,
     confirmPutOnLot,
-    _sortGarageCars
+    _sortGarageCars,
+    _getFixedCarImage
 });
 
-console.log('[🏠 garage v1.4.0] Сортировка с originalIdx + uid-safe удаление + защита от битых индексов ✓');
+console.log('[🏠 garage v1.6.0] ФИКСАЦИЯ картинки машины (car.img) + компактные плитки + широкая обложка ✓');

@@ -1,6 +1,6 @@
 // ========================================================
 // data_core.js — ЯДРО, СИСТЕМНЫЕ ДАННЫЕ И КАСТОМИЗАЦИЯ
-// ⭐ v2.0.0: РЕБАЛАНС ЭКОНОМИКИ И ЦЕНТРАЛИЗАЦИЯ
+// ⭐ v2.1.0: ГАЛЕРЕЯ БАРН-ФАЙНДОВ В СУПЕРВИЛСПИНЕ
 // ========================================================
 
 const GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/PolegcheDrug/Perekupik/main/";
@@ -70,16 +70,30 @@ const WHEEL_SECTORS = [
 ];
 
 // --------------------------------------------------------
-// ⭐ v2.0.0: SUPER_SPIN_TIERS
-// Цены в звёздах сопоставлены с новым курсом 1 ⭐ = 2,500 ₽.
-// В комментариях указан рублёвый эквивалент для справки.
+// ⭐ v2.1.0: SUPER_SPIN_TIERS
+// КРИТИЧЕСКИЙ ФИКС ГАЛЕРЕИ:
+//   - Теперь используются barnId и точные имена моделей
+//     из BARN_CARS_DATABASE (data_barn.js).
+//   - Это гарантирует, что машины из СуперВилспина получат
+//     полную галерею images из assets/cars/barn/<model>/*.jpg
+//     и главная картинка будет зафиксирована случайно.
 // --------------------------------------------------------
 const SUPER_SPIN_TIERS = {
     reelCars: [
-        { type: "car", name: "ВАЗ-2101 «Копейка»", category: "economy", basePrice: 180000, power: 85, emoji: "🏎️" },
-        { type: "car", name: "BMW E30 Coupe", category: "comfort", basePrice: 650000, power: 170, emoji: "🏎️" },
-        { type: "car", name: "VW Golf VI GTI", category: "comfort", basePrice: 1450000, power: 211, emoji: "🏎️" },
-        { type: "car", name: "Toyota Mark II (JZX90)", category: "economy", basePrice: 590000, power: 200, emoji: "🏎️" },
+        // ⭐ v2.1.0: barnId = точный id модели в BARN_CARS_DATABASE
+        { type: "car", barnId: "barn_vaz_2101",     name: "ВАЗ-2101 «Копейка»",              category: "economy", basePrice: 180000,   power: 85,  emoji: "🏎️" },
+        { type: "car", barnId: "barn_golf6_gti",    name: "Volkswagen Golf VI GTI",          category: "comfort", basePrice: 1550000,  power: 211, emoji: "🏎️" },
+        { type: "car", barnId: "barn_mark2",        name: "Toyota Mark II (JZX90 / JZX100)", category: "economy", basePrice: 750000,   power: 280, emoji: "🏎️" },
+        { type: "car", barnId: "barn_silvia",       name: "Nissan Silvia (S15)",             category: "comfort", basePrice: 1900000,  power: 250, emoji: "🏎️" },
+        { type: "car", barnId: "barn_supra_mk5",    name: "Toyota GR Supra (A90 Mk5)",       category: "comfort", basePrice: 5200000,  power: 340, emoji: "🏎️" },
+        { type: "car", barnId: "barn_bmw_m340i",    name: "BMW M340i xDrive (G20)",          category: "premium", basePrice: 5100000,  power: 387, emoji: "🏎️" },
+        { type: "car", barnId: "barn_c63_amg",      name: "Mercedes-Benz C63 AMG (W205)",    category: "premium", basePrice: 5800000,  power: 510, emoji: "🏎️" },
+        { type: "car", barnId: "barn_charger_srt",  name: "Dodge Charger SRT Hellcat",       category: "premium", basePrice: 6900000,  power: 717, emoji: "🏎️" },
+        { type: "car", barnId: "barn_corvette_c6",  name: "Chevrolet Corvette C6 Z06",       category: "premium", basePrice: 4600000,  power: 505, emoji: "🏎️" },
+        { type: "car", barnId: "barn_mercedes_s63", name: "Mercedes-AMG S63 (W222)",         category: "premium", basePrice: 11500000, power: 612, emoji: "🏎️" },
+        { type: "car", barnId: "barn_ghost",        name: "Rolls-Royce Ghost",               category: "premium", basePrice: 24000000, power: 571, emoji: "👑" },
+        { type: "car", barnId: "barn_huracan",      name: "Lamborghini Huracán EVO",         category: "hyper",   basePrice: 38000000, power: 640, emoji: "⚡" },
+        { type: "car", barnId: "barn_ferrari_458",  name: "Ferrari 458 Italia",              category: "hyper",   basePrice: 32000000, power: 570, emoji: "🐎" },
         { type: "tool", toolId: "obd_launch", name: "Сканер Launch Pro", emoji: "📱" },
         { type: "tool", toolId: "endoscope", name: "HD Видеоэндоскоп", emoji: "📹" },
         { type: "free_impound", name: "Талон ГИБДД", emoji: "🚔" },
@@ -95,7 +109,6 @@ const SUPER_SPIN_TIERS = {
         { type: "xp",       label: "+200 XP",          amount: 200 }
     ],
     reelExclusives: [
-        // ⭐ v2.0.0: 30 ⭐ = 75,000 ₽, 75 ⭐ = 187,500 ₽ (раньше "30 ⭐" было эквивалентно 3M ₽!)
         { type: "stars",     label: "30 ⭐ (75,000 ₽)",      amount: 30,  emoji: "⭐" },
         { type: "stars",     label: "75 ⭐ (187,500 ₽)",     amount: 75,  emoji: "⭐" },
         { type: "plate",     label: "Номер А777АА 77",       plate: "А777АА 77",  emoji: "🏷️" },
@@ -107,10 +120,6 @@ const SUPER_SPIN_TIERS = {
 
 // --------------------------------------------------------
 // ⭐ v2.0.0: КУРСЫ ВАЛЮТ БАНКА
-// КРИТИЧЕСКИЙ ФИКС: stars.buyRub снижен со 100,000 ₽ до 2,500 ₽.
-// Раньше: SuperSpin ticket за 60 ⭐ = 6,000,000 ₽ в рублёвом эквиваленте,
-//         при цене альтернативы 150,000 ₽. Эксплойт в 40 раз.
-// Теперь: 60 ⭐ = 150,000 ₽. Совпадает с рублёвой ценой.
 // --------------------------------------------------------
 const BANK_EXCHANGE_RATES = {
     rub:     { buyRub: 1,       sellRub: 1,       name: "Рубли" },
@@ -123,20 +132,12 @@ const BANK_EXCHANGE_RATES = {
 };
 
 // --------------------------------------------------------
-// ⚠️ v2.0.0: КАТАЛОГИ HUD
-// Активные версии живут в theme-manager.js:
-//   • ThemeManager.themes         → HUD_SOLID_COLORS
-//   • ThemeManager.nickEffects    → NICKNAME_EFFECTS_CATALOG
-//   • ThemeManager.avatarEffects  → AVATAR_EFFECTS_CATALOG
-// Здесь оставлены пустые заглушки для совместимости со старым кодом,
-// который мог бы обратиться к ним ДО загрузки theme-manager.js.
+// ⚠️ v2.0.0: КАТАЛОГИ HUD (заглушки, активные в theme-manager.js)
 // --------------------------------------------------------
-const HUD_SOLID_COLORS = [];               // → перезаписывается theme-manager.js
-const NICKNAME_EFFECTS_CATALOG = [];       // → перезаписывается theme-manager.js
-const AVATAR_EFFECTS_CATALOG = [];         // → перезаписывается theme-manager.js
+const HUD_SOLID_COLORS = [];
+const NICKNAME_EFFECTS_CATALOG = [];
+const AVATAR_EFFECTS_CATALOG = [];
 
-// ⚠️ HUD_THEMES_CATALOG — только здесь, нигде не дублируется.
-// Используется в ThemeManager как источник готовых пресетов оформления.
 const HUD_THEMES_CATALOG = [
     { id: "cyber_black_neo",  name: "Cyber Black Neo (Матовый DEV)", desc: "Все иконки телефона и блоки получают черно-неоновый матовый стиль консоли DEV.", colorId: "green",    cost: 380000, reqStars: 20, reqLevel: 10, isCyberIcons: true },
     { id: "lightning_storm",  name: "Lightning Storm (Гроза)",       desc: "Электрический сине-фиолетовый неон с искрами молний на HUD и телефоне.",       colorId: "lightning", cost: 300000, reqStars: 15, reqLevel: 7,  isLightning: true },
@@ -212,11 +213,9 @@ function calculatePlateValue(plateStr) {
 
 // --------------------------------------------------------
 // ЛОКАЛИЗАЦИЯ
-// ⭐ v2.0.0: добавлены ключи для площадки продаж и классов техники.
 // --------------------------------------------------------
 const I18N_TRANSLATIONS = {
     ru: {
-        // Классы техники
         classes_title: "Классы техники",
         cat_all: "Все категории",
         cat_economy: "Эконом",
@@ -229,20 +228,14 @@ const I18N_TRANSLATIONS = {
         cat_truck: "Грузовики",
         cat_yacht: "Яхты",
         cat_available: "Доступен",
-
-        // Рынок
         btn_refresh_market: "Обновить ленту",
         market_estimate: "Оценка рынка",
         price: "ЦЕНА",
         autoteka: "Автотека",
         inspected: "Просмотрено",
         thickness_gauge: "Толщиномер",
-
-        // Гараж
         garage_title: "Мой Автопарк",
         garage_capacity: "Вместимость",
-
-        // Площадка продаж
         saleslot_title: "Площадка продаж",
         saleslot_desc: "Покупатели оценивают машины с учётом состояния, эксклюзивности госномеров и вашей репутации.",
         express_passes: "Экспресс-пропуски",
@@ -254,7 +247,6 @@ const I18N_TRANSLATIONS = {
         plate_bonus_tip: "🔥 Установлен блатной номер! Рыночная стоимость повышена."
     },
     en: {
-        // Vehicle Classes
         classes_title: "Vehicle Classes",
         cat_all: "All Categories",
         cat_economy: "Economy",
@@ -267,20 +259,14 @@ const I18N_TRANSLATIONS = {
         cat_truck: "Trucks",
         cat_yacht: "Yachts",
         cat_available: "Available",
-
-        // Market
         btn_refresh_market: "Refresh Feed",
         market_estimate: "Market estimate",
         price: "PRICE",
         autoteka: "History Report",
         inspected: "Viewed",
         thickness_gauge: "Paint Gauge",
-
-        // Garage
         garage_title: "My Fleet / Garage",
         garage_capacity: "Capacity",
-
-        // Sales Lot
         saleslot_title: "Sales Lot",
         saleslot_desc: "Buyers evaluate cars considering condition, exclusive license plates, and your reputation.",
         express_passes: "Express Passes",
@@ -308,4 +294,4 @@ window.STREET_RACE_ANIM_CONFIG = STREET_RACE_ANIM_CONFIG;
 window.calculatePlateValue = calculatePlateValue;
 window.I18N_TRANSLATIONS = I18N_TRANSLATIONS;
 
-console.log('[💠 data_core v2.0.0] Курс Stars = 2,500 ₽, курсы валют пересчитаны ✓');
+console.log('[💠 data_core v2.1.0] barnId в SUPER_SPIN_TIERS + галерея сараев ✓');

@@ -1,11 +1,23 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v1.3.0)
+// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v1.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.5.0 (ГАЛЕРЕЯ BARN-ФАЙНДОВ):
+//   - ФИКС: при выпадении машины из СуперВилспина
+//     сначала ищем шаблон в BARN_CARS_DATABASE
+//     по barnId, потом по имени, потом в CAR_DATABASE.
+//   - Гарантированно используется полная галерея
+//     images (10+ фото) из assets/cars/barn/<model>/.
+//   - Главная картинка выбирается случайно из галереи
+//     ОДИН РАЗ и фиксируется в car.img.
+//   - Fallback по категории (getCategoryFallback).
+// ⭐ v1.4.0:
+//   - Исправлена галерея машин из СуперВилспина через
+//     findCarTemplateByName + getCarImageList.
 // ⭐ v1.3.0:
-//   - Цена SuperSpin читается из WHEEL_CONFIG (costCash + costStars).
-//   - Убран хардкод 150000 ₽ во всех местах.
+//   - Цена SuperSpin из WHEEL_CONFIG (costCash + costStars).
+//   - Убран хардкод 150000 ₽.
 //   - Уважается canFreeDaily из конфига.
-//   - PhoneMedia.purchaseSuperSpinTicket — единая точка покупки билета.
+//   - PhoneMedia.purchaseSuperSpinTicket — единая точка покупки.
 // ========================================================
 
 const PhoneMedia = {
@@ -269,13 +281,11 @@ const PhoneMedia = {
         message: "«Кручу-верчу, запутать хочу! Ставь кэш и следи за шариком!»"
     },
 
-    // ⭐ v1.3.0: единый геттер конфига SuperSpin
     _getSuperSpinConfig() {
         const cfg = (window.WHEEL_CONFIG && window.WHEEL_CONFIG.superWheel) ? window.WHEEL_CONFIG.superWheel : null;
         const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 2500;
 
         if (!cfg) {
-            // Fallback с ребалансированными значениями
             return {
                 costCash: 150000,
                 costStars: 60,
@@ -303,7 +313,6 @@ const PhoneMedia = {
         const curDay = state.player?.day || 1;
         const lastFreeDay = state.player?.lastFreeSuperSpinDay || 0;
 
-        // ⭐ v1.3.0: уважаем canFreeDaily
         const canFreeSuperSpin = cfg.canFreeDaily && lastFreeDay < curDay;
 
         container.innerHTML = `
@@ -420,7 +429,6 @@ const PhoneMedia = {
         `;
     },
 
-    // ⭐ v1.3.0: единая точка покупки билета SuperSpin
     purchaseSuperSpinTicket() {
         const cfg = this._getSuperSpinConfig();
         let cash = state.player?.cash || 0;
@@ -461,7 +469,6 @@ const PhoneMedia = {
         return true;
     },
 
-    // Алиас для обратной совместимости (вызывается из банка и Фортуны)
     buySuperSpinTicket() {
         const ok = this.purchaseSuperSpinTicket();
         if (ok) {
@@ -476,7 +483,6 @@ const PhoneMedia = {
         const curDay = state.player?.day || 1;
         const lastFreeDay = state.player?.lastFreeSuperSpinDay || 0;
 
-        // ⭐ v1.3.0: уважаем canFreeDaily
         const canFree = cfg.canFreeDaily && lastFreeDay < curDay;
         let tickets = state.player?.superSpinTickets || 0;
 
@@ -485,7 +491,6 @@ const PhoneMedia = {
         } else if (tickets > 0) {
             state.player.superSpinTickets = tickets - 1;
         } else {
-            // Платное вращение — берём рубли или звёзды
             let cash = state.player?.cash || 0;
             let stars = state.player?.stars || 0;
 
@@ -590,11 +595,63 @@ const PhoneMedia = {
         }, 110);
     },
 
+    // ========================================================
+    // ⭐ v1.5.0: ГАЛЕРЕЯ МАШИН ИЗ BARN_CARS_DATABASE
+    // ========================================================
     claimAllThreePrizes(p1, p2, p3) {
         let rewardTokens = [];
 
-        // 1. БАРАБАН 1: ТЕХНИКА / ПРИБОРЫ / ТАЛОНЫ / ОПЫТ
+        // ═══ 1. БАРАБАН 1: ТЕХНИКА / ПРИБОРЫ / ТАЛОНЫ / ОПЫТ ═══
         if (p1.type === 'car') {
+            // ⭐ v1.5.0: ищем шаблон в BARN_CARS_DATABASE по barnId или по имени
+            let matchedTemplate = null;
+
+            // 1.1. Прямой поиск по barnId
+            if (p1.barnId && typeof BARN_CARS_DATABASE !== 'undefined' && Array.isArray(BARN_CARS_DATABASE)) {
+                matchedTemplate = BARN_CARS_DATABASE.find(c => c && c.id === p1.barnId) || null;
+            }
+
+            // 1.2. Fallback: поиск по имени в BARN_CARS_DATABASE
+            if (!matchedTemplate && typeof BARN_CARS_DATABASE !== 'undefined' && Array.isArray(BARN_CARS_DATABASE)) {
+                const cleanName = String(p1.name || '').trim().toLowerCase();
+                matchedTemplate = BARN_CARS_DATABASE.find(c => c && c.name && c.name.toLowerCase() === cleanName) || null;
+            }
+
+            // 1.3. Fallback: поиск в CAR_DATABASE (общая база рынка)
+            if (!matchedTemplate && typeof findCarTemplateByName === 'function') {
+                matchedTemplate = findCarTemplateByName(p1.name);
+            }
+
+            // ⭐ v1.5.0: галерея из найденного шаблона
+            let carGallery = [];
+            if (matchedTemplate && typeof getCarImageList === 'function') {
+                carGallery = getCarImageList(matchedTemplate);
+            }
+            if (carGallery.length === 0 && matchedTemplate && Array.isArray(matchedTemplate.images) && matchedTemplate.images.length > 0) {
+                carGallery = [...matchedTemplate.images];
+            }
+
+            // ⭐ v1.5.0: главное фото — случайное из галереи и ФИКСИРУЕТСЯ
+            let mainImg = '';
+            if (carGallery.length > 0) {
+                const randIdx = Math.floor(Math.random() * carGallery.length);
+                mainImg = carGallery[randIdx];
+            } else if (matchedTemplate && matchedTemplate.img) {
+                mainImg = matchedTemplate.img;
+            } else {
+                mainImg = "assets/cars/economy/2101/vaz-2101.jpg";
+            }
+
+            // ⭐ v1.5.0: фолбек по категории
+            const fallbackImg = (typeof getCategoryFallback === 'function')
+                ? getCategoryFallback(p1.category || 'economy')
+                : (matchedTemplate?.fallback || "assets/cars/economy/2101/vaz-2101.jpg");
+
+            // Если галерея пустая — хотя бы [mainImg]
+            if (carGallery.length === 0) {
+                carGallery = [mainImg];
+            }
+
             let wonPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77";
 
             let wonCar = {
@@ -605,8 +662,12 @@ const PhoneMedia = {
                 basePrice: p1.basePrice || 150000,
                 price: p1.basePrice || 150000,
                 marketValue: Math.round((p1.basePrice || 150000) * 1.15),
-                img: "assets/cars/economy/2101/vaz-2101.jpg",
-                fallback: (typeof getCategoryFallback === 'function') ? getCategoryFallback(p1.category) : "assets/cars/economy/2101/vaz-2101.jpg",
+
+                // ⭐ v1.5.0: галерея + главное фото (ФИКСИРУЕТСЯ)
+                img: mainImg,
+                images: carGallery,
+                fallback: fallbackImg,
+
                 plate: wonPlate,
                 customPlate: wonPlate,
                 condition: 85,
@@ -616,27 +677,21 @@ const PhoneMedia = {
                 engineTemp: 90,
                 tireWear: 95,
                 purchaseCost: 0,
-                tuning: { chip: 0, exhaust: false, stance: false, bodykit: false, rollCage: false, dragSlicks: false, hydroHandbrake: false, weldedDiff: false, steeringAngle: false, bucketSeats: false, customWheels: false, risk1251: 0 }
+                tuning: {
+                    chip: 0, exhaust: false, stance: false, bodykit: false,
+                    rollCage: false, dragSlicks: false, hydroHandbrake: false,
+                    weldedDiff: false, steeringAngle: false, bucketSeats: false,
+                    customWheels: false, risk1251: 0
+                }
             };
 
             if (typeof recalculateCarMarketValue === 'function') {
                 recalculateCarMarketValue(wonCar);
             }
 
-            // ⭐ v1.3.0: сохраняем галерею из шаблона, если он есть
-            if (typeof findCarTemplateByName === 'function') {
-                const matchedTemplate = findCarTemplateByName(wonCar.name);
-                if (matchedTemplate) {
-                    if (typeof getRandomCarImage === 'function') {
-                        wonCar.img = getRandomCarImage(matchedTemplate);
-                    }
-                    if (typeof getCarImageList === 'function') {
-                        const gallery = getCarImageList(matchedTemplate);
-                        if (gallery.length > 0) wonCar.images = gallery;
-                    }
-                }
+            if (typeof window.ensureCarIdentity === 'function') {
+                window.ensureCarIdentity(wonCar);
             }
-            if (!wonCar.images) wonCar.images = [wonCar.img];
 
             if (typeof window.pushToMailbox === 'function') {
                 window.pushToMailbox({
@@ -712,8 +767,7 @@ const PhoneMedia = {
             });
         }
 
-        // 2. БАРАБАН 2: ВАЛЮТА И РЕСУРСЫ
-        // ⭐ v1.3.0: jackpot теперь отдельный тип, не путается с cash
+        // ═══ 2. БАРАБАН 2: ВАЛЮТА И РЕСУРСЫ ═══
         if (p2.type === 'cash' || p2.type === 'jackpot') {
             if (typeof window.pushToMailbox === 'function') {
                 window.pushToMailbox({
@@ -806,7 +860,7 @@ const PhoneMedia = {
             });
         }
 
-        // 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ
+        // ═══ 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ ═══
         if (p3.type === 'stars') {
             if (typeof window.pushToMailbox === 'function') {
                 window.pushToMailbox({
@@ -860,6 +914,24 @@ const PhoneMedia = {
                 value: `+${p3.cashValue.toLocaleString()} ₽`,
                 desc: "Посылка в Почтовом ящике",
                 rarity: "token-green"
+            });
+        } else if (p3.type === 'free_impound') {
+            if (typeof window.pushToMailbox === 'function') {
+                window.pushToMailbox({
+                    type: "free_impound",
+                    amount: 1,
+                    title: "Амнистия ГИБДД",
+                    sender: "Клуб Фортуны",
+                    desc: "Официальный талон на бесплатную выдачу задержанного авто.",
+                    badge: "ГИБДД"
+                });
+            }
+            rewardTokens.push({
+                icon: "👮",
+                title: "Амнистия в Почту",
+                value: "+1 Талон ГИБДД",
+                desc: "Посылка в Почтовом ящике",
+                rarity: "token-purple"
             });
         }
 
@@ -1145,3 +1217,5 @@ const PhoneMedia = {
 };
 
 window.PhoneMedia = PhoneMedia;
+
+console.log('[🎰 phone-media v1.5.0] Галерея из BARN_CARS_DATABASE по barnId + фиксация главного фото ✓');

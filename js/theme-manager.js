@@ -1,20 +1,24 @@
 // ========================================================
-// js/theme-manager.js — МЕНЕДЖЕР ТЕМ И КАСТОМИЗАЦИИ (v3.2.0)
+// js/theme-manager.js — МЕНЕДЖЕР ТЕМ И КАСТОМИЗАЦИИ (v3.4.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v3.2.0:
-//   - Оставлена тема MIDNIGHT PURPLE
-//   - ДОБАВЛЕНА DEV-тема (чёрно-зелёная) для ПК-режима
-//   - Убраны ссылки на светлую тему
-//   - Авто-бейдж DEV MODE в HUD при isPcDevMode
-//   - 6 продвинутых ник-эффектов + 6 аур аватара
-//   - 4 темы: Cyber Neon, Midnight Purple, Tokyo Night, DEV Mode
+// ⭐ v3.4.0 (НОВЫЕ АУРЫ АВАТАРА):
+//   - Добавлены 3 новые ауры: Lava Core, Spinning Rim,
+//     Tire Smoke.
+//   - Заменены Holographic Ring и Plasma Core на
+//     Fire Ring и Snow Storm.
+//   - Обновлены CSS-анимации для новых аур.
+// ⭐ v3.3.0 (НОВЫЕ ТЕМЫ):
+//   - Добавлены 3 новые темы: Neon Samurai, Midnight Gold,
+//     Cyberpunk 2077.
+//   - Оптимизирована логика применения тем.
+//   - Сохранена DEV-тема (чёрно-зелёная матрица).
 // ========================================================
 
 const ThemeManager = {
     activeCustomizerTab: 'colors',
 
     // --------------------------------------------------------
-    // 4 ТЕМЫ (3 игровые + DEV)
+    // 7 ТЕМ (6 игровых + DEV)
     // --------------------------------------------------------
     themes: [
         {
@@ -52,6 +56,42 @@ const ThemeManager = {
             isLight: false,
             isDev: false,
             desc: 'Ночные сходки Daikoku. Розово-фиолетовый неон, глубокий тёмный фон.'
+        },
+        {
+            id: 'neon_samurai',
+            name: '🌆 Neon Samurai',
+            hex: '#e879f9', // Фуксия
+            secondaryHex: '#a3e635', // Лайм
+            glow: 'rgba(232, 121, 249, 0.5)',
+            bgGrad: 'linear-gradient(135deg, #e879f9, #a3e635)',
+            isLightning: false,
+            isLight: false,
+            isDev: false,
+            desc: 'Глубокий фиолетовый фон, акценты фуксии и лайма. Агрессивный стиль самурая.'
+        },
+        {
+            id: 'midnight_gold',
+            name: '🏆 Midnight Gold',
+            hex: '#fbbf24', // Золотой
+            secondaryHex: '#f59e0b', // Медный
+            glow: 'rgba(251, 191, 36, 0.5)',
+            bgGrad: 'linear-gradient(135deg, #fbbf24, #f59e0b)',
+            isLightning: false,
+            isLight: false,
+            isDev: false,
+            desc: 'Тёмно-синий фон, золотые и медные акценты. Для элитного перекупа.'
+        },
+        {
+            id: 'cyberpunk_2077',
+            name: '💀 Cyberpunk 2077',
+            hex: '#facc15', // Жёлтый
+            secondaryHex: '#06b6d4', // Бирюзовый
+            glow: 'rgba(250, 204, 21, 0.5)',
+            bgGrad: 'linear-gradient(135deg, #facc15, #06b6d4)',
+            isLightning: false,
+            isLight: false,
+            isDev: false,
+            desc: 'Жёлто-чёрная схема с яркими бирюзовыми вспышками. Максимальный контраст.'
         },
         {
             id: 'dev_matrix',
@@ -130,7 +170,7 @@ const ThemeManager = {
     ],
 
     // --------------------------------------------------------
-    // 6 ПРОДВИНУТЫХ АУР АВАТАРА
+    // 8 ПРОДВИНУТЫХ АУР АВАТАРА (v3.4.0)
     // --------------------------------------------------------
     avatarEffects: [
         {
@@ -142,28 +182,44 @@ const ThemeManager = {
             reqStars: 0
         },
         {
-            id: 'holographic_ring',
-            name: '🔮 Holographic Ring',
-            className: 'avatar-fx-holographic',
-            desc: 'Голографическое кольцо с RGB-разделением. Вращается плавно, цвета переливаются.',
+            id: 'fire_ring',
+            name: '🔥 Fire Ring',
+            className: 'avatar-fx-fire-ring',
+            desc: 'Настоящее пламя вокруг аватара. Анимация огня с языками пламени.',
             cost: 220000,
             reqStars: 5
         },
         {
-            id: 'plasma_core',
-            name: '⚡ Plasma Core',
-            className: 'avatar-fx-plasma-core',
-            desc: 'Плазменное ядро с молниями. Пульсирующий фиолетовый ореол с электрическими разрядами.',
+            id: 'snow_storm',
+            name: '❄️ Snow Storm',
+            className: 'avatar-fx-snow-storm',
+            desc: 'Падающий снег и морозный ореол. Ледяное свечение с кружащимися снежинками.',
             cost: 280000,
             reqStars: 7
         },
         {
-            id: 'ember_orbit',
-            name: '🔥 Ember Orbit',
-            className: 'avatar-fx-ember-orbit',
-            desc: 'Огненные искры, летящие по орбите вокруг аватара. Живое пламя с переменным свечением.',
+            id: 'lava_core',
+            name: '🌋 Lava Core',
+            className: 'avatar-fx-lava-core',
+            desc: 'Раскалённая лава с пузырями. Оранжево-красное свечение с эффектом кипения.',
             cost: 250000,
             reqStars: 6
+        },
+        {
+            id: 'spinning_rim',
+            name: '🏎️ Spinning Rim',
+            className: 'avatar-fx-spinning-rim',
+            desc: 'Вращающийся автомобильный диск. Хромированный обод с эффектом скорости.',
+            cost: 260000,
+            reqStars: 6
+        },
+        {
+            id: 'tire_smoke',
+            name: '🛞 Tire Smoke',
+            className: 'avatar-fx-tire-smoke',
+            desc: 'Покрышка с дымом и надписями. Эффект дрифта с клубами дыма.',
+            cost: 300000,
+            reqStars: 8
         },
         {
             id: 'aurora_halo',
@@ -219,7 +275,7 @@ const ThemeManager = {
 
     // --------------------------------------------------------
     // ПРИМЕНЕНИЕ ТЕМЫ
-    // ⭐ v3.2.0: автоматически форсирует DEV-тему при ПК-режиме
+    // ⭐ v3.4.0: обновлённая логика с новыми аурами
     // --------------------------------------------------------
     applyTheme() {
         const root = document.documentElement;
@@ -494,7 +550,7 @@ const ThemeManager = {
                     </div>
                 `;
             });
-            bodyHtml = `<div class="sub-label mb-2" style="font-size:9.5px;">6 продвинутых аур вокруг фото:</div><div class="space-y-1 mb-2" style="max-height:400px; overflow-y:auto;">${listHtml}</div>`;
+            bodyHtml = `<div class="sub-label mb-2" style="font-size:9.5px;">8 продвинутых аур вокруг фото:</div><div class="space-y-1 mb-2" style="max-height:400px; overflow-y:auto;">${listHtml}</div>`;
         }
         // -------- ТИТУЛ --------
         else if (curTab === 'titles') {
@@ -727,4 +783,4 @@ window.buyAvatarEffectAction = (id, c, s) => ThemeManager.buyAvatarEffect(id, c,
 window.setAvatarEffectAction = (id) => ThemeManager.setAvatarEffect(id);
 window.setSoundProfileAction = (p) => ThemeManager.setSoundProfile(p);
 
-console.log('[🎨 theme-manager v3.2.0] 4 темы (3 игровые + DEV) + фикс светлой темы + авто-бейдж DEV ✓');
+console.log('[🎨 theme-manager v3.4.0] 8 аур аватара + новые эффекты (Fire, Snow, Lava, Rim, Smoke) ✓');

@@ -1,19 +1,16 @@
 // ========================================================
-// js/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.3.1)
+// js/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.3.1 (ФИКС ДКП):
-//   - УДАЛЕНЫ ВСЕ 6 функций-заглушек ДКП (они перезаписывали
-//     реальные функции из market-deal.js и ломали кнопку
-//     «Оформить ДКП» / «Подписать ДКП»).
-//   - Реальные реализации живут ТОЛЬКО в market-deal.js.
-//   - Экспорт в window очищен от мёртвых делегатов.
-// ⭐ v1.3.0 (ФИКС КЛИКОВ ПО КАТЕГОРИЯМ):
-//   - setCategory обёрнут в try/catch с логированием
-//   - Защита от двойного клика через _setCategoryPending
-//   - Таймаут на populateMarketFeed (5 сек)
-//   - renderMarketFeed устойчив к пустому marketFeed
-//   - updateMarketTimers безопасен
-//   - Диагностика: [Market] setCategory → ...
+// ⭐ v1.5.0 (ШИРОКАЯ ОБЛОЖКА):
+//   - Плитки характеристик (Мощность/Пробег/Кузов) стали
+//     компактнее: min-height 38px, уменьшены отступы.
+//   - Обложка car-img-wrap увеличена до 190px.
+//   - Кнопки "Автотека" и "Позвонить" перенесены вниз,
+//     в блок оценки (между "Оценка вторичного рынка" и
+//     "Разница от оценки").
+//   - Кнопки сделаны компактными (высота 30px, шрифт 9.5px).
+// ⭐ v1.4.0 (КОМПАКТНАЯ КАРТОЧКА):
+//   - Перенос кнопок в блок оценки.
 // ========================================================
 
 let marketSortOrder = 'asc';
@@ -305,7 +302,7 @@ function promptHiddenPlateAutotekaHint(event) {
 }
 
 // ========================================================
-// РЕНДЕР ЛЕНТЫ
+// РЕНДЕР ЛЕНТЫ (⭐ v1.5.0: ШИРОКАЯ ОБЛОЖКА)
 // ========================================================
 function renderMarketFeed() {
     const container = document.getElementById('marketCardContainer');
@@ -442,6 +439,7 @@ function renderMarketFeed() {
                     ? `<span class="color-red font-bold ml-1" style="font-size:8px;">[скручен]</span>`
                     : "";
 
+                // ⭐ v1.5.0: КОМПАКТНЫЕ ПЛИТКИ ХАРАКТЕРИСТИК
                 htmlContent += `
                 <div class='glass-card mb-3 ${busyClass} ${viewedClass} ${cardAuraClass}' id='card_${car.id}'>
                     ${viewedBadge}
@@ -452,7 +450,7 @@ function renderMarketFeed() {
                         <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>Платный дозвон (1,000 ₽)</button>
                     </div>
 
-                    <div class='car-img-wrap'>
+                    <div class='car-img-wrap' style="height: 190px;">
                         <img id="market_car_img_${car.id}" ${carImgAttrs} class='car-img'>
                     </div>
 
@@ -474,52 +472,56 @@ function renderMarketFeed() {
                         </div>
                     </div>
 
-                    <div class="car-specs-grid-volumetric">
-                        <div class="spec-tile-3d-col">
-                            <div class="spec-tile-icon-wrap spec-tile-icon-power"><i class="fa-solid fa-bolt"></i></div>
+                    <!-- ⭐ v1.5.0: КОМПАКТНЫЕ ПЛИТКИ -->
+                    <div class="car-specs-grid-volumetric" style="margin-bottom: 6px !important;">
+                        <div class="spec-tile-3d-col" style="min-height: 38px; padding: 4px 6px;">
+                            <div class="spec-tile-icon-wrap spec-tile-icon-power" style="width: 18px; height: 18px; font-size: 9px;"><i class="fa-solid fa-bolt"></i></div>
                             <div class="spec-tile-col-data">
-                                <span class="spec-tile-col-label">Мощность</span>
-                                <b class="color-amber">${car.power || 100} л.с.</b>
+                                <span class="spec-tile-col-label" style="font-size: 7.5px;">Мощность</span>
+                                <b class="color-amber" style="font-size: 10px;">${car.power || 100} л.с.</b>
                             </div>
                         </div>
-                        <div class="spec-tile-3d-col">
-                            <div class="spec-tile-icon-wrap spec-tile-icon-road"><i class="fa-solid fa-road"></i></div>
+                        <div class="spec-tile-3d-col" style="min-height: 38px; padding: 4px 6px;">
+                            <div class="spec-tile-icon-wrap spec-tile-icon-road" style="width: 18px; height: 18px; font-size: 9px;"><i class="fa-solid fa-road"></i></div>
                             <div class="spec-tile-col-data">
-                                <span class="spec-tile-col-label">Пробег</span>
-                                <b class="color-cyan">${carMileage} км${odoWarningPill}</b>
+                                <span class="spec-tile-col-label" style="font-size: 7.5px;">Пробег</span>
+                                <b class="color-cyan" style="font-size: 10px;">${carMileage} км${odoWarningPill}</b>
                             </div>
                         </div>
-                        <div class="spec-tile-3d-col">
-                            <div class="spec-tile-icon-wrap ${shieldIconClass}"><i class="fa-solid ${isBodyKnown ? 'fa-shield' : 'fa-circle-question'}"></i></div>
+                        <div class="spec-tile-3d-col" style="min-height: 38px; padding: 4px 6px;">
+                            <div class="spec-tile-icon-wrap ${shieldIconClass}" style="width: 18px; height: 18px; font-size: 9px;"><i class="fa-solid ${isBodyKnown ? 'fa-shield' : 'fa-circle-question'}"></i></div>
                             <div class="spec-tile-col-data">
-                                <span class="spec-tile-col-label">Кузов</span>
-                                ${condValueHtml}
+                                <span class="spec-tile-col-label" style="font-size: 7.5px;">Кузов</span>
+                                ${condValueHtml.replace('font-size:12px', 'font-size:10px')}
                             </div>
                         </div>
                     </div>
 
                     ${sellerDialogHtml}
 
-                    <div class="p-2 mb-2 flex-between" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.06);">
-                        <div>
-                            <span class="sub-label text-xs">Оценка вторичного рынка:</span>
-                            <div class="font-bold color-cyan text-xs" style="font-size:12px;">~${carMarketVal} ₽</div>
+                    <!-- ОЦЕНКА + КНОПКИ В ОДНОМ БЛОКЕ -->
+                    <div class="p-2 mb-2" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.06);">
+                        <div class="flex-between mb-2">
+                            <div>
+                                <span class="sub-label text-xs">Оценка вторичного рынка:</span>
+                                <div class="font-bold color-cyan text-xs" style="font-size:12px;">~${carMarketVal} ₽</div>
+                            </div>
+                            <div class="text-right">
+                                <span class="sub-label text-xs">Разница от оценки:</span>
+                                <div class="font-bold ${estimatedProfit > 0 ? 'color-green' : 'color-red'} text-xs" style="font-size:12px;">${estimatedProfit > 0 ? '+' : ''}${estimatedProfit.toLocaleString()} ₽</div>
+                            </div>
                         </div>
-                        <div class="text-right">
-                            <span class="sub-label text-xs">Разница от оценки:</span>
-                            <div class="font-bold ${estimatedProfit > 0 ? 'color-green' : 'color-red'} text-xs" style="font-size:12px;">${estimatedProfit > 0 ? '+' : ''}${estimatedProfit.toLocaleString()} ₽</div>
+
+                        <!-- Компактные кнопки -->
+                        <div class="grid-2" style="gap: 6px;">
+                            <button onclick="openAutotekaModal('${car.id}')" class='btn btn-dark btn-sm' style="height: 30px; font-size: 9.5px; padding: 0 6px;">
+                                <i class='fa-solid fa-file-waveform color-green' style="font-size:10px;"></i> Автотека (${autoIcon})
+                            </button>
+                            <button onclick="initiateBuyMarketCar('${car.id}')" class="btn btn-cyan btn-sm" style="height: 30px; font-size: 9.5px; padding: 0 6px; font-weight: 700;">
+                                <i class="fa-solid fa-phone" style="font-size:10px;"></i> Позвонить
+                            </button>
                         </div>
                     </div>
-
-                    <div class='mb-2'>
-                        <button onclick="openAutotekaModal('${car.id}')" class='btn btn-dark btn-sm w-full'>
-                            <i class='fa-solid fa-file-waveform color-green mr-1'></i> Автотека (${autoIcon})
-                        </button>
-                    </div>
-
-                    <button onclick="initiateBuyMarketCar('${car.id}')" class="btn btn-cyan w-full font-bold">
-                        <i class="fa-solid fa-phone mr-1"></i> Позвонить и назначить встречу
-                    </button>
                 </div>`;
 
             } catch (carError) {
@@ -584,25 +586,6 @@ function updateMarketTimers() {
 }
 
 // ========================================================
-// ⭐ v1.3.1: УДАЛЕНЫ 6 функций-заглушек ДКП
-// ========================================================
-// Ранее здесь были:
-//   - confirmMarketPurchaseSuccess
-//   - openRegistrationChoiceModal
-//   - confirmRegistrationChoice
-//   - openDriveRouteChoiceModal
-//   - finishMarketCarBuyProcessRoute
-//   - finishMarketCarBuyProcess
-//
-// Они конфликтовали с реальными реализациями из market-deal.js
-// и перезаписывали window.confirmMarketPurchaseSuccess заглушкой,
-// из-за чего клик «Оформить ДКП» / «Подписать ДКП» молча ничего
-// не делал (условие `window.confirmMarketPurchaseSuccess !== 
-// confirmMarketPurchaseSuccess` всегда было false из-за hoisting).
-//
-// Реальные функции ДКП живут ТОЛЬКО в js/market-deal.js.
-
-// ========================================================
 // ЭКСПОРТ
 // ========================================================
 Object.assign(window, {
@@ -617,4 +600,4 @@ Object.assign(window, {
     updateMarketTimers
 });
 
-console.log('[🏪 market v1.3.1] Заглушки ДКП удалены, реальные функции в market-deal.js ✓');
+console.log('[🏪 market v1.5.0] Компактные плитки характеристик + широкая обложка 190px ✓');

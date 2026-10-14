@@ -1,19 +1,20 @@
 // ========================================================
-// js/market-inspection.js — СИСТЕМА ПРОВЕРОК 2.1 (v2.1.0)
+// js/market-inspection.js — СИСТЕМА ПРОВЕРОК 2.2 (v2.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.2.0 (ИНТЕРАКТИВНАЯ АВТОТЕКА):
+//   - openAutotekaModal полностью переработан: теперь это
+//     официальный отчёт с водяными знаками, разделами,
+//     шкалой рисков и кнопкой PDF.
+//   - Стилистика совпадает с бланком ДКП.
 // ⭐ v2.1.0:
-//   - ФИКС: клик по плитке теперь работает корректно
-//   - Защита от двойного клика (_inspectionPending)
-//   - Информативные логи в консоль
-//   - Исправлен runInspection при ошибке
-//   - Добавлены fallback-тиры если INSPECTION_TIERS не загружен
-//   - Кнопка «Назад» после проверки
+//   - ФИКС кликов по плиткам проверки.
+//   - Защита от двойного клика (_inspectionPending).
 // ========================================================
 
 let activeInspectCarId = null;
 let isOBDScanningInProgress = false;
 let isInspectionInProgress = false;
-let _inspectionPending = false; // ⭐ v2.1.0: защита от двойного клика
+let _inspectionPending = false;
 
 // --------------------------------------------------------
 // ВСПОМОГАТЕЛЬНЫЕ ГЕТТЕРЫ
@@ -39,7 +40,6 @@ function _consumeToolWear(toolId) {
     if (typeof saveState === 'function') saveState();
 }
 
-// ⭐ v2.1.0: fallback для INSPECTION_TIERS
 function _getInspectionTiers() {
     if (typeof INSPECTION_TIERS !== 'undefined' && Array.isArray(INSPECTION_TIERS) && INSPECTION_TIERS.length > 0) {
         return INSPECTION_TIERS;
@@ -272,7 +272,7 @@ function closeOBD2Modal() {
 }
 
 // --------------------------------------------------------
-// ⭐ v2.1.0: ВЫБОР УРОВНЯ ПРОВЕРКИ (с исправленным onclick)
+// 3. ВЫБОР УРОВНЯ ПРОВЕРКИ
 // --------------------------------------------------------
 function openInspectionChoiceModal(carId) {
     activeInspectCarId = carId;
@@ -295,7 +295,6 @@ function openInspectionChoiceModal(carId) {
         const canAfford = (state.player?.cash || 0) >= t.cost;
         const disabled = isDone || (!canAfford && t.cost > 0);
 
-        // ⭐ v2.1.0: используем data-id и делегирование событий
         const clickHandler = disabled ? '' : `data-inspection-tier="${t.id}" data-inspection-action="run"`;
         const cursorStyle = disabled ? 'not-allowed' : 'pointer';
         const opacity = (disabled && !isDone) ? 0.55 : 1;
@@ -307,9 +306,7 @@ function openInspectionChoiceModal(carId) {
                  style="background:${isDone ? 'rgba(0,230,118,0.08)' : '#050914'};
                  border:1px solid ${isDone ? 'rgba(0,230,118,0.4)' : (disabled ? 'rgba(255,255,255,0.05)' : 'rgba(0,242,254,0.3)')};
                  border-radius:10px; cursor:${cursorStyle}; opacity:${opacity};
-                 padding:10px 12px; margin-bottom:8px; transition:all 0.15s ease;"
-                 onmouseover="if(!${disabled}){this.style.borderColor='var(--cyan)';this.style.boxShadow='0 0 14px var(--cyan-glow)';}"
-                 onmouseout="if(!${disabled}){this.style.borderColor='rgba(0,242,254,0.3)';this.style.boxShadow='none';}">
+                 padding:10px 12px; margin-bottom:8px; transition:all 0.15s ease;">
                 <div class="flex-between mb-1">
                     <div class="flex-gap" style="align-items:center;">
                         <span style="font-size:20px;">${t.icon}</span>
@@ -346,7 +343,6 @@ function openInspectionChoiceModal(carId) {
         </div>
     `;
 
-    // ⭐ v2.1.0: ДЕЛЕГИРОВАНИЕ КЛИКОВ через data-атрибуты
     modal.querySelectorAll('[data-inspection-tier][data-inspection-action="run"]').forEach(el => {
         el.addEventListener('click', (e) => {
             e.preventDefault();
@@ -362,10 +358,9 @@ function openInspectionChoiceModal(carId) {
 }
 
 // --------------------------------------------------------
-// ⭐ v2.1.0: ЗАПУСК ПРОВЕРКИ (с защитой от двойного клика)
+// 4. ЗАПУСК ПРОВЕРКИ
 // --------------------------------------------------------
 function runInspection(tierId) {
-    // ⭐ v2.1.0: защита от двойного клика
     if (_inspectionPending) {
         console.warn('[Inspection] runInspection уже в процессе');
         return;
@@ -383,13 +378,11 @@ function runInspection(tierId) {
         return showToast("⚠️ Уровень проверки не найден");
     }
 
-    // Проверка статуса
     const status = car.inspectionStatus || {};
     if (status[tierId] === true) {
         return showToast("✓ Этот уровень уже пройден");
     }
 
-    // Проверка инструментов
     const detects = tier.detects || [];
     if (detects.includes('gauge') && !(_hasTool('gauge') || _hasTool('gauge_pro'))) {
         return showToast("⚠️ Нужен толщиномер ЛКП!");
@@ -404,7 +397,6 @@ function runInspection(tierId) {
         return showToast("⚠️ Нужен компрессометр!");
     }
 
-    // Проверка стоимости
     if (tier.cost > 0) {
         if ((state.player?.cash || 0) < tier.cost) {
             return showToast(`Нужно ${tier.cost.toLocaleString()} ₽!`);
@@ -415,13 +407,11 @@ function runInspection(tierId) {
         }
     }
 
-    // Списываем износ
     if (detects.includes('gauge')) _consumeToolWear(_hasTool('gauge_pro') ? 'gauge_pro' : 'gauge');
     if (detects.includes('obd')) _consumeToolWear(_hasTool('obd_launch') ? 'obd_launch' : 'obd');
     if (detects.includes('endoscope')) _consumeToolWear('endoscope');
     if (detects.includes('compression')) _consumeToolWear('compressor');
 
-    // Обновляем статус
     if (!car.inspectionStatus) car.inspectionStatus = {};
     car.inspectionStatus[tierId] = true;
 
@@ -433,7 +423,6 @@ function runInspection(tierId) {
     if (typeof playSound === 'function') playSound('tick');
     if (typeof tgHaptic === 'function') tgHaptic('medium');
 
-    // ⭐ v2.1.0: анимация сканирования
     const modal = document.getElementById('modalInspectionChoice');
     if (modal) {
         modal.innerHTML = `
@@ -471,7 +460,7 @@ function runInspection(tierId) {
 }
 
 // --------------------------------------------------------
-// ⭐ v2.1.0: ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ
+// 5. ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ ПРОВЕРКИ
 // --------------------------------------------------------
 function _showInspectionResults(car, tier) {
     const detects = tier.detects || [];
@@ -491,7 +480,6 @@ function _showInspectionResults(car, tier) {
         legalFound = car.legalDefect;
     }
 
-    // Обновляем флаги видимости
     if (!car._revealedDefects) car._revealedDefects = [];
     foundDefects.forEach(fd => {
         const key = fd.defect.id;
@@ -505,7 +493,6 @@ function _showInspectionResults(car, tier) {
 
     if (typeof saveState === 'function') saveState();
 
-    // HTML результатов
     let defectsHtml = '';
     let totalRepairCost = 0;
     let totalPenaltyPct = 0;
@@ -621,7 +608,7 @@ function closeInspectionResults() {
 }
 
 // --------------------------------------------------------
-// 6. АВТОТЕКА (сокращённая версия для совместимости)
+// 6. ⭐ v2.2.0: ИНТЕРАКТИВНАЯ АВТОТЕКА (ОФИЦИАЛЬНЫЙ ОТЧЁТ)
 // --------------------------------------------------------
 function openAutotekaModal(carId) {
     if (!state.marketFeed) return;
@@ -629,100 +616,253 @@ function openAutotekaModal(carId) {
     if (!car) return;
     car.viewed = true;
 
+    // Покупка отчёта
     if (!car.autotekaChecked) {
         const isVip = !!(state.player && state.player.vipPro);
         const cost = isVip ? 0 : 5000;
         const cash = (state.player && state.player.cash) ? state.player.cash : 0;
 
         if (cash < cost && !isVip) return showToast("Автотека стоит 5,000 ₽!");
-        state.player.cash -= cost;
+        if (!isVip) {
+            state.player.cash -= cost;
+            if (typeof logBankTransaction === 'function') {
+                logBankTransaction("Заказ отчёта Автотеки", cost, false);
+            }
+        }
         car.autotekaChecked = true;
         if (!car.inspectionStatus) car.inspectionStatus = {};
         car.inspectionStatus.autoteka = true;
-        showToast("🔍 Базы ГИБДД проверены!");
+        showToast("🔍 Запрос в базы ГИБДД, ФНП и ФССП отправлен...");
         if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
     }
+
+    // === Подготовка данных ===
+    const legal = car.legalDefect;
+    const cName = car.name || "Автомобиль";
+    const cPlate = car.customPlate || car.plate || "ТРАНЗИТ";
+    const mVal = car.mileage || 85000;
+    const engWear = car.wear?.engine ? Math.round(car.wear.engine) : 85;
+    const transWear = car.wear?.transmission ? Math.round(car.wear.transmission) : 85;
+
+    const pts = car.ptsData || {
+        ownerName: "Иванов И.И.", ownerAvatar: "🧔",
+        ownersCount: 2, ownershipYears: 3,
+        vin: "XTA21070001234567",
+        ptsType: "Электронный (ЭПТС) ✓",
+        pledgeBank: "Залогов нет ✓",
+        fsspRestrictions: "Ограничений нет ✓",
+        taxiCheck: "В такси не использовалась ✓"
+    };
+
+    let pledgeStatus = pts.pledgeBank || "Залогов нет ✓";
+    let fsspStatus = pts.fsspRestrictions || "Ограничений нет ✓";
+    let taxiStatus = pts.taxiCheck || "В такси не использовалась ✓";
+    let ptsTypeStatus = pts.ptsType || "Электронный (ЭПТС) ✓";
+
+    if (legal) {
+        if (legal.id === 'legal_pledge' || legal.id === 'legal_pledge_partial') pledgeStatus = "🔴 В ЗАЛОГЕ У БАНКА";
+        if (legal.id === 'legal_fssp') fsspStatus = "🔴 ЗАПРЕТ ФССП";
+        if (legal.id === 'legal_arrest') fsspStatus = "🔴 АРЕСТ ПРИСТАВОВ";
+        if (legal.id === 'legal_taxi_former') taxiStatus = "⚠️ Работала в такси";
+        if (legal.id === 'legal_pts_duplicate') ptsTypeStatus = "⚠️ Дубликат ПТС";
+    }
+
+    // Общий рейтинг
+    let overallScore = 10;
+    if (car.hiddenDefect) overallScore -= 2;
+    if (car.rolledOdometer) overallScore -= 2;
+    if (car.isStolen) overallScore -= 4;
+    if (legal) overallScore -= 2;
+    if (car.isRepainted) overallScore -= 1;
+    overallScore = Math.max(1, overallScore);
+
+    let scoreColor = overallScore >= 8 ? "color-green" : (overallScore >= 5 ? "color-amber" : "color-red");
+    let scoreLabel = overallScore >= 9 ? "ИДЕАЛЬНО" : (overallScore >= 7 ? "ХОРОШО" : (overallScore >= 5 ? "ЕСТЬ РИСКИ" : "ОПАСНО"));
+
+    // Статус юридической чистоты
+    let legalCleanBadge = legal
+        ? `<span class='tag-badge bg-tag-red'>⚠️ ПРОБЛЕМА</span>`
+        : (car.isStolen
+            ? `<span class='tag-badge bg-tag-red'>🚨 В РОЗЫСКЕ</span>`
+            : `<span class='tag-badge bg-tag-green'>✓ ЮРИДИЧЕСКИ ЧИСТ</span>`);
+
+    // Номер отчёта
+    const reportNum = `AT-${String(Date.now()).slice(-8)}`;
+    const reportDate = new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    // VIN
+    const carVIN = car.vin || pts.vin || `XTA${String(car.id || '2107000').slice(-13).padEnd(13, '0')}`;
 
     const rep = document.getElementById("autotekaReportContent");
-    if (rep) {
-        let cName = car.name || "Автомобиль";
-        let cPlate = car.plate || "ТРАНЗИТ";
+    if (!rep) return;
 
-        const legal = car.legalDefect;
-        let legalStatus = legal
-            ? `<span class='tag-badge bg-tag-red'>⚠️ ${legal.name}</span>`
-            : (car.isStolen
-                ? `<span class='tag-badge bg-tag-red'>🚨 В РОЗЫСКЕ</span>`
-                : `<span class='tag-badge bg-tag-green'>✓ ЮРИДИЧЕСКИ ЧИСТ</span>`);
+    rep.innerHTML = `
+        <div class="autoteka-official-blank">
+            <div class="autoteka-watermark">АВТОТЕКА</div>
+            <div class="autoteka-watermark autoteka-watermark-2">ГИБДД</div>
 
-        let mVal = car.mileage ? car.mileage : 85000;
-        let engWear = car.wear?.engine ? Math.round(car.wear.engine) : 85;
-        let transWear = car.wear?.transmission ? Math.round(car.wear.transmission) : 85;
-
-        let pts = car.ptsData || {
-            ownerName: "Иванов И.И.", ownerAvatar: "🧔",
-            ownersCount: 2, ownershipYears: 3,
-            vin: "XTA21070001234567",
-            ptsType: "Электронный (ЭПТС) ✓",
-            pledgeBank: "Залогов нет ✓",
-            fsspRestrictions: "Ограничений нет ✓",
-            taxiCheck: "В такси не использовалась ✓"
-        };
-
-        if (legal) {
-            if (legal.id === 'legal_pledge' || legal.id === 'legal_pledge_partial') pts.pledgeBank = "🔴 В ЗАЛОГЕ У БАНКА";
-            if (legal.id === 'legal_fssp') pts.fsspRestrictions = "🔴 ЗАПРЕТ ФССП";
-            if (legal.id === 'legal_arrest') pts.fsspRestrictions = "🔴 АРЕСТ ПРИСТАВОВ";
-        }
-
-        let overallScore = 10;
-        if (car.hiddenDefect) overallScore -= 2;
-        if (car.rolledOdometer) overallScore -= 2;
-        if (car.isStolen) overallScore -= 4;
-        if (legal) overallScore -= 2;
-        overallScore = Math.max(1, overallScore);
-        let scoreColor = overallScore >= 8 ? "color-green" : (overallScore >= 5 ? "color-amber" : "color-red");
-
-        rep.innerHTML = `
-            <div class='flex-between mb-2'>
-                <div>
-                    <b class='color-cyan' style='font-size:13.5px;'>${cName}</b>
-                    <div class='sub-label mt-1'>Госномер: <span class='license-plate text-xs' style='padding:2px 6px;'>${cPlate}</span></div>
+            <div class="autoteka-blank-border">
+                <!-- ШАПКА -->
+                <div class="autoteka-header text-center mb-2">
+                    <div class="autoteka-logo-row mb-1">
+                        <span class="autoteka-logo-icon">📋</span>
+                    </div>
+                    <div class="autoteka-title-small">ОФИЦИАЛЬНЫЙ ОТЧЁТ ПО ПРОВЕРКЕ АВТОМОБИЛЯ</div>
+                    <h3 class="autoteka-title-main mb-1">АВТОТЕКА · ИСТОРИЯ АВТО</h3>
+                    <div class="autoteka-report-num">Отчёт № <b>${reportNum}</b> от <b>${reportDate}</b></div>
                 </div>
-                ${legalStatus}
-            </div>
 
-            <div class='p-2 mb-2' style='background:#0d1424; border-radius:10px;'>
-                <div class='sub-label' style='font-size:10px;'>Владелец: <b>${pts.ownerName}</b></div>
-                <div class='sub-label' style='font-size:9.5px;'>Записей в ПТС: <b>${pts.ownersCount}</b> | Срок: <b>${pts.ownershipYears} г.</b></div>
-                <div class='sub-label' style='font-size:9.5px;'>VIN: <b class='color-cyan'>${pts.vin}</b></div>
-            </div>
+                <!-- 1. ТС -->
+                <div class="autoteka-section-compact">
+                    <div class="autoteka-section-title">
+                        <span>1. ТРАНСПОРТНОЕ СРЕДСТВО</span>
+                        ${legalCleanBadge}
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Модель:</span>
+                        <b class="autoteka-value color-cyan">${cName}</b>
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">VIN:</span>
+                        <span class="autoteka-value-mono color-cyan">${carVIN}</span>
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Госномер:</span>
+                        <span class="license-plate" style="font-size:10px; padding:1px 6px;">${cPlate} <span class="license-flag">RUS</span></span>
+                    </div>
+                </div>
 
-            <div class='p-2 mb-2' style='background:#0d1424; border-radius:10px;'>
-                <div class='flex-between text-xs mb-1'>
-                    <span>Пробег:</span>
-                    <b class='color-amber'>${mVal.toLocaleString()} км</b>
+                <!-- 2. ВЛАДЕЛЕЦ -->
+                <div class="autoteka-section-compact">
+                    <div class="autoteka-section-title"><span>2. ВЛАДЕЛЕЦ</span></div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">ФИО:</span>
+                        <b class="autoteka-value">${pts.ownerName || "Не указано"}</b>
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Записей в ПТС:</span>
+                        <b class="autoteka-value">${pts.ownersCount || 1}</b>
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Срок владения:</span>
+                        <b class="autoteka-value">${pts.ownershipYears || 3} г.</b>
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Тип ПТС:</span>
+                        <b class="autoteka-value ${ptsTypeStatus.includes('Дубликат') ? 'color-amber' : 'color-green'}">${ptsTypeStatus}</b>
+                    </div>
                 </div>
-                <div class='flex-between text-xs mb-1'>
-                    <span>Ресурс ДВС:</span>
-                    <b class='color-green'>${engWear}%</b>
-                </div>
-                <div class='flex-between text-xs'>
-                    <span>Ресурс КПП:</span>
-                    <b class='color-green'>${transWear}%</b>
-                </div>
-            </div>
 
-            <div class='flex-between p-2' style='background:rgba(0,242,254,0.05); border:1px solid var(--border-glow); border-radius:10px;'>
-                <b class='text-xs color-cyan'>Итоговый рейтинг:</b>
-                <div class='price-val ${scoreColor}' style='font-size:20px;'>${overallScore}/10</div>
+                <!-- 3. ПРОБЕГ И РЕСУРС -->
+                <div class="autoteka-section-compact">
+                    <div class="autoteka-section-title"><span>3. ПРОБЕГ И РЕСУРС</span></div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Пробег:</span>
+                        <b class="autoteka-value ${car.rolledOdometer ? 'color-red' : 'color-amber'}">
+                            ${mVal.toLocaleString()} км
+                            ${car.rolledOdometer ? ' <span style="font-size:8px;">[СКРУЧЕН]</span>' : ''}
+                        </b>
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Ресурс ДВС:</span>
+                        <b class="autoteka-value ${engWear < 50 ? 'color-red' : 'color-green'}">${engWear}%</b>
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Ресурс КПП:</span>
+                        <b class="autoteka-value ${transWear < 50 ? 'color-red' : 'color-green'}">${transWear}%</b>
+                    </div>
+                </div>
+
+                <!-- 4. ЮРИДИЧЕСКАЯ ПРОВЕРКА -->
+                <div class="autoteka-section-compact">
+                    <div class="autoteka-section-title"><span>4. ЮРИДИЧЕСКАЯ ПРОВЕРКА</span></div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Залоги:</span>
+                        <b class="autoteka-value ${pledgeStatus.includes('🔴') ? 'color-red' : 'color-green'}">${pledgeStatus}</b>
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Ограничения ФССП:</span>
+                        <b class="autoteka-value ${fsspStatus.includes('🔴') ? 'color-red' : 'color-green'}">${fsspStatus}</b>
+                    </div>
+                    <div class="autoteka-row-compact">
+                        <span class="autoteka-label">Работа в такси:</span>
+                        <b class="autoteka-value ${taxiStatus.includes('⚠️') ? 'color-amber' : 'color-green'}">${taxiStatus}</b>
+                    </div>
+                </div>
+
+                ${legal ? `
+                    <div class="autoteka-legal-warning">
+                        <div class="flex-between mb-1">
+                            <b class="text-xs color-red">⚠️ ОБНАРУЖЕНА ПРОБЛЕМА</b>
+                            <span class="tag-badge bg-tag-red">${legal.severity}</span>
+                        </div>
+                        <div class="sub-label mb-1" style="font-size:9px;">
+                            <b>${legal.name}</b> — ${legal.desc}
+                        </div>
+                        <div class="sub-label color-red font-bold" style="font-size:8.5px;">
+                            Последствие: ${legal.consequence}
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- ИТОГОВЫЙ РЕЙТИНГ -->
+                <div class="autoteka-score-block">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan">ИТОГОВЫЙ РЕЙТИНГ:</b>
+                        <span class="tag-badge ${overallScore >= 8 ? 'bg-tag-green' : (overallScore >= 5 ? 'bg-tag-amber' : 'bg-tag-red')}" style="font-size:8px;">${scoreLabel}</span>
+                    </div>
+                    <div class="flex-between">
+                        <div class="autoteka-score-bar">
+                            <div class="autoteka-score-fill ${overallScore >= 8 ? 'score-good' : (overallScore >= 5 ? 'score-mid' : 'score-bad')}" style="width:${overallScore * 10}%;"></div>
+                        </div>
+                        <b class="${scoreColor}" style="font-size:20px; margin-left:10px;">${overallScore}/10</b>
+                    </div>
+                </div>
+
+                <!-- КНОПКА PDF -->
+                <button onclick="downloadAutotekaPDF()" class="btn btn-dark btn-sm w-full mt-2">
+                    <i class="fa-solid fa-download mr-1"></i> Скачать PDF
+                </button>
             </div>
-        `;
-    }
+        </div>
+    `;
 
     ModalManager.open("modalAutoteka");
     if (typeof playSound === 'function') playSound('tick');
     if (typeof renderMarketFeed === 'function') renderMarketFeed();
+}
+
+// --------------------------------------------------------
+// ⭐ v2.2.0: СКАЧАТЬ PDF АВТОТЕКИ (ИМИТАЦИЯ)
+// --------------------------------------------------------
+function downloadAutotekaPDF() {
+    if (typeof showToast === 'function') {
+        showToast("📄 Отчёт Автотеки сохранён в буфер обмена (PDF-имитация)");
+    }
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+
+    if (activeInspectCarId) {
+        const car = _getInspectCar();
+        if (car) {
+            const reportText = `
+АВТОТЕКА — ОФИЦИАЛЬНЫЙ ОТЧЁТ
+Дата: ${new Date().toLocaleDateString('ru-RU')}
+Модель: ${car.name}
+VIN: ${car.vin || '—'}
+Госномер: ${car.customPlate || car.plate || 'ТРАНЗИТ'}
+Пробег: ${(car.mileage || 0).toLocaleString()} км
+Ресурс ДВС: ${car.wear?.engine || 85}%
+Ресурс КПП: ${car.wear?.transmission || 85}%
+Юридический статус: ${car.legalDefect ? '⚠️ Есть проблемы' : '✓ Чисто'}
+            `.trim();
+
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(reportText).catch(() => {});
+            }
+        }
+    }
 }
 
 // --------------------------------------------------------
@@ -736,7 +876,8 @@ window.PhoneMarketInspection = {
     closeGaugeModal,
     quickOBDScanMarketCar,
     closeOBD2Modal,
-    openAutotekaModal
+    openAutotekaModal,
+    downloadAutotekaPDF
 };
 
 Object.assign(window, {
@@ -746,10 +887,11 @@ Object.assign(window, {
     quickOBDScanMarketCar,
     closeOBD2Modal,
     openAutotekaModal,
+    downloadAutotekaPDF,
     openInspectionChoiceModal,
     runInspection,
     closeInspectionResults,
     _showInspectionResults
 });
 
-console.log('[🔬 market-inspection v2.1.0] ФИКС кликов + защита от двойного клика + логи ✓');
+console.log('[🔬 market-inspection v2.2.0] Интерактивная Автотека с PDF + шкалой рисков ✓');
