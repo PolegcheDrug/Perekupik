@@ -5,26 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v1.0.0</title>
-    
-    <!-- Модульные CSS-стили с принудительным сбросом кэша v=349 -->
-    <link rel="stylesheet" href="css/base.css?v=349">
-    <link rel="stylesheet" href="css/hud.css?v=349">
-    <link rel="stylesheet" href="css/market.css?v=349">
-    <link rel="stylesheet" href="css/phone.css?v=349">
-    <link rel="stylesheet" href="css/modals.css?v=349">
-    <link rel="stylesheet" href="css/nav.css?v=349">
-    
+
+    <!-- Модульные CSS-стили с принудительным сбросом кэша v=350 -->
+    <link rel="stylesheet" href="css/base.css?v=350">
+    <link rel="stylesheet" href="css/hud.css?v=350">
+    <link rel="stylesheet" href="css/market.css?v=350">
+    <link rel="stylesheet" href="css/phone.css?v=350">
+    <link rel="stylesheet" href="css/modals.css?v=350">
+    <link rel="stylesheet" href="css/nav.css?v=350">
+
     <!-- Внешние библиотеки -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
   <body class="notranslate" translate="no">
     <div class="app-shell">
-      
+
       <!-- КАПСУЛЬНЫЙ НЕОНОВЫЙ HUD С ПОДДЕРЖКОЙ КАСТОМИЗАЦИИ -->
       <header class="hud-header">
         <div class="hud-card hud-top-row">
-          
+
           <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль и аналитику">
             <div class="avatar-ring">
               <div class="avatar-glow"></div>
@@ -35,7 +35,7 @@
               </div>
               <span id="vipBadge" class="vip-tag" style="display:none;">VIP</span>
             </div>
-            
+
             <div class="user-details">
               <div class="player-capsule-box">
                 <div class="user-name-row">
@@ -99,7 +99,7 @@
               </div>
               <span id="hungerText" class="need-text">80%</span>
             </div>
-            
+
             <div class="need-track" onclick="switchTab('tabLife')" title="Настроение и кураж">
               <div class="need-icon-wrap mood-wrap">
                 <i class="fa-solid fa-masks-theater"></i>
@@ -124,7 +124,7 @@
           </div>
         </div>
       </header>
-      
+
       <!-- ОСНОВНОЙ КОНТЕЙНЕР -->
       <main class="main-content">
         <!-- 1. TAB: РЫНОК -->
@@ -219,7 +219,7 @@
           </button>
           <div id="marketCardContainer"></div>
         </section>
-        
+
         <!-- 2. TAB: ГАРАЖ -->
         <section id="tabGarage" class="tab-screen">
           <div class="glass-card mb-2">
@@ -233,7 +233,7 @@
           </div>
           <div id="garageList"></div>
         </section>
-        
+
         <!-- 3. TAB: ПЛОЩАДКА ПРОДАЖ -->
         <section id="tabSalesLot" class="tab-screen">
           <div class="glass-card mb-2">
@@ -375,7 +375,7 @@
             </div>
           </div>
         </section>
-        
+
         <!-- 5. TAB: ЖИЗНЬ -->
         <section id="tabLife" class="tab-screen"></section>
 
@@ -384,7 +384,7 @@
           <div id="profileDashboardContainer"></div>
         </section>
       </main>
-      
+
       <!-- НИЖНИЙ БАР НАВИГАЦИИ -->
       <nav class="bottom-nav">
         <div class="b-nav-item active" onclick="switchTab('tabMarket')" id="bnav-tabMarket">
@@ -436,7 +436,7 @@
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #349</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #350</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
           <div class="patch-item"><b>⚡ Единый хаб Сети «M» & Autodrot:</b> Объединённый онлайн-рынок и чат торга с кнопками риска.</div>
           <div class="patch-item"><b>🏢 Бизнес-кастомизация:</b> Живые скины, эффекты карточек и стикеры суточного дохода.</div>
@@ -466,7 +466,7 @@
         </div>
 
         <div class="sub-label font-bold mb-2 text-xs">Выберите пункты страхового покрытия:</div>
-        
+
         <div class="space-y-2 mb-3">
           <div class="insurance-option-card selected" id="insCard_osago" onclick="toggleInsuranceOption('osago')">
             <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
@@ -581,7 +581,7 @@
             </div>
             <div id="dkpNetProfitBadge" class="text-xs text-center font-bold mb-2" style="display:none;"></div>
           </div>
-          
+
           <div class="dkp-signatures-area">
             <div class="dkp-sig-col">
               <span class="text-xs sub-label">Продавец:</span>
@@ -713,7 +713,7 @@
 
         <div class="chat-thread-container mb-2" id="dealChatThread"></div>
         <div id="dealHaggleArea" class="mb-2"></div>
-        
+
         <div class="grid-2">
           <button onclick="closeModal('modalMarketDeal')" class="btn btn-dark">Уехать со встречи 🚗</button>
           <button id="dealBuyBtn" onclick="confirmMarketPurchaseSuccess()" class="btn btn-green">Оформить ДКП 🤝</button>
@@ -764,9 +764,9 @@
         <div class="modal-glow-badge mb-1" id="verdictBadgeText">ИТОГИ СДЕЛКИ</div>
         <h3 class="font-bold mb-1" id="verdictTitle">Сделка закрыта</h3>
         <p class="sub-label mb-2" id="verdictText"></p>
-        
+
         <div id="verdictTokensContainer" class="reward-tokens-wrapper" style="display:none;"></div>
-        
+
         <div class="price-val mb-1" id="verdictAmount">+0 ₽</div>
         <div id="verdictProfitBadge" class="text-xs font-bold mb-3" style="display:none;"></div>
         <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Забрать награды ✓</button>
@@ -859,10 +859,10 @@
           <button type="button" onclick="AppM.selectP2PListingType('business')" id="btnP2PTypeBiz" class="btn btn-dark btn-sm">Бизнес</button>
           <button type="button" onclick="AppM.selectP2PListingType('housing')" id="btnP2PTypeHouse" class="btn btn-dark btn-sm">Жильё</button>
         </div>
-        
+
         <div class="sub-label mb-1" style="font-size:9.5px;">Выберите объект для продажи:</div>
         <div id="p2pCardsListContainer" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; padding-right: 2px;"></div>
-        
+
         <div class="sub-label mb-1" style="font-size:9.5px;">Стоимость выставления (₽):</div>
         <input type="number" id="p2pPriceInput" placeholder="Цена в рублях ₽" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;" min="1000">
         <div class="grid-2">
@@ -875,7 +875,7 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- 1. ПОДКЛЮЧЕНИЕ СЕТЕВОГО МОДУЛЯ FIREBASE (ES-МОДУЛЬ) -->
-    <script type="module" src="firebase-bridge.js?v=349"></script>
+    <script type="module" src="firebase-bridge.js?v=350"></script>
 
     <!-- 2. АВТОЗАГРУЗЧИК СКРИПТОВ ИГРЫ -->
     <script>
@@ -887,7 +887,7 @@
           } catch (e) {}
         }
 
-        const CACHE_VER = '349';
+        const CACHE_VER = '350';
 
         const rootModules = [
             'data_core.js',
@@ -909,7 +909,7 @@
             // ⭐ Тонкий индекс — собирает CAR_DATABASE из window.CARS_CATEGORY_*
             'data_cars.js',
 
-            // Остальные data-модули (не трогаем)
+            // Остальные data-модули
             'data_barn.js',
             'data_economy.js',
             'data_activities.js',
@@ -924,6 +924,9 @@
           'theme-manager.js',
           'app.js',
           'phone.js',
+          'phone-messenger.js',     // ⭐ НОВЫЙ — СМС-мессенджер и анти-скам
+          'phone-autodrot.js',      // ⭐ НОВЫЙ — P2P биржа Autodrot
+          'phone-barn.js',          // ⭐ НОВЫЙ — Сараи с мульти-фото
           'phone-bank.js',
           'm-hub/m-leaderboard.js',
           'm-hub/m-events.js',

@@ -759,3 +759,449 @@
   color: var(--text-sub) !important;
   text-align: center !important;
 }
+
+/* ==========================================================================
+   MARKET.CSS — Стили авторынка и интерактивной карты
+   ========================================================================== */
+
+/* Контейнер рынка */
+.market-container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px 20px 40px;
+    box-sizing: border-box;
+}
+
+/* Шапка рынка и навигация */
+.market-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(13, 20, 36, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.market-header-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.market-header-title h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+.market-view-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Кнопка переключения вида карты в верхнем правом углу */
+.btn-market-map-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #00f0ff 0%, #0077ff 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 240, 255, 0.35);
+    transition: all 0.2s ease;
+}
+
+.btn-market-map-toggle:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 240, 255, 0.6);
+}
+
+.btn-market-map-toggle:active {
+    transform: translateY(1px);
+}
+
+/* Фильтры рынка */
+.market-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.market-filter-btn {
+    background: rgba(18, 26, 45, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: #9ab4d0;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.market-filter-btn.active,
+.market-filter-btn:hover {
+    background: rgba(0, 240, 255, 0.15);
+    border-color: #00f0ff;
+    color: #ffffff;
+}
+
+/* Сетка карточек автомобилей */
+.market-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+}
+
+/* Карточка автомобиля */
+.market-car-card {
+    background: linear-gradient(180deg, #121a2d 0%, #0c1220 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.25s ease;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.market-car-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(0, 240, 255, 0.4);
+    box-shadow: 0 10px 25px rgba(0, 240, 255, 0.2);
+}
+
+.car-card-image-wrap {
+    width: 100%;
+    height: 160px;
+    position: relative;
+    background: #080c14;
+    overflow: hidden;
+}
+
+.car-card-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.car-card-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.75);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: #00f0ff;
+    font-weight: 700;
+}
+
+.car-card-body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.car-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 6px;
+}
+
+.car-card-price {
+    font-size: 18px;
+    font-weight: 800;
+    color: #00ffaa;
+    margin-bottom: 12px;
+}
+
+.car-card-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    color: #8da4be;
+    margin-bottom: 16px;
+}
+
+.car-card-meta-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.car-card-actions {
+    margin-top: auto;
+}
+
+.btn-car-inspect {
+    width: 100%;
+    background: linear-gradient(135deg, #00f0ff 0%, #0099ff 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    cursor: pointer;
+    transition: filter 0.2s ease;
+}
+
+.btn-car-inspect:hover {
+    filter: brightness(1.15);
+}
+
+/* ==========================================================================
+   МОДАЛЬНОЕ ОКНО ИНТЕРАКТИВНОЙ КАРТЫ
+   ========================================================================== */
+
+.market-map-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(4, 8, 16, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    padding: 20px;
+}
+
+.market-map-overlay.hidden {
+    display: none !important;
+}
+
+.market-map-modal {
+    width: 100%;
+    max-width: 1000px;
+    height: 85vh;
+    background: #0a0e17;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 240, 255, 0.2);
+}
+
+.market-map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: #101624;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.market-map-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.market-map-title h3 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.map-subtitle {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: #7d96b2;
+}
+
+.market-map-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.radar-status-badge {
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #00f0ff;
+}
+
+.map-btn-upgrade-radar {
+    background: linear-gradient(135deg, #ffaa00 0%, #ff6600 100%);
+    border: none;
+    border-radius: 6px;
+    padding: 7px 14px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.map-btn-upgrade-radar:hover {
+    transform: scale(1.04);
+}
+
+.map-btn-close {
+    background: transparent;
+    border: none;
+    color: #7d96b2;
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+
+.map-btn-close:hover {
+    color: #ffffff;
+}
+
+.market-map-body {
+    position: relative;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+#market-map-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Легенда карты */
+.market-map-legend {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    background: rgba(10, 14, 23, 0.85);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    color: #9cb1c9;
+    pointer-events: none;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.dot-player { background: #00ffaa; box-shadow: 0 0 6px #00ffaa; }
+.dot-active { background: #00f0ff; box-shadow: 0 0 6px #00f0ff; }
+.dot-disabled { background: #555555; }
+
+/* Карточка быстрого осмотра авто при тапе на пин */
+.map-pin-preview {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 320px;
+    background: rgba(14, 20, 34, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 240, 255, 0.4);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    box-sizing: border-box;
+    z-index: 10;
+}
+
+.map-pin-preview.hidden {
+    display: none !important;
+}
+
+.map-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.map-preview-header h4 {
+    margin: 0;
+    font-size: 15px;
+    color: #ffffff;
+}
+
+.map-preview-price {
+    font-size: 15px;
+    font-weight: 800;
+    color: #00ffaa;
+}
+
+.map-preview-info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 6px;
+    color: #8fa5be;
+}
+
+.map-preview-info-row strong {
+    color: #ffffff;
+}
+
+.map-preview-actions {
+    margin-top: 14px;
+}
+
+.map-preview-btn-inspect {
+    width: 100%;
+    background: linear-gradient(135deg, #00f0ff 0%, #0077ff 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0, 240, 255, 0.3);
+}
+
+.map-preview-locked-warning {
+    background: rgba(255, 50, 50, 0.15);
+    border: 1px solid rgba(255, 50, 50, 0.3);
+    border-radius: 6px;
+    padding: 8px;
+    font-size: 11px;
+    color: #ff6666;
+    text-align: center;
+}
