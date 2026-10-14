@@ -1,8 +1,8 @@
 // ========================================================
-// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.8.0)
+// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.8.5)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
-// 1. Полная замена <select> на интерактивную ленту карточек авто с тюнингом
+// 1. Интерактивная лента карточек авто вместо select
 // 2. Двусторонний торг (покупка на P2P и продажа на площадке)
 // 3. Интеграция базы реплик data_dialogues.js с неоновой цензурой
 // 4. Кнопка «Заключить ДКП» строго внизу под тактикой торга
@@ -384,7 +384,6 @@ const AppM = {
         let tacticKey = percent <= 3 ? 'soft' : (percent <= 8 ? 'medium' : 'hard');
 
         if (roll < adjustedRisk) {
-            // НЕУДАЧНЫЙ ТОРГ
             if (typeof playSound === 'function') playSound('error');
             if (typeof tgHaptic === 'function') tgHaptic('error');
 
@@ -404,7 +403,6 @@ const AppM = {
             msg.chatHistory.push({ from: 'me', text: playerMsg });
             msg.chatHistory.push({ from: 'them', text: sellerReply });
 
-            // Срыв сделки при нулевом терпении
             if (msg.patience <= 0 || roll < 10) {
                 let quitReply = "«С вами каши не сваришь. Сделки не будет!»";
                 if (isP2P && typeof DIALOGUES_DATABASE !== 'undefined' && DIALOGUES_DATABASE.p2p?.tacticsResponses?.rageQuit) {
@@ -421,7 +419,6 @@ const AppM = {
                 }
             }
         } else {
-            // УСПЕШНЫЙ ТОРГ
             if (typeof playSound === 'function') playSound('win');
             if (typeof tgHaptic === 'function') tgHaptic('success');
 
@@ -487,7 +484,6 @@ const AppM = {
         let msg = (state.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
 
-        // Покупка на P2P-бирже
         if (msg.isP2PMarket && msg.p2pId) {
             let lot = (state.p2pMarketListings || []).find(l => l.id === msg.p2pId);
             let finalPrice = msg.offerPrice || lot?.price || 100000;
@@ -536,7 +532,6 @@ const AppM = {
             return;
         }
 
-        // Продажа на площадке NPC
         let slotIdx = msg.carIndex !== undefined ? msg.carIndex : 0;
         let slot = state.salesLot ? state.salesLot[slotIdx] : null;
 
@@ -711,7 +706,7 @@ const AppM = {
         let html = '';
 
         if (type === 'cars' || type === 'car') {
-            let garage = state.garage || [];
+            let garage = (state.garage || []).filter(c => c && typeof c === 'object');
             if (garage.length === 0) {
                 html = `
                     <div class="glass-card p-3 text-center sub-label" style="background:#050914;">
@@ -808,7 +803,6 @@ const AppM = {
 
         container.innerHTML = html;
 
-        // Если есть элементы и ничего не выбрано — выбираем первый по умолчанию
         if (this.selectedItemIndex === null) {
             let hasItems = (type === 'cars' && (state.garage || []).length > 0) ||
                            (type === 'plates' && (state.ownedPlates || []).length > 0) ||
@@ -824,7 +818,6 @@ const AppM = {
         this.selectedItemIndex = idx;
         const type = this.selectedListingType;
 
-        // Обновляем визуальную подсветку рамок
         const cards = document.querySelectorAll('[id^="p2pCardItem_"]');
         cards.forEach(c => {
             c.style.border = '1.5px solid rgba(255,255,255,0.08)';
@@ -837,7 +830,6 @@ const AppM = {
             activeCard.style.boxShadow = '0 0 14px var(--cyan-glow)';
         }
 
-        // Автоподстановка рекомендованной цены продажи
         const priceInput = document.getElementById('p2pPriceInput');
         if (priceInput) {
             if (type === 'cars') {
@@ -886,7 +878,6 @@ const AppM = {
             newListing.name = car.name;
             newListing.itemData = Object.assign({}, car);
             
-            // Удаляем машину из гаража игрока
             state.garage.splice(idx, 1);
             if (typeof renderGarage === 'function') renderGarage();
         } else if (type === 'plates') {
