@@ -1,10 +1,10 @@
 // ========================================================
-// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.6.2)
+// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.7.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
-// 1. Интеграция с базой реплик data_dialogues.js
-// 2. Кнопка «Заключить ДКП» строго внизу под тактикой торга
-// 3. Динамический чат торга, селектор имущества с мини-превью и тюнингом
+// 1. Полная интеграция с базой реплик data_dialogues.js и цензурой
+// 2. Двусторонний торг (покупка на P2P и продажа на площадке)
+// 3. Выбор имущества с превью, тюнингом и кнопка ДКП строго внизу
 // ========================================================
 
 const AppM = {
@@ -155,6 +155,8 @@ const AppM = {
                 ? `<span class="tag-badge bg-tag-red" style="font-weight:900;"><span class="led-dot led-red"></span> НОВОЕ</span>`
                 : (isViewed ? `<span class="tag-badge bg-tag-dark" style="border-color:rgba(255,255,255,0.2);"><i class="fa-solid fa-eye color-cyan mr-1"></i> ПРОСМОТРЕНО</span>` : '');
 
+            let senderLabel = m.isP2PMarket ? "Продавец P2P:" : "Покупатель:";
+
             return `
                 <div onclick="AppM.openDialog('${m.id}')" class="glass-card mb-3 p-2 cursor-pointer ${isUnread ? 'card-glow-deal' : ''}" style="border-left: 3px solid ${isUnread ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}; background: #090e18;">
                     <div class="car-img-wrap mb-2" style="height:120px; position:relative; border-radius:10px; overflow:hidden;">
@@ -168,7 +170,7 @@ const AppM = {
                         <div>
                             <b class="text-xs color-cyan" style="font-size:12.5px;">${carName}</b>
                             <div class="sub-label mt-1" style="font-size:9px;">
-                                Покупатель: <b class="color-amber">${m.sender}</b>
+                                ${senderLabel} <b class="color-amber">${m.sender}</b>
                             </div>
                         </div>
                         <div class="text-right">
@@ -192,7 +194,7 @@ const AppM = {
     },
 
     // --------------------------------------------------------
-    // ДИАЛОГ СДЕЛКИ: КНОПКА ДКП СТРОГО ВНИЗУ ПОД ТАКТИКОЙ ТОРГА
+    // ДИАЛОГ СДЕЛКИ: ДВУСТОРОННИЙ ТОРГ И КНОПКА ДКП ВНИЗУ
     // --------------------------------------------------------
     renderConversationScreen(container) {
         let msg = (state.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
@@ -205,21 +207,19 @@ const AppM = {
         msg.unread = false;
         msg.viewed = true;
 
-        let slot = (msg.carIndex !== undefined && state.salesLot?.[msg.carIndex]) ? state.salesLot[msg.carIndex] : null;
+        let isP2P = !!msg.isP2PMarket;
+        let slot = (!isP2P && msg.carIndex !== undefined && state.salesLot?.[msg.carIndex]) ? state.salesLot[msg.carIndex] : null;
         let car = slot?.car || msg.carData || {};
         let buyerObj = slot?.currentBuyer || slot?.buyer || null;
 
         let askingPrice = slot?.askingPrice || msg.askingPrice || car.price || 100000;
-        let currentOffer = buyerObj?.currentOffer || msg.offerPrice || Math.round(askingPrice * 0.85);
+        let currentOffer = buyerObj?.currentOffer || msg.offerPrice || (isP2P ? askingPrice : Math.round(askingPrice * 0.85));
 
         msg.askingPrice = askingPrice;
         msg.offerPrice = currentOffer;
 
-        let purchaseCost = car.purchaseCost || Math.round(askingPrice * 0.75);
-        let netProfit = currentOffer - purchaseCost;
-
         let patience = buyerObj ? buyerObj.patience : (msg.patience !== undefined ? msg.patience : 4);
-        let maxPatience = buyerObj ? buyerObj.maxPatience : 4;
+        let maxPatience = buyerObj ? buyerObj.maxPatience : (msg.maxPatience || 4);
         let patiencePct = Math.round((patience / maxPatience) * 100);
         let patienceColor = patiencePct > 60 ? "color-green" : (patiencePct > 30 ? "color-amber" : "color-red");
 
@@ -234,77 +234,120 @@ const AppM = {
             </div>
         `).join('');
 
+        let benefitHtml = "";
+        let tacticsButtonsHtml = "";
+        let dkpButtonHtml = "";
+
+        if (isP2P) {
+            let discountGained = Math.max(0, askingPrice - currentOffer);
+            benefitHtml = `
+                <div class="flex-between text-xs px-1 mt-1">
+                    <span class="sub-label" style="font-size:8.5px;">Сторговано на бирже:</span>
+                    <b class="color-green" style="font-size:9.5px;">-${Number(discountGained).toLocaleString()} ₽</b>
+                </div>
+            `;
+            tacticsButtonsHtml = `
+                <button onclick="AppM.executeChatHaggle('${msg.id}', 3, 15)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
+                    <div class="font-bold color-green text-xs" style="font-size:8.5px;">-3% НА ДОРОГУ</div>
+                    <div class="sub-label" style="font-size:7px;">РИСК: 15%</div>
+                </button>
+                <button onclick="AppM.executeChatHaggle('${msg.id}', 7, 35)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
+                    <div class="font-bold color-amber text-xs" style="font-size:8.5px;">-7% ПО ФАКТУ</div>
+                    <div class="sub-label" style="font-size:7px;">РИСК: 35%</div>
+                </button>
+                <button onclick="AppM.executeChatHaggle('${msg.id}', 12, 60)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
+                    <div class="font-bold color-red text-xs" style="font-size:8.5px;">-12% ЖЁСТКО</div>
+                    <div class="sub-label" style="font-size:7px;">РИСК: 60%</div>
+                </button>
+            `;
+            dkpButtonHtml = `
+                <button onclick="AppM.dealAcceptFromChat('${msg.id}')" class="btn btn-green btn-sm w-full font-bold mt-1" style="padding:9px 0; font-size:11px; box-shadow:0 0 14px var(--green-glow);">
+                    <i class="fa-solid fa-handshake mr-1"></i> ЗАКЛЮЧИТЬ ДКП И ВЫКУПИТЬ ЗА ${Number(currentOffer).toLocaleString()} ₽ 🤝
+                </button>
+            `;
+        } else {
+            let purchaseCost = car.purchaseCost || Math.round(askingPrice * 0.75);
+            let netProfit = currentOffer - purchaseCost;
+            benefitHtml = `
+                <div class="flex-between text-xs px-1 mt-1">
+                    <span class="sub-label" style="font-size:8.5px;">Чистая прибыль по сделке:</span>
+                    <b class="${netProfit >= 0 ? 'color-green' : 'color-red'}" style="font-size:9.5px;">${netProfit >= 0 ? '+' : ''}${Number(netProfit).toLocaleString()} ₽</b>
+                </div>
+            `;
+            tacticsButtonsHtml = `
+                <button onclick="AppM.executeChatHaggle('${msg.id}', 3, 10)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
+                    <div class="font-bold color-green text-xs" style="font-size:8.5px;">+3% НА ДОРОГУ</div>
+                    <div class="sub-label" style="font-size:7px;">РИСК: 10%</div>
+                </button>
+                <button onclick="AppM.executeChatHaggle('${msg.id}', 6, 28)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
+                    <div class="font-bold color-amber text-xs" style="font-size:8.5px;">+6% ПО ФАКТУ</div>
+                    <div class="sub-label" style="font-size:7px;">РИСК: 28%</div>
+                </button>
+                <button onclick="AppM.executeChatHaggle('${msg.id}', 10, 60)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
+                    <div class="font-bold color-red text-xs" style="font-size:8.5px;">БЕЗ СКИДОК</div>
+                    <div class="sub-label" style="font-size:7px;">РИСК: 60%</div>
+                </button>
+            `;
+            dkpButtonHtml = `
+                <button onclick="AppM.dealAcceptFromChat('${msg.id}')" class="btn btn-green btn-sm w-full font-bold mt-1" style="padding:9px 0; font-size:11px; box-shadow:0 0 14px var(--green-glow);">
+                    <i class="fa-solid fa-handshake mr-1"></i> ЗАКЛЮЧИТЬ ДКП ЗА ${Number(currentOffer).toLocaleString()} ₽ 🤝
+                </button>
+            `;
+        }
+
         container.innerHTML = `
             <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.4); flex-shrink: 0;">
                 <button onclick="AppM.closeDialog()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
                 <div style="text-align:center;">
                     <div class="phone-app-title text-xs font-bold">${msg.sender}</div>
-                    <div class="sub-label color-green" style="font-size:8px;">● В сети (Онлайн торг)</div>
+                    <div class="sub-label color-green" style="font-size:8px;">● ${isP2P ? 'P2P Биржа онлайн' : 'Покупатель с площадки'}</div>
                 </div>
                 <div style="width:40px;"></div>
             </div>
 
             <div class="phone-app-body" style="display:flex; flex-direction:column; height: calc(100% - 46px); min-height: 0; padding: 4px 6px 8px 6px; gap: 6px;">
-                <!-- ВЕРХНЯЯ КАРТОЧКА: СВОДКА ЛОТА БЕЗ КНОПКИ ДКП -->
+                <!-- ВЕРХНЯЯ КАРТОЧКА СВОДКИ ЛОТА -->
                 <div class="glass-card p-2" style="border: 1.5px solid var(--green); background: #060a14; margin-bottom: 0; flex-shrink: 0;">
                     <div class="deal-car-preview-card" style="height:56px; min-height:56px; padding: 4px 8px;">
                         <img src="${carImg}" class="deal-car-thumb" style="width:68px; height:46px; min-width:68px; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
                         <div style="flex:1; min-width:0;">
                             <div class="flex-between">
-                                <b class="text-xs color-cyan block" style="font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${car.name || 'Автомобиль'}</b>
-                                <span class="tag-badge bg-tag-green" style="font-size:7.5px;">ЛОТ СИНХРОНЕН</span>
+                                <b class="text-xs color-cyan block" style="font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${car.name || 'Объект сделки'}</b>
+                                <span class="tag-badge bg-tag-green" style="font-size:7.5px;">${isP2P ? 'P2P ЛОТ' : 'СИНХРОНЕН'}</span>
                             </div>
                             <div class="sub-label mt-1" style="font-size:8.5px;">
                                 Цена в объявлении: <b>${Number(askingPrice).toLocaleString()} ₽</b>
                             </div>
                             <div class="flex-between mt-1">
-                                <span class="sub-label" style="font-size:8px;">Оффер покупателя:</span>
+                                <span class="sub-label" style="font-size:8px;">${isP2P ? 'Ваше предложение:' : 'Оффер покупателя:'}</span>
                                 <b class="color-green text-xs" style="font-size:12px;">${Number(currentOffer).toLocaleString()} ₽</b>
                             </div>
                         </div>
                     </div>
-
-                    <div class="flex-between text-xs px-1 mt-1">
-                        <span class="sub-label" style="font-size:8.5px;">Чистая прибыль по сделке:</span>
-                        <b class="${netProfit >= 0 ? 'color-green' : 'color-red'}" style="font-size:9.5px;">${netProfit >= 0 ? '+' : ''}${Number(netProfit).toLocaleString()} ₽</b>
-                    </div>
+                    ${benefitHtml}
                 </div>
 
-                <!-- ОКНО ПЕРЕПИСКИ: ГИБКИЙ СКРОЛЛ НА ВСЮ ВЫСОТУ -->
+                <!-- ОКНО ПЕРЕПИСКИ: ГИБКИЙ СКРОЛЛ -->
                 <div class="chat-thread-container" id="mChatScrollBox" style="flex: 1 1 auto; min-height: 120px; max-height: none; overflow-y:auto; padding:8px; background:#04070e; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
                     ${messagesHtml}
                 </div>
 
-                <!-- НИЖНИЙ БЛОК: ТАКТИКА ТОРГА И КНОПКА ДКП В САМОМ НИЗУ -->
+                <!-- НИЖНИЙ БЛОК: ТАКТИКА ТОРГА И КНОПКА ДКП -->
                 <div class="p-2" style="background:#090e18; border-radius:12px; border:1px solid rgba(255,255,255,0.08); flex-shrink: 0; display:flex; flex-direction:column; gap:5px;">
                     <div class="flex-between text-xs">
-                        <span class="sub-label font-bold" style="font-size:9px;">Терпение клиента в чате:</span>
+                        <span class="sub-label font-bold" style="font-size:9px;">Терпение собеседника:</span>
                         <b class="${patienceColor}" style="font-size:9px;">${patiencePct}% (${patience} попытки)</b>
                     </div>
                     <div style="height:4px; background:rgba(255,255,255,0.06); border-radius:2px; overflow:hidden;">
                         <div style="width:${patiencePct}%; height:100%; background:${patiencePct > 50 ? 'var(--green)' : (patiencePct > 25 ? 'var(--amber)' : 'var(--red)')}; transition:width 0.3s ease;"></div>
                     </div>
 
-                    <div class="sub-label" style="font-size:8px; text-transform:uppercase; font-weight:800; color:#94a3b8; margin-top:2px;">Тактика торга в чате:</div>
+                    <div class="sub-label" style="font-size:8px; text-transform:uppercase; font-weight:800; color:#94a3b8; margin-top:2px;">Тактика торга:</div>
                     <div class="grid-3" style="gap:4px;">
-                        <button onclick="AppM.executeChatHaggle('${msg.id}', 3, 10)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
-                            <div class="font-bold color-green text-xs" style="font-size:8.5px;">-3% НА ДОРОГУ</div>
-                            <div class="sub-label" style="font-size:7px;">РИСК: 10%</div>
-                        </button>
-                        <button onclick="AppM.executeChatHaggle('${msg.id}', 6, 28)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
-                            <div class="font-bold color-amber text-xs" style="font-size:8.5px;">-6% ПО ФАКТУ</div>
-                            <div class="sub-label" style="font-size:7px;">РИСК: 28%</div>
-                        </button>
-                        <button onclick="AppM.executeChatHaggle('${msg.id}', 10, 60)" class="btn btn-dark btn-sm text-left" style="padding:5px 4px; min-height:34px;">
-                            <div class="font-bold color-red text-xs" style="font-size:8.5px;">БЕЗ СКИДОК</div>
-                            <div class="sub-label" style="font-size:7px;">РИСК: 60%</div>
-                        </button>
+                        ${tacticsButtonsHtml}
                     </div>
 
-                    <!-- ФИНАЛЬНАЯ КНОПКА ЗАКЛЮЧЕНИЯ ДКП В САМОМ НИЗУ -->
-                    <button onclick="AppM.dealAcceptFromChat('${msg.id}')" class="btn btn-green btn-sm w-full font-bold mt-1" style="padding:9px 0; font-size:11px; box-shadow:0 0 14px var(--green-glow);">
-                        <i class="fa-solid fa-handshake mr-1"></i> ЗАКЛЮЧИТЬ ДКП ЗА ${Number(currentOffer).toLocaleString()} ₽ 🤝
-                    </button>
+                    ${dkpButtonHtml}
                 </div>
             </div>
         `;
@@ -317,12 +360,13 @@ const AppM = {
         let msg = (state.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
 
-        let slot = (msg.carIndex !== undefined && state.salesLot?.[msg.carIndex]) ? state.salesLot[msg.carIndex] : null;
+        let isP2P = !!msg.isP2PMarket;
+        let slot = (!isP2P && msg.carIndex !== undefined && state.salesLot?.[msg.carIndex]) ? state.salesLot[msg.carIndex] : null;
         let buyer = slot?.currentBuyer || slot?.buyer;
 
         let currentPatience = buyer ? buyer.patience : (msg.patience !== undefined ? msg.patience : 4);
         if (currentPatience <= 0) {
-            return showToast("Покупатель вышел из диалога и не готов торговаться!");
+            return showToast("Собеседник больше не готов вести диалог!");
         }
 
         if (buyer) buyer.patience -= 1;
@@ -331,20 +375,42 @@ const AppM = {
         let lvl = state.player?.level || 1;
         let karma = state.player?.karma || 50;
         let adjustedRisk = Math.max(5, Math.min(90, failRisk - (lvl * 0.5) - ((karma - 50) * 0.2)));
-
         let roll = Math.random() * 100;
+
         if (!msg.chatHistory) msg.chatHistory = [];
 
+        let tacticKey = percent <= 3 ? 'soft' : (percent <= 8 ? 'medium' : 'hard');
+
         if (roll < adjustedRisk) {
+            // НЕУДАЧНЫЙ ТОРГ
             if (typeof playSound === 'function') playSound('error');
             if (typeof tgHaptic === 'function') tgHaptic('error');
 
-            msg.chatHistory.push({ from: 'me', text: `Скидывай ещё ${percent}%, заберу прямо сейчас!` });
-            msg.chatHistory.push({ from: 'them', text: `«Не устраивает цена — ищи другую тачку. Я на такое не пойду!»` });
+            let playerMsg = isP2P 
+                ? `Скидывай ещё ${percent}%, деньги на руках!` 
+                : `Скидывай ещё ${percent}%, заберу прямо сейчас!`;
 
-            if (msg.patience <= 0 || roll < 12) {
-                msg.chatHistory.push({ from: 'them', text: `«С вами каши не сваришь. Сделки не будет!»` });
-                showToast("Покупатель прервал сделку!");
+            let sellerReply = "«Не устраивает цена — ищи другую тачку. Я на такое не пойду!»";
+
+            if (isP2P && typeof DIALOGUES_DATABASE !== 'undefined' && DIALOGUES_DATABASE.p2p?.tacticsResponses?.[tacticKey]) {
+                let refusePool = DIALOGUES_DATABASE.p2p.tacticsResponses[tacticKey].refuse;
+                if (Array.isArray(refusePool) && refusePool.length > 0) {
+                    sellerReply = refusePool[Math.floor(Math.random() * refusePool.length)];
+                }
+            }
+
+            msg.chatHistory.push({ from: 'me', text: playerMsg });
+            msg.chatHistory.push({ from: 'them', text: sellerReply });
+
+            // Срыв сделки при нулевом терпении
+            if (msg.patience <= 0 || roll < 10) {
+                let quitReply = "«С вами каши не сваришь. Сделки не будет!»";
+                if (isP2P && typeof DIALOGUES_DATABASE !== 'undefined' && DIALOGUES_DATABASE.p2p?.tacticsResponses?.rageQuit) {
+                    let quitPool = DIALOGUES_DATABASE.p2p.tacticsResponses.rageQuit;
+                    quitReply = quitPool[Math.floor(Math.random() * quitPool.length)];
+                }
+                msg.chatHistory.push({ from: 'them', text: quitReply });
+                showToast("Собеседник прервал сделку!");
                 if (slot) {
                     slot.currentBuyer = null;
                     slot.buyer = null;
@@ -353,22 +419,43 @@ const AppM = {
                 }
             }
         } else {
-            let asking = msg.askingPrice || 100000;
-            let raise = Math.round(asking * (percent / 100));
-
-            let newOffer = Math.min(asking, (msg.offerPrice || Math.round(asking * 0.85)) + raise);
-            msg.offerPrice = newOffer;
-            if (buyer) {
-                buyer.currentOffer = newOffer;
-                buyer.offeredPrice = newOffer;
-            }
-
-            msg.chatHistory.push({ from: 'me', text: `Давай добавим +${raise.toLocaleString()} ₽ на дорогу и оформляем ДКП прямо сейчас!` });
-            msg.chatHistory.push({ from: 'them', text: `«Ладно, твоя взяла! Накидываю +${raise.toLocaleString()} ₽, оформляем сделку 🤝»` });
-
+            // УСПЕШНЫЙ ТОРГ
             if (typeof playSound === 'function') playSound('win');
             if (typeof tgHaptic === 'function') tgHaptic('success');
-            showToast("Успешный торг! Предложение покупателя выросло.");
+
+            let asking = msg.askingPrice || 100000;
+            let delta = Math.round(asking * (percent / 100));
+
+            if (isP2P) {
+                let newOffer = Math.max(Math.round(asking * 0.5), (msg.offerPrice || asking) - delta);
+                msg.offerPrice = newOffer;
+
+                let playerPhrase = `Давай скидку -${delta.toLocaleString()} ₽, и я сразу жму кнопку выкупа!`;
+                let sellerPhrase = `«Ладно, твоя взяла! Уступаю -${delta.toLocaleString()} ₽, забирай!»`;
+
+                if (typeof DIALOGUES_DATABASE !== 'undefined' && DIALOGUES_DATABASE.p2p?.tacticsResponses?.[tacticKey]) {
+                    let agreePool = DIALOGUES_DATABASE.p2p.tacticsResponses[tacticKey].agree;
+                    if (Array.isArray(agreePool) && agreePool.length > 0) {
+                        let fn = agreePool[Math.floor(Math.random() * agreePool.length)];
+                        if (typeof fn === 'function') sellerPhrase = fn(delta);
+                    }
+                }
+
+                msg.chatHistory.push({ from: 'me', text: playerPhrase });
+                msg.chatHistory.push({ from: 'them', text: sellerPhrase });
+                showToast("Успешный торг! Цена лота на бирже снижена.");
+            } else {
+                let newOffer = Math.min(asking, (msg.offerPrice || Math.round(asking * 0.85)) + delta);
+                msg.offerPrice = newOffer;
+                if (buyer) {
+                    buyer.currentOffer = newOffer;
+                    buyer.offeredPrice = newOffer;
+                }
+
+                msg.chatHistory.push({ from: 'me', text: `Давай добавим +${delta.toLocaleString()} ₽ на дорогу и оформляем ДКП прямо сейчас!` });
+                msg.chatHistory.push({ from: 'them', text: `«Ладно, твоя взяла! Накидываю +${delta.toLocaleString()} ₽, оформляем сделку 🤝»` });
+                showToast("Успешный торг! Предложение покупателя выросло.");
+            }
         }
 
         saveState();
@@ -398,7 +485,7 @@ const AppM = {
         let msg = (state.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
 
-        // Корректная обработка сделки с P2P биржи
+        // Покупка на P2P-бирже
         if (msg.isP2PMarket && msg.p2pId) {
             let lot = (state.p2pMarketListings || []).find(l => l.id === msg.p2pId);
             let finalPrice = msg.offerPrice || lot?.price || 100000;
@@ -447,7 +534,7 @@ const AppM = {
             return;
         }
 
-        // Стандартный блок для NPC со площадки продаж
+        // Продажа на площадке NPC
         let slotIdx = msg.carIndex !== undefined ? msg.carIndex : 0;
         let slot = state.salesLot ? state.salesLot[slotIdx] : null;
 
@@ -480,7 +567,7 @@ const AppM = {
     },
 
     // ========================================================
-    // 2. ВКЛАДКА: «P2P БИРЖА» И СЕЛЕКТОР ИМУЩЕСТВА С ПРЕВЬЮ
+    // 2. ВКЛАДКА: «P2P БИРЖА» И ВЫБОР ИМУЩЕСТВА С ПРЕВЬЮ
     // ========================================================
     renderMarketScreen(container) {
         if (!container) return;
@@ -608,7 +695,6 @@ const AppM = {
             }
         });
 
-        // Сбрасываем превью
         let previewBox = document.getElementById('p2pItemPreviewBox');
         if (previewBox) {
             previewBox.style.display = 'none';
@@ -756,7 +842,6 @@ const AppM = {
             newListing.name = car.name;
             newListing.itemData = Object.assign({}, car);
             
-            // Удаляем машину из гаража игрока
             state.garage.splice(idx, 1);
             if (typeof renderGarage === 'function') renderGarage();
         } else if (type === 'plates') {
@@ -1102,6 +1187,7 @@ const AppM = {
                         askingPrice: asking,
                         offerPrice: offer,
                         patience: buyer.patience || 4,
+                        maxPatience: 4,
                         preview: buyer.lastReply || `Готов забрать авто за ${Number(offer).toLocaleString()} ₽!`,
                         chatHistory: [
                             { from: 'them', text: `Здравствуйте! Пишу по объявлению на «${slot.car.name}». Готов забрать за ${Number(offer).toLocaleString()} ₽!` }
