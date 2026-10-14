@@ -1,10 +1,11 @@
 // ========================================================
-// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.7.0)
+// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
-// 1. Полная интеграция с базой реплик data_dialogues.js и цензурой
+// 1. Полная замена <select> на интерактивную ленту карточек авто с тюнингом
 // 2. Двусторонний торг (покупка на P2P и продажа на площадке)
-// 3. Выбор имущества с превью, тюнингом и кнопка ДКП строго внизу
+// 3. Интеграция базы реплик data_dialogues.js с неоновой цензурой
+// 4. Кнопка «Заключить ДКП» строго внизу под тактикой торга
 // ========================================================
 
 const AppM = {
@@ -12,6 +13,7 @@ const AppM = {
     marketFilter: 'cars', // 'cars' | 'plates' | 'business' | 'housing'
     activeDialogId: null,
     selectedListingType: 'cars',
+    selectedItemIndex: null,
 
     init() {
         this.syncSalesLotBuyersToMessages();
@@ -567,7 +569,7 @@ const AppM = {
     },
 
     // ========================================================
-    // 2. ВКЛАДКА: «P2P БИРЖА» И ВЫБОР ИМУЩЕСТВА С ПРЕВЬЮ
+    // 2. ВКЛАДКА: «P2P БИРЖА»
     // ========================================================
     renderMarketScreen(container) {
         if (!container) return;
@@ -684,10 +686,14 @@ const AppM = {
         }).join('');
     },
 
+    // ========================================================
+    // ИНТЕРАКТИВНЫЙ ВЫБОР ИМУЩЕСТВА КАРТОЧКАМИ В МОДАЛКЕ P2P
+    // ========================================================
     selectP2PListingType(type) {
         this.selectedListingType = type;
+        this.selectedItemIndex = null;
+
         const elMap = { cars: 'btnP2PTypeCar', plates: 'btnP2PTypePlate', business: 'btnP2PTypeBiz', housing: 'btnP2PTypeHouse' };
-        
         ['cars', 'plates', 'business', 'housing'].forEach(t => {
             let btn = document.getElementById(elMap[t]);
             if (btn) {
@@ -695,83 +701,32 @@ const AppM = {
             }
         });
 
-        let previewBox = document.getElementById('p2pItemPreviewBox');
-        if (previewBox) {
-            previewBox.style.display = 'none';
-            previewBox.innerHTML = '';
-        }
-
-        this.populateP2PItemSelect(type);
+        this.renderP2PCardsList(type);
     },
 
-    populateP2PItemSelect(type) {
-        let sel = document.getElementById('p2pItemSelect');
-        if (!sel) return;
+    renderP2PCardsList(type) {
+        const container = document.getElementById('p2pCardsListContainer');
+        if (!container) return;
 
-        let optionsHtml = '<option value="">-- Выберите объект для продажи --</option>';
+        let html = '';
 
         if (type === 'cars' || type === 'car') {
             let garage = state.garage || [];
             if (garage.length === 0) {
-                optionsHtml = '<option value="">В гараже нет свободных авто</option>';
+                html = `
+                    <div class="glass-card p-3 text-center sub-label" style="background:#050914;">
+                        <i class="fa-solid fa-car-burst color-cyan mb-1" style="font-size:22px;"></i>
+                        <div>В гараже пока нет свободных автомобилей.</div>
+                        <div class="text-xs mt-1">Купите авто на авторынке, чтобы выставить его на биржу!</div>
+                    </div>
+                `;
             } else {
                 garage.forEach((car, idx) => {
-                    let plateStr = car.plate ? `[${car.plate}]` : '[Б/Н]';
-                    let tuningObj = car.tuning || {};
-                    let tuningCount = Object.keys(tuningObj).length;
-                    let tuningText = tuningCount > 0 ? ` (+${tuningCount} мод.)` : '';
-                    optionsHtml += `<option value="${idx}">${car.name || 'Авто'} ${plateStr} — ${car.power || 100} л.с.${tuningText}</option>`;
-                });
-            }
-        } else if (type === 'plates' || type === 'plate') {
-            let plates = state.ownedPlates || ['А777АА 77', 'О777ОО 77'];
-            plates.forEach((plate, idx) => {
-                optionsHtml += `<option value="${idx}">Госномер: ${plate}</option>`;
-            });
-        } else if (type === 'business') {
-            let bizList = state.businesses || [];
-            bizList.forEach((b, idx) => {
-                optionsHtml += `<option value="${b.id || idx}">${b.name || 'Бизнес'} (Ур. ${b.level || 1})</option>`;
-            });
-        } else if (type === 'housing') {
-            let houses = state.player?.ownedHouses || ['gsk_box'];
-            houses.forEach((h, idx) => {
-                optionsHtml += `<option value="${h}">Объект недвижимости: ${h}</option>`;
-            });
-        }
-
-        sel.innerHTML = optionsHtml;
-        if (sel.options.length > 1) {
-            sel.selectedIndex = 1;
-            this.onP2PItemSelected(sel.value);
-        }
-    },
-
-    onP2PItemSelected(val) {
-        let priceInput = document.getElementById('p2pPriceInput');
-        let previewBox = document.getElementById('p2pItemPreviewBox');
-
-        if (val === "" || val === undefined) {
-            if (previewBox) {
-                previewBox.style.display = 'none';
-                previewBox.innerHTML = '';
-            }
-            return;
-        }
-
-        if (this.selectedListingType === 'cars') {
-            let car = (state.garage || [])[parseInt(val, 10)];
-            if (car) {
-                if (priceInput) {
-                    priceInput.value = Math.round((car.price || car.marketValue || 150000) * 1.15);
-                }
-
-                if (previewBox) {
                     let rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
                     let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
                     let fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(car.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
-                    let plateStr = car.plate ? `<span class="license-plate" style="font-size:9.5px; padding:1px 5px;">${car.plate}</span>` : '<span class="sub-label">ТРАНЗИТ</span>';
-                    
+                    let plateStr = car.plate ? `<span class="license-plate" style="font-size:9px; padding:1px 5px;">${car.plate}</span>` : '<span class="sub-label">ТРАНЗИТ</span>';
+
                     let tuningObj = car.tuning || {};
                     let tuningMods = [];
                     if (tuningObj.chip) tuningMods.push(`Stage ${tuningObj.chip}`);
@@ -780,15 +735,16 @@ const AppM = {
                     if (tuningObj.turbo) tuningMods.push("Турбо");
                     let tuningDesc = tuningMods.length > 0 
                         ? `<span class="color-green font-bold">⚡ ${tuningMods.join(', ')}</span>` 
-                        : '<span class="sub-label">📦 Стоковое состояние</span>';
+                        : '<span class="sub-label">📦 Сток</span>';
 
-                    previewBox.style.display = 'block';
-                    previewBox.innerHTML = `
-                        <div class="glass-card p-2 flex-gap" style="background:#050914; border:1px solid rgba(0,242,254,0.3); align-items:center; border-radius:10px; margin-bottom:8px;">
-                            <img src="${carImg}" style="width:68px; height:46px; object-fit:cover; border-radius:6px; border:1px solid rgba(255,255,255,0.1);" onerror="this.onerror=null; this.src='${fallbackImg}';">
+                    let isSelected = this.selectedItemIndex === idx;
+
+                    html += `
+                        <div onclick="AppM.pickP2PItemCard(${idx})" id="p2pCardItem_${idx}" class="glass-card p-2 cursor-pointer flex-gap" style="align-items:center; background:#050914; border: 1.5px solid ${isSelected ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; box-shadow: ${isSelected ? '0 0 12px var(--cyan-glow)' : 'none'}; border-radius:10px;">
+                            <img src="${carImg}" style="width:72px; height:48px; min-width:72px; object-fit:cover; border-radius:6px; border:1px solid rgba(255,255,255,0.1);" onerror="this.onerror=null; this.src='${fallbackImg}';">
                             <div style="flex:1; min-width:0;">
                                 <div class="flex-between">
-                                    <b class="text-xs color-cyan" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${car.name || 'Автомобиль'}</b>
+                                    <b class="text-xs color-cyan" style="font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${car.name || 'Автомобиль'}</b>
                                     ${plateStr}
                                 </div>
                                 <div class="sub-label mt-1" style="font-size:8.5px;">Мощность: <b>${car.power || 100} л.с.</b> • Кузов: <b>${car.condition || 85}%</b></div>
@@ -796,31 +752,120 @@ const AppM = {
                             </div>
                         </div>
                     `;
-                }
+                });
             }
-        } else {
-            if (previewBox) {
-                previewBox.style.display = 'none';
-                previewBox.innerHTML = '';
+        } else if (type === 'plates' || type === 'plate') {
+            let plates = state.ownedPlates || ['А777АА 77', 'О777ОО 77'];
+            plates.forEach((plate, idx) => {
+                let isSelected = this.selectedItemIndex === idx;
+                html += `
+                    <div onclick="AppM.pickP2PItemCard(${idx})" id="p2pCardItem_${idx}" class="glass-card p-2 cursor-pointer flex-between" style="background:#050914; border: 1.5px solid ${isSelected ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; border-radius:10px;">
+                        <div>
+                            <span class="license-plate" style="font-size:12px; padding:2px 8px;">${plate}</span>
+                            <div class="sub-label mt-1" style="font-size:8.5px;">Архивный регистрационный знак РФ</div>
+                        </div>
+                        <i class="fa-solid ${isSelected ? 'fa-circle-check color-cyan' : 'fa-circle-dot'} text-xs"></i>
+                    </div>
+                `;
+            });
+        } else if (type === 'business') {
+            let bizList = (state.businesses || []).filter(b => b && b.level > 0);
+            if (bizList.length === 0) {
+                html = `<div class="glass-card p-3 text-center sub-label" style="background:#050914;">У вас пока нет купленных предприятий.</div>`;
+            } else {
+                bizList.forEach((b, idx) => {
+                    let isSelected = this.selectedItemIndex === idx;
+                    html += `
+                        <div onclick="AppM.pickP2PItemCard(${idx})" id="p2pCardItem_${idx}" class="glass-card p-2 cursor-pointer flex-between" style="background:#050914; border: 1.5px solid ${isSelected ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; border-radius:10px;">
+                            <div>
+                                <b class="text-xs color-green">${b.name || 'Бизнес'} (Ур. ${b.level || 1})</b>
+                                <div class="sub-label mt-1" style="font-size:8.5px;">Касса: +${Number((b.income || 1000) * b.level).toLocaleString()} ₽/день</div>
+                            </div>
+                            <i class="fa-solid ${isSelected ? 'fa-circle-check color-cyan' : 'fa-circle-dot'} text-xs"></i>
+                        </div>
+                    `;
+                });
             }
-            if (priceInput) {
-                if (this.selectedListingType === 'plates') priceInput.value = 500000;
-                else if (this.selectedListingType === 'business') priceInput.value = 1000000;
-                else if (this.selectedListingType === 'housing') priceInput.value = 1500000;
+        } else if (type === 'housing') {
+            let houses = state.player?.ownedHouses || [];
+            if (houses.length === 0) {
+                html = `<div class="glass-card p-3 text-center sub-label" style="background:#050914;">У вас пока нет недвижимости в собственности.</div>`;
+            } else {
+                houses.forEach((hId, idx) => {
+                    let isSelected = this.selectedItemIndex === idx;
+                    html += `
+                        <div onclick="AppM.pickP2PItemCard(${idx})" id="p2pCardItem_${idx}" class="glass-card p-2 cursor-pointer flex-between" style="background:#050914; border: 1.5px solid ${isSelected ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; border-radius:10px;">
+                            <div>
+                                <b class="text-xs color-amber">Объект: ${hId}</b>
+                                <div class="sub-label mt-1" style="font-size:8.5px;">Собственный гаражный бокс</div>
+                            </div>
+                            <i class="fa-solid ${isSelected ? 'fa-circle-check color-cyan' : 'fa-circle-dot'} text-xs"></i>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        container.innerHTML = html;
+
+        // Если есть элементы и ничего не выбрано — выбираем первый по умолчанию
+        if (this.selectedItemIndex === null) {
+            let hasItems = (type === 'cars' && (state.garage || []).length > 0) ||
+                           (type === 'plates' && (state.ownedPlates || []).length > 0) ||
+                           (type === 'business' && (state.businesses || []).some(b => b && b.level > 0)) ||
+                           (type === 'housing' && (state.player?.ownedHouses || []).length > 0);
+            if (hasItems) {
+                this.pickP2PItemCard(0);
             }
         }
     },
 
+    pickP2PItemCard(idx) {
+        this.selectedItemIndex = idx;
+        const type = this.selectedListingType;
+
+        // Обновляем визуальную подсветку рамок
+        const cards = document.querySelectorAll('[id^="p2pCardItem_"]');
+        cards.forEach(c => {
+            c.style.border = '1.5px solid rgba(255,255,255,0.08)';
+            c.style.boxShadow = 'none';
+        });
+
+        const activeCard = document.getElementById(`p2pCardItem_${idx}`);
+        if (activeCard) {
+            activeCard.style.border = '1.5px solid var(--cyan)';
+            activeCard.style.boxShadow = '0 0 14px var(--cyan-glow)';
+        }
+
+        // Автоподстановка рекомендованной цены продажи
+        const priceInput = document.getElementById('p2pPriceInput');
+        if (priceInput) {
+            if (type === 'cars') {
+                let car = (state.garage || [])[idx];
+                if (car) {
+                    priceInput.value = Math.round((car.price || car.marketValue || 150000) * 1.15);
+                }
+            } else if (type === 'plates') {
+                priceInput.value = 500000;
+            } else if (type === 'business') {
+                priceInput.value = 1000000;
+            } else if (type === 'housing') {
+                priceInput.value = 1500000;
+            }
+        }
+
+        if (typeof playSound === 'function') playSound('tick');
+    },
+
     confirmCreateP2PListing() {
-        let sel = document.getElementById('p2pItemSelect');
-        let priceInput = document.getElementById('p2pPriceInput');
-        if (!sel || !priceInput) return;
+        const priceInput = document.getElementById('p2pPriceInput');
+        if (!priceInput) return;
 
-        let val = sel.value;
         let price = parseInt(priceInput.value, 10);
+        let idx = this.selectedItemIndex;
 
-        if (val === "" || isNaN(price) || price <= 500) {
-            return showToast("Выберите объект и укажите корректную стоимость!");
+        if (idx === null || idx === undefined || isNaN(price) || price <= 500) {
+            return showToast("Выберите объект из списка и укажите цену!");
         }
 
         if (!state.p2pMarketListings) state.p2pMarketListings = [];
@@ -835,28 +880,32 @@ const AppM = {
         };
 
         if (type === 'cars') {
-            let idx = parseInt(val, 10);
             let car = state.garage[idx];
             if (!car) return showToast("Автомобиль не найден в гараже!");
 
             newListing.name = car.name;
             newListing.itemData = Object.assign({}, car);
             
+            // Удаляем машину из гаража игрока
             state.garage.splice(idx, 1);
             if (typeof renderGarage === 'function') renderGarage();
         } else if (type === 'plates') {
             let plates = state.ownedPlates || ['А777АА 77'];
-            let plateStr = plates[parseInt(val, 10)] || 'В777ВВ 77';
+            let plateStr = plates[idx] || 'В777ВВ 77';
             newListing.name = `Госномер ${plateStr}`;
             newListing.itemData = { plate: plateStr };
             
-            state.ownedPlates = plates.filter((_, i) => i !== parseInt(val, 10));
+            state.ownedPlates = plates.filter((_, i) => i !== idx);
         } else if (type === 'business') {
-            newListing.name = `Бизнес (${val})`;
-            newListing.itemData = { bizId: val, level: 2, income: 2500 };
+            let bizList = (state.businesses || []).filter(b => b && b.level > 0);
+            let b = bizList[idx];
+            newListing.name = b ? b.name : `Бизнес #${idx}`;
+            newListing.itemData = { bizId: b?.id || idx, level: b?.level || 1, income: (b?.income || 1000) * (b?.level || 1) };
         } else if (type === 'housing') {
-            newListing.name = `Недвижимость (${val})`;
-            newListing.itemData = { houseId: val, slots: 2 };
+            let houses = state.player?.ownedHouses || [];
+            let hId = houses[idx] || 'gsk_box';
+            newListing.name = `Бокс/Недвижимость (${hId})`;
+            newListing.itemData = { houseId: hId, slots: 2 };
         }
 
         state.p2pMarketListings.unshift(newListing);
