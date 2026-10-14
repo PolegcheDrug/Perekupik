@@ -1,15 +1,17 @@
 /* ========================================================
-   css/hud.css — ВЕРХНЯЯ ПАНЕЛЬ + ЭФФЕКТЫ НИКНЕЙМОВ И АВАТАРА (v3.4.0)
+   css/hud.css — ВЕРХНЯЯ ПАНЕЛЬ + ЭФФЕКТЫ НИКНЕЙМОВ И АВАТАРА (v4.0.0)
    Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-   ⭐ v3.4.0 (НОВЫЕ АУРЫ АВАТАРА):
-     - Добавлены 5 новых аур: Fire Ring, Snow Storm,
-       Lava Core, Spinning Rim, Tire Smoke.
-     - Обновлены CSS-анимации для новых аур.
-   ⭐ v3.3.0:
-     - Живой баланс рублей (пульсация, блик, проскок цифр, вспышки)
-     - Объединенная строка статов и валют с горизонтальным скроллом
-     - Ник центрирован по рамке, на всю ширину
-     - 6 ПРОДВИНУТЫХ ник-эффектов + 6 аур аватара
+   ⭐ v4.0.0 (ПЛАТНАЯ КАСТОМИЗАЦИЯ):
+     - Стили для карточек с ценами в модалке кастомизации
+     - Золотые рамки для глитч-предметов (.theme-exclusive-frame)
+     - Плашки цен (.theme-price-badge)
+     - Бейджи владения (.theme-owned-badge)
+     - Добавлены ник-эффекты: Aurora, Ember, Plasma (глитч-версии)
+     - Добавлена аура: Supernova (глитч-версия)
+     - Строка баланса валют в шапке модалки (.cosmetics-balance-bar)
+   ⭐ v3.4.0:
+     - 5 новых аур аватара
+     - 8 аур всего
    ======================================================== */
 
 /* ========================================================
@@ -140,14 +142,12 @@
   box-sizing: border-box;
 }
 
-/* ⭐ v3.1.0: user-name-row — block, чтобы работал text-align: center */
 .user-name-row {
   display: block;
   width: 100%;
   text-align: center;
 }
 
-/* ⭐ v3.1.0: ник на всю ширину рамки, по центру */
 .player-name-text {
   font-size: 14px;
   font-weight: 900;
@@ -162,7 +162,6 @@
   line-height: 1.2;
 }
 
-/* Старый lvl-badge — оставлен для совместимости (не используется в HUD) */
 .lvl-badge {
   font-size: 8.5px;
   font-weight: 900;
@@ -204,7 +203,7 @@
 }
 
 /* ========================================================
-   ⭐ v3.2.0: СТРОКА СТАТОВ И ВАЛЮТ С ГОРИЗОНТАЛЬНЫМ СКРОЛЛОМ
+   СТРОКА СТАТОВ И ВАЛЮТ С ГОРИЗОНТАЛЬНЫМ СКРОЛЛОМ
    ======================================================== */
 .user-stats-row {
   display: flex;
@@ -266,7 +265,7 @@
 }
 
 /* ========================================================
-   ⭐ v3.3.0: ЖИВОЙ БАЛАНС РУБЛЕЙ
+   ЖИВОЙ БАЛАНС РУБЛЕЙ
    ======================================================== */
 .wallet-capsule-box {
   position: relative;
@@ -455,7 +454,7 @@
 }
 
 /* ========================================================
-   ⭐ 5. НИК-ЭФФЕКТЫ — 6 ПРОДВИНУТЫХ
+   5. НИК-ЭФФЕКТЫ — 8 ПРОДВИНУТЫХ (v4.0.0)
    ======================================================== */
 
 /* ===== 5.1. HOLOGRAPHIC SHIFT ===== */
@@ -656,8 +655,58 @@
   50%      { opacity: 1;   transform: scaleX(1.05); }
 }
 
+/* ===== 5.7. QUANTUM (ГЛИТЧ-НИК) ===== */
+.nick-fx-quantum {
+  background: linear-gradient(
+    90deg,
+    #00f2fe 0%,
+    #7b2ff7 25%,
+    #ff0080 50%,
+    #7b2ff7 75%,
+    #00f2fe 100%
+  );
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: quantumNick 2s ease-in-out infinite;
+  filter:
+    drop-shadow(0 0 8px rgba(123, 47, 247, 0.85))
+    drop-shadow(0 0 14px rgba(0, 242, 254, 0.6))
+    drop-shadow(0 0 22px rgba(255, 0, 128, 0.4));
+  position: relative;
+  letter-spacing: 1.5px;
+}
+.nick-fx-quantum::before {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, #ff0080, #00f2fe, #7b2ff7);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: blur(6px);
+  opacity: 0.6;
+  animation: quantumNick 2s ease-in-out infinite reverse;
+  z-index: -1;
+}
+@keyframes quantumNick {
+  0%, 100% {
+    background-position: 0% 50%;
+    filter: drop-shadow(0 0 6px rgba(123, 47, 247, 0.7)) drop-shadow(0 0 12px rgba(0, 242, 254, 0.5));
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: drop-shadow(0 0 14px rgba(123, 47, 247, 1)) drop-shadow(0 0 24px rgba(0, 242, 254, 0.8));
+  }
+}
+
 /* ========================================================
-   ⭐ v3.4.0: 8 АУР АВАТАРА — ПРОДВИНУТЫЕ
+   6. АУРЫ АВАТАРА — 10 ПРОДВИНУТЫХ (v4.0.0)
    ======================================================== */
 
 /* ===== 6.1. FIRE RING ===== */
@@ -1017,8 +1066,80 @@
   100% { transform: rotate(360deg) scale(1); }
 }
 
+/* ===== 6.9. SUPERNOVA (ГЛИТЧ-АУРА) ===== */
+.avatar-fx-supernova .avatar-fx-glow {
+  background: radial-gradient(circle,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(0, 242, 254, 0.85) 25%,
+    rgba(192, 132, 252, 0.6) 55%,
+    rgba(255, 0, 128, 0.3) 80%,
+    transparent 100%);
+  animation: supernovaPulse 2s ease-in-out infinite;
+  opacity: 1;
+  filter: blur(8px);
+}
+.avatar-fx-supernova::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0%,
+    rgba(0, 242, 254, 0.9) 8%,
+    transparent 15%,
+    rgba(255, 0, 128, 0.9) 22%,
+    transparent 30%,
+    rgba(192, 132, 252, 0.9) 38%,
+    transparent 45%,
+    rgba(0, 242, 254, 0.9) 52%,
+    transparent 60%,
+    rgba(255, 0, 128, 0.9) 68%,
+    transparent 75%,
+    rgba(192, 132, 252, 0.9) 82%,
+    transparent 90%,
+    rgba(0, 242, 254, 0.9) 100%
+  );
+  animation: supernovaRays 3s linear infinite;
+  filter: blur(5px) brightness(1.5);
+  opacity: 0.9;
+  z-index: 1;
+}
+.avatar-fx-supernova::after {
+  content: '💫';
+  position: absolute;
+  font-size: 16px;
+  top: -14px;
+  right: -8px;
+  animation: supernovaStar 1.2s infinite alternate ease-in-out;
+  filter: drop-shadow(0 0 8px #00f2fe) drop-shadow(0 0 14px #ff0080);
+  z-index: 5;
+}
+@keyframes supernovaPulse {
+  0%, 100% {
+    transform: scale(0.94);
+    opacity: 0.85;
+    filter: blur(7px) brightness(1);
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+    filter: blur(11px) brightness(1.4);
+  }
+}
+@keyframes supernovaRays {
+  0%   { transform: rotate(0deg) scale(1); }
+  50%  { transform: rotate(180deg) scale(1.12); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes supernovaStar {
+  0%   { transform: scale(0.85) rotate(-15deg); opacity: 0.85; }
+  100% { transform: scale(1.25) rotate(15deg); opacity: 1; }
+}
+
 /* ========================================================
-   ⭐ 7. ПРЕВЬЮ-БОКСЫ ДЛЯ МОДАЛКИ КАСТОМИЗАЦИИ
+   7. ПРЕВЬЮ-БОКСЫ ДЛЯ МОДАЛКИ КАСТОМИЗАЦИИ
    ======================================================== */
 
 .nick-preview-box {
@@ -1067,6 +1188,210 @@
 }
 
 /* ========================================================
+   ⭐ v4.0.0: СТИЛИ ДЛЯ ПЛАТНОЙ КАСТОМИЗАЦИИ
+   ======================================================== */
+
+/* Шапка модалки с балансом валют */
+.cosmetics-balance-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(5, 9, 20, 0.95), rgba(15, 23, 42, 0.9));
+  border-radius: 10px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.15), inset 0 0 8px rgba(255, 215, 0, 0.05);
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.cosmetics-balance-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+
+.cosmetics-balance-item b {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+/* Плашка цены на карточке товара */
+.theme-price-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  background: rgba(0, 230, 118, 0.15);
+  color: var(--green, #00e676);
+  border: 1px solid rgba(0, 230, 118, 0.4);
+  white-space: nowrap;
+}
+
+.theme-price-badge.price-stars {
+  background: rgba(0, 242, 254, 0.15);
+  color: var(--cyan, #00f2fe);
+  border-color: rgba(0, 242, 254, 0.4);
+}
+
+.theme-price-badge.price-tickets {
+  background: rgba(255, 215, 0, 0.18);
+  color: #ffd700;
+  border-color: rgba(255, 215, 0, 0.55);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+
+.theme-price-badge.price-mixed {
+  background: linear-gradient(135deg, rgba(0, 230, 118, 0.15), rgba(0, 242, 254, 0.15));
+  color: #a7f3d0;
+  border-color: rgba(0, 230, 118, 0.35);
+}
+
+/* Бейдж «Куплено / Активно» */
+.theme-owned-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 7.5px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.theme-owned-badge.owned-active {
+  background: rgba(0, 230, 118, 0.2);
+  color: var(--green, #00e676);
+  border: 1px solid rgba(0, 230, 118, 0.5);
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.3);
+}
+
+.theme-owned-badge.owned-inactive {
+  background: rgba(0, 242, 254, 0.12);
+  color: var(--cyan, #00f2fe);
+  border: 1px solid rgba(0, 242, 254, 0.4);
+}
+
+.theme-owned-badge.locked-level {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+/* Золотая рамка для глитч-эксклюзивов */
+.theme-exclusive-frame {
+  position: relative;
+  border: 1.5px solid #ffd700 !important;
+  box-shadow:
+    0 0 12px rgba(255, 215, 0, 0.4),
+    inset 0 0 8px rgba(255, 215, 0, 0.08) !important;
+  animation: exclusivePulse 2.5s ease-in-out infinite;
+}
+
+.theme-exclusive-frame::before {
+  content: '🎰';
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 12px;
+  filter: drop-shadow(0 0 4px #ffd700);
+  z-index: 10;
+  animation: exclusiveGlimmer 2s ease-in-out infinite;
+}
+
+@keyframes exclusivePulse {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(255, 215, 0, 0.35),
+      inset 0 0 6px rgba(255, 215, 0, 0.06);
+    border-color: rgba(255, 215, 0, 0.85);
+  }
+  50% {
+    box-shadow:
+      0 0 20px rgba(255, 215, 0, 0.65),
+      inset 0 0 12px rgba(255, 215, 0, 0.15);
+    border-color: #ffd700;
+  }
+}
+
+@keyframes exclusiveGlimmer {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.9; }
+  50%      { transform: scale(1.15) rotate(-10deg); opacity: 1; }
+}
+
+/* Кнопка покупки в карточке */
+.theme-buy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.1s ease, filter 0.15s ease;
+  background: linear-gradient(135deg, var(--green, #00e676), #059669);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.4);
+}
+.theme-buy-btn:active { transform: scale(0.94); }
+.theme-buy-btn:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: #64748b;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.theme-buy-btn.btn-tickets {
+  background: linear-gradient(135deg, #ffd700, #f59e0b);
+  color: #000;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+}
+.theme-buy-btn.btn-apply {
+  background: linear-gradient(135deg, var(--cyan, #00f2fe), #0284c7);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
+}
+
+/* Карточка косметики в сетке */
+.cosmetic-tile {
+  background: rgba(14, 22, 38, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  box-sizing: border-box;
+}
+.cosmetic-tile:hover {
+  background: rgba(20, 32, 54, 0.95);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.cosmetic-tile.selected {
+  border-color: var(--cyan, #00f2fe);
+  background: rgba(0, 242, 254, 0.08);
+  box-shadow: 0 0 12px var(--cyan-glow, rgba(0, 242, 254, 0.4));
+}
+
+/* ========================================================
    8. АДАПТИВ
    ======================================================== */
 @media (max-width: 380px) {
@@ -1077,4 +1402,6 @@
   .hud-btn { font-size: 9px; padding: 0 6px; }
   .need-text { font-size: 8.5px; min-width: 22px; }
   .nick-preview-text { font-size: 17px; }
+  .cosmetics-balance-item { font-size: 9px; }
+  .theme-buy-btn { font-size: 8px; padding: 3px 8px; }
 }

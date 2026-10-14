@@ -1,6 +1,18 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v1.5.0)
+// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v2.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.0.0 (КОСМЕТИКА В СУПЕРВИЛСПИНЕ):
+//   - ФИКС: обработка p3.type === 'cosmetic' — теперь
+//     СуперВилспин может выдать тему, ник-эффект, ауру
+//     или титул из ThemeManager.
+//   - Дубликаты автоматически конвертируются в Stars
+//     (10-30 ⭐ в зависимости от стоимости).
+//   - Эксклюзивные (глитч) предметы помечены в UI
+//     золотой рамкой и надписью 🎰.
+//   - Показ названия и эмодзи выпавшей косметики в
+//     reelExclusives и в финальном вердикте.
+//   - Fallback: если ThemeManager не загружен —
+//     выдаётся 15 ⭐ как компенсация.
 // ⭐ v1.5.0 (ГАЛЕРЕЯ BARN-ФАЙНДОВ):
 //   - ФИКС: при выпадении машины из СуперВилспина
 //     сначала ищем шаблон в BARN_CARS_DATABASE
@@ -9,10 +21,6 @@
 //     images (10+ фото) из assets/cars/barn/<model>/.
 //   - Главная картинка выбирается случайно из галереи
 //     ОДИН РАЗ и фиксируется в car.img.
-//   - Fallback по категории (getCategoryFallback).
-// ⭐ v1.4.0:
-//   - Исправлена галерея машин из СуперВилспина через
-//     findCarTemplateByName + getCarImageList.
 // ⭐ v1.3.0:
 //   - Цена SuperSpin из WHEEL_CONFIG (costCash + costStars).
 //   - Убран хардкод 150000 ₽.
@@ -383,7 +391,7 @@ const PhoneMedia = {
                     <span class="tag-badge bg-tag-amber">ВЫДАЁТ 3 ПРИЗА СРАЗУ</span>
                 </div>
                 <div class="sub-label" style="font-size:9.5px;">
-                    Каждое вращение активирует <b>все 3 слота одновременно</b>. Все выигранные призы и машины доставляются на вашу <b>Почту</b>!
+                    Каждое вращение активирует <b>все 3 слота одновременно</b>. Все выигранные призы, машины и <b>косметика профиля</b> доставляются на вашу <b>Почту</b> или активируются сразу!
                 </div>
             </div>
 
@@ -424,6 +432,9 @@ const PhoneMedia = {
             <div class="glass-card p-2 mt-2 text-center" style="background:#090e18;">
                 <div class="sub-label" style="font-size:8.5px;">
                     Курс: 1 ⭐ = ${starRate.toLocaleString()} ₽ • ${cfg.costStars} ⭐ = ${starsRubValue} ₽
+                </div>
+                <div class="sub-label" style="font-size:8px; color:#ffd700; margin-top:3px;">
+                    🎰 = глитч-эксклюзив (только за билеты в каталоге стиля)
                 </div>
             </div>
         `;
@@ -550,8 +561,14 @@ const PhoneMedia = {
                 setTxt('reelName2', r2.label || "Валюта");
             }
             if (spinCount <= 24) {
-                setTxt('reelEmoji3', r3.emoji || "⭐");
-                setTxt('reelName3', r3.label || "Эксклюзив");
+                // ⭐ v2.0.0: если приз — косметика, показываем её label и emoji
+                if (r3.type === 'cosmetic') {
+                    setTxt('reelEmoji3', r3.emoji || "🎨");
+                    setTxt('reelName3', r3.label || "Косметика");
+                } else {
+                    setTxt('reelEmoji3', r3.emoji || "⭐");
+                    setTxt('reelName3', r3.label || "Эксклюзив");
+                }
             }
 
             if (spinCount === 13) {
@@ -580,13 +597,21 @@ const PhoneMedia = {
 
             if (spinCount >= 25) {
                 clearInterval(spinInterval);
-                setTxt('reelEmoji3', prize3.emoji || "⭐");
-                setTxt('reelName3', prize3.label || "Эксклюзив");
+                // ⭐ v2.0.0: показываем финальный приз барабана 3
+                if (prize3.type === 'cosmetic') {
+                    setTxt('reelEmoji3', prize3.emoji || "🎨");
+                    setTxt('reelName3', prize3.label || "Косметика");
+                } else {
+                    setTxt('reelEmoji3', prize3.emoji || "⭐");
+                    setTxt('reelName3', prize3.label || "Эксклюзив");
+                }
                 const c3 = document.getElementById('fortuneReelCard3');
                 if (c3) {
                     c3.classList.remove('reel-spinning-anim');
-                    c3.style.borderColor = "var(--purple)";
-                    c3.style.boxShadow = "0 0 16px var(--purple-glow)";
+                    c3.style.borderColor = prize3.isExclusive ? "#ffd700" : "var(--purple)";
+                    c3.style.boxShadow = prize3.isExclusive
+                        ? "0 0 20px rgba(255,215,0,0.7)"
+                        : "0 0 16px var(--purple-glow)";
                 }
 
                 this.isSuperSpinning = false;
@@ -597,32 +622,28 @@ const PhoneMedia = {
 
     // ========================================================
     // ⭐ v1.5.0: ГАЛЕРЕЯ МАШИН ИЗ BARN_CARS_DATABASE
+    // ⭐ v2.0.0: обработка p3.type === 'cosmetic'
     // ========================================================
     claimAllThreePrizes(p1, p2, p3) {
         let rewardTokens = [];
 
         // ═══ 1. БАРАБАН 1: ТЕХНИКА / ПРИБОРЫ / ТАЛОНЫ / ОПЫТ ═══
         if (p1.type === 'car') {
-            // ⭐ v1.5.0: ищем шаблон в BARN_CARS_DATABASE по barnId или по имени
             let matchedTemplate = null;
 
-            // 1.1. Прямой поиск по barnId
             if (p1.barnId && typeof BARN_CARS_DATABASE !== 'undefined' && Array.isArray(BARN_CARS_DATABASE)) {
                 matchedTemplate = BARN_CARS_DATABASE.find(c => c && c.id === p1.barnId) || null;
             }
 
-            // 1.2. Fallback: поиск по имени в BARN_CARS_DATABASE
             if (!matchedTemplate && typeof BARN_CARS_DATABASE !== 'undefined' && Array.isArray(BARN_CARS_DATABASE)) {
                 const cleanName = String(p1.name || '').trim().toLowerCase();
                 matchedTemplate = BARN_CARS_DATABASE.find(c => c && c.name && c.name.toLowerCase() === cleanName) || null;
             }
 
-            // 1.3. Fallback: поиск в CAR_DATABASE (общая база рынка)
             if (!matchedTemplate && typeof findCarTemplateByName === 'function') {
                 matchedTemplate = findCarTemplateByName(p1.name);
             }
 
-            // ⭐ v1.5.0: галерея из найденного шаблона
             let carGallery = [];
             if (matchedTemplate && typeof getCarImageList === 'function') {
                 carGallery = getCarImageList(matchedTemplate);
@@ -631,7 +652,6 @@ const PhoneMedia = {
                 carGallery = [...matchedTemplate.images];
             }
 
-            // ⭐ v1.5.0: главное фото — случайное из галереи и ФИКСИРУЕТСЯ
             let mainImg = '';
             if (carGallery.length > 0) {
                 const randIdx = Math.floor(Math.random() * carGallery.length);
@@ -642,12 +662,10 @@ const PhoneMedia = {
                 mainImg = "assets/cars/economy/2101/vaz-2101.jpg";
             }
 
-            // ⭐ v1.5.0: фолбек по категории
             const fallbackImg = (typeof getCategoryFallback === 'function')
                 ? getCategoryFallback(p1.category || 'economy')
                 : (matchedTemplate?.fallback || "assets/cars/economy/2101/vaz-2101.jpg");
 
-            // Если галерея пустая — хотя бы [mainImg]
             if (carGallery.length === 0) {
                 carGallery = [mainImg];
             }
@@ -662,12 +680,9 @@ const PhoneMedia = {
                 basePrice: p1.basePrice || 150000,
                 price: p1.basePrice || 150000,
                 marketValue: Math.round((p1.basePrice || 150000) * 1.15),
-
-                // ⭐ v1.5.0: галерея + главное фото (ФИКСИРУЕТСЯ)
                 img: mainImg,
                 images: carGallery,
                 fallback: fallbackImg,
-
                 plate: wonPlate,
                 customPlate: wonPlate,
                 condition: 85,
@@ -860,7 +875,7 @@ const PhoneMedia = {
             });
         }
 
-        // ═══ 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ ═══
+        // ═══ 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ + КОСМЕТИКА ═══
         if (p3.type === 'stars') {
             if (typeof window.pushToMailbox === 'function') {
                 window.pushToMailbox({
@@ -934,6 +949,76 @@ const PhoneMedia = {
                 rarity: "token-purple"
             });
         }
+        // ⭐ v2.0.0: ОБРАБОТКА КОСМЕТИКИ
+        else if (p3.type === 'cosmetic') {
+            const category = p3.category;
+            const itemId = p3.itemId;
+            const emoji = p3.emoji || '🎨';
+            const label = p3.label || 'Косметика';
+            const isExclusive = !!p3.isExclusive;
+
+            if (typeof ThemeManager !== 'undefined' && typeof ThemeManager.grantCosmeticFromSpin === 'function') {
+                const res = ThemeManager.grantCosmeticFromSpin(category, itemId);
+
+                if (res && res.success) {
+                    if (res.convertedToStars > 0) {
+                        // Дубликат → Stars
+                        if (typeof window.pushToMailbox === 'function') {
+                            window.pushToMailbox({
+                                type: "stars",
+                                amount: res.convertedToStars,
+                                title: `Дубликат: ${res.item.name}`,
+                                sender: "Клуб Фортуны",
+                                desc: `Этот предмет у вас уже был в коллекции. Мы конвертировали награду в Stars.`,
+                                badge: "STARS"
+                            });
+                        }
+                        rewardTokens.push({
+                            icon: "💵",
+                            title: "Дубликат → Stars",
+                            value: `+${res.convertedToStars} ⭐`,
+                            desc: `${res.item.name} уже был в коллекции`,
+                            rarity: "token-amber"
+                        });
+                    } else {
+                        // Новый предмет — активирован сразу
+                        rewardTokens.push({
+                            icon: emoji,
+                            title: isExclusive ? "🎰 ГЛИТЧ РАЗБЛОКИРОВАН!" : "Косметика разблокирована!",
+                            value: res.item.name,
+                            desc: "Открывается в «Стиле Перекупа» (телефон → Скин)",
+                            rarity: isExclusive ? "token-amber" : "token-purple"
+                        });
+
+                        if (typeof showToast === 'function') {
+                            showToast(`🎨 ${res.item.name} разблокирован!`);
+                        }
+                    }
+                } else {
+                    // Что-то пошло не так — компенсация
+                    const comp = 15;
+                    state.player.stars = (state.player.stars || 0) + comp;
+                    rewardTokens.push({
+                        icon: "⭐",
+                        title: "Компенсация",
+                        value: `+${comp} ⭐`,
+                        desc: "Косметика не найдена, выдана компенсация",
+                        rarity: "token-amber"
+                    });
+                }
+            } else {
+                // ThemeManager не загружен — компенсация
+                const comp = 15;
+                state.player.stars = (state.player.stars || 0) + comp;
+                rewardTokens.push({
+                    icon: "⭐",
+                    title: "Компенсация (нет ThemeManager)",
+                    value: `+${comp} ⭐`,
+                    desc: "Косметика недоступна, выдана компенсация",
+                    rarity: "token-amber"
+                });
+            }
+        }
 
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -943,7 +1028,7 @@ const PhoneMedia = {
         if (typeof openVerdictModal === 'function') {
             openVerdictModal(
                 "ТРОЙНОЙ КУШ СУПЕРВИЛСПИНА! 🎰",
-                "Все 3 награды успешно отправлены в приложение «Почта & Склад»:\nПерейдите в телефон, чтобы распаковать посылки!",
+                "Все 3 награды успешно выданы: машины, ресурсы и деньги — в Почте, косметика активирована в профиле!",
                 true,
                 null,
                 null,
@@ -1218,4 +1303,4 @@ const PhoneMedia = {
 
 window.PhoneMedia = PhoneMedia;
 
-console.log('[🎰 phone-media v1.5.0] Галерея из BARN_CARS_DATABASE по barnId + фиксация главного фото ✓');
+console.log('[🎰 phone-media v2.0.0] СуперВилспин с косметикой + дубликаты → Stars + глитч-подсветка ✓');

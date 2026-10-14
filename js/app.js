@@ -1,6 +1,11 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v2.6.0)
+// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v2.7.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.7.0 (ПЛАТНАЯ КАСТОМИЗАЦИЯ ПРОФИЛЯ):
+//   - DEFAULT_STATE.player.ownedThemes = ['cyber_neon']
+//   - Миграция ownedThemes в sanitizeState
+//   - Билет СуперВилспина раз в 7 дней (streakDay)
+//   - Обновлены патчноуты под v3.0.0 кастомизацию
 // ⭐ v2.6.0:
 //   - УДАЛЁН дубликат window.pushToMailbox (перенесён
 //     в phone-post.js, единая каноническая версия).
@@ -16,14 +21,14 @@
 //   - isPcDevMode() — утилита проверки режима.
 // ========================================================
 
-window.CURRENT_GAME_VERSION = "v2.1.0";
+window.CURRENT_GAME_VERSION = "v2.2.0";
 
 let tgUserId = null;
 let tgUserData = null;
 let isPcDevSession = false;
 
-const SAVE_VERSION = 10;
-let SAVE_KEY_PREFIX = "perekup_v10_";
+const SAVE_VERSION = 11;
+let SAVE_KEY_PREFIX = "perekup_v11_";
 
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
@@ -405,7 +410,7 @@ function dismissPatchNotesModal() {
 
 // ========================================================
 // 5. ДЕФОЛТНЫЙ STATE
-// ⭐ v2.6.0: добавлены interior, housingRentDue
+// ⭐ v2.7.0: добавлены ownedThemes для платной кастомизации
 // ========================================================
 const DEFAULT_STATE = {
     lang: 'ru',
@@ -430,15 +435,17 @@ const DEFAULT_STATE = {
         diet: 'shaurma',
         housingId: 'trailer',
         housingType: 'rent',
-        housingRentDue: 0,          // ⭐ v2.6.0
+        housingRentDue: 0,
         ownedHouses: [],
         mortgage: null,
-        interior: {},                // ⭐ v2.6.0
-        hudColorId: 'lightning',
+        interior: {},
+        hudColorId: 'cyber_neon',
         themePresetId: 'default',
         customHexColor: null,
         nickEffect: 'none',
         avatarEffect: 'none',
+        // ⭐ v2.7.0: КОСМЕТИКА — ТРЕКЕРЫ ВЛАДЕНИЯ
+        ownedThemes: ['cyber_neon'],
         ownedNickEffects: ['none'],
         ownedAvatarEffects: ['none'],
         ownedTitles: ['cash_buyer'],
@@ -678,7 +685,7 @@ function migrateSave(parsed) {
     const currentVersion = parsed.__saveVersion || 9;
 
     if (currentVersion < 10) {
-        console.log(`[Migration] v${currentVersion} → v${SAVE_VERSION}`);
+        console.log(`[Migration] v${currentVersion} → v10`);
         if (parsed.player && typeof parsed.player === 'object') {
             if (parsed.player.garageSlots !== undefined && parsed.player.garageSlots > 0) {
                 const oldBase = parsed.player.baseSlots || 2;
@@ -696,21 +703,10 @@ function migrateSave(parsed) {
             if (!Array.isArray(parsed.player.ownedBizSkins)) parsed.player.ownedBizSkins = [];
             if (!Array.isArray(parsed.player.ownedBizStickers)) parsed.player.ownedBizStickers = [];
 
-            // ⭐ v2.6.0: миграция новых полей
             if (!parsed.player.interior || typeof parsed.player.interior !== 'object') parsed.player.interior = {};
             if (typeof parsed.player.housingRentDue !== 'number') parsed.player.housingRentDue = 0;
             if (!Array.isArray(parsed.player.ownedHouses)) parsed.player.ownedHouses = [];
             if (parsed.player.mortgage === undefined) parsed.player.mortgage = null;
-
-            if (Array.isArray(parsed.player.phoneMessages) && Array.isArray(parsed.salesLot)) {
-                const validLotIndices = new Set();
-                parsed.salesLot.forEach((_, i) => validLotIndices.add(i));
-                parsed.player.phoneMessages = parsed.player.phoneMessages.filter(m => {
-                    if (!m) return false;
-                    if (m.category === 'buyers' && m.carIndex !== undefined) return validLotIndices.has(m.carIndex);
-                    return true;
-                });
-            }
         }
         if (!Array.isArray(parsed.mEventsFeed)) parsed.mEventsFeed = [];
         if (!parsed.businessWorkshop || typeof parsed.businessWorkshop !== 'object') {
@@ -721,6 +717,27 @@ function migrateSave(parsed) {
         }
         if (!Array.isArray(parsed.businessFleet)) parsed.businessFleet = [];
         parsed.marketFeedVersion = (parsed.marketFeedVersion || 0) + 1;
+    }
+
+    // ⭐ v2.7.0: миграция v10 → v11
+    if (currentVersion < 11) {
+        console.log(`[Migration] v${currentVersion} → v11 (косметика)`);
+        if (parsed.player && typeof parsed.player === 'object') {
+            // Автовыдача всех имеющихся тем как купленных
+            if (!Array.isArray(parsed.player.ownedThemes)) {
+                parsed.player.ownedThemes = ['cyber_neon'];
+                if (parsed.player.hudColorId && parsed.player.hudColorId !== 'cyber_neon') {
+                    parsed.player.ownedThemes.push(parsed.player.hudColorId);
+                }
+                if (parsed.player.themePresetId === 'cyber_black_neo') {
+                    parsed.player.ownedThemes.push('cyber_black_neo');
+                }
+            }
+            if (!Array.isArray(parsed.player.ownedNickEffects)) parsed.player.ownedNickEffects = ['none'];
+            if (!Array.isArray(parsed.player.ownedAvatarEffects)) parsed.player.ownedAvatarEffects = ['none'];
+            if (!Array.isArray(parsed.player.ownedTitles)) parsed.player.ownedTitles = ['cash_buyer'];
+            if (typeof parsed.player.streakDay !== 'number') parsed.player.streakDay = 1;
+        }
     }
 
     parsed.__saveVersion = SAVE_VERSION;
@@ -869,6 +886,7 @@ function loadFromLocalStorage() {
     if (!tgUserId) return false;
     try {
         let saved = localStorage.getItem("perekup_save_" + tgUserId);
+        if (!saved) saved = localStorage.getItem("perekup_v10_" + tgUserId);
         if (!saved) saved = localStorage.getItem(SAVE_KEY_PREFIX + tgUserId);
 
         if (saved) {
@@ -907,11 +925,16 @@ function applyLoadedState(parsed) {
         if (parsed.player.phoneWidgetsCollapsed) state.player.phoneWidgetsCollapsed = { ...DEFAULT_STATE.player.phoneWidgetsCollapsed, ...parsed.player.phoneWidgetsCollapsed };
         if (parsed.player.club) state.player.club = parsed.player.club;
 
-        // ⭐ v2.6.0: защита от null для новых полей
         if (!state.player.interior || typeof state.player.interior !== 'object') state.player.interior = {};
         if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
         if (typeof state.player.housingRentDue !== 'number') state.player.housingRentDue = 0;
         if (state.player.mortgage === undefined) state.player.mortgage = null;
+
+        // ⭐ v2.7.0: косметика
+        if (!Array.isArray(state.player.ownedThemes)) state.player.ownedThemes = ['cyber_neon'];
+        if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
+        if (!Array.isArray(state.player.ownedAvatarEffects)) state.player.ownedAvatarEffects = ['none'];
+        if (!Array.isArray(state.player.ownedTitles)) state.player.ownedTitles = ['cash_buyer'];
 
         if (!Array.isArray(state.player.phoneMessages)) state.player.phoneMessages = [];
         if (!Array.isArray(state.player.dailyQuests)) state.player.dailyQuests = [];
@@ -963,7 +986,7 @@ function sanitizeState() {
     if (typeof state.player.expressTickets !== 'number') state.player.expressTickets = state.player.maxExpressTickets;
     if (typeof state.player.cash !== 'number' || state.player.cash < 0) state.player.cash = 150000;
     if (typeof state.player.stars !== 'number' || state.player.stars < 0) state.player.stars = 15;
-    if (!state.player.hudColorId) state.player.hudColorId = 'lightning';
+    if (!state.player.hudColorId) state.player.hudColorId = 'cyber_neon';
     if (!state.player.soundProfile) state.player.soundProfile = 'cyber';
     if (!state.player.traderTitle) state.player.traderTitle = "Быстрый выкуп за кэш 💸";
     if (!Array.isArray(state.player.mailbox)) state.player.mailbox = [];
@@ -976,13 +999,32 @@ function sanitizeState() {
     if (!state.player.dailyQuests || state.player.dailyQuests.length === 0) refreshDailyQuestsList();
     if (!state.player.mEventReactions || typeof state.player.mEventReactions !== 'object') state.player.mEventReactions = {};
 
-    // ⭐ v2.6.0: защита новых полей
     if (!state.player.interior || typeof state.player.interior !== 'object') state.player.interior = {};
     if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
     if (typeof state.player.housingRentDue !== 'number') state.player.housingRentDue = 0;
     if (state.player.mortgage === undefined) state.player.mortgage = null;
     if (!state.player.housingId) state.player.housingId = 'trailer';
     if (!state.player.housingType) state.player.housingType = 'own';
+
+    // ⭐ v2.7.0: КРИТИЧЕСКАЯ миграция ownedThemes
+    if (!Array.isArray(state.player.ownedThemes)) {
+        state.player.ownedThemes = ['cyber_neon'];
+        if (state.player.hudColorId && state.player.hudColorId !== 'cyber_neon') {
+            state.player.ownedThemes.push(state.player.hudColorId);
+        }
+        if (state.player.themePresetId === 'cyber_black_neo') {
+            state.player.ownedThemes.push('cyber_black_neo');
+        }
+        console.log('[Sanitize] ownedThemes создан:', state.player.ownedThemes);
+    }
+    if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
+    if (!Array.isArray(state.player.ownedAvatarEffects)) state.player.ownedAvatarEffects = ['none'];
+    if (!Array.isArray(state.player.ownedTitles)) state.player.ownedTitles = ['cash_buyer'];
+
+    // ⭐ v2.7.0: streakDay для билета раз в 7 дней
+    if (typeof state.player.streakDay !== 'number' || state.player.streakDay < 0) {
+        state.player.streakDay = 1;
+    }
 
     if (!state.businessWorkshop) state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
     if (!state.businessStaff) state.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
@@ -1043,12 +1085,11 @@ function saveState() {
         console.warn("[Save] Ошибка сохранения:", e);
     }
 
-    // ⭐ v2.6.0: защита от отсутствия updateHeaderUI
     if (typeof updateHeaderUI === 'function') updateHeaderUI();
 }
 
 // ========================================================
-// ⭐ v2.6.0: РЕМОНТ: ПОЛНЫЙ СБРОС ПРОГРЕССА
+// РЕМОНТ: ПОЛНЫЙ СБРОС ПРОГРЕССА
 // ========================================================
 function resetGameData() {
     if (!confirm("⚠️ ВНИМАНИЕ! Это полностью сотрёт весь прогресс: гараж, бизнес, деньги, уровень, купленные скины и ВСЁ остальное.\n\nПрогресс будет удалён и из локальной памяти, и из облака Firestore.\n\nПродолжить?")) {
@@ -1065,6 +1106,7 @@ function resetGameData() {
         const keysToRemove = new Set();
 
         keysToRemove.add("perekup_save_" + tgUserId);
+        keysToRemove.add("perekup_v10_" + tgUserId);
         keysToRemove.add(SAVE_KEY_PREFIX + tgUserId);
         keysToRemove.add("perekup_save_guest_777");
         keysToRemove.add("perekup_save_777");
@@ -1075,7 +1117,7 @@ function resetGameData() {
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (!key) continue;
-            if (key.includes('perekup') || key.includes('perekoop') || key.includes('perekupik') || key.startsWith('perekup_v10_')) {
+            if (key.includes('perekup') || key.includes('perekoop') || key.includes('perekupik') || key.startsWith('perekup_v')) {
                 keysToRemove.add(key);
             }
         }
@@ -1236,6 +1278,19 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.expressTickets = state.player.maxExpressTickets || 25;
     state.player.consecutiveRaces = 0;
 
+    // ⭐ v2.7.0: билет СуперВилспина раз в 7 дней за вход
+    state.player.streakDay = (state.player.streakDay || 0) + 1;
+    if (state.player.streakDay >= 7) {
+        state.player.streakDay = 0;
+        state.player.superSpinTickets = (state.player.superSpinTickets || 0) + 1;
+        if (typeof showToast === 'function') {
+            setTimeout(() => showToast("🎟️ 7-дневный стрик! +1 билет СуперВилспина"), 3200);
+        }
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction("Бонус за 7-дневный стрик: +1 билет", 0, true);
+        }
+    }
+
     if (state.player.loanDebt > 0) state.player.loanDebt = Math.round(state.player.loanDebt * 1.02);
 
     if (Array.isArray(state.player.bankDeposits)) {
@@ -1251,7 +1306,7 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
     state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
 
-    // ⭐ v2.6.0: ежедневный mood-бонус жилья
+    // Ежедневный mood-бонус жилья
     try {
         if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST) && state.player?.housingId) {
             const activeHouse = HOUSING_LIST.find(h => h.id === state.player.housingId);
@@ -1320,7 +1375,7 @@ function executeDayCycleMidnight(currentDateObj) {
         }
     } catch (e) {}
 
-    // ⭐ v2.6.0: ежедневная аренда жилья
+    // Ежедневная аренда жилья
     try {
         if (state.player.housingType === 'rent' && state.player.housingRentDue > 0) {
             const curDay = state.player.day || 1;
@@ -1339,7 +1394,6 @@ function executeDayCycleMidnight(currentDateObj) {
                             setTimeout(() => showToast(`🏠 Списана аренда жилья: -${rent.toLocaleString()} ₽`), 2800);
                         }
                     } else {
-                        // Денег нет — переезд в бытовку
                         state.player.housingId = 'trailer';
                         state.player.housingType = 'own';
                         if (typeof showToast === 'function') {
@@ -1892,4 +1946,4 @@ window.migrateSave = migrateSave;
 window.executeDayCycleMidnight = executeDayCycleMidnight;
 window.SAVE_VERSION = SAVE_VERSION;
 
-console.log('[💠 app.js v2.6.0] pushToMailbox удалён + mood-бонус жилья + защита sanitize ✓');
+console.log('[💠 app.js v2.7.0] ownedThemes + билет раз в 7 дней + миграция косметики ✓');
