@@ -1,11 +1,8 @@
 // ========================================================
-// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.8.5)
+// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO» (v3.9.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
-// 1. Интерактивная лента карточек авто вместо select
-// 2. Двусторонний торг (покупка на P2P и продажа на площадке)
-// 3. Интеграция базы реплик data_dialogues.js с неоновой цензурой
-// 4. Кнопка «Заключить ДКП» строго внизу под тактикой торга
+// Полная поддержка живых карточек кастомизации (скины, ауры,
+// стикеры дохода, анимированные названия и передача прав)
 // ========================================================
 
 const AppM = {
@@ -126,7 +123,7 @@ const AppM = {
                 <div class="glass-card text-center sub-label py-6">
                     <i class="fa-solid fa-comment-slash color-cyan mb-2" style="font-size:26px;"></i>
                     <div>Входящих сообщений пока нет.</div>
-                    <div class="text-xs mt-1">Выставьте машину на продажу или дождитесь онлайн-покупателя!</div>
+                    <div class="text-xs mt-1">Выставьте имущество на биржу или дождитесь покупателя!</div>
                 </div>
             `;
         }
@@ -195,9 +192,6 @@ const AppM = {
         }).join('');
     },
 
-    // --------------------------------------------------------
-    // ДИАЛОГ СДЕЛКИ: ДВУСТОРОННИЙ ТОРГ И КНОПКА ДКП ВНИЗУ
-    // --------------------------------------------------------
     renderConversationScreen(container) {
         let msg = (state.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
         if (!msg) {
@@ -308,7 +302,6 @@ const AppM = {
             </div>
 
             <div class="phone-app-body" style="display:flex; flex-direction:column; height: calc(100% - 46px); min-height: 0; padding: 4px 6px 8px 6px; gap: 6px;">
-                <!-- ВЕРХНЯЯ КАРТОЧКА СВОДКИ ЛОТА -->
                 <div class="glass-card p-2" style="border: 1.5px solid var(--green); background: #060a14; margin-bottom: 0; flex-shrink: 0;">
                     <div class="deal-car-preview-card" style="height:56px; min-height:56px; padding: 4px 8px;">
                         <img src="${carImg}" class="deal-car-thumb" style="width:68px; height:46px; min-width:68px; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
@@ -329,12 +322,10 @@ const AppM = {
                     ${benefitHtml}
                 </div>
 
-                <!-- ОКНО ПЕРЕПИСКИ: ГИБКИЙ СКРОЛЛ -->
                 <div class="chat-thread-container" id="mChatScrollBox" style="flex: 1 1 auto; min-height: 120px; max-height: none; overflow-y:auto; padding:8px; background:#04070e; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
                     ${messagesHtml}
                 </div>
 
-                <!-- НИЖНИЙ БЛОК: ТАКТИКА ТОРГА И КНОПКА ДКП -->
                 <div class="p-2" style="background:#090e18; border-radius:12px; border:1px solid rgba(255,255,255,0.08); flex-shrink: 0; display:flex; flex-direction:column; gap:5px;">
                     <div class="flex-between text-xs">
                         <span class="sub-label font-bold" style="font-size:9px;">Терпение собеседника:</span>
@@ -380,7 +371,6 @@ const AppM = {
         let roll = Math.random() * 100;
 
         if (!msg.chatHistory) msg.chatHistory = [];
-
         let tacticKey = percent <= 3 ? 'soft' : (percent <= 8 ? 'medium' : 'hard');
 
         if (roll < adjustedRisk) {
@@ -391,7 +381,7 @@ const AppM = {
                 ? `Скидывай ещё ${percent}%, деньги на руках!` 
                 : `Скидывай ещё ${percent}%, заберу прямо сейчас!`;
 
-            let sellerReply = "«Не устраивает цена — ищи другую тачку. Я на такое не пойду!»";
+            let sellerReply = "«Не устраивает цена — ищи другой вариант. На такое не пойду!»";
 
             if (isP2P && typeof DIALOGUES_DATABASE !== 'undefined' && DIALOGUES_DATABASE.p2p?.tacticsResponses?.[tacticKey]) {
                 let refusePool = DIALOGUES_DATABASE.p2p.tacticsResponses[tacticKey].refuse;
@@ -442,7 +432,7 @@ const AppM = {
 
                 msg.chatHistory.push({ from: 'me', text: playerPhrase });
                 msg.chatHistory.push({ from: 'them', text: sellerPhrase });
-                showToast("Успешный торг! Цена лота на бирже снижена.");
+                showToast("Успешный торг! Цена лота снижена.");
             } else {
                 let newOffer = Math.min(asking, (msg.offerPrice || Math.round(asking * 0.85)) + delta);
                 msg.offerPrice = newOffer;
@@ -503,10 +493,16 @@ const AppM = {
                     if (!state.ownedPlates) state.ownedPlates = [];
                     state.ownedPlates.push(lot.itemData?.plate || lot.name);
                 } else if (lot.type === 'business') {
-                    let biz = (state.businesses || []).find(b => b.id === (lot.itemData?.bizId || lot.id));
-                    if (biz) {
-                        biz.level = Math.max(biz.level || 0, lot.itemData?.level || 1);
-                        biz.stock = 100;
+                    let bizId = lot.itemData?.bizId || lot.id;
+                    let targetBiz = (state.businesses || []).find(b => b.id === bizId);
+                    if (targetBiz) {
+                        targetBiz.level = Math.max(targetBiz.level || 0, lot.itemData?.level || 1);
+                        targetBiz.stock = 100;
+                        targetBiz.customName = lot.itemData?.customName || lot.name;
+                        targetBiz.coverSkin = lot.itemData?.coverSkin || 'classic';
+                        targetBiz.cardAnimation = lot.itemData?.cardAnimation || 'none';
+                        targetBiz.vipSticker = lot.itemData?.vipSticker || 'none';
+                        targetBiz.titleStyle = lot.itemData?.titleStyle || 'default';
                     }
                 } else if (lot.type === 'housing') {
                     let hId = lot.itemData?.houseId || 'gsk_box';
@@ -564,7 +560,7 @@ const AppM = {
     },
 
     // ========================================================
-    // 2. ВКЛАДКА: «P2P БИРЖА»
+    // 2. ВКЛАДКА: «P2P БИРЖА» С ПОЛНОЙ КАСТОМИЗАЦИЕЙ
     // ========================================================
     renderMarketScreen(container) {
         if (!container) return;
@@ -574,7 +570,7 @@ const AppM = {
         container.innerHTML = `
             <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.12), #090e18); border-color: rgba(0, 230, 118, 0.35);">
                 <div>
-                    <b class="text-xs color-green"><i class="fa-solid fa-globe mr-1"></i> Онлайн P2P Биржа имущества</b>
+                    <b class="text-xs color-green"><i class="fa-solid fa-globe"></i> Онлайн P2P Биржа имущества</b>
                     <div class="sub-label" style="font-size:8.5px;">Торговля машинами, номерами, бизнесом и жильём</div>
                 </div>
                 <button onclick="AppM.openCreateListingModal()" class="btn btn-green btn-auto btn-sm" style="font-size:9px; padding:4px 8px;">
@@ -635,6 +631,7 @@ const AppM = {
 
             let descText = "";
             let imgBlockHtml = "";
+            let animClass = "";
 
             if (item.type === 'cars' || item.type === 'car') {
                 let rawImg = item.itemData?.img || item.img || "assets/cars/economy/2101/vaz-2101.jpg";
@@ -655,6 +652,51 @@ const AppM = {
                         <div class="badge-tag badge-br"><span class="tag-badge bg-tag-cyan">АВТО P2P</span></div>
                     </div>
                 `;
+            } else if (item.type === 'business') {
+                let bData = item.itemData || {};
+                let bName = bData.customName || item.name;
+                let bIncome = bData.income || 25000;
+                let skinId = bData.coverSkin || 'classic';
+                let skin = (typeof BUSINESS_COVER_SKINS !== 'undefined') ? BUSINESS_COVER_SKINS.find(s => s.id === skinId) : null;
+                let stickerId = bData.vipSticker || 'none';
+                let sticker = (typeof BUSINESS_VIP_STICKERS !== 'undefined') ? BUSINESS_VIP_STICKERS.find(s => s.id === stickerId) : null;
+                let titleStyleId = bData.titleStyle || 'default';
+                let titleStyle = (typeof BUSINESS_TITLE_STYLES !== 'undefined') ? BUSINESS_TITLE_STYLES.find(t => t.id === titleStyleId) : null;
+
+                if (bData.cardAnimation && typeof BUSINESS_CARD_ANIMATIONS !== 'undefined') {
+                    let aObj = BUSINESS_CARD_ANIMATIONS.find(a => a.id === bData.cardAnimation);
+                    if (aObj) animClass = aObj.className;
+                }
+
+                let iconClass = skin?.icon || 'fa-briefcase';
+                let colorHex = skin?.color || '#00e676';
+                let titleFx = titleStyle?.className || '';
+                let stickerHtml = (sticker && sticker.icon) ? `<span class="biz-vip-sticker ${sticker.cssClass}">${sticker.icon}</span>` : '';
+
+                let rawImg = bData.img || ('assets/business/' + (bData.bizId || 'wash') + '.jpg');
+                let bizImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
+
+                descText = `Ежедневный доход: <b class="color-green">+${Number(bIncome).toLocaleString()} ₽/день</b> • Уровень точки: <b>${bData.level || 1}</b>`;
+
+                imgBlockHtml = `
+                    <div class="car-img-wrap mb-2" style="height:120px; position:relative; border-radius:10px; overflow:hidden;">
+                        <img src="${bizImg}" class="car-img" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80'">
+                        <div class="biz-cover-badge">
+                            <div class="biz-brand-pill" style="border-color:${colorHex};">
+                                <i class="fa-solid ${iconClass}" style="color:${colorHex};"></i>
+                                <span class="biz-brand-name ${titleFx}">${bName}</span>
+                            </div>
+                            <span class="tag-badge bg-tag-green">БИЗНЕС P2P</span>
+                        </div>
+                    </div>
+                    <div class="flex-between mb-1">
+                        <span class="sub-label" style="font-size:9px;">Стикер владельца:</span>
+                        <div class="biz-income-badge-wrap">
+                            ${stickerHtml}
+                            <span class="tag-badge bg-tag-green font-bold">+${Number(bIncome).toLocaleString()} ₽/д</span>
+                        </div>
+                    </div>
+                `;
             } else {
                 descText = `Официальный лот категории ${item.type.toUpperCase()}`;
                 imgBlockHtml = `
@@ -665,7 +707,7 @@ const AppM = {
             }
 
             return `
-                <div onclick="openP2PDealModal('${item.id}')" class="glass-card mb-3 p-2 cursor-pointer" style="border-left: 3px solid var(--green); background:#090e18;">
+                <div onclick="openP2PDealModal('${item.id}')" class="glass-card mb-3 p-2 cursor-pointer biz-card-compact ${animClass}" style="border-left: 3px solid var(--green); background:#090e18;">
                     ${imgBlockHtml}
                     <div class="flex-between mb-1">
                         <div>
@@ -682,7 +724,7 @@ const AppM = {
     },
 
     // ========================================================
-    // ИНТЕРАКТИВНЫЙ ВЫБОР ИМУЩЕСТВА КАРТОЧКАМИ В МОДАЛКЕ P2P
+    // ВЫСТАВЛЕНИЕ ИМУЩЕСТВА С УЧЕТОМ КАСТОМИЗАЦИИ
     // ========================================================
     selectP2PListingType(type) {
         this.selectedListingType = type;
@@ -691,9 +733,7 @@ const AppM = {
         const elMap = { cars: 'btnP2PTypeCar', plates: 'btnP2PTypePlate', business: 'btnP2PTypeBiz', housing: 'btnP2PTypeHouse' };
         ['cars', 'plates', 'business', 'housing'].forEach(t => {
             let btn = document.getElementById(elMap[t]);
-            if (btn) {
-                btn.className = t === type ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
-            }
+            if (btn) btn.className = t === type ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
         });
 
         this.renderP2PCardsList(type);
@@ -708,49 +748,31 @@ const AppM = {
         if (type === 'cars' || type === 'car') {
             let garage = (state.garage || []).filter(c => c && typeof c === 'object');
             if (garage.length === 0) {
-                html = `
-                    <div class="glass-card p-3 text-center sub-label" style="background:#050914;">
-                        <i class="fa-solid fa-car-burst color-cyan mb-1" style="font-size:22px;"></i>
-                        <div>В гараже пока нет свободных автомобилей.</div>
-                        <div class="text-xs mt-1">Купите авто на авторынке, чтобы выставить его на биржу!</div>
-                    </div>
-                `;
+                html = `<div class="glass-card p-3 text-center sub-label" style="background:#050914;">В гараже пока нет машин для выставления.</div>`;
             } else {
                 garage.forEach((car, idx) => {
                     let rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
                     let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
                     let fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(car.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
                     let plateStr = car.plate ? `<span class="license-plate" style="font-size:9px; padding:1px 5px;">${car.plate}</span>` : '<span class="sub-label">ТРАНЗИТ</span>';
-
-                    let tuningObj = car.tuning || {};
-                    let tuningMods = [];
-                    if (tuningObj.chip) tuningMods.push(`Stage ${tuningObj.chip}`);
-                    if (tuningObj.weldedDiff) tuningMods.push("Заварка");
-                    if (tuningObj.steeringAngle) tuningMods.push("Выворот");
-                    if (tuningObj.turbo) tuningMods.push("Турбо");
-                    let tuningDesc = tuningMods.length > 0 
-                        ? `<span class="color-green font-bold">⚡ ${tuningMods.join(', ')}</span>` 
-                        : '<span class="sub-label">📦 Сток</span>';
-
                     let isSelected = this.selectedItemIndex === idx;
 
                     html += `
-                        <div onclick="AppM.pickP2PItemCard(${idx})" id="p2pCardItem_${idx}" class="glass-card p-2 cursor-pointer flex-gap" style="align-items:center; background:#050914; border: 1.5px solid ${isSelected ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; box-shadow: ${isSelected ? '0 0 12px var(--cyan-glow)' : 'none'}; border-radius:10px;">
-                            <img src="${carImg}" style="width:72px; height:48px; min-width:72px; object-fit:cover; border-radius:6px; border:1px solid rgba(255,255,255,0.1);" onerror="this.onerror=null; this.src='${fallbackImg}';">
+                        <div onclick="AppM.pickP2PItemCard(${idx})" id="p2pCardItem_${idx}" class="glass-card p-2 cursor-pointer flex-gap" style="align-items:center; background:#050914; border: 1.5px solid ${isSelected ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; border-radius:10px;">
+                            <img src="${carImg}" style="width:72px; height:48px; min-width:72px; object-fit:cover; border-radius:6px;" onerror="this.onerror=null; this.src='${fallbackImg}';">
                             <div style="flex:1; min-width:0;">
                                 <div class="flex-between">
                                     <b class="text-xs color-cyan" style="font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${car.name || 'Автомобиль'}</b>
                                     ${plateStr}
                                 </div>
-                                <div class="sub-label mt-1" style="font-size:8.5px;">Мощность: <b>${car.power || 100} л.с.</b> • Кузов: <b>${car.condition || 85}%</b></div>
-                                <div class="sub-label mt-1" style="font-size:8px;">${tuningDesc}</div>
+                                <div class="sub-label mt-1" style="font-size:8.5px;">Мощность: <b>${car.power || 100} л.с.</b> • Состояние: <b>${car.condition || 85}%</b></div>
                             </div>
                         </div>
                     `;
                 });
             }
         } else if (type === 'plates' || type === 'plate') {
-            let plates = state.ownedPlates || ['А777АА 77', 'О777ОО 77'];
+            let plates = state.ownedPlates || ['А777АА 77'];
             plates.forEach((plate, idx) => {
                 let isSelected = this.selectedItemIndex === idx;
                 html += `
@@ -764,17 +786,24 @@ const AppM = {
                 `;
             });
         } else if (type === 'business') {
-            let bizList = (state.businesses || []).filter(b => b && b.level > 0);
+            let bizList = (state.businesses || []).filter(b => b && (b.level || 0) > 0);
             if (bizList.length === 0) {
                 html = `<div class="glass-card p-3 text-center sub-label" style="background:#050914;">У вас пока нет купленных предприятий.</div>`;
             } else {
                 bizList.forEach((b, idx) => {
                     let isSelected = this.selectedItemIndex === idx;
+                    let displayName = b.customName || b.name;
+                    let stickerIcon = '';
+                    if (b.vipSticker && typeof BUSINESS_VIP_STICKERS !== 'undefined') {
+                        let st = BUSINESS_VIP_STICKERS.find(s => s.id === b.vipSticker);
+                        if (st && st.icon) stickerIcon = st.icon + ' ';
+                    }
+
                     html += `
                         <div onclick="AppM.pickP2PItemCard(${idx})" id="p2pCardItem_${idx}" class="glass-card p-2 cursor-pointer flex-between" style="background:#050914; border: 1.5px solid ${isSelected ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; border-radius:10px;">
                             <div>
-                                <b class="text-xs color-green">${b.name || 'Бизнес'} (Ур. ${b.level || 1})</b>
-                                <div class="sub-label mt-1" style="font-size:8.5px;">Касса: +${Number((b.income || 1000) * b.level).toLocaleString()} ₽/день</div>
+                                <b class="text-xs color-green">${stickerIcon}${displayName} (Ур. ${b.level || 1})</b>
+                                <div class="sub-label mt-1" style="font-size:8.5px;">Касса: +${Number((b.income || 1000) * b.level).toLocaleString()} ₽/д | Обложка: <b>${b.coverSkin || 'classic'}</b></div>
                             </div>
                             <i class="fa-solid ${isSelected ? 'fa-circle-check color-cyan' : 'fa-circle-dot'} text-xs"></i>
                         </div>
@@ -792,7 +821,7 @@ const AppM = {
                         <div onclick="AppM.pickP2PItemCard(${idx})" id="p2pCardItem_${idx}" class="glass-card p-2 cursor-pointer flex-between" style="background:#050914; border: 1.5px solid ${isSelected ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; border-radius:10px;">
                             <div>
                                 <b class="text-xs color-amber">Объект: ${hId}</b>
-                                <div class="sub-label mt-1" style="font-size:8.5px;">Собственный гаражный бокс</div>
+                                <div class="sub-label mt-1" style="font-size:8.5px;">Собственный бокс / Недвижимость</div>
                             </div>
                             <i class="fa-solid ${isSelected ? 'fa-circle-check color-cyan' : 'fa-circle-dot'} text-xs"></i>
                         </div>
@@ -808,9 +837,7 @@ const AppM = {
                            (type === 'plates' && (state.ownedPlates || []).length > 0) ||
                            (type === 'business' && (state.businesses || []).some(b => b && b.level > 0)) ||
                            (type === 'housing' && (state.player?.ownedHouses || []).length > 0);
-            if (hasItems) {
-                this.pickP2PItemCard(0);
-            }
+            if (hasItems) this.pickP2PItemCard(0);
         }
     },
 
@@ -834,13 +861,12 @@ const AppM = {
         if (priceInput) {
             if (type === 'cars') {
                 let car = (state.garage || [])[idx];
-                if (car) {
-                    priceInput.value = Math.round((car.price || car.marketValue || 150000) * 1.15);
-                }
+                if (car) priceInput.value = Math.round((car.price || car.marketValue || 150000) * 1.15);
             } else if (type === 'plates') {
                 priceInput.value = 500000;
             } else if (type === 'business') {
-                priceInput.value = 1000000;
+                let b = (state.businesses || []).filter(x => x && x.level > 0)[idx];
+                if (b) priceInput.value = Math.round((b.cost || 200000) * (b.level || 1) * 1.3);
             } else if (type === 'housing') {
                 priceInput.value = 1500000;
             }
@@ -849,7 +875,7 @@ const AppM = {
         if (typeof playSound === 'function') playSound('tick');
     },
 
-    confirmCreateP2PListing() {
+    async confirmCreateP2PListing() {
         const priceInput = document.getElementById('p2pPriceInput');
         if (!priceInput) return;
 
@@ -857,15 +883,14 @@ const AppM = {
         let idx = this.selectedItemIndex;
 
         if (idx === null || idx === undefined || isNaN(price) || price <= 500) {
-            return showToast("Выберите объект из списка и укажите цену!");
+            return showToast("Выберите объект и укажите цену!");
         }
 
-        if (!state.p2pMarketListings) state.p2pMarketListings = [];
-
         let type = this.selectedListingType;
+        let myName = state.player?.name || 'Перекуп #777';
         let newListing = {
             id: "p2p_item_" + Date.now(),
-            sellerName: state.player?.name || 'Перекуп #777',
+            sellerName: myName,
             type: type,
             price: price,
             itemData: {}
@@ -873,11 +898,9 @@ const AppM = {
 
         if (type === 'cars') {
             let car = state.garage[idx];
-            if (!car) return showToast("Автомобиль не найден в гараже!");
-
+            if (!car) return showToast("Машина не найдена в гараже!");
             newListing.name = car.name;
             newListing.itemData = Object.assign({}, car);
-            
             state.garage.splice(idx, 1);
             if (typeof renderGarage === 'function') renderGarage();
         } else if (type === 'plates') {
@@ -885,24 +908,49 @@ const AppM = {
             let plateStr = plates[idx] || 'В777ВВ 77';
             newListing.name = `Госномер ${plateStr}`;
             newListing.itemData = { plate: plateStr };
-            
             state.ownedPlates = plates.filter((_, i) => i !== idx);
         } else if (type === 'business') {
             let bizList = (state.businesses || []).filter(b => b && b.level > 0);
             let b = bizList[idx];
-            newListing.name = b ? b.name : `Бизнес #${idx}`;
-            newListing.itemData = { bizId: b?.id || idx, level: b?.level || 1, income: (b?.income || 1000) * (b?.level || 1) };
+            if (!b) return showToast("Бизнес не найден!");
+            newListing.name = b.customName || b.name;
+            newListing.itemData = {
+                bizId: b.id,
+                level: b.level,
+                income: (b.income || 1000) * b.level,
+                customName: b.customName || b.name,
+                coverSkin: b.coverSkin || 'classic',
+                cardAnimation: b.cardAnimation || 'none',
+                vipSticker: b.vipSticker || 'none',
+                titleStyle: b.titleStyle || 'default',
+                upgrades: b.upgrades || {}
+            };
+            b.level = 0;
+            b.stored = 0;
         } else if (type === 'housing') {
             let houses = state.player?.ownedHouses || [];
             let hId = houses[idx] || 'gsk_box';
-            newListing.name = `Бокс/Недвижимость (${hId})`;
+            newListing.name = `Бокс (${hId})`;
             newListing.itemData = { houseId: hId, slots: 2 };
+            state.player.ownedHouses = state.player.ownedHouses.filter(id => id !== hId);
         }
 
+        if (window.publishP2PLot && typeof window.publishP2PLot === 'function') {
+            try {
+                showToast("Публикация в облако Firestore...");
+                let cloudId = await window.publishP2PLot(newListing);
+                if (cloudId) newListing.id = cloudId;
+            } catch (e) {
+                console.warn("[P2P] Ошибка облачной публикации:", e);
+            }
+        }
+
+        if (!state.p2pMarketListings) state.p2pMarketListings = [];
         state.p2pMarketListings.unshift(newListing);
+
         saveState();
         updateHeaderUI();
-        
+
         if (typeof ModalManager !== 'undefined') {
             ModalManager.close('modalCreateP2P');
         } else {
@@ -910,19 +958,42 @@ const AppM = {
             if (m) m.classList.remove('active');
         }
 
-        showToast("Лот успешно выставлен на онлайн-биржу! ☁️");
+        showToast("✓ Объект успешно выставлен на биржу!");
         this.renderMarketScreen(document.getElementById('mHubSubContentBox'));
     },
 
     cancelP2PListing(lotId) {
+        let lot = (state.p2pMarketListings || []).find(l => l.id === lotId);
+        if (lot) {
+            if (lot.type === 'business') {
+                let b = (state.businesses || []).find(x => x.id === (lot.itemData?.bizId || lot.name));
+                if (b) {
+                    b.level = lot.itemData?.level || 1;
+                    b.customName = lot.itemData?.customName || lot.name;
+                    b.coverSkin = lot.itemData?.coverSkin || 'classic';
+                    b.cardAnimation = lot.itemData?.cardAnimation || 'none';
+                    b.vipSticker = lot.itemData?.vipSticker || 'none';
+                    b.titleStyle = lot.itemData?.titleStyle || 'default';
+                }
+            } else if (lot.type === 'car' || lot.type === 'cars') {
+                if (!state.garage) state.garage = [];
+                state.garage.push(lot.itemData);
+                if (typeof renderGarage === 'function') renderGarage();
+            } else if (lot.type === 'plate' || lot.type === 'plates') {
+                if (!state.ownedPlates) state.ownedPlates = [];
+                state.ownedPlates.push(lot.itemData?.plate || lot.name);
+            }
+        }
+
         state.p2pMarketListings = (state.p2pMarketListings || []).filter(l => l.id !== lotId);
         saveState();
-        showToast("Лот снят с P2P биржи.");
+        updateHeaderUI();
+        showToast("Лот снят с биржи и возвращен владельцу.");
         this.renderMarketScreen(document.getElementById('mHubSubContentBox'));
     },
 
     // ========================================================
-    // 3. ВКЛАДКА: «АВТОКЛУБЫ»
+    // 3. АВТОКЛУБЫ
     // ========================================================
     renderClubsScreen(container) {
         if (!container) return;
@@ -967,9 +1038,7 @@ const AppM = {
                     <b class="text-xs color-purple"><i class="fa-solid fa-users"></i> Автоклубы Перекупов</b>
                     <div class="sub-label" style="font-size:8.5px;">${myClub ? `Вы состоите в: <b>${myClub.name}</b>` : 'Вступите в клуб или создайте свой'}</div>
                 </div>
-                <button onclick="AppM.createClubPrompt()" class="btn btn-purple btn-auto btn-sm" style="font-size:9px;">
-                    + Создать клуб
-                </button>
+                <button onclick="AppM.createClubPrompt()" class="btn btn-purple btn-auto btn-sm" style="font-size:9px;">+ Создать</button>
             </div>
             <div class="space-y-1">${clubListHtml}</div>
         `;
@@ -977,10 +1046,10 @@ const AppM = {
 
     joinClubAction(clubId, clubName, fee, minLvl) {
         let pLvl = state.player?.level || 1;
-        if (pLvl < (minLvl || 1)) return showToast(`Вступление в этот клуб доступно с ${minLvl} уровня!`);
+        if (pLvl < (minLvl || 1)) return showToast(`Доступно с ${minLvl} уровня!`);
 
         let cash = state.player?.cash || 0;
-        if (cash < fee) return showToast(`Не хватает денег на взнос (${fee.toLocaleString()} ₽)!`);
+        if (cash < fee) return showToast(`Нужно ${fee.toLocaleString()} ₽ на взнос!`);
 
         state.player.cash -= fee;
         state.player.club = { id: clubId, name: clubName };
@@ -1002,7 +1071,7 @@ const AppM = {
 
     createClubPrompt() {
         let pLvl = state.player?.level || 1;
-        if (pLvl < 5) return showToast("Создание своего автоклуба доступно с 5 уровня!");
+        if (pLvl < 5) return showToast("Создание клуба доступно с 5 уровня!");
 
         let name = prompt("Название нового автоклуба:", "Turbo Syndicate");
         if (!name || !name.trim()) return;
@@ -1022,14 +1091,14 @@ const AppM = {
     },
 
     // ========================================================
-    // 4. ВКЛАДКА: «НАПАРНИКИ»
+    // 4. НАПАРНИКИ
     // ========================================================
     renderFriendsScreen(container) {
         if (!container) return;
 
         let friends = [
-            { id: "f1", name: "Артём_BMW (Ур. 14)", car: "BMW E30 Coupe", status: "В гараже" },
-            { id: "f2", name: "Денис_GTI (Ур. 22)", car: "Golf VI GTI", status: "На 402м" }
+            { id: "f1", name: "Артём_BMW (Ур. 14)", car: "BMW E30 Coupe" },
+            { id: "f2", name: "Денис_GTI (Ур. 22)", car: "Golf VI GTI" }
         ];
 
         let listHtml = friends.map(f => `
@@ -1097,7 +1166,6 @@ const AppM = {
         let conn = state.player?.connections || 0;
         if (conn < 1) return showToast("Нужна хотя бы 1 Теневая Связь 🤝!");
 
-        let pLvl = state.player?.level || 1;
         state.player.connections -= 1;
         saveState();
         updateHeaderUI();
@@ -1141,7 +1209,7 @@ const AppM = {
     },
 
     // ========================================================
-    // 5. ВКЛАДКА: «ПУЛЬС РЫНКА» И ВИЗИТКА
+    // 5. ПУЛЬС РЫНКА И ВИЗИТКА
     // ========================================================
     renderFeedScreen(container) {
         if (!container) return;

@@ -6,13 +6,13 @@
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v1.0.0</title>
     
-    <!-- Модульные CSS-стили с принудительным сбросом кэша v=345 -->
-    <link rel="stylesheet" href="css/base.css?v=345">
-    <link rel="stylesheet" href="css/hud.css?v=345">
-    <link rel="stylesheet" href="css/market.css?v=345">
-    <link rel="stylesheet" href="css/phone.css?v=345">
-    <link rel="stylesheet" href="css/modals.css?v=345">
-    <link rel="stylesheet" href="css/nav.css?v=345">
+    <!-- Модульные CSS-стили с принудительным сбросом кэша v=346 -->
+    <link rel="stylesheet" href="css/base.css?v=346">
+    <link rel="stylesheet" href="css/hud.css?v=346">
+    <link rel="stylesheet" href="css/market.css?v=346">
+    <link rel="stylesheet" href="css/phone.css?v=346">
+    <link rel="stylesheet" href="css/modals.css?v=346">
+    <link rel="stylesheet" href="css/nav.css?v=346">
     
     <!-- Внешние библиотеки -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -25,7 +25,6 @@
       <header class="hud-header">
         <div class="hud-card hud-top-row">
           
-          <!-- Левая зона: Аватар и капсула никнейма (расширена до середины) -->
           <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль и аналитику">
             <div class="avatar-ring">
               <div class="avatar-glow"></div>
@@ -38,7 +37,6 @@
             </div>
             
             <div class="user-details">
-              <!-- Капсула никнейма и уровня -->
               <div class="player-capsule-box">
                 <div class="user-name-row">
                   <span id="playerName" class="player-name-text">Перекуп #777</span>
@@ -51,7 +49,6 @@
                 </div>
               </div>
 
-              <!-- Мини-виджеты связей, кармы и гаража -->
               <div class="user-stats-row">
                 <div class="stat-pill stat-pill-conn" title="Теневые связи">
                   <i class="fa-solid fa-handshake"></i> <span id="connectionsText">1</span>
@@ -66,7 +63,6 @@
             </div>
           </div>
 
-          <!-- Правая зона: Растянутый до середины баланс и валюты под ним в стиле stat-pill (строго в один ряд) -->
           <div class="wallet-dashboard">
             <div class="wallet-capsule-box" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Открыть Во-Банк">
               <div class="cash-val">
@@ -74,7 +70,6 @@
               </div>
             </div>
 
-            <!-- Валюты в стиле stat-pill, выстроенные в один ряд справа налево -->
             <div class="wallet-stats-row">
               <button type="button" class="stat-pill stat-pill-note" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты">
                 <i class="fa-solid fa-money-bill-wave"></i> <span id="starsAmount">15</span>
@@ -93,7 +88,6 @@
 
         </div>
 
-        <!-- Нижний ряд: Состояние потребностей и кнопки быстрых действий -->
         <div class="hud-card hud-bottom-row">
           <div class="needs-container">
             <div class="need-track" onclick="switchTab('tabLife')" title="Сытость (Нажмите, чтобы перекусить)">
@@ -149,7 +143,6 @@
               </button>
             </div>
 
-            <!-- СЕТКА КЛАССОВ -->
             <div class="market-categories-grid" id="marketCatListContainer">
               <button onclick="setCategory('all')" id="catBtn-all" class="cat-tile" style="grid-column: span 3; border-color: rgba(0, 242, 254, 0.4) !important;">
                 <div class="cat-tile-icon"><i class="fa-solid fa-layer-group color-cyan"></i></div>
@@ -263,7 +256,6 @@
         <!-- 4. TAB: ИНТЕРАКТИВНЫЙ СМАРТФОН «PEREKUP OS» -->
         <section id="tabPhone" class="tab-screen">
           <div class="phone-device-wrapper">
-            <!-- СТАТУС-БАР -->
             <div class="phone-status-bar">
               <span id="phoneStatusBarClock" class="phone-status-time">12:00</span>
               <div class="phone-notch"></div>
@@ -274,15 +266,12 @@
               </div>
             </div>
 
-            <!-- ЭКРАН ТЕЛЕФОНА -->
             <div class="phone-screen-content">
-              <!-- ДОМАШНИЙ ЭКРАН -->
               <div id="phoneHomeScreen">
                 <div id="phoneBizWidgetContainer" class="mb-2" style="display:none;"></div>
                 <div id="phoneDailyQuestsWidget" class="phone-quests-widget mb-3"></div>
 
                 <div class="phone-home-grid mb-2">
-                  <!-- РЯД 1 -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('m')">
                     <div class="phone-app-icon bg-m-network">
                       <span class="m-app-icon-letter">M</span>
@@ -306,7 +295,6 @@
                     <span class="phone-app-label">Жильё</span>
                   </div>
 
-                  <!-- РЯД 2 -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('reshala')">
                     <div class="phone-app-icon bg-dark-purple"><i class="fa-solid fa-user-secret"></i></div>
                     <span class="phone-app-label">Решала</span>
@@ -327,7 +315,6 @@
                     <span class="phone-app-label">Порт</span>
                   </div>
 
-                  <!-- РЯД 3 -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('radar')">
                     <div class="phone-app-icon bg-red"><i class="fa-solid fa-tower-broadcast"></i></div>
                     <span class="phone-app-label">ДПС Радар</span>
@@ -348,7 +335,6 @@
                     <span class="phone-app-label">Фортуна</span>
                   </div>
 
-                  <!-- РЯД 4 -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('post')">
                     <div class="phone-app-icon bg-post-office">
                       <i class="fa-solid fa-boxes-packing"></i>
@@ -372,7 +358,6 @@
                     <span class="phone-app-label">Блокнот</span>
                   </div>
 
-                  <!-- РЯД 5 -->
                   <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('dev')">
                     <div class="phone-app-icon bg-dev-terminal">
                       <i class="fa-solid fa-terminal color-green"></i>
@@ -382,11 +367,9 @@
                 </div>
               </div>
 
-              <!-- КОНТЕЙНЕР ЗАПУЩЕННОГО ПРИЛОЖЕНИЯ -->
               <div id="phoneAppContainer" style="display:none;" class="phone-opened-app-view"></div>
             </div>
 
-            <!-- HOME BAR -->
             <div class="phone-home-bar-area" onclick="PhoneManager.goHome()">
               <div class="phone-home-indicator"></div>
             </div>
@@ -438,6 +421,7 @@
     </div>
 
     <div id="modalHudCustomizer" class="modal-overlay"></div>
+    <div id="modalBusinessCustomize" class="modal-overlay"></div>
     <div id="modalNeedGarage" class="modal-overlay"></div>
     <div id="modalImpoundLot" class="modal-overlay"></div>
     <div id="modalPortBrokerDeal" class="modal-overlay"></div>
@@ -452,10 +436,10 @@
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #345 (Единый P2P-хаб, фикс таймеров и обложек)</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #346</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
           <div class="patch-item"><b>⚡ Единый хаб Сети «M» & Autodrot:</b> Объединённый онлайн-рынок и чат торга с кнопками риска.</div>
-          <div class="patch-item"><b>🏢 Недвижимость и Боксы:</b> Исправлена аренда/покупка и возвращены визуальные обложки домов.</div>
+          <div class="patch-item"><b>🏢 Бизнес-кастомизация:</b> Живые скины, эффекты карточек и стикеры суточного дохода.</div>
           <div class="patch-item"><b>🏪 Площадка продаж:</b> Восстановлен плавный таймер поиска, мгновенный пропуск и торг прямо у капота.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
@@ -572,7 +556,6 @@
       </div>
     </div>
 
-    <!-- ОФИЦИАЛЬНЫЙ БЛАНК ДКП -->
     <div id="modalDKP" class="modal-overlay">
       <div class="modal-box dkp-official-blank">
         <div class="dkp-blank-border">
@@ -876,7 +859,6 @@
           <button type="button" onclick="AppM.selectP2PListingType('housing')" id="btnP2PTypeHouse" class="btn btn-dark btn-sm">Жильё</button>
         </div>
         
-        <!-- КОНТЕЙНЕР ИНТЕРАКТИВНЫХ КАРТОЧЕК ИМУЩЕСТВА С СКРОЛЛОМ -->
         <div class="sub-label mb-1" style="font-size:9.5px;">Выберите объект для продажи:</div>
         <div id="p2pCardsListContainer" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; padding-right: 2px;"></div>
         
@@ -892,7 +874,7 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- 1. ПОДКЛЮЧЕНИЕ СЕТЕВОГО МОДУЛЯ FIREBASE (ES-МОДУЛЬ) -->
-    <script type="module" src="firebase-bridge.js?v=345"></script>
+    <script type="module" src="firebase-bridge.js?v=346"></script>
 
     <!-- 2. АВТОЗАГРУЗЧИК СКРИПТОВ ИГРЫ -->
     <script>
@@ -904,9 +886,8 @@
           } catch (e) {}
         }
 
-        const CACHE_VER = '345';
+        const CACHE_VER = '346';
 
-        // Модули баз данных игры (включая data_dialogues.js)
         const rootModules = [
           'data_core.js',
           'data_cars.js',
@@ -931,17 +912,14 @@
           'phone-media.js',
           'phone-racing.js',
           'phone-dev.js',
-          // Разгруженный модуль авторынка:
           'market-generator.js',
           'market-inspection.js',
           'market-deal.js',
           'market.js',
-          // Разгруженный модуль гаража:
           'garage-calc.js',
           'garage-services.js',
           'garage-dialogs.js',
           'garage.js',
-          // Остальные системы:
           'salesLot.js',
           'life.js',
           'street.js',

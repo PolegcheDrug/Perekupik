@@ -1,9 +1,19 @@
 // ========================================================
-// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА 3.0 (Кастомизация & Модерация)
+// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА 3.2
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// Стикеры дохода, анимированные названия, темы и Live Preview
 // ========================================================
 
-// Каталог кастомных обложек (10 видов с бонусами)
+const DEFAULT_BUSINESS_CATALOG = [
+    { id: 'wash', name: 'Автомойка «Блеск»', cost: 180000, reqStars: 0, minLevel: 1, income: 12000, perk: 'Скидка 50% на полировку и химчистку', desc: 'Круглосуточный комплекс бесконтактной мойки и сушки кузова.' },
+    { id: 'shina', name: 'Шиномонтаж «Вираж»', cost: 320000, reqStars: 2, minLevel: 3, income: 22000, perk: 'Сезонный ажиотаж весной и осенью', desc: 'Пункт правки дисков, дошиповки и сезонного переобувания.' },
+    { id: 'sto', name: 'Автосервис «Гараж-Мастер»', cost: 650000, reqStars: 5, minLevel: 6, income: 45000, perk: 'Скидка на ремонт собственных авто -20%', desc: 'Три подъёмника, компьютерная диагностика и слесарный цех.' },
+    { id: 'detailing', name: 'Детейлинг «Ceramic Pro»', cost: 1200000, reqStars: 8, minLevel: 10, income: 85000, perk: 'Повышает ликвидность машин в гараже', desc: 'Полировка кузова, керамические составы и оклейка плёнкой.' },
+    { id: 'chip_tuning', name: 'Тюнинг-Ателье «Stage 3»', cost: 2400000, reqStars: 15, minLevel: 15, income: 170000, perk: 'Доступ к кастомным прошивкам ЭБУ', desc: 'Настройка моторов на диностенде и прямоточный выхлоп.' },
+    { id: 'razborka', name: 'Авторазборка «Последний Путь»', cost: 4500000, reqStars: 20, minLevel: 20, income: 320000, perk: 'Выкуп битых авто под распил', desc: 'Склад контрактных моторов, кузовных панелей и запчастей.' }
+];
+
+// Каталог скинов обложек (10 видов)
 if (typeof window.BUSINESS_COVER_SKINS === 'undefined') {
     window.BUSINESS_COVER_SKINS = [
         { id: 'classic', name: 'Гаражная классика', cost: 0, bonusIncPct: 0, icon: 'fa-warehouse', color: '#64748b' },
@@ -12,25 +22,52 @@ if (typeof window.BUSINESS_COVER_SKINS === 'undefined') {
         { id: 'carbon_stealth', name: 'Carbon Stealth', cost: 220000, bonusIncPct: 8, icon: 'fa-shield-halved', color: '#334155' },
         { id: 'cyber_terminal', name: 'Cyber Terminal', cost: 280000, bonusIncPct: 10, icon: 'fa-terminal', color: '#00e676' },
         { id: 'vintage_retro', name: 'Retro 80s Garage', cost: 150000, bonusIncPct: 6, icon: 'fa-record-vinyl', color: '#f43f5e' },
-        { id: 'elite_marble', name: 'Elite Marble Showroom', cost: 600000, bonusIncPct: 18, icon: 'fa-gem', color: '#c084fc' },
-        { id: 'industrial_rust', name: 'Industrial Heavy Duty', cost: 180000, bonusIncPct: 7, icon: 'fa-industry', color: '#f59e0b' },
-        { id: 'drift_king', name: 'Drift King Station', cost: 310000, bonusIncPct: 11, icon: 'fa-flag-checkered', color: '#ff3366' },
-        { id: 'federal_hub', name: 'Federal Logistics Hub', cost: 950000, bonusIncPct: 25, icon: 'fa-globe', color: '#38bdf8' }
+        { id: 'elite_marble', name: 'Elite Showroom', cost: 600000, bonusIncPct: 18, icon: 'fa-gem', color: '#c084fc' },
+        { id: 'industrial_rust', name: 'Heavy Duty', cost: 180000, bonusIncPct: 7, icon: 'fa-industry', color: '#f59e0b' },
+        { id: 'drift_king', name: 'Drift Station', cost: 310000, bonusIncPct: 11, icon: 'fa-flag-checkered', color: '#ff3366' },
+        { id: 'federal_hub', name: 'Logistics Hub', cost: 950000, bonusIncPct: 25, icon: 'fa-globe', color: '#38bdf8' }
     ];
 }
 
-// Каталог анимаций карточки для P2P биржи
+// Каталог анимаций карточки
 if (typeof window.BUSINESS_CARD_ANIMATIONS === 'undefined') {
     window.BUSINESS_CARD_ANIMATIONS = [
-        { id: 'none', name: 'Статичная карточка', cost: 0, className: '' },
-        { id: 'neon_pulse', name: '⚡ Неоновый пульс', cost: 85000, className: 'card-glow-tuned' },
-        { id: 'gold_shimmer', name: '👑 Золотой перелив', cost: 200000, className: 'badge-shimmer-gold' },
-        { id: 'matrix_glitch', name: '💻 Матричный глитч', cost: 160000, className: 'card-anim-shimmer' },
-        { id: 'plasma_storm', name: '🔥 Плазменный шторм', cost: 300000, className: 'card-glow-urgent' }
+        { id: 'none', name: 'Стандарт', cost: 0, className: '' },
+        { id: 'neon_pulse', name: '⚡ Неон-Пульс', cost: 85000, className: 'biz-anim-neon-pulse' },
+        { id: 'gold_shimmer', name: '👑 Золото', cost: 200000, className: 'biz-anim-gold-shimmer' },
+        { id: 'matrix_glitch', name: '💻 Матрица', cost: 160000, className: 'biz-anim-matrix-glitch' },
+        { id: 'plasma_storm', name: '🔥 Плазма', cost: 300000, className: 'biz-anim-plasma-storm' }
     ];
 }
 
-// Список запрещенных слов и оскорблений для модерации названий
+// Эксклюзивные стикеры возле суммы ежедневного дохода
+if (typeof window.BUSINESS_VIP_STICKERS === 'undefined') {
+    window.BUSINESS_VIP_STICKERS = [
+        { id: 'none', icon: '', label: 'Без стикера', cost: 0, cssClass: '' },
+        { id: 'crown', icon: '👑', label: 'Корона Олигарха', cost: 250000, cssClass: 'sticker-crown' },
+        { id: 'diamond', icon: '💎', label: 'Алмазный Статус', cost: 450000, cssClass: 'sticker-diamond' },
+        { id: 'fire', icon: '🔥', label: 'Огненная Прибыль', cost: 180000, cssClass: 'sticker-fire' },
+        { id: 'rocket', icon: '🚀', label: 'Ракета P2P', cost: 320000, cssClass: 'sticker-rocket' },
+        { id: 'moneybag', icon: '💰', label: 'Мешок Рублей', cost: 140000, cssClass: 'sticker-moneybag' },
+        { id: 'shield', icon: '🛡️', label: 'Крыша Синдиката', cost: 500000, cssClass: 'sticker-crown' }
+    ];
+}
+
+// Эффекты и цвет текста названия бизнеса
+if (typeof window.BUSINESS_TITLE_STYLES === 'undefined') {
+    window.BUSINESS_TITLE_STYLES = [
+        { id: 'default', name: 'Белый классический', className: '', cost: 0 },
+        { id: 'cyan_glow', name: 'Неоновый Циан', className: 'biz-title-glow-cyan', cost: 75000 },
+        { id: 'gold_glow', name: 'Имперское Золото', className: 'biz-title-glow-gold', cost: 140000 },
+        { id: 'neon_lime', name: 'Кислотный Лайм', className: 'biz-title-glow-neon', cost: 90000 },
+        { id: 'ruby_red', name: 'Дрифт-Рубин', className: 'biz-title-glow-ruby', cost: 95000 },
+        { id: 'purple_neon', name: 'Теневой Пурпур', className: 'biz-title-glow-purple', cost: 110000 },
+        { id: 'fire_run', name: '🔥 Огненный Градиент', className: 'biz-title-anim-fire', cost: 260000 },
+        { id: 'rainbow_wave', name: '🌈 Радужная Волна', className: 'biz-title-anim-rainbow', cost: 320000 },
+        { id: 'cyber_glitch', name: '💻 Кибер-Глитч', className: 'biz-title-anim-glitch', cost: 210000 }
+    ];
+}
+
 if (typeof window.FORBIDDEN_WORDS_LIST === 'undefined') {
     window.FORBIDDEN_WORDS_LIST = [
         'хуй', 'пизд', 'еб', 'сук', 'бля', 'мраз', 'чмо', 'админ', 'модер', 
@@ -82,41 +119,29 @@ if (typeof window.BUSINESS_FLEET_CATALOG === 'undefined') {
     window.BUSINESS_FLEET_CATALOG = [
         { id: "tow_truck", name: "Эвакуатор «MAN TGL»", cost: 850000, reqStars: 5, incomeBonusPct: 12, stockCapacityBonus: 25, suitableBusinesses: ["sto", "shina", "tow_truck", "razborka"], desc: "Быстрая доставка битых авто и клиентов." },
         { id: "autovoz", name: "Автовоз «Scania»", cost: 2500000, reqStars: 12, incomeBonusPct: 20, stockCapacityBonus: 50, suitableBusinesses: ["detailing", "chip_tuning", "autopodbor", "razborka"], desc: "Массовая перевозка авто из регионов." },
-        { id: "van_parts", name: "Фургон запчастей «Ford Transit»", cost: 450000, reqStars: 3, incomeBonusPct: 8, stockCapacityBonus: 40, suitableBusinesses: ["shina", "sto", "razborka", "chip_tuning"], desc: "Оперативная доставка деталей." },
-        { id: "mobile_wash", name: "Мобильная мойка «Газель Next»", cost: 620000, reqStars: 5, incomeBonusPct: 15, stockCapacityBonus: 15, suitableBusinesses: ["wash", "detailing"], desc: "Выездная мойка и химчистка." },
-        { id: "tuning_lab", name: "Передвижная тюнинг-лаборатория", cost: 1800000, reqStars: 15, incomeBonusPct: 25, stockCapacityBonus: 20, suitableBusinesses: ["chip_tuning", "paint_shop"], desc: "Чип-тюнинг на выезде." },
-        { id: "taxi_fleet", name: "Таксопарк (5 авто)", cost: 1200000, reqStars: 8, incomeBonusPct: 18, stockCapacityBonus: 10, suitableBusinesses: ["taxi"], desc: "Расширение таксопарка." },
-        { id: "customs_truck", name: "Контейнеровоз «MAERSK»", cost: 8500000, reqStars: 25, incomeBonusPct: 35, stockCapacityBonus: 80, suitableBusinesses: ["customs_hub"], desc: "Прямые поставки из портов." }
+        { id: "van_parts", name: "Фургон «Ford Transit»", cost: 450000, reqStars: 3, incomeBonusPct: 8, stockCapacityBonus: 40, suitableBusinesses: ["shina", "sto", "razborka", "chip_tuning"], desc: "Оперативная доставка деталей." },
+        { id: "mobile_wash", name: "Мобильная мойка «Газель»", cost: 620000, reqStars: 5, incomeBonusPct: 15, stockCapacityBonus: 15, suitableBusinesses: ["wash", "detailing"], desc: "Выездная мойка и химчистка." }
     ];
 }
 
 const AppBusiness = {
     activeSubTab: 'list',
     selectedBizIndex: 0,
+    customizerActiveTab: 'skins', // 'skins' | 'anims' | 'stickers' | 'title_fx'
 
     render: function(container) {
         if (!container) return;
 
-        if (!state.businesses || !Array.isArray(state.businesses) || state.businesses.length === 0) {
-            if (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA)) {
-                state.businesses = JSON.parse(JSON.stringify(BUSINESS_DATA));
-            } else {
-                state.businesses = [];
-            }
-        }
+        var sourceList = (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA)) 
+            ? BUSINESS_DATA 
+            : DEFAULT_BUSINESS_CATALOG;
 
-        if (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA)) {
-            BUSINESS_DATA.forEach(function(baseBiz) {
-                var found = false;
-                for (var i = 0; i < state.businesses.length; i++) {
-                    if (state.businesses[i].id === baseBiz.id) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    state.businesses.push(JSON.parse(JSON.stringify(baseBiz)));
-                }
+        if (!state.businesses || !Array.isArray(state.businesses) || state.businesses.length === 0) {
+            state.businesses = JSON.parse(JSON.stringify(sourceList));
+        } else {
+            sourceList.forEach(function(baseBiz) {
+                var found = state.businesses.some(function(b) { return b.id === baseBiz.id; });
+                if (!found) state.businesses.push(JSON.parse(JSON.stringify(baseBiz)));
             });
         }
 
@@ -129,7 +154,7 @@ const AppBusiness = {
 
         for (var i = 0; i < state.businesses.length; i++) {
             var b = state.businesses[i];
-            if (b && b.level > 0) {
+            if (b && (b.level || 0) > 0) {
                 ownedCount++;
                 totalIncome += this.calculateBusinessIncome(b);
                 totalStored += (b.stored || 0);
@@ -147,10 +172,10 @@ const AppBusiness = {
 
         var summaryHtml = 
             '<div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.15), rgba(9, 14, 24, 0.98)); border-color: rgba(0, 230, 118, 0.35);">' +
-                '<div class="flex-between mb-1">' +
+                '<div class="flex-between">' +
                     '<div>' +
-                        '<span class="sub-label" style="font-size:9px;">Пассивный доход сети:</span>' +
-                        '<div class="price-val color-green" style="font-size:16px;">+' + totalIncome.toLocaleString() + ' ₽/день</div>' +
+                        '<span class="sub-label" style="font-size:8.5px;">Пассивный доход сети:</span>' +
+                        '<div class="price-val color-green" style="font-size:15px;">+' + totalIncome.toLocaleString() + ' ₽/день</div>' +
                     '</div>' +
                     '<span class="tag-badge bg-tag-green">Точек: ' + ownedCount + ' из ' + state.businesses.length + '</span>' +
                 '</div>' +
@@ -183,9 +208,12 @@ const AppBusiness = {
             if (b.maxStock === undefined || b.maxStock <= 0) b.maxStock = 100;
             if (b.stock === undefined) b.stock = 100;
             if (b.stored === undefined) b.stored = 0;
+            if (b.level === undefined) b.level = 0;
             if (!b.customName) b.customName = b.name;
             if (!b.coverSkin) b.coverSkin = 'classic';
             if (!b.cardAnimation) b.cardAnimation = 'none';
+            if (!b.vipSticker) b.vipSticker = 'none';
+            if (!b.titleStyle) b.titleStyle = 'default';
         }
     },
 
@@ -202,7 +230,7 @@ const AppBusiness = {
     },
 
     calculateBusinessIncome: function(biz) {
-        if (!biz || biz.level <= 0) return 0;
+        if (!biz || (biz.level || 0) <= 0) return 0;
         var base = (biz.income || 1000) * biz.level;
         var bonusMul = this.calculateBusinessMultiplier(biz);
         return Math.round(base * bonusMul);
@@ -212,7 +240,6 @@ const AppBusiness = {
         if (!biz) return 1.0;
         var bonusMul = 1.0;
 
-        // Бонус от обложки
         if (biz.coverSkin && typeof BUSINESS_COVER_SKINS !== 'undefined') {
             var skin = BUSINESS_COVER_SKINS.find(function(s) { return s.id === biz.coverSkin; });
             if (skin && skin.bonusIncPct) bonusMul += (skin.bonusIncPct / 100);
@@ -254,28 +281,174 @@ const AppBusiness = {
         return bonusMul;
     },
 
-    // ========================================================
-    // МОДЕРАЦИЯ И ПРОВЕРКА НАПРЯМУЮ ЧЕРЕЗ СОГЛАШЕНИЕ
-    // ========================================================
     validateCustomName: function(nameStr) {
         if (!nameStr || typeof nameStr !== 'string') return "Предприятие";
         var clean = nameStr.trim();
         if (clean.length < 2) return "Предприятие";
-        if (clean.length > 32) clean = clean.substring(0, 32);
+        if (clean.length > 28) clean = clean.substring(0, 28);
 
         var lower = clean.toLowerCase();
         var forbidden = window.FORBIDDEN_WORDS_LIST || [];
         for (var i = 0; i < forbidden.length; i++) {
-            if (lower.indexOf(forbidden[i]) !== -1) {
-                return "Заблокировано цензурой";
-            }
+            if (lower.indexOf(forbidden[i]) !== -1) return "Заблокировано цензурой";
         }
         return clean;
     },
 
+    renderBusinessesListHtml: function() {
+        var lvl = state.player ? (state.player.level || 1) : 1;
+        var html = "";
+
+        var defaultIcons = {
+            wash: 'fa-soap', shina: 'fa-compact-disc', sto: 'fa-screwdriver-wrench',
+            tow_truck: 'fa-truck-pickup', detailing: 'fa-spray-can-sparkles',
+            chip_tuning: 'fa-microchip', razborka: 'fa-car-burst'
+        };
+
+        var fallbackMap = {
+            wash: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80',
+            shina: 'https://images.unsplash.com/photo-1578844251758-2f71da64c96f?auto=format&fit=crop&w=600&q=80',
+            sto: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
+            detailing: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80',
+            chip_tuning: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
+            razborka: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?auto=format&fit=crop&w=600&q=80'
+        };
+
+        for (var idx = 0; idx < state.businesses.length; idx++) {
+            var biz = state.businesses[idx];
+            if (!biz) continue;
+
+            var isLocked = lvl < (biz.minLevel || 1);
+            var isOwned = (biz.level || 0) > 0;
+            var cost = isOwned ? Math.round(biz.cost * (biz.level + 1)) : biz.cost;
+            var calculatedIncome = isOwned ? this.calculateBusinessIncome(biz) : (biz.income || 1000);
+            var maxStk = biz.maxStock || 100;
+            var curStk = biz.stock !== undefined ? biz.stock : 100;
+            var curStored = biz.stored || 0;
+
+            var stockPct = Math.min(100, Math.round((curStk / maxStk) * 100));
+            var stockColor = stockPct > 40 ? 'var(--green)' : (stockPct > 15 ? 'var(--amber)' : 'var(--red)');
+
+            var safeCapacity = Math.max(50000, calculatedIncome * 3);
+            var cashFillPct = Math.min(100, Math.round((curStored / safeCapacity) * 100));
+
+            var multiplier = this.calculateBusinessMultiplier(biz);
+            var bonusPctText = Math.round((multiplier - 1) * 100);
+
+            var rawImg = biz.img || ('assets/business/' + biz.id + '.jpg');
+            var bizImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
+            var fallbackImg = biz.fallback || fallbackMap[biz.id] || 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80';
+
+            var iconClass = defaultIcons[biz.id] || 'fa-briefcase';
+            var displayName = isOwned ? (biz.customName || biz.name) : biz.name;
+
+            // Класс анимации карточки
+            var animClass = "";
+            if (isOwned && biz.cardAnimation && typeof BUSINESS_CARD_ANIMATIONS !== 'undefined') {
+                var aObj = BUSINESS_CARD_ANIMATIONS.find(function(a) { return a.id === biz.cardAnimation; });
+                if (aObj) animClass = aObj.className;
+            }
+
+            // Стикер возле суммы дохода
+            var stickerHtml = "";
+            if (isOwned && biz.vipSticker && typeof BUSINESS_VIP_STICKERS !== 'undefined') {
+                var stObj = BUSINESS_VIP_STICKERS.find(function(s) { return s.id === biz.vipSticker; });
+                if (stObj && stObj.icon) {
+                    stickerHtml = '<span class="biz-vip-sticker ' + stObj.cssClass + '" title="' + stObj.label + '">' + stObj.icon + '</span>';
+                }
+            }
+
+            // Оформление текста названия
+            var titleFxClass = "";
+            if (isOwned && biz.titleStyle && typeof BUSINESS_TITLE_STYLES !== 'undefined') {
+                var tObj = BUSINESS_TITLE_STYLES.find(function(t) { return t.id === biz.titleStyle; });
+                if (tObj) titleFxClass = tObj.className;
+            }
+
+            var actionBlock = "";
+            if (isLocked) {
+                actionBlock = '<button class="btn btn-dark btn-sm w-full opacity-50" disabled>🔒 Откроется с ' + biz.minLevel + ' уровня</button>';
+            } else if (!isOwned) {
+                actionBlock = 
+                    '<button onclick="AppBusiness.buyNewBusinessAction(' + idx + ')" class="btn btn-cyan btn-sm w-full font-bold">' +
+                        'Купить объект (' + (cost / 1000).toFixed(0) + 'k ₽' + (biz.reqStars ? ' + ' + biz.reqStars + ' ⭐' : '') + ')' +
+                    '</button>';
+            } else {
+                actionBlock = 
+                    '<div class="biz-actions-panel">' +
+                        '<button onclick="AppBusiness.collectCashSingle(' + idx + ')" class="btn btn-green btn-sm w-full font-bold"' + (curStored <= 0 ? ' disabled' : '') + '>' +
+                            '<i class="fa-solid fa-vault mr-1"></i> Снять кассу (' + curStored.toLocaleString() + ' ₽)' +
+                        '</button>' +
+                        '<div class="biz-quick-actions-row">' +
+                            '<button onclick="AppBusiness.restockSingle(' + idx + ')" class="btn btn-amber btn-sm" style="font-size:9.5px; padding:6px 2px;"' + (curStk >= maxStk ? ' disabled' : '') + '>' +
+                                '📦 Сырьё (15k)' +
+                            '</button>' +
+                            '<button onclick="AppBusiness.upgradeLevelSingle(' + idx + ')" class="btn btn-cyan btn-sm" style="font-size:9.5px; padding:6px 2px;">' +
+                                '⬆️ Ур. ' + (biz.level + 1) + ' (' + (cost / 1000).toFixed(0) + 'k)' +
+                            '</button>' +
+                            '<button onclick="AppBusiness.openCustomizationModal(' + idx + ')" class="btn btn-purple btn-sm" style="font-size:9.5px; padding:6px 2px;">' +
+                                '🎨 Бренд' +
+                            '</button>' +
+                        '</div>' +
+                    '</div>';
+            }
+
+            html += 
+                '<div class="glass-card mb-2 p-2 biz-card-compact ' + animClass + '">' +
+                    '<div class="car-img-wrap mb-1" style="height:115px; position:relative; cursor:pointer;" onclick="AppBusiness.selectBusinessForDetail(' + idx + ')" title="Открыть цех">' +
+                        '<img src="' + bizImg + '" class="car-img" onerror="this.onerror=null; this.src=\'' + fallbackImg + '\';">' +
+                        '<div class="biz-cover-badge">' +
+                            '<div class="biz-brand-pill">' +
+                                '<i class="fa-solid ' + iconClass + ' color-green"></i>' +
+                                '<span class="biz-brand-name ' + titleFxClass + '">' + displayName + '</span>' +
+                            '</div>' +
+                            '<span class="tag-badge ' + (isOwned ? 'bg-tag-green' : 'bg-tag-amber') + '">' +
+                                (isOwned ? 'Ур. ' + biz.level : 'СВОБОДЕН') +
+                            '</span>' +
+                        '</div>' +
+                    '</div>' +
+
+                    '<div class="flex-between mb-1">' +
+                        '<span class="sub-label" style="font-size:8.5px; line-height:1.2; max-width:65%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + (biz.perk || biz.desc) + '</span>' +
+                        '<div class="biz-income-badge-wrap">' +
+                            stickerHtml +
+                            '<span class="tag-badge bg-tag-green font-bold">+' + calculatedIncome.toLocaleString() + ' ₽/д</span>' +
+                        '</div>' +
+                    '</div>' +
+
+                    (isOwned ? (
+                        '<div class="biz-telemetry-trio">' +
+                            '<div class="biz-telemetry-cell">' +
+                                '<div class="biz-telemetry-title"><i class="fa-solid fa-bolt color-green"></i> Доход:</div>' +
+                                '<div class="biz-telemetry-val color-green">+' + (bonusPctText > 0 ? bonusPctText + '%' : '0%') + '</div>' +
+                                '<div class="biz-micro-bar"><div class="biz-micro-bar-fill" style="width:100%; background:var(--green);"></div></div>' +
+                            '</div>' +
+
+                            '<div class="biz-telemetry-cell">' +
+                                '<div class="biz-telemetry-title"><i class="fa-solid fa-vault color-cyan"></i> Касса:</div>' +
+                                '<div class="biz-telemetry-val color-cyan">' + (curStored / 1000).toFixed(1) + 'k ₽</div>' +
+                                '<div class="biz-micro-bar"><div class="biz-micro-bar-fill" style="width:' + cashFillPct + '%; background:var(--cyan);"></div></div>' +
+                            '</div>' +
+
+                            '<div class="biz-telemetry-cell">' +
+                                '<div class="biz-telemetry-title"><i class="fa-solid fa-boxes-stacked" style="color:' + stockColor + ';"></i> Склад:</div>' +
+                                '<div class="biz-telemetry-val" style="color:' + stockColor + ';">' + curStk + '%</div>' +
+                                '<div class="biz-micro-bar"><div class="biz-micro-bar-fill" style="width:' + stockPct + '%; background:' + stockColor + ';"></div></div>' +
+                            '</div>' +
+                        '</div>'
+                    ) : '') +
+
+                    actionBlock +
+                '</div>';
+        }
+
+        return html;
+    },
+
     openCustomizationModal: function(idx) {
         var biz = state.businesses[idx];
-        if (!biz || biz.level <= 0) return;
+        if (!biz || (biz.level || 0) <= 0) return;
+        this.selectedBizIndex = idx;
 
         var modal = document.getElementById('modalBusinessCustomize');
         if (!modal) {
@@ -285,52 +458,145 @@ const AppBusiness = {
             document.body.appendChild(modal);
         }
 
-        var skinsHtml = '';
-        BUSINESS_COVER_SKINS.forEach(function(skin) {
-            var isSel = biz.coverSkin === skin.id;
-            skinsHtml += '<div onclick="AppBusiness.selectSkinAction(' + idx + ', \'' + skin.id + '\')" class="glass-card p-2 mb-1 flex-between cursor-pointer ' + (isSel ? 'personal-car-card' : '') + '" style="border-color:' + skin.color + ';">' +
-                '<div class="flex-gap" style="align-items:center;">' +
-                    '<i class="fa-solid ' + skin.icon + ' fa-lg" style="color:' + skin.color + ';"></i>' +
-                    '<div><b>' + skin.name + '</b><div class="sub-label" style="font-size:8px;">Доход: +' + skin.bonusIncPct + '%</div></div>' +
-                '</div>' +
-                '<span class="tag-badge ' + (isSel ? 'bg-tag-green' : 'bg-tag-cyan') + '">' + (isSel ? 'НАДЕТО ✓' : (skin.cost > 0 ? skin.cost.toLocaleString() + ' ₽' : 'БЕСПЛАТНО')) + '</span>' +
-            '</div>';
-        });
-
-        var animsHtml = '';
-        BUSINESS_CARD_ANIMATIONS.forEach(function(anim) {
-            var isSel = biz.cardAnimation === anim.id;
-            animsHtml += '<div onclick="AppBusiness.selectAnimAction(' + idx + ', \'' + anim.id + '\')" class="glass-card p-2 mb-1 flex-between cursor-pointer ' + (isSel ? 'personal-car-card' : '') + '">' +
-                '<div><b>' + anim.name + '</b></div>' +
-                '<span class="tag-badge ' + (isSel ? 'bg-tag-green' : 'bg-tag-cyan') + '">' + (isSel ? 'АКТИВНО ✓' : (anim.cost > 0 ? anim.cost.toLocaleString() + ' ₽' : 'СТАНДАРТ')) + '</span>' +
-            '</div>';
-        });
-
-        modal.innerHTML = '<div class="modal-box" style="max-width:440px; max-height:85vh; overflow-y:auto;">' +
-            '<div class="flex-between mb-2">' +
-                '<div class="modal-glow-badge"><i class="fa-solid fa-paintbrush"></i> КАСТОМИЗАЦИЯ БИЗНЕСА</div>' +
-                '<button onclick="ModalManager.close(\'modalBusinessCustomize\')" class="btn btn-dark btn-auto btn-sm">✕</button>' +
-            '</div>' +
-
-            '<div class="sub-label mb-2" style="font-size:9.5px;">Укажите уникальное название предприятия и выберите визуальный стиль бренда.</div>' +
-
-            '<div class="mb-3">' +
-                '<label class="sub-label text-xs mb-1 block">Название компании (Внимание: действует цензура!):</label>' +
-                '<input type="text" id="inputBizCustomName" value="' + (biz.customName || biz.name) + '" class="glass-input w-full mb-1" placeholder="Введите название..." style="padding:8px; font-size:12px;">' +
-                '<button onclick="AppBusiness.saveCustomNameAction(' + idx + ')" class="btn btn-green btn-sm w-full font-bold">Сохранить название ✓</button>' +
-            '</div>' +
-
-            '<b class="text-xs color-cyan block mb-1">🎨 Выбор обложки цеха:</b>' +
-            '<div class="space-y-1 mb-3">' + skinsHtml + '</div>' +
-
-            '<b class="text-xs color-purple block mb-1">✨ Анимация карточки для P2P биржи:</b>' +
-            '<div class="space-y-1 mb-3">' + animsHtml + '</div>' +
-
-            '<button onclick="ModalManager.close(\'modalBusinessCustomize\')" class="btn btn-cyan w-full font-bold">Готово</button>' +
-        '</div>';
-
+        this.renderCustomizerModalContent();
         ModalManager.open('modalBusinessCustomize');
         if (typeof playSound === 'function') playSound('tick');
+    },
+
+    switchCustomizerTab: function(tab) {
+        this.customizerActiveTab = tab;
+        this.renderCustomizerModalContent();
+        if (typeof playSound === 'function') playSound('tick');
+    },
+
+    renderCustomizerModalContent: function() {
+        var modal = document.getElementById('modalBusinessCustomize');
+        if (!modal) return;
+        var idx = this.selectedBizIndex;
+        var biz = state.businesses[idx];
+        if (!biz) return;
+
+        var activeSkin = BUSINESS_COVER_SKINS.find(function(s) { return s.id === (biz.coverSkin || 'classic'); }) || BUSINESS_COVER_SKINS[0];
+        var activeAnim = BUSINESS_CARD_ANIMATIONS.find(function(a) { return a.id === (biz.cardAnimation || 'none'); }) || BUSINESS_CARD_ANIMATIONS[0];
+        var activeSticker = BUSINESS_VIP_STICKERS.find(function(s) { return s.id === (biz.vipSticker || 'none'); }) || BUSINESS_VIP_STICKERS[0];
+        var activeTitleStyle = BUSINESS_TITLE_STYLES.find(function(t) { return t.id === (biz.titleStyle || 'default'); }) || BUSINESS_TITLE_STYLES[0];
+        var calcInc = this.calculateBusinessIncome(biz);
+
+        // Навигация по табам в 4 кнопки
+        var tabsHtml = 
+            '<div class="grid-4 mb-2" style="grid-template-columns: repeat(4, 1fr); gap: 3px;">' +
+                '<button onclick="AppBusiness.switchCustomizerTab(\'skins\')" class="btn ' + (this.customizerActiveTab === 'skins' ? 'btn-cyan' : 'btn-dark') + ' btn-sm" style="font-size:8.5px; padding:6px 2px;">🎨 Скины</button>' +
+                '<button onclick="AppBusiness.switchCustomizerTab(\'anims\')" class="btn ' + (this.customizerActiveTab === 'anims' ? 'btn-purple' : 'btn-dark') + ' btn-sm" style="font-size:8.5px; padding:6px 2px;">✨ Аура</button>' +
+                '<button onclick="AppBusiness.switchCustomizerTab(\'stickers\')" class="btn ' + (this.customizerActiveTab === 'stickers' ? 'btn-amber' : 'btn-dark') + ' btn-sm" style="font-size:8.5px; padding:6px 2px;">💎 Стикер</button>' +
+                '<button onclick="AppBusiness.switchCustomizerTab(\'title_fx\')" class="btn ' + (this.customizerActiveTab === 'title_fx' ? 'btn-green' : 'btn-dark') + ' btn-sm" style="font-size:8.5px; padding:6px 2px;">🔤 Текст</button>' +
+            '</div>';
+
+        var tabBodyHtml = '';
+
+        if (this.customizerActiveTab === 'skins') {
+            var gridTiles = '';
+            BUSINESS_COVER_SKINS.forEach(function(skin) {
+                var isSel = biz.coverSkin === skin.id;
+                var isBought = (skin.cost === 0) || (biz.ownedSkins && biz.ownedSkins.includes(skin.id));
+                var priceText = isBought ? 'Куплено' : (skin.cost / 1000).toFixed(0) + 'k ₽';
+
+                gridTiles += 
+                    '<div onclick="AppBusiness.selectSkinAction(' + idx + ', \'' + skin.id + '\')" class="biz-skin-tile ' + (isSel ? 'selected' : '') + '" style="border-color:' + (isSel ? 'var(--cyan)' : skin.color) + ';">' +
+                        '<div class="flex-between">' +
+                            '<i class="fa-solid ' + skin.icon + '" style="color:' + skin.color + '; font-size:14px;"></i>' +
+                            '<span class="tag-badge bg-tag-green" style="font-size:7.5px;">+' + skin.bonusIncPct + '%</span>' +
+                        '</div>' +
+                        '<b class="text-xs" style="font-size:10px; line-height:1.15; color:#fff;">' + skin.name + '</b>' +
+                        '<span class="tag-badge ' + (isSel ? 'bg-tag-green' : (isBought ? 'bg-tag-dark' : 'bg-tag-cyan')) + '" style="font-size:8px; align-self:flex-start;">' + (isSel ? 'ВЫБРАНО ✓' : priceText) + '</span>' +
+                    '</div>';
+            });
+            tabBodyHtml = '<div class="biz-skins-grid mb-2">' + gridTiles + '</div>';
+
+        } else if (this.customizerActiveTab === 'anims') {
+            var animTiles = '';
+            BUSINESS_CARD_ANIMATIONS.forEach(function(anim) {
+                var isSel = biz.cardAnimation === anim.id;
+                var isBought = (anim.cost === 0) || (biz.ownedAnims && biz.ownedAnims.includes(anim.id));
+                var priceText = isBought ? 'Куплено' : (anim.cost / 1000).toFixed(0) + 'k ₽';
+
+                animTiles += 
+                    '<div onclick="AppBusiness.selectAnimAction(' + idx + ', \'' + anim.id + '\')" class="glass-card p-2 mb-1 flex-between cursor-pointer ' + (isSel ? 'personal-car-card' : '') + '">' +
+                        '<b class="text-xs color-purple">' + anim.name + '</b>' +
+                        '<span class="tag-badge ' + (isSel ? 'bg-tag-green' : (isBought ? 'bg-tag-dark' : 'bg-tag-purple')) + '">' + (isSel ? 'АКТИВНО ✓' : priceText) + '</span>' +
+                    '</div>';
+            });
+            tabBodyHtml = '<div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto;">' + animTiles + '</div>';
+
+        } else if (this.customizerActiveTab === 'stickers') {
+            var stickerTiles = '';
+            BUSINESS_VIP_STICKERS.forEach(function(st) {
+                var isSel = (biz.vipSticker || 'none') === st.id;
+                var isBought = (st.cost === 0) || (biz.ownedStickers && biz.ownedStickers.includes(st.id));
+                var priceText = isBought ? 'Куплено' : (st.cost / 1000).toFixed(0) + 'k ₽';
+
+                stickerTiles += 
+                    '<div onclick="AppBusiness.selectStickerAction(' + idx + ', \'' + st.id + '\')" class="glass-card p-2 mb-1 flex-between cursor-pointer ' + (isSel ? 'personal-car-card' : '') + '">' +
+                        '<div class="flex-gap" style="align-items:center;">' +
+                            '<span style="font-size:18px;">' + (st.icon || '🚫') + '</span>' +
+                            '<div><b class="text-xs">' + st.label + '</b><div class="sub-label" style="font-size:8px;">Отображается рядом с доходом</div></div>' +
+                        '</div>' +
+                        '<span class="tag-badge ' + (isSel ? 'bg-tag-green' : (isBought ? 'bg-tag-dark' : 'bg-tag-amber')) + '">' + (isSel ? 'ВЫБРАН ✓' : priceText) + '</span>' +
+                    '</div>';
+            });
+            tabBodyHtml = '<div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto;">' + stickerTiles + '</div>';
+
+        } else if (this.customizerActiveTab === 'title_fx') {
+            var titleTiles = '';
+            BUSINESS_TITLE_STYLES.forEach(function(tf) {
+                var isSel = (biz.titleStyle || 'default') === tf.id;
+                var isBought = (tf.cost === 0) || (biz.ownedTitleStyles && biz.ownedTitleStyles.includes(tf.id));
+                var priceText = isBought ? 'Куплено' : (tf.cost / 1000).toFixed(0) + 'k ₽';
+
+                titleTiles += 
+                    '<div onclick="AppBusiness.selectTitleStyleAction(' + idx + ', \'' + tf.id + '\')" class="glass-card p-2 mb-1 flex-between cursor-pointer ' + (isSel ? 'personal-car-card' : '') + '">' +
+                        '<b class="text-xs ' + tf.className + '">' + tf.name + '</b>' +
+                        '<span class="tag-badge ' + (isSel ? 'bg-tag-green' : (isBought ? 'bg-tag-dark' : 'bg-tag-green')) + '">' + (isSel ? 'АКТИВЕН ✓' : priceText) + '</span>' +
+                    '</div>';
+            });
+            tabBodyHtml = '<div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto;">' + titleTiles + '</div>';
+        }
+
+        modal.innerHTML = 
+            '<div class="modal-box" style="max-width:420px; max-height:88vh; overflow-y:auto;">' +
+                '<div class="flex-between mb-2">' +
+                    '<div class="modal-glow-badge"><i class="fa-solid fa-paintbrush"></i> СТИЛЬ И БРЕНД ПРЕДПРИЯТИЯ</div>' +
+                    '<button onclick="ModalManager.close(\'modalBusinessCustomize\')" class="btn btn-dark btn-auto btn-sm">✕</button>' +
+                '</div>' +
+
+                '<!-- LIVE PREVIEW -->' +
+                '<div class="biz-live-preview-box ' + activeAnim.className + '">' +
+                    '<div class="flex-between mb-1">' +
+                        '<div class="flex-gap" style="align-items:center;">' +
+                            '<i class="fa-solid ' + activeSkin.icon + '" style="color:' + activeSkin.color + ';"></i>' +
+                            '<b class="text-xs ' + activeTitleStyle.className + '" id="previewBizTitle">' + (biz.customName || biz.name) + '</b>' +
+                        '</div>' +
+                        '<div class="biz-income-badge-wrap">' +
+                            (activeSticker.icon ? '<span class="biz-vip-sticker ' + activeSticker.cssClass + '">' + activeSticker.icon + '</span>' : '') +
+                            '<span class="tag-badge bg-tag-green">+' + calcInc.toLocaleString() + ' ₽/д</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="sub-label" style="font-size:8px;">Стиль: <b>' + activeSkin.name + '</b> | Эффект: <b>' + activeAnim.name + '</b></div>' +
+                '</div>' +
+
+                '<!-- НАЗВАНИЕ -->' +
+                '<div class="mb-2">' +
+                    '<label class="sub-label mb-1 block" style="font-size:9px;">Название бизнеса (действует цензура):</label>' +
+                    '<div class="flex-gap">' +
+                        '<input type="text" id="inputBizCustomName" value="' + (biz.customName || biz.name) + '" class="glass-input flex-1" placeholder="Введите бренд..." style="padding:6px 8px; font-size:11px;" oninput="document.getElementById(\'previewBizTitle\').innerText = this.value || \'Предприятие\';">' +
+                        '<button onclick="AppBusiness.saveCustomNameAction(' + idx + ')" class="btn btn-green btn-auto btn-sm font-bold" style="padding:6px 10px;">OK ✓</button>' +
+                    '</div>' +
+                '</div>' +
+
+                tabsHtml +
+                tabBodyHtml +
+
+                '<button onclick="ModalManager.close(\'modalBusinessCustomize\')" class="btn btn-cyan w-full font-bold">Применить и закрыть ✓</button>' +
+            '</div>';
     },
 
     saveCustomNameAction: function(idx) {
@@ -339,18 +605,16 @@ const AppBusiness = {
         var biz = state.businesses[idx];
         if (!biz) return;
 
-        var raw = input.value;
-        var validated = this.validateCustomName(raw);
-
+        var validated = this.validateCustomName(input.value);
         if (validated === "Заблокировано цензурой") {
-            showToast("🚫 Название содержит запрещенные слова или оскорбления!");
+            showToast("🚫 Название отклонено: обнаружены запрещённые слова!");
             if (typeof playSound === 'function') playSound('error');
             return;
         }
 
         biz.customName = validated;
         saveState();
-        showToast("Название компании успешно обновлено: «" + validated + "» ✓");
+        showToast("Бренд обновлён: «" + validated + "» ✓");
         if (typeof playSound === 'function') playSound('win');
         this.render(document.getElementById('phoneAppContainer'));
     },
@@ -361,9 +625,9 @@ const AppBusiness = {
         var skin = BUSINESS_COVER_SKINS.find(function(s) { return s.id === skinId; });
         if (!skin) return;
 
-        if (skin.cost > 0 && !biz.ownedSkins?.includes(skinId)) {
+        if (skin.cost > 0 && (!biz.ownedSkins || !biz.ownedSkins.includes(skinId))) {
             var cash = state.player ? (state.player.cash || 0) : 0;
-            if (cash < skin.cost) return showToast("Не хватает денег на покупку обложки (" + skin.cost.toLocaleString() + " ₽)!");
+            if (cash < skin.cost) return showToast("Не хватает " + skin.cost.toLocaleString() + " ₽!");
             state.player.cash -= skin.cost;
             if (!biz.ownedSkins) biz.ownedSkins = ['classic'];
             biz.ownedSkins.push(skinId);
@@ -372,9 +636,8 @@ const AppBusiness = {
         biz.coverSkin = skinId;
         saveState();
         updateHeaderUI();
-        showToast("Установлена новая обложка: «" + skin.name + "»!");
         if (typeof playSound === 'function') playSound('win');
-        this.openCustomizationModal(idx);
+        this.renderCustomizerModalContent();
         this.render(document.getElementById('phoneAppContainer'));
     },
 
@@ -384,9 +647,9 @@ const AppBusiness = {
         var anim = BUSINESS_CARD_ANIMATIONS.find(function(a) { return a.id === animId; });
         if (!anim) return;
 
-        if (anim.cost > 0 && !biz.ownedAnims?.includes(animId)) {
+        if (anim.cost > 0 && (!biz.ownedAnims || !biz.ownedAnims.includes(animId))) {
             var cash = state.player ? (state.player.cash || 0) : 0;
-            if (cash < anim.cost) return showToast("Не хватает денег на анимацию (" + anim.cost.toLocaleString() + " ₽)!");
+            if (cash < anim.cost) return showToast("Не хватает " + anim.cost.toLocaleString() + " ₽!");
             state.player.cash -= anim.cost;
             if (!biz.ownedAnims) biz.ownedAnims = ['none'];
             biz.ownedAnims.push(animId);
@@ -395,180 +658,62 @@ const AppBusiness = {
         biz.cardAnimation = animId;
         saveState();
         updateHeaderUI();
-        showToast("Анимация карточки обновлена!");
         if (typeof playSound === 'function') playSound('win');
-        this.openCustomizationModal(idx);
+        this.renderCustomizerModalContent();
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // ========================================================
-    // 1. ВКЛАДКА «ТОЧКИ» С УНИКАЛЬНЫМИ ИМЕНАМИ И КНОПКОЙ КАСТОМИЗАЦИИ
-    // ========================================================
-    renderBusinessesListHtml: function() {
-        var lvl = state.player ? (state.player.level || 1) : 1;
-        var html = "";
+    selectStickerAction: function(idx, stickerId) {
+        var biz = state.businesses[idx];
+        if (!biz) return;
+        var st = BUSINESS_VIP_STICKERS.find(function(s) { return s.id === stickerId; });
+        if (!st) return;
 
-        var defaultIcons = {
-            wash: 'fa-soap', shina: 'fa-compact-disc', sto: 'fa-screwdriver-wrench',
-            tow_truck: 'fa-truck-pickup', paint_shop: 'fa-paint-roller', detailing: 'fa-spray-can-sparkles',
-            chip_tuning: 'fa-microchip', razborka: 'fa-car-burst', autopodbor: 'fa-magnifying-glass-chart',
-            taxi: 'fa-taxi', customs_hub: 'fa-ship'
-        };
-
-        var fallbackMap = {
-            wash: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80',
-            shina: 'https://images.unsplash.com/photo-1578844251758-2f71da64c96f?auto=format&fit=crop&w=600&q=80',
-            sto: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-            tow_truck: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80',
-            paint_shop: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80',
-            chip_tuning: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
-            detailing: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80',
-            razborka: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?auto=format&fit=crop&w=600&q=80',
-            autopodbor: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80',
-            taxi: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80',
-            customs_hub: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80'
-        };
-
-        for (var idx = 0; idx < state.businesses.length; idx++) {
-            var biz = state.businesses[idx];
-            if (!biz) continue;
-
-            var isLocked = lvl < (biz.minLevel || 1);
-            var isOwned = biz.level > 0;
-            var cost = isOwned ? Math.round(biz.cost * (biz.level + 1)) : biz.cost;
-            var calculatedIncome = isOwned ? this.calculateBusinessIncome(biz) : (biz.income || 1000);
-            var maxStk = biz.maxStock || 100;
-            var curStk = biz.stock !== undefined ? biz.stock : 100;
-            var curStored = biz.stored || 0;
-
-            var stockPct = Math.min(100, Math.round((curStk / maxStk) * 100));
-            var stockBarClass = stockPct > 40 ? 'fill-biz-stock' : (stockPct > 15 ? 'fill-condition-mid' : 'risk-high');
-            var stockColor = stockPct > 40 ? 'color-green' : (stockPct > 15 ? 'color-amber' : 'color-red');
-
-            var multiplier = this.calculateBusinessMultiplier(biz);
-            var effPct = Math.min(100, Math.round((multiplier / 2.5) * 100));
-            var bonusPctText = Math.round((multiplier - 1) * 100);
-
-            var safeCapacity = Math.max(50000, calculatedIncome * 3);
-            var cashFillPct = Math.min(100, Math.round((curStored / safeCapacity) * 100));
-
-            var rawImg = biz.img || ('assets/business/' + biz.id + '.jpg');
-            var bizImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
-            var fallbackImg = biz.fallback || fallbackMap[biz.id] || 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80';
-
-            var actionBlock = "";
-            if (isLocked) {
-                actionBlock = '<button class="btn btn-dark btn-sm w-full opacity-50" disabled>С ' + biz.minLevel + ' уровня авторитета</button>';
-            } else if (!isOwned) {
-                actionBlock = 
-                    '<button onclick="AppBusiness.buyNewBusinessAction(' + idx + ')" class="btn btn-cyan btn-sm w-full font-bold">' +
-                        'Купить объект (' + (cost / 1000).toFixed(0) + 'k ₽ + ' + (biz.reqStars || 0) + ' ⭐)' +
-                    '</button>';
-            } else {
-                actionBlock = 
-                    '<div class="grid-2 mb-1">' +
-                        '<button onclick="AppBusiness.selectBusinessForDetail(' + idx + ')" class="btn btn-dark btn-sm">' +
-                            '⚙️ Управление цехом' +
-                        '</button>' +
-                        '<button onclick="AppBusiness.collectCashSingle(' + idx + ')" class="btn btn-green btn-sm"' + (curStored <= 0 ? ' disabled' : '') + '>' +
-                            'Снять (' + curStored.toLocaleString() + ' ₽)' +
-                        '</button>' +
-                    '</div>' +
-                    '<div class="grid-2 mb-1">' +
-                        '<button onclick="AppBusiness.restockSingle(' + idx + ')" class="btn btn-amber btn-sm"' + (curStk >= maxStk ? ' disabled' : '') + '>' +
-                            'Сырьё (15k)' +
-                        '</button>' +
-                        '<button onclick="AppBusiness.upgradeLevelSingle(' + idx + ')" class="btn btn-cyan btn-sm">' +
-                            '+Уровень (' + (cost / 1000).toFixed(0) + 'k)' +
-                        '</button>' +
-                    '</div>' +
-                    '<button onclick="AppBusiness.openCustomizationModal(' + idx + ')" class="btn btn-purple btn-sm w-full">' +
-                        '🎨 Название, Скин и Бренд' +
-                    '</button>';
-            }
-
-            var staffBadge = "";
-            if (isOwned && biz.staff && biz.staff.manager) {
-                staffBadge += '<span class="tag-badge bg-tag-green ml-1" style="font-size:7.5px;">МЕНЕДЖЕР ✓</span>';
-            }
-            if (isOwned && Array.isArray(biz.fleet) && biz.fleet.length > 0) {
-                staffBadge += '<span class="tag-badge bg-tag-cyan ml-1" style="font-size:7.5px;">ФЛОТ: ' + biz.fleet.length + '</span>';
-            }
-
-            var iconClass = defaultIcons[biz.id] || 'fa-briefcase';
-            var displayName = isOwned ? (biz.customName || biz.name) : biz.name;
-
-            html += 
-                '<div class="glass-card mb-3 p-2">' +
-                    '<div class="car-img-wrap mb-2" style="height:130px; position:relative;">' +
-                        '<img src="' + bizImg + '" class="car-img" onerror="this.onerror=null; this.src=\'' + fallbackImg + '\';">' +
-                        '<div class="badge-tag badge-br">' +
-                            '<span class="tag-badge ' + (isOwned ? 'bg-tag-green' : 'bg-tag-amber') + '">' +
-                                (isOwned ? 'Ур. ' + biz.level : 'ДОСТУПНО') +
-                            '</span>' +
-                        '</div>' +
-                    '</div>' +
-
-                    '<div class="flex-between mb-1">' +
-                        '<div>' +
-                            '<b class="text-xs color-green" style="font-size:13px;"><i class="fa-solid ' + iconClass + ' mr-1"></i> ' + displayName + '</b>' +
-                            staffBadge +
-                        '</div>' +
-                        '<span class="tag-badge bg-tag-green">+' + calculatedIncome.toLocaleString() + ' ₽/д</span>' +
-                    '</div>' +
-
-                    '<div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">' + (biz.desc || '') + '</div>' +
-
-                    (isOwned ? (
-                        '<div class="car-telemetry-panel mb-2" style="background:#090e18; border-radius:10px; padding:8px; border:1px solid rgba(255,255,255,0.06);">' +
-                            '<div class="telemetry-row mb-1">' +
-                                '<div class="telemetry-label" style="font-size:9px;"><i class="fa-solid fa-bolt color-green"></i> Доходность:</div>' +
-                                '<div class="telemetry-bar-bg" style="height:7px;">' +
-                                    '<div class="telemetry-bar-fill" style="width:' + effPct + '%; background: linear-gradient(90deg, #10b981, #00e676); box-shadow: 0 0 8px rgba(0,230,118,0.4);"></div>' +
-                                '</div>' +
-                                '<div class="telemetry-val color-green" style="font-size:10px; font-weight:900;">+' + calculatedIncome.toLocaleString() + ' ₽/д ' + (bonusPctText > 0 ? '(+' + bonusPctText + '%)' : '') + '</div>' +
-                            '</div>' +
-
-                            '<div class="telemetry-row mb-1">' +
-                                '<div class="telemetry-label" style="font-size:9px;"><i class="fa-solid fa-vault color-cyan"></i> В кассе:</div>' +
-                                '<div class="telemetry-bar-bg" style="height:7px;">' +
-                                    '<div class="telemetry-bar-fill" style="width:' + cashFillPct + '%; background: linear-gradient(90deg, #0284c7, #00f2fe); box-shadow: 0 0 8px var(--cyan-glow);"></div>' +
-                                '</div>' +
-                                '<div class="telemetry-val color-cyan" style="font-size:10px; font-weight:900;">' + curStored.toLocaleString() + ' ₽</div>' +
-                            '</div>' +
-
-                            '<div class="telemetry-row">' +
-                                '<div class="telemetry-label" style="font-size:9px;"><i class="fa-solid fa-boxes-stacked ' + stockColor + '"></i> Склад сырья:</div>' +
-                                '<div class="telemetry-bar-bg" style="height:7px;">' +
-                                    '<div class="telemetry-bar-fill ' + stockBarClass + '" style="width:' + stockPct + '%;"></div>' +
-                                '</div>' +
-                                '<div class="telemetry-val ' + stockColor + '" style="font-size:10px; font-weight:900;">' + curStk + ' / ' + maxStk + '%</div>' +
-                            '</div>' +
-                        '</div>'
-                    ) : (
-                        '<div class="flex-between p-2 mb-2" style="background:#090e18; border-radius:8px;">' +
-                            '<span class="sub-label text-xs">Базовый доход:</span>' +
-                            '<b class="color-green text-xs">+' + calculatedIncome.toLocaleString() + ' ₽/день</b>' +
-                        '</div>'
-                    )) +
-
-                    '<div class="sub-label mb-2" style="font-size:9px; color:#cbd5e1;">⭐ Перк: <b>' + (biz.perk || 'Стандарт') + '</b></div>' +
-
-                    actionBlock +
-                '</div>';
+        if (st.cost > 0 && (!biz.ownedStickers || !biz.ownedStickers.includes(stickerId))) {
+            var cash = state.player ? (state.player.cash || 0) : 0;
+            if (cash < st.cost) return showToast("Не хватает " + st.cost.toLocaleString() + " ₽!");
+            state.player.cash -= st.cost;
+            if (!biz.ownedStickers) biz.ownedStickers = ['none'];
+            biz.ownedStickers.push(stickerId);
         }
 
-        return html;
+        biz.vipSticker = stickerId;
+        saveState();
+        updateHeaderUI();
+        showToast("Установлен стикер: " + (st.icon || 'Стандарт'));
+        if (typeof playSound === 'function') playSound('win');
+        this.renderCustomizerModalContent();
+        this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // ========================================================
-    // 2. ВКЛАДКА «ЦЕХ»: МОДЕРНИЗАЦИЯ
-    // ========================================================
+    selectTitleStyleAction: function(idx, styleId) {
+        var biz = state.businesses[idx];
+        if (!biz) return;
+        var tf = BUSINESS_TITLE_STYLES.find(function(t) { return t.id === styleId; });
+        if (!tf) return;
+
+        if (tf.cost > 0 && (!biz.ownedTitleStyles || !biz.ownedTitleStyles.includes(styleId))) {
+            var cash = state.player ? (state.player.cash || 0) : 0;
+            if (cash < tf.cost) return showToast("Не хватает " + tf.cost.toLocaleString() + " ₽!");
+            state.player.cash -= tf.cost;
+            if (!biz.ownedTitleStyles) biz.ownedTitleStyles = ['default'];
+            biz.ownedTitleStyles.push(styleId);
+        }
+
+        biz.titleStyle = styleId;
+        saveState();
+        updateHeaderUI();
+        showToast("Применён стиль названия: " + tf.name);
+        if (typeof playSound === 'function') playSound('win');
+        this.renderCustomizerModalContent();
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
     renderBusinessDetailHtml: function() {
         var biz = state.businesses[this.selectedBizIndex];
-        if (!biz || biz.level <= 0) {
+        if (!biz || (biz.level || 0) <= 0) {
             return '<div class="glass-card text-center sub-label py-6">' +
-                '<div>Выберите выкупленное предприятие на вкладке «Точки».</div>' +
+                '<div>Выберите предприятие на вкладке «Точки».</div>' +
                 '<button onclick="AppBusiness.switchSubTab(\'list\')" class="btn btn-cyan btn-sm mt-2">К списку точек</button>' +
             '</div>';
         }
@@ -578,7 +723,6 @@ const AppBusiness = {
         var mkLvl = biz.upgrades ? (biz.upgrades.marketing || 0) : 0;
 
         var branches = (typeof BUSINESS_UPGRADES_BRANCHES !== 'undefined') ? BUSINESS_UPGRADES_BRANCHES : { equipment: [], storage: [], marketing: [] };
-
         var nextEq = branches.equipment ? branches.equipment[eqLvl] : null;
         var nextSt = branches.storage ? branches.storage[stLvl] : null;
         var nextMk = branches.marketing ? branches.marketing[mkLvl] : null;
@@ -588,88 +732,44 @@ const AppBusiness = {
         var stCost = nextSt ? Math.round(baseCost * nextSt.costMul) : 0;
         var mkCost = nextMk ? Math.round(baseCost * nextMk.costMul) : 0;
 
-        var maxStk = biz.maxStock || 100;
-        var curStk = biz.stock !== undefined ? biz.stock : 100;
-        var curStored = biz.stored || 0;
-
-        var stockPct = Math.min(100, Math.round((curStk / maxStk) * 100));
-        var stockColor = stockPct > 40 ? 'color-green' : (stockPct > 15 ? 'color-amber' : 'color-red');
-        var stockBarClass = stockPct > 40 ? 'fill-biz-stock' : (stockPct > 15 ? 'fill-condition-mid' : 'risk-high');
-
-        var calcIncome = this.calculateBusinessIncome(biz);
-        var safeCapacity = Math.max(50000, calcIncome * 3);
-        var cashPct = Math.min(100, Math.round((curStored / safeCapacity) * 100));
-        var displayName = biz.customName || biz.name;
-
         return '<div class="glass-card mb-2 p-2" style="border-left: 3px solid var(--green);">' +
-                '<div class="flex-between mb-1">' +
-                    '<b class="text-xs color-green">' + displayName + ' (Ур. ' + biz.level + ')</b>' +
+                '<div class="flex-between">' +
+                    '<b class="text-xs color-green">' + (biz.customName || biz.name) + ' (Ур. ' + biz.level + ')</b>' +
                     '<span class="tag-badge bg-tag-green">ЦЕХ АКТИВЕН</span>' +
                 '</div>' +
-                '<div class="sub-label mb-2" style="font-size:9.5px;">' + (biz.desc || biz.perk || 'Промышленный объект сети.') + '</div>' +
-                
-                '<div class="grid-2 my-2" style="gap:6px;">' +
-                    '<div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">' +
-                        '<div class="flex-between text-xs mb-1">' +
-                            '<span class="sub-label"><i class="fa-solid fa-vault color-cyan"></i> Касса:</span>' +
-                            '<b class="color-green">' + curStored.toLocaleString() + ' ₽</b>' +
-                        '</div>' +
-                        '<div class="telemetry-bar-bg" style="height:6px;">' +
-                            '<div class="telemetry-bar-fill" style="width:' + cashPct + '%; background: linear-gradient(90deg, #0284c7, #00f2fe);"></div>' +
-                        '</div>' +
-                    '</div>' +
-
-                    '<div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">' +
-                        '<div class="flex-between text-xs mb-1">' +
-                            '<span class="sub-label"><i class="fa-solid fa-boxes-stacked ' + stockColor + '"></i> Склад:</span>' +
-                            '<b class="' + stockColor + '">' + curStk + ' / ' + maxStk + '%</b>' +
-                        '</div>' +
-                        '<div class="telemetry-bar-bg" style="height:6px;">' +
-                            '<div class="telemetry-bar-fill ' + stockBarClass + '" style="width:' + stockPct + '%;"></div>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>' +
+                '<div class="sub-label mt-1" style="font-size:9px;">' + (biz.perk || biz.desc) + '</div>' +
             '</div>' +
 
             '<div class="glass-card mb-2 p-2">' +
                 '<div class="flex-between mb-1">' +
-                    '<div>' +
-                        '<b class="text-xs color-cyan"><i class="fa-solid fa-screwdriver-wrench"></i> Оснащение цеха</b>' +
-                        '<div class="sub-label" style="font-size:9px;">Уровень апгрейда: <b>' + eqLvl + '/3</b></div>' +
-                    '</div>' +
-                    (nextEq ? '<span class="price-val text-xs color-green">' + eqCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">МАКСИМУМ</span>') +
+                    '<b class="text-xs color-cyan"><i class="fa-solid fa-screwdriver-wrench"></i> Оснащение цеха (' + eqLvl + '/3)</b>' +
+                    (nextEq ? '<span class="price-val text-xs color-green">' + eqCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">MAX</span>') +
                 '</div>' +
-                '<div class="sub-label mb-2" style="font-size:9.5px;">' + (nextEq ? nextEq.name : 'Установлены топовые посты и компьютерные 3D-стенды (+45% к выручке)') + '</div>' +
+                '<div class="sub-label mb-2" style="font-size:9px;">' + (nextEq ? nextEq.name : 'Максимальный класс станков (+45% к выручке)') + '</div>' +
                 '<button onclick="AppBusiness.upgradeBranchAction(\'equipment\', ' + eqCost + ')" class="btn btn-cyan btn-sm w-full"' + (!nextEq ? ' disabled' : '') + '>' +
-                    (nextEq ? 'Прокачать оснащение (' + (eqCost / 1000).toFixed(0) + 'k ₽)' : 'Оборудование максимального класса ✓') +
+                    (nextEq ? 'Прокачать оснащение' : 'Максимальный уровень ✓') +
                 '</button>' +
             '</div>' +
 
             '<div class="glass-card mb-2 p-2">' +
                 '<div class="flex-between mb-1">' +
-                    '<div>' +
-                        '<b class="text-xs color-amber"><i class="fa-solid fa-boxes-stacked"></i> Склад и логистика</b>' +
-                        '<div class="sub-label" style="font-size:9px;">Уровень склада: <b>' + stLvl + '/3</b></div>' +
-                    '</div>' +
-                    (nextSt ? '<span class="price-val text-xs color-green">' + stCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">МАКСИМУМ</span>') +
+                    '<b class="text-xs color-amber"><i class="fa-solid fa-boxes-stacked"></i> Склад и ёмкость (' + stLvl + '/3)</b>' +
+                    (nextSt ? '<span class="price-val text-xs color-green">' + stCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">MAX</span>') +
                 '</div>' +
-                '<div class="sub-label mb-2" style="font-size:9.5px;">' + (nextSt ? nextSt.name : 'Складской терминал вмещает до 500% сырья без простоев') + '</div>' +
+                '<div class="sub-label mb-2" style="font-size:9px;">' + (nextSt ? nextSt.name : 'Склад вмещает до 500% сырья без простоев') + '</div>' +
                 '<button onclick="AppBusiness.upgradeBranchAction(\'storage\', ' + stCost + ')" class="btn btn-amber btn-sm w-full"' + (!nextSt ? ' disabled' : '') + '>' +
-                    (nextSt ? 'Расширить склад (' + (stCost / 1000).toFixed(0) + 'k ₽)' : 'Склады максимальной ёмкости ✓') +
+                    (nextSt ? 'Расширить склад' : 'Склад расширен ✓') +
                 '</button>' +
             '</div>' +
 
             '<div class="glass-card mb-2 p-2">' +
                 '<div class="flex-between mb-1">' +
-                    '<div>' +
-                        '<b class="text-xs color-purple"><i class="fa-solid fa-bullhorn"></i> Маркетинг и вывеска</b>' +
-                        '<div class="sub-label" style="font-size:9px;">Уровень рекламы: <b>' + mkLvl + '/3</b></div>' +
-                    '</div>' +
-                    (nextMk ? '<span class="price-val text-xs color-green">' + mkCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">МАКСИМУМ</span>') +
+                    '<b class="text-xs color-purple"><i class="fa-solid fa-bullhorn"></i> Маркетинг (' + mkLvl + '/3)</b>' +
+                    (nextMk ? '<span class="price-val text-xs color-green">' + mkCost.toLocaleString() + ' ₽</span>' : '<span class="tag-badge bg-tag-green">MAX</span>') +
                 '</div>' +
-                '<div class="sub-label mb-2" style="font-size:9.5px;">' + (nextMk ? nextMk.name : 'Прямые контракты с автоклубами города (+40% клиентов)') + '</div>' +
+                '<div class="sub-label mb-2" style="font-size:9px;">' + (nextMk ? nextMk.name : 'Контракты с автоклубами (+40% клиентов)') + '</div>' +
                 '<button onclick="AppBusiness.upgradeBranchAction(\'marketing\', ' + mkCost + ')" class="btn btn-purple btn-sm w-full"' + (!nextMk ? ' disabled' : '') + '>' +
-                    (nextMk ? 'Запустить кампанию (' + (mkCost / 1000).toFixed(0) + 'k ₽)' : 'Максимальный охват трафика ✓') +
+                    (nextMk ? 'Запустить рекламу' : 'Максимальный охват ✓') +
                 '</button>' +
             '</div>';
     },
@@ -678,7 +778,7 @@ const AppBusiness = {
         var biz = state.businesses[this.selectedBizIndex];
         if (!biz) return;
         var cash = state.player ? (state.player.cash || 0) : 0;
-        if (cash < cost) return showToast("Не хватает денег на апгрейд филиала!");
+        if (cash < cost) return showToast("Не хватает денег!");
 
         state.player.cash -= cost;
         if (!biz.upgrades) biz.upgrades = { equipment: 0, storage: 0, marketing: 0 };
@@ -692,138 +792,73 @@ const AppBusiness = {
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Филиал успешно модернизирован!");
+        showToast("Улучшение установлено!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
     renderStaffManagementHtml: function() {
         var biz = state.businesses[this.selectedBizIndex];
-        if (!biz || biz.level <= 0) {
+        if (!biz || (biz.level || 0) <= 0) {
             return '<div class="glass-card text-center sub-label py-6">' +
-                '<div>Сначала выберите выкупленное предприятие для управления штатом.</div>' +
+                '<div>Выберите предприятие для найма специалистов.</div>' +
                 '<button onclick="AppBusiness.switchSubTab(\'list\')" class="btn btn-cyan btn-sm mt-2">К списку точек</button>' +
             '</div>';
         }
 
         var staffCat = (typeof BUSINESS_STAFF_CATALOG !== 'undefined') ? BUSINESS_STAFF_CATALOG : { managers: [], masters: [], security: [] };
+        var curMgr = biz.staff?.manager ? staffCat.managers.find(function(m) { return m.id === biz.staff.manager; }) : null;
+        var curMst = biz.staff?.master ? staffCat.masters.find(function(m) { return m.id === biz.staff.master; }) : null;
+        var curSec = biz.staff?.security ? staffCat.security.find(function(s) { return s.id === biz.staff.security; }) : null;
 
-        var curMgr = null, curMst = null, curSec = null;
-        if (biz.staff) {
-            if (biz.staff.manager && Array.isArray(staffCat.managers)) {
-                curMgr = staffCat.managers.find(function(m) { return m.id === biz.staff.manager; });
-            }
-            if (biz.staff.master && Array.isArray(staffCat.masters)) {
-                curMst = staffCat.masters.find(function(m) { return m.id === biz.staff.master; });
-            }
-            if (biz.staff.security && Array.isArray(staffCat.security)) {
-                curSec = staffCat.security.find(function(s) { return s.id === biz.staff.security; });
-            }
-        }
-
-        var mgrListHtml = '';
-        if (Array.isArray(staffCat.managers)) {
-            staffCat.managers.forEach(function(m) {
-                mgrListHtml += '<div class="p-1 flex-between" style="background:#090e18; border-radius:6px; font-size:9.5px;">' +
-                    '<div><b>' + m.name + '</b> (' + m.salary + ' ₽/д)<div class="sub-label" style="font-size:8px;">' + m.perkText + '</div></div>' +
-                    '<button onclick="AppBusiness.hireStaffAction(\'manager\', \'' + m.id + '\', ' + m.hireCost + ', ' + (m.reqStars || 0) + ')" class="btn btn-cyan btn-auto btn-sm" style="font-size:8.5px; padding:3px 8px;">Нанять (' + (m.hireCost/1000).toFixed(0) + 'k)</button>' +
+        var renderRoleList = function(list, role, btnColor) {
+            var res = '';
+            list.forEach(function(item) {
+                res += '<div class="p-1 flex-between mb-1" style="background:#060a12; border-radius:6px; font-size:9px;">' +
+                    '<div><b>' + item.name + '</b> (' + item.salary + ' ₽/д)<div class="sub-label" style="font-size:8px;">' + item.perkText + '</div></div>' +
+                    '<button onclick="AppBusiness.hireStaffAction(\'' + role + '\', \'' + item.id + '\', ' + item.hireCost + ', ' + (item.reqStars || 0) + ')" class="btn ' + btnColor + ' btn-auto btn-sm" style="font-size:8px; padding:3px 8px;">Нанять (' + (item.hireCost/1000).toFixed(0) + 'k)</button>' +
                 '</div>';
             });
-        }
-
-        var mstListHtml = '';
-        if (Array.isArray(staffCat.masters)) {
-            staffCat.masters.forEach(function(m) {
-                mstListHtml += '<div class="p-1 flex-between" style="background:#090e18; border-radius:6px; font-size:9.5px;">' +
-                    '<div><b>' + m.name + '</b> (' + m.salary + ' ₽/д)<div class="sub-label" style="font-size:8px;">' + m.perkText + '</div></div>' +
-                    '<button onclick="AppBusiness.hireStaffAction(\'master\', \'' + m.id + '\', ' + m.hireCost + ', ' + (m.reqStars || 0) + ')" class="btn btn-amber btn-auto btn-sm" style="font-size:8.5px; padding:3px 8px;">Нанять (' + (m.hireCost/1000).toFixed(0) + 'k)</button>' +
-                '</div>';
-            });
-        }
-
-        var secListHtml = '';
-        if (Array.isArray(staffCat.security)) {
-            staffCat.security.forEach(function(s) {
-                secListHtml += '<div class="p-1 flex-between" style="background:#090e18; border-radius:6px; font-size:9.5px;">' +
-                    '<div><b>' + s.name + '</b> (' + s.salary + ' ₽/д)<div class="sub-label" style="font-size:8px;">' + s.perkText + '</div></div>' +
-                    '<button onclick="AppBusiness.hireStaffAction(\'security\', \'' + s.id + '\', ' + s.hireCost + ', ' + (s.reqStars || 0) + ')" class="btn btn-purple btn-auto btn-sm" style="font-size:8.5px; padding:3px 8px;">Нанять (' + (s.hireCost/1000).toFixed(0) + 'k)</button>' +
-                '</div>';
-            });
-        }
-
-        var displayName = biz.customName || biz.name;
+            return res;
+        };
 
         return '<div class="glass-card mb-2 p-2">' +
-                '<b class="text-xs color-green block mb-1">Штат филиала: ' + displayName + '</b>' +
-                '<div class="sub-label mb-2" style="font-size:9.5px;">Сотрудники работают в филиале, дают бонусы и получают зарплату в 00:00.</div>' +
+                '<b class="text-xs color-green block mb-1">Штат: ' + (biz.customName || biz.name) + '</b>' +
+                '<div class="sub-label" style="font-size:9px;">Зарплата списывается раз в сутки в 00:00.</div>' +
             '</div>' +
             '<div class="glass-card mb-2 p-2">' +
-                '<div class="flex-between mb-1">' +
-                    '<b class="text-xs color-cyan"><i class="fa-solid fa-user-tie"></i> 1. Управляющий филиала</b>' +
-                    (curMgr ? '<button onclick="AppBusiness.fireStaffAction(\'manager\')" class="btn btn-danger btn-auto btn-sm" style="font-size:8px; padding:2px 6px;">Уволить</button>' : '') +
-                '</div>' +
-                (curMgr ? (
-                    '<div class="p-2 mb-1" style="background:#090e18; border-radius:8px;">' +
-                        '<div class="flex-between text-xs"><b>' + curMgr.name + '</b> <span class="color-amber">' + curMgr.salary.toLocaleString() + ' ₽/день</span></div>' +
-                        '<div class="sub-label mt-1" style="font-size:9px;">' + curMgr.perkText + '</div>' +
-                    '</div>'
-                ) : (
-                    '<div class="sub-label mb-2" style="font-size:9.5px;">Вакансия открыта. Наймите менеджера для автоматической закупки сырья.</div>' +
-                    '<div class="space-y-1">' + mgrListHtml + '</div>'
-                )) +
+                '<div class="flex-between mb-1"><b class="text-xs color-cyan"><i class="fa-solid fa-user-tie"></i> Управляющий</b>' +
+                (curMgr ? '<button onclick="AppBusiness.fireStaffAction(\'manager\')" class="btn btn-danger btn-auto btn-sm" style="font-size:8px; padding:2px 6px;">Уволить</button>' : '') + '</div>' +
+                (curMgr ? '<div class="p-1 text-xs" style="background:#090e18; border-radius:6px;"><b>' + curMgr.name + '</b> (' + curMgr.salary + ' ₽/д)<div class="sub-label" style="font-size:8.5px;">' + curMgr.perkText + '</div></div>' : renderRoleList(staffCat.managers, 'manager', 'btn-cyan')) +
             '</div>' +
             '<div class="glass-card mb-2 p-2">' +
-                '<div class="flex-between mb-1">' +
-                    '<b class="text-xs color-amber"><i class="fa-solid fa-wrench"></i> 2. Старший мастер цеха</b>' +
-                    (curMst ? '<button onclick="AppBusiness.fireStaffAction(\'master\')" class="btn btn-danger btn-auto btn-sm" style="font-size:8px; padding:2px 6px;">Уволить</button>' : '') +
-                '</div>' +
-                (curMst ? (
-                    '<div class="p-2 mb-1" style="background:#090e18; border-radius:8px;">' +
-                        '<div class="flex-between text-xs"><b>' + curMst.name + '</b> <span class="color-amber">' + curMst.salary.toLocaleString() + ' ₽/день</span></div>' +
-                        '<div class="sub-label mt-1" style="font-size:9px;">' + curMst.perkText + '</div>' +
-                    '</div>'
-                ) : (
-                    '<div class="sub-label mb-2" style="font-size:9.5px;">Наймите профессионала для резкого роста ежедневной выручки точки.</div>' +
-                    '<div class="space-y-1">' + mstListHtml + '</div>'
-                )) +
+                '<div class="flex-between mb-1"><b class="text-xs color-amber"><i class="fa-solid fa-wrench"></i> Мастер цеха</b>' +
+                (curMst ? '<button onclick="AppBusiness.fireStaffAction(\'master\')" class="btn btn-danger btn-auto btn-sm" style="font-size:8px; padding:2px 6px;">Уволить</button>' : '') + '</div>' +
+                (curMst ? '<div class="p-1 text-xs" style="background:#090e18; border-radius:6px;"><b>' + curMst.name + '</b> (' + curMst.salary + ' ₽/д)<div class="sub-label" style="font-size:8.5px;">' + curMst.perkText + '</div></div>' : renderRoleList(staffCat.masters, 'master', 'btn-amber')) +
             '</div>' +
             '<div class="glass-card mb-2 p-2">' +
-                '<div class="flex-between mb-1">' +
-                    '<b class="text-xs color-purple"><i class="fa-solid fa-shield-halved"></i> 3. Охрана и безопасность</b>' +
-                    (curSec ? '<button onclick="AppBusiness.fireStaffAction(\'security\')" class="btn btn-danger btn-auto btn-sm" style="font-size:8px; padding:2px 6px;">Уволить</button>' : '') +
-                '</div>' +
-                (curSec ? (
-                    '<div class="p-2 mb-1" style="background:#090e18; border-radius:8px;">' +
-                        '<div class="flex-between text-xs"><b>' + curSec.name + '</b> <span class="color-amber">' + curSec.salary.toLocaleString() + ' ₽/день</span></div>' +
-                        '<div class="sub-label mt-1" style="font-size:9px;">' + curSec.perkText + '</div>' +
-                    '</div>'
-                ) : (
-                    '<div class="sub-label mb-2" style="font-size:9.5px;">Защита от ночных проверок, кражи инструментов и визитов полиции.</div>' +
-                    '<div class="space-y-1">' + secListHtml + '</div>'
-                )) +
+                '<div class="flex-between mb-1"><b class="text-xs color-purple"><i class="fa-solid fa-shield-halved"></i> Охрана</b>' +
+                (curSec ? '<button onclick="AppBusiness.fireStaffAction(\'security\')" class="btn btn-danger btn-auto btn-sm" style="font-size:8px; padding:2px 6px;">Уволить</button>' : '') + '</div>' +
+                (curSec ? '<div class="p-1 text-xs" style="background:#090e18; border-radius:6px;"><b>' + curSec.name + '</b> (' + curSec.salary + ' ₽/д)<div class="sub-label" style="font-size:8.5px;">' + curSec.perkText + '</div></div>' : renderRoleList(staffCat.security, 'security', 'btn-purple')) +
             '</div>';
     },
 
     hireStaffAction: function(role, staffId, cost, reqStars) {
         var biz = state.businesses[this.selectedBizIndex];
         if (!biz) return;
-        reqStars = reqStars || 0;
-
-        var cash = state.player ? (state.player.cash || 0) : 0;
-        var stars = state.player ? (state.player.stars || 0) : 0;
-
-        if (cash < cost) return showToast("Не хватает денег на найм!");
-        if (stars < reqStars) return showToast("Нужно " + reqStars + " Stars ⭐!");
+        var cash = state.player?.cash || 0;
+        var stars = state.player?.stars || 0;
+        if (cash < cost) return showToast("Не хватает денег!");
+        if (stars < (reqStars || 0)) return showToast("Нужно " + reqStars + " Stars ⭐!");
 
         state.player.cash -= cost;
-        state.player.stars -= reqStars;
-        if (!biz.staff) biz.staff = { manager: null, master: null, security: null };
+        state.player.stars -= (reqStars || 0);
+        if (!biz.staff) biz.staff = {};
         biz.staff[role] = staffId;
 
         saveState();
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Специалист принят в штат предприятия!");
+        showToast("Сотрудник принят в штат!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
@@ -832,84 +867,68 @@ const AppBusiness = {
         if (!biz || !biz.staff) return;
         biz.staff[role] = null;
         saveState();
-        if (typeof playSound === 'function') playSound('tick');
         showToast("Сотрудник уволен.");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
     renderFleetManagementHtml: function() {
         var biz = state.businesses[this.selectedBizIndex];
-        if (!biz || biz.level <= 0) {
+        if (!biz || (biz.level || 0) <= 0) {
             return '<div class="glass-card text-center sub-label py-6">' +
-                '<div>Выберите предприятие для закрепления спецтранспорта.</div>' +
+                '<div>Выберите предприятие для закрепления транспорта.</div>' +
                 '<button onclick="AppBusiness.switchSubTab(\'list\')" class="btn btn-cyan btn-sm mt-2">К списку точек</button>' +
             '</div>';
         }
 
-        var fleetCat = (typeof BUSINESS_FLEET_CATALOG !== 'undefined' && Array.isArray(BUSINESS_FLEET_CATALOG)) ? BUSINESS_FLEET_CATALOG : [];
+        var fleetCat = (typeof BUSINESS_FLEET_CATALOG !== 'undefined') ? BUSINESS_FLEET_CATALOG : [];
         var curFleetIds = Array.isArray(biz.fleet) ? biz.fleet : [];
-
         var cardsHtml = '';
+
         fleetCat.forEach(function(fl) {
             var isOwned = curFleetIds.indexOf(fl.id) !== -1;
             var isSuitable = Array.isArray(fl.suitableBusinesses) && fl.suitableBusinesses.indexOf(biz.id) !== -1;
-            var starsTxt = fl.reqStars ? ' + ' + fl.reqStars + ' ⭐' : '';
 
             cardsHtml += '<div class="glass-card p-2 mb-2 ' + (isOwned ? 'personal-car-card' : '') + '">' +
                 '<div class="flex-between mb-1">' +
                     '<b class="text-xs ' + (isOwned ? 'color-green' : 'color-cyan') + '">' + fl.name + '</b>' +
                     '<span class="tag-badge ' + (isOwned ? 'bg-tag-green' : (isSuitable ? 'bg-tag-cyan' : 'bg-tag-dark')) + '">' +
-                        (isOwned ? 'В АВТОПАРКЕ ✓' : (isSuitable ? 'ПОДХОДИТ' : 'ДРУГОЙ ЦЕХ')) +
+                        (isOwned ? 'В ПАРКЕ ✓' : (isSuitable ? 'ПОДХОДИТ' : 'ДРУГОЙ ЦЕХ')) +
                     '</span>' +
                 '</div>' +
-                '<div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">' + fl.desc + '</div>' +
-                '<div class="flex-between text-xs mb-2 p-1" style="background:#090e18; border-radius:6px;">' +
-                    '<span>Бонус к кассе: <b class="color-green">+' + fl.incomeBonusPct + '%</b></span>' +
-                    '<span>Склад: <b class="color-amber">+' + fl.stockCapacityBonus + '%</b></span>' +
-                '</div>' +
+                '<div class="sub-label mb-1" style="font-size:9px;">' + fl.desc + '</div>' +
                 '<button onclick="AppBusiness.buyFleetAction(\'' + fl.id + '\', ' + fl.cost + ', ' + (fl.reqStars || 0) + ')" class="btn ' + (isOwned ? 'btn-dark' : 'btn-cyan') + ' btn-sm w-full"' + (isOwned || !isSuitable ? ' disabled' : '') + '>' +
-                    (isOwned ? 'Машина закреплена за цехом ✓' : (isSuitable ? 'Купить в автопарк (' + (fl.cost/1000).toFixed(0) + 'k ₽' + starsTxt + ')' : 'Не подходит под профиль этого цеха')) +
+                    (isOwned ? 'Закреплён за цехом ✓' : (isSuitable ? 'Купить (' + (fl.cost/1000).toFixed(0) + 'k ₽)' : 'Не подходит для этой точки')) +
                 '</button>' +
             '</div>';
         });
 
-        var displayName = biz.customName || biz.name;
-
         return '<div class="glass-card mb-2 p-2">' +
-                '<b class="text-xs color-green block mb-1">Спецтехника точки: ' + displayName + '</b>' +
-                '<div class="sub-label mb-2" style="font-size:9.5px;">Коммерческий транспорт увеличивает емкость складов и оборот выручки.</div>' +
+                '<b class="text-xs color-green block mb-1">Спецтехника: ' + (biz.customName || biz.name) + '</b>' +
+                '<div class="sub-label" style="font-size:9px;">Повышает суточный доход и расширяет склады.</div>' +
             '</div>' +
-            '<div class="space-y-2">' + cardsHtml + '</div>';
+            '<div class="space-y-1">' + cardsHtml + '</div>';
     },
 
     buyFleetAction: function(fleetId, cost, reqStars) {
         var biz = state.businesses[this.selectedBizIndex];
         if (!biz) return;
-        reqStars = reqStars || 0;
-
-        var cash = state.player ? (state.player.cash || 0) : 0;
-        var stars = state.player ? (state.player.stars || 0) : 0;
-
-        if (cash < cost) return showToast("Не хватает денег на спецтехнику!");
-        if (stars < reqStars) return showToast("Нужно " + reqStars + " Stars ⭐!");
+        var cash = state.player?.cash || 0;
+        var stars = state.player?.stars || 0;
+        if (cash < cost) return showToast("Не хватает денег!");
+        if (stars < (reqStars || 0)) return showToast("Нужно " + reqStars + " Stars ⭐!");
 
         state.player.cash -= cost;
-        state.player.stars -= reqStars;
+        state.player.stars -= (reqStars || 0);
         if (!Array.isArray(biz.fleet)) biz.fleet = [];
         biz.fleet.push(fleetId);
 
-        if (typeof BUSINESS_FLEET_CATALOG !== 'undefined' && Array.isArray(BUSINESS_FLEET_CATALOG)) {
-            var fl = BUSINESS_FLEET_CATALOG.find(function(it) { return it.id === fleetId; });
-            if (fl) {
-                biz.maxStock = (biz.maxStock || 100) + fl.stockCapacityBonus;
-            }
-        }
+        var fl = (typeof BUSINESS_FLEET_CATALOG !== 'undefined') ? BUSINESS_FLEET_CATALOG.find(function(it) { return it.id === fleetId; }) : null;
+        if (fl) biz.maxStock = (biz.maxStock || 100) + fl.stockCapacityBonus;
 
         saveState();
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Спецтранспорт закреплен за предприятием!");
+        showToast("Спецтехника закреплена за точкой!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
@@ -917,37 +936,35 @@ const AppBusiness = {
         var biz = state.businesses[idx];
         if (!biz) return;
         var cost = biz.cost;
-        var reqStars = biz.reqStars || 0;
-        var cash = state.player ? (state.player.cash || 0) : 0;
-        var stars = state.player ? (state.player.stars || 0) : 0;
-
-        if (cash < cost) return showToast("Не хватает денег на покупку предприятия!");
-        if (stars < reqStars) return showToast("Нужно " + reqStars + " Stars ⭐!");
+        var cash = state.player?.cash || 0;
+        var stars = state.player?.stars || 0;
+        if (cash < cost) return showToast("Не хватает денег!");
+        if (stars < (biz.reqStars || 0)) return showToast("Нужно " + biz.reqStars + " Stars ⭐!");
 
         state.player.cash -= cost;
-        state.player.stars -= reqStars;
+        state.player.stars -= (biz.reqStars || 0);
         biz.level = 1;
         biz.stock = 100;
         biz.stored = 0;
         biz.customName = biz.name;
         biz.coverSkin = 'classic';
         biz.cardAnimation = 'none';
+        biz.vipSticker = 'none';
+        biz.titleStyle = 'default';
 
         saveState();
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Вы стали владельцем «" + biz.name + "»!");
+        showToast("Вы приобрели «" + biz.name + "»!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
     upgradeLevelSingle: function(idx) {
         var biz = state.businesses[idx];
-        if (!biz || biz.level <= 0) return;
+        if (!biz || (biz.level || 0) <= 0) return;
         var cost = Math.round(biz.cost * (biz.level + 1));
-        var cash = state.player ? (state.player.cash || 0) : 0;
-
-        if (cash < cost) return showToast("Не хватает денег на повышение уровня!");
+        var cash = state.player?.cash || 0;
+        if (cash < cost) return showToast("Не хватает денег на апгрейд!");
 
         state.player.cash -= cost;
         biz.level += 1;
@@ -956,8 +973,7 @@ const AppBusiness = {
         saveState();
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("«" + (biz.customName || biz.name) + "» повышен до " + biz.level + " уровня!");
+        showToast("Уровень точки повышен до " + biz.level + "!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
@@ -965,17 +981,15 @@ const AppBusiness = {
         var biz = state.businesses[idx];
         if (!biz) return;
         var cost = 15000;
-        var cash = state.player ? (state.player.cash || 0) : 0;
-
-        if (cash < cost) return showToast("Нужно 15,000 ₽ на партию сырья!");
+        var cash = state.player?.cash || 0;
+        if (cash < cost) return showToast("Нужно 15,000 ₽ на сырьё!");
 
         state.player.cash -= cost;
         biz.stock = biz.maxStock || 100;
 
         saveState();
         if (typeof playSound === 'function') playSound('tick');
-        if (typeof tgHaptic === 'function') tgHaptic('light');
-        showToast("Склад сырья полностью заполнен!");
+        showToast("Склад сырья пополнен до 100%!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
@@ -992,8 +1006,7 @@ const AppBusiness = {
         saveState();
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Снята выручка: +" + payout.toLocaleString() + " ₽!");
+        showToast("Касса снята: +" + payout.toLocaleString() + " ₽!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
@@ -1012,28 +1025,18 @@ const AppBusiness = {
         if (total <= 0) return showToast("Кассы предприятий пусты!");
 
         state.player.cash = (state.player.cash || 0) + total;
-        
-        // Исправленный вызов
-        if (typeof trackQuestProgress === 'function') {
-            trackQuestProgress('collect_biz', 1);
-        }
+        if (typeof trackQuestProgress === 'function') trackQuestProgress('collect_biz', 1);
 
         saveState();
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Собрана вся касса сети: +" + total.toLocaleString() + " ₽!");
+        showToast("Собрана вся касса: +" + total.toLocaleString() + " ₽!");
         this.render(document.getElementById('phoneAppContainer'));
-    };
+    }
+};
 
 window.AppBusiness = AppBusiness;
 
-window.collectAllBusinessCash = function() {
-    AppBusiness.collectAllCashAction();
-};
-window.upgradeBusiness = function(idx) {
-    AppBusiness.upgradeLevelSingle(idx);
-};
-window.restockBusiness = function(idx) {
-    AppBusiness.restockSingle(idx);
-};
+window.collectAllBusinessCash = function() { AppBusiness.collectAllCashAction(); };
+window.upgradeBusiness = function(idx) { AppBusiness.upgradeLevelSingle(idx); };
+window.restockBusiness = function(idx) { AppBusiness.restockSingle(idx); };
