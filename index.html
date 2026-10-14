@@ -862,7 +862,7 @@
       </div>
     </div>
 
-    <!-- МОДАЛКА ВЫСТАВЛЕНИЯ НА P2P БИРЖУ -->
+    <!-- МОДАЛКА ВЫСТАВЛЕНИЯ НА P2P БИРЖУ С КАРТОЧКАМИ ВМЕСТО СЕЛЕКТА -->
     <div id="modalCreateP2P" class="modal-overlay">
       <div class="modal-box">
         <div class="flex-between mb-2">
@@ -875,8 +875,12 @@
           <button type="button" onclick="AppM.selectP2PListingType('business')" id="btnP2PTypeBiz" class="btn btn-dark btn-sm">Бизнес</button>
           <button type="button" onclick="AppM.selectP2PListingType('housing')" id="btnP2PTypeHouse" class="btn btn-dark btn-sm">Жильё</button>
         </div>
-        <select id="p2pItemSelect" onchange="AppM.onP2PItemSelected(this.value)" style="width:100%; background:#090e18; border:1px solid var(--border-glass); border-radius:8px; padding:10px; color:#fff; font-size:12px; margin-bottom:8px;"></select>
-        <div id="p2pItemPreviewBox" style="display:none; margin-bottom:8px;"></div>
+        
+        <!-- КОНТЕЙНЕР ИНТЕРАКТИВНЫХ КАРТОЧЕК ИМУЩЕСТВА С СКРОЛЛОМ -->
+        <div class="sub-label mb-1" style="font-size:9.5px;">Выберите объект для продажи:</div>
+        <div id="p2pCardsListContainer" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; padding-right: 2px;"></div>
+        
+        <div class="sub-label mb-1" style="font-size:9.5px;">Стоимость выставления (₽):</div>
         <input type="number" id="p2pPriceInput" placeholder="Цена в рублях ₽" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;" min="1000">
         <div class="grid-2">
           <button onclick="AppM.confirmCreateP2PListing()" class="btn btn-green">Выставить в облако ☁️</button>
@@ -902,7 +906,7 @@
 
         const CACHE_VER = '345';
 
-        // Модули баз данных игры (включая data_dialogues.js и транспорт)
+        // Модули баз данных игры (включая data_dialogues.js)
         const rootModules = [
           'data_core.js',
           'data_cars.js',
