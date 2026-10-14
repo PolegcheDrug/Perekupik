@@ -1,12 +1,12 @@
 /* ========================================================
-   css/market.css — АВТОРЫНОК И КАРТОЧКИ КЛАССОВ (v2.0.0)
+   css/market.css — АВТОРЫНОК И КАРТОЧКИ КЛАССОВ (v2.1.0)
    Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-   ⭐ v2.0.0: РЕДИЗАЙН СЕТКИ КЛАССОВ
-   - Кнопки компактнее (min-height 52px)
-   - Иконки крупнее, текст мельче
-   - Активная — обводка, не заливка
-   - «Все категории» — на всю ширину
-   - Инфо-баннер компактнее
+   ⭐ v2.1.0:
+   - Шкала терпения продавца (.patience-meter)
+   - Подсказки шансов торга (.haggle-chance-badge)
+   - Панель торга у капота (.hood-deal-panel)
+   - Анимации кнопок торга
+   - Блок аргументов дефектов (.defect-argue-block)
    ======================================================== */
 
 /* ========================================================
@@ -83,7 +83,7 @@
 }
 
 /* ========================================================
-   3. ⭐ v2.0.0: РЕДИЗАЙН СЕТКИ КАТЕГОРИЙ
+   3. СЕТКА КАТЕГОРИЙ
    ======================================================== */
 .market-categories-grid {
   display: grid !important;
@@ -96,7 +96,6 @@
   display: none !important;
 }
 
-/* Базовая плитка */
 .market-categories-grid .cat-tile {
   background: #0d1424 !important;
   color: #ffffff !important;
@@ -120,7 +119,6 @@
   transform: scale(0.96);
 }
 
-/* Иконка категории — крупнее */
 .market-categories-grid .cat-tile-icon {
   font-size: 22px;
   color: var(--text-sub);
@@ -128,7 +126,6 @@
   transition: color 0.15s ease;
 }
 
-/* Название категории */
 .market-categories-grid .cat-tile-name {
   font-size: 10px;
   font-weight: 800;
@@ -141,7 +138,6 @@
   line-height: 1.1;
 }
 
-/* Подпись (уровень/«Доступен») */
 .market-categories-grid .cat-tile-sub {
   font-size: 8px;
   font-weight: 700;
@@ -154,9 +150,6 @@
   max-width: 90px;
 }
 
-/* ========================================================
-   4. АКТИВНАЯ КАТЕГОРИЯ — ОБВОДКА, НЕ ЗАЛИВКА
-   ======================================================== */
 .market-categories-grid .cat-tile.active {
   background: linear-gradient(145deg, rgba(0, 242, 254, 0.12), rgba(2, 132, 199, 0.18)) !important;
   border: 1.5px solid var(--cyan) !important;
@@ -174,9 +167,6 @@
   color: #a5f3fc;
 }
 
-/* ========================================================
-   5. ЗАБЛОКИРОВАННАЯ КАТЕГОРИЯ
-   ======================================================== */
 .market-categories-grid .cat-tile.locked {
   background: #080c14 !important;
   border-color: rgba(255, 255, 255, 0.04) !important;
@@ -192,9 +182,6 @@
   color: #f87171;
 }
 
-/* ========================================================
-   6. КНОПКА «ВСЕ КАТЕГОРИИ» — НА ВСЮ ШИРИНУ
-   ======================================================== */
 .market-categories-grid .cat-tile-full {
   grid-column: 1 / -1 !important;
   min-height: 46px !important;
@@ -230,7 +217,7 @@
 }
 
 /* ========================================================
-   7. ИНФО-БАННЕР КАТЕГОРИИ
+   4. ИНФО-БАННЕР КАТЕГОРИИ
    ======================================================== */
 .cat-info-banner {
   background: rgba(13, 20, 36, 0.7) !important;
@@ -247,7 +234,7 @@
 }
 
 /* ========================================================
-   8. ШИЛЬДИКИ И СТИЛИЗОВАННЫЕ МАРКИ АВТОМОБИЛЕЙ
+   5. ШИЛЬДИКИ И МАРКИ АВТО
    ======================================================== */
 .car-brand-title-wrap {
   display: flex;
@@ -292,7 +279,7 @@
 }
 
 /* ========================================================
-   9. СТРОКА ТЕГОВ И ГОСНОМЕР
+   6. ТЕГИ И ГОСНОМЕРА
    ======================================================== */
 .car-status-badges-row {
   display: flex;
@@ -368,7 +355,7 @@
 }
 
 /* ========================================================
-   10. ОБЛОЖКА АВТО
+   7. ОБЛОЖКА АВТО
    ======================================================== */
 .car-img-wrap {
   position: relative !important;
@@ -402,7 +389,7 @@
 }
 
 /* ========================================================
-   11. ВЕРХНИЙ БЛОК: ЦЕНА И МАРЖА
+   8. ВЕРХНИЙ БЛОК: ЦЕНА И МАРЖА
    ======================================================== */
 .car-header-row-volumetric {
   display: flex;
@@ -452,7 +439,7 @@
 }
 
 /* ========================================================
-   12. ХАРАКТЕРИСТИКИ (3 КОЛОНКИ)
+   9. ХАРАКТЕРИСТИКИ (3 КОЛОНКИ)
    ======================================================== */
 .car-specs-grid-volumetric {
   display: grid !important;
@@ -524,7 +511,7 @@
 .spec-tile-icon-unknown { background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25); }
 
 /* ========================================================
-   13. ТЮНИНГ-ПЛАШКА И БЕЙДЖИ МОДОВ
+   10. ТЮНИНГ-ПЛАШКА
    ======================================================== */
 .car-tuning-status-capsule {
   background: linear-gradient(145deg, rgba(16, 24, 38, 0.95), rgba(7, 11, 20, 0.95));
@@ -594,7 +581,7 @@
 }
 
 /* ========================================================
-   14. LED / СТРОБОСКОП / БЕЙДЖИ
+   11. LED / СТРОБОСКОП / БЕЙДЖИ
    ======================================================== */
 .badge-tag {
   background: rgba(8, 12, 20, 0.92) !important;
@@ -667,7 +654,7 @@
 }
 
 /* ========================================================
-   15. РЕПЛИКИ ПРОДАВЦА
+   12. РЕПЛИКИ ПРОДАВЦА
    ======================================================== */
 .seller-dialog-bubble {
   background: linear-gradient(135deg, rgba(14, 23, 40, 0.95), rgba(7, 12, 22, 0.95));
@@ -697,7 +684,7 @@
 }
 
 /* ========================================================
-   16. АВТОТЕКА И ТАЙМЕРЫ
+   13. АВТОТЕКА И ТАЙМЕРЫ
    ======================================================== */
 .autoteka-pts-card {
   background: linear-gradient(145deg, #090e18 0%, #060a12 100%);
@@ -786,7 +773,284 @@
 }
 
 /* ========================================================
-   17. ИНТЕРАКТИВНАЯ КАРТА РЫНКА
+   ⭐ v2.1.0: 14. ШКАЛА ТЕРПЕНИЯ ПРОДАВЦА
+   ======================================================== */
+.patience-meter-block {
+  background: #090e18;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.patience-meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.patience-meter-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-sub);
+  letter-spacing: 0.3px;
+}
+
+.patience-meter-value {
+  font-size: 11px;
+  font-weight: 900;
+  font-family: monospace, sans-serif;
+}
+
+.patience-meter-value.patience-high { color: var(--green); text-shadow: 0 0 6px var(--green-glow); }
+.patience-meter-value.patience-mid { color: var(--amber); text-shadow: 0 0 6px var(--amber-glow); }
+.patience-meter-value.patience-low { color: var(--red); text-shadow: 0 0 6px var(--red-glow); animation: patienceLowPulse 1s infinite alternate ease-in-out; }
+
+@keyframes patienceLowPulse {
+  0% { filter: brightness(1); }
+  100% { filter: brightness(1.4); }
+}
+
+.patience-meter-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.patience-meter-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1), background 0.3s ease;
+  position: relative;
+}
+
+.patience-meter-fill.patience-high {
+  background: linear-gradient(90deg, #059669, #00e676);
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
+}
+
+.patience-meter-fill.patience-mid {
+  background: linear-gradient(90deg, #d97706, #ffb300);
+  box-shadow: 0 0 10px rgba(255, 179, 0, 0.5);
+}
+
+.patience-meter-fill.patience-low {
+  background: linear-gradient(90deg, #b91c1c, #ff3366);
+  box-shadow: 0 0 12px rgba(255, 51, 102, 0.7);
+  animation: patienceTrackPulse 0.8s infinite alternate ease-in-out;
+}
+
+@keyframes patienceTrackPulse {
+  0% { filter: brightness(1); }
+  100% { filter: brightness(1.3); }
+}
+
+.patience-meter-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: patienceShimmer 2s infinite;
+}
+
+@keyframes patienceShimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.patience-meter-hint {
+  font-size: 8.5px;
+  color: #94a3b8;
+  margin-top: 5px;
+  line-height: 1.3;
+  font-style: italic;
+}
+
+/* ========================================================
+   ⭐ v2.1.0: 15. ПОДСКАЗКИ ШАНСОВ ТОРГА
+   ======================================================== */
+.haggle-chance-badge {
+  display: inline-block;
+  font-size: 8.5px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 5px;
+  margin-top: 3px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.haggle-chance-badge.chance-high {
+  background: rgba(0, 230, 118, 0.18);
+  color: var(--green);
+  border: 1px solid rgba(0, 230, 118, 0.45);
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.25);
+}
+
+.haggle-chance-badge.chance-mid {
+  background: rgba(255, 179, 0, 0.18);
+  color: var(--amber);
+  border: 1px solid rgba(255, 179, 0, 0.45);
+}
+
+.haggle-chance-badge.chance-low {
+  background: rgba(255, 51, 102, 0.18);
+  color: var(--red);
+  border: 1px solid rgba(255, 51, 102, 0.45);
+}
+
+.haggle-chance-badge.chance-dead {
+  background: rgba(120, 113, 108, 0.18);
+  color: #94a3b8;
+  border: 1px solid rgba(120, 113, 108, 0.4);
+}
+
+/* ========================================================
+   ⭐ v2.1.0: 16. ПАНЕЛЬ ТОРГА У КАПОТА
+   ======================================================== */
+.hood-deal-panel {
+  background: #090e18;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.hood-deal-panel-title {
+  font-size: 10px;
+  font-weight: 900;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hood-deal-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.hood-deal-actions-grid .btn {
+  min-height: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 4px;
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.15;
+}
+
+.hood-deal-actions-grid .btn .btn-main-text {
+  font-size: 11px;
+  font-weight: 900;
+  display: block;
+  text-align: center;
+}
+
+.hood-deal-actions-grid .btn .btn-sub-text {
+  font-size: 8.5px;
+  font-weight: 700;
+  opacity: 0.85;
+  display: block;
+  text-align: center;
+}
+
+/* Анимация пульсации для кнопки с высоким шансом */
+.hood-deal-actions-grid .btn.btn-chance-high {
+  animation: chanceHighPulse 2s infinite alternate ease-in-out;
+}
+
+@keyframes chanceHighPulse {
+  0% { box-shadow: 0 0 6px rgba(0, 230, 118, 0.2); }
+  100% { box-shadow: 0 0 16px rgba(0, 230, 118, 0.55); }
+}
+
+/* ========================================================
+   ⭐ v2.1.0: 17. БЛОК АРГУМЕНТОВ ДЕФЕКТОВ
+   ======================================================== */
+.defect-argue-block {
+  background: rgba(255, 179, 0, 0.08);
+  border: 1px solid rgba(255, 179, 0, 0.4);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+
+.defect-argue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.defect-argue-title {
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--amber);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.defect-argue-list {
+  margin-bottom: 8px;
+}
+
+.defect-argue-item {
+  font-size: 9.5px;
+  color: #f1f5f9;
+  line-height: 1.4;
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.defect-argue-item:last-child {
+  border-bottom: none;
+}
+
+.defect-argue-item-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.defect-argue-item-pct {
+  color: var(--red);
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.defect-argue-legal {
+  margin-top: 6px;
+  padding: 5px 8px;
+  background: rgba(220, 38, 38, 0.12);
+  border-radius: 6px;
+  border-left: 3px solid var(--red);
+  font-size: 9.5px;
+  color: #fca5a5;
+}
+
+/* ========================================================
+   18. КАРТА РЫНКА
    ======================================================== */
 .market-container {
     width: 100%;
@@ -1082,7 +1346,7 @@
 }
 
 /* ========================================================
-   18. АДАПТИВНОСТЬ
+   19. АДАПТИВНОСТЬ
    ======================================================== */
 @media (max-width: 380px) {
     .market-categories-grid .cat-tile-icon { font-size: 20px; }
@@ -1094,4 +1358,11 @@
     .spec-tile-3d-col { padding: 5px 6px; min-height: 44px; }
     .spec-tile-icon-wrap { width: 18px; height: 18px; font-size: 9px; }
     .spec-tile-col-data b { font-size: 9.5px; }
+
+    /* ⭐ v2.1.0: адаптив для новых элементов */
+    .hood-deal-actions-grid .btn { min-height: 44px; padding: 4px 2px; }
+    .hood-deal-actions-grid .btn .btn-main-text { font-size: 10px; }
+    .hood-deal-actions-grid .btn .btn-sub-text { font-size: 7.5px; }
+    .patience-meter-block { padding: 8px 10px; }
+    .defect-argue-block { padding: 8px 10px; }
 }

@@ -1,23 +1,28 @@
 /* ========================================================
-   css/base.css — БАЗОВЫЕ ПЕРЕМЕННЫЕ И СВЕТЛАЯ ТЕМА (v2.0.0)
+   css/base.css — БАЗОВЫЕ ПЕРЕМЕННЫЕ (ТОЛЬКО ТЁМНАЯ ТЕМА) (v2.1.0)
    Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-   ⭐ v2.0.0: Добавлена полная поддержка светлой темы
-   (body.theme-light) с глянцевыми панелями в стиле iOS.
+   ⭐ v2.1.0:
+   - Убрана светлая тема полностью
+   - Только тёмный неоновый дизайн
+   - Переменные для DEV-режима
    ======================================================== */
 
 /* ========================================================
    1. ПЕРЕМЕННЫЕ ТЁМНОЙ ТЕМЫ (по умолчанию)
    ======================================================== */
 :root {
+  /* Фоны */
   --bg-body: #05080f;
   --bg-surface: #0b101a;
   --bg-card: linear-gradient(145deg, rgba(20, 27, 43, 0.94) 0%, rgba(10, 15, 25, 0.96) 100%);
   --bg-card-hover: rgba(26, 36, 54, 0.95);
   --bg-modal: radial-gradient(circle at 50% 0%, rgba(26, 38, 64, 0.98) 0%, rgba(9, 14, 24, 0.98) 100%);
 
+  /* Рамки */
   --border-glass: rgba(255, 255, 255, 0.08);
   --border-glow: rgba(0, 242, 254, 0.25);
 
+  /* Акцентные цвета */
   --cyan: #00f2fe;
   --cyan-glow: rgba(0, 242, 254, 0.45);
   --green: #00e676;
@@ -30,60 +35,43 @@
   --purple-dark: #7e22ce;
   --purple-glow: rgba(192, 132, 252, 0.4);
 
+  /* Молния (Lightning theme) */
   --lightning-secondary: #7928ca;
   --lightning-glow: rgba(121, 40, 202, 0.45);
+
+  /* Кастомные цвета (перезаписываются из theme-manager.js) */
   --custom-fx-color: #00f2fe;
   --custom-fx-glow: rgba(0, 242, 254, 0.45);
 
+  /* Текст */
   --text-main: #f8fafc;
   --text-sub: #94a3b8;
   --text-muted: #64748b;
 
+  /* Радиусы */
   --radius-xl: 20px;
   --radius-lg: 16px;
   --radius-md: 12px;
   --radius-sm: 8px;
 
+  /* HUD и NAV */
   --hud-bg-custom: linear-gradient(180deg, rgba(8, 13, 24, 0.98) 0%, rgba(5, 8, 15, 0.94) 100%);
   --nav-bg-custom: rgba(11, 16, 26, 0.98);
 
+  /* Тени */
   --shadow-card: 0 10px 28px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --shadow-card-hover: 0 12px 32px rgba(0, 0, 0, 0.85);
   --shadow-modal: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 20px var(--cyan-glow);
+
+  /* ⭐ v2.1.0: DEV-режим */
+  --dev-accent: #00e676;
+  --dev-bg: #05080f;
+  --dev-border: rgba(0, 230, 118, 0.5);
+  --dev-glow: rgba(0, 230, 118, 0.35);
 }
 
 /* ========================================================
-   2. СВЕТЛАЯ ТЕМА (body.theme-light)
-   ======================================================== */
-body.theme-light {
-  /* Фоны */
-  --bg-body: #f0f4f9;
-  --bg-surface: #ffffff;
-  --bg-card: linear-gradient(145deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
-  --bg-card-hover: rgba(241, 245, 249, 0.98);
-  --bg-modal: radial-gradient(circle at 50% 0%, #ffffff 0%, #f1f5f9 100%);
-
-  /* Рамки */
-  --border-glass: rgba(15, 23, 42, 0.08);
-  --border-glow: rgba(14, 165, 233, 0.35);
-
-  /* Текст */
-  --text-main: #0f172a;
-  --text-sub: #475569;
-  --text-muted: #94a3b8;
-
-  /* HUD / NAV */
-  --hud-bg-custom: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.96) 100%);
-  --nav-bg-custom: rgba(255, 255, 255, 0.98);
-
-  /* Тени — мягкие, как в iOS */
-  --shadow-card: 0 4px 16px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --shadow-card-hover: 0 6px 20px rgba(15, 23, 42, 0.12);
-  --shadow-modal: 0 25px 60px rgba(15, 23, 42, 0.25), 0 0 30px rgba(14, 165, 233, 0.15);
-}
-
-/* ========================================================
-   3. ГЛОБАЛЬНЫЙ RESET
+   2. ГЛОБАЛЬНЫЙ RESET
    ======================================================== */
 * {
   box-sizing: border-box;
@@ -103,7 +91,6 @@ html, body {
   background-color: var(--bg-body);
   color: var(--text-main);
   overflow: hidden;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Скрытие мусора от хостинга */
@@ -114,7 +101,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   4. СКРОЛЛБАРЫ
+   3. СКРОЛЛБАРЫ
    ======================================================== */
 ::-webkit-scrollbar {
   width: 5px;
@@ -128,15 +115,8 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border-radius: 8px;
 }
 
-body.theme-light ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.05);
-}
-body.theme-light ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #0ea5e9, #6366f1);
-}
-
 /* ========================================================
-   5. КАРКАС ПРИЛОЖЕНИЯ
+   4. КАРКАС ПРИЛОЖЕНИЯ
    ======================================================== */
 .app-shell {
   display: flex;
@@ -152,19 +132,10 @@ body.theme-light ::-webkit-scrollbar-thumb {
     radial-gradient(circle at 80% 90%, rgba(192, 132, 252, 0.06) 0%, transparent 50%),
     linear-gradient(180deg, #0f1728 0%, var(--bg-body) 100%);
   overflow: hidden;
-  transition: background 0.3s ease;
-}
-
-/* Светлый каркас */
-body.theme-light .app-shell {
-  background:
-    radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.08) 0%, transparent 60%),
-    radial-gradient(circle at 80% 90%, rgba(99, 102, 241, 0.06) 0%, transparent 50%),
-    linear-gradient(180deg, #ffffff 0%, var(--bg-body) 100%);
 }
 
 /* ========================================================
-   6. КОНТЕНТ И ЭКРАНЫ
+   5. КОНТЕНТ И ЭКРАНЫ
    ======================================================== */
 .main-content {
   flex: 1 1 auto;
@@ -191,7 +162,7 @@ body.theme-light .app-shell {
 }
 
 /* ========================================================
-   7. КАРТОЧКИ GLASS (тёмная + светлая)
+   6. КАРТОЧКИ GLASS
    ======================================================== */
 .glass-card {
   position: relative;
@@ -204,8 +175,7 @@ body.theme-light .app-shell {
   box-shadow: var(--shadow-card);
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               box-shadow 0.25s ease,
-              border-color 0.25s ease,
-              background 0.3s ease;
+              border-color 0.25s ease;
   overflow: hidden;
 }
 
@@ -213,34 +183,14 @@ body.theme-light .app-shell {
   transform: scale(0.992);
 }
 
-/* Светлая карточка — глянцевая */
-body.theme-light .glass-card {
-  background: var(--bg-card);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  border-top: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow:
-    0 4px 16px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
-}
-
-body.theme-light .glass-card:hover {
-  background: var(--bg-card-hover);
-  box-shadow: var(--shadow-card-hover);
-}
-
-/* Персональные карточки */
+/* Персональные карточки (личный авто) */
 .glass-card.personal-car-card {
   border: 1.5px solid rgba(255, 179, 0, 0.85) !important;
   box-shadow: 0 0 24px rgba(255, 179, 0, 0.35), inset 0 0 15px rgba(255, 179, 0, 0.08) !important;
 }
 
-body.theme-light .glass-card.personal-car-card {
-  border: 1.5px solid rgba(234, 88, 12, 0.75) !important;
-  box-shadow: 0 4px 16px rgba(234, 88, 12, 0.15), inset 0 0 12px rgba(234, 88, 12, 0.05) !important;
-}
-
 /* ========================================================
-   8. КНОПКИ
+   7. КНОПКИ
    ======================================================== */
 .btn {
   width: 100%;
@@ -274,23 +224,11 @@ body.theme-light .glass-card.personal-car-card {
 .btn-dark { background: rgba(255, 255, 255, 0.07) !important; color: #e2e8f0 !important; border: 1px solid var(--border-glass) !important; }
 .btn-danger { background: #dc2626 !important; color: #fff !important; box-shadow: 0 0 12px rgba(220, 38, 38, 0.4) !important; }
 
-/* Светлые кнопки */
-body.theme-light .btn-dark {
-  background: rgba(15, 23, 42, 0.05) !important;
-  color: #334155 !important;
-  border: 1px solid rgba(15, 23, 42, 0.1) !important;
-}
-body.theme-light .btn-dark:active {
-  background: rgba(15, 23, 42, 0.1) !important;
-}
-body.theme-light .btn-cyan { color: #fff !important; }
-body.theme-light .btn-green { color: #fff !important; }
-
 .btn-sm { min-height: 36px; font-size: 11px; padding: 6px 12px; }
 .btn-auto { width: auto; min-width: max-content; padding: 8px 16px; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
 
 /* ========================================================
-   9. СЕТКИ И УТИЛИТЫ
+   8. СЕТКИ И УТИЛИТЫ
    ======================================================== */
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
@@ -298,19 +236,17 @@ body.theme-light .btn-green { color: #fff !important; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .flex-gap { display: flex; gap: 7px; }
 
+/* Цвета */
 .color-cyan { color: var(--cyan); }
 .color-green { color: var(--green); }
 .color-amber { color: var(--amber); }
 .color-red { color: var(--red); }
 .color-purple { color: var(--purple); }
+.color-sub { color: var(--text-sub); }
+.color-muted { color: var(--text-muted); }
+.color-main { color: var(--text-main); }
 
-/* ⭐ Цвета, адаптированные под светлую тему */
-body.theme-light .color-cyan { color: #0284c7; }
-body.theme-light .color-green { color: #059669; }
-body.theme-light .color-amber { color: #d97706; }
-body.theme-light .color-red { color: #dc2626; }
-body.theme-light .color-purple { color: #7e22ce; }
-
+/* Утилиты */
 .sub-label { font-size: 11px; color: var(--text-sub); }
 .font-bold { font-weight: 800; }
 .mb-1 { margin-bottom: 4px; }
@@ -318,6 +254,7 @@ body.theme-light .color-purple { color: #7e22ce; }
 .mb-3 { margin-bottom: 12px; }
 .mt-1 { margin-top: 4px; }
 .mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
 .p-1 { padding: 4px; }
 .p-2 { padding: 8px; }
 .p-3 { padding: 12px; }
@@ -328,9 +265,12 @@ body.theme-light .color-purple { color: #7e22ce; }
 .block { display: block; }
 .space-y-1 > * + * { margin-top: 4px; }
 .space-y-2 > * + * { margin-top: 8px; }
+.space-y-3 > * + * { margin-top: 12px; }
+.opacity-50 { opacity: 0.5; }
+.opacity-60 { opacity: 0.6; }
 
 /* ========================================================
-   10. TAG-BADGES
+   9. TAG-BADGES
    ======================================================== */
 .tag-badge {
   font-size: 9px;
@@ -349,16 +289,8 @@ body.theme-light .color-purple { color: #7e22ce; }
 .bg-tag-red { background: #3b050d; color: var(--red); }
 .bg-tag-dark { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; }
 
-/* Светлые теги */
-body.theme-light .bg-tag-cyan { background: #e0f2fe; color: #0284c7; }
-body.theme-light .bg-tag-amber { background: #fef3c7; color: #b45309; }
-body.theme-light .bg-tag-green { background: #d1fae5; color: #047857; }
-body.theme-light .bg-tag-purple { background: #ede9fe; color: #6d28d9; }
-body.theme-light .bg-tag-red { background: #fee2e2; color: #b91c1c; }
-body.theme-light .bg-tag-dark { background: rgba(15, 23, 42, 0.06); color: #475569; }
-
 /* ========================================================
-   11. ЦЕНЗУРА
+   10. ЦЕНЗУРА
    ======================================================== */
 .censor-badge {
   display: inline-flex;
@@ -383,16 +315,9 @@ body.theme-light .bg-tag-dark { background: rgba(15, 23, 42, 0.06); color: #4755
 }
 .censor-badge::before { content: '⚠'; font-size: 8px; opacity: 0.9; }
 
-body.theme-light .censor-badge {
-  background: rgba(220, 38, 38, 0.1);
-  border-color: rgba(220, 38, 38, 0.5);
-  color: #dc2626;
-  text-shadow: none;
-  box-shadow: 0 0 4px rgba(220, 38, 38, 0.2);
-}
-
 /* ========================================================
-   12. ЭФФЕКТЫ НИКНЕЙМОВ
+   11. БАЗОВЫЕ НИК-ЭФФЕКТЫ (старые, для совместимости)
+   Новые — в hud.css
    ======================================================== */
 @keyframes nickLightningAnim {
   0% { color: #fff; text-shadow: 0 0 5px var(--cyan), 0 0 10px var(--cyan); }
@@ -430,14 +355,8 @@ body.theme-light .censor-badge {
 .nick-fx-matrix { animation: nickMatrixAnim 2s infinite steps(4, start); }
 .nick-fx-sakura { animation: nickSakuraAnim 3s infinite ease-in-out; }
 
-/* Светлая тема — ник-эффекты тоже адаптированы */
-body.theme-light .nick-fx-gold {
-  animation: nickGoldAnim 3s infinite ease-in-out;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
-}
-
 /* ========================================================
-   13. АУРА АВАТАРА
+   12. АУРА АВАТАРА (старая, для совместимости)
    ======================================================== */
 @keyframes ringSpin {
   0% { transform: rotate(0deg); }
@@ -466,216 +385,206 @@ body.theme-light .nick-fx-gold {
 }
 
 /* ========================================================
-   14. СВЕТЛАЯ ТЕМА — ДОП. ЭЛЕМЕНТЫ
+   ⭐ v2.1.0: 13. DEV-РЕЖИМ ДЛЯ ПК
    ======================================================== */
 
-/* HUD */
-body.theme-light .hud-header {
-  background: var(--hud-bg-custom);
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
-}
-body.theme-light .hud-card {
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-}
-body.theme-light .player-capsule-box {
-  background: rgba(241, 245, 249, 0.9);
-  border-color: rgba(14, 165, 233, 0.35);
-}
-body.theme-light .player-name-text {
-  color: #0f172a;
-}
-body.theme-light .lvl-badge {
-  background: rgba(14, 165, 233, 0.12);
-  color: #0284c7;
-}
-body.theme-light .xp-bar-wrap {
-  background: rgba(15, 23, 42, 0.08);
-}
-body.theme-light .wallet-capsule-box {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(5, 150, 105, 0.35);
-}
-body.theme-light .cash-val {
-  color: #047857;
-  text-shadow: none;
-}
-body.theme-light .stat-pill {
-  background: rgba(15, 23, 42, 0.03);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-}
-body.theme-light .hud-btn.btn-lang {
-  background: rgba(15, 23, 42, 0.05);
-  color: #334155;
-  border-color: rgba(15, 23, 42, 0.1);
+/* DEV-бейдж в профиле */
+.dev-mode-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #00e676, #059669);
+  color: #000;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  margin-left: 4px;
+  text-transform: uppercase;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
 }
 
-/* Мобильная оболочка */
-body.theme-light .phone-device-wrapper {
-  background:
-    repeating-linear-gradient(45deg, rgba(15, 23, 42, 0.01) 0px, rgba(15, 23, 42, 0.01) 2px, transparent 2px, transparent 4px),
-    linear-gradient(165deg, #ffffff 0%, #f1f5f9 100%);
-  border: 2px solid rgba(14, 165, 233, 0.35) !important;
-  box-shadow:
-    0 12px 32px rgba(15, 23, 42, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+/* DEV-панель быстрого доступа (появляется при isPcDevMode) */
+.dev-quick-panel {
+  position: fixed;
+  bottom: 80px;
+  right: 10px;
+  z-index: 4500;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
 }
-body.theme-light .phone-status-bar {
-  color: #64748b;
+.dev-quick-panel > * {
+  pointer-events: auto;
 }
-body.theme-light .phone-notch {
-  background: #0f172a;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+.dev-quick-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00e676, #059669);
+  border: 2px solid rgba(0, 0, 0, 0.4);
+  color: #000;
+  font-size: 16px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 230, 118, 0.4);
+  transition: transform 0.15s ease, filter 0.15s ease;
 }
-body.theme-light .phone-back-btn {
-  background: rgba(15, 23, 42, 0.05);
-  color: #0284c7;
-  border-color: rgba(15, 23, 42, 0.1);
+.dev-quick-btn:active {
+  transform: scale(0.92);
 }
-body.theme-light .phone-app-title {
-  color: #0f172a;
-}
-
-/* Модалки */
-body.theme-light .modal-overlay {
-  background: rgba(15, 23, 42, 0.35);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-body.theme-light .modal-box {
-  background: var(--bg-modal);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: var(--shadow-modal);
-  color: var(--text-main);
+.dev-quick-btn:hover {
+  filter: brightness(1.15);
 }
 
-/* Чаты */
-body.theme-light .chat-thread-container {
-  background: #f8fafc;
-  border-color: rgba(15, 23, 42, 0.08);
-}
-body.theme-light .chat-msg.msg-seller {
-  background: #f1f5f9;
-  color: #0f172a;
-  border-color: rgba(15, 23, 42, 0.1);
-}
-body.theme-light .chat-msg.msg-player {
-  background: linear-gradient(135deg, rgba(14, 165, 233, 0.15), rgba(99, 102, 241, 0.15));
-  border-color: rgba(14, 165, 233, 0.4);
-  color: #0f172a;
-}
-
-/* Нижняя навигация */
-body.theme-light .bottom-nav {
-  background: var(--nav-bg-custom);
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.06);
-}
-body.theme-light .b-nav-item {
-  color: #94a3b8;
-}
-body.theme-light .b-nav-item.active {
-  color: #0f172a;
+/* DEV-индикатор в углу */
+.dev-corner-indicator {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  right: 8px;
+  z-index: 4500;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid var(--dev-border);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 900;
+  color: var(--dev-accent);
+  letter-spacing: 0.5px;
+  font-family: monospace, sans-serif;
+  box-shadow: 0 0 10px var(--dev-glow);
+  pointer-events: none;
+  animation: devCornerPulse 2s infinite alternate ease-in-out;
 }
 
-/* Тосты */
-body.theme-light .toast {
-  background: #ffffff;
-  border-color: rgba(14, 165, 233, 0.4);
-  color: #0f172a;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.2), 0 0 12px rgba(14, 165, 233, 0.2);
-}
-
-/* Категории рынка */
-body.theme-light .market-categories-grid .cat-tile {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  border-color: rgba(15, 23, 42, 0.08) !important;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-}
-body.theme-light .market-categories-grid .cat-tile-name {
-  color: #0f172a;
-}
-body.theme-light .market-categories-grid .cat-tile-icon {
-  color: #64748b;
-}
-body.theme-light .market-categories-grid .cat-tile.active {
-  background: linear-gradient(145deg, rgba(14, 165, 233, 0.12), rgba(99, 102, 241, 0.08)) !important;
-  border-color: #0284c7 !important;
-  box-shadow: 0 0 12px rgba(14, 165, 233, 0.3);
-}
-body.theme-light .market-categories-grid .cat-tile.locked {
-  background: #f8fafc !important;
-}
-
-/* Инпуты */
-body.theme-light input[type="text"],
-body.theme-light input[type="number"],
-body.theme-light textarea,
-body.theme-light .chat-input {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  border: 1px solid rgba(15, 23, 42, 0.12) !important;
-}
-body.theme-light .chat-input::placeholder {
-  color: #94a3b8;
-}
-
-/* Бизнес-карточки */
-body.theme-light .biz-summary-bar {
-  background: linear-gradient(135deg, rgba(5, 150, 105, 0.06), #ffffff);
-  border-color: rgba(5, 150, 105, 0.25);
-}
-body.theme-light .biz-summary-value { color: #0f172a; }
-body.theme-light .biz-summary-label { color: #64748b; }
-
-body.theme-light .biz-tabs-row {
-  background: #f1f5f9;
-  border-color: rgba(15, 23, 42, 0.06);
-}
-body.theme-light .biz-tab { color: #64748b; }
-body.theme-light .biz-tab.active {
-  background: linear-gradient(135deg, rgba(5, 150, 105, 0.15), rgba(5, 150, 105, 0.1));
-  border-color: rgba(5, 150, 105, 0.5);
-  color: #047857;
-}
-
-body.theme-light .biz-stats-panel {
-  background: #f8fafc;
-  border-color: rgba(15, 23, 42, 0.06);
-}
-body.theme-light .biz-stat-val { color: #0f172a; }
-body.theme-light .biz-stat-label { color: #64748b; }
-
-body.theme-light .biz-dna-panel {
-  background: rgba(14, 165, 233, 0.04);
-  border-color: rgba(14, 165, 233, 0.3);
-}
-body.theme-light .biz-dna-title { color: #0284c7; }
-body.theme-light .biz-dna-cell {
-  background: #ffffff;
-  border-color: rgba(14, 165, 233, 0.25);
-}
-body.theme-light .biz-dna-cell-mult { color: #0284c7; }
-
-body.theme-light .biz-spark-panel {
-  background: #f8fafc;
-  border-color: rgba(15, 23, 42, 0.06);
-}
-
-/* Спойлер-обложки */
-body.theme-light .biz-cover {
-  border-color: rgba(15, 23, 42, 0.08);
-}
-body.theme-light .biz-cover-icon {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(15, 23, 42, 0.15);
+@keyframes devCornerPulse {
+  0% { box-shadow: 0 0 6px var(--dev-glow); }
+  100% { box-shadow: 0 0 14px var(--dev-glow); }
 }
 
 /* ========================================================
-   15. АНИМАЦИЯ ПЕРЕКЛЮЧЕНИЯ ТЕМЫ
+   14. ПРОЧИЕ БАЗОВЫЕ ЭЛЕМЕНТЫ
    ======================================================== */
-body, .app-shell, .glass-card, .hud-header, .bottom-nav, .modal-box, .phone-device-wrapper {
-  transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+
+/* Инпуты */
+.chat-input,
+input[type="text"],
+input[type="number"],
+textarea {
+  background: #090e18;
+  color: #fff;
+  border: 1px solid var(--border-glow);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chat-input:focus,
+input[type="text"]:focus,
+input[type="number"]:focus,
+textarea:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+.chat-input::placeholder,
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
+}
+
+/* Select */
+select {
+  background: #090e18;
+  color: #fff;
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* Убираем стрелки у number */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Range slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cyan);
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--cyan-glow);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--cyan);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 8px var(--cyan-glow);
+}
+
+/* ========================================================
+   15. СКРЫТИЕ ЭЛЕМЕНТОВ
+   ======================================================== */
+.hidden { display: none !important; }
+.invisible { visibility: hidden; }
+
+/* ========================================================
+   16. АНИМАЦИИ ОБЩИЕ
+   ======================================================== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================================
+   17. АДАПТИВНОСТЬ
+   ======================================================== */
+@media (max-width: 380px) {
+  .grid-4 { gap: 4px; }
+  .grid-3 { gap: 5px; }
+  .btn { font-size: 11px; }
+  .btn-sm { font-size: 10px; }
+  .sub-label { font-size: 10px; }
 }

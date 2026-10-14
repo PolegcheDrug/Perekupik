@@ -1,11 +1,14 @@
 // ========================================================
-// firebase-bridge.js — СЕТЕВОЙ ШЛЮЗ FIRESTORE 2.3.0 (v1.4.0)
+// firebase-bridge.js — СЕТЕВОЙ ШЛЮЗ FIRESTORE 2.4.0 (v1.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.4.0:
-//   - НИКАКИХ профилей без Telegram ID. Guest/dev/p2p профили удалены.
-//   - getCurrentPlayerProfile() возвращает null при отсутствии Telegram.
-//   - initSession() возвращает success:false, userId:null без Telegram.
-//   - pushSave/pullSave безопасно выходят при null userId.
+// ⭐ v1.5.0:
+//   - УБРАНО дублирование market_lots/p2p_market (только market_lots)
+//   - ДОБАВЛЕН TTL: chat_messages (30 дней), notifications (7 дней)
+//   - ДОБАВЛЕНА cleanupExpiredData() — очистка мусора
+//   - ДОБАВЛЕНА getFirestoreStats() — статистика для DEV
+//   - УЛУЧШЕНО логирование всех операций
+//   - УБРАНА legacy-коллекция saves/ (мигрирована в players/garages)
+//   - ДОБАВЛЕНА защита от переполнения Firestore
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -25,7 +28,10 @@ import {
   query,
   orderBy,
   limit,
-  runTransaction
+  where,
+  runTransaction,
+  writeBatch,
+  Timestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -44,8 +50,24 @@ const db = getFirestore(app);
 
 const DEFAULT_AUTH_SERVER_URL = window.AUTH_SERVER_URL || "http://localhost:3000";
 
+// ⭐ v1.5.0: TTL конфигурация
+const TTL_CONFIG = {
+  chat_messages: 30 * 24 * 60 * 60 * 1000,   // 30 дней
+  notifications: 7 * 24 * 60 * 60 * 1000,    // 7 дней
+  transactions: 90 * 24 * 60 * 60 * 1000,    // 90 дней
+  market_lots: 14 * 24 * 60 * 60 * 1000      // 14 дней (автоснятие мёртвых лотов)
+};
+
+// ⭐ v1.5.0: лимиты Firestore
+const LIMITS = {
+  maxLotsPerFetch: 40,
+  maxMessagesPerDialog: 100,
+  maxNotificationsPerUser: 50,
+  maxChatMessagesTotal: 500
+};
+
 // ========================================================
-// ⭐ ХЕЛПЕР ЛОГИРОВАНИЯ FIRESTORE В DEVLOGGER
+// ХЕЛПЕР ЛОГИРОВАНИЯ
 // ========================================================
 function devLogFirestore(action, details) {
     if (window.DevLogger) {
@@ -54,7 +76,7 @@ function devLogFirestore(action, details) {
 }
 
 // ========================================================
-// ⭐ v1.4.0: ЕДИНАЯ ТОЧКА ПОЛУЧЕНИЯ TELEGRAM-ЮЗЕРА
+// ⭐ v1.5.0: ЕДИНАЯ ТОЧКА ПОЛУЧЕНИЯ TELEGRAM-ЮЗЕРА
 // ========================================================
 function getTelegramUser() {
     try {
@@ -205,6 +227,7 @@ const CacheManager = {
 
 // ========================================================
 // 3. КОЛЛЕКЦИИ: players/{id} И garages/{id}
+// ⭐ v1.5.0: убрана запись в legacy saves/
 // ========================================================
 let saveDebounceTimer = null;
 let lastSavedHash = "";
@@ -287,10 +310,10 @@ const PlayersStorageManager = {
         }
 
         const t0 = performance.now();
+        // ⭐ v1.5.0: убрана запись в saves/ (legacy)
         await Promise.all([
           setDoc(doc(db, "players", String(targetUid)), playerDoc, { merge: true }),
-          setDoc(doc(db, "garages", String(targetUid)), garageDoc, { merge: true }),
-          setDoc(doc(db, "saves", String(targetUid)), { ...playerDoc, ...garageDoc }, { merge: true })
+          setDoc(doc(db, "garages", String(targetUid)), garageDoc, { merge: true })
         ]);
         const dt = Math.round(performance.now() - t0);
         lastSavedHash = currentHash;
@@ -359,6 +382,7 @@ const PlayersStorageManager = {
         };
       }
 
+      // ⭐ v1.5.0: fallback на legacy saves/ для миграции старых игроков
       const oldSnap = await getDoc(doc(db, "saves", String(targetUid)));
       if (oldSnap.exists()) {
         devLogFirestore('pullSave (legacy saves/)', `${targetUid}`);
@@ -375,6 +399,7 @@ const PlayersStorageManager = {
 
 // ========================================================
 // 4. market_lots
+// ⭐ v1.5.0: убрано дублирование в p2p_market
 // ========================================================
 const MARKET_FEE_PERCENT = 0.03;
 
@@ -402,7 +427,8 @@ const MarketLotsManager = {
         sellerName: profile.name || "Перекуп",
         type: lotData.type, name: lotData.name, price: rawPrice,
         itemData: lotData.itemData || {},
-        status: "active", timestamp: Date.now()
+        status: "active", timestamp: Date.now(),
+        expireAt: Date.now() + TTL_CONFIG.market_lots  // ⭐ v1.5.0: TTL
       };
 
       if (lotData.type === "plate" || lotData.type === "plates") {
@@ -416,10 +442,8 @@ const MarketLotsManager = {
         }
       }
 
-      await Promise.all([
-        setDoc(doc(db, "market_lots", lotId), payload),
-        setDoc(doc(db, "p2p_market", lotId), payload)
-      ]);
+      // ⭐ v1.5.0: ТОЛЬКО market_lots (убрано p2p_market)
+      await setDoc(doc(db, "market_lots", lotId), payload);
 
       CacheManager.marketLots = null;
       devLogFirestore('publishLot OK', lotId);
@@ -436,12 +460,19 @@ const MarketLotsManager = {
       return CacheManager.marketLots;
     }
     try {
-      const q = query(collection(db, "market_lots"), orderBy("timestamp", "desc"), limit(40));
+      const q = query(
+        collection(db, "market_lots"), 
+        where("status", "==", "active"),
+        orderBy("timestamp", "desc"), 
+        limit(LIMITS.maxLotsPerFetch)
+      );
       const snap = await getDocs(q);
       const lots = [];
       snap.forEach(d => {
         const item = d.data();
-        if (item.status === "active") lots.push(item);
+        // ⭐ v1.5.0: фильтр TTL
+        if (item.expireAt && item.expireAt < now) return;
+        lots.push(item);
       });
       CacheManager.marketLots = lots;
       CacheManager.marketTimestamp = now;
@@ -479,13 +510,15 @@ const MarketLotsManager = {
           tx_id: txId, lot_id: String(lotId),
           buyerId: String(profile.id), buyerName: profile.name || "Покупатель",
           sellerId: String(lot.sellerId), sellerName: lot.sellerName || "Продавец",
-          item: lot.name, type: lot.type, price: lot.price, fee: marketFee, payout: sellerPayout, timestamp: Date.now()
+          item: lot.name, type: lot.type, price: lot.price, fee: marketFee, payout: sellerPayout, timestamp: Date.now(),
+          expireAt: Date.now() + TTL_CONFIG.transactions  // ⭐ v1.5.0: TTL
         });
         tx.set(notifRef, {
           toUser: String(lot.sellerId), type: "deal_payout",
           title: "Продажа на P2P бирже!",
           text: `Покупатель ${profile.name} приобрёл «${lot.name}» за ${lot.price.toLocaleString()} ₽ (начислено: +${sellerPayout.toLocaleString()} ₽).`,
-          amount: sellerPayout, read: false, claimed: false, timestamp: Date.now()
+          amount: sellerPayout, read: false, claimed: false, timestamp: Date.now(),
+          expireAt: Date.now() + TTL_CONFIG.notifications  // ⭐ v1.5.0: TTL
         });
 
         if (lot.type === "plate" || lot.type === "plates") {
@@ -537,6 +570,7 @@ const MarketLotsManager = {
 
 // ========================================================
 // 5. chat_messages
+// ⭐ v1.5.0: TTL 30 дней + batch write
 // ========================================================
 const ChatMessagesManager = {
   async sendMessage(params) {
@@ -547,7 +581,8 @@ const ChatMessagesManager = {
       msg_id: msgId, senderId: String(profile.id), senderName: profile.name || "Перекуп",
       receiverId: params.receiverId ? String(params.receiverId) : null,
       clubId: params.clubId ? String(params.clubId) : null,
-      dialogId: params.dialogId || null, text: params.text, timestamp: Date.now()
+      dialogId: params.dialogId || null, text: params.text, timestamp: Date.now(),
+      expireAt: Date.now() + TTL_CONFIG.chat_messages  // ⭐ v1.5.0: TTL
     };
     try {
       await setDoc(doc(db, "chat_messages", msgId), payload);
@@ -558,32 +593,59 @@ const ChatMessagesManager = {
   },
   async fetchMessagesForDialog(dialogId) {
     try {
-      const q = query(collection(db, "chat_messages"), orderBy("timestamp", "asc"), limit(40));
+      const q = query(
+        collection(db, "chat_messages"), 
+        where("dialogId", "==", dialogId),
+        orderBy("timestamp", "asc"), 
+        limit(LIMITS.maxMessagesPerDialog)  // ⭐ v1.5.0: лимит
+      );
       const snap = await getDocs(q);
       const list = [];
-      snap.forEach(d => { const it = d.data(); if (it.dialogId === dialogId) list.push(it); });
+      const now = Date.now();
+      snap.forEach(d => { 
+        const it = d.data(); 
+        // ⭐ v1.5.0: фильтр TTL
+        if (it.expireAt && it.expireAt < now) return;
+        list.push(it);
+      });
       return list;
-    } catch (e) { return []; }
+    } catch (e) { 
+      console.warn('[ChatMessages] fetch error:', e);
+      return []; 
+    }
   }
 };
 
 // ========================================================
 // 6. notifications
+// ⭐ v1.5.0: TTL 7 дней + лимит
 // ========================================================
 const NotificationsManager = {
   async fetchMyNotifications(userId) {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) return [];
     try {
-      const q = query(collection(db, "notifications"), orderBy("timestamp", "desc"), limit(20));
+      const q = query(
+        collection(db, "notifications"), 
+        where("toUser", "==", String(targetUid)),
+        where("claimed", "==", false),
+        orderBy("timestamp", "desc"), 
+        limit(LIMITS.maxNotificationsPerUser)  // ⭐ v1.5.0: лимит
+      );
       const snap = await getDocs(q);
       const notifs = [];
+      const now = Date.now();
       snap.forEach(d => {
         const it = d.data();
-        if (String(it.toUser) === String(targetUid) && !it.claimed) notifs.push({ id: d.id, ...it });
+        // ⭐ v1.5.0: фильтр TTL
+        if (it.expireAt && it.expireAt < now) return;
+        notifs.push({ id: d.id, ...it });
       });
       return notifs;
-    } catch (e) { return []; }
+    } catch (e) { 
+      console.warn('[Notifications] fetch error:', e);
+      return []; 
+    }
   },
   async claimNotificationPayout(notifId) {
     try {
@@ -656,17 +718,22 @@ const RegisteredPlatesManager = {
 
 const CarsCatalogManager = {
   async seedDefaultCarsCatalog(force = false) {
-    const isSeeded = localStorage.getItem("perekup_db_seeded_v1");
+    const isSeeded = localStorage.getItem("perekup_db_seeded_v2");  // ⭐ v1.5.0: новая версия
     if (isSeeded && !force) return { success: true };
     if (typeof window.CAR_DATABASE === "undefined") return { success: false };
     try {
       let count = 0;
+      // ⭐ v1.5.0: batch write для скорости
+      const batches = [];
+      let currentBatch = writeBatch(db);
+      let batchCount = 0;
+
       for (const [category, carsList] of Object.entries(window.CAR_DATABASE)) {
         if (!Array.isArray(carsList)) continue;
         for (const car of carsList) {
           if (!car || !car.name) continue;
           const carDocId = "car_" + car.name.toLowerCase().replace(/[^a-z0-9а-я]/gi, "_");
-          await setDoc(doc(db, "cars_catalog", carDocId), {
+          currentBatch.set(doc(db, "cars_catalog", carDocId), {
             id: carDocId, name: car.name, power: Number(car.power) || 100,
             basePrice: Number(car.basePrice) || 100000, drivetrain: car.drivetrain || "rwd",
             type: car.type || category, img: car.img || "",
@@ -675,12 +742,31 @@ const CarsCatalogManager = {
             isActive: true, createdAt: Date.now()
           }, { merge: true });
           count++;
+          batchCount++;
+
+          // Firestore лимит: 500 операций на batch
+          if (batchCount >= 450) {
+            batches.push(currentBatch);
+            currentBatch = writeBatch(db);
+            batchCount = 0;
+          }
         }
       }
-      localStorage.setItem("perekup_db_seeded_v1", "true");
+
+      if (batchCount > 0) batches.push(currentBatch);
+
+      for (const b of batches) {
+        await b.commit();
+      }
+
+      localStorage.setItem("perekup_db_seeded_v2", "true");
       CacheManager.cloudCars = null;
+      devLogFirestore('seedCarsCatalog OK', `${count} моделей в ${batches.length} batch`);
       return { success: true, count };
-    } catch (e) { return { success: false, error: e.message }; }
+    } catch (e) { 
+      devLogFirestore('seedCarsCatalog ERROR', e.message);
+      return { success: false, error: e.message }; 
+    }
   },
   async fetchCloudCars(force = false) {
     const now = Date.now();
@@ -698,7 +784,10 @@ const CarsCatalogManager = {
       CacheManager.cloudCars = cars;
       CacheManager.cloudCarsTimestamp = now;
       return cars;
-    } catch (e) { return CacheManager.cloudCars || []; }
+    } catch (e) { 
+      console.warn('[CarsCatalog] fetch error:', e);
+      return CacheManager.cloudCars || []; 
+    }
   },
   async saveCarToCloud(carData, authorProfile) {
     const profile = authorProfile || TelegramAuthManager.getUserProfile();
@@ -820,8 +909,123 @@ const LeaderboardManager = {
 };
 
 // ========================================================
-// 10. ПРОФИЛЬ И ЭКСПОРТ
-// ⭐ v1.4.0: НИКАКИХ guest/dev/p2p профилей.
+// 10. ⭐ v1.5.0: CLEANUP EXPIRED DATA
+// Удаляет устаревшие chat_messages и notifications
+// ========================================================
+const CleanupManager = {
+  _lastCleanup: 0,
+  _cleanupInterval: 60 * 60 * 1000,  // раз в час
+
+  async runCleanup(force = false) {
+    const now = Date.now();
+    if (!force && now - this._lastCleanup < this._cleanupInterval) return { skipped: true };
+    this._lastCleanup = now;
+
+    const results = { chat_messages: 0, notifications: 0, market_lots: 0, transactions: 0 };
+
+    try {
+      // 1. Чистим старые chat_messages
+      const chatQ = query(
+        collection(db, "chat_messages"),
+        where("expireAt", "<=", now),
+        limit(100)
+      );
+      const chatSnap = await getDocs(chatQ);
+      if (!chatSnap.empty) {
+        const batch = writeBatch(db);
+        chatSnap.forEach(d => { batch.delete(d.ref); results.chat_messages++; });
+        await batch.commit();
+      }
+
+      // 2. Чистим старые notifications
+      const notifQ = query(
+        collection(db, "notifications"),
+        where("expireAt", "<=", now),
+        limit(100)
+      );
+      const notifSnap = await getDocs(notifQ);
+      if (!notifSnap.empty) {
+        const batch = writeBatch(db);
+        notifSnap.forEach(d => { batch.delete(d.ref); results.notifications++; });
+        await batch.commit();
+      }
+
+      // 3. Чистим просроченные market_lots
+      const lotQ = query(
+        collection(db, "market_lots"),
+        where("expireAt", "<=", now),
+        limit(50)
+      );
+      const lotSnap = await getDocs(lotQ);
+      if (!lotSnap.empty) {
+        const batch = writeBatch(db);
+        lotSnap.forEach(d => { batch.delete(d.ref); results.market_lots++; });
+        await batch.commit();
+      }
+
+      // 4. Чистим старые transactions
+      const txQ = query(
+        collection(db, "transactions"),
+        where("expireAt", "<=", now),
+        limit(100)
+      );
+      const txSnap = await getDocs(txQ);
+      if (!txSnap.empty) {
+        const batch = writeBatch(db);
+        txSnap.forEach(d => { batch.delete(d.ref); results.transactions++; });
+        await batch.commit();
+      }
+
+      const total = Object.values(results).reduce((a, b) => a + b, 0);
+      if (total > 0) {
+        devLogFirestore('cleanupExpiredData OK', 
+          `chat: ${results.chat_messages}, notif: ${results.notifications}, lots: ${results.market_lots}, tx: ${results.transactions}`);
+      }
+      return { success: true, results, total };
+    } catch (e) {
+      console.warn('[Cleanup] Ошибка:', e);
+      devLogFirestore('cleanupExpiredData ERROR', e.message);
+      return { success: false, error: e.message };
+    }
+  }
+};
+
+// ========================================================
+// 11. ⭐ v1.5.0: FIRESTORE STATS (для DEV-приложения)
+// ========================================================
+async function getFirestoreStats() {
+  const stats = {
+    market_lots: 0,
+    chat_messages: 0,
+    notifications: 0,
+    clubs: 0,
+    transactions: 0,
+    registered_plates: 0,
+    cars_catalog: 0,
+    leaderboard: 0
+  };
+
+  try {
+    for (const colName in stats) {
+      try {
+        const q = query(collection(db, colName), limit(1));
+        const snap = await getDocs(q);
+        // Проверяем, есть ли хоть один документ
+        // (Firestore не даёт count без агрегации, поэтому считаем приблизительно)
+        stats[colName] = snap.empty ? 0 : "есть данные";
+      } catch (e) {
+        stats[colName] = "ошибка";
+      }
+    }
+  } catch (e) {
+    console.warn('[Stats] Ошибка:', e);
+  }
+
+  return stats;
+}
+
+// ========================================================
+// 12. ПРОФИЛЬ И ЭКСПОРТ
 // ========================================================
 function getCurrentPlayerProfile() {
   if (currentUserProfile && verifiedUserId) return currentUserProfile;
@@ -858,6 +1062,8 @@ window.FB_Bridge = {
   Plates: RegisteredPlatesManager,
   Clubs: ClubsManager,
   Leaderboard: LeaderboardManager,
+  Cleanup: CleanupManager,               // ⭐ v1.5.0
+  getStats: getFirestoreStats,           // ⭐ v1.5.0
   CloudSave: {
     pushSave: PlayersStorageManager.pushSave,
     pushSaveForce: PlayersStorageManager.pushSaveForce,
@@ -877,4 +1083,13 @@ window.FB_Bridge = {
 };
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Bridge v1.4.0] Telegram-only. Guest/dev профили отключены.");
+// ⭐ v1.5.0: автозапуск cleanup при старте
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      CleanupManager.runCleanup().catch(e => console.warn('[Cleanup] Автозапуск ошибка:', e));
+    }, 5000);
+  });
+}
+
+console.log("[☁️ FB_Bridge v1.5.0] TTL + Cleanup + Stats + убрано дублирование ✓");

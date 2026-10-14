@@ -4,22 +4,85 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="google" content="notranslate">
-    <title>Симулятор Перекупа v1.0.0</title>
+    <title>Симулятор Перекупа v2.1.0</title>
 
-    <!-- Модульные CSS-стили с принудительным сбросом кэша v=400 -->
-    <link rel="stylesheet" href="css/base.css?v=400">
-    <link rel="stylesheet" href="css/hud.css?v=400">
-    <link rel="stylesheet" href="css/market.css?v=400">
-    <link rel="stylesheet" href="css/phone.css?v=400">
-    <link rel="stylesheet" href="css/modals.css?v=400">
-    <link rel="stylesheet" href="css/nav.css?v=400">
+    <!-- Модульные CSS-стили с принудительным сбросом кэша v=401 -->
+    <link rel="stylesheet" href="css/base.css?v=401">
+    <link rel="stylesheet" href="css/hud.css?v=401">
+    <link rel="stylesheet" href="css/market.css?v=401">
+    <link rel="stylesheet" href="css/phone.css?v=401">
+    <link rel="stylesheet" href="css/modals.css?v=401">
+    <link rel="stylesheet" href="css/nav.css?v=401">
 
     <!-- Внешние библиотеки -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   </head>
   <body class="notranslate" translate="no">
-    <div class="app-shell">
+
+    <!-- ⭐ v2.1.0: ЭКРАН DEV-АВТОРИЗАЦИИ ДЛЯ ПК -->
+    <div id="pcAuthScreen" class="pc-auth-overlay" style="display:none;">
+      <div class="pc-auth-box">
+        <div class="pc-auth-logo">
+          <i class="fa-solid fa-terminal"></i>
+        </div>
+        <h1 class="pc-auth-title">PEREKUP OS</h1>
+        <p class="pc-auth-subtitle">Введите пароль для входа</p>
+
+        <div class="pc-auth-input-wrap">
+          <input type="password" id="pcAuthInput" class="pc-auth-input" placeholder="••••••••" maxlength="32" autocomplete="off">
+          <button type="button" id="pcAuthToggle" class="pc-auth-toggle" onclick="togglePcAuthPassword()">
+            <i class="fa-solid fa-eye"></i>
+          </button>
+        </div>
+
+        <div id="pcAuthError" class="pc-auth-error" style="display:none;"></div>
+
+        <button type="button" onclick="submitPcAuthPassword()" class="pc-auth-submit">
+          <i class="fa-solid fa-unlock mr-2"></i> ВОЙТИ В СИСТЕМУ
+        </button>
+
+        <div class="pc-auth-footer">
+          <div class="pc-auth-hint">
+            💡 Если вы играете через Telegram — просто откройте бота заново.
+          </div>
+          <div class="pc-auth-version">
+            v2.1.0 // BUILD 401
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⭐ v2.1.0: ЭКРАН БЛОКИРОВКИ (если Telegram не обнаружен) -->
+    <div id="tgRequiredScreen" class="pc-auth-overlay" style="display:none;">
+      <div class="pc-auth-box">
+        <div class="pc-auth-logo" style="color: var(--cyan);">
+          <i class="fa-solid fa-mobile-screen"></i>
+        </div>
+        <h1 class="pc-auth-title">ТРЕБУЕТСЯ TELEGRAM</h1>
+        <p class="pc-auth-subtitle">Игра доступна только через Telegram Mini App</p>
+
+        <div style="padding: 12px; background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.3); border-radius: 10px; color: #67e8f9; font-size: 11px; line-height: 1.4; margin-bottom: 16px; text-align: left;">
+          <b>Что делать:</b><br>
+          1. Откройте бота <b>@PerekupSimBot</b> в Telegram<br>
+          2. Запустите игру из бота<br>
+          3. Если играете с ПК — используйте DEV-режим (пароль <code>perekup2026</code>)
+        </div>
+
+        <button type="button" onclick="openPcAuthScreen()" class="pc-auth-submit" style="background: linear-gradient(135deg, #c084fc, #9333ea);">
+          <i class="fa-solid fa-terminal mr-2"></i> DEV-РЕЖИМ ДЛЯ ПК
+        </button>
+
+        <div class="pc-auth-footer">
+          <div class="pc-auth-version">
+            v2.1.0 // BUILD 401
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ОСНОВНОЕ ПРИЛОЖЕНИЕ -->
+    <div class="app-shell" id="appShell" style="display:none;">
 
       <!-- КАПСУЛЬНЫЙ НЕОНОВЫЙ HUD -->
       <header class="hud-header">
@@ -40,7 +103,7 @@
               <div class="player-capsule-box">
                 <div class="user-name-row">
                   <span id="playerName" data-text="Перекуп #777" class="player-name-text">Перекуп #777</span>
-                  <span class="lvl-badge" id="playerLvl">Ур. 1</span>
+                  <span class="lvl-badge" id="playerLvl" style="display:none;">Ур. 1</span>
                 </div>
                 <div class="xp-bar-wrap" title="Прогресс опыта">
                   <div class="xp-bar-fill" id="xpBar">
@@ -49,7 +112,7 @@
                 </div>
               </div>
 
-              <!-- ОБЪЕДИНЕННАЯ СТРОКА СТАТОВ И ВАЛЮТ -->
+              <!-- ⭐ v2.1.0: ОБЪЕДИНЕННАЯ СТРОКА СТАТОВ И ВАЛЮТ -->
               <div class="user-stats-row">
                 <div class="stat-pill stat-pill-conn" title="Теневые связи">
                   <i class="fa-solid fa-handshake"></i> <span id="connectionsText">1</span>
@@ -78,6 +141,7 @@
 
           <div class="wallet-dashboard">
             <div class="wallet-capsule-box" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Открыть Во-Банк">
+              <div class="cash-shine"></div>
               <div class="cash-val">
                 <span id="cashAmount">150,000</span> <span class="currency-sign">₽</span>
               </div>
@@ -436,17 +500,17 @@
     <div id="modalPatchNotes" class="modal-overlay">
       <div class="modal-box" style="max-width: 420px;">
         <div class="flex-between mb-2">
-          <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v1.0.0</div>
+          <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v2.1.0</div>
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #400</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #401</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-          <div class="patch-item"><b>⚡ Единый хаб Сети «M» & Autodrot:</b> Онлайн-рынок и чат торга с кнопками риска.</div>
-          <div class="patch-item"><b>🏢 Бизнес-кастомизация:</b> ДНК объекта, обложки, переименование, P2P-продажа.</div>
-          <div class="patch-item"><b>🌐 Storage Wars P2P:</b> Онлайн-лобби аукциона на 2-5 игроков через Firestore.</div>
-          <div class="patch-item"><b>🎨 Midnight Purple:</b> Новая тема + 6 продвинутых эффектов ника и аватара.</div>
-          <div class="patch-item"><b>🔍 Дефекты авто:</b> 42 механических дефекта и 12 юридических проблем.</div>
+          <div class="patch-item"><b>🔧 ФИКС бага с кнопкой ДКП:</b> теперь показывает точную причину (гараж полон/нет денег).</div>
+          <div class="patch-item"><b>📊 Визуальная шкала терпения продавца:</b> зелёная/жёлтая/красная + подсказки.</div>
+          <div class="patch-item"><b>🎯 Подсказки шансов торга:</b> на кнопках видно вероятность успеха.</div>
+          <div class="patch-item"><b>☁️ Настройка Firestore:</b> TTL, cleanup, статистика.</div>
+          <div class="patch-item"><b>🔧 DEV-режим для ПК:</b> игра без Telegram (пароль).</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
       </div>
@@ -879,131 +943,381 @@
 
     <div id="toastNotification" class="toast">Уведомление</div>
 
+    <!-- ⭐ v2.1.0: СТИЛИ ДЛЯ PC-АВТОРИЗАЦИИ -->
+    <style>
+      .pc-auth-overlay {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at 50% 0%, #151d2f 0%, #05080f 100%);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+
+      .pc-auth-box {
+        width: 100%;
+        max-width: 380px;
+        background: linear-gradient(145deg, rgba(20, 27, 43, 0.98) 0%, rgba(10, 15, 25, 0.98) 100%);
+        border: 1px solid rgba(0, 242, 254, 0.35);
+        border-radius: 20px;
+        padding: 32px 24px 20px 24px;
+        box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(0, 242, 254, 0.15);
+        text-align: center;
+        box-sizing: border-box;
+      }
+
+      .pc-auth-logo {
+        font-size: 48px;
+        color: var(--green, #00e676);
+        margin-bottom: 12px;
+        text-shadow: 0 0 20px rgba(0, 230, 118, 0.5);
+      }
+
+      .pc-auth-title {
+        font-size: 22px;
+        font-weight: 900;
+        color: #fff;
+        letter-spacing: 1.5px;
+        margin: 0 0 6px 0;
+      }
+
+      .pc-auth-subtitle {
+        font-size: 12px;
+        color: #94a3b8;
+        margin: 0 0 24px 0;
+      }
+
+      .pc-auth-input-wrap {
+        position: relative;
+        margin-bottom: 14px;
+      }
+
+      .pc-auth-input {
+        width: 100%;
+        padding: 14px 44px 14px 16px;
+        background: #05080f;
+        border: 1.5px solid rgba(0, 242, 254, 0.35);
+        border-radius: 12px;
+        color: #fff;
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        text-align: center;
+        outline: none;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+        font-family: monospace;
+      }
+
+      .pc-auth-input:focus {
+        border-color: var(--cyan, #00f2fe);
+        box-shadow: 0 0 16px rgba(0, 242, 254, 0.35);
+      }
+
+      .pc-auth-toggle {
+        position: absolute;
+        right: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: rgba(255, 255, 255, 0.05);
+        border: none;
+        color: #94a3b8;
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .pc-auth-toggle:hover {
+        color: var(--cyan);
+        background: rgba(0, 242, 254, 0.1);
+      }
+
+      .pc-auth-error {
+        background: rgba(255, 51, 102, 0.15);
+        border: 1px solid rgba(255, 51, 102, 0.5);
+        color: #ff3366;
+        font-size: 11px;
+        font-weight: 800;
+        padding: 8px 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        text-align: center;
+      }
+
+      .pc-auth-submit {
+        width: 100%;
+        background: linear-gradient(135deg, #00e676, #059669);
+        color: #000;
+        border: none;
+        border-radius: 12px;
+        padding: 14px;
+        font-size: 13px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        cursor: pointer;
+        box-shadow: 0 0 16px rgba(0, 230, 118, 0.4);
+        transition: transform 0.15s ease, filter 0.15s ease;
+      }
+      .pc-auth-submit:hover {
+        filter: brightness(1.1);
+      }
+      .pc-auth-submit:active {
+        transform: scale(0.97);
+      }
+
+      .pc-auth-footer {
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px dashed rgba(255, 255, 255, 0.08);
+      }
+
+      .pc-auth-hint {
+        font-size: 10px;
+        color: #64748b;
+        line-height: 1.4;
+        margin-bottom: 8px;
+      }
+
+      .pc-auth-version {
+        font-size: 9px;
+        color: #475569;
+        font-family: monospace;
+        letter-spacing: 1px;
+      }
+    </style>
+
     <!-- 1. ПОДКЛЮЧЕНИЕ FIREBASE (ES-МОДУЛЬ) -->
-    <script type="module" src="firebase-bridge.js?v=400"></script>
+    <script type="module" src="firebase-bridge.js?v=401"></script>
 
     <!-- 2. АВТОЗАГРУЗЧИК СКРИПТОВ ИГРЫ -->
     <script>
       (function() {
-        if (window.Telegram?.WebApp) {
-          try {
-            window.Telegram.WebApp.ready();
-            window.Telegram.WebApp.expand();
-          } catch (e) {}
+        // ⭐ v2.1.0: DEV-режим для ПК
+        const PC_DEV_PASSWORD = "perekup2026";
+        const PC_AUTH_STORAGE_KEY = "perekup_pc_auth_ok";
+        let isPcAuthenticated = false;
+
+        // Определяем, нужно ли показывать DEV-режим
+        const urlParams = new URLSearchParams(window.location.search);
+        const forceDev = urlParams.get('dev') === '1';
+        const isTelegram = !!(window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
+        const savedAuth = sessionStorage.getItem(PC_AUTH_STORAGE_KEY) === 'true';
+
+        // ⭐ Экспорт функций для UI
+        window.togglePcAuthPassword = function() {
+          const input = document.getElementById('pcAuthInput');
+          const btn = document.getElementById('pcAuthToggle');
+          if (!input || !btn) return;
+          if (input.type === 'password') {
+            input.type = 'text';
+            btn.innerHTML = '<i class="fa-solid fa-eye-slash"></i>';
+          } else {
+            input.type = 'password';
+            btn.innerHTML = '<i class="fa-solid fa-eye"></i>';
+          }
+        };
+
+        window.submitPcAuthPassword = function() {
+          const input = document.getElementById('pcAuthInput');
+          const err = document.getElementById('pcAuthError');
+          if (!input || !err) return;
+
+          const pwd = input.value.trim();
+          if (!pwd) {
+            err.style.display = 'block';
+            err.innerText = '❌ Введите пароль';
+            return;
+          }
+
+          if (pwd === PC_DEV_PASSWORD) {
+            isPcAuthenticated = true;
+            sessionStorage.setItem(PC_AUTH_STORAGE_KEY, 'true');
+
+            // Скрываем экран авторизации
+            document.getElementById('pcAuthScreen').style.display = 'none';
+            document.getElementById('tgRequiredScreen').style.display = 'none';
+            document.getElementById('appShell').style.display = 'flex';
+
+            // Форсируем UID для DEV
+            if (!window.tgUserId) {
+              window.tgUserId = 'pc_dev_' + Date.now();
+            }
+
+            // Запускаем игру
+            startGame();
+          } else {
+            err.style.display = 'block';
+            err.innerText = '❌ Неверный пароль';
+            input.value = '';
+            input.focus();
+            if (typeof playSound === 'function') playSound('error');
+          }
+        };
+
+        window.openPcAuthScreen = function() {
+          document.getElementById('tgRequiredScreen').style.display = 'none';
+          document.getElementById('pcAuthScreen').style.display = 'flex';
+          setTimeout(() => {
+            document.getElementById('pcAuthInput')?.focus();
+          }, 100);
+        };
+
+        // ⭐ Определяем, что показать при старте
+        function decideStartupScreen() {
+          if (isTelegram) {
+            // Telegram есть — показываем игру
+            document.getElementById('appShell').style.display = 'flex';
+            startGame();
+            return;
+          }
+
+          if (forceDev || savedAuth) {
+            // DEV-режим разрешён
+            if (savedAuth) {
+              isPcAuthenticated = true;
+              document.getElementById('appShell').style.display = 'flex';
+              window.tgUserId = window.tgUserId || ('pc_dev_' + Date.now());
+              startGame();
+            } else {
+              document.getElementById('pcAuthScreen').style.display = 'flex';
+            }
+            return;
+          }
+
+          // Нет Telegram, нет DEV — показываем экран «Требуется Telegram»
+          document.getElementById('tgRequiredScreen').style.display = 'flex';
         }
 
-        const CACHE_VER = '400';
+        // ⭐ Запуск игры
+        function startGame() {
+          if (window.Telegram?.WebApp) {
+            try {
+              window.Telegram.WebApp.ready();
+              window.Telegram.WebApp.expand();
+            } catch (e) {}
+          }
 
-        const rootModules = [
-          'data_core.js',
+          const CACHE_VER = '401';
 
-          // Фолбеки по категориям
-          'data_cars_fallbacks.js',
+          const rootModules = [
+            'data_core.js',
+            'data_cars_fallbacks.js',
+            'data/cars/economy.js',
+            'data/cars/scooter.js',
+            'data/cars/moto.js',
+            'data/cars/atv.js',
+            'data/cars/comfort.js',
+            'data/cars/premium.js',
+            'data/cars/hyper.js',
+            'data/cars/truck.js',
+            'data/cars/yacht.js',
+            'data_cars.js',
+            'data_barn.js',
+            'data_economy.js',
+            'data_activities_port.js',
+            'data_activities_quests.js',
+            'data_activities_life.js',
+            'data-defects.js',
+            'data_cars_helpers.js'
+          ];
 
-          // Файлы категорий машин
-          'data/cars/economy.js',
-          'data/cars/scooter.js',
-          'data/cars/moto.js',
-          'data/cars/atv.js',
-          'data/cars/comfort.js',
-          'data/cars/premium.js',
-          'data/cars/hyper.js',
-          'data/cars/truck.js',
-          'data/cars/yacht.js',
+          const jsModules = [
+            'audio-fx.js',
+            'theme-manager.js',
+            'app.js',
+            'phone.js',
+            'phone-messenger.js',
+            'phone-autodrot.js',
+            'phone-barn.js',
+            'phone-bank.js',
+            'm-hub/m-leaderboard.js',
+            'm-hub/m-events.js',
+            'm-hub/m-clubs.js',
+            'phone-m.js',
+            'phone-post.js',
+            'phone-gosuslugi.js',
+            'phone-darknet.js',
+            'phone-business.js',
+            'phone-housing.js',
+            'phone-port.js',
+            'storage-wars-p2p.js',
+            'phone-radar.js',
+            'phone-media.js',
+            'phone-racing.js',
+            'dev/dev-logger.js',
+            'dev/dev-data-checker.js',
+            'dev/phone-dev.js',
+            'market-generator.js',
+            'market-inspection.js',
+            'market-deal.js',
+            'market.js',
+            'market-map.js',
+            'garage-calc.js',
+            'garage-services.js',
+            'garage-dialogs.js',
+            'garage.js',
+            'salesLot.js',
+            'life.js',
+            'street.js',
+            'syndicate.js',
+            'dev/dev-studio.js'
+          ];
 
-          // Тонкий индекс
-          'data_cars.js',
+          function loadScript(path) {
+            return new Promise((resolve) => {
+              const s = document.createElement('script');
+              s.src = path + '?v=' + CACHE_VER;
+              s.onload = () => resolve(true);
+              s.onerror = () => {
+                console.warn('[Loader] Ошибка загрузки скрипта: ' + path);
+                resolve(false);
+              };
+              document.body.appendChild(s);
+            });
+          }
 
-          // Остальные data-модули
-          'data_barn.js',
-          'data_economy.js',
+          async function initAllModules() {
+            for (const name of rootModules) {
+              await loadScript(name);
+            }
+            for (const name of jsModules) {
+              await loadScript('js/' + name);
+            }
+            if (typeof initApp === 'function') {
+              initApp();
+            }
+          }
 
-          // Разбитый data_activities на 3 части
-          'data_activities_port.js',
-          'data_activities_quests.js',
-          'data_activities_life.js',
-
-          // Каталог дефектов
-          'data-defects.js',
-
-          // Хелперы выбора фото
-          'data_cars_helpers.js'
-        ];
-
-        const jsModules = [
-          'audio-fx.js',
-          'theme-manager.js',
-          'app.js',
-          'phone.js',
-          'phone-messenger.js',
-          'phone-autodrot.js',
-          'phone-barn.js',
-          'phone-bank.js',
-          'm-hub/m-leaderboard.js',
-          'm-hub/m-events.js',
-          'm-hub/m-clubs.js',
-          'phone-m.js',
-          'phone-post.js',
-          'phone-gosuslugi.js',
-          'phone-darknet.js',
-          'phone-business.js',
-          'phone-housing.js',
-          'phone-port.js',
-          'storage-wars-p2p.js',
-          'phone-radar.js',
-          'phone-media.js',
-          'phone-racing.js',
-
-          // ⭐ DEV-модули: logger ПЕРВЫМ, чтобы перехватить всё остальное
-          'dev/dev-logger.js',
-          'dev/dev-data-checker.js',
-          'dev/phone-dev.js',
-
-          'market-generator.js',
-          'market-inspection.js',
-          'market-deal.js',
-          'market.js',
-          'garage-calc.js',
-          'garage-services.js',
-          'garage-dialogs.js',
-          'garage.js',
-          'salesLot.js',
-          'life.js',
-          'street.js',
-          'syndicate.js',
-          'dev/dev-studio.js'
-        ];
-
-        function loadScript(path) {
-          return new Promise((resolve) => {
-            const s = document.createElement('script');
-            s.src = path + '?v=' + CACHE_VER;
-            s.onload = () => resolve(true);
-            s.onerror = () => {
-              console.warn('[Loader] Ошибка загрузки скрипта: ' + path);
-              resolve(false);
-            };
-            document.body.appendChild(s);
-          });
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initAllModules);
+          } else {
+            initAllModules();
+          }
         }
 
-        async function initAllModules() {
-          for (const name of rootModules) {
-            await loadScript(name);
-          }
-          for (const name of jsModules) {
-            await loadScript('js/' + name);
-          }
-          if (typeof initApp === 'function') {
-            initApp();
-          }
-        }
-
+        // ⭐ Автозапуск при загрузке
         if (document.readyState === 'loading') {
-          document.addEventListener('DOMContentLoaded', initAllModules);
+          document.addEventListener('DOMContentLoaded', decideStartupScreen);
         } else {
-          initAllModules();
+          decideStartupScreen();
         }
+
+        // Enter в поле пароля
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            const authScreen = document.getElementById('pcAuthScreen');
+            if (authScreen && authScreen.style.display === 'flex') {
+              window.submitPcAuthPassword();
+            }
+          }
+        });
       })();
     </script>
   </body>
