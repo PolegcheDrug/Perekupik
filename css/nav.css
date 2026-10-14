@@ -1,0 +1,152 @@
+.bottom-nav {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 100% !important;
+  max-width: 480px !important;
+  height: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  background: var(--nav-bg-custom) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-top: 1px solid var(--border-glow) !important;
+  display: flex !important;
+  justify-content: space-around !important;
+  align-items: center !important;
+  z-index: 4000 !important;
+  box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.75);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.b-nav-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+  color: var(--text-sub);
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  width: 20%;
+  opacity: 0.55;
+  transition: opacity 0.2s ease, color 0.2s ease, transform 0.1s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.b-nav-item:active {
+  transform: scale(0.92);
+}
+
+.b-nav-item i {
+  font-size: 20px;
+  transition: transform 0.2s ease, text-shadow 0.2s ease, color 0.2s ease;
+}
+
+.b-nav-item.active {
+  opacity: 1 !important;
+  color: #ffffff !important;
+}
+
+.b-nav-item.active i {
+  transform: translateY(-2px);
+}
+
+#bnav-tabMarket.active i {
+  color: var(--cyan) !important;
+  text-shadow: 0 0 12px var(--cyan-glow);
+}
+
+#bnav-tabGarage.active i {
+  color: var(--green) !important;
+  text-shadow: 0 0 12px var(--green-glow);
+}
+
+#bnav-tabSalesLot.active i {
+  color: var(--amber) !important;
+  text-shadow: 0 0 12px var(--amber-glow);
+}
+
+#bnav-tabLife.active i {
+  color: #fb7185 !important;
+  text-shadow: 0 0 12px rgba(251, 113, 133, 0.4);
+}
+
+#bnav-tabPhone.active i {
+  color: var(--purple) !important;
+  text-shadow: 0 0 14px var(--purple-glow);
+}
+
+.phone-nav-item {
+  position: relative !important;
+}
+
+.phone-nav-icon-wrap {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.phone-nav-counter {
+  position: absolute !important;
+  top: -4px !important;
+  right: -8px !important;
+  background: var(--red) !important;
+  color: #ffffff !important;
+  font-size: 8px !important;
+  font-weight: 900 !important;
+  border-radius: 10px !important;
+  padding: 1px 5px !important;
+  line-height: 1.1 !important;
+  box-shadow: 0 2px 6px rgba(255, 51, 102, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  animation: badgePulse 2s infinite ease-in-out;
+}
+
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.toast {
+  position: fixed !important;
+  top: calc(env(safe-area-inset-top, 0px) + 16px) !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(-100px);
+  background: #111a2a !important;
+  border: 1px solid var(--cyan) !important;
+  color: #ffffff !important;
+  padding: 10px 20px !important;
+  border-radius: 24px !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  z-index: 6000 !important;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  white-space: nowrap !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px var(--cyan-glow);
+  pointer-events: none;
+}
+
+.toast.show {
+  transform: translateX(-50%) translateY(0) !important;
+}
+
+.floating-reward {
+  position: fixed !important;
+  font-weight: 900 !important;
+  font-size: 18px !important;
+  color: var(--green) !important;
+  z-index: 7000 !important;
+  pointer-events: none !important;
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.6), 0 2px 6px rgba(0, 0, 0, 0.9);
+  animation: floatUp 1.2s forwards cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes floatUp {
+  0% { opacity: 0; transform: translate(-50%, 0) scale(0.8); }
+  30% { opacity: 1; transform: translate(-50%, -15px) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -55px) scale(0.95); }
+}

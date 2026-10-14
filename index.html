@@ -49,16 +49,33 @@
                 </div>
               </div>
 
+              <!-- ОБЪЕДИНЕННАЯ СТРОКА СТАТОВ И ВАЛЮТ -->
               <div class="user-stats-row">
+                <!-- Связи -->
                 <div class="stat-pill stat-pill-conn" title="Теневые связи">
                   <i class="fa-solid fa-handshake"></i> <span id="connectionsText">1</span>
                 </div>
+                <!-- Карма -->
                 <div class="stat-pill stat-pill-karma" title="Карма">
                   <i class="fa-solid fa-face-smile"></i> <span id="karmaText">50</span>
                 </div>
+                <!-- Гараж -->
                 <div class="stat-pill stat-pill-garage" title="Вместимость автопарка" onclick="event.stopPropagation(); switchTab('tabGarage');">
                   <i class="fa-solid fa-warehouse"></i> <span id="garageHeaderSlots">0/2</span>
                 </div>
+                <!-- Валюты (перенесены сюда) -->
+                <button type="button" class="stat-pill stat-pill-note" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты">
+                  <i class="fa-solid fa-money-bill-wave"></i> <span id="starsAmount">15</span>
+                </button>
+                <button type="button" class="stat-pill stat-pill-superspin" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('fortune'); }, 100);" title="Билеты СуперВилспина">
+                  <i class="fa-solid fa-dharmachakra"></i> <span id="superSpinTicketsAmount">1</span>
+                </button>
+                <button type="button" class="stat-pill stat-pill-fuel" onclick="refuelAction('cash')" title="Заправить бак">
+                  <i class="fa-solid fa-gas-pump"></i> <span id="fuelAmount">100</span><span class="res-max">/100</span>
+                </button>
+                <button type="button" class="stat-pill stat-pill-ticket" onclick="upgradeExpressCapacity()" title="Экспресс-талоны">
+                  <i class="fa-solid fa-ticket"></i> <span id="ticketsAmount">25/25</span>
+                </button>
               </div>
             </div>
           </div>
@@ -68,21 +85,6 @@
               <div class="cash-val">
                 <span id="cashAmount">150,000</span> <span class="currency-sign">₽</span>
               </div>
-            </div>
-
-            <div class="wallet-stats-row">
-              <button type="button" class="stat-pill stat-pill-note" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты">
-                <i class="fa-solid fa-money-bill-wave"></i> <span id="starsAmount">15</span>
-              </button>
-              <button type="button" class="stat-pill stat-pill-superspin" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('fortune'); }, 100);" title="Билеты СуперВилспина">
-                <i class="fa-solid fa-dharmachakra"></i> <span id="superSpinTicketsAmount">1</span>
-              </button>
-              <button type="button" class="stat-pill stat-pill-fuel" onclick="refuelAction('cash')" title="Заправить бак">
-                <i class="fa-solid fa-gas-pump"></i> <span id="fuelAmount">100</span><span class="res-max">/100</span>
-              </button>
-              <button type="button" class="stat-pill stat-pill-ticket" onclick="upgradeExpressCapacity()" title="Экспресс-талоны">
-                <i class="fa-solid fa-ticket"></i> <span id="ticketsAmount">25/25</span>
-              </button>
             </div>
           </div>
 
@@ -952,11 +954,11 @@
           'phone-business.js',
           'phone-housing.js',
           'phone-port.js',
-          'storage-wars-p2p.js',   // ⭐ НОВЫЙ — P2P аукцион
+          'storage-wars-p2p.js',
           'phone-radar.js',
           'phone-media.js',
           'phone-racing.js',
-          'dev-data-checker.js',  // ⭐ НОВЫЙ — DEV проверка данных
+          'dev-data-checker.js',
           'phone-dev.js',
           'market-generator.js',
           'market-inspection.js',
