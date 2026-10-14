@@ -18,7 +18,7 @@ const CAR_FALLBACKS_BY_CATEGORY = {
 const CAR_DATABASE = {
     economy: [
         { 
-            name: "ВАЗ-2101 «Копейка»", 
+            name: "ВАЗ 2101 «Копейка»", 
             power: 64, 
             basePrice: 65000, 
             priceVariation: { minMultiplier: 0.70, maxMultiplier: 1.40 },
@@ -41,7 +41,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-2105 «Пятерка»", 
+            name: "ВАЗ 2105 «Пятерка»", 
             power: 71, 
             basePrice: 78000, 
             priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
@@ -64,7 +64,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-2106 «Шестерка»", 
+            name: "ВАЗ 2106 «Шестерка»", 
             power: 75, 
             basePrice: 82000, 
             priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.38 },
@@ -87,7 +87,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-2107 «Семёрка»", 
+            name: "ВАЗ 2107 «Семёрка»", 
             power: 74, 
             basePrice: 98000, 
             priceVariation: { minMultiplier: 0.78, maxMultiplier: 1.35 },
@@ -110,7 +110,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-2108 «Зубило»", 
+            name: "ВАЗ 2108 «Зубило»", 
             power: 70, 
             basePrice: 105000, 
             priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
@@ -133,7 +133,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-2109 «Девятка»", 
+            name: "ВАЗ 2109 «Девятка»", 
             power: 72, 
             basePrice: 118000, 
             priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
@@ -156,7 +156,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-21099 «Дуплет»", 
+            name: "ВАЗ 21099 «Дуплет»", 
             power: 78, 
             basePrice: 125000, 
             priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
@@ -179,7 +179,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-2110 «Десятка»", 
+            name: "ВАЗ 2110 «Десятка»", 
             power: 89, 
             basePrice: 135000, 
             priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
@@ -202,7 +202,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-2112 «Двенашка»", 
+            name: "ВАЗ 2112 «Двенашка»", 
             power: 91, 
             basePrice: 145000, 
             priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
@@ -225,7 +225,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-2114 «Четырка»", 
+            name: "ВАЗ 2114 «Четырка»", 
             power: 81, 
             basePrice: 142000, 
             priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
@@ -248,7 +248,7 @@ const CAR_DATABASE = {
             fallback: CAR_FALLBACKS_BY_CATEGORY.economy 
         },
         { 
-            name: "ВАЗ-2115 «Пятнашка»", 
+            name: "ВАЗ 2115 «Пятнашка»", 
             power: 81, 
             basePrice: 148000, 
             priceVariation: { minMultiplier: 0.75, maxMultiplier: 1.35 },
