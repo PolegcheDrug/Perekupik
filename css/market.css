@@ -1,3 +1,17 @@
+/* ========================================================
+   css/market.css — АВТОРЫНОК И КАРТОЧКИ КЛАССОВ (v2.0.0)
+   Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+   ⭐ v2.0.0: РЕДИЗАЙН СЕТКИ КЛАССОВ
+   - Кнопки компактнее (min-height 52px)
+   - Иконки крупнее, текст мельче
+   - Активная — обводка, не заливка
+   - «Все категории» — на всю ширину
+   - Инфо-баннер компактнее
+   ======================================================== */
+
+/* ========================================================
+   1. ГЛАВНЫЙ КОНТЕЙНЕР И БАЗОВЫЕ КАРТОЧКИ
+   ======================================================== */
 .glass-card {
   position: relative;
   background: var(--bg-card);
@@ -21,7 +35,7 @@
 }
 
 /* ========================================================
-   1. НЕОНОВЫЕ АУРЫ И АНИМАЦИИ КАРТОЧЕК РЫНКА
+   2. НЕОНОВЫЕ АУРЫ КАРТОЧЕК МАШИН
    ======================================================== */
 .card-anim-shimmer::before {
   content: '';
@@ -41,7 +55,6 @@
   30%, 100% { left: 170%; }
 }
 
-/* Фиолетовая аура боевых корчей */
 .card-glow-tuned {
   border-color: rgba(192, 132, 252, 0.45) !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px rgba(192, 132, 252, 0.25) !important;
@@ -53,7 +66,6 @@
   100% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 24px rgba(192, 132, 252, 0.45); }
 }
 
-/* Красная тревожная аура ушатанных авто */
 .card-glow-beater {
   border-color: rgba(255, 51, 102, 0.45) !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px rgba(255, 51, 102, 0.2) !important;
@@ -65,25 +77,26 @@
   100% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 22px rgba(255, 51, 102, 0.4); }
 }
 
-/* Зеленая аура срочных лотов */
 .card-glow-urgent {
   border-color: rgba(0, 230, 118, 0.45) !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px rgba(0, 230, 118, 0.25) !important;
 }
 
 /* ========================================================
-   2. КОМПАКТНАЯ СЕТКА КАТЕГОРИЙ РЫНКА
+   3. ⭐ v2.0.0: РЕДИЗАЙН СЕТКИ КАТЕГОРИЙ
    ======================================================== */
 .market-categories-grid {
   display: grid !important;
   grid-template-columns: repeat(3, 1fr) !important;
   gap: 6px !important;
-  margin-top: 6px;
+  margin-top: 8px;
 }
+
 .market-categories-grid.collapsed {
   display: none !important;
 }
 
+/* Базовая плитка */
 .market-categories-grid .cat-tile {
   background: #0d1424 !important;
   color: #ffffff !important;
@@ -96,52 +109,145 @@
   justify-content: center !important;
   gap: 3px;
   cursor: pointer;
-  transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
-  min-height: 58px;
+  transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  min-height: 52px;
+  position: relative;
+  overflow: hidden;
+  outline: none;
 }
-.market-categories-grid .cat-tile:active { transform: scale(0.96); }
 
-.market-categories-grid .cat-tile-icon { 
-  font-size: 16px; 
-  color: var(--text-sub); 
+.market-categories-grid .cat-tile:active {
+  transform: scale(0.96);
 }
-.market-categories-grid .cat-tile-name { 
-  font-size: 10.5px; 
-  font-weight: 800; 
-  color: #fff; 
+
+/* Иконка категории — крупнее */
+.market-categories-grid .cat-tile-icon {
+  font-size: 22px;
+  color: var(--text-sub);
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+/* Название категории */
+.market-categories-grid .cat-tile-name {
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+  line-height: 1.1;
+}
+
+/* Подпись (уровень/«Доступен») */
+.market-categories-grid .cat-tile-sub {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--text-sub);
+  line-height: 1.1;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 90px;
 }
-.market-categories-grid .cat-tile-sub { 
-  font-size: 8.5px; 
-  font-weight: 700; 
-  color: var(--text-sub); 
-}
 
+/* ========================================================
+   4. АКТИВНАЯ КАТЕГОРИЯ — ОБВОДКА, НЕ ЗАЛИВКА
+   ======================================================== */
 .market-categories-grid .cat-tile.active {
-  background: linear-gradient(145deg, rgba(0, 242, 254, 0.25), rgba(2, 132, 199, 0.35)) !important;
-  border-color: var(--cyan) !important;
-  box-shadow: 0 0 12px var(--cyan-glow);
-}
-.market-categories-grid .cat-tile.active .cat-tile-icon { color: var(--cyan); }
-.market-categories-grid .cat-tile.active .cat-tile-sub { color: #a5f3fc; }
-
-.market-categories-grid .cat-tile.locked {
-  background: #080c14 !important;
-  border-color: rgba(255, 255, 255, 0.04) !important;
-  opacity: 0.6;
+  background: linear-gradient(145deg, rgba(0, 242, 254, 0.12), rgba(2, 132, 199, 0.18)) !important;
+  border: 1.5px solid var(--cyan) !important;
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.45), inset 0 0 12px rgba(0, 242, 254, 0.08);
 }
 
-.market-categories-grid #catBtn-all {
-  grid-column: auto !important;
-  border-color: rgba(0, 242, 254, 0.3) !important;
+.market-categories-grid .cat-tile.active .cat-tile-icon {
+  color: var(--cyan);
+  filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.5));
+}
+.market-categories-grid .cat-tile.active .cat-tile-name {
+  color: var(--cyan);
+}
+.market-categories-grid .cat-tile.active .cat-tile-sub {
+  color: #a5f3fc;
 }
 
 /* ========================================================
-   3. ШИЛЬДИКИ И СТИЛИЗОВАННЫЕ МАРКИ АВТОМОБИЛЕЙ
+   5. ЗАБЛОКИРОВАННАЯ КАТЕГОРИЯ
+   ======================================================== */
+.market-categories-grid .cat-tile.locked {
+  background: #080c14 !important;
+  border-color: rgba(255, 255, 255, 0.04) !important;
+  opacity: 0.55;
+}
+.market-categories-grid .cat-tile.locked .cat-tile-icon {
+  color: #64748b;
+}
+.market-categories-grid .cat-tile.locked .cat-tile-name {
+  color: #94a3b8;
+}
+.market-categories-grid .cat-tile.locked .cat-tile-sub {
+  color: #f87171;
+}
+
+/* ========================================================
+   6. КНОПКА «ВСЕ КАТЕГОРИИ» — НА ВСЮ ШИРИНУ
+   ======================================================== */
+.market-categories-grid .cat-tile-full {
+  grid-column: 1 / -1 !important;
+  min-height: 46px !important;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  padding: 8px 14px !important;
+  gap: 10px !important;
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.08), rgba(2, 132, 199, 0.05)) !important;
+  border: 1px solid rgba(0, 242, 254, 0.28) !important;
+}
+.market-categories-grid .cat-tile-full .cat-tile-icon {
+  font-size: 20px;
+  color: var(--cyan);
+}
+.market-categories-grid .cat-tile-full .cat-tile-name {
+  font-size: 12px;
+  color: #fff;
+  text-align: left;
+  max-width: none;
+  white-space: normal;
+}
+.market-categories-grid .cat-tile-full .cat-tile-sub {
+  font-size: 9px;
+  color: var(--cyan);
+  text-align: left;
+  max-width: none;
+}
+
+.market-categories-grid .cat-tile-full.active {
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.18), rgba(2, 132, 199, 0.15)) !important;
+  border-color: var(--cyan) !important;
+  box-shadow: 0 0 16px rgba(0, 242, 254, 0.5);
+}
+
+/* ========================================================
+   7. ИНФО-БАННЕР КАТЕГОРИИ
+   ======================================================== */
+.cat-info-banner {
+  background: rgba(13, 20, 36, 0.7) !important;
+  border: 1px solid rgba(0, 242, 254, 0.15) !important;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.cat-info-banner .color-cyan {
+  font-size: 11.5px !important;
+}
+.cat-info-banner .sub-label {
+  font-size: 9px !important;
+  line-height: 1.35;
+}
+
+/* ========================================================
+   8. ШИЛЬДИКИ И СТИЛИЗОВАННЫЕ МАРКИ АВТОМОБИЛЕЙ
    ======================================================== */
 .car-brand-title-wrap {
   display: flex;
@@ -186,7 +292,7 @@
 }
 
 /* ========================================================
-   4. УВЕЛИЧЕННАЯ СТРОКА ТЕГОВ И ГОСНОМЕР
+   9. СТРОКА ТЕГОВ И ГОСНОМЕР
    ======================================================== */
 .car-status-badges-row {
   display: flex;
@@ -262,7 +368,7 @@
 }
 
 /* ========================================================
-   5. ЧИСТАЯ ОБЛОЖКА БЕЗ ПЕРЕГРУЖАЮЩИХ ПЛАШЕК
+   10. ОБЛОЖКА АВТО
    ======================================================== */
 .car-img-wrap {
   position: relative !important;
@@ -295,60 +401,8 @@
   pointer-events: none;
 }
 
-.car-gallery-nav-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: rgba(8, 13, 24, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  cursor: pointer;
-  z-index: 15;
-  transition: background 0.15s ease, transform 0.1s ease;
-}
-.car-gallery-nav-btn:active {
-  transform: translateY(-50%) scale(0.92);
-  background: var(--cyan);
-  color: #000;
-}
-.car-gallery-prev { left: 6px; }
-.car-gallery-next { right: 6px; }
-
-.car-gallery-dots {
-  position: absolute;
-  bottom: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 4px;
-  z-index: 15;
-  pointer-events: none;
-}
-.car-gallery-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.4);
-  transition: width 0.2s ease, background 0.2s ease;
-}
-.car-gallery-dot.active {
-  width: 14px;
-  border-radius: 4px;
-  background: var(--cyan);
-  box-shadow: 0 0 6px var(--cyan-glow);
-}
-
 /* ========================================================
-   6. ВЕРХНИЙ БЛОК: ЦЕНА + МАРЖА
+   11. ВЕРХНИЙ БЛОК: ЦЕНА И МАРЖА
    ======================================================== */
 .car-header-row-volumetric {
   display: flex;
@@ -398,7 +452,7 @@
 }
 
 /* ========================================================
-   7. ХАРАКТЕРИСТИКИ В 3 КОЛОНКИ СЛЕВА НАПРАВО (.spec-tile-3d-col)
+   12. ХАРАКТЕРИСТИКИ (3 КОЛОНКИ)
    ======================================================== */
 .car-specs-grid-volumetric {
   display: grid !important;
@@ -462,44 +516,15 @@
   flex-shrink: 0;
 }
 
-.spec-tile-icon-power {
-  background: rgba(255, 179, 0, 0.15);
-  color: var(--amber);
-  border: 1px solid rgba(255, 179, 0, 0.35);
-}
-
-.spec-tile-icon-road {
-  background: rgba(0, 242, 254, 0.15);
-  color: var(--cyan);
-  border: 1px solid rgba(0, 242, 254, 0.35);
-}
-
-.spec-tile-icon-shield {
-  background: rgba(0, 230, 118, 0.15);
-  color: var(--green);
-  border: 1px solid rgba(0, 230, 118, 0.35);
-}
-
-.spec-tile-icon-shield-mid {
-  background: rgba(255, 179, 0, 0.15);
-  color: var(--amber);
-  border: 1px solid rgba(255, 179, 0, 0.35);
-}
-
-.spec-tile-icon-shield-low {
-  background: rgba(255, 51, 102, 0.2);
-  color: var(--red);
-  border: 1px solid rgba(255, 51, 102, 0.45);
-}
-
-.spec-tile-icon-unknown {
-  background: rgba(148, 163, 184, 0.12);
-  color: #94a3b8;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-}
+.spec-tile-icon-power { background: rgba(255, 179, 0, 0.15); color: var(--amber); border: 1px solid rgba(255, 179, 0, 0.35); }
+.spec-tile-icon-road { background: rgba(0, 242, 254, 0.15); color: var(--cyan); border: 1px solid rgba(0, 242, 254, 0.35); }
+.spec-tile-icon-shield { background: rgba(0, 230, 118, 0.15); color: var(--green); border: 1px solid rgba(0, 230, 118, 0.35); }
+.spec-tile-icon-shield-mid { background: rgba(255, 179, 0, 0.15); color: var(--amber); border: 1px solid rgba(255, 179, 0, 0.35); }
+.spec-tile-icon-shield-low { background: rgba(255, 51, 102, 0.2); color: var(--red); border: 1px solid rgba(255, 51, 102, 0.45); }
+.spec-tile-icon-unknown { background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25); }
 
 /* ========================================================
-   8. СТАТУС-ПЛАШКА ТЮНИНГА / СТОКА
+   13. ТЮНИНГ-ПЛАШКА И БЕЙДЖИ МОДОВ
    ======================================================== */
 .car-tuning-status-capsule {
   background: linear-gradient(145deg, rgba(16, 24, 38, 0.95), rgba(7, 11, 20, 0.95));
@@ -569,7 +594,7 @@
 }
 
 /* ========================================================
-   9. СВЕТОДИОДНЫЕ (LED) И СТРОБОСКОПИЧЕСКИЕ БЕЙДЖИ
+   14. LED / СТРОБОСКОП / БЕЙДЖИ
    ======================================================== */
 .badge-tag {
   background: rgba(8, 12, 20, 0.92) !important;
@@ -642,7 +667,7 @@
 }
 
 /* ========================================================
-   10. ЖИВЫЕ РЕПЛИКИ ПРОДАВЦА У КАПОТА
+   15. РЕПЛИКИ ПРОДАВЦА
    ======================================================== */
 .seller-dialog-bubble {
   background: linear-gradient(135deg, rgba(14, 23, 40, 0.95), rgba(7, 12, 22, 0.95));
@@ -672,7 +697,7 @@
 }
 
 /* ========================================================
-   11. АВТОТЕКА И ТАЙМЕРЫ
+   16. АВТОТЕКА И ТАЙМЕРЫ
    ======================================================== */
 .autoteka-pts-card {
   background: linear-gradient(145deg, #090e18 0%, #060a12 100%);
@@ -760,11 +785,9 @@
   text-align: center !important;
 }
 
-/* ==========================================================================
-   MARKET.CSS — Стили авторынка и интерактивной карты
-   ========================================================================== */
-
-/* Контейнер рынка */
+/* ========================================================
+   17. ИНТЕРАКТИВНАЯ КАРТА РЫНКА
+   ======================================================== */
 .market-container {
     width: 100%;
     max-width: 1200px;
@@ -773,7 +796,6 @@
     box-sizing: border-box;
 }
 
-/* Шапка рынка и навигация */
 .market-header {
     display: flex;
     justify-content: space-between;
@@ -803,13 +825,6 @@
     text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
 }
 
-.market-view-controls {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-/* Кнопка переключения вида карты в верхнем правом углу */
 .btn-market-map-toggle {
     display: flex;
     align-items: center;
@@ -836,144 +851,6 @@
 .btn-market-map-toggle:active {
     transform: translateY(1px);
 }
-
-/* Фильтры рынка */
-.market-filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-.market-filter-btn {
-    background: rgba(18, 26, 45, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 8px 14px;
-    color: #9ab4d0;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.market-filter-btn.active,
-.market-filter-btn:hover {
-    background: rgba(0, 240, 255, 0.15);
-    border-color: #00f0ff;
-    color: #ffffff;
-}
-
-/* Сетка карточек автомобилей */
-.market-cards-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 18px;
-}
-
-/* Карточка автомобиля */
-.market-car-card {
-    background: linear-gradient(180deg, #121a2d 0%, #0c1220 100%);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transition: all 0.25s ease;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
-}
-
-.market-car-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(0, 240, 255, 0.4);
-    box-shadow: 0 10px 25px rgba(0, 240, 255, 0.2);
-}
-
-.car-card-image-wrap {
-    width: 100%;
-    height: 160px;
-    position: relative;
-    background: #080c14;
-    overflow: hidden;
-}
-
-.car-card-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.car-card-badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background: rgba(0, 0, 0, 0.75);
-    border: 1px solid rgba(0, 240, 255, 0.4);
-    border-radius: 6px;
-    padding: 4px 8px;
-    font-size: 11px;
-    color: #00f0ff;
-    font-weight: 700;
-}
-
-.car-card-body {
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-}
-
-.car-card-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #ffffff;
-    margin-bottom: 6px;
-}
-
-.car-card-price {
-    font-size: 18px;
-    font-weight: 800;
-    color: #00ffaa;
-    margin-bottom: 12px;
-}
-
-.car-card-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    font-size: 12px;
-    color: #8da4be;
-    margin-bottom: 16px;
-}
-
-.car-card-meta-row {
-    display: flex;
-    justify-content: space-between;
-}
-
-.car-card-actions {
-    margin-top: auto;
-}
-
-.btn-car-inspect {
-    width: 100%;
-    background: linear-gradient(135deg, #00f0ff 0%, #0099ff 100%);
-    border: none;
-    border-radius: 8px;
-    padding: 10px;
-    font-size: 13px;
-    font-weight: 700;
-    color: #ffffff;
-    cursor: pointer;
-    transition: filter 0.2s ease;
-}
-
-.btn-car-inspect:hover {
-    filter: brightness(1.15);
-}
-
-/* ==========================================================================
-   МОДАЛЬНОЕ ОКНО ИНТЕРАКТИВНОЙ КАРТЫ
-   ========================================================================== */
 
 .market-map-overlay {
     position: fixed;
@@ -1095,7 +972,6 @@
     display: block;
 }
 
-/* Легенда карты */
 .market-map-legend {
     position: absolute;
     bottom: 14px;
@@ -1128,7 +1004,6 @@
 .dot-active { background: #00f0ff; box-shadow: 0 0 6px #00f0ff; }
 .dot-disabled { background: #555555; }
 
-/* Карточка быстрого осмотра авто при тапе на пин */
 .map-pin-preview {
     position: absolute;
     bottom: 20px;
@@ -1204,4 +1079,19 @@
     font-size: 11px;
     color: #ff6666;
     text-align: center;
+}
+
+/* ========================================================
+   18. АДАПТИВНОСТЬ
+   ======================================================== */
+@media (max-width: 380px) {
+    .market-categories-grid .cat-tile-icon { font-size: 20px; }
+    .market-categories-grid .cat-tile-name { font-size: 9.5px; }
+    .market-categories-grid .cat-tile-sub { font-size: 7.5px; }
+    .car-model-name { font-size: 13px; }
+    .car-price-value-3d { font-size: 14px; }
+    .car-specs-grid-volumetric { gap: 4px; }
+    .spec-tile-3d-col { padding: 5px 6px; min-height: 44px; }
+    .spec-tile-icon-wrap { width: 18px; height: 18px; font-size: 9px; }
+    .spec-tile-col-data b { font-size: 9.5px; }
 }

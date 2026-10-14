@@ -1,0 +1,1059 @@
+// ========================================================
+// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.4.0)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.4.0:
+//   - case 'business' → PhoneBusiness.render(appContainer)
+//   - AppNotepad: fallback-goals если NOTEPAD_CAREER_GOALS не загрузился
+//   - case 'barn' безопасно работает через window.AppBarn
+//   - renderGenericFallback оставлен для неизвестных appId
+//   - AppShop и AppNotepad живут здесь (у них нет внешних файлов)
+// ========================================================
+
+const PhoneManager = {
+    currentApp: null,
+    _clockInterval: null,
+    _isInitialized: false,
+    _isOpeningApp: false,
+
+    // ⭐ Карта приложений, требующих разблокировки
+    accessKeyMap: {
+        'barn':       'barn',
+        'containers': 'containers',
+        'syndicate':  'autopodbor_order',
+        'street':     'street',
+        'reshala':    'darknet'
+    },
+
+    init() {
+        if (this._isInitialized) return;
+        this._isInitialized = true;
+
+        this.updateClock();
+        if (this._clockInterval) clearInterval(this._clockInterval);
+        this._clockInterval = setInterval(() => this.updateClock(), 1000);
+
+        this.renderDailyQuestsWidget();
+        this.renderBusinessWidget();
+        this.updateUnreadBadge();
+    },
+
+    updateClock() {
+        const clockEl = document.getElementById('phoneStatusBarClock');
+        if (!clockEl) return;
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        clockEl.innerText = `${hours}:${minutes}`;
+    },
+
+    updateUnreadBadge() {
+        const smsBadge = document.getElementById('phoneAppSmsBadge');
+        const postBadge = document.getElementById('phoneAppPostBadge');
+        const navBadge = document.getElementById('phoneNavBadge');
+        let unreadCount = 0;
+
+        if (state.player && Array.isArray(state.player.phoneMessages)) {
+            unreadCount = state.player.phoneMessages.filter(m => m && m.unread).length;
+        }
+
+        let unreadMail = 0;
+        if (state.player && Array.isArray(state.player.mailbox)) {
+            unreadMail = state.player.mailbox.filter(m => m && !m.claimed).length;
+        }
+
+        if (smsBadge) {
+            smsBadge.style.display = unreadCount > 0 ? 'block' : 'none';
+            smsBadge.innerText = unreadCount;
+        }
+        if (postBadge) {
+            postBadge.style.display = unreadMail > 0 ? 'block' : 'none';
+            postBadge.innerText = unreadMail;
+        }
+
+        let total = unreadCount + unreadMail;
+        if (navBadge) {
+            navBadge.style.display = total > 0 ? 'inline-block' : 'none';
+            navBadge.innerText = total;
+        }
+    },
+
+    // --------------------------------------------------------
+    // ПРОВЕРКА ДОСТУПА ПО УРОВНЯМ И ПЛАТНЫМ РАЗБЛОКИРОВКАМ
+    // --------------------------------------------------------
+    checkAppAccess(appId) {
+        if (!state.player) return true;
+        if (!state.player.unlockedApps) state.player.unlockedApps = [];
+
+        const configKey = this.accessKeyMap[appId];
+        if (!configKey) return true;
+
+        const config = (window.APP_ACCESS_CONFIG && window.APP_ACCESS_CONFIG[configKey])
+            ? window.APP_ACCESS_CONFIG[configKey]
+            : null;
+
+        if (!config) return true;
+
+        const minLevel = Number(config.minLevel) || 1;
+        const pLvl = state.player.level || 1;
+        const isUnlocked = state.player.unlockedApps.includes(configKey);
+
+        if (isUnlocked) return true;
+
+        if (pLvl < minLevel) {
+            if (typeof window.openLevelGateModal === 'function') {
+                window.openLevelGateModal(config.name || appId, minLevel);
+            } else if (typeof showToast === 'function') {
+                showToast(`Сервис доступен с ${minLevel} уровня!`);
+            }
+            return false;
+        }
+
+        this.showAppUnlockPrompt(appId, configKey, config);
+        return false;
+    },
+
+    showAppUnlockPrompt(appId, configKey, config) {
+        const cash = state.player?.cash || 0;
+        const stars = state.player?.stars || 0;
+        const tickets = state.player?.expressTickets || 0;
+
+        const costCash = Number(config.costCash) || 0;
+        const costStars = Number(config.costStars) || 0;
+        const costTickets = Number(config.costTickets) || 0;
+
+        const hasCash = cash >= costCash;
+        const hasStars = stars >= costStars;
+        const hasTickets = tickets >= costTickets;
+        const canUnlock = hasCash && hasStars && hasTickets;
+
+        const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 2500;
+
+        let priceList = [];
+        if (costCash > 0) priceList.push(`${costCash.toLocaleString()} ₽`);
+        if (costStars > 0) priceList.push(`${costStars} ⭐ (${(costStars * starRate).toLocaleString()} ₽)`);
+        if (costTickets > 0) priceList.push(`${costTickets} 🎫`);
+        const priceText = priceList.length > 0 ? priceList.join(' + ') : 'Бесплатно';
+
+        let modal = document.getElementById('modalAppUnlockPrompt');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalAppUnlockPrompt';
+            modal.className = 'modal-overlay';
+            document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+            <div class="modal-box text-center" style="max-width: 410px; border-color: var(--cyan); background: radial-gradient(circle at 50% 0%, #151d2f 0%, #070a10 85%);">
+                <div class="radar-spinner-ring mb-2" style="border-top-color: var(--cyan); border-right-color: var(--green); margin: 0 auto 10px auto;">
+                    <div class="radar-spinner-center" style="font-size:24px;">🔑</div>
+                </div>
+
+                <div class="modal-glow-badge mb-1" style="color:var(--cyan); border-color:var(--cyan); background:rgba(0,242,254,0.1); display:inline-block;">
+                    РАЗБЛОКИРОВКА СЕРВИСА
+                </div>
+
+                <h3 class="font-bold mb-1 color-cyan" style="font-size:16px;">${config.name || appId}</h3>
+
+                <p class="sub-label mb-3" style="font-size:11px; line-height:1.45; color:#cbd5e1; padding: 0 6px;">
+                    ${config.desc || 'Получите постоянный доступ к данному разделу сервиса.'}
+                </p>
+
+                <div class="p-2 mb-3 text-left" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
+                    <div class="flex-between text-xs mb-1">
+                        <span class="sub-label">Стоимость лицензии:</span>
+                        <b class="color-green" style="font-size:13px;">${priceText}</b>
+                    </div>
+                    <div class="flex-between" style="font-size:9.5px; color:#94a3b8;">
+                        <span>Ваш баланс:</span>
+                        <span>${cash.toLocaleString()} ₽ | ${stars} ⭐ | ${tickets} 🎫</span>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <button onclick="PhoneManager.confirmUnlockAppAction('${appId}', '${configKey}')" class="btn ${canUnlock ? 'btn-green' : 'btn-dark opacity-50'} btn-sm w-full font-bold" ${canUnlock ? '' : 'disabled'}>
+                        ${canUnlock ? `Оплатить и открыть (${priceText}) ✓` : 'Недостаточно средств для оплаты'}
+                    </button>
+                    <button onclick="ModalManager.close('modalAppUnlockPrompt')" class="btn btn-dark btn-sm w-full">
+                        Отмена
+                    </button>
+                </div>
+            </div>
+        `;
+
+        ModalManager.open('modalAppUnlockPrompt', { closeOthers: true });
+        if (typeof playSound === 'function') playSound('tick');
+    },
+
+    confirmUnlockAppAction(appId, configKey) {
+        const config = (window.APP_ACCESS_CONFIG && window.APP_ACCESS_CONFIG[configKey])
+            ? window.APP_ACCESS_CONFIG[configKey]
+            : null;
+        if (!config) return;
+
+        const costCash = Number(config.costCash) || 0;
+        const costStars = Number(config.costStars) || 0;
+        const costTickets = Number(config.costTickets) || 0;
+
+        const cash = state.player?.cash || 0;
+        const stars = state.player?.stars || 0;
+        const tickets = state.player?.expressTickets || 0;
+
+        if (cash < costCash)     return showToast("Не хватает рублей для оплаты!");
+        if (stars < costStars)   return showToast("Не хватает банкнот ⭐ для оплаты!");
+        if (tickets < costTickets) return showToast("Не хватает билетов 🎫 для оплаты!");
+
+        if (costCash > 0)     state.player.cash -= costCash;
+        if (costStars > 0)    state.player.stars -= costStars;
+        if (costTickets > 0)  state.player.expressTickets -= costTickets;
+
+        if (!state.player.unlockedApps) state.player.unlockedApps = [];
+        if (!state.player.unlockedApps.includes(configKey)) {
+            state.player.unlockedApps.push(configKey);
+        }
+
+        ModalManager.close('modalAppUnlockPrompt');
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast(`Сервис «${config.name || appId}» успешно разблокирован!`);
+
+        this.openApp(appId);
+    },
+
+    // --------------------------------------------------------
+    // ОТКРЫТИЕ ПРИЛОЖЕНИЙ
+    // --------------------------------------------------------
+    openApp(appId) {
+        if (this._isOpeningApp) {
+            console.log("[Phone] openApp проигнорирован — предыдущий вызов ещё не завершён");
+            return;
+        }
+
+        if (!this.checkAppAccess(appId)) {
+            return;
+        }
+
+        const homeScreen = document.getElementById('phoneHomeScreen');
+        const appContainer = document.getElementById('phoneAppContainer');
+        if (!appContainer) return;
+
+        this._isOpeningApp = true;
+
+        try {
+            this.currentApp = appId;
+
+            if (homeScreen) {
+                homeScreen.style.setProperty('display', 'none', 'important');
+            }
+            appContainer.style.setProperty('display', 'flex', 'important');
+            appContainer.innerHTML = '';
+
+            // ============================================
+            // 1. СЕТЬ M+ & P2P БИРЖА (AppM)
+            // ============================================
+            if (appId === 'messages' || appId === 'm' || appId === 'autodrot') {
+                if (window.AppM && typeof window.AppM.render === 'function') {
+                    if (appId === 'autodrot') {
+                        window.AppM.activeTab = 'market';
+                    }
+                    window.AppM.render(appContainer);
+                } else {
+                    this.renderGenericFallback(appId, appContainer);
+                }
+                return;
+            }
+
+            // ============================================
+            // 2. ПОЧТА / СКЛАД
+            // ============================================
+            if (appId === 'post' || appId === 'mailbox' || appId === 'warehouse') {
+                if (window.AppPost && typeof window.AppPost.render === 'function') {
+                    window.AppPost.render(appContainer);
+                    return;
+                }
+            }
+
+            // ============================================
+            // 3. АВТО-МАРКЕТ (локальный AppShop)
+            // ============================================
+            if (appId === 'shop') {
+                AppShop.render(appContainer);
+                return;
+            }
+
+            // ============================================
+            // 4. САРАИ (AppBarn из phone-barn.js)
+            // ============================================
+            if (appId === 'barn') {
+                if (window.AppBarn && typeof window.AppBarn.render === 'function') {
+                    window.AppBarn.render(appContainer);
+                    return;
+                }
+                this.renderGenericFallback(appId, appContainer);
+                return;
+            }
+
+            // ============================================
+            // 5. БЛОКНОТ
+            // ============================================
+            if (appId === 'notepad') {
+                AppNotepad.render(appContainer);
+                return;
+            }
+
+            // ============================================
+            // 6. ОСТАЛЬНЫЕ ПРИЛОЖЕНИЯ — через switch
+            // ============================================
+            switch (appId) {
+                case 'dev':
+                    if (window.AppDev && typeof window.AppDev.render === 'function') {
+                        window.AppDev.render(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'fortune':
+                    if (window.PhoneMedia && typeof window.PhoneMedia.renderFortuneApp === 'function') {
+                        window.PhoneMedia.renderFortuneApp(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'reshala':
+                    if (window.AppDarknet && typeof window.AppDarknet.render === 'function') {
+                        window.AppDarknet.render(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'street':
+                    if (window.PhoneRacing && typeof window.PhoneRacing.renderStreetApp === 'function') {
+                        window.PhoneRacing.renderStreetApp(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'radio':
+                    if (window.PhoneMedia && typeof window.PhoneMedia.renderRadioApp === 'function') {
+                        window.PhoneMedia.renderRadioApp(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'bank':
+                    if (window.AppBank && typeof window.AppBank.render === 'function') {
+                        window.AppBank.render(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                // ⭐ v1.4.0: ИСПРАВЛЕНО — вызываем PhoneBusiness
+                case 'business':
+                    if (window.PhoneBusiness && typeof window.PhoneBusiness.render === 'function') {
+                        window.PhoneBusiness.render(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'housing':
+                    if (window.PhoneHousing && typeof window.PhoneHousing.renderHousingApp === 'function') {
+                        window.PhoneHousing.renderHousingApp(appContainer);
+                    } else if (window.PhoneHousing && typeof window.PhoneHousing.render === 'function') {
+                        window.PhoneHousing.render(appContainer);
+                    } else if (window.AppHousing && typeof window.AppHousing.render === 'function') {
+                        window.AppHousing.render(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'syndicate':
+                    if (window.AppSyndicate && typeof window.AppSyndicate.render === 'function') {
+                        window.AppSyndicate.render(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'containers':
+                    if (window.AppPort && typeof window.AppPort.render === 'function') {
+                        window.AppPort.render(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'radar':
+                    if (window.AppRadar && typeof window.AppRadar.render === 'function') {
+                        window.AppRadar.render(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                case 'gosuslugi':
+                    if (window.AppGosuslugi && typeof window.AppGosuslugi.render === 'function') {
+                        window.AppGosuslugi.render(appContainer);
+                    } else {
+                        this.renderGenericFallback(appId, appContainer);
+                    }
+                    break;
+
+                default:
+                    this.renderGenericFallback(appId, appContainer);
+            }
+        } finally {
+            this.afterAppOpened();
+            this._isOpeningApp = false;
+        }
+    },
+
+    afterAppOpened() {
+        if (typeof tgHaptic === 'function') tgHaptic('light');
+    },
+
+    goHome() {
+        this.currentApp = null;
+        const homeScreen = document.getElementById('phoneHomeScreen');
+        const appContainer = document.getElementById('phoneAppContainer');
+
+        if (appContainer) {
+            appContainer.style.setProperty('display', 'none', 'important');
+            appContainer.innerHTML = '';
+        }
+        if (homeScreen) {
+            homeScreen.style.setProperty('display', 'block', 'important');
+        }
+
+        this.renderDailyQuestsWidget();
+        this.renderBusinessWidget();
+        this.updateUnreadBadge();
+
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
+    },
+
+    renderPhoneScreen() {
+        if (!this.currentApp) {
+            this.goHome();
+        } else {
+            this.openApp(this.currentApp);
+        }
+    },
+
+    renderGenericFallback(appId, container) {
+        if (!container) return;
+        container.innerHTML = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
+                <div class="phone-app-title">${String(appId).toUpperCase()}</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body text-center p-4">
+                <div class="glass-card p-3">
+                    <b class="text-xs">Приложение «${appId}» не найдено</b>
+                    <div class="sub-label mt-1" style="font-size:9.5px;">Возможно, модуль ещё загружается. Попробуйте ещё раз.</div>
+                    <button onclick="PhoneManager.openApp('${appId}')" class="btn btn-cyan btn-sm mt-2">Перезапустить</button>
+                </div>
+            </div>
+        `;
+    },
+
+    // ========================================================
+    // ВИДЖЕТ ЗАДАНИЙ
+    // ========================================================
+    toggleQuestsWidgetCollapse() {
+        if (!state.player) return;
+        if (!state.player.phoneWidgetsCollapsed) state.player.phoneWidgetsCollapsed = {};
+        state.player.phoneWidgetsCollapsed.quests = !state.player.phoneWidgetsCollapsed.quests;
+        if (typeof saveState === 'function') saveState();
+        this.renderDailyQuestsWidget();
+        if (typeof playSound === 'function') playSound('tick');
+    },
+
+    renderDailyQuestsWidget() {
+        const box = document.getElementById('phoneDailyQuestsWidget');
+        if (!box) return;
+
+        const isCollapsed = !!(state.player?.phoneWidgetsCollapsed?.quests);
+        const quests = state.player?.dailyQuests || [];
+        const completedCount = quests.filter(q => q && (q.done || (q.cur >= (q.max || 1)))).length;
+
+        let itemsHtml = "";
+        if (!isCollapsed) {
+            quests.forEach((q, idx) => {
+                if (!q) return;
+                const isFinished = q.done;
+                const canClaim = !q.done && (q.cur >= (q.max || 1));
+                const progressPct = Math.min(100, Math.round(((q.cur || 0) / (q.max || 1)) * 100));
+
+                let actionBtn = "";
+                if (isFinished) {
+                    actionBtn = `<span class="quest-done-badge">Выполнено ✓</span>`;
+                } else if (canClaim) {
+                    actionBtn = `<button onclick="PhoneManager.claimQuestReward(${idx})" class="quest-claim-btn">+${(q.reward || 0).toLocaleString()} ₽</button>`;
+                } else {
+                    actionBtn = `<span class="sub-label font-bold" style="font-size:10px;">${q.cur || 0}/${q.max || 1}</span>`;
+                }
+
+                itemsHtml += `
+                    <div class="quest-card-item ${isFinished ? 'quest-completed' : ''}">
+                        <div class="quest-card-info">
+                            <div class="quest-card-title">${q.text}</div>
+                            <div class="quest-card-sub">
+                                <div class="quest-progress-track">
+                                    <div class="quest-progress-bar" style="width:${progressPct}%;"></div>
+                                </div>
+                                <span class="sub-label" style="font-size:8.5px;">+${(q.reward || 0).toLocaleString()} ₽</span>
+                            </div>
+                        </div>
+                        ${actionBtn}
+                    </div>
+                `;
+            });
+        }
+
+        box.innerHTML = `
+            <div class="quest-widget-header">
+                <div class="flex-gap" style="align-items:center;">
+                    <i class="fa-solid fa-list-check color-cyan"></i>
+                    <b class="text-xs color-cyan">Задания дня</b>
+                    <span class="tag-badge ${completedCount === quests.length && quests.length > 0 ? 'bg-tag-green' : 'bg-tag-cyan'}" style="font-size:8px;">${completedCount}/${quests.length}</span>
+                </div>
+                <button onclick="PhoneManager.toggleQuestsWidgetCollapse()" class="btn btn-dark btn-auto btn-sm" style="padding:2px 6px; font-size:9px;">
+                    <i class="fa-solid ${isCollapsed ? 'fa-chevron-down' : 'fa-chevron-up'}"></i>
+                </button>
+            </div>
+            ${itemsHtml}
+        `;
+    },
+
+    claimQuestReward(idx) {
+        const quests = state.player?.dailyQuests || [];
+        const q = quests[idx];
+        if (!q) return;
+
+        if (q._claiming) return;
+        if (q.done || (q.cur || 0) < (q.max || 1)) return;
+
+        q._claiming = true;
+        q.done = true;
+        state.player.cash = (state.player.cash || 0) + (q.reward || 0);
+        if (typeof addXp === 'function') addXp(q.rewardXp || 35);
+
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        if (typeof showToast === 'function') showToast(`Награда получена: +${(q.reward || 0).toLocaleString()} ₽!`);
+
+        this.renderDailyQuestsWidget();
+    },
+
+    // ========================================================
+    // ВИДЖЕТ БИЗНЕСА
+    // ========================================================
+    renderBusinessWidget() {
+        const box = document.getElementById('phoneBizWidgetContainer');
+        if (!box) return;
+
+        const ownedBusinesses = (state.businesses || []).filter(b => b && b.level > 0);
+        if (ownedBusinesses.length === 0) {
+            box.style.display = 'none';
+            return;
+        }
+
+        let totalDailyIncome = 0;
+        let totalStoredCash = 0;
+        ownedBusinesses.forEach(b => {
+            const supplyMul = (b.stock || 0) > 0 ? 1.0 : 0.15;
+            totalDailyIncome += (b.income || 0) * Math.pow(1.55, Math.max(0, (b.level || 1) - 1)) * supplyMul;
+            totalStoredCash += (b.stored || 0);
+        });
+
+        box.style.display = 'block';
+        box.innerHTML = `
+            <div class="phone-biz-widget">
+                <div class="flex-between mb-1">
+                    <div class="flex-gap" style="align-items:center;">
+                        <div class="widget-icon-bubble"><i class="fa-solid fa-briefcase color-green"></i></div>
+                        <div>
+                            <div class="widget-title">Касса предприятий</div>
+                            <div class="sub-label" style="font-size:8.5px;">Точек в сети: <b>${ownedBusinesses.length} шт.</b></div>
+                        </div>
+                    </div>
+                    <span class="tag-badge bg-tag-green">+${Math.round(totalDailyIncome).toLocaleString()} ₽/день</span>
+                </div>
+
+                <div class="widget-metrics-row">
+                    <div>
+                        <span class="sub-label" style="font-size:9px;">Накоплено в кассах:</span>
+                        <div class="price-val color-green" style="font-size:14px;">${Math.floor(totalStoredCash).toLocaleString()} ₽</div>
+                    </div>
+                    <button onclick="PhoneManager.collectAllBusinessCash()" class="btn btn-green btn-sm btn-auto" ${totalStoredCash <= 0 ? 'disabled' : ''}>
+                        Снять кассу
+                    </button>
+                </div>
+            </div>
+        `;
+    },
+
+    collectAllBusinessCash() {
+        // ⭐ v1.4.0: делегируем в PhoneBusiness, если он загружен
+        if (window.PhoneBusiness && typeof window.PhoneBusiness.collectAllCash === 'function') {
+            window.PhoneBusiness.collectAllCash();
+            this.renderBusinessWidget();
+            return;
+        }
+
+        // Fallback — свой сбор
+        let total = 0;
+        (state.businesses || []).forEach(b => {
+            if (b && b.stored && b.stored > 0) {
+                total += Math.floor(b.stored);
+                b.stored = 0;
+            }
+        });
+
+        if (total <= 0) return;
+
+        state.player.cash = (state.player.cash || 0) + total;
+        if (typeof trackQuestProgress === 'function') trackQuestProgress('collect_biz', 1);
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast(`Собрана выручка: +${total.toLocaleString()} ₽!`);
+
+        this.renderBusinessWidget();
+    }
+};
+
+// ========================================================
+// АВТОНОМНЫЙ АВТО-МАРКЕТ (AppShop)
+// ========================================================
+const AppShop = {
+    activeCategory: 'tools',
+
+    render(container) {
+        if (!container) return;
+        let sub = this.activeCategory || 'tools';
+
+        container.innerHTML = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
+                <div class="phone-app-title color-orange"><i class="fa-solid fa-cart-shopping mr-1"></i> Авто-Маркет</div>
+                <div style="width:40px;"></div>
+            </div>
+
+            <div class="phone-app-body">
+                <div class="grid-4 mb-2" style="grid-template-columns: repeat(4, 1fr); gap: 3px;">
+                    <button onclick="AppShop.switchCategory('tools')" class="btn ${sub === 'tools' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:6px 2px; font-size:9px;">
+                        <i class="fa-solid fa-microchip"></i> Приборы
+                    </button>
+                    <button onclick="AppShop.switchCategory('consumables')" class="btn ${sub === 'consumables' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:6px 2px; font-size:9px;">
+                        <i class="fa-solid fa-oil-can"></i> Сырьё
+                    </button>
+                    <button onclick="AppShop.switchCategory('tuningParts')" class="btn ${sub === 'tuningParts' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:6px 2px; font-size:9px;">
+                        <i class="fa-solid fa-id-card"></i> Документы
+                    </button>
+                    <button onclick="AppShop.switchCategory('homeItems')" class="btn ${sub === 'homeItems' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:6px 2px; font-size:9px;">
+                        <i class="fa-solid fa-couch"></i> Бокс/Дом
+                    </button>
+                </div>
+
+                <div id="shopItemsContainer"></div>
+            </div>
+        `;
+
+        this.renderCategoryItems();
+    },
+
+    switchCategory(cat) {
+        this.activeCategory = cat;
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    renderCategoryItems() {
+        const box = document.getElementById('shopItemsContainer');
+        if (!box) return;
+
+        const catalog = (typeof SHOP_CATALOG !== 'undefined') ? SHOP_CATALOG : {};
+        const cat = this.activeCategory;
+        const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 2500;
+        let html = "";
+
+        if (cat === 'tools') {
+            const tools = catalog.tools || [];
+            html += `
+                <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0,242,254,0.14), #090e18); border-color: var(--cyan);">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-laptop-code"></i> Оборудование эксперта</b>
+                        <span class="tag-badge bg-tag-cyan">Точность 100%</span>
+                    </div>
+                    <div class="sub-label" style="font-size:9.5px;">Без толщиномера и сканера OBD2 проверки у капота и спецзаказы ПодКлюч заблокированы.</div>
+                </div>
+            `;
+
+            tools.forEach(t => {
+                let isOwned = !!(state.player.tools && state.player.tools[t.id]);
+                let wear = (state.player.toolsWear && state.player.toolsWear[t.id] !== undefined)
+                    ? state.player.toolsWear[t.id]
+                    : (t.maxUses || 50);
+                let maxUses = t.maxUses || 50;
+                let starsTxt = t.reqStars ? ` + ${t.reqStars} ⭐` : "";
+
+                let actionBlock = "";
+                if (!isOwned) {
+                    actionBlock = `<button onclick="AppShop.buyToolAction('${t.id}', ${t.cost}, ${t.reqStars || 0})" class="btn btn-cyan btn-sm btn-auto">${t.cost.toLocaleString()} ₽${starsTxt}</button>`;
+                } else {
+                    let wearClass = wear < 15 ? "color-red" : "color-green";
+                    actionBlock = `
+                        <div style="text-align:right;">
+                            <div class="sub-label mb-1" style="font-size:9px;">Ресурс: <b class="${wearClass}">${wear}/${maxUses}</b></div>
+                            <button onclick="AppShop.calibrateToolAction('${t.id}', ${t.serviceCost || 3500})" class="btn btn-dark btn-sm btn-auto" ${wear >= maxUses ? 'disabled' : ''}>
+                                Калибровка (${(t.serviceCost || 3500).toLocaleString()} ₽)
+                            </button>
+                        </div>
+                    `;
+                }
+
+                html += `
+                <div class="glass-card p-2 flex-between mb-2">
+                    <div style="flex:1; margin-right:8px;">
+                        <b class="text-xs color-cyan"><i class="fa-solid ${t.icon || 'fa-microchip'} mr-1"></i> ${t.name}</b>
+                        <div class="sub-label mt-1" style="font-size:9.5px; line-height:1.35;">${t.desc}</div>
+                    </div>
+                    ${actionBlock}
+                </div>`;
+            });
+
+        } else if (cat === 'consumables') {
+            const consumables = catalog.consumables || [];
+            html += `
+                <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(255,179,0,0.14), #090e18); border-color: var(--amber);">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-amber"><i class="fa-solid fa-boxes-stacked"></i> Сырьевая база сети</b>
+                        <span class="tag-badge bg-tag-amber">Опт без дефицита</span>
+                    </div>
+                    <div class="sub-label" style="font-size:9.5px;">Пополнение запасов сырья исключает остановку кассы на ваших предприятиях.</div>
+                </div>
+            `;
+
+            consumables.forEach(c => {
+                let starsTxt = c.reqStars ? ` + ${c.reqStars} ⭐` : "";
+                html += `
+                <div class="glass-card p-2 flex-between mb-2">
+                    <div style="flex:1; margin-right:8px;">
+                        <b class="text-xs color-amber"><i class="fa-solid fa-box mr-1"></i> ${c.name}</b>
+                        <div class="sub-label mt-1" style="font-size:9.5px; line-height:1.35;">${c.desc}</div>
+                    </div>
+                    <button onclick="AppShop.buyConsumableAction('${c.id}', ${c.cost}, ${c.reqStars || 0}, ${c.value}, '${c.targetBiz || 'all'}')" class="btn btn-amber btn-sm btn-auto">
+                        Купить (${(c.cost / 1000).toFixed(0)}k ₽${starsTxt})
+                    </button>
+                </div>`;
+            });
+
+        } else if (cat === 'tuningParts') {
+            const parts = catalog.tuningParts || [];
+            html += `
+                <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(192,132,252,0.14), #090e18); border-color: var(--purple);">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-purple"><i class="fa-solid fa-shield-halved"></i> Официальные допуски</b>
+                        <span class="tag-badge bg-tag-purple">Легальность</span>
+                    </div>
+                    <div class="sub-label" style="font-size:9.5px;">Лицензии пилота для 402м, пропуска в Порт и полисы защиты от угонов.</div>
+                </div>
+            `;
+
+            parts.forEach(p => {
+                let isOwned = false;
+                if (p.id === 'raf_license')   isOwned = !!state.player.hasRacingLicense;
+                if (p.id === 'gps_tracker')   isOwned = !!state.player.hasGpsTracker;
+                if (p.id === 'customs_pass')  isOwned = !!state.player.hasCustomsPass;
+
+                let starsTxt = p.reqStars ? ` + ${p.reqStars} ⭐` : "";
+                let actionBtn = isOwned
+                    ? `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Оформлено ✓</button>`
+                    : `<button onclick="AppShop.buyDocAction('${p.id}', ${p.cost}, ${p.reqStars || 0})" class="btn btn-purple btn-sm btn-auto">Оформить (${(p.cost / 1000).toFixed(0)}k ₽${starsTxt})</button>`;
+
+                html += `
+                <div class="glass-card p-2 flex-between mb-2">
+                    <div style="flex:1; margin-right:8px;">
+                        <b class="text-xs color-purple"><i class="fa-solid ${p.icon || 'fa-file'} mr-1"></i> ${p.name}</b>
+                        <div class="sub-label mt-1" style="font-size:9.5px; line-height:1.35;">${p.desc}</div>
+                    </div>
+                    ${actionBtn}
+                </div>`;
+            });
+
+        } else if (cat === 'homeItems') {
+            const items = catalog.homeItems || [];
+            if (!state.player.furniture) state.player.furniture = [];
+
+            html += `
+                <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0,230,118,0.14), #090e18); border-color: var(--green);">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-green"><i class="fa-solid fa-couch"></i> Оснащение боксов и апартаментов</b>
+                        <span class="tag-badge bg-tag-green">Пассивные перки</span>
+                    </div>
+                    <div class="sub-label" style="font-size:9.5px;">Мебель восстанавливает кураж, сейф защищает кэш, а подъёмник ускоряет ремонт.</div>
+                </div>
+            `;
+
+            items.forEach(item => {
+                let isOwned = state.player.furniture.includes(item.id);
+                let starsTxt = item.reqStars ? ` + ${item.reqStars} ⭐` : "";
+                let actionBtn = isOwned
+                    ? `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled>Установлено ✓</button>`
+                    : `<button onclick="AppShop.buyFurnitureAction('${item.id}', ${item.cost}, ${item.reqStars || 0})" class="btn btn-green btn-sm btn-auto">Купить (${(item.cost / 1000).toFixed(0)}k ₽${starsTxt})</button>`;
+
+                html += `
+                <div class="glass-card p-2 flex-between mb-2">
+                    <div style="flex:1; margin-right:8px;">
+                        <b class="text-xs color-green"><i class="fa-solid ${item.icon || 'fa-couch'} mr-1"></i> ${item.name}</b>
+                        <div class="sub-label mt-1" style="font-size:9.5px; line-height:1.35;">${item.perk}</div>
+                    </div>
+                    ${actionBtn}
+                </div>`;
+            });
+        }
+
+        box.innerHTML = html;
+    },
+
+    buyToolAction(toolId, cost, reqStars) {
+        const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 2500;
+        let cash = state.player?.cash || 0;
+        let stars = state.player?.stars || 0;
+
+        if (cash < cost) return showToast("Не хватает рублей на покупку прибора!");
+        if (stars < (reqStars || 0)) return showToast(`Нужно ${reqStars} ⭐ (${(reqStars * starRate).toLocaleString()} ₽)!`);
+
+        state.player.cash -= cost;
+        state.player.stars -= (reqStars || 0);
+
+        if (!state.player.tools) state.player.tools = {};
+        if (!state.player.toolsWear) state.player.toolsWear = {};
+
+        state.player.tools[toolId] = true;
+        const catalogTools = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.tools) ? SHOP_CATALOG.tools : [];
+        const tObj = catalogTools.find(t => t.id === toolId);
+        state.player.toolsWear[toolId] = tObj ? tObj.maxUses : 50;
+
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast("Прибор куплен и добавлен в ваш арсенал!");
+        this.renderCategoryItems();
+    },
+
+    calibrateToolAction(toolId, cost) {
+        let cash = state.player?.cash || 0;
+        if (cash < cost) return showToast("Не хватает денег на калибровку и зарядку!");
+
+        state.player.cash -= cost;
+        const catalogTools = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.tools) ? SHOP_CATALOG.tools : [];
+        const tObj = catalogTools.find(t => t.id === toolId);
+        if (!state.player.toolsWear) state.player.toolsWear = {};
+        state.player.toolsWear[toolId] = tObj ? tObj.maxUses : 50;
+
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast("Прибор откалиброван и заряжен на 100%!");
+        this.renderCategoryItems();
+    },
+
+    buyConsumableAction(cId, cost, reqStars, value, targetBiz) {
+        const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 2500;
+        let cash = state.player?.cash || 0;
+        let stars = state.player?.stars || 0;
+
+        if (cash < cost) return showToast("Не хватает денег на партию сырья!");
+        if (stars < (reqStars || 0)) return showToast(`Нужно ${reqStars} ⭐ (${(reqStars * starRate).toLocaleString()} ₽)!`);
+
+        state.player.cash -= cost;
+        state.player.stars -= (reqStars || 0);
+
+        let filledAny = false;
+        if (state.businesses && Array.isArray(state.businesses)) {
+            state.businesses.forEach(b => {
+                if (b && b.level > 0) {
+                    if (targetBiz === 'all' || b.id === targetBiz) {
+                        let maxStk = b.maxStock || 100;
+                        b.stock = Math.min(maxStk, (b.stock || 0) + value);
+                        filledAny = true;
+                    }
+                }
+            });
+        }
+
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast(filledAny ? "Склады предприятий успешно пополнены сырьем!" : "Сырьё оплачено и поступит на склад после открытия точки!");
+        this.renderCategoryItems();
+    },
+
+    buyDocAction(docId, cost, reqStars) {
+        const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 2500;
+        let cash = state.player?.cash || 0;
+        let stars = state.player?.stars || 0;
+
+        if (cash < cost) return showToast("Не хватает денег на оформление документа!");
+        if (stars < (reqStars || 0)) return showToast(`Нужно ${reqStars} ⭐ (${(reqStars * starRate).toLocaleString()} ₽)!`);
+
+        state.player.cash -= cost;
+        state.player.stars -= (reqStars || 0);
+
+        if (docId === 'raf_license') {
+            state.player.hasRacingLicense = true;
+            if (!state.player.unlockedApps) state.player.unlockedApps = [];
+            if (!state.player.unlockedApps.includes('street')) {
+                state.player.unlockedApps.push('street');
+            }
+            if (typeof openVerdictModal === 'function') {
+                openVerdictModal("ЛИЦЕНЗИЯ ПИЛОТА РАФ! 🏎️", "Официальная лицензия оформлена. Допуск к ночным заездам на 402м открыт!", true);
+            }
+        } else if (docId === 'gps_tracker') {
+            state.player.hasGpsTracker = true;
+            showToast("GPS-маяк активирован в защитной системе гаража!");
+        } else if (docId === 'customs_pass') {
+            state.player.hasCustomsPass = true;
+            showToast("Таможенный пропуск в Порт зарегистрирован!");
+        } else if (docId === 'insurance_osago') {
+            showToast("Полис «КАСКО/Анти-Угон» сохранён в вашем аккаунте. Активация — через меню Инспекции авто.");
+        }
+
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        this.renderCategoryItems();
+    },
+
+    buyFurnitureAction(itemId, cost, reqStars) {
+        const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 2500;
+        let cash = state.player?.cash || 0;
+        let stars = state.player?.stars || 0;
+
+        if (cash < cost) return showToast("Не хватает денег на покупку мебели!");
+        if (stars < (reqStars || 0)) return showToast(`Нужно ${reqStars} ⭐ (${(reqStars * starRate).toLocaleString()} ₽)!`);
+
+        state.player.cash -= cost;
+        state.player.stars -= (reqStars || 0);
+
+        if (!state.player.furniture) state.player.furniture = [];
+        state.player.furniture.push(itemId);
+
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast("Установлено в вашей мастерской!");
+        this.renderCategoryItems();
+    }
+};
+
+// ========================================================
+// ПРИЛОЖЕНИЕ «БЛОКНОТ ЦЕЛЕЙ» (AppNotepad)
+// ⭐ v1.4.0: fallback-goals если NOTEPAD_CAREER_GOALS не загрузился
+// ========================================================
+const AppNotepad = {
+    // ⭐ v1.4.0: встроенный fallback-набор целей
+    _fallbackGoals: [
+        { id: "g_mil",     category: "Капитал", title: "Первый Миллион Чистыми", desc: "Заработать суммарно более 1,000,000 ₽ чистой прибыли на сделках.", targetProfit: 1000000, reward: "Титул: «Делец со Стажем» (+5 ⭐)" },
+        { id: "g_ten",     category: "Оборот",  title: "Мастер ДКП (10 Продаж)",  desc: "Закрыть 10 успешных прибыльных сделок купли-продажи.",            targetSales: 10,    reward: "+100k ₽ бонус кэша" },
+        { id: "g_garage",  category: "Автопарк",title: "Гаражный Магнат",         desc: "Расширить гараж до 5 боксов и заполнить их проверенными авто.",   targetSlots: 5,     reward: "Скидка 15% на все детали тюнинга" },
+        { id: "g_contract",category: "ПодКлюч", title: "Поставщик ПодКлюч",       desc: "Выполнить 5 эксклюзивных контрактов под ключ.",                   targetContracts: 5, reward: "+5 🤝 Теневых Связей" },
+        { id: "g_plate",   category: "Коллекция",title: "Властелин Спецсерий",   desc: "Собрать в коллекции госномера серий 777, ЕКХ или АМР.",          targetPlatesCount: 3,reward: "+25 ⭐ Stars" },
+        { id: "g_drift",   category: "Улица",   title: "Легенда RDS GP",          desc: "Построить корч мощностью свыше 450 л.с. с каркасом и победить.", targetCred: 600,    reward: "Особый статус на авторынке" },
+        { id: "g_island",  category: "Олигарх", title: "Абсолютная Вершина",      desc: "Выкупить частный остров с виллой и причалом для супер-яхт.",     targetHousing: "island", reward: "Золотой статус перекупа #1" }
+    ],
+
+    render(container) {
+        if (!container) return;
+
+        let s = state.player?.stats || {};
+        let profit = s.totalNetProfit || 0;
+        let sold = s.sold || 0;
+
+        // ⭐ v1.4.0: безопасный доступ к целям
+        let goals = (typeof NOTEPAD_CAREER_GOALS !== 'undefined' && Array.isArray(NOTEPAD_CAREER_GOALS) && NOTEPAD_CAREER_GOALS.length > 0)
+            ? NOTEPAD_CAREER_GOALS
+            : this._fallbackGoals;
+
+        let goalsHtml = goals.map(g => {
+            let done = false;
+            if (g.targetProfit && profit >= g.targetProfit) done = true;
+            if (g.targetSales && sold >= g.targetSales) done = true;
+            if (g.targetSlots && (typeof getTotalGarageSlots === 'function' ? getTotalGarageSlots() : 2) >= g.targetSlots) done = true;
+            if (g.targetHousing && (state.player?.ownedHouses || []).includes(g.targetHousing)) done = true;
+            if (g.targetCred && (state.player?.streetCred || 0) >= g.targetCred) done = true;
+            if (g.targetPlatesCount && (state.ownedPlates || []).length >= g.targetPlatesCount) done = true;
+            if (g.targetContracts && (state.player?.stats?.contractsDone || 0) >= g.targetContracts) done = true;
+
+            return `
+            <div class="glass-card p-2 mb-2" style="border-left: 3px solid ${done ? 'var(--green)' : 'var(--cyan)'};">
+                <div class="flex-between mb-1">
+                    <b class="text-xs color-cyan">${g.title}</b>
+                    <span class="tag-badge ${done ? 'bg-tag-green' : 'bg-tag-cyan'}">${done ? 'ВЫПОЛНЕНО ✓' : (g.category || 'ЦЕЛЬ')}</span>
+                </div>
+                <div class="sub-label mb-1" style="font-size:9.5px; line-height:1.35;">${g.desc}</div>
+                <div class="color-amber font-bold text-xs" style="font-size:9px;">Награда: ${g.reward}</div>
+            </div>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="phone-app-header">
+                <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
+                <div class="phone-app-title color-amber"><i class="fa-solid fa-note-sticky mr-1"></i> Блокнот Целей</div>
+                <div style="width:40px;"></div>
+            </div>
+            <div class="phone-app-body">
+                <div class="glass-card p-2 mb-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(255, 179, 0, 0.12), #090e18);">
+                    <div>
+                        <span class="sub-label" style="font-size:9px;">Чистая прибыль:</span>
+                        <div class="color-green font-bold text-xs" style="font-size:13px;">${profit.toLocaleString()} ₽</div>
+                    </div>
+                    <div>
+                        <span class="sub-label" style="font-size:9px;">Продано авто:</span>
+                        <div class="color-cyan font-bold text-xs" style="font-size:13px;">${sold} шт.</div>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    ${goalsHtml}
+                </div>
+            </div>
+        `;
+    }
+};
+
+// ========================================================
+// Экспорт в window
+// ========================================================
+window.PhoneManager = PhoneManager;
+window.AppNotepad = AppNotepad;
+window.AppShop = AppShop;
+// window.AppBusiness устанавливается в phone-business.js (алиас PhoneBusiness)
+// window.AppBarn устанавливается в phone-barn.js
+
+document.addEventListener('DOMContentLoaded', () => {
+    PhoneManager.init();
+});
+
+console.log('[📱 phone.js v1.4.0] Операционка Perekup OS загружена ✓');
