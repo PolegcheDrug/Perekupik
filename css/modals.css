@@ -589,7 +589,7 @@
 }
 
 /* ========================================================
-   ⭐ v2.2.0: ИНТЕРАКТИВНАЯ АВТОТЕКА (ОФИЦИАЛЬНЫЙ ОТЧЁТ)
+   ⭐ v2.2.1: КОМПАКТНАЯ АВТОТЕКА (ОФИЦИАЛЬНЫЙ ОТЧЁТ)
    ======================================================== */
 .autoteka-official-blank {
   background: 
@@ -597,7 +597,7 @@
     linear-gradient(145deg, #0a1a12 0%, #05080f 100%) !important;
   border: 2px solid rgba(0, 230, 118, 0.45) !important;
   box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 25px rgba(0, 230, 118, 0.15) !important;
-  padding: 12px !important;
+  padding: 12px !important; /* Как у ДКП */
   position: relative !important;
   overflow: hidden !important;
   border-radius: var(--radius-xl);
@@ -630,7 +630,7 @@
 .autoteka-blank-border {
   border: 1px dashed rgba(0, 230, 118, 0.25);
   border-radius: 10px;
-  padding: 10px;
+  padding: 8px; /* Уменьшено */
   position: relative;
   z-index: 1;
 }
@@ -660,7 +660,7 @@
 }
 
 .autoteka-title-main {
-  font-size: 12.5px;
+  font-size: 11.5px; /* Уменьшено */
   font-weight: 900;
   color: #fff;
   letter-spacing: 1.2px;
@@ -684,8 +684,8 @@
 }
 
 .autoteka-section-compact {
-  margin-bottom: 6px;
-  padding: 6px 8px;
+  margin-bottom: 4px; /* Уменьшено */
+  padding: 4px 6px; /* Уменьшено */
   background: rgba(0, 230, 118, 0.025);
   border-left: 2px solid rgba(0, 230, 118, 0.5);
   border-radius: 4px;
@@ -713,8 +713,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 9.5px;
-  padding: 2px 0;
+  font-size: 9px; /* Уменьшено */
+  padding: 1px 0; /* Уменьшено */
   border-bottom: 1px dotted rgba(255, 255, 255, 0.04);
   gap: 6px;
 }
@@ -730,7 +730,7 @@
 }
 
 .autoteka-value {
-  font-size: 9.5px;
+  font-size: 9px; /* Уменьшено */
   color: #f1f5f9;
   font-weight: 700;
   text-align: right;
@@ -799,8 +799,8 @@
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  max-width: 440px !important;
-  max-height: 90vh !important;
+  max-width: 420px !important; /* Как у ДКП */
+  max-height: calc(100dvh - 32px) !important; /* Как у ДКП */
   overflow-y: auto !important;
 }
 
