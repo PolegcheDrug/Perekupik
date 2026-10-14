@@ -1,5 +1,5 @@
 // ========================================================
-// js/market-generator.js — ГЕНЕРАТОР ЛОТОВ, ЦЕН И ГОСНОМЕРОВ
+// js/market-generator.js — ГЕНЕРАТОР ЛОТОВ, ЦЕН И ГОСНОМЕРОВ (v1.1.0)
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -349,9 +349,14 @@ async function populateMarketFeed() {
             cPower = Math.round(cPower * (carTuning.chip === 2 ? 1.35 : 1.18));
         }
 
-        let rawImg = (Array.isArray(template.images) && template.images.length > 0)
-            ? template.images[0]
-            : (template.img || "assets/cars/economy/2101/vaz-2101.jpg");
+        // ВЫБОР ОДНОГО ИЗ 10 ФОТО ДЛЯ КАЖДОЙ МОДЕЛИ
+        let rawImg = "";
+        if (Array.isArray(template.images) && template.images.length > 0) {
+            const randImgIdx = Math.floor(Math.random() * template.images.length);
+            rawImg = template.images[randImgIdx];
+        } else {
+            rawImg = template.img || "assets/cars/economy/2101/vaz-2101.jpg";
+        }
             
         let cFallback = template.fallback || getCategoryFallback(tType);
 

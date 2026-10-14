@@ -1,13 +1,10 @@
 // ========================================================
-// js/theme-manager.js — МЕНЕДЖЕР ТЕМ, АНИМАЦИЙ И КАСТОМИЗАЦИИ (v2.0.0)
+// js/theme-manager.js — МЕНЕДЖЕР ТЕМ, АНИМАЦИЙ И КАСТОМИЗАЦИИ (v2.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
-// Разгрузка ядра app.js: темы HUD, звуковые профили,
-// анимации никнейма, ауры аватарок и титулы перекупа.
 // ========================================================
 
 const ThemeManager = {
-    activeCustomizerTab: 'colors', // 'colors' | 'nick' | 'avatar' | 'titles' | 'sound'
+    activeCustomizerTab: 'colors', // 'colors' | 'nick' | 'avatar' | 'titles'
 
     themes: [
         { 
@@ -91,9 +88,9 @@ const ThemeManager = {
     ],
 
     traderTitles: [
-        { id: 'cash_buyer', title: 'Быстрый выкуп за кэш 💸', minLvl: 1, cost: 0, desc: 'Деньги сразу на руки без проверок' },
+        { id: 'cash_buyer', title: 'Быстрый выкуп за кэш 💸', minLvl: 1, cost: 0, desc: 'Деньги сразу на руки без долгих проверок' },
         { id: 'classic_king', title: 'Король Боевой Классики 👑', minLvl: 3, cost: 45000, desc: 'Знает каждый винтик в жигулях и москвичах' },
-        { id: 'hood_master', title: 'Торг строго у капота 🤝', minLvl: 5, cost: 80000, desc: 'Ни рубля скидки в переписке — только по факту' },
+        { id: 'hood_master', title: 'Торг строго у капота 🤝', minLvl: 5, cost: 80000, desc: 'Ни рубля скидки по телефону — только аргументы по кузову' },
         { id: 'pro_scanner', title: 'Автоподбор от Бога 🔍', minLvl: 8, cost: 150000, desc: 'Видит шпаклёвку и смотанный пробег за версту' },
         { id: 'syndicate_boss', title: 'Синдикат 777 ⚡', minLvl: 15, cost: 500000, desc: 'Закрытые аукционы, распилы и оптовые поставки' }
     ],
@@ -111,7 +108,7 @@ const ThemeManager = {
 
     applyTheme() {
         const root = document.documentElement;
-        if (!state.player) return;
+        if (!window.state?.player) return;
 
         const curColorId = state.player.hudColorId || 'lightning';
         const customHex = state.player.customHexColor;
@@ -129,12 +126,11 @@ const ThemeManager = {
         } else {
             const found = this.themes.find(t => t.id === curColorId) || this.themes[0];
             targetHex = found.hex;
-            targetSecondaryHex = found.secondaryHex;
+            targetSecondaryHex = found.secondaryHex || "#0284c7";
             targetGlow = found.glow;
             isLightning = !!found.isLightning;
         }
 
-        // Обновляем CSS-переменные
         root.style.setProperty('--cyan', targetHex);
         root.style.setProperty('--cyan-glow', targetGlow);
         root.style.setProperty('--border-glow', this.hexToRgba(targetHex, 0.35));
@@ -142,7 +138,6 @@ const ThemeManager = {
         root.style.setProperty('--custom-fx-color', targetHex);
         root.style.setProperty('--custom-fx-glow', targetGlow);
 
-        // Корпус телефона Perekup OS
         const phoneDevice = document.querySelector('.phone-device-wrapper');
         if (phoneDevice) {
             if (isCyberThemeActive) {
@@ -151,7 +146,6 @@ const ThemeManager = {
                 phoneDevice.classList.remove('theme-cyber-icons');
             }
 
-            // Динамический неоновый контур под выбранный цвет
             phoneDevice.style.borderColor = targetHex;
             phoneDevice.style.boxShadow = `0 20px 50px rgba(0, 0, 0, 0.9), inset 0 0 25px ${targetGlow}, 0 0 30px ${this.hexToRgba(targetSecondaryHex, 0.35)}`;
 
@@ -162,7 +156,6 @@ const ThemeManager = {
             }
         }
 
-        // Эффект никнейма
         const nameEl = document.getElementById('playerName');
         const nickFxId = state.player.nickEffect || 'none';
         if (nameEl) {
@@ -175,7 +168,6 @@ const ThemeManager = {
             }
         }
 
-        // Эффект аватара
         const ringEl = document.querySelector('.avatar-ring');
         const avatarFxId = state.player.avatarEffect || 'none';
         if (ringEl) {
@@ -194,16 +186,16 @@ const ThemeManager = {
         if (typeof ModalManager !== 'undefined') {
             ModalManager.open('modalHudCustomizer');
         } else {
-            let m = document.getElementById('modalHudCustomizer');
+            const m = document.getElementById('modalHudCustomizer');
             if (m) m.classList.add('active');
         }
-        if (typeof playSound === 'function') playSound('tick');
+        if (window.AudioFx) window.AudioFx.play('tick');
     },
 
     switchTab(tab) {
         this.activeCustomizerTab = tab;
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('tick');
+        if (window.AudioFx) window.AudioFx.play('tick');
     },
 
     renderCustomizerModal() {
@@ -384,6 +376,7 @@ const ThemeManager = {
                     <div class="flex-gap">
                         <button onclick="ThemeManager.setSoundProfile('cyber')" class="btn ${sProfile === 'cyber' ? 'btn-cyan' : 'btn-dark'} btn-sm btn-auto" style="padding:4px 8px; font-size:9px;">Кибер</button>
                         <button onclick="ThemeManager.setSoundProfile('relay')" class="btn ${sProfile === 'relay' ? 'btn-cyan' : 'btn-dark'} btn-sm btn-auto" style="padding:4px 8px; font-size:9px;">Реле</button>
+                        <button onclick="ThemeManager.setSoundProfile('retro')" class="btn ${sProfile === 'retro' ? 'btn-cyan' : 'btn-dark'} btn-sm btn-auto" style="padding:4px 8px; font-size:9px;">Ретро</button>
                         <button onclick="ThemeManager.setSoundProfile('silent')" class="btn ${sProfile === 'silent' ? 'btn-cyan' : 'btn-dark'} btn-sm btn-auto" style="padding:4px 8px; font-size:9px;">Тишина</button>
                     </div>
                 </div>
@@ -399,9 +392,9 @@ const ThemeManager = {
         if (typeof saveState === 'function') saveState();
         this.applyTheme();
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('tick');
-        if (typeof tgHaptic === 'function') tgHaptic('light');
-        showToast("Тема оформления успешно активирована!");
+        if (window.AudioFx) window.AudioFx.play('tick');
+        if (window.AudioFx) window.AudioFx.haptic('light');
+        if (typeof showToast === 'function') showToast("Тема оформления успешно активирована!");
     },
 
     setCustomHex(hexValue) {
@@ -409,9 +402,9 @@ const ThemeManager = {
         if (typeof saveState === 'function') saveState();
         this.applyTheme();
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('tick');
-        if (typeof tgHaptic === 'function') tgHaptic('light');
-        showToast(`Установлен оттенок ${hexValue}!`);
+        if (window.AudioFx) window.AudioFx.play('tick');
+        if (window.AudioFx) window.AudioFx.haptic('light');
+        if (typeof showToast === 'function') showToast(`Установлен оттенок ${hexValue}!`);
     },
 
     toggleCyberTheme() {
@@ -419,17 +412,19 @@ const ThemeManager = {
         if (typeof saveState === 'function') saveState();
         this.applyTheme();
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast(state.player.themePresetId === 'cyber_black_neo' ? "Тема Cyber Black Neo активирована!" : "Тема иконок возвращена к классической.");
+        if (window.AudioFx) window.AudioFx.play('win');
+        if (window.AudioFx) window.AudioFx.haptic('success');
+        if (typeof showToast === 'function') {
+            showToast(state.player.themePresetId === 'cyber_black_neo' ? "Тема Cyber Black Neo активирована!" : "Тема иконок возвращена к классической.");
+        }
     },
 
     buyNickEffect(fxId, cost, reqStars = 0) {
         let cash = state.player?.cash || 0;
         let stars = state.player?.stars || 0;
 
-        if (cash < cost) return showToast("Не хватает рублей на покупку эффекта ника!");
-        if (stars < reqStars) return showToast(`Нужно ${reqStars} 💵 банкнот!`);
+        if (cash < cost) return typeof showToast === 'function' ? showToast("Не хватает рублей на покупку эффекта ника!") : null;
+        if (stars < reqStars) return typeof showToast === 'function' ? showToast(`Нужно ${reqStars} 💵 банкнот!`) : null;
 
         state.player.cash -= cost;
         state.player.stars -= reqStars;
@@ -444,9 +439,9 @@ const ThemeManager = {
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         this.applyTheme();
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Эффект никнейма приобретен и активирован!");
+        if (window.AudioFx) window.AudioFx.play('win');
+        if (window.AudioFx) window.AudioFx.haptic('success');
+        if (typeof showToast === 'function') showToast("Эффект никнейма приобретен и активирован!");
     },
 
     setNickEffect(fxId) {
@@ -454,17 +449,17 @@ const ThemeManager = {
         if (typeof saveState === 'function') saveState();
         this.applyTheme();
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('tick');
-        if (typeof tgHaptic === 'function') tgHaptic('light');
-        showToast("Эффект ника установлен!");
+        if (window.AudioFx) window.AudioFx.play('tick');
+        if (window.AudioFx) window.AudioFx.haptic('light');
+        if (typeof showToast === 'function') showToast("Эффект ника установлен!");
     },
 
     buyAvatarEffect(fxId, cost, reqStars = 0) {
         let cash = state.player?.cash || 0;
         let stars = state.player?.stars || 0;
 
-        if (cash < cost) return showToast("Не хватает рублей на покупку ауры аватарки!");
-        if (stars < reqStars) return showToast(`Нужно ${reqStars} 💵 банкнот!`);
+        if (cash < cost) return typeof showToast === 'function' ? showToast("Не хватает рублей на покупку ауры аватарки!") : null;
+        if (stars < reqStars) return typeof showToast === 'function' ? showToast(`Нужно ${reqStars} 💵 банкнот!`) : null;
 
         state.player.cash -= cost;
         state.player.stars -= reqStars;
@@ -479,9 +474,9 @@ const ThemeManager = {
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         this.applyTheme();
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Аура аватарки приобретена и активирована!");
+        if (window.AudioFx) window.AudioFx.play('win');
+        if (window.AudioFx) window.AudioFx.haptic('success');
+        if (typeof showToast === 'function') showToast("Аура аватарки приобретена и активирована!");
     },
 
     setAvatarEffect(fxId) {
@@ -489,14 +484,14 @@ const ThemeManager = {
         if (typeof saveState === 'function') saveState();
         this.applyTheme();
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('tick');
-        if (typeof tgHaptic === 'function') tgHaptic('light');
-        showToast("Эффект аватарки установлен!");
+        if (window.AudioFx) window.AudioFx.play('tick');
+        if (window.AudioFx) window.AudioFx.haptic('light');
+        if (typeof showToast === 'function') showToast("Эффект аватарки установлен!");
     },
 
     buyTraderTitle(titleId, cost) {
         let cash = state.player?.cash || 0;
-        if (cash < cost) return showToast("Не хватает денег на покупку титула!");
+        if (cash < cost) return typeof showToast === 'function' ? showToast("Не хватает денег на покупку титула!") : null;
 
         state.player.cash -= cost;
         if (!state.player.ownedTitles) state.player.ownedTitles = ['cash_buyer'];
@@ -509,9 +504,9 @@ const ThemeManager = {
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Новый титул перекупа активирован!");
+        if (window.AudioFx) window.AudioFx.play('win');
+        if (window.AudioFx) window.AudioFx.haptic('success');
+        if (typeof showToast === 'function') showToast("Новый титул перекупа активирован!");
     },
 
     setTraderTitle(titleId) {
@@ -521,8 +516,8 @@ const ThemeManager = {
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
             this.renderCustomizerModal();
-            if (typeof playSound === 'function') playSound('tick');
-            showToast("Титул перекупа обновлен!");
+            if (window.AudioFx) window.AudioFx.play('tick');
+            if (typeof showToast === 'function') showToast("Титул перекупа обновлен!");
         }
     },
 
@@ -530,15 +525,21 @@ const ThemeManager = {
         state.player.soundProfile = profile;
         if (typeof saveState === 'function') saveState();
         this.renderCustomizerModal();
-        if (typeof playSound === 'function') playSound('tick');
-        if (typeof tgHaptic === 'function') tgHaptic('light');
-        showToast("Звуковой профиль обновлен!");
+        if (window.AudioFx) window.AudioFx.play('tick');
+        if (window.AudioFx) window.AudioFx.haptic('light');
+        if (typeof showToast === 'function') showToast("Звуковой профиль обновлен!");
     }
 };
 
-// Экспорт глобальных функций для обратной совместимости с кнопками в HUD
 window.ThemeManager = ThemeManager;
+window.HUD_SOLID_COLORS = ThemeManager.themes;
+window.NICKNAME_EFFECTS_CATALOG = ThemeManager.nickEffects;
+window.AVATAR_EFFECTS_CATALOG = ThemeManager.avatarEffects;
+
+// Глобальные алиасы
 window.openHudCustomizerModal = () => ThemeManager.openCustomizer();
+window.switchCustomizerTab = (tab) => ThemeManager.switchTab(tab);
+window.renderHudCustomizerContent = () => ThemeManager.renderCustomizerModal();
 window.applyHudCustomization = () => ThemeManager.applyTheme();
 window.setHudSolidColor = (id) => ThemeManager.setThemeColor(id);
 window.setHudCustomHexColor = (hex) => ThemeManager.setCustomHex(hex);
