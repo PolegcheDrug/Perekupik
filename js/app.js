@@ -4,9 +4,10 @@
 // ПОЛНЫЙ ФАЙЛ БЕЗ СОКРАЩЕНИЙ.
 // Анимированный роллер чисел HUD, учет инвентаря, Почта/Склад,
 // неоновые банкноты, кастомизация HUD, анимированные ники и ауры аватаров.
+// Безопасное монтирование в window без конфликтов переопределения const.
 // ========================================================
 
-const CURRENT_GAME_VERSION = "v1.2.3";
+window.CURRENT_GAME_VERSION = "v1.2.3";
 
 let ACtx = window.AudioContext || window.webkitAudioContext;
 let audioCtx = null;
@@ -25,35 +26,38 @@ let activeNumberAnimators = {};
 // ========================================================
 // КАТАЛОГИ КАСТОМИЗАЦИИ HUD, НИКНЕЙМОВ И АВАТАРОК
 // ========================================================
-const HUD_SOLID_COLORS = [
-    { id: 'lightning', name: 'Cyber Neon (Молния)', hex: '#00f2fe', secondaryHex: '#7928ca', glow: 'rgba(0, 242, 254, 0.45)', isLightning: true },
-    { id: 'sakura', name: 'Tokyo Sakura (Дрифт)', hex: '#f43f5e', secondaryHex: '#c084fc', glow: 'rgba(244, 63, 94, 0.45)', isLightning: false },
-    { id: 'gold', name: 'Syndicate Gold (Олигарх)', hex: '#ffd700', secondaryHex: '#b45309', glow: 'rgba(255, 215, 0, 0.45)', isLightning: false },
-    { id: 'redline', name: 'Redline Beast (Алый)', hex: '#ff3366', secondaryHex: '#991b1b', glow: 'rgba(255, 51, 102, 0.45)', isLightning: false },
-    { id: 'matrix', name: 'Matrix Emerald (Терминал)', hex: '#00e676', secondaryHex: '#064e3b', glow: 'rgba(0, 230, 118, 0.45)', isLightning: false },
-    { id: 'frost', name: 'Arctic Frost (Лазурь)', hex: '#38bdf8', secondaryHex: '#1d4ed8', glow: 'rgba(56, 189, 248, 0.45)', isLightning: false }
-];
-window.HUD_SOLID_COLORS = HUD_SOLID_COLORS;
+if (!window.HUD_SOLID_COLORS || !Array.isArray(window.HUD_SOLID_COLORS)) {
+    window.HUD_SOLID_COLORS = [
+        { id: 'lightning', name: 'Cyber Neon (Молния)', hex: '#00f2fe', secondaryHex: '#7928ca', glow: 'rgba(0, 242, 254, 0.45)', isLightning: true },
+        { id: 'sakura', name: 'Tokyo Sakura (Дрифт)', hex: '#f43f5e', secondaryHex: '#c084fc', glow: 'rgba(244, 63, 94, 0.45)', isLightning: false },
+        { id: 'gold', name: 'Syndicate Gold (Олигарх)', hex: '#ffd700', secondaryHex: '#b45309', glow: 'rgba(255, 215, 0, 0.45)', isLightning: false },
+        { id: 'redline', name: 'Redline Beast (Алый)', hex: '#ff3366', secondaryHex: '#991b1b', glow: 'rgba(255, 51, 102, 0.45)', isLightning: false },
+        { id: 'matrix', name: 'Matrix Emerald (Терминал)', hex: '#00e676', secondaryHex: '#064e3b', glow: 'rgba(0, 230, 118, 0.45)', isLightning: false },
+        { id: 'frost', name: 'Arctic Frost (Лазурь)', hex: '#38bdf8', secondaryHex: '#1d4ed8', glow: 'rgba(56, 189, 248, 0.45)', isLightning: false }
+    ];
+}
 
-const NICKNAME_EFFECTS_CATALOG = [
-    { id: 'none', name: 'Классический белый', className: '', desc: 'Стандартный читаемый никнейм', cost: 0, reqStars: 0 },
-    { id: 'lightning_spark', name: '⚡ Неоновый перелив', className: 'nick-fx-lightning', desc: 'Светящиеся переливы кибер-электричества', cost: 75000, reqStars: 2 },
-    { id: 'fire_flicker', name: '🔥 Пламя отсечки', className: 'nick-fx-fire', desc: 'Огненное мерцание прямо из прямотока', cost: 120000, reqStars: 3 },
-    { id: 'gold_shimmer', name: '👑 Золотой слиток', className: 'nick-fx-gold', desc: 'Блеск чистого золота Синдиката', cost: 250000, reqStars: 5 },
-    { id: 'matrix_scan', name: '💻 Цифровой код', className: 'nick-fx-matrix', desc: 'Неоновые терминальные символы', cost: 95000, reqStars: 2 },
-    { id: 'sakura_drift', name: '🌸 Tokyo Sakura', className: 'nick-fx-sakura', desc: 'Нежный розово-пурпурный градиент JDM', cost: 140000, reqStars: 4 }
-];
-window.NICKNAME_EFFECTS_CATALOG = NICKNAME_EFFECTS_CATALOG;
+if (!window.NICKNAME_EFFECTS_CATALOG || !Array.isArray(window.NICKNAME_EFFECTS_CATALOG)) {
+    window.NICKNAME_EFFECTS_CATALOG = [
+        { id: 'none', name: 'Классический белый', className: '', desc: 'Стандартный читаемый никнейм', cost: 0, reqStars: 0 },
+        { id: 'lightning_spark', name: '⚡ Неоновый перелив', className: 'nick-fx-lightning', desc: 'Светящиеся переливы кибер-электричества', cost: 75000, reqStars: 2 },
+        { id: 'fire_flicker', name: '🔥 Пламя отсечки', className: 'nick-fx-fire', desc: 'Огненное мерцание прямо из прямотока', cost: 120000, reqStars: 3 },
+        { id: 'gold_shimmer', name: '👑 Золотой слиток', className: 'nick-fx-gold', desc: 'Блеск чистого золота Синдиката', cost: 250000, reqStars: 5 },
+        { id: 'matrix_scan', name: '💻 Цифровой код', className: 'nick-fx-matrix', desc: 'Неоновые терминальные символы', cost: 95000, reqStars: 2 },
+        { id: 'sakura_drift', name: '🌸 Tokyo Sakura', className: 'nick-fx-sakura', desc: 'Нежный розово-пурпурный градиент JDM', cost: 140000, reqStars: 4 }
+    ];
+}
 
-const AVATAR_EFFECTS_CATALOG = [
-    { id: 'none', name: 'Стандартный ободок', className: '', desc: 'Базовое кольцо аватара', cost: 0, reqStars: 0 },
-    { id: 'lightning_shield', name: '⚡ Кольцо молний', className: 'avatar-fx-lightning-ring', desc: 'Вращающееся неоновое кольцо 24/7', cost: 90000, reqStars: 2 },
-    { id: 'fire_shield', name: '🔥 Огненная плазма', className: 'avatar-fx-fire-ring', desc: 'Пульсирующий огненный ореол вокруг фото', cost: 135000, reqStars: 3 },
-    { id: 'gold_shield', name: '👑 Корона Синдиката', className: 'avatar-fx-gold-ring', desc: 'Вращающаяся золотая аура успеха', cost: 300000, reqStars: 6 },
-    { id: 'matrix_shield', name: '💻 Кибер-щит', className: 'avatar-fx-matrix-ring', desc: 'Зелёный импульс хакерского Launch', cost: 110000, reqStars: 2 },
-    { id: 'sakura_shield', name: '🌸 Лепестки Сакуры', className: 'avatar-fx-sakura-ring', desc: 'Вращающийся японский градиент', cost: 150000, reqStars: 4 }
-];
-window.AVATAR_EFFECTS_CATALOG = AVATAR_EFFECTS_CATALOG;
+if (!window.AVATAR_EFFECTS_CATALOG || !Array.isArray(window.AVATAR_EFFECTS_CATALOG)) {
+    window.AVATAR_EFFECTS_CATALOG = [
+        { id: 'none', name: 'Стандартный ободок', className: '', desc: 'Базовое кольцо аватара', cost: 0, reqStars: 0 },
+        { id: 'lightning_shield', name: '⚡ Кольцо молний', className: 'avatar-fx-lightning-ring', desc: 'Вращающееся неоновое кольцо 24/7', cost: 90000, reqStars: 2 },
+        { id: 'fire_shield', name: '🔥 Огненная плазма', className: 'avatar-fx-fire-ring', desc: 'Пульсирующий огненный ореол вокруг фото', cost: 135000, reqStars: 3 },
+        { id: 'gold_shield', name: '👑 Корона Синдиката', className: 'avatar-fx-gold-ring', desc: 'Вращающаяся золотая аура успеха', cost: 300000, reqStars: 6 },
+        { id: 'matrix_shield', name: '💻 Кибер-щит', className: 'avatar-fx-matrix-ring', desc: 'Зелёный импульс хакерского Launch', cost: 110000, reqStars: 2 },
+        { id: 'sakura_shield', name: '🌸 Лепестки Сакуры', className: 'avatar-fx-sakura-ring', desc: 'Вращающийся японский градиент', cost: 150000, reqStars: 4 }
+    ];
+}
 
 // ========================================================
 // 1. ДИНАМИЧЕСКИЙ ВЫБОР ФОТО АВТОМОБИЛЯ ИЗ ПАПКИ МОДЕЛИ
@@ -566,7 +570,7 @@ function openPatchNotesModal() {
 function dismissPatchNotesModal() {
     ModalManager.close('modalPatchNotes');
     try {
-        localStorage.setItem('perekup_last_seen_version', CURRENT_GAME_VERSION);
+        localStorage.setItem('perekup_last_seen_version', window.CURRENT_GAME_VERSION);
     } catch(e) {}
 }
 
@@ -696,7 +700,8 @@ function applyHudCustomization() {
         targetHex = customHex;
         targetGlow = hexToRgba(customHex, 0.45);
     } else {
-        const found = HUD_SOLID_COLORS.find(c => c.id === curColorId) || HUD_SOLID_COLORS[0];
+        const solidColors = window.HUD_SOLID_COLORS || [];
+        const found = solidColors.find(c => c.id === curColorId) || solidColors[0] || { hex: '#00f2fe', secondaryHex: '#7928ca', glow: 'rgba(0, 242, 254, 0.45)', isLightning: true };
         targetHex = found.hex;
         targetSecondaryHex = found.secondaryHex || "#0284c7";
         targetGlow = found.glow;
@@ -732,11 +737,12 @@ function applyHudCustomization() {
     // Применение анимации ника
     const nameEl = document.getElementById('playerName');
     const nickFxId = state.player?.nickEffect || 'none';
+    const nickCatalog = window.NICKNAME_EFFECTS_CATALOG || [];
     if (nameEl) {
-        NICKNAME_EFFECTS_CATALOG.forEach(fx => {
+        nickCatalog.forEach(fx => {
             if (fx.className) nameEl.classList.remove(fx.className);
         });
-        const activeFx = NICKNAME_EFFECTS_CATALOG.find(fx => fx.id === nickFxId);
+        const activeFx = nickCatalog.find(fx => fx.id === nickFxId);
         if (activeFx && activeFx.className) {
             nameEl.classList.add(activeFx.className);
         }
@@ -745,11 +751,12 @@ function applyHudCustomization() {
     // Применение ауры аватара
     const ringEl = document.querySelector('.avatar-ring');
     const avatarFxId = state.player?.avatarEffect || 'none';
+    const avatarCatalog = window.AVATAR_EFFECTS_CATALOG || [];
     if (ringEl) {
-        AVATAR_EFFECTS_CATALOG.forEach(fx => {
+        avatarCatalog.forEach(fx => {
             if (fx.className) ringEl.classList.remove(fx.className);
         });
-        const activeAvatarFx = AVATAR_EFFECTS_CATALOG.find(fx => fx.id === avatarFxId);
+        const activeAvatarFx = avatarCatalog.find(fx => fx.id === avatarFxId);
         if (activeAvatarFx && activeAvatarFx.className) {
             ringEl.classList.add(activeAvatarFx.className);
         }
@@ -796,7 +803,7 @@ function renderHudCustomizerContent() {
 
     if (activeCustomizerTab === 'colors') {
         let colorsGrid = "";
-        HUD_SOLID_COLORS.forEach(c => {
+        (window.HUD_SOLID_COLORS || []).forEach(c => {
             const isSel = curColorId === c.id && !state.player?.customHexColor;
             let lightningBadge = c.isLightning ? `<span class="tag-badge bg-tag-purple" style="font-size:7px; position:absolute; top:-4px; left:-4px;">⚡ НЕОН</span>` : "";
             colorsGrid += `
@@ -834,7 +841,7 @@ function renderHudCustomizerContent() {
         `;
     } else if (activeCustomizerTab === 'nick') {
         let listHtml = "";
-        NICKNAME_EFFECTS_CATALOG.forEach(fx => {
+        (window.NICKNAME_EFFECTS_CATALOG || []).forEach(fx => {
             const isOwned = ownedNicks.includes(fx.id);
             const isCur = curNickFx === fx.id;
 
@@ -864,7 +871,7 @@ function renderHudCustomizerContent() {
         bodyHtml = `<div class="sub-label mb-2" style="font-size:10px;">Анимированные эффекты для имени перекупа:</div><div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto;">${listHtml}</div>`;
     } else if (activeCustomizerTab === 'avatar') {
         let listHtml = "";
-        AVATAR_EFFECTS_CATALOG.forEach(fx => {
+        (window.AVATAR_EFFECTS_CATALOG || []).forEach(fx => {
             const isOwned = ownedAvatars.includes(fx.id);
             const isCur = curAvatarFx === fx.id;
 
@@ -2087,7 +2094,7 @@ function renderProfileAnalytics() {
                     🎨 Скин & Эффекты
                 </button>
                 <button onclick="openPatchNotesModal()" class="btn btn-dark btn-sm btn-auto" style="font-size:10px;">
-                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут ${CURRENT_GAME_VERSION}
+                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут ${window.CURRENT_GAME_VERSION}
                 </button>
             </div>
         </div>
@@ -2234,7 +2241,7 @@ function switchTab(tabId) {
 function checkAutoShowPatchNotes() {
     try {
         const lastSeen = localStorage.getItem('perekup_last_seen_version');
-        if (lastSeen !== CURRENT_GAME_VERSION) {
+        if (lastSeen !== window.CURRENT_GAME_VERSION) {
             setTimeout(() => { openPatchNotesModal(); }, 800);
         }
     } catch(e) {}
