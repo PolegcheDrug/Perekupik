@@ -1,5 +1,5 @@
 // ========================================================
-// firebase-bridge.js — СЕТЕВОЙ ШЛЮЗ FIRESTORE 2.0 (v1.1.0)
+// firebase-bridge.js — СЕТЕВОЙ ШЛЮЗ FIRESTORE 2.2.0 (v1.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Полная реализация структуры коллекций Firestore:
 // 1. players/{telegram_id} — публичные профили перекупов
@@ -11,6 +11,8 @@
 // 7. chat_messages/{msg_id} — P2P и клубные сообщения
 // 8. notifications/{notif_id} — системные уведомления
 // 9. registered_plates & cars_catalog — номера и авто с GitHub
+// ⭐ v1.3.0: pushSave игнорируется во время сброса прогресса
+// ⭐ v1.3.0: добавлено логирование Firestore-операций в DevLogger
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -50,6 +52,15 @@ const db = getFirestore(app);
 const DEFAULT_AUTH_SERVER_URL = "http://localhost:3000";
 
 // ========================================================
+// ⭐ ХЕЛПЕР ЛОГИРОВАНИЯ FIRESTORE В DEVLOGGER
+// ========================================================
+function devLogFirestore(action, details) {
+    if (window.DevLogger) {
+        window.DevLogger.add('firestore', action + (details ? ' — ' + details : ''));
+    }
+}
+
+// ========================================================
 // 0. TELEGRAM AUTH & SESSION MANAGER
 // ========================================================
 let verifiedUserId = null;
@@ -86,9 +97,11 @@ const TelegramAuthManager = {
       currentUserProfile = data.user;
 
       console.log(`[🔐 Auth] Сессия подтверждена. UID: ${verifiedUserId}`);
+      devLogFirestore('Auth OK', `UID: ${verifiedUserId}`);
       return { success: true, userId: verifiedUserId, user: currentUserProfile };
     } catch (err) {
       console.warn("[🔐 Auth] Фолбек на локальный профиль:", err);
+      devLogFirestore('Auth fallback', err.message || String(err));
       const fallback = getCurrentPlayerProfile();
       verifiedUserId = fallback.id;
       currentUserProfile = fallback;
@@ -182,6 +195,13 @@ let lastSavedHash = "";
 
 const PlayersStorageManager = {
   pushSave(userId, gameState) {
+    // ⭐ v1.2.0: Защита от сохранения после сброса
+    if (window.__IS_RESETTING__) {
+      console.log('[FB_Bridge] Игнорирую pushSave — идёт сброс прогресса.');
+      devLogFirestore('pushSave ЗАБЛОКИРОВАН', 'идёт сброс прогресса');
+      return;
+    }
+
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) return;
 
@@ -236,15 +256,25 @@ const PlayersStorageManager = {
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = setTimeout(async () => {
       try {
+        // ⭐ Повторная проверка — вдруг сброс начался за время дебаунса
+        if (window.__IS_RESETTING__) {
+          devLogFirestore('pushSave ОТМЕНЁН', 'сброс начался во время дебаунса');
+          return;
+        }
+
+        const t0 = performance.now();
         await Promise.all([
           setDoc(doc(db, "players", String(targetUid)), playerDoc, { merge: true }),
           setDoc(doc(db, "garages", String(targetUid)), garageDoc, { merge: true }),
-          setDoc(doc(db, "saves", String(targetUid)), { ...playerDoc, ...garageDoc }, { merge: true }) // обратная совместимость
+          setDoc(doc(db, "saves", String(targetUid)), { ...playerDoc, ...garageDoc }, { merge: true })
         ]);
+        const dt = Math.round(performance.now() - t0);
         lastSavedHash = currentHash;
         console.log(`[☁️ Firestore] players/ и garages/ синхронизированы для ${targetUid}`);
+        devLogFirestore('pushSave OK', `players/garages → ${targetUid} (${dt}ms)`);
       } catch (e) {
         console.warn("[☁️ Firestore] Ошибка записи players/garages:", e);
+        devLogFirestore('pushSave ERROR', e.message || String(e));
       }
     }, 3500);
   },
@@ -253,14 +283,17 @@ const PlayersStorageManager = {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) return null;
     try {
+      const t0 = performance.now();
       const [playerSnap, garageSnap] = await Promise.all([
         getDoc(doc(db, "players", String(targetUid))),
         getDoc(doc(db, "garages", String(targetUid)))
       ]);
+      const dt = Math.round(performance.now() - t0);
 
       if (playerSnap.exists() || garageSnap.exists()) {
         const pData = playerSnap.exists() ? playerSnap.data() : {};
         const gData = garageSnap.exists() ? garageSnap.data() : {};
+        devLogFirestore('pullSave OK', `${targetUid} (${dt}ms, ${(gData.cars || []).length} авто)`);
         return {
           player: { ...pData },
           garage: gData.cars || [],
@@ -270,11 +303,15 @@ const PlayersStorageManager = {
         };
       }
 
-      // Фолбек на старый путь saves/
       const oldSnap = await getDoc(doc(db, "saves", String(targetUid)));
-      if (oldSnap.exists()) return oldSnap.data();
+      if (oldSnap.exists()) {
+        devLogFirestore('pullSave (legacy saves/)', `${targetUid}`);
+        return oldSnap.data();
+      }
+      devLogFirestore('pullSave MISS', `${targetUid} — документов нет`);
     } catch (e) {
       console.warn("[☁️ Firestore] Ошибка загрузки профиля:", e);
+      devLogFirestore('pullSave ERROR', e.message || String(e));
     }
     return null;
   }
@@ -294,7 +331,6 @@ const MarketLotsManager = {
       const lotId = "lot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
       const rawPrice = Math.max(1000, parseInt(lotData.price) || 50000);
 
-      // Проверяем и гарантируем уникальные VIN и UID при продаже авто
       if (lotData.itemData && (lotData.type === 'car' || lotData.type === 'cars')) {
         if (typeof window.ensureCarIdentity === 'function') {
           lotData.itemData = window.ensureCarIdentity(lotData.itemData);
@@ -330,13 +366,15 @@ const MarketLotsManager = {
 
       await Promise.all([
         setDoc(doc(db, "market_lots", lotId), payload),
-        setDoc(doc(db, "p2p_market", lotId), payload) // зеркало обратной совместимости
+        setDoc(doc(db, "p2p_market", lotId), payload)
       ]);
 
       CacheManager.marketLots = null;
+      devLogFirestore('publishLot OK', `${lotId} — «${lotData.name}» за ${rawPrice.toLocaleString()} ₽`);
       return { success: true, lotId };
     } catch (e) {
       console.error("[market_lots] Ошибка создания лота:", e);
+      devLogFirestore('publishLot ERROR', e.message || String(e));
       return { success: false, error: e.message };
     }
   },
@@ -362,9 +400,11 @@ const MarketLotsManager = {
 
       CacheManager.marketLots = lots;
       CacheManager.marketTimestamp = now;
+      devLogFirestore('fetchLots OK', `получено ${lots.length} активных лотов`);
       return lots;
     } catch (e) {
       console.warn("[market_lots] Фолбек на p2p_market:", e);
+      devLogFirestore('fetchLots ERROR', e.message || String(e));
       return CacheManager.marketLots || [];
     }
   },
@@ -391,7 +431,6 @@ const MarketLotsManager = {
         const marketFee = Math.round(lot.price * MARKET_FEE_PERCENT);
         const sellerPayout = lot.price - marketFee;
 
-        // 1. Помечаем лот проданным
         tx.update(lotRef, {
           status: "sold",
           buyerId: String(profile.id),
@@ -399,7 +438,6 @@ const MarketLotsManager = {
           soldAt: Date.now()
         });
 
-        // 2. Записываем транзакцию в transactions/{tx_id}
         tx.set(txRef, {
           tx_id: txId,
           lot_id: String(lotId),
@@ -415,7 +453,6 @@ const MarketLotsManager = {
           timestamp: Date.now()
         });
 
-        // 3. Создаем уведомление продавцу notifications/{notif_id}
         tx.set(notifRef, {
           toUser: String(lot.sellerId),
           type: "deal_payout",
@@ -427,7 +464,6 @@ const MarketLotsManager = {
           timestamp: Date.now()
         });
 
-        // 4. Перепривязка номера в реестре, если продавался госномер
         if (lot.type === "plate" || lot.type === "plates") {
           const plateStr = lot.itemData?.plate || lot.name;
           const clean = RegisteredPlatesManager.cleanPlateString(plateStr);
@@ -448,8 +484,10 @@ const MarketLotsManager = {
       });
 
       CacheManager.marketLots = null;
+      devLogFirestore('buyLotAtomic OK', `${lotId} за ${transactionResult.price?.toLocaleString() || '?'} ₽`);
       return { success: true, lot: transactionResult };
     } catch (e) {
+      devLogFirestore('buyLotAtomic ERROR', `${lotId} — ${e.message}`);
       return { success: false, error: e.message };
     }
   },
@@ -467,10 +505,13 @@ const MarketLotsManager = {
         }
         await deleteDoc(lotRef);
         CacheManager.marketLots = null;
+        devLogFirestore('cancelLot OK', lotId);
         return true;
       }
+      devLogFirestore('cancelLot SKIP', `${lotId} — не владелец или лот не найден`);
     } catch (e) {
       console.warn("[market_lots] Ошибка снятия лота:", e);
+      devLogFirestore('cancelLot ERROR', e.message || String(e));
     }
     return false;
   }
@@ -498,9 +539,11 @@ const ChatMessagesManager = {
 
     try {
       await setDoc(msgRef, payload);
+      devLogFirestore('sendMessage OK', `msg в диалог ${params.dialogId || 'клуб'}`);
       return { success: true, msg: payload };
     } catch (e) {
       console.warn("[chat_messages] Ошибка отправки:", e);
+      devLogFirestore('sendMessage ERROR', e.message || String(e));
       return { success: false, error: e.message };
     }
   },
@@ -545,6 +588,7 @@ const NotificationsManager = {
           notifs.push({ id: d.id, ...it });
         }
       });
+      devLogFirestore('fetchNotifications OK', `найдено ${notifs.length} непрочитанных`);
       return notifs;
     } catch (e) {
       return [];
@@ -555,6 +599,7 @@ const NotificationsManager = {
     try {
       const nRef = doc(db, "notifications", notifId);
       await updateDoc(nRef, { claimed: true, read: true, claimedAt: Date.now() });
+      devLogFirestore('claimNotification OK', notifId);
       return true;
     } catch (e) {
       return false;
@@ -563,7 +608,7 @@ const NotificationsManager = {
 };
 
 // ========================================================
-// 7. КОЛЛЕКЦИЯ: registered_plates & cars_catalog (GITHUB RAW)
+// 7. КОЛЛЕКЦИЯ: registered_plates & cars_catalog
 // ========================================================
 const RegisteredPlatesManager = {
   cleanPlateString(plateStr) {
@@ -603,8 +648,10 @@ const RegisteredPlatesManager = {
         return payload;
       });
 
+      devLogFirestore('claimPlate OK', cleanPlate);
       return { success: true, plate: result.plate };
     } catch (e) {
+      devLogFirestore('claimPlate ERROR', `${cleanPlate} — ${e.message}`);
       return { success: false, error: e.message };
     }
   },
@@ -634,8 +681,10 @@ const RegisteredPlatesManager = {
           updatedAt: Date.now()
         });
       });
+      devLogFirestore('releasePlate OK', `${cleanPlate} ${archive ? '(в архив)' : '(в инвентарь)'}`);
       return true;
     } catch (e) {
+      devLogFirestore('releasePlate ERROR', `${cleanPlate} — ${e.message}`);
       return false;
     }
   },
@@ -663,6 +712,7 @@ const CarsCatalogManager = {
 
     try {
       console.log("[cars_catalog] Синхронизация каталога под GitHub Raw...");
+      devLogFirestore('seedCarsCatalog START', 'синхронизация каталога машин');
       let count = 0;
 
       for (const [category, carsList] of Object.entries(window.CAR_DATABASE)) {
@@ -695,8 +745,10 @@ const CarsCatalogManager = {
 
       localStorage.setItem("perekup_db_seeded_v1", "true");
       CacheManager.cloudCars = null;
+      devLogFirestore('seedCarsCatalog OK', `загружено ${count} машин`);
       return { success: true, count };
     } catch (e) {
+      devLogFirestore('seedCarsCatalog ERROR', e.message || String(e));
       return { success: false, error: e.message };
     }
   },
@@ -731,8 +783,10 @@ const CarsCatalogManager = {
 
       CacheManager.cloudCars = cars;
       CacheManager.cloudCarsTimestamp = now;
+      devLogFirestore('fetchCloudCars OK', `получено ${cars.length} машин`);
       return cars;
     } catch (e) {
+      devLogFirestore('fetchCloudCars ERROR', e.message || String(e));
       return CacheManager.cloudCars || [];
     }
   },
@@ -764,8 +818,10 @@ const CarsCatalogManager = {
 
       await setDoc(carRef, payload, { merge: true });
       CacheManager.cloudCars = null;
+      devLogFirestore('saveCarToCloud OK', carDocId);
       return { success: true, car: payload };
     } catch (e) {
+      devLogFirestore('saveCarToCloud ERROR', e.message || String(e));
       return { success: false, error: e.message };
     }
   }
@@ -816,8 +872,10 @@ const ClubsManager = {
 
       await setDoc(doc(db, "clubs", clubId), clubData);
       CacheManager.clubs = null;
+      devLogFirestore('createClub OK', `${clubName} (${clubId})`);
       return { success: true, club: clubData };
     } catch (e) {
+      devLogFirestore('createClub ERROR', e.message || String(e));
       return { success: false, error: e.message };
     }
   },
@@ -834,8 +892,10 @@ const ClubsManager = {
         tx.update(clubRef, { membersCount: (cur.membersCount || 1) + 1 });
       });
       CacheManager.clubs = null;
+      devLogFirestore('joinClub OK', clubId);
       return true;
     } catch (e) {
+      devLogFirestore('joinClub ERROR', e.message || String(e));
       return false;
     }
   },
@@ -851,8 +911,10 @@ const ClubsManager = {
         tx.update(clubRef, { bank: (cur.bank || 0) + amount });
       });
       CacheManager.clubs = null;
+      devLogFirestore('depositToClubBank OK', `+${amount.toLocaleString()} ₽ → ${clubId}`);
       return true;
     } catch (e) {
+      devLogFirestore('depositToClubBank ERROR', e.message || String(e));
       return false;
     }
   }
@@ -881,7 +943,10 @@ const LeaderboardManager = {
 
       lastLeaderboardUpdate = now;
       CacheManager.leaderboard = null;
-    } catch (e) {}
+      devLogFirestore('updateRank OK', `${playerName} — ${profit.toLocaleString()} ₽`);
+    } catch (e) {
+      devLogFirestore('updateRank ERROR', e.message || String(e));
+    }
   },
 
   async fetchTop(force = false) {
@@ -898,8 +963,10 @@ const LeaderboardManager = {
 
       CacheManager.leaderboard = leaders;
       CacheManager.leaderboardTimestamp = now;
+      devLogFirestore('fetchLeaderboard OK', `получено ${leaders.length} игроков`);
       return leaders;
     } catch (e) {
+      devLogFirestore('fetchLeaderboard ERROR', e.message || String(e));
       return CacheManager.leaderboard || [];
     }
   }
@@ -953,7 +1020,6 @@ window.FB_Bridge = {
   Plates: RegisteredPlatesManager,
   Clubs: ClubsManager,
   Leaderboard: LeaderboardManager,
-  // Алиасы обратной совместимости:
   CloudSave: {
     pushSave: PlayersStorageManager.pushSave,
     pullSave: PlayersStorageManager.pullSave
@@ -972,4 +1038,4 @@ window.FB_Bridge = {
 };
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Bridge v1.1.0] players, garages, market_lots, transactions активны 🌐");
+console.log("[☁️ FB_Bridge v1.3.0] players, garages, market_lots + DevLogger активны 🌐");

@@ -51,19 +51,15 @@
 
               <!-- ОБЪЕДИНЕННАЯ СТРОКА СТАТОВ И ВАЛЮТ -->
               <div class="user-stats-row">
-                <!-- Связи -->
                 <div class="stat-pill stat-pill-conn" title="Теневые связи">
                   <i class="fa-solid fa-handshake"></i> <span id="connectionsText">1</span>
                 </div>
-                <!-- Карма -->
                 <div class="stat-pill stat-pill-karma" title="Карма">
                   <i class="fa-solid fa-face-smile"></i> <span id="karmaText">50</span>
                 </div>
-                <!-- Гараж -->
                 <div class="stat-pill stat-pill-garage" title="Вместимость автопарка" onclick="event.stopPropagation(); switchTab('tabGarage');">
                   <i class="fa-solid fa-warehouse"></i> <span id="garageHeaderSlots">0/2</span>
                 </div>
-                <!-- Валюты (перенесены сюда) -->
                 <button type="button" class="stat-pill stat-pill-note" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты">
                   <i class="fa-solid fa-money-bill-wave"></i> <span id="starsAmount">15</span>
                 </button>
@@ -146,7 +142,6 @@
             </div>
 
             <div class="market-categories-grid" id="marketCatListContainer">
-              <!-- ВСЕ КАТЕГОРИИ — на всю ширину -->
               <button onclick="setCategory('all')" id="catBtn-all" class="cat-tile cat-tile-full">
                 <div class="cat-tile-icon"><i class="fa-solid fa-layer-group"></i></div>
                 <div class="cat-tile-name" data-i18n="cat_all">Все категории (Общий поиск)</div>
@@ -958,8 +953,12 @@
           'phone-radar.js',
           'phone-media.js',
           'phone-racing.js',
-          'dev-data-checker.js',
-          'phone-dev.js',
+
+          // ⭐ DEV-модули: logger ПЕРВЫМ, чтобы перехватить всё остальное
+          'dev/dev-logger.js',
+          'dev/dev-data-checker.js',
+          'dev/phone-dev.js',
+
           'market-generator.js',
           'market-inspection.js',
           'market-deal.js',
@@ -972,7 +971,7 @@
           'life.js',
           'street.js',
           'syndicate.js',
-          'dev-studio.js'
+          'dev/dev-studio.js'
         ];
 
         function loadScript(path) {
