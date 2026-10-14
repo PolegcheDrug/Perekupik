@@ -6,13 +6,13 @@
     <meta name="google" content="notranslate">
     <title>Симулятор Перекупа v1.0.0</title>
     
-    <!-- Модульные CSS-стили с принудительным сбросом кэша v=346 -->
-    <link rel="stylesheet" href="css/base.css?v=346">
-    <link rel="stylesheet" href="css/hud.css?v=346">
-    <link rel="stylesheet" href="css/market.css?v=346">
-    <link rel="stylesheet" href="css/phone.css?v=346">
-    <link rel="stylesheet" href="css/modals.css?v=346">
-    <link rel="stylesheet" href="css/nav.css?v=346">
+    <!-- Модульные CSS-стили с принудительным сбросом кэша v=349 -->
+    <link rel="stylesheet" href="css/base.css?v=349">
+    <link rel="stylesheet" href="css/hud.css?v=349">
+    <link rel="stylesheet" href="css/market.css?v=349">
+    <link rel="stylesheet" href="css/phone.css?v=349">
+    <link rel="stylesheet" href="css/modals.css?v=349">
+    <link rel="stylesheet" href="css/nav.css?v=349">
     
     <!-- Внешние библиотеки -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -436,11 +436,12 @@
           <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
         </div>
         <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #346</div>
+        <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #349</div>
         <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
           <div class="patch-item"><b>⚡ Единый хаб Сети «M» & Autodrot:</b> Объединённый онлайн-рынок и чат торга с кнопками риска.</div>
           <div class="patch-item"><b>🏢 Бизнес-кастомизация:</b> Живые скины, эффекты карточек и стикеры суточного дохода.</div>
           <div class="patch-item"><b>🏪 Площадка продаж:</b> Восстановлен плавный таймер поиска, мгновенный пропуск и торг прямо у капота.</div>
+          <div class="patch-item"><b>🚗 Разгрузка базы авто:</b> CAR_DATABASE разложен по 9 файлам категорий в data/cars/.</div>
         </div>
         <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
       </div>
@@ -874,7 +875,7 @@
     <div id="toastNotification" class="toast">Уведомление</div>
 
     <!-- 1. ПОДКЛЮЧЕНИЕ СЕТЕВОГО МОДУЛЯ FIREBASE (ES-МОДУЛЬ) -->
-    <script type="module" src="firebase-bridge.js?v=346"></script>
+    <script type="module" src="firebase-bridge.js?v=349"></script>
 
     <!-- 2. АВТОЗАГРУЗЧИК СКРИПТОВ ИГРЫ -->
     <script>
@@ -886,22 +887,47 @@
           } catch (e) {}
         }
 
-        const CACHE_VER = '346';
+        const CACHE_VER = '349';
 
         const rootModules = [
-          'data_core.js',
-          'data_cars.js',
-          'data_barn.js',
-          'data_economy.js',
-          'data_activities.js',
-          'data_dialogues.js'
+            'data_core.js',
+
+            // ⭐ Фолбеки по категориям (нужны в файлах категорий ниже)
+            'data_cars_fallbacks.js',
+
+            // ⭐ ФАЙЛЫ КАТЕГОРИЙ (каждый экспортирует window.CARS_CATEGORY_*)
+            'data/cars/economy.js',
+            'data/cars/scooter.js',
+            'data/cars/moto.js',
+            'data/cars/atv.js',
+            'data/cars/comfort.js',
+            'data/cars/premium.js',
+            'data/cars/hyper.js',
+            'data/cars/truck.js',
+            'data/cars/yacht.js',
+
+            // ⭐ Тонкий индекс — собирает CAR_DATABASE из window.CARS_CATEGORY_*
+            'data_cars.js',
+
+            // Остальные data-модули (не трогаем)
+            'data_barn.js',
+            'data_economy.js',
+            'data_activities.js',
+            'data_dialogues.js',
+
+            // ⭐ Хелперы выбора фото (последними — им нужен CAR_DATABASE)
+            'data_cars_helpers.js'
         ];
+
         const jsModules = [
           'audio-fx.js',
           'theme-manager.js',
           'app.js',
           'phone.js',
           'phone-bank.js',
+          'm-hub/m-leaderboard.js',
+          'm-hub/m-events.js',
+          'm-hub/m-clubs.js',
           'phone-m.js',
           'phone-post.js',
           'phone-gosuslugi.js',

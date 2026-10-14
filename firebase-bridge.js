@@ -294,8 +294,16 @@ const MarketLotsManager = {
       const lotId = "lot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
       const rawPrice = Math.max(1000, parseInt(lotData.price) || 50000);
 
+      // Проверяем и гарантируем уникальные VIN и UID при продаже авто
+      if (lotData.itemData && (lotData.type === 'car' || lotData.type === 'cars')) {
+        if (typeof window.ensureCarIdentity === 'function') {
+          lotData.itemData = window.ensureCarIdentity(lotData.itemData);
+        }
+      }
+
       const payload = {
         lot_id: lotId,
+        id: lotId,
         sellerId: String(profile.id),
         sellerName: profile.name || "Перекуп",
         type: lotData.type,
@@ -322,7 +330,7 @@ const MarketLotsManager = {
 
       await Promise.all([
         setDoc(doc(db, "market_lots", lotId), payload),
-        setDoc(doc(db, "p2p_market", lotId), payload) // зеркало
+        setDoc(doc(db, "p2p_market", lotId), payload) // зеркало обратной совместимости
       ]);
 
       CacheManager.marketLots = null;
@@ -377,7 +385,7 @@ const MarketLotsManager = {
 
         const lot = lotSnap.data();
         if (lot.status !== "active") throw new Error("Этот лот уже успел купить другой перекуп!");
-        if (lot.sellerId === String(profile.id)) throw new Error("Нельзя купить собственный лот!");
+        if (String(lot.sellerId) === String(profile.id)) throw new Error("Нельзя купить собственный лот!");
         if (buyerCash < lot.price) throw new Error("Недостаточно денег на балансе!");
 
         const marketFee = Math.round(lot.price * MARKET_FEE_PERCENT);
@@ -391,7 +399,7 @@ const MarketLotsManager = {
           soldAt: Date.now()
         });
 
-        // 2. Записываем в transactions/{tx_id}
+        // 2. Записываем транзакцию в transactions/{tx_id}
         tx.set(txRef, {
           tx_id: txId,
           lot_id: String(lotId),
@@ -419,7 +427,7 @@ const MarketLotsManager = {
           timestamp: Date.now()
         });
 
-        // 4. Перепривязка номера, если продавался номер
+        // 4. Перепривязка номера в реестре, если продавался госномер
         if (lot.type === "plate" || lot.type === "plates") {
           const plateStr = lot.itemData?.plate || lot.name;
           const clean = RegisteredPlatesManager.cleanPlateString(plateStr);
@@ -451,7 +459,7 @@ const MarketLotsManager = {
     try {
       const lotRef = doc(db, "market_lots", String(lotId));
       const snap = await getDoc(lotRef);
-      if (snap.exists() && snap.data().sellerId === String(targetUid)) {
+      if (snap.exists() && String(snap.data().sellerId) === String(targetUid)) {
         const lot = snap.data();
         if (lot.type === "plate" || lot.type === "plates") {
           const plateStr = lot.itemData?.plate || lot.name;
