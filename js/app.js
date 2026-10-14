@@ -1,26 +1,26 @@
 // ========================================================
-// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v2.3.0)
+// js/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И TELEGRAM REF (v2.4.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v2.3.0:
-//   - РЕМОНТ: resetGameData теперь чистит localStorage, sessionStorage,
-//     Telegram Cloud, Firestore и in-memory state
-//   - РЕМОНТ: __IS_RESETTING__ блокирует saveState во время сброса
-//   - DEFAULT_STATE экспортируется в window
+// ⭐ v2.4.0:
+//   - НИКАКИХ guest/dev профилей. Игра работает ТОЛЬКО через Telegram.
+//   - Экран «Только через Telegram» при отсутствии initDataUnsafe.user.
+//   - saveState заблокирован без валидного tgUserId.
+//   - Онбординг обязателен и привязан к Telegram ID.
+//   - РЕМОНТ: resetGameData чистит всё (localStorage + Firestore).
+//   - __IS_RESETTING__ блокирует saveState/pushSave во время сброса.
 // ========================================================
 
 window.CURRENT_GAME_VERSION = "v2.0.0";
 
-let tgUserId = "guest_777";
+let tgUserId = null;         // ⭐ v1.4.0: null по умолчанию — не "guest_777"
 let tgUserData = null;
 
-// ⭐ смена версии сейва для миграции экономики
 const SAVE_VERSION = 9;
 let SAVE_KEY_PREFIX = "perekup_v9_";
 
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
 
-// Кэш предыдущих значений для плавной накрутки роллером
 let displayedCashValue = 0;
 let displayedStarsValue = 0;
 let activeNumberAnimators = {};
@@ -43,7 +43,7 @@ function getCarImage(template) {
 window.getCarImage = getCarImage;
 
 // ========================================================
-// 2. ЦЕНТРАЛИЗОВАННЫЙ МЕНЕДЖЕР МОДАЛЬНЫХ ОКОН
+// 2. МЕНЕДЖЕР МОДАЛЬНЫХ ОКОН
 // ========================================================
 const ModalManager = {
     activeModals: [],
@@ -96,7 +96,7 @@ window.ModalManager = ModalManager;
 window.closeModal = (id) => ModalManager.close(id);
 
 // ========================================================
-// 3. АНИМИРОВАННЫЙ РОЛЛЕР И СИСТЕМНЫЕ УВЕДОМЛЕНИЯ
+// 3. АНИМИРОВАННЫЙ РОЛЛЕР И УВЕДОМЛЕНИЯ
 // ========================================================
 function animateNumberRoll(elementId, startVal, endVal, duration = 450, isCurrency = true) {
     const el = document.getElementById(elementId);
@@ -182,7 +182,7 @@ function logBankTransaction(title, amount, isIncome) {
 window.logBankTransaction = logBankTransaction;
 
 // ========================================================
-// 4. ИНТЕРАКТИВНЫЙ РЕНДЕР НАГРАД И МОДАЛКИ
+// 4. НАГРАДЫ И ВЕРДИКТ-МОДАЛКА
 // ========================================================
 function renderPrizeTokensHTML(items) {
     if (!Array.isArray(items) || items.length === 0) return "";
@@ -207,7 +207,6 @@ function renderPrizeTokensHTML(items) {
 function extractPrizesFromText(text) {
     let tokens = [];
     if (!text || typeof text !== 'string') return tokens;
-
     let lines = text.split('\n');
     lines.forEach(line => {
         let trimLine = line.trim();
@@ -216,57 +215,44 @@ function extractPrizesFromText(text) {
         if (trimLine.includes('₽')) {
             let match = trimLine.match(/([+\-]?\d[\d\s,.]*)\s*₽/);
             tokens.push({
-                icon: '💰',
-                title: 'Денежные средства',
+                icon: '💰', title: 'Денежные средства',
                 value: match ? match[1].trim() + ' ₽' : trimLine,
-                desc: 'Зачислено на баланс игрока',
-                rarity: 'token-green'
+                desc: 'Зачислено на баланс игрока', rarity: 'token-green'
             });
         } else if (trimLine.includes('⭐') || trimLine.toLowerCase().includes('stars') || trimLine.toLowerCase().includes('банкнот')) {
             let match = trimLine.match(/([+\-]?\d+)\s*(⭐|stars|банкнот)/i);
             tokens.push({
-                icon: '💵',
-                title: 'Неоновые банкноты',
+                icon: '💵', title: 'Неоновые банкноты',
                 value: match ? '+' + match[1] + ' 💵' : trimLine,
-                desc: 'Премиальная валюта перекупа',
-                rarity: 'token-green'
+                desc: 'Премиальная валюта перекупа', rarity: 'token-green'
             });
         } else if (trimLine.includes('XP') || trimLine.toLowerCase().includes('опыт')) {
             let match = trimLine.match(/([+\-]?\d+)\s*XP/i);
             tokens.push({
-                icon: '🎖️',
-                title: 'Опыт авторитета',
+                icon: '🎖️', title: 'Опыт авторитета',
                 value: match ? '+' + match[1] + ' XP' : trimLine,
-                desc: 'Повышает ранг перекупа',
-                rarity: 'token-cyan'
+                desc: 'Повышает ранг перекупа', rarity: 'token-cyan'
             });
         } else if (trimLine.toLowerCase().includes('штрафстоян') || trimLine.includes('🚔')) {
             tokens.push({
-                icon: '🚔',
-                title: 'Талон штрафстоянки',
+                icon: '🚔', title: 'Талон штрафстоянки',
                 value: 'Бесплатный забор авто',
-                desc: 'Позволяет забрать машину без оплаты протокола',
-                rarity: 'token-purple'
+                desc: 'Позволяет забрать машину без оплаты протокола', rarity: 'token-purple'
             });
         } else if (trimLine.includes('🚗') || trimLine.toLowerCase().includes('получен в гараж')) {
             tokens.push({
-                icon: '🏎️',
-                title: 'Транспортное средство',
+                icon: '🏎️', title: 'Транспортное средство',
                 value: trimLine.replace(/^[0-9.\s]+/, '').replace('🚗', '').trim(),
-                desc: 'Добавлено в ваш автопарк',
-                rarity: 'token-cyan'
+                desc: 'Добавлено в ваш автопарк', rarity: 'token-cyan'
             });
         } else if (trimLine.includes('🏷️') || trimLine.toLowerCase().includes('номер')) {
             tokens.push({
-                icon: '🏷️',
-                title: 'Госномер РФ',
+                icon: '🏷️', title: 'Госномер РФ',
                 value: trimLine.replace('🏷️', '').trim(),
-                desc: 'Архивный номер в инвентаре',
-                rarity: 'token-purple'
+                desc: 'Архивный номер в инвентаре', rarity: 'token-purple'
             });
         }
     });
-
     return tokens;
 }
 
@@ -296,33 +282,26 @@ function openLevelGateModal(appName, reqLevel, customDesc = null) {
             <div class="radar-spinner-ring mb-2" style="border-top-color: var(--cyan); border-right-color: var(--purple); margin: 0 auto 10px auto;">
                 <div class="radar-spinner-center" style="font-size:24px;">🔒</div>
             </div>
-
             <div class="modal-glow-badge mb-1" style="color:var(--cyan); border-color:var(--cyan); background:rgba(0,242,254,0.1); display:inline-block;">
                 ТРЕБУЕТСЯ УРОВЕНЬ ${reqLevel}
             </div>
-
             <h3 class="font-bold mb-1 color-cyan" style="font-size:16px;">${appName}</h3>
-
             <p class="sub-label mb-3" style="font-size:11px; line-height:1.45; color:#cbd5e1; padding: 0 6px;">
                 ${customDesc || defaultDesc}
             </p>
-
             <div class="p-2 mb-3 text-left" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
                 <div class="flex-between text-xs mb-1">
                     <span class="sub-label">Текущий ранг перекупа:</span>
                     <b class="color-amber">Уровень ${curLvl} из ${reqLevel}</b>
                 </div>
-
                 <div class="xp-bar-wrap my-1" style="width:100%; height:8px; background:rgba(255,255,255,0.06); border-radius:6px; overflow:hidden;">
                     <div class="xp-bar-fill" style="width: ${xpPercent}%; height:100%; background: linear-gradient(90deg, var(--cyan), var(--green));"></div>
                 </div>
-
                 <div class="flex-between" style="font-size:9.5px; color:#94a3b8;">
                     <span>Прогресс до след. ур: ${curXp}/${maxXp} XP</span>
                     <span class="color-cyan font-bold">${xpPercent}%</span>
                 </div>
             </div>
-
             <div class="space-y-2">
                 <button onclick="ModalManager.close('modalLevelGate'); switchTab('tabMarket');" class="btn btn-cyan btn-sm w-full font-bold">
                     <i class="fa-solid fa-store mr-1"></i> На авторынок (Качать опыт)
@@ -413,20 +392,19 @@ function dismissPatchNotesModal() {
 }
 
 // ========================================================
-// 5. ИГРОВОЙ STATE & ДЕФОЛТНЫЕ ДАННЫЕ
+// 5. ДЕФОЛТНЫЙ STATE
 // ========================================================
 const DEFAULT_STATE = {
     lang: 'ru',
     __saveVersion: SAVE_VERSION,
-
-    // ⭐ v9: версия ленты рынка для защиты от гонок
     marketFeedVersion: 0,
-
-    // ⭐ v9: лента событий M+ (сохраняется в сейв)
     mEventsFeed: [],
 
     player: {
-        name: "Перекуп #777", avatarUrl: null, cash: 150000, stars: 15, connections: 1,
+        name: "Перекуп #777",
+        uid: null,
+        onboardingDone: false,
+        avatarUrl: null, cash: 150000, stars: 15, connections: 1,
         expressTickets: 25, maxExpressTickets: 25, fuel: 100, level: 1, xp: 0, maxXp: 120,
         baseSlots: 2, vip: false, vipPro: false, lastFreeSpinDay: 0, lastFreeSuperSpinDay: 0,
         club: null, karma: 50, streetCred: 100, superSpinTickets: 1,
@@ -441,7 +419,6 @@ const DEFAULT_STATE = {
         housingType: 'rent',
         ownedHouses: [],
         mortgage: null,
-
         hudColorId: 'lightning',
         themePresetId: 'default',
         customHexColor: null,
@@ -451,21 +428,15 @@ const DEFAULT_STATE = {
         ownedAvatarEffects: ['none'],
         ownedTitles: ['cash_buyer'],
         soundProfile: 'cyber',
-
         crypto: { btc: 0, eth: 0, staked: [], prices: { btc: 9500000, eth: 340000 } },
         bankReputation: {
-            rating: 5.0,
-            successfulDeals: 0,
-            fairDealsCount: 0,
-            scandalsCount: 0,
-            vipBankTier: 'Стандарт',
-            loanLimit: 500000,
+            rating: 5.0, successfulDeals: 0, fairDealsCount: 0, scandalsCount: 0,
+            vipBankTier: 'Стандарт', loanLimit: 500000,
             reviewsLog: [
-                { author: "Алексей В.", rating: 5, date: "Недавно", text: "Отличный продавец, машина в идеале, доехали без сюрпризов!" },
-                { author: "Сергей Д.", rating: 5, date: "Недавно", text: "Честный парень, Launch показал чистый блок, респект!" }
+                { author: "Алексей В.", rating: 5, date: "Недавно", text: "Отличный продавец, машина в идеале!" },
+                { author: "Сергей Д.", rating: 5, date: "Недавно", text: "Честный парень, Launch показал чистый блок!" }
             ]
         },
-
         selectedStreetCarIndex: 0,
         lastBarnDay: 0, preSalesCount: 0, preSaleCooldownUntil: 0, policeImmunityDays: 0,
         hasRacingLicense: false, consecutiveRaces: 0, maxRacesBeforeRaid: 12,
@@ -475,18 +446,10 @@ const DEFAULT_STATE = {
         furniture: [], phoneMessages: [], dailyQuests: [], dailyQuestsSuperClaimed: false,
         bankHistory: [], bankDeposits: [], mailbox: [],
         warehouse: { maxCars: 6, maxItems: 12, cars: [], items: [] },
-
-        // ⭐ v9: реакции на события M+ сохраняются в сейв
         mEventReactions: {},
-
-        // ⭐ v9: список разблокированных сервисов
         unlockedApps: [],
-
-        // ⭐ v9: страховки и трекеры
         hasGpsTracker: false,
         hasCustomsPass: false,
-
-        // ⭐ v2.2.0: бизнес-бонусы и достижения
         businessAdBonus: null,
         businessAchievements: [],
         businessSalesCount: 0,
@@ -500,24 +463,18 @@ const DEFAULT_STATE = {
     officialPlateAuction: [],
     marketModifiers: { economy: 1, comfort: 1, premium: 1, hyper: 1, moto: 1, truck: 1, all: 1 },
     lifeChatMessages: [], friendsList: [],
-
-    // ⭐ v2.2.0: инфраструктура бизнеса
     businessWorkshop: { equipment: 0, storage: 0, brand: 0, diagnostics: 0 },
     businessStaff: { mechanic: 0, painter: 0, manager: 0, accountant: 0 },
     businessFleet: []
 };
 
-// ⭐ Экспорт DEFAULT_STATE в window, чтобы resetGameData мог его использовать
 window.DEFAULT_STATE = DEFAULT_STATE;
 
 let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
 window.state = state;
 
-// ⭐ глобальный монотонный счётчик для защиты async-операций от гонок
 window.__marketRenderToken = 0;
 window.__salesLotRenderToken = 0;
-
-// ⭐ Флаг сброса прогресса — блокирует saveState и pushSave
 window.__IS_RESETTING__ = false;
 
 window.pushToMailbox = function(mailItem) {
@@ -526,12 +483,9 @@ window.pushToMailbox = function(mailItem) {
 
     const item = Object.assign({
         id: "mail_" + Date.now() + "_" + Math.random().toString(36).substring(2, 5),
-        type: "item",
-        title: "Посылка",
-        sender: "Служба доставки",
+        type: "item", title: "Посылка", sender: "Служба доставки",
         desc: "Новое поступление в почтовый ящик.",
-        date: "Только что",
-        claimed: false
+        date: "Только что", claimed: false
     }, mailItem);
 
     state.player.mailbox.unshift(item);
@@ -550,7 +504,7 @@ function t(key) {
 window.t = t;
 
 // ========================================================
-// 6. МУЛЬТИЯЗЫЧНОСТЬ (I18N)
+// 6. ЯЗЫК
 // ========================================================
 function toggleGameLanguage() {
     setGameLanguage(state.lang === 'ru' ? 'en' : 'ru');
@@ -585,7 +539,7 @@ function applyLanguageToDOM() {
 }
 
 // ========================================================
-// 7. ЗАДАНИЯ И ВЕХИ КАРЬЕРЫ
+// 7. ЗАДАНИЯ И ВЕХИ
 // ========================================================
 function trackQuestProgress(actionType, count = 1) {
     if (!state.player || !Array.isArray(state.player.dailyQuests)) return;
@@ -596,7 +550,7 @@ function trackQuestProgress(actionType, count = 1) {
             q.cur = Math.min(q.max || q.target || 1, (q.cur || 0) + count);
             questsUpdated = true;
             if (q.cur >= (q.max || q.target || 1)) {
-                showToast(`🎯 Выполнено задание: «${q.text}»! Заберите награду в телефоне.`);
+                showToast(`🎯 Выполнено задание: «${q.text}»!`);
                 if (window.AudioFx) window.AudioFx.haptic('success');
             }
         }
@@ -619,12 +573,12 @@ function checkNotepadMilestones() {
 
     if (netProfit >= 1000000 && !state.player.milestoneMilClaimed) {
         state.player.milestoneMilClaimed = true;
-        showToast("🏆 Веха в Блокноте: Первый 1,000,000 ₽ чистой прибыли!");
+        showToast("🏆 Веха: Первый 1,000,000 ₽ чистой прибыли!");
         if (window.AudioFx) window.AudioFx.play('win');
     }
     if (sold >= 10 && !state.player.milestoneSalesClaimed) {
         state.player.milestoneSalesClaimed = true;
-        showToast("🏆 Веха в Блокноте: Закрыто 10 успешных продаж!");
+        showToast("🏆 Веха: Закрыто 10 успешных продаж!");
         if (window.AudioFx) window.AudioFx.play('win');
     }
 }
@@ -633,8 +587,8 @@ function refreshDailyQuestsList() {
     state.player.dailyQuestsSuperClaimed = false;
     if (typeof DAILY_QUESTS_POOL === 'undefined' || !Array.isArray(DAILY_QUESTS_POOL)) {
         state.player.dailyQuests = [
-            { id: "q_inspect", text: "Осмотреть толщиномером 2 авто на рынке", cur: 0, max: 2, actionType: "gauge_check", reward: 40000, rewardXp: 40, done: false },
-            { id: "q_race", text: "Выиграть заезд 402м в Стрите", cur: 0, max: 1, actionType: "win_drag", reward: 60000, rewardXp: 45, done: false },
+            { id: "q_inspect", text: "Осмотреть толщиномером 2 авто", cur: 0, max: 2, actionType: "gauge_check", reward: 40000, rewardXp: 40, done: false },
+            { id: "q_race", text: "Выиграть заезд 402м", cur: 0, max: 1, actionType: "win_drag", reward: 60000, rewardXp: 45, done: false },
             { id: "q_biz", text: "Собрать кассу с предприятий", cur: 0, max: 1, actionType: "collect_biz", reward: 30000, rewardXp: 30, done: false }
         ];
         return;
@@ -642,14 +596,8 @@ function refreshDailyQuestsList() {
 
     const shuffled = [...DAILY_QUESTS_POOL].sort(() => 0.5 - Math.random());
     state.player.dailyQuests = shuffled.slice(0, 3).map(q => ({
-        id: q.id,
-        text: q.text,
-        cur: 0,
-        max: q.target || 1,
-        actionType: q.actionType,
-        reward: q.reward,
-        rewardXp: q.rewardXp || 35,
-        done: false
+        id: q.id, text: q.text, cur: 0, max: q.target || 1,
+        actionType: q.actionType, reward: q.reward, rewardXp: q.rewardXp || 35, done: false
     }));
 }
 
@@ -676,7 +624,6 @@ function getExpressTicketUpgradeCost() {
 
 function getTotalGarageSlots() {
     let slots = state.player?.baseSlots || 2;
-
     if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
         const activeHousingId = state.player?.housingId;
         if (activeHousingId) {
@@ -686,16 +633,11 @@ function getTotalGarageSlots() {
             }
         }
     }
-
     return Math.max(2, slots);
 }
 
 // ========================================================
-// 9. ДОСТУП К СЕРВИСУ «ПОДКЛЮЧ» — живёт в syndicate.js
-// ========================================================
-
-// ========================================================
-// 10. TELEGRAM CLOUD & STORAGE SYNC
+// 10. TELEGRAM CLOUD
 // ========================================================
 const CHUNK_SIZE = 2048;
 
@@ -705,6 +647,7 @@ function prepareStateForCloud() {
 
 function saveToTelegramCloud(jsonString, callback) {
     if (!window.Telegram?.WebApp?.CloudStorage) return;
+    if (!tgUserId || tgUserId === "guest_777") return;
     const tgCloud = window.Telegram.WebApp.CloudStorage;
     const totalChunks = Math.ceil(jsonString.length / CHUNK_SIZE);
 
@@ -727,16 +670,14 @@ function saveToTelegramCloud(jsonString, callback) {
 }
 
 // ========================================================
-// 11. МИГРАЦИЯ СЕЙВОВ
+// 11. МИГРАЦИЯ СЕЙВА
 // ========================================================
 function migrateSave(parsed) {
     if (!parsed || typeof parsed !== 'object') return parsed;
-
     const currentVersion = parsed.__saveVersion || 8;
 
     if (currentVersion < 9) {
-        console.log(`[Migration] Обновление сейва v${currentVersion} → v${SAVE_VERSION}`);
-
+        console.log(`[Migration] v${currentVersion} → v${SAVE_VERSION}`);
         if (parsed.player && typeof parsed.player === 'object') {
             if (parsed.player.garageSlots !== undefined && parsed.player.garageSlots > 0) {
                 const oldBase = parsed.player.baseSlots || 2;
@@ -747,10 +688,7 @@ function migrateSave(parsed) {
             if (!Array.isArray(parsed.player.unlockedApps)) parsed.player.unlockedApps = [];
             if (typeof parsed.player.hasGpsTracker !== 'boolean') parsed.player.hasGpsTracker = false;
             if (typeof parsed.player.hasCustomsPass !== 'boolean') parsed.player.hasCustomsPass = false;
-            if (!parsed.player.mEventReactions || typeof parsed.player.mEventReactions !== 'object') {
-                parsed.player.mEventReactions = {};
-            }
-            // ⭐ v2.2.0: поля бизнеса
+            if (!parsed.player.mEventReactions || typeof parsed.player.mEventReactions !== 'object') parsed.player.mEventReactions = {};
             if (parsed.player.businessAdBonus === undefined) parsed.player.businessAdBonus = null;
             if (!Array.isArray(parsed.player.businessAchievements)) parsed.player.businessAchievements = [];
             if (typeof parsed.player.businessSalesCount !== 'number') parsed.player.businessSalesCount = 0;
@@ -762,17 +700,12 @@ function migrateSave(parsed) {
                 parsed.salesLot.forEach((_, i) => validLotIndices.add(i));
                 parsed.player.phoneMessages = parsed.player.phoneMessages.filter(m => {
                     if (!m) return false;
-                    if (m.category === 'buyers' && m.carIndex !== undefined) {
-                        return validLotIndices.has(m.carIndex);
-                    }
+                    if (m.category === 'buyers' && m.carIndex !== undefined) return validLotIndices.has(m.carIndex);
                     return true;
                 });
             }
         }
-
         if (!Array.isArray(parsed.mEventsFeed)) parsed.mEventsFeed = [];
-
-        // ⭐ v2.2.0: инфраструктура бизнеса
         if (!parsed.businessWorkshop || typeof parsed.businessWorkshop !== 'object') {
             parsed.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
         }
@@ -780,7 +713,6 @@ function migrateSave(parsed) {
             parsed.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
         }
         if (!Array.isArray(parsed.businessFleet)) parsed.businessFleet = [];
-
         parsed.marketFeedVersion = (parsed.marketFeedVersion || 0) + 1;
     }
 
@@ -789,7 +721,37 @@ function migrateSave(parsed) {
 }
 
 // ========================================================
-// 12. АВТОРИЗАЦИЯ, ЗАГРУЗКА И СОХРАНЕНИЕ
+// 12. ЭКРАН «ТОЛЬКО ЧЕРЕЗ TELEGRAM»
+// ========================================================
+function showTelegramRequiredScreen() {
+    const shell = document.querySelector('.app-shell');
+    if (!shell) return;
+    shell.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center;
+                    width:100%; height:100dvh; padding:24px; text-align:center;
+                    background:radial-gradient(circle at 50% 0%, #151d2f 0%, #070a10 90%);">
+            <div style="font-size:64px; margin-bottom:12px;">📵</div>
+            <h1 style="color:#fff; font-size:20px; font-weight:900; margin-bottom:8px;">
+                Игра доступна только через Telegram
+            </h1>
+            <p style="color:#94a3b8; font-size:13px; line-height:1.5; max-width:320px; margin-bottom:20px;">
+                Этот симулятор перекупа работает как Telegram Mini App.
+                Чтобы играть — откройте бота в Telegram и запустите игру оттуда.
+            </p>
+            <div style="padding:10px 16px; background:rgba(0,242,254,0.1); border:1px solid rgba(0,242,254,0.35);
+                        border-radius:10px; color:#00f2fe; font-size:11px; font-weight:800; letter-spacing:0.5px;">
+                ⚡ @PerekupSimBot
+            </div>
+            <div style="margin-top:24px; color:#475569; font-size:10px;">
+                Если вы уже открыли через Telegram — перезапустите приложение.
+            </div>
+        </div>
+    `;
+}
+window.showTelegramRequiredScreen = showTelegramRequiredScreen;
+
+// ========================================================
+// 13. ИНИЦИАЛИЗАЦИЯ
 // ========================================================
 async function initTelegramAuthAndStorage(callback) {
     let callbackCalled = false;
@@ -801,60 +763,89 @@ async function initTelegramAuthAndStorage(callback) {
     };
 
     const watchdogTimer = setTimeout(() => {
-        console.warn("[App] Сработал защитный таймаут инициализации.");
+        console.warn("[App] Watchdog инициализации сработал.");
         safeCallback();
-    }, 2000);
+    }, 2500);
 
+    // ⭐ v1.4.0: Получаем Telegram-юзерa
+    let tgUser = null;
     try {
         if (window.Telegram?.WebApp) {
             const tg = window.Telegram.WebApp;
             tg.ready();
             tg.expand();
 
-            if (tg.initDataUnsafe?.user) {
-                tgUserData = tg.initDataUnsafe.user;
-                tgUserId = String(tgUserData.id);
+            tgUser = tg.initDataUnsafe?.user || null;
+            if (tgUser && tgUser.id) {
+                tgUserData = tgUser;
+                tgUserId = String(tgUser.id);
+                console.log('[Auth] Telegram ID установлен:', tgUserId);
             }
         }
     } catch (e) {
-        console.warn("Ошибка инициализации Telegram WebApp:", e);
+        console.warn("[Auth] Ошибка Telegram WebApp:", e);
     }
 
+    // ⭐ v1.4.0: БЕЗ Telegram — не продолжаем игру
+    if (!tgUser || !tgUser.id) {
+        console.error('[Auth] ⛔ Нет Telegram-пользователя. Игра не запускается.');
+        showTelegramRequiredScreen();
+        clearTimeout(watchdogTimer);
+        return;
+    }
+
+    // Firestore Auth (для кастомных UID, если есть сервер)
+    if (window.FB_Bridge?.Auth) {
+        try {
+            const authRes = await window.FB_Bridge.Auth.initSession();
+            console.log('[Auth] initSession результат:', authRes);
+        } catch (e) {
+            console.warn('[Auth] initSession упал:', e);
+        }
+    }
+
+    // Форсируем uid = Telegram ID
+    if (window.FB_Bridge?.Auth?._forceVerifiedUserId) {
+        window.FB_Bridge.Auth._forceVerifiedUserId(tgUserId);
+    }
+
+    // Загружаем локальный сейв
     const hadLocalSave = loadFromLocalStorage();
 
+    // Если локального нет — тянем из Firestore
     if (!hadLocalSave && window.FB_Bridge?.Players?.pullSave) {
         try {
             const cloudSave = await window.FB_Bridge.Players.pullSave(tgUserId);
             if (cloudSave) {
                 applyLoadedState(cloudSave);
-                console.log("[Cloud] Прогресс восстановлен из облака Firestore");
+                console.log("[Cloud] Прогресс восстановлен из Firestore");
                 showToast("☁️ Прогресс синхронизирован из облака!");
             }
         } catch (e) {
-            console.warn("[Cloud] Не удалось восстановить сейв:", e);
+            console.warn("[Cloud] Ошибка pullSave:", e);
         }
     }
 
-    if (tgUserData && state.player) {
+    // Обновляем профиль из Telegram
+    if (tgUser && state.player) {
         let names = [];
-        if (tgUserData.first_name) names.push(tgUserData.first_name);
-        if (tgUserData.last_name) names.push(tgUserData.last_name);
+        if (tgUser.first_name) names.push(tgUser.first_name);
+        if (tgUser.last_name) names.push(tgUser.last_name);
         const fullName = names.join(' ').trim();
 
         const currentName = state.player.name || "";
         const isDefaultName = !currentName || currentName === "Перекуп #777" || currentName.startsWith("Гость");
 
-        if (isDefaultName) {
-            if (fullName) state.player.name = fullName;
-            else if (tgUserData.username) state.player.name = "@" + tgUserData.username;
-        }
-        if (tgUserData.photo_url) state.player.avatarUrl = tgUserData.photo_url;
+        if (isDefaultName && fullName) state.player.name = fullName;
+        if (tgUser.photo_url) state.player.avatarUrl = tgUser.photo_url;
     }
 
+    // ⭐ v1.4.0: uid = Telegram ID
+    state.player.uid = String(tgUserId);
+
+    // Сидируем каталог машин
     if (window.FB_Bridge?.CarsCatalog) {
-        try {
-            await window.FB_Bridge.CarsCatalog.seedDefaultCarsCatalog();
-        } catch (e) {}
+        try { await window.FB_Bridge.CarsCatalog.seedDefaultCarsCatalog(); } catch (e) {}
     }
 
     clearTimeout(watchdogTimer);
@@ -862,22 +853,20 @@ async function initTelegramAuthAndStorage(callback) {
 }
 
 function loadFromLocalStorage() {
+    if (!tgUserId) return false;
     try {
         let saved = localStorage.getItem("perekup_save_" + tgUserId);
         if (!saved) saved = localStorage.getItem(SAVE_KEY_PREFIX + tgUserId);
-        if (!saved) saved = localStorage.getItem('perekoop_sim_save_v105_release');
-        if (!saved) saved = localStorage.getItem("perekup_save_guest_777");
 
         if (saved) {
             const parsed = JSON.parse(saved);
             applyLoadedState(parsed);
             return true;
         }
-
         applyLoadedState({});
         return false;
     } catch(e) {
-        console.warn("[Local] Ошибка загрузки сейва:", e);
+        console.warn("[Local] Ошибка загрузки:", e);
         applyLoadedState({});
         return false;
     }
@@ -885,25 +874,18 @@ function loadFromLocalStorage() {
 
 function applyLoadedState(parsed) {
     if (!parsed) parsed = {};
-
     parsed = migrateSave(parsed);
 
     if (parsed.lang) state.lang = parsed.lang;
 
-    if (typeof parsed.marketFeedVersion === 'number') {
-        state.marketFeedVersion = parsed.marketFeedVersion;
-    } else {
-        state.marketFeedVersion = 0;
-    }
-    if (Array.isArray(parsed.mEventsFeed)) {
-        state.mEventsFeed = parsed.mEventsFeed;
-    } else {
-        state.mEventsFeed = [];
-    }
+    if (typeof parsed.marketFeedVersion === 'number') state.marketFeedVersion = parsed.marketFeedVersion;
+    else state.marketFeedVersion = 0;
+
+    if (Array.isArray(parsed.mEventsFeed)) state.mEventsFeed = parsed.mEventsFeed;
+    else state.mEventsFeed = [];
 
     if (parsed.player) {
         state.player = { ...DEFAULT_STATE.player, ...parsed.player };
-
         if (parsed.player.stats) state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
         if (parsed.player.tools) state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
         if (parsed.player.toolsWear) state.player.toolsWear = { ...DEFAULT_STATE.player.toolsWear, ...parsed.player.toolsWear };
@@ -945,7 +927,6 @@ function applyLoadedState(parsed) {
     if (Array.isArray(parsed.lifeChatMessages)) state.lifeChatMessages = parsed.lifeChatMessages;
     if (Array.isArray(parsed.friendsList)) state.friendsList = parsed.friendsList;
 
-    // ⭐ v2.2.0: инфраструктура бизнеса
     if (parsed.businessWorkshop && typeof parsed.businessWorkshop === 'object') {
         state.businessWorkshop = { ...DEFAULT_STATE.businessWorkshop, ...parsed.businessWorkshop };
     }
@@ -977,7 +958,6 @@ function sanitizeState() {
     if (!state.player.dailyQuests || state.player.dailyQuests.length === 0) refreshDailyQuestsList();
     if (!state.player.mEventReactions || typeof state.player.mEventReactions !== 'object') state.player.mEventReactions = {};
 
-    // ⭐ v2.2.0: инфраструктура бизнеса
     if (!state.businessWorkshop) state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
     if (!state.businessStaff) state.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
     if (!Array.isArray(state.businessFleet)) state.businessFleet = [];
@@ -988,6 +968,12 @@ function sanitizeState() {
 }
 
 function saveState() {
+    // ⭐ v1.4.0: Без Telegram ID — сейв не пишем
+    if (!tgUserId || tgUserId === "guest_777" || String(tgUserId).startsWith('guest_') || String(tgUserId).startsWith('p_')) {
+        console.warn('[Save] saveState заблокирован: нет валидного Telegram ID');
+        return;
+    }
+
     // ⭐ Защита от сохранения после сброса
     if (window.__IS_RESETTING__) {
         console.log('[Save] Игнорирую saveState — идёт сброс прогресса.');
@@ -1032,17 +1018,13 @@ function resetGameData() {
         return;
     }
 
-    // Двойное подтверждение — защита от случайного клика
     if (!confirm("🔴 ВЫ УВЕРЕНЫ? Это действие НЕОБРАТИМО!\n\nНажмите OK, чтобы стереть всё навсегда.")) {
         return;
     }
 
-    // ⭐ КРИТИЧНО: выставляем флаг, чтобы saveState и Firestore-синхронизация
-    // не записали прогресс обратно до полной перезагрузки
     window.__IS_RESETTING__ = true;
 
     try {
-        // 1. Собираем ВСЕ ключи, связанные с игрой
         const keysToRemove = new Set();
 
         keysToRemove.add("perekup_save_" + tgUserId);
@@ -1052,31 +1034,23 @@ function resetGameData() {
         keysToRemove.add("perekup_save_undefined");
         keysToRemove.add('perekoop_sim_save_v105_release');
 
-        // Пробегаем по всему localStorage и собираем всё с "perekup" / "perekoop"
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
             if (!key) continue;
-            if (
-                key.includes('perekup') ||
-                key.includes('perekoop') ||
-                key.includes('perekupik') ||
-                key.startsWith('perekup_v9_')
-            ) {
+            if (key.includes('perekup') || key.includes('perekoop') || key.includes('perekupik') || key.startsWith('perekup_v9_')) {
                 keysToRemove.add(key);
             }
         }
 
-        // 2. Удаляем все найденные ключи (из localStorage + sessionStorage)
         keysToRemove.forEach(key => {
             try { localStorage.removeItem(key); } catch (e) {}
             try { sessionStorage.removeItem(key); } catch (e) {}
         });
 
-        // 3. Полная очистка localStorage и sessionStorage
         try { localStorage.clear(); } catch (e) {}
         try { sessionStorage.clear(); } catch (e) {}
 
-        // 4. Очистка Telegram CloudStorage (если игра открыта в Telegram)
+        // Telegram Cloud
         try {
             if (window.Telegram?.WebApp?.CloudStorage) {
                 const tgCloud = window.Telegram.WebApp.CloudStorage;
@@ -1092,23 +1066,19 @@ function resetGameData() {
             }
         } catch (e) {}
 
-        // 5. Удаляем облачный сейв из Firestore (асинхронно, не блокируем перезагрузку)
+        // Firestore
         (async () => {
             try {
-                if (window.FB_Bridge?.db) {
-                    const uid = String(tgUserId || 'guest_777');
+                if (window.FB_Bridge?.db && tgUserId) {
+                    const uid = String(tgUserId);
                     const mod = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
                     const { doc, deleteDoc } = mod;
-
                     const collectionsToWipe = ['players', 'garages', 'saves', 'leaderboard'];
-
                     for (const colName of collectionsToWipe) {
                         try {
                             await deleteDoc(doc(window.FB_Bridge.db, colName, uid));
                             console.log(`[Reset] Удалён Firestore: ${colName}/${uid}`);
-                        } catch (e) {
-                            // Игнорируем, если документа нет
-                        }
+                        } catch (e) {}
                     }
                 }
             } catch (e) {
@@ -1116,37 +1086,29 @@ function resetGameData() {
             }
         })();
 
-        // 6. Сбрасываем in-memory state на дефолтный
+        // In-memory reset
         try {
             const cleanState = JSON.parse(JSON.stringify(DEFAULT_STATE));
             Object.keys(state).forEach(k => { delete state[k]; });
             Object.assign(state, cleanState);
             state.__saveVersion = SAVE_VERSION;
             window.state = state;
-        } catch (e) {
-            console.warn('[Reset] Ошибка сброса state:', e);
-        }
+        } catch (e) {}
 
-        // 7. Отключаем все активные таймеры, чтобы они не записали сейв обратно
+        // Отключаем таймеры
         try {
             if (window.gameCycleInterval) clearInterval(window.gameCycleInterval);
             if (window.salesLotTimerInterval) clearInterval(window.salesLotTimerInterval);
             if (window.PhoneBusiness?._tickInterval) clearInterval(PhoneBusiness._tickInterval);
-            // Общий "глушитель" для любых оставшихся интервалов:
             for (let i = 1; i < 99999; i++) { window.clearInterval(i); window.clearTimeout(i); }
         } catch (e) {}
 
-        // 8. Сообщение и жёсткая перезагрузка
         if (window.AudioFx) window.AudioFx.haptic('warning');
-        if (typeof showToast === 'function') {
-            showToast("🗑️ Прогресс полностью сброшен! Перезагрузка...");
-        }
+        if (typeof showToast === 'function') showToast("🗑️ Прогресс полностью сброшен! Перезагрузка...");
 
         setTimeout(() => {
-            // Жёсткая перезагрузка с обходом кэша
             const cleanUrl = window.location.href.split('?')[0];
             window.location.href = cleanUrl + '?reset=' + Date.now();
-            // Дополнительная страховка через 200 мс
             setTimeout(() => { window.location.reload(true); }, 200);
         }, 1200);
 
@@ -1214,7 +1176,7 @@ function importSaveCodeAction() {
 }
 
 // ========================================================
-// 13. СУТОЧНЫЙ ЦИКЛ
+// 14. СУТОЧНЫЙ ЦИКЛ
 // ========================================================
 function checkRealTimeDayChange() {
     const now = new Date();
@@ -1226,9 +1188,7 @@ function checkRealTimeDayChange() {
         now.getDate() !== lastDate.getDate()
     );
 
-    if (isDifferentDay) {
-        executeDayCycleMidnight(now);
-    }
+    if (isDifferentDay) executeDayCycleMidnight(now);
 }
 
 function executeDayCycleMidnight(currentDateObj) {
@@ -1237,12 +1197,8 @@ function executeDayCycleMidnight(currentDateObj) {
     state.player.expressTickets = state.player.maxExpressTickets || 25;
     state.player.consecutiveRaces = 0;
 
-    // Рост долга по кредиту (2% в день на остаток)
-    if (state.player.loanDebt > 0) {
-        state.player.loanDebt = Math.round(state.player.loanDebt * 1.02);
-    }
+    if (state.player.loanDebt > 0) state.player.loanDebt = Math.round(state.player.loanDebt * 1.02);
 
-    // Начисление процентов по банковским вкладам (0.3%/день)
     if (Array.isArray(state.player.bankDeposits)) {
         state.player.bankDeposits.forEach(dep => {
             dep.daysPassed = (dep.daysPassed || 0) + 1;
@@ -1253,52 +1209,34 @@ function executeDayCycleMidnight(currentDateObj) {
         });
     }
 
-    // Голод и настроение
     state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
     state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
 
-    // Обновление ежедневных квестов
-    if (typeof refreshDailyQuestsList === 'function') {
-        refreshDailyQuestsList();
-    }
+    if (typeof refreshDailyQuestsList === 'function') refreshDailyQuestsList();
 
-    // --------------------------------------------------------
-    // БИЗНЕС-СЕТЬ ЗА ПРОШЕДШИЙ ДЕНЬ
-    // --------------------------------------------------------
     try {
         if (window.PhoneBusiness && typeof window.PhoneBusiness.onNewDay === 'function') {
             window.PhoneBusiness.onNewDay();
-
             if (typeof window.PhoneBusiness.checkAchievements === 'function') {
                 window.PhoneBusiness.checkAchievements();
             }
-        } else {
-            console.warn('[DayCycle] PhoneBusiness.onNewDay не найден — пропускаем обработку бизнеса');
         }
     } catch (e) {
-        console.error('[DayCycle] Ошибка обработки бизнес-сети:', e);
+        console.error('[DayCycle] Ошибка бизнеса:', e);
     }
 
-    // --------------------------------------------------------
-    // Уведомление о накоплениях в кассах (если нет Управляющего)
-    // --------------------------------------------------------
     try {
         if (window.PhoneBusiness && typeof window.PhoneBusiness.getAccumulatedCash === 'function') {
             const pending = window.PhoneBusiness.getAccumulatedCash();
             const hasManager = (window.state?.businessStaff?.manager || 0) > 0;
             if (pending >= 500000 && !hasManager && typeof showToast === 'function') {
                 setTimeout(() => {
-                    showToast(`💼 В кассах бизнесов накопилось ${pending.toLocaleString()} ₽! Загляните в приложение «Бизнес».`);
+                    showToast(`💼 В кассах бизнесов накопилось ${pending.toLocaleString()} ₽!`);
                 }, 1500);
             }
         }
-    } catch (e) {
-        console.warn('[DayCycle] Ошибка проверки накоплений:', e);
-    }
+    } catch (e) {}
 
-    // --------------------------------------------------------
-    // BACKFIRE — ПРЕТЕНЗИЯ ПОКУПАТЕЛЯ ЧЕРЕЗ N ДНЕЙ
-    // --------------------------------------------------------
     try {
         if (Array.isArray(state.garage)) {
             state.garage.forEach((car, idx) => {
@@ -1307,22 +1245,13 @@ function executeDayCycleMidnight(currentDateObj) {
                 if (curDay >= car._backfireDay) {
                     car._backfireResolved = true;
                     setTimeout(() => {
-                        if (typeof _triggerBuyerBackfire === 'function') {
-                            _triggerBuyerBackfire(car, idx);
-                        } else {
-                            console.warn('[DayCycle] _triggerBuyerBackfire не найден в window');
-                        }
+                        if (typeof _triggerBuyerBackfire === 'function') _triggerBuyerBackfire(car, idx);
                     }, 800 + Math.random() * 1500);
                 }
             });
         }
-    } catch (e) {
-        console.warn('[DayCycle] Ошибка backfire:', e);
-    }
+    } catch (e) {}
 
-    // --------------------------------------------------------
-    // Рекламная кампания бизнеса (сброс по истечении)
-    // --------------------------------------------------------
     try {
         if (state.player.businessAdBonus) {
             const curDay = state.player.day || 1;
@@ -1333,24 +1262,17 @@ function executeDayCycleMidnight(currentDateObj) {
         }
     } catch (e) {}
 
-    // Сохраняем и обновляем UI
     saveState();
     updateHeaderUI();
 
-    if (typeof showToast === 'function') {
-        showToast("🌙 Наступил новый день! Суточные лимиты, кассы и зарплаты обновлены.");
-    }
+    if (typeof showToast === 'function') showToast("🌙 Наступил новый день!");
     if (typeof playSound === 'function') playSound('win');
     if (typeof tgHaptic === 'function') tgHaptic('success');
 }
 
 // ========================================================
-// УТИЛИТЫ ГЕНЕРАЦИИ УНИКАЛЬНЫХ ИДЕНТИФИКАТОРОВ И VIN
+// 15. ГЕНЕРАЦИЯ УНИКАЛЬНЫХ ID
 // ========================================================
-function generatePlayerUID() {
-    return 'usr_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7);
-}
-
 function generateVehicleVIN(modelPrefix = 'PRK') {
     const chars = 'ABCDEFGHJKLMNPRSTUVWXYZ0123456789';
     let vin = (modelPrefix.substring(0, 3).toUpperCase() + '1').padEnd(4, 'X');
@@ -1362,67 +1284,69 @@ function generateVehicleVIN(modelPrefix = 'PRK') {
 
 function ensureCarIdentity(car) {
     if (!car) return car;
-    if (!car.vin) {
-        car.vin = generateVehicleVIN(car.make || car.name || 'AUT');
-    }
-    if (!car.uid) {
-        car.uid = 'car_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
-    }
+    if (!car.vin) car.vin = generateVehicleVIN(car.make || car.name || 'AUT');
+    if (!car.uid) car.uid = 'car_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
     return car;
 }
 window.generateVehicleVIN = generateVehicleVIN;
 window.ensureCarIdentity = ensureCarIdentity;
 
 // ========================================================
-// 14. СТАРТОВАЯ РЕГИСТРАЦИЯ ИГРОКА
+// 16. ОНБОРДИНГ (ОБЯЗАТЕЛЬНЫЙ)
 // ========================================================
 function checkPlayerOnboarding(onComplete) {
     if (!state.player) state.player = {};
 
-    if (!state.player.uid) {
-        state.player.uid = (tgUserId && tgUserId !== "guest_777") ? String(tgUserId) : generatePlayerUID();
-        window.tgUserId = state.player.uid;
+    // Без валидного Telegram ID — блок
+    if (!tgUserId || String(tgUserId).startsWith('guest_') || String(tgUserId).startsWith('p_')) {
+        console.error('[Onboarding] Нет валидного Telegram ID — блокируем');
+        showTelegramRequiredScreen();
+        return;
     }
 
-    const isDefaultNick = !state.player.name || state.player.name === "Перекуп #777" || state.player.name.startsWith("Гость");
+    // uid игрока = Telegram ID
+    state.player.uid = String(tgUserId);
 
-    if (isDefaultNick) {
-        let overlay = document.getElementById('modalPlayerOnboarding');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'modalPlayerOnboarding';
-            overlay.className = 'modal-overlay active';
-            overlay.style.zIndex = '99999';
-            document.body.appendChild(overlay);
-        }
-
-        overlay.innerHTML = `
-            <div class="modal-box text-center" style="max-width: 380px; border-color: var(--cyan); background: radial-gradient(circle at 50% 0%, #151d2f 0%, #070a10 90%);">
-                <div class="modal-glow-badge mb-2" style="display:inline-block;"><i class="fa-solid fa-id-card"></i> ВХОД В СИНДИКАТ</div>
-                <h3 class="font-bold mb-1 color-cyan" style="font-size:18px;">Личное дело перекупа</h3>
-                <p class="sub-label mb-3" style="font-size:11px; color:#94a3b8;">
-                    Придумайте ваш позывной на авторынке и P2P-бирже. Вам будет присвоен уникальный ID в общей базе.
-                </p>
-
-                <div class="glass-card p-2 mb-3 text-left" style="background:#090e18;">
-                    <span class="sub-label" style="font-size:9px;">Ваш системный ID:</span>
-                    <div class="font-bold color-green" style="font-size:12px; font-family:monospace;">${state.player.uid}</div>
-                </div>
-
-                <div class="mb-3 text-left">
-                    <label class="sub-label block mb-1" style="font-size:10px;">Позывной (Никнейм):</label>
-                    <input type="text" id="onboardingNickInput" class="input-dark w-full" maxlength="20" placeholder="Например: Хантер_77" style="padding:10px; font-size:14px; text-align:center; font-weight:bold; border:1px solid var(--cyan); border-radius:8px;">
-                </div>
-
-                <button onclick="submitPlayerOnboarding()" class="btn btn-cyan w-full font-bold" style="padding:10px;">
-                    Начать карьеру перекупа <i class="fa-solid fa-arrow-right ml-1"></i>
-                </button>
-            </div>
-        `;
-        window._onboardingCallback = onComplete;
-    } else {
+    // Если онбординг уже пройден — пропускаем
+    if (state.player.onboardingDone === true) {
         if (typeof onComplete === 'function') onComplete();
+        return;
     }
+
+    // Показываем окно ввода ника
+    let overlay = document.getElementById('modalPlayerOnboarding');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'modalPlayerOnboarding';
+        overlay.className = 'modal-overlay active';
+        overlay.style.zIndex = '99999';
+        document.body.appendChild(overlay);
+    }
+
+    overlay.innerHTML = `
+        <div class="modal-box text-center" style="max-width: 380px; border-color: var(--cyan); background: radial-gradient(circle at 50% 0%, #151d2f 0%, #070a10 90%);">
+            <div class="modal-glow-badge mb-2" style="display:inline-block;"><i class="fa-solid fa-id-card"></i> ВХОД В СИНДИКАТ</div>
+            <h3 class="font-bold mb-1 color-cyan" style="font-size:18px;">Личное дело перекупа</h3>
+            <p class="sub-label mb-3" style="font-size:11px; color:#94a3b8;">
+                Придумайте ваш позывной на авторынке. Он сохранится в облаке под вашим Telegram ID.
+            </p>
+
+            <div class="glass-card p-2 mb-3 text-left" style="background:#090e18;">
+                <span class="sub-label" style="font-size:9px;">Ваш Telegram ID:</span>
+                <div class="font-bold color-green" style="font-size:12px; font-family:monospace;">${state.player.uid}</div>
+            </div>
+
+            <div class="mb-3 text-left">
+                <label class="sub-label block mb-1" style="font-size:10px;">Позывной (Никнейм):</label>
+                <input type="text" id="onboardingNickInput" class="input-dark w-full" maxlength="20" placeholder="Например: Хантер_77" style="padding:10px; font-size:14px; text-align:center; font-weight:bold; border:1px solid var(--cyan); border-radius:8px;">
+            </div>
+
+            <button onclick="submitPlayerOnboarding()" class="btn btn-cyan w-full font-bold" style="padding:10px;">
+                Начать карьеру перекупа <i class="fa-solid fa-arrow-right ml-1"></i>
+            </button>
+        </div>
+    `;
+    window._onboardingCallback = onComplete;
 }
 
 function submitPlayerOnboarding() {
@@ -1434,9 +1358,20 @@ function submitPlayerOnboarding() {
         return;
     }
 
+    // Жёсткая привязка к Telegram ID
+    state.player.uid = String(tgUserId);
     state.player.name = val;
+    state.player.onboardingDone = true;
+
     saveState();
     updateHeaderUI();
+
+    // Форс-синк в Firestore
+    if (window.FB_Bridge?.Players?.pushSaveForce) {
+        window.FB_Bridge.Players.pushSaveForce(String(tgUserId), state)
+            .then(ok => console.log('[Onboarding] pushSaveForce →', ok ? 'OK' : 'FAIL'))
+            .catch(e => console.warn('[Onboarding] pushSaveForce error:', e));
+    }
 
     const overlay = document.getElementById('modalPlayerOnboarding');
     if (overlay) overlay.remove();
@@ -1455,7 +1390,7 @@ function submitPlayerOnboarding() {
 window.submitPlayerOnboarding = submitPlayerOnboarding;
 
 // ========================================================
-// 15. UI ДАШБОРД ПРОФИЛЯ
+// 17. HUD
 // ========================================================
 function updateHeaderUI() {
     let targetCash = state.player?.cash || 0;
@@ -1494,16 +1429,6 @@ function updateHeaderUI() {
     if (hungerText) hungerText.innerText = hunger + '%';
     if (moodText) moodText.innerText = mood + '%';
 
-    const banknotePill = document.getElementById('hudBanknotePill');
-    if (banknotePill) {
-        banknotePill.classList.toggle('res-pulse-active', targetStars > 5);
-    }
-
-    const superSpinPill = document.getElementById('hudSuperSpinPill');
-    if (superSpinPill) {
-        superSpinPill.classList.toggle('res-pulse-active', targetSuperSpinTickets > 5);
-    }
-
     const pPhoto = document.getElementById('playerTgPhoto');
     const dIcon = document.getElementById('defaultAvatarIcon');
     if (state.player?.avatarUrl) {
@@ -1541,7 +1466,6 @@ function updateLevelGatesUI() {
         { id: 'truck', lockId: 'lock-truck', minLvl: 50 },
         { id: 'yacht', lockId: 'lock-yacht', minLvl: 100 }
     ];
-
     gates.forEach(g => {
         const btn = document.getElementById("catBtn-" + g.id);
         const sub = document.getElementById(g.lockId);
@@ -1613,9 +1537,7 @@ function renderProfileAnalytics() {
 
     let fleetValuation = 0;
     if (Array.isArray(state.garage)) {
-        state.garage.forEach(c => {
-            if (c) fleetValuation += (c.marketValue || c.basePrice || 100000);
-        });
+        state.garage.forEach(c => { if (c) fleetValuation += (c.marketValue || c.basePrice || 100000); });
     }
 
     let realEstateValuation = 0;
@@ -1640,9 +1562,9 @@ function renderProfileAnalytics() {
                     <i class="fa-solid fa-user-ninja"></i>
                 </div>
             </div>
-
             <h3 class="font-bold text-xs" style="font-size:16px;">${p.name || 'Перекуп #777'}</h3>
             <div class="sub-label mt-1 font-bold color-cyan">${rankTitle} (Уровень ${lvl})</div>
+            <div class="sub-label mt-1 font-mono" style="font-size:9px; color:#64748b;">UID: ${p.uid || '—'}</div>
 
             <div class="flex-between mt-3 pt-2" style="border-top: 1px dashed rgba(255,255,255,0.08);">
                 <button onclick="ThemeManager.openCustomizer()" class="btn btn-purple btn-sm btn-auto" style="font-size:10px;">
@@ -1705,7 +1627,7 @@ function renderProfileAnalytics() {
 }
 
 // ========================================================
-// 16. НАВИГАЦИЯ
+// 18. НАВИГАЦИЯ
 // ========================================================
 function switchTab(tabId) {
     if (window.AudioFx) {
@@ -1749,7 +1671,7 @@ function switchTab(tabId) {
 }
 
 // ========================================================
-// 17. СТАРТ ПРИЛОЖЕНИЯ И ГЛАВНЫЙ ТАЙМЕР
+// 19. СТАРТ
 // ========================================================
 function initApp() {
     initTelegramAuthAndStorage(async () => {
@@ -1761,9 +1683,7 @@ function initApp() {
             checkRealTimeDayChange();
 
             if (window.FB_Bridge?.CarsCatalog) {
-                try {
-                    await window.FB_Bridge.CarsCatalog.fetchCloudCars();
-                } catch(e) {}
+                try { await window.FB_Bridge.CarsCatalog.fetchCloudCars(); } catch(e) {}
             }
 
             if (typeof renderGarage === 'function') renderGarage();
@@ -1774,7 +1694,7 @@ function initApp() {
                 PhoneManager.init();
             }
 
-            if (window.FB_Bridge?.Notifications && typeof PhoneManager !== 'undefined') {
+            if (window.FB_Bridge?.Notifications && typeof PhoneManager !== 'undefined' && tgUserId) {
                 try {
                     const notifs = await window.FB_Bridge.Notifications.fetchMyNotifications(tgUserId);
                     if (notifs && notifs.length > 0) {
@@ -1790,9 +1710,7 @@ function initApp() {
                         saveState();
                         updateHeaderUI();
                     }
-                } catch (e) {
-                    console.warn("[Notifications] Ошибка загрузки:", e);
-                }
+                } catch (e) {}
             }
 
             switchTab('tabMarket');
@@ -1805,9 +1723,7 @@ let gameCycleSeconds = 0;
 window.gameCycleInterval = setInterval(() => {
     gameCycleSeconds++;
 
-    if (gameCycleSeconds % 60 === 0) {
-        checkRealTimeDayChange();
-    }
+    if (gameCycleSeconds % 60 === 0) checkRealTimeDayChange();
 
     if (gameCycleSeconds % 45 === 0 && state.player) {
         state.player.hunger = Math.max(0, (state.player.hunger || 80) - 1);
@@ -1821,7 +1737,7 @@ window.gameCycleInterval = setInterval(() => {
     }
 }, 1000);
 
-// Экспорт ядра
+// Экспорт
 window.initApp = initApp;
 window.switchTab = switchTab;
 window.saveState = saveState;
