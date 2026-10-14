@@ -1,10 +1,13 @@
 // ========================================================
-// js/market-inspection.js — СИСТЕМА ПРОВЕРОК 2.2 (v2.2.0)
+// js/market-inspection.js — СИСТЕМА ПРОВЕРОК 2.2 (v2.2.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.2.1 (КОМПАКТНАЯ АВТОТЕКА):
+//   - Убрана кнопка «Скачать PDF».
+//   - Уменьшены размеры окна и внутренние отступы.
 // ⭐ v2.2.0 (ИНТЕРАКТИВНАЯ АВТОТЕКА):
 //   - openAutotekaModal полностью переработан: теперь это
 //     официальный отчёт с водяными знаками, разделами,
-//     шкалой рисков и кнопкой PDF.
+//     шкалой рисков.
 //   - Стилистика совпадает с бланком ДКП.
 // ⭐ v2.1.0:
 //   - ФИКС кликов по плиткам проверки.
@@ -608,7 +611,7 @@ function closeInspectionResults() {
 }
 
 // --------------------------------------------------------
-// 6. ⭐ v2.2.0: ИНТЕРАКТИВНАЯ АВТОТЕКА (ОФИЦИАЛЬНЫЙ ОТЧЁТ)
+// 6. ⭐ v2.2.1: ИНТЕРАКТИВНАЯ АВТОТЕКА (КОМПАКТНЫЙ ОТЧЁТ)
 // --------------------------------------------------------
 function openAutotekaModal(carId) {
     if (!state.marketFeed) return;
@@ -819,11 +822,6 @@ function openAutotekaModal(carId) {
                         <b class="${scoreColor}" style="font-size:20px; margin-left:10px;">${overallScore}/10</b>
                     </div>
                 </div>
-
-                <!-- КНОПКА PDF -->
-                <button onclick="downloadAutotekaPDF()" class="btn btn-dark btn-sm w-full mt-2">
-                    <i class="fa-solid fa-download mr-1"></i> Скачать PDF
-                </button>
             </div>
         </div>
     `;
@@ -831,38 +829,6 @@ function openAutotekaModal(carId) {
     ModalManager.open("modalAutoteka");
     if (typeof playSound === 'function') playSound('tick');
     if (typeof renderMarketFeed === 'function') renderMarketFeed();
-}
-
-// --------------------------------------------------------
-// ⭐ v2.2.0: СКАЧАТЬ PDF АВТОТЕКИ (ИМИТАЦИЯ)
-// --------------------------------------------------------
-function downloadAutotekaPDF() {
-    if (typeof showToast === 'function') {
-        showToast("📄 Отчёт Автотеки сохранён в буфер обмена (PDF-имитация)");
-    }
-    if (typeof playSound === 'function') playSound('win');
-    if (typeof tgHaptic === 'function') tgHaptic('success');
-
-    if (activeInspectCarId) {
-        const car = _getInspectCar();
-        if (car) {
-            const reportText = `
-АВТОТЕКА — ОФИЦИАЛЬНЫЙ ОТЧЁТ
-Дата: ${new Date().toLocaleDateString('ru-RU')}
-Модель: ${car.name}
-VIN: ${car.vin || '—'}
-Госномер: ${car.customPlate || car.plate || 'ТРАНЗИТ'}
-Пробег: ${(car.mileage || 0).toLocaleString()} км
-Ресурс ДВС: ${car.wear?.engine || 85}%
-Ресурс КПП: ${car.wear?.transmission || 85}%
-Юридический статус: ${car.legalDefect ? '⚠️ Есть проблемы' : '✓ Чисто'}
-            `.trim();
-
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(reportText).catch(() => {});
-            }
-        }
-    }
 }
 
 // --------------------------------------------------------
@@ -876,8 +842,7 @@ window.PhoneMarketInspection = {
     closeGaugeModal,
     quickOBDScanMarketCar,
     closeOBD2Modal,
-    openAutotekaModal,
-    downloadAutotekaPDF
+    openAutotekaModal
 };
 
 Object.assign(window, {
@@ -887,11 +852,10 @@ Object.assign(window, {
     quickOBDScanMarketCar,
     closeOBD2Modal,
     openAutotekaModal,
-    downloadAutotekaPDF,
     openInspectionChoiceModal,
     runInspection,
     closeInspectionResults,
     _showInspectionResults
 });
 
-console.log('[🔬 market-inspection v2.2.0] Интерактивная Автотека с PDF + шкалой рисков ✓');
+console.log('[🔬 market-inspection v2.2.1] Компактная Автотека без PDF ✓');
