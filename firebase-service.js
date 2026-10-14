@@ -8,7 +8,10 @@ import {
   query, 
   orderBy, 
   limit, 
-  getDocs 
+  getDocs,
+  addDoc,
+  deleteDoc,
+  where
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -46,7 +49,7 @@ export function getPlayerProfile() {
   };
 }
 
-// Загрузка сохранений из облака
+// Загрузка сохранений из облака[cite: 12]
 export async function loadCloudSave() {
   const { id } = getPlayerProfile();
   try {
@@ -61,10 +64,9 @@ export async function loadCloudSave() {
   return null;
 }
 
-// Сохранение в облако с дебаунсом (3 сек) для экономии квот
+// Сохранение в облако с дебаунсом (3 сек) для экономии квот[cite: 12]
 let saveTimer = null;
 export function saveCloudSave(state) {
-  // Мгновенная запись в localStorage
   localStorage.setItem("perekupik_save", JSON.stringify(state));
 
   clearTimeout(saveTimer);
@@ -78,7 +80,6 @@ export function saveCloudSave(state) {
         updatedAt: Date.now()
       }, { merge: true });
 
-      // Если в стейте есть баланс — обновляем рейтинг
       if (typeof state.balance === "number") {
         const lbRef = doc(db, "leaderboard", id);
         await setDoc(lbRef, {
@@ -93,7 +94,7 @@ export function saveCloudSave(state) {
   }, 3000);
 }
 
-// Получение ТОП-10 перекупов
+// Получение ТОП-10 перекупов[cite: 12]
 export async function getLeaderboard() {
   try {
     const q = query(
@@ -106,5 +107,76 @@ export async function getLeaderboard() {
   } catch (err) {
     console.error("Ошибка загрузки лидерборда:", err);
     return [];
+  }
+}
+
+// ========================================================
+// УНИВЕРСАЛЬНАЯ P2P БИРЖА (АВТО, НОМЕРА, БИЗНЕС, ЖИЛЬЕ)
+// ========================================================
+
+// Опубликовать любой лот на P2P рынок
+export async function publishP2PLot(lotData) {
+  const { id, name } = getPlayerProfile();
+  try {
+    const lotRef = collection(db, "market_lots");
+    const docRef = await addDoc(lotRef, {
+      ...lotData,
+      sellerId: id,
+      sellerName: lotData.sellerName || name,
+      // Универсальный тип имущества: 'car', 'plate', 'business', 'housing'
+      itemType: lotData.type || lotData.itemType || 'car', 
+      createdAt: Date.now(),
+      status: "active"
+    });
+    return docRef.id;
+  } catch (err) {
+    console.error("Ошибка публикации универсального P2P лота:", err);
+    throw err;
+  }
+}
+
+// Загрузить все активные P2P лоты (с фильтрацией по типу, если нужно)
+export async function fetchMarketLots(itemTypeFilter = null) {
+  try {
+    let q;
+    if (itemTypeFilter && itemTypeFilter !== 'all') {
+      q = query(
+        collection(db, "market_lots"), 
+        where("status", "==", "active"), 
+        where("itemType", "==", itemTypeFilter),
+        limit(50)
+      );
+    } else {
+      q = query(
+        collection(db, "market_lots"), 
+        where("status", "==", "active"), 
+        limit(50)
+      );
+    }
+
+    const snapshot = await getDocs(q);
+    let lots = [];
+    snapshot.forEach(docSnap => {
+      lots.push({
+        id: docSnap.id,
+        ...docSnap.data()
+      });
+    });
+    return lots;
+  } catch (err) {
+    console.error("Ошибка загрузки универсального P2P рынка:", err);
+    return [];
+  }
+}
+
+// Удалить/купить P2P лот
+export async function removeP2PLot(lotId) {
+  try {
+    const lotRef = doc(db, "market_lots", lotId);
+    await deleteDoc(lotRef);
+    return true;
+  } catch (err) {
+    console.error("Ошибка удаления лота с биржи:", err);
+    return false;
   }
 }

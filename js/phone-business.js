@@ -1,10 +1,42 @@
 // ========================================================
-// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА 2.0 (v0.8.0)
+// js/phone-business.js — БИЗНЕС-ИМПЕРИЯ ПЕРЕКУПА 3.0 (Кастомизация & Модерация)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Восстановлены визуальные обложки предприятий и цехов,
-// графические шкалы доходности, кассы и сырья,
-// глубокое управление цехами, штатом сотрудников и автопарком.
 // ========================================================
+
+// Каталог кастомных обложек (10 видов с бонусами)
+if (typeof window.BUSINESS_COVER_SKINS === 'undefined') {
+    window.BUSINESS_COVER_SKINS = [
+        { id: 'classic', name: 'Гаражная классика', cost: 0, bonusIncPct: 0, icon: 'fa-warehouse', color: '#64748b' },
+        { id: 'neon_tokyo', name: 'Tokyo Neon Club', cost: 120000, bonusIncPct: 5, icon: 'fa-city', color: '#00f2fe' },
+        { id: 'gold_syndicate', name: 'Syndicate Gold', cost: 350000, bonusIncPct: 12, icon: 'fa-crown', color: '#ffd700' },
+        { id: 'carbon_stealth', name: 'Carbon Stealth', cost: 220000, bonusIncPct: 8, icon: 'fa-shield-halved', color: '#334155' },
+        { id: 'cyber_terminal', name: 'Cyber Terminal', cost: 280000, bonusIncPct: 10, icon: 'fa-terminal', color: '#00e676' },
+        { id: 'vintage_retro', name: 'Retro 80s Garage', cost: 150000, bonusIncPct: 6, icon: 'fa-record-vinyl', color: '#f43f5e' },
+        { id: 'elite_marble', name: 'Elite Marble Showroom', cost: 600000, bonusIncPct: 18, icon: 'fa-gem', color: '#c084fc' },
+        { id: 'industrial_rust', name: 'Industrial Heavy Duty', cost: 180000, bonusIncPct: 7, icon: 'fa-industry', color: '#f59e0b' },
+        { id: 'drift_king', name: 'Drift King Station', cost: 310000, bonusIncPct: 11, icon: 'fa-flag-checkered', color: '#ff3366' },
+        { id: 'federal_hub', name: 'Federal Logistics Hub', cost: 950000, bonusIncPct: 25, icon: 'fa-globe', color: '#38bdf8' }
+    ];
+}
+
+// Каталог анимаций карточки для P2P биржи
+if (typeof window.BUSINESS_CARD_ANIMATIONS === 'undefined') {
+    window.BUSINESS_CARD_ANIMATIONS = [
+        { id: 'none', name: 'Статичная карточка', cost: 0, className: '' },
+        { id: 'neon_pulse', name: '⚡ Неоновый пульс', cost: 85000, className: 'card-glow-tuned' },
+        { id: 'gold_shimmer', name: '👑 Золотой перелив', cost: 200000, className: 'badge-shimmer-gold' },
+        { id: 'matrix_glitch', name: '💻 Матричный глитч', cost: 160000, className: 'card-anim-shimmer' },
+        { id: 'plasma_storm', name: '🔥 Плазменный шторм', cost: 300000, className: 'card-glow-urgent' }
+    ];
+}
+
+// Список запрещенных слов и оскорблений для модерации названий
+if (typeof window.FORBIDDEN_WORDS_LIST === 'undefined') {
+    window.FORBIDDEN_WORDS_LIST = [
+        'хуй', 'пизд', 'еб', 'сук', 'бля', 'мраз', 'чмо', 'админ', 'модер', 
+        'support', 'admin', 'moderator', 'gay', 'fag', 'nigga', 'nigger', 'порно', 'casino', 'клубника'
+    ];
+}
 
 if (typeof window.BUSINESS_UPGRADES_BRANCHES === 'undefined') {
     window.BUSINESS_UPGRADES_BRANCHES = {
@@ -151,6 +183,9 @@ const AppBusiness = {
             if (b.maxStock === undefined || b.maxStock <= 0) b.maxStock = 100;
             if (b.stock === undefined) b.stock = 100;
             if (b.stored === undefined) b.stored = 0;
+            if (!b.customName) b.customName = b.name;
+            if (!b.coverSkin) b.coverSkin = 'classic';
+            if (!b.cardAnimation) b.cardAnimation = 'none';
         }
     },
 
@@ -176,6 +211,12 @@ const AppBusiness = {
     calculateBusinessMultiplier: function(biz) {
         if (!biz) return 1.0;
         var bonusMul = 1.0;
+
+        // Бонус от обложки
+        if (biz.coverSkin && typeof BUSINESS_COVER_SKINS !== 'undefined') {
+            var skin = BUSINESS_COVER_SKINS.find(function(s) { return s.id === biz.coverSkin; });
+            if (skin && skin.bonusIncPct) bonusMul += (skin.bonusIncPct / 100);
+        }
 
         if (biz.staff && typeof BUSINESS_STAFF_CATALOG !== 'undefined') {
             if (biz.staff.manager && Array.isArray(BUSINESS_STAFF_CATALOG.managers)) {
@@ -214,7 +255,154 @@ const AppBusiness = {
     },
 
     // ========================================================
-    // 1. ВКЛАДКА «ТОЧКИ»: С ОБЛОЖКАМИ И ШКАЛАМИ
+    // МОДЕРАЦИЯ И ПРОВЕРКА НАПРЯМУЮ ЧЕРЕЗ СОГЛАШЕНИЕ
+    // ========================================================
+    validateCustomName: function(nameStr) {
+        if (!nameStr || typeof nameStr !== 'string') return "Предприятие";
+        var clean = nameStr.trim();
+        if (clean.length < 2) return "Предприятие";
+        if (clean.length > 32) clean = clean.substring(0, 32);
+
+        var lower = clean.toLowerCase();
+        var forbidden = window.FORBIDDEN_WORDS_LIST || [];
+        for (var i = 0; i < forbidden.length; i++) {
+            if (lower.indexOf(forbidden[i]) !== -1) {
+                return "Заблокировано цензурой";
+            }
+        }
+        return clean;
+    },
+
+    openCustomizationModal: function(idx) {
+        var biz = state.businesses[idx];
+        if (!biz || biz.level <= 0) return;
+
+        var modal = document.getElementById('modalBusinessCustomize');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalBusinessCustomize';
+            modal.className = 'modal-overlay';
+            document.body.appendChild(modal);
+        }
+
+        var skinsHtml = '';
+        BUSINESS_COVER_SKINS.forEach(function(skin) {
+            var isSel = biz.coverSkin === skin.id;
+            skinsHtml += '<div onclick="AppBusiness.selectSkinAction(' + idx + ', \'' + skin.id + '\')" class="glass-card p-2 mb-1 flex-between cursor-pointer ' + (isSel ? 'personal-car-card' : '') + '" style="border-color:' + skin.color + ';">' +
+                '<div class="flex-gap" style="align-items:center;">' +
+                    '<i class="fa-solid ' + skin.icon + ' fa-lg" style="color:' + skin.color + ';"></i>' +
+                    '<div><b>' + skin.name + '</b><div class="sub-label" style="font-size:8px;">Доход: +' + skin.bonusIncPct + '%</div></div>' +
+                '</div>' +
+                '<span class="tag-badge ' + (isSel ? 'bg-tag-green' : 'bg-tag-cyan') + '">' + (isSel ? 'НАДЕТО ✓' : (skin.cost > 0 ? skin.cost.toLocaleString() + ' ₽' : 'БЕСПЛАТНО')) + '</span>' +
+            '</div>';
+        });
+
+        var animsHtml = '';
+        BUSINESS_CARD_ANIMATIONS.forEach(function(anim) {
+            var isSel = biz.cardAnimation === anim.id;
+            animsHtml += '<div onclick="AppBusiness.selectAnimAction(' + idx + ', \'' + anim.id + '\')" class="glass-card p-2 mb-1 flex-between cursor-pointer ' + (isSel ? 'personal-car-card' : '') + '">' +
+                '<div><b>' + anim.name + '</b></div>' +
+                '<span class="tag-badge ' + (isSel ? 'bg-tag-green' : 'bg-tag-cyan') + '">' + (isSel ? 'АКТИВНО ✓' : (anim.cost > 0 ? anim.cost.toLocaleString() + ' ₽' : 'СТАНДАРТ')) + '</span>' +
+            '</div>';
+        });
+
+        modal.innerHTML = '<div class="modal-box" style="max-width:440px; max-height:85vh; overflow-y:auto;">' +
+            '<div class="flex-between mb-2">' +
+                '<div class="modal-glow-badge"><i class="fa-solid fa-paintbrush"></i> КАСТОМИЗАЦИЯ БИЗНЕСА</div>' +
+                '<button onclick="ModalManager.close(\'modalBusinessCustomize\')" class="btn btn-dark btn-auto btn-sm">✕</button>' +
+            '</div>' +
+
+            '<div class="sub-label mb-2" style="font-size:9.5px;">Укажите уникальное название предприятия и выберите визуальный стиль бренда.</div>' +
+
+            '<div class="mb-3">' +
+                '<label class="sub-label text-xs mb-1 block">Название компании (Внимание: действует цензура!):</label>' +
+                '<input type="text" id="inputBizCustomName" value="' + (biz.customName || biz.name) + '" class="glass-input w-full mb-1" placeholder="Введите название..." style="padding:8px; font-size:12px;">' +
+                '<button onclick="AppBusiness.saveCustomNameAction(' + idx + ')" class="btn btn-green btn-sm w-full font-bold">Сохранить название ✓</button>' +
+            '</div>' +
+
+            '<b class="text-xs color-cyan block mb-1">🎨 Выбор обложки цеха:</b>' +
+            '<div class="space-y-1 mb-3">' + skinsHtml + '</div>' +
+
+            '<b class="text-xs color-purple block mb-1">✨ Анимация карточки для P2P биржи:</b>' +
+            '<div class="space-y-1 mb-3">' + animsHtml + '</div>' +
+
+            '<button onclick="ModalManager.close(\'modalBusinessCustomize\')" class="btn btn-cyan w-full font-bold">Готово</button>' +
+        '</div>';
+
+        ModalManager.open('modalBusinessCustomize');
+        if (typeof playSound === 'function') playSound('tick');
+    },
+
+    saveCustomNameAction: function(idx) {
+        var input = document.getElementById('inputBizCustomName');
+        if (!input) return;
+        var biz = state.businesses[idx];
+        if (!biz) return;
+
+        var raw = input.value;
+        var validated = this.validateCustomName(raw);
+
+        if (validated === "Заблокировано цензурой") {
+            showToast("🚫 Название содержит запрещенные слова или оскорбления!");
+            if (typeof playSound === 'function') playSound('error');
+            return;
+        }
+
+        biz.customName = validated;
+        saveState();
+        showToast("Название компании успешно обновлено: «" + validated + "» ✓");
+        if (typeof playSound === 'function') playSound('win');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    selectSkinAction: function(idx, skinId) {
+        var biz = state.businesses[idx];
+        if (!biz) return;
+        var skin = BUSINESS_COVER_SKINS.find(function(s) { return s.id === skinId; });
+        if (!skin) return;
+
+        if (skin.cost > 0 && !biz.ownedSkins?.includes(skinId)) {
+            var cash = state.player ? (state.player.cash || 0) : 0;
+            if (cash < skin.cost) return showToast("Не хватает денег на покупку обложки (" + skin.cost.toLocaleString() + " ₽)!");
+            state.player.cash -= skin.cost;
+            if (!biz.ownedSkins) biz.ownedSkins = ['classic'];
+            biz.ownedSkins.push(skinId);
+        }
+
+        biz.coverSkin = skinId;
+        saveState();
+        updateHeaderUI();
+        showToast("Установлена новая обложка: «" + skin.name + "»!");
+        if (typeof playSound === 'function') playSound('win');
+        this.openCustomizationModal(idx);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    selectAnimAction: function(idx, animId) {
+        var biz = state.businesses[idx];
+        if (!biz) return;
+        var anim = BUSINESS_CARD_ANIMATIONS.find(function(a) { return a.id === animId; });
+        if (!anim) return;
+
+        if (anim.cost > 0 && !biz.ownedAnims?.includes(animId)) {
+            var cash = state.player ? (state.player.cash || 0) : 0;
+            if (cash < anim.cost) return showToast("Не хватает денег на анимацию (" + anim.cost.toLocaleString() + " ₽)!");
+            state.player.cash -= anim.cost;
+            if (!biz.ownedAnims) biz.ownedAnims = ['none'];
+            biz.ownedAnims.push(animId);
+        }
+
+        biz.cardAnimation = animId;
+        saveState();
+        updateHeaderUI();
+        showToast("Анимация карточки обновлена!");
+        if (typeof playSound === 'function') playSound('win');
+        this.openCustomizationModal(idx);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // ========================================================
+    // 1. ВКЛАДКА «ТОЧКИ» С УНИКАЛЬНЫМИ ИМЕНАМИ И КНОПКОЙ КАСТОМИЗАЦИИ
     // ========================================================
     renderBusinessesListHtml: function() {
         var lvl = state.player ? (state.player.level || 1) : 1;
@@ -286,14 +474,17 @@ const AppBusiness = {
                             'Снять (' + curStored.toLocaleString() + ' ₽)' +
                         '</button>' +
                     '</div>' +
-                    '<div class="grid-2">' +
+                    '<div class="grid-2 mb-1">' +
                         '<button onclick="AppBusiness.restockSingle(' + idx + ')" class="btn btn-amber btn-sm"' + (curStk >= maxStk ? ' disabled' : '') + '>' +
                             'Сырьё (15k)' +
                         '</button>' +
                         '<button onclick="AppBusiness.upgradeLevelSingle(' + idx + ')" class="btn btn-cyan btn-sm">' +
                             '+Уровень (' + (cost / 1000).toFixed(0) + 'k)' +
                         '</button>' +
-                    '</div>';
+                    '</div>' +
+                    '<button onclick="AppBusiness.openCustomizationModal(' + idx + ')" class="btn btn-purple btn-sm w-full">' +
+                        '🎨 Название, Скин и Бренд' +
+                    '</button>';
             }
 
             var staffBadge = "";
@@ -305,10 +496,10 @@ const AppBusiness = {
             }
 
             var iconClass = defaultIcons[biz.id] || 'fa-briefcase';
+            var displayName = isOwned ? (biz.customName || biz.name) : biz.name;
 
             html += 
                 '<div class="glass-card mb-3 p-2">' +
-                    '<!-- ВОССТАНОВЛЕННАЯ ОБЛОЖКА БИЗНЕСА -->' +
                     '<div class="car-img-wrap mb-2" style="height:130px; position:relative;">' +
                         '<img src="' + bizImg + '" class="car-img" onerror="this.onerror=null; this.src=\'' + fallbackImg + '\';">' +
                         '<div class="badge-tag badge-br">' +
@@ -320,7 +511,7 @@ const AppBusiness = {
 
                     '<div class="flex-between mb-1">' +
                         '<div>' +
-                            '<b class="text-xs color-green" style="font-size:13px;"><i class="fa-solid ' + iconClass + ' mr-1"></i> ' + biz.name + '</b>' +
+                            '<b class="text-xs color-green" style="font-size:13px;"><i class="fa-solid ' + iconClass + ' mr-1"></i> ' + displayName + '</b>' +
                             staffBadge +
                         '</div>' +
                         '<span class="tag-badge bg-tag-green">+' + calculatedIncome.toLocaleString() + ' ₽/д</span>' +
@@ -408,10 +599,11 @@ const AppBusiness = {
         var calcIncome = this.calculateBusinessIncome(biz);
         var safeCapacity = Math.max(50000, calcIncome * 3);
         var cashPct = Math.min(100, Math.round((curStored / safeCapacity) * 100));
+        var displayName = biz.customName || biz.name;
 
         return '<div class="glass-card mb-2 p-2" style="border-left: 3px solid var(--green);">' +
                 '<div class="flex-between mb-1">' +
-                    '<b class="text-xs color-green">' + biz.name + ' (Ур. ' + biz.level + ')</b>' +
+                    '<b class="text-xs color-green">' + displayName + ' (Ур. ' + biz.level + ')</b>' +
                     '<span class="tag-badge bg-tag-green">ЦЕХ АКТИВЕН</span>' +
                 '</div>' +
                 '<div class="sub-label mb-2" style="font-size:9.5px;">' + (biz.desc || biz.perk || 'Промышленный объект сети.') + '</div>' +
@@ -558,8 +750,10 @@ const AppBusiness = {
             });
         }
 
+        var displayName = biz.customName || biz.name;
+
         return '<div class="glass-card mb-2 p-2">' +
-                '<b class="text-xs color-green block mb-1">Штат филиала: ' + biz.name + '</b>' +
+                '<b class="text-xs color-green block mb-1">Штат филиала: ' + displayName + '</b>' +
                 '<div class="sub-label mb-2" style="font-size:9.5px;">Сотрудники работают в филиале, дают бонусы и получают зарплату в 00:00.</div>' +
             '</div>' +
             '<div class="glass-card mb-2 p-2">' +
@@ -679,8 +873,10 @@ const AppBusiness = {
             '</div>';
         });
 
+        var displayName = biz.customName || biz.name;
+
         return '<div class="glass-card mb-2 p-2">' +
-                '<b class="text-xs color-green block mb-1">Спецтехника точки: ' + biz.name + '</b>' +
+                '<b class="text-xs color-green block mb-1">Спецтехника точки: ' + displayName + '</b>' +
                 '<div class="sub-label mb-2" style="font-size:9.5px;">Коммерческий транспорт увеличивает емкость складов и оборот выручки.</div>' +
             '</div>' +
             '<div class="space-y-2">' + cardsHtml + '</div>';
@@ -733,6 +929,9 @@ const AppBusiness = {
         biz.level = 1;
         biz.stock = 100;
         biz.stored = 0;
+        biz.customName = biz.name;
+        biz.coverSkin = 'classic';
+        biz.cardAnimation = 'none';
 
         saveState();
         updateHeaderUI();
@@ -758,7 +957,7 @@ const AppBusiness = {
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("«" + biz.name + "» повышен до " + biz.level + " уровня!");
+        showToast("«" + (biz.customName || biz.name) + "» повышен до " + biz.level + " уровня!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
@@ -813,7 +1012,11 @@ const AppBusiness = {
         if (total <= 0) return showToast("Кассы предприятий пусты!");
 
         state.player.cash = (state.player.cash || 0) + total;
-        if (typeof trackQuestProgress === 'function') trackQuestProgress('collect_biz', 1);
+        
+        // Исправленный вызов
+        if (typeof trackQuestProgress === 'function') {
+            trackQuestProgress('collect_biz', 1);
+        }
 
         saveState();
         updateHeaderUI();
@@ -821,8 +1024,7 @@ const AppBusiness = {
         if (typeof tgHaptic === 'function') tgHaptic('success');
         showToast("Собрана вся касса сети: +" + total.toLocaleString() + " ₽!");
         this.render(document.getElementById('phoneAppContainer'));
-    }
-};
+    };
 
 window.AppBusiness = AppBusiness;
 
