@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#05080f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<title>PEREKUP OS — Симулятор Перекупа</title>
+
+<!-- ═══════════ СТИЛИ ═══════════ -->
+<link rel="stylesheet" href="style.css?v=421">
+<link rel="stylesheet" href="css/base.css?v=421">
+<link rel="stylesheet" href="css/hud.css?v=421">
+<link rel="stylesheet" href="css/market.css?v=421">
+<link rel="stylesheet" href="css/phone.css?v=421">
+<link rel="stylesheet" href="css/modals.css?v=421">
+<link rel="stylesheet" href="css/nav.css?v=421">
+
+<!-- ═══════════ БИБЛИОТЕКИ ═══════════ -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<!-- ═══════════════════════════════════════════════════════
+     FIREBASE МОДУЛИ (загружаются ДО основного скрипта)
+     ═══════════════════════════════════════════════════════ -->
+<script type="module" src="js/firebase/firebase-core.js?v=421"></script>
+<script type="module" src="js/firebase/firebase-market.js?v=421"></script>
+<script type="module" src="js/firebase/firebase-friendships.js?v=421"></script>
+<script type="module" src="js/firebase/firebase-notifications.js?v=421"></script>
+<script type="module" src="js/firebase/firebase-p2p.js?v=421"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     ЭКРАН DEV-АВТОРИЗАЦИИ ДЛЯ ПК
+     ═══════════════════════════════════════════════════════ -->
+<div id="pcAuthScreen" class="pc-auth-overlay" style="display:none;">
+  <div class="pc-auth-box">
+    <div class="pc-auth-logo"><i class="fa-solid fa-terminal"></i></div>
+    <h1 class="pc-auth-title">PEREKUP OS</h1>
+    <p class="pc-auth-subtitle">Введите пароль для входа</p>
+
+    <div class="pc-auth-input-wrap">
+      <input type="password" id="pcAuthInput" class="pc-auth-input" placeholder="••••••••" maxlength="32" autocomplete="off">
+      <button type="button" id="pcAuthToggle" class="pc-auth-toggle" onclick="togglePcAuthPassword()">
+        <i class="fa-solid fa-eye"></i>
+      </button>
+    </div>
+
+    <div id="pcAuthError" class="pc-auth-error" style="display:none;"></div>
+
+    <button type="button" onclick="submitPcAuthPassword()" class="pc-auth-submit">
+      <i class="fa-solid fa-unlock mr-2"></i> ВОЙТИ В СИСТЕМУ
+    </button>
+
+    <div class="pc-auth-footer">
+      <div class="pc-auth-hint">💡 Если вы играете через Telegram — просто откройте бота заново.</div>
+      <div class="pc-auth-version">v4.0.0 // BUILD 421</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     ЭКРАН ТРЕБОВАНИЯ TELEGRAM
+     ═══════════════════════════════════════════════════════ -->
+<div id="tgRequiredScreen" class="pc-auth-overlay" style="display:none;">
+  <div class="pc-auth-box">
+    <div class="pc-auth-logo" style="color: var(--cyan, #00f2fe);">
+      <i class="fa-solid fa-mobile-screen"></i>
+    </div>
+    <h1 class="pc-auth-title">ТРЕБУЕТСЯ TELEGRAM</h1>
+    <p class="pc-auth-subtitle">Игра доступна только через Telegram Mini App</p>
+
+    <div style="padding: 12px; background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.3); border-radius: 10px; color: #67e8f9; font-size: 11px; line-height: 1.4; margin-bottom: 16px; text-align: left;">
+      <b>Что делать:</b><br>
+      1. Откройте бота <b>@PerekupSimBot</b> в Telegram<br>
+      2. Запустите игру из бота<br>
+      3. Если играете с ПК — используйте DEV-режим (пароль <code>perekup2026</code>)
+    </div>
+
+    <button type="button" onclick="openPcAuthScreen()" class="pc-auth-submit" style="background: linear-gradient(135deg, #c084fc, #9333ea);">
+      <i class="fa-solid fa-terminal mr-2"></i> DEV-РЕЖИМ ДЛЯ ПК
+    </button>
+
+    <div class="pc-auth-footer">
+      <div class="pc-auth-version">v4.0.0 // BUILD 421</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     ЭКРАН ОТКАЗА В ДОСТУПЕ (AccessControl)
+     ═══════════════════════════════════════════════════════ -->
+<div id="accessDeniedScreen" class="pc-auth-overlay" style="display:none;">
+  <div class="pc-auth-box">
+    <div class="pc-auth-logo" style="color: #ff3366;">
+      <i class="fa-solid fa-shield-halved"></i>
+    </div>
+    <h1 class="pc-auth-title" style="color: #ff3366;">ДОСТУП ЗАКРЫТ</h1>
+    <p class="pc-auth-subtitle">Игра доступна только по приглашению владельца</p>
+
+    <div style="padding: 12px; background: rgba(255, 51, 102, 0.08); border: 1px solid rgba(255, 51, 102, 0.3); border-radius: 10px; color: #fca5a5; font-size: 11px; line-height: 1.5; margin-bottom: 16px; text-align: left;">
+      <b>Что делать:</b><br>
+      • Свяжитесь с владельцем игры в Telegram<br>
+      • Или введите инвайт-код, если он у вас есть
+    </div>
+
+    <div style="position: relative; margin-bottom: 14px;">
+      <input type="text" id="accessInviteInput" placeholder="Инвайт-код" maxlength="32" autocomplete="off"
+             style="width:100%; padding:14px 16px; background:#05080f; border:1.5px solid rgba(255,51,102,0.35); border-radius:12px; color:#fff; font-size:14px; font-weight:700; text-align:center; outline:none; box-sizing:border-box; font-family:monospace;">
+    </div>
+
+    <div id="accessErrorMsg" class="pc-auth-error" style="display:none;"></div>
+
+    <button type="button" onclick="submitAccessInviteCode()" class="pc-auth-submit" style="background: linear-gradient(135deg, #c084fc, #9333ea);">
+      <i class="fa-solid fa-key mr-2"></i> АКТИВИРОВАТЬ КОД
+    </button>
+
+    <div class="pc-auth-footer">
+      <div class="pc-auth-hint">💡 Инвайт-код выдаёт владелец игры в личном сообщении.</div>
+      <div class="pc-auth-version">v4.0.0 // BUILD 421</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     ОСНОВНОЕ ПРИЛОЖЕНИЕ
+     ═══════════════════════════════════════════════════════ -->
+<div class="app-shell" id="appShell" style="display:none;">
+
+  <!-- HUD -->
+  <header class="hud-header">
+    <div class="hud-card hud-top-row">
+      <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль">
+        <div class="avatar-ring">
+          <div class="avatar-glow"></div>
+          <div class="avatar-fx-glow"></div>
+          <div class="avatar" id="playerAvatarBox">
+            <i class="fa-solid fa-user-ninja" id="defaultAvatarIcon"></i>
+            <img id="playerTgPhoto" src="" style="display:none;" onerror="this.style.display='none'; document.getElementById('defaultAvatarIcon').style.display='block';">
+          </div>
+          <span id="vipBadge" class="vip-tag" style="display:none;">VIP</span>
+        </div>
+
+        <div class="user-details">
+          <div class="player-capsule-box">
+            <div class="user-name-row">
+              <span id="playerName" data-text="Перекуп #777" class="player-name-text">Перекуп #777</span>
+              <span class="lvl-badge" id="playerLvl" style="display:none;">Ур. 1</span>
+            </div>
+            <div class="xp-bar-wrap" title="Прогресс опыта">
+              <div class="xp-bar-fill" id="xpBar">
+                <div class="xp-bar-shimmer"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="user-stats-row">
+            <div class="stat-pill stat-pill-conn" title="Теневые связи">
+              <i class="fa-solid fa-handshake"></i> <span id="connectionsText">1</span>
+            </div>
+            <div class="stat-pill stat-pill-karma" title="Карма">
+              <i class="fa-solid fa-face-smile"></i> <span id="karmaText">50</span>
+            </div>
+            <div class="stat-pill stat-pill-garage" title="Вместимость автопарка" onclick="event.stopPropagation(); switchTab('tabGarage');">
+              <i class="fa-solid fa-warehouse"></i> <span id="garageHeaderSlots">0/2</span>
+            </div>
+            <button type="button" class="stat-pill stat-pill-note" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты">
+              <i class="fa-solid fa-money-bill-wave"></i> <span id="starsAmount">15</span>
+            </button>
+            <button type="button" class="stat-pill stat-pill-superspin" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('fortune'); }, 100);" title="Билеты СуперВилспина">
+              <i class="fa-solid fa-dharmachakra"></i> <span id="superSpinTicketsAmount">1</span>
+            </button>
+            <button type="button" class="stat-pill stat-pill-fuel" onclick="refuelAction('cash')" title="Заправить бак">
+              <i class="fa-solid fa-gas-pump"></i> <span id="fuelAmount">100</span><span class="res-max">/100</span>
+            </button>
+            <button type="button" class="stat-pill stat-pill-ticket" onclick="upgradeExpressCapacity()" title="Экспресс-талоны">
+              <i class="fa-solid fa-ticket"></i> <span id="ticketsAmount">25/25</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="wallet-dashboard">
+        <div class="wallet-capsule-box" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Открыть Во-Банк">
+          <div class="cash-shine"></div>
+          <div class="cash-val">
+            <span id="cashAmount">150,000</span> <span class="currency-sign">₽</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hud-card hud-bottom-row">
+      <div class="needs-container">
+        <div class="need-track" onclick="switchTab('tabLife')" title="Сытость">
+          <div class="need-icon-wrap hunger-wrap"><i class="fa-solid fa-drumstick-bite"></i></div>
+          <div class="rp-bar-bg"><div id="hungerFill" class="rp-bar-fill fill-hunger" style="width: 80%;"></div></div>
+          <span id="hungerText" class="need-text">80%</span>
+        </div>
+
+        <div class="need-track" onclick="switchTab('tabLife')" title="Настроение">
+          <div class="need-icon-wrap mood-wrap"><i class="fa-solid fa-masks-theater"></i></div>
+          <div class="rp-bar-bg"><div id="moodFill" class="rp-bar-fill fill-mood" style="width: 85%;"></div></div>
+          <span id="moodText" class="need-text">85%</span>
+        </div>
+      </div>
+
+      <div class="hud-actions-group">
+        <button onclick="openHudCustomizerModal()" class="hud-btn btn-theme-custom" title="Кастомизация">
+          <i class="fa-solid fa-palette"></i> <span>Скин</span>
+        </button>
+        <button onclick="toggleGameLanguage()" class="hud-btn btn-lang" id="btnLangToggle" title="Сменить язык">
+          <i class="fa-solid fa-globe"></i> <span>RU</span>
+        </button>
+        <button onclick="openDailyBonusModal()" class="hud-btn btn-bonus" title="Ежедневный подарок">
+          <i class="fa-solid fa-gift bonus-icon-pulse"></i> <span>Бонус</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- КОНТЕНТ -->
+  <main class="main-content">
+    <section id="tabMarket" class="tab-screen active">
+      <div class="glass-card market-filter-card mb-3">
+        <div class="flex-between mb-2">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="category-header-icon"><i class="fa-solid fa-car-side color-cyan"></i></div>
+            <div>
+              <h3 style="font-size: 13px; font-weight:900;" data-i18n="classes_title">Классы автотехники</h3>
+              <span class="tag-badge bg-tag-cyan" id="currentCatBadge">ЭКОНОМ</span>
+            </div>
+          </div>
+          <button onclick="toggleMarketCategories()" class="btn btn-dark btn-sm btn-auto" id="btnToggleMarketGrid" title="Свернуть/Развернуть">
+            <i class="fa-solid fa-chevron-up"></i>
+          </button>
+        </div>
+
+        <div class="market-categories-grid" id="marketCatListContainer">
+          <button onclick="setCategory('all')" id="catBtn-all" class="cat-tile cat-tile-full">
+            <div class="cat-tile-icon"><i class="fa-solid fa-layer-group"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_all">Все категории (Общий поиск)</div>
+            <div class="cat-tile-sub">Сортировка цен ▲/▼</div>
+          </button>
+
+          <button onclick="setCategory('economy')" id="catBtn-economy" class="cat-tile active">
+            <div class="cat-tile-icon"><i class="fa-solid fa-car"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_economy">Эконом</div>
+            <div class="cat-tile-sub"></div>
+          </button>
+
+          <button onclick="setCategory('scooter')" id="catBtn-scooter" class="cat-tile">
+            <div class="cat-tile-icon"><i class="fa-solid fa-motorcycle" style="transform: scaleX(-1);"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_scooter">Скутеры</div>
+            <div class="cat-tile-sub"></div>
+          </button>
+
+          <button onclick="setCategory('moto')" id="catBtn-moto" class="cat-tile locked">
+            <div class="cat-tile-icon"><i class="fa-solid fa-motorcycle"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_moto">Мото</div>
+            <div class="cat-tile-sub" id="lock-moto"><i class="fa-solid fa-lock"></i> 5 ур</div>
+          </button>
+
+          <button onclick="setCategory('atv')" id="catBtn-atv" class="cat-tile locked">
+            <div class="cat-tile-icon"><i class="fa-solid fa-truck-monster"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_atv">Квадро</div>
+            <div class="cat-tile-sub" id="lock-atv"><i class="fa-solid fa-lock"></i> 8 ур</div>
+          </button>
+
+          <button onclick="setCategory('comfort')" id="catBtn-comfort" class="cat-tile locked">
+            <div class="cat-tile-icon"><i class="fa-solid fa-taxi"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_comfort">Комфорт</div>
+            <div class="cat-tile-sub" id="lock-comfort"><i class="fa-solid fa-lock"></i> 15 ур</div>
+          </button>
+
+          <button onclick="setCategory('premium')" id="catBtn-premium" class="cat-tile locked">
+            <div class="cat-tile-icon"><i class="fa-solid fa-gem"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_premium">Премиум</div>
+            <div class="cat-tile-sub" id="lock-premium"><i class="fa-solid fa-lock"></i> 30 ур</div>
+          </button>
+
+          <button onclick="setCategory('hyper')" id="catBtn-hyper" class="cat-tile locked">
+            <div class="cat-tile-icon"><i class="fa-solid fa-bolt-lightning"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_hyper">Гиперкары</div>
+            <div class="cat-tile-sub" id="lock-hyper"><i class="fa-solid fa-lock"></i> 50 ур</div>
+          </button>
+
+          <button onclick="setCategory('truck')" id="catBtn-truck" class="cat-tile locked">
+            <div class="cat-tile-icon"><i class="fa-solid fa-truck-moving"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_truck">Грузовики</div>
+            <div class="cat-tile-sub" id="lock-truck"><i class="fa-solid fa-lock"></i> 50 ур</div>
+          </button>
+
+          <button onclick="setCategory('yacht')" id="catBtn-yacht" class="cat-tile locked">
+            <div class="cat-tile-icon"><i class="fa-solid fa-ship"></i></div>
+            <div class="cat-tile-name" data-i18n="cat_yacht">Яхты</div>
+            <div class="cat-tile-sub" id="lock-yacht"><i class="fa-solid fa-lock"></i> 100 ур</div>
+          </button>
+        </div>
+
+        <div class="cat-info-banner mt-2" id="catInfoBanner">
+          <div class="flex-between text-xs">
+            <span class="color-cyan font-bold" id="catInfoTitle"><i class="fa-solid fa-chart-line"></i> Сегмент Эконом:</span>
+            <span class="sub-label" id="catInfoPrice">Капитал: от 40 000 ₽</span>
+          </div>
+          <div class="sub-label mt-1" id="catInfoDesc">Высокий оборот, быстрый торг у капота и минимальные риски на старте.</div>
+        </div>
+      </div>
+
+      <button onclick="refreshMarketFeedManual()" class="btn btn-cyan mb-3">
+        <i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="btn_refresh_market">Обновить ленту</span> (<span id="refreshCostText">250</span> ₽ + 5 ⛽)
+      </button>
+      <div id="marketCardContainer"></div>
+    </section>
+
+    <section id="tabGarage" class="tab-screen">
+      <div class="glass-card mb-2">
+        <div class="flex-between mb-1">
+          <div>
+            <h3><i class="fa-solid fa-warehouse color-green"></i> <span data-i18n="garage_title">Мой Автопарк</span></h3>
+            <p class="sub-label"><span data-i18n="garage_capacity">Вместимость</span>: <span id="garageDetailedSlots">0 из 2</span></p>
+          </div>
+          <button onclick="buyGarageSlot()" class="btn btn-dark btn-auto border-green color-green" id="btnBuyGarageSlot">+1 Бокс</button>
+        </div>
+      </div>
+      <div id="garageList"></div>
+    </section>
+
+    <section id="tabSalesLot" class="tab-screen">
+      <div class="glass-card mb-2">
+        <div class="flex-between mb-1">
+          <h3><i class="fa-solid fa-car-on color-green"></i> <span data-i18n="saleslot_title">Площадка продаж</span></h3>
+          <span class="tag-badge bg-tag-cyan" id="lotCountBadge">0 авто на продаже</span>
+        </div>
+        <p class="sub-label mb-2" data-i18n="saleslot_desc">Покупатели оценивают машины с учётом состояния, эксклюзивности госномеров и вашей репутации.</p>
+        <div class="flex-between p-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+          <div>
+            <div class="text-xs color-purple font-bold">🎟️ <span data-i18n="express_passes">Экспресс-пропуски</span>: <span id="expressCountDisplay">25 / 25</span></div>
+            <div class="sub-label" style="font-size:9px;" data-i18n="express_desc">Ускоряют поиск клиента до 0 сек.</div>
+          </div>
+          <button onclick="upgradeExpressCapacity()" class="btn btn-dark btn-auto btn-sm" id="btnUpgradeTickets">Расширить</button>
+        </div>
+      </div>
+      <div id="salesLotList"></div>
+    </section>
+
+    <section id="tabPhone" class="tab-screen">
+      <div class="phone-device-wrapper">
+        <div class="phone-status-bar">
+          <span id="phoneStatusBarClock" class="phone-status-time">12:00</span>
+          <div class="phone-notch"></div>
+          <div class="phone-status-icons">
+            <i class="fa-solid fa-signal text-xs"></i>
+            <i class="fa-solid fa-wifi text-xs"></i>
+            <i class="fa-solid fa-battery-full text-xs color-green"></i>
+          </div>
+        </div>
+
+        <div class="phone-screen-content">
+          <div id="phoneHomeScreen">
+            <div id="phoneBizWidgetContainer" class="mb-2" style="display:none;"></div>
+            <div id="phoneDailyQuestsWidget" class="phone-quests-widget mb-3"></div>
+
+            <div class="phone-home-grid mb-2">
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('m')">
+                <div class="phone-app-icon bg-m-network">
+                  <span class="m-app-icon-letter">M</span>
+                  <span id="phoneAppSmsBadge" class="phone-app-badge" style="display:none;">0</span>
+                </div>
+                <span class="phone-app-label color-cyan font-bold">Сеть «M» & P2P</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('bank')">
+                <div class="phone-app-icon bg-green"><i class="fa-solid fa-vault"></i></div>
+                <span class="phone-app-label">Во-Банк</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('business')">
+                <div class="phone-app-icon bg-emerald"><i class="fa-solid fa-briefcase"></i></div>
+                <span class="phone-app-label">Бизнес</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('housing')">
+                <div class="phone-app-icon bg-teal"><i class="fa-solid fa-house"></i></div>
+                <span class="phone-app-label">Жильё</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('reshala')">
+                <div class="phone-app-icon bg-dark-purple"><i class="fa-solid fa-user-secret"></i></div>
+                <span class="phone-app-label">Решала</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('syndicate')">
+                <div class="phone-app-icon bg-purple"><i class="fa-solid fa-key"></i></div>
+                <span class="phone-app-label">ПодКлюч</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('barn')">
+                <div class="phone-app-icon bg-amber"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+                <span class="phone-app-label">Сараи</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('containers')">
+                <div class="phone-app-icon bg-indigo"><i class="fa-solid fa-box-open"></i></div>
+                <span class="phone-app-label">Порт</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('radar')">
+                <div class="phone-app-icon bg-red"><i class="fa-solid fa-tower-broadcast"></i></div>
+                <span class="phone-app-label">ДПС Радар</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('street')">
+                <div class="phone-app-icon bg-rose"><i class="fa-solid fa-flag-checkered"></i></div>
+                <span class="phone-app-label">Стрит 402м</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('shop')">
+                <div class="phone-app-icon bg-orange"><i class="fa-solid fa-cart-shopping"></i></div>
+                <span class="phone-app-label">Маркет</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('fortune')">
+                <div class="phone-app-icon bg-yellow"><i class="fa-solid fa-clover"></i></div>
+                <span class="phone-app-label">Фортуна</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('post')">
+                <div class="phone-app-icon bg-post-office">
+                  <i class="fa-solid fa-boxes-packing"></i>
+                  <span id="phoneAppPostBadge" class="phone-app-badge" style="display:none; background:#f59e0b;">0</span>
+                </div>
+                <span class="phone-app-label color-amber font-bold">Почта/Склад</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('gosuslugi')">
+                <div class="phone-app-icon bg-gosuslugi"><i class="fa-solid fa-building-columns"></i></div>
+                <span class="phone-app-label">Госуслуги</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('radio')">
+                <div class="phone-app-icon bg-radio"><i class="fa-solid fa-radio"></i></div>
+                <span class="phone-app-label">Магнитола</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('notepad')">
+                <div class="phone-app-icon bg-notepad"><i class="fa-solid fa-note-sticky"></i></div>
+                <span class="phone-app-label">Блокнот</span>
+              </div>
+
+              <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('dev')">
+                <div class="phone-app-icon bg-dev-terminal">
+                  <i class="fa-solid fa-terminal color-green"></i>
+                </div>
+                <span class="phone-app-label color-green font-bold">DEV</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="phoneAppContainer" style="display:none;" class="phone-opened-app-view"></div>
+        </div>
+
+        <div class="phone-home-bar-area" onclick="PhoneManager.goHome()">
+          <div class="phone-home-indicator"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tabLife" class="tab-screen"></section>
+
+    <section id="tabProfile" class="tab-screen">
+      <div id="profileDashboardContainer"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav">
+    <div class="b-nav-item active" onclick="switchTab('tabMarket')" id="bnav-tabMarket">
+      <i class="fa-solid fa-store"></i><span>Рынок</span>
+    </div>
+    <div class="b-nav-item" onclick="switchTab('tabGarage')" id="bnav-tabGarage">
+      <i class="fa-solid fa-warehouse"></i><span>Гараж</span>
+    </div>
+    <div class="b-nav-item" onclick="switchTab('tabSalesLot')" id="bnav-tabSalesLot">
+      <i class="fa-solid fa-car-on"></i><span>Площадка</span>
+    </div>
+    <div class="b-nav-item" onclick="switchTab('tabLife')" id="bnav-tabLife">
+      <i class="fa-solid fa-mug-hot"></i><span>Жизнь</span>
+    </div>
+    <div class="b-nav-item phone-nav-item" onclick="switchTab('tabPhone')" id="bnav-tabPhone">
+      <div class="phone-nav-icon-wrap">
+        <i class="fa-solid fa-mobile-screen-button"></i>
+        <span id="phoneNavBadge" class="phone-nav-counter" style="display:none;">0</span>
+      </div>
+      <span>Телефон</span>
+    </div>
+  </nav>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     МОДАЛЬНЫЕ ОКНА — ПОЛНЫЕ, БЕЗ СОКРАЩЕНИЙ
+     ═══════════════════════════════════════════════════════ -->
+
+<div id="modalDevStudio" class="modal-overlay">
+  <div class="modal-box" style="max-width: 440px; max-height: calc(100dvh - 20px);">
+    <div id="devStudioContent"></div>
+  </div>
+</div>
+
+<div id="modalHudCustomizer" class="modal-overlay"></div>
+<div id="modalNeedGarage" class="modal-overlay"></div>
+
+<div id="modalImpoundLot" class="modal-overlay"></div>
+<div id="modalPortBrokerDeal" class="modal-overlay"></div>
+<div id="modalStorageWars" class="modal-overlay"></div>
+<div id="modalStorageWarsP2P" class="modal-overlay"></div>
+
+<div id="modalLevelGate" class="modal-overlay"></div>
+<div id="modalAppUnlockPrompt" class="modal-overlay"></div>
+<div id="modalBackfire" class="modal-overlay"></div>
+<div id="modalInspectionChoice" class="modal-overlay"></div>
+<div id="modalBizCrisis" class="modal-overlay"></div>
+<div id="modalBizCustomize" class="modal-overlay"></div>
+<div id="modalBizSell" class="modal-overlay"></div>
+
+<!-- Owner-панель доступа -->
+<div id="modalAccessManager" class="modal-overlay"></div>
+
+<!-- P2P чат -->
+<div id="modalP2PChat" class="modal-overlay">
+  <div class="modal-box chat-deal-box" style="max-width: 430px;">
+    <div class="chat-header-bar flex-between mb-2">
+      <div class="flex-gap" style="align-items:center;">
+        <div class="chat-avatar-circle" id="p2pChatSellerAvatar">👤</div>
+        <div>
+          <div class="font-bold text-xs" id="p2pChatSellerTitle">Продавец</div>
+          <div class="text-xs color-green" id="p2pChatLotSubtitle">Лот: —</div>
+        </div>
+      </div>
+      <button onclick="ModalManager.close('modalP2PChat')" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+
+    <div class="chat-thread-container mb-2" id="p2pChatMessagesBox" style="min-height: 200px; max-height: 320px;"></div>
+
+    <div class="sub-label mb-1" style="font-size:9.5px;">Быстрые фразы:</div>
+    <div class="mplus-nav-scroll-bar mb-2" id="p2pCannedChipsBox"></div>
+
+    <div class="grid-2">
+      <button onclick="ModalManager.close('modalP2PChat')" class="btn btn-dark">Закрыть</button>
+      <button id="p2pChatBuyBtn" class="btn btn-green">Купить 🤝</button>
+    </div>
+  </div>
+</div>
+
+<!-- Trade Offer -->
+<div id="modalTradeOffer" class="modal-overlay"></div>
+
+<!-- Клуб -->
+<div id="modalCreateClub" class="modal-overlay"></div>
+
+<!-- Событие M+ -->
+<div id="modalCreateStreetPost" class="modal-overlay"></div>
+
+<!-- Онбординг игрока -->
+<div id="modalPlayerOnboarding" class="modal-overlay"></div>
+
+<!-- ⭐ Патчноут -->
+<div id="modalPatchNotes" class="modal-overlay">
+  <div class="modal-box" style="max-width: 420px;">
+    <div class="flex-between mb-2">
+      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.0.0</div>
+      <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+    <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
+    <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #421</div>
+    <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
+      <div class="patch-item"><b>🔐 AccessControl:</b> закрытая бета по приглашениям.</div>
+      <div class="patch-item"><b>👑 Owner-панель:</b> кнопка внизу справа — управление инвайтами.</div>
+      <div class="patch-item"><b>📱 Модульный Firebase:</b> core/market/friendships/notifications/p2p.</div>
+      <div class="patch-item"><b>📶 Offline-баннер:</b> уведомление при потере сети.</div>
+      <div class="patch-item"><b>🎨 Адаптив:</b> полная поддержка планшетов и ПК.</div>
+      <div class="patch-item"><b>🐛 Фиксы:</b> убран монолит firebase-bridge.js.</div>
+    </div>
+    <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
+  </div>
+</div>
+
+<!-- ⭐ Страховка — ПОЛНАЯ -->
+<div id="modalInsurance" class="modal-overlay">
+  <div class="modal-box insurance-contract-blank" style="max-width: 420px;">
+    <div class="flex-between mb-2 pb-2" style="border-bottom: 1px solid var(--border-glass);">
+      <div class="flex-gap" style="align-items:center;">
+        <i class="fa-solid fa-shield-halved color-green" style="font-size:18px;"></i>
+        <div>
+          <b class="text-xs color-green">АО «РОСГОССТРАХ ПЕРЕКУП»</b>
+          <div class="sub-label" style="font-size:8.5px;">Единый реестр страховщиков РФ</div>
+        </div>
+      </div>
+      <button onclick="closeInsuranceModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+
+    <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid var(--border-glass);">
+      <div class="sub-label text-xs">Объект страхования:</div>
+      <b class="color-cyan text-xs" id="insureCarTitle">-</b>
+    </div>
+
+    <div class="sub-label font-bold mb-2 text-xs">Выберите пункты покрытия:</div>
+
+    <div class="space-y-2 mb-3">
+      <div class="insurance-option-card selected" id="insCard_osago" onclick="toggleInsuranceOption('osago')">
+        <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
+        <div style="flex:1;">
+          <div class="flex-between">
+            <b class="text-xs color-cyan">📋 Базовое ОСАГО</b>
+            <span class="text-xs font-bold">8,500 ₽ + 2 ⭐</span>
+          </div>
+          <div class="sub-label" style="font-size:9.5px;">Защита от штрафов ГИБДД.</div>
+        </div>
+      </div>
+
+      <div class="insurance-option-card" id="insCard_theft" onclick="toggleInsuranceOption('theft')">
+        <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
+        <div style="flex:1;">
+          <div class="flex-between">
+            <b class="text-xs color-amber">🚨 КАСКО: Угон</b>
+            <span class="text-xs font-bold">+14,000 ₽ + 4 ⭐</span>
+          </div>
+          <div class="sub-label" style="font-size:9.5px;">Выплата при угоне.</div>
+        </div>
+      </div>
+
+      <div class="insurance-option-card" id="insCard_totalLoss" onclick="toggleInsuranceOption('totalLoss')">
+        <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
+        <div style="flex:1;">
+          <div class="flex-between">
+            <b class="text-xs color-red">💥 КАСКО: Тотал</b>
+            <span class="text-xs font-bold">+18,000 ₽ + 5 ⭐</span>
+          </div>
+          <div class="sub-label" style="font-size:9.5px;">Полное покрытие ДТП.</div>
+        </div>
+      </div>
+
+      <div class="insurance-option-card" id="insCard_roadside" onclick="toggleInsuranceOption('roadside')">
+        <div class="insurance-check-circle"><i class="fa-solid fa-check"></i></div>
+        <div style="flex:1;">
+          <div class="flex-between">
+            <b class="text-xs color-purple">🛞 Помощь на дороге</b>
+            <span class="text-xs font-bold">+4,500 ₽ + 1 ⭐</span>
+          </div>
+          <div class="sub-label" style="font-size:9.5px;">Эвакуатор 24/7.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="insurance-stamp-badge">
+      <span>ЛИЦЕНЗИЯ</span><span>ЦБ РФ</span><span>ОДОБРЕНО</span>
+    </div>
+
+    <div class="flex-between p-2 mb-3" style="background:#090e18; border-radius:8px; border:1px solid rgba(0,230,118,0.3);">
+      <span class="text-xs font-bold">ИТОГО:</span>
+      <b class="price-val text-xs color-green" id="insuranceTotalCostText">8,500 ₽ + 2 ⭐</b>
+    </div>
+
+    <div class="grid-2">
+      <button onclick="confirmSignInsurancePolicy()" class="btn btn-green">✍️ Подписать</button>
+      <button onclick="closeInsuranceModal()" class="btn btn-dark">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⭐ Регистрация — ПОЛНАЯ -->
+<div id="modalRegistrationChoice" class="modal-overlay">
+  <div class="modal-box text-center" style="max-width: 410px;">
+    <div class="radar-spinner-ring mb-2"><div class="radar-spinner-center">📑</div></div>
+    <h3 class="font-bold mb-1 color-cyan">Способ оформления авто</h3>
+    <p class="sub-label mb-3">Выберите форму владения:</p>
+    <div class="glass-card text-left p-2 mb-2" style="border-left: 3px solid var(--green);">
+      <div class="flex-between">
+        <b class="text-xs color-green">1. Поставить на учёт в МРЭО</b>
+        <span class="tag-badge bg-tag-green">ЧИСТЫЙ VIN</span>
+      </div>
+      <div class="sub-label my-1" style="font-size:10px;">• Госпошлина: <b>2,850 ₽</b><br>• ⚠️ <b>Налог 13%</b> при продаже!</div>
+      <button onclick="confirmRegistrationChoice(true)" class="btn btn-green btn-sm w-full mt-2">Оформить (-2,850 ₽)</button>
+    </div>
+    <div class="glass-card text-left p-2 mb-3" style="border-left: 3px solid var(--amber);">
+      <div class="flex-between">
+        <b class="text-xs color-amber">2. Оставить на ДКП</b>
+        <span class="tag-badge bg-tag-amber">ПЕРЕКУП</span>
+      </div>
+      <div class="sub-label my-1" style="font-size:10px;">• Пошлина: <b>0 ₽</b><br>• Налог: <b>не платится</b><br>• 🚨 <b>Лимит 10 дней!</b></div>
+      <button onclick="confirmRegistrationChoice(false)" class="btn btn-amber btn-sm w-full mt-2">Оставить на ДКП</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⭐ ДКП — ПОЛНЫЙ -->
+<div id="modalDKP" class="modal-overlay">
+  <div class="modal-box dkp-official-blank">
+    <div class="dkp-blank-border">
+      <div class="dkp-header text-center mb-2">
+        <div class="modal-glow-badge mb-1"><i class="fa-solid fa-file-contract"></i> ГОСУСЛУГИ АВТОКОД</div>
+        <h4 class="font-bold dkp-title">ДОГОВОР КУПЛИ-ПРОДАЖИ ТС</h4>
+      </div>
+      <div class="dkp-body-text mb-3">
+        <div class="dkp-row mb-1"><span class="sub-label">Продавец:</span> <b class="text-xs" id="dkpSellerName">Иванов И.И.</b></div>
+        <div class="dkp-row mb-2"><span class="sub-label">Покупатель:</span> <b class="text-xs" id="dkpBuyerName">Перекуп #777</b></div>
+        <div class="p-2 mb-2 dkp-car-spec-box">
+          <div class="font-bold text-xs color-cyan" id="dkpCarTitle">ВАЗ-2107</div>
+          <div class="text-xs my-1" id="dkpCarSpecs">Мощность: 74 л.с. | Пробег: 85,000 км</div>
+          <div class="flex-between mt-1 text-xs">
+            <span class="sub-label">Госномер:</span>
+            <span class="license-plate" style="font-size:10.5px; padding:2px 6px;" id="dkpCarPlate">В777ВВ 77</span>
+          </div>
+        </div>
+        <div class="flex-between p-2 mb-2 dkp-price-line">
+          <span class="font-bold text-xs">ИТОГО:</span>
+          <b class="price-val text-xs color-green" id="dkpPriceAmount">150,000 ₽</b>
+        </div>
+        <div id="dkpNetProfitBadge" class="text-xs text-center font-bold mb-2" style="display:none;"></div>
+      </div>
+
+      <div class="dkp-signatures-area">
+        <div class="dkp-sig-col">
+          <span class="text-xs sub-label">Продавец:</span>
+          <div class="dkp-handwrite" id="dkpSellerSig">✓ Подписано</div>
+        </div>
+        <div class="dkp-sig-col text-right">
+          <span class="text-xs sub-label">Покупатель:</span>
+          <div class="dkp-handwrite" id="dkpBuyerSig">✍️ Ожидает...</div>
+        </div>
+        <div id="dkpOfficialStamp" class="official-mreo-stamp">
+          <div class="stamp-inner">
+            <span>МРЭО ГИБДД</span>
+            <span>ЗАРЕГИСТРИРОВАНО</span>
+            <span>РФ</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 space-y-2">
+        <button id="btnSignDKP" onclick="confirmSignDKP()" class="btn btn-green w-full">✍️ Подписать ДКП</button>
+        <button id="btnAbortDKP" onclick="abortDKPDeal()" class="btn btn-danger btn-sm w-full">❌ Разорвать сделку</button>
+        <button id="btnCloseDKP" onclick="closeModal('modalDKP')" class="btn btn-dark w-full mt-2" style="display:none;">Готово</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ⭐ Гараж-инцидент — ПОЛНЫЙ -->
+<div id="modalGarageEvent" class="modal-overlay">
+  <div class="modal-box text-center">
+    <div class="radar-spinner-ring mb-2">
+      <div class="radar-spinner-center" id="garageEventEmoji">⚠️</div>
+    </div>
+    <div class="modal-glow-badge mb-1" id="garageEventBadge">ИНЦИДЕНТ</div>
+    <h3 class="font-bold mb-1" id="garageEventTitle">Происшествие</h3>
+    <p class="sub-label mb-3" id="garageEventDesc">Описание...</p>
+    <div class="p-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
+      Автомобиль: <b class="color-cyan" id="garageEventCarName">-</b>
+    </div>
+    <div id="garageEventActions" class="space-y-2"></div>
+  </div>
+</div>
+
+<!-- ⭐ Контракт-ПодКлюч — ПОЛНЫЙ -->
+<div id="modalSelectContractCar" class="modal-overlay">
+  <div class="modal-box">
+    <div class="flex-between mb-2">
+      <div class="modal-glow-badge"><i class="fa-solid fa-key"></i> СПЕЦЗАКАЗ «ПОДКЛЮЧ»</div>
+      <button onclick="closeModal('modalSelectContractCar')" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+    <div id="contractTargetInfo" class="text-xs color-amber mb-2 font-bold"></div>
+    <div id="contractCarsSelectList" class="space-y-2 mb-3" style="max-height: 280px; overflow-y: auto;"></div>
+    <button onclick="closeModal('modalSelectContractCar')" class="btn btn-dark w-full">Отмена</button>
+  </div>
+</div>
+
+<!-- ⭐ SaveManager — ПОЛНЫЙ -->
+<div id="modalSaveManager" class="modal-overlay">
+  <div class="modal-box">
+    <div class="flex-between mb-2">
+      <div class="modal-glow-badge"><i class="fa-solid fa-file-export"></i> РЕЗЕРВНОЕ ХРАНИЛИЩЕ</div>
+      <button onclick="closeModal('modalSaveManager')" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+    <p class="sub-label mb-2">Скопируйте код сохранения для переноса:</p>
+    <textarea id="saveExportArea" style="width:100%; height:90px; background:#090e18; color:#fff; font-size:10px; padding:8px; border-radius:8px; border:1px solid var(--border-glass); margin-bottom:10px;"></textarea>
+    <div class="grid-2 mb-2">
+      <button onclick="exportSaveCodeAction()" class="btn btn-cyan btn-sm">Экспорт</button>
+      <button onclick="importSaveCodeAction()" class="btn btn-amber btn-sm">Импорт</button>
+    </div>
+    <button onclick="closeModal('modalSaveManager')" class="btn btn-dark w-full">Закрыть</button>
+  </div>
+</div>
+
+<!-- ⭐ Тюнинг — ПОЛНЫЙ -->
+<div id="modalTuning" class="modal-overlay">
+  <div class="modal-box" style="max-width: 420px;">
+    <div class="flex-between mb-2">
+      <div class="modal-glow-badge"><i class="fa-solid fa-screwdriver-wrench"></i> СПОРТИВНОЕ АТЕЛЬЕ</div>
+      <button onclick="closeModal('modalTuning')" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+    <div id="tuneCarTitle" class="text-xs color-amber mb-2 font-bold"></div>
+    <div class="risk-meter-box mb-2">
+      <div class="flex-between text-xs">
+        <span>Риск по 12.5.1:</span>
+        <b id="tuneRiskValue" class="color-amber">0%</b>
+      </div>
+      <div class="risk-track"><div id="tuneRiskFill" class="risk-fill risk-low" style="width: 0%;"></div></div>
+    </div>
+    <div class="grid-4 mb-2">
+      <button onclick="switchTuneTab('engine')" id="tuneTab-engine" class="btn btn-cyan btn-sm">⚡ Мотор</button>
+      <button onclick="switchTuneTab('drift')" id="tuneTab-drift" class="btn btn-dark btn-sm">💨 Дрифт</button>
+      <button onclick="switchTuneTab('drag')" id="tuneTab-drag" class="btn btn-dark btn-sm">🏁 Драг</button>
+      <button onclick="switchTuneTab('style')" id="tuneTab-style" class="btn btn-dark btn-sm">✨ Стенс</button>
+    </div>
+    <div id="tuningItemsContainer" class="space-y-2 mb-3" style="max-height: 250px; overflow-y: auto;"></div>
+    <button onclick="closeModal('modalTuning')" class="btn btn-cyan w-full">Готово</button>
+  </div>
+</div>
+
+<!-- ⭐ MarketDeal — ПОЛНЫЙ -->
+<div id="modalMarketDeal" class="modal-overlay">
+  <div class="modal-box chat-deal-box">
+    <div class="chat-header-bar flex-between mb-2">
+      <div class="flex-gap" style="align-items:center;">
+        <div class="chat-avatar-circle" id="dealSellerAvatar">👤</div>
+        <div>
+          <div class="font-bold text-xs" id="dealSellerName">Продавец</div>
+          <div class="text-xs color-green">● Личная встреча у капота</div>
+        </div>
+      </div>
+      <button onclick="closeModal('modalMarketDeal')" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+
+    <div class="deal-car-preview-card mb-2">
+      <img id="dealCarImg" src="" class="deal-car-thumb" alt="car">
+      <div style="flex:1;">
+        <div class="font-bold text-xs" id="dealCarTitle">Автомобиль</div>
+        <div class="text-xs sub-label" id="dealCarMileageInfo">Пробег</div>
+        <div class="price-val text-xs" id="dealCarPrice">0 ₽</div>
+      </div>
+    </div>
+
+    <div class="chat-thread-container mb-2" id="dealChatThread"></div>
+    <div id="dealHaggleArea" class="mb-2"></div>
+
+    <div class="grid-2">
+      <button onclick="closeModal('modalMarketDeal')" class="btn btn-dark">Уехать 🚗</button>
+      <button id="dealBuyBtn" onclick="confirmMarketPurchaseSuccess()" class="btn btn-green">Оформить ДКП 🤝</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⭐ Autoteka — ПОЛНЫЙ -->
+<div id="modalAutoteka" class="modal-overlay">
+  <div class="modal-box">
+    <div class="flex-between mb-2">
+      <div class="modal-glow-badge" style="color:var(--green); border-color:rgba(0,230,118,0.4); background:rgba(0,230,118,0.1);"><i class="fa-solid fa-file-waveform"></i> АВТОТЕКА ОТЧЁТ</div>
+      <button onclick="closeModal('modalAutoteka')" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+    <div id="autotekaReportContent" class="report-box p-3 mb-3"></div>
+    <button onclick="closeModal('modalAutoteka')" class="btn btn-green w-full">Закрыть</button>
+  </div>
+</div>
+
+<!-- ⭐ PreSale — ПОЛНЫЙ -->
+<div id="modalPreSale" class="modal-overlay"></div>
+
+<!-- ⭐ BuyCall — ПОЛНЫЙ -->
+<div id="modalBuyCall" class="modal-overlay">
+  <div class="modal-box text-center">
+    <div class="radar-spinner-ring mb-2">
+      <div class="radar-spinner-center" id="buyCallEmoji">📞</div>
+    </div>
+    <div class="modal-glow-badge mb-1">ТЕЛЕФОННЫЙ ВЫЗОВ</div>
+    <h3 class="font-bold mb-1" id="buyCallTitle">Звонок...</h3>
+    <p class="sub-label mb-3" id="buyCallDesc">Идут гудки...</p>
+    <div id="buyCallActionBtnBox"></div>
+  </div>
+</div>
+
+<!-- ⭐ DailyBonus — ПОЛНЫЙ -->
+<div id="modalDailyBonus" class="modal-overlay">
+  <div class="modal-box text-center">
+    <div class="modal-glow-badge mb-1" style="color:#ffd700; border-color:rgba(255,179,0,0.4);"><i class="fa-solid fa-gift"></i> ЕЖЕДНЕВНЫЙ ПОДАРОК</div>
+    <h3 class="font-bold mb-2">Календарь наград</h3>
+    <div class="daily-streak-grid" id="dailyBonusGrid"></div>
+    <button id="btnClaimDaily" onclick="claimDailyReward()" class="btn btn-green mb-2">Забрать</button>
+    <button onclick="closeModal('modalDailyBonus')" class="btn btn-dark w-full">Закрыть</button>
+  </div>
+</div>
+
+<!-- ⭐ DealVerdict — ПОЛНЫЙ -->
+<div id="modalDealVerdict" class="modal-overlay">
+  <div class="modal-box text-center">
+    <div class="radar-spinner-ring mb-2" id="verdictRingAnim">
+      <div class="radar-spinner-center" id="verdictEmoji">🎉</div>
+    </div>
+    <div class="modal-glow-badge mb-1" id="verdictBadgeText">ИТОГИ</div>
+    <h3 class="font-bold mb-1" id="verdictTitle">Сделка</h3>
+    <p class="sub-label mb-2" id="verdictText"></p>
+
+    <div id="verdictTokensContainer" class="reward-tokens-wrapper" style="display:none;"></div>
+
+    <div class="price-val mb-1" id="verdictAmount">+0 ₽</div>
+    <div id="verdictProfitBadge" class="text-xs font-bold mb-3" style="display:none;"></div>
+    <button onclick="closeModal('modalDealVerdict')" class="btn btn-cyan w-full">Забрать ✓</button>
+  </div>
+</div>
+
+<!-- ⭐ OBD2 — ПОЛНЫЙ -->
+<div id="modalOBD2" class="modal-overlay">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="flex-between mb-2 border-b pb-2" style="border-bottom: 1px solid var(--border-glass);">
+      <div class="flex-gap" style="align-items:center;">
+        <i class="fa-solid fa-tablet-screen-button color-cyan" style="font-size:18px;"></i>
+        <b class="text-xs color-cyan" id="obd2CarTitle">Launch Pad</b>
+      </div>
+      <button onclick="closeOBD2Modal()" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+    <div id="obd2ResultBox" class="mb-2" style="font-size:11px;"></div>
+    <div id="obd2ActionBox"></div>
+  </div>
+</div>
+
+<!-- ⭐ PutOnLot — ПОЛНЫЙ -->
+<div id="modalPutOnLot" class="modal-overlay">
+  <div class="modal-box">
+    <div class="flex-between mb-2">
+      <div class="modal-glow-badge"><i class="fa-solid fa-store"></i> ПЛОЩАДКА</div>
+      <button onclick="closeModal('modalPutOnLot')" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+    <div id="lotPutCarTitle" class="text-xs color-cyan text-center font-bold mb-1"></div>
+    <div id="lotCostInfo" class="text-xs color-amber text-center mb-3"></div>
+    <input type="number" id="lotAskingPriceInput" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;" min="1">
+    <div class="grid-2">
+      <button onclick="confirmPutOnLot()" class="btn btn-green">Выставить</button>
+      <button onclick="closeModal('modalPutOnLot')" class="btn btn-dark">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="modalPreview" class="modal-overlay"></div>
+<div id="modalChangePlate" class="modal-overlay"></div>
+
+<!-- ⭐ Gauge — ПОЛНЫЙ -->
+<div id="modalGauge" class="modal-overlay">
+  <div class="modal-box">
+    <div class="flex-between mb-2">
+      <div class="modal-glow-badge"><i class="fa-solid fa-microchip"></i> ТОЛЩИНОМЕР</div>
+      <button onclick="closeGaugeModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+    <div class="gauge-interactive-meter mb-3">
+      <div class="dial-sensor-bar">
+        <div>
+          <b class="text-xs">Капот:</b>
+          <div class="sub-label" style="font-size:9.5px;">Завод: 90-130 мкм</div>
+        </div>
+        <button onclick="checkBodyPart('hood')" class="btn btn-dark btn-sm dial-sensor-btn" id="part-hood">Замерить</button>
+      </div>
+      <div class="dial-sensor-bar">
+        <div>
+          <b class="text-xs">Крыша:</b>
+          <div class="sub-label" style="font-size:9.5px;">Завод: 80-120 мкм</div>
+        </div>
+        <button onclick="checkBodyPart('roof')" class="btn btn-dark btn-sm dial-sensor-btn" id="part-roof">Замерить</button>
+      </div>
+      <div class="dial-sensor-bar">
+        <div>
+          <b class="text-xs">Двери:</b>
+          <div class="sub-label" style="font-size:9.5px;">Завод: 90-140 мкм</div>
+        </div>
+        <button onclick="checkBodyPart('doors')" class="btn btn-dark btn-sm dial-sensor-btn" id="part-doors">Замерить</button>
+      </div>
+      <div class="dial-sensor-bar">
+        <div>
+          <b class="text-xs">Крылья:</b>
+          <div class="sub-label" style="font-size:9.5px;">Завод: 95-135 мкм</div>
+        </div>
+        <button onclick="checkBodyPart('wings')" class="btn btn-dark btn-sm dial-sensor-btn" id="part-wings">Замерить</button>
+      </div>
+    </div>
+    <button onclick="closeGaugeModal()" class="btn btn-cyan w-full">Готово ✓</button>
+  </div>
+</div>
+
+<!-- ⭐ CreateP2P — ПОЛНЫЙ -->
+<div id="modalCreateP2P" class="modal-overlay">
+  <div class="modal-box">
+    <div class="flex-between mb-2">
+      <div class="modal-glow-badge"><i class="fa-solid fa-handshake"></i> ВЫСТАВИТЬ НА P2P</div>
+      <button onclick="closeModal('modalCreateP2P')" class="btn btn-dark btn-auto btn-sm">✕</button>
+    </div>
+    <div class="grid-4 mb-2">
+      <button type="button" onclick="AppM.selectP2PListingType('cars')" id="btnP2PTypeCar" class="btn btn-cyan btn-sm">Авто</button>
+      <button type="button" onclick="AppM.selectP2PListingType('plates')" id="btnP2PTypePlate" class="btn btn-dark btn-sm">Номер</button>
+      <button type="button" onclick="AppM.selectP2PListingType('business')" id="btnP2PTypeBiz" class="btn btn-dark btn-sm">Бизнес</button>
+      <button type="button" onclick="AppM.selectP2PListingType('housing')" id="btnP2PTypeHouse" class="btn btn-dark btn-sm">Жильё</button>
+    </div>
+
+    <div class="sub-label mb-1" style="font-size:9.5px;">Выберите объект:</div>
+    <div id="p2pCardsListContainer" style="max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; padding-right: 2px;"></div>
+
+    <div class="sub-label mb-1" style="font-size:9.5px;">Цена (₽):</div>
+    <input type="number" id="p2pPriceInput" placeholder="Цена в рублях" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:15px; margin-bottom:12px;" min="1000">
+    <div class="grid-2">
+      <button onclick="AppM.confirmCreateP2PListing()" class="btn btn-green">Выставить ☁️</button>
+      <button onclick="closeModal('modalCreateP2P')" class="btn btn-dark">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<div id="toastNotification" class="toast">Уведомление</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     СТИЛИ PC-АВТОРИЗАЦИИ
+     ═══════════════════════════════════════════════════════ -->
+<style>
+  .pc-auth-overlay {
+    position: fixed; inset: 0;
+    background: radial-gradient(circle at 50% 0%, #151d2f 0%, #05080f 100%);
+    z-index: 99999;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; box-sizing: border-box;
+  }
+  .pc-auth-box {
+    width: 100%; max-width: 380px;
+    background: linear-gradient(145deg, rgba(20, 27, 43, 0.98) 0%, rgba(10, 15, 25, 0.98) 100%);
+    border: 1px solid rgba(0, 242, 254, 0.35);
+    border-radius: 20px;
+    padding: 32px 24px 20px 24px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(0, 242, 254, 0.15);
+    text-align: center; box-sizing: border-box;
+  }
+  .pc-auth-logo { font-size: 48px; color: var(--green, #00e676); margin-bottom: 12px; text-shadow: 0 0 20px rgba(0, 230, 118, 0.5); }
+  .pc-auth-title { font-size: 22px; font-weight: 900; color: #fff; letter-spacing: 1.5px; margin: 0 0 6px 0; }
+  .pc-auth-subtitle { font-size: 12px; color: #94a3b8; margin: 0 0 24px 0; }
+  .pc-auth-input-wrap { position: relative; margin-bottom: 14px; }
+  .pc-auth-input {
+    width: 100%; padding: 14px 44px 14px 16px;
+    background: #05080f; border: 1.5px solid rgba(0, 242, 254, 0.35);
+    border-radius: 12px; color: #fff; font-size: 16px; font-weight: 800;
+    letter-spacing: 2px; text-align: center; outline: none;
+    transition: all 0.2s ease; box-sizing: border-box; font-family: monospace;
+  }
+  .pc-auth-input:focus { border-color: var(--cyan, #00f2fe); box-shadow: 0 0 16px rgba(0, 242, 254, 0.35); }
+  .pc-auth-toggle {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.05); border: none; color: #94a3b8;
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pc-auth-toggle:hover { color: var(--cyan); background: rgba(0, 242, 254, 0.1); }
+  .pc-auth-error {
+    background: rgba(255, 51, 102, 0.15); border: 1px solid rgba(255, 51, 102, 0.5);
+    color: #ff3366; font-size: 11px; font-weight: 800;
+    padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; text-align: center;
+  }
+  .pc-auth-submit {
+    width: 100%; background: linear-gradient(135deg, #00e676, #059669);
+    color: #000; border: none; border-radius: 12px; padding: 14px;
+    font-size: 13px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;
+    cursor: pointer; box-shadow: 0 0 16px rgba(0, 230, 118, 0.4);
+    transition: transform 0.15s ease, filter 0.15s ease;
+  }
+  .pc-auth-submit:hover { filter: brightness(1.1); }
+  .pc-auth-submit:active { transform: scale(0.97); }
+  .pc-auth-footer { margin-top: 20px; padding-top: 16px; border-top: 1px dashed rgba(255, 255, 255, 0.08); }
+  .pc-auth-hint { font-size: 10px; color: #64748b; line-height: 1.4; margin-bottom: 8px; }
+  .pc-auth-version { font-size: 9px; color: #475569; font-family: monospace; letter-spacing: 1px; }
+</style>
+
+<!-- ═══════════════════════════════════════════════════════
+     СИСТЕМНЫЙ ЗАГРУЗЧИК — точные пути под твою структуру
+     ═══════════════════════════════════════════════════════ -->
+<script>
+  (function() {
+    'use strict';
+
+    const PC_DEV_PASSWORD = "perekup2026";
+    const PC_AUTH_STORAGE_KEY = "perekup_pc_auth_ok";
+    const CACHE_VER = '421';
+
+    let isPcAuthenticated = false;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceDev = urlParams.get('dev') === '1';
+    const isTelegram = !!(window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
+    const savedAuth = sessionStorage.getItem(PC_AUTH_STORAGE_KEY) === 'true';
+
+    window.togglePcAuthPassword = function() {
+      const input = document.getElementById('pcAuthInput');
+      const btn = document.getElementById('pcAuthToggle');
+      if (!input || !btn) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = '<i class="fa-solid fa-eye-slash"></i>';
+      } else {
+        input.type = 'password';
+        btn.innerHTML = '<i class="fa-solid fa-eye"></i>';
+      }
+    };
+
+    window.submitPcAuthPassword = function() {
+      const input = document.getElementById('pcAuthInput');
+      const err = document.getElementById('pcAuthError');
+      if (!input || !err) return;
+
+      const pwd = input.value.trim();
+      if (!pwd) {
+        err.style.display = 'block';
+        err.innerText = '❌ Введите пароль';
+        return;
+      }
+
+      if (pwd === PC_DEV_PASSWORD) {
+        isPcAuthenticated = true;
+        sessionStorage.setItem(PC_AUTH_STORAGE_KEY, 'true');
+        document.getElementById('pcAuthScreen').style.display = 'none';
+        document.getElementById('tgRequiredScreen').style.display = 'none';
+        document.getElementById('appShell').style.display = 'flex';
+
+        if (!window.tgUserId) window.tgUserId = 'pc_dev_' + Date.now();
+        startGame();
+      } else {
+        err.style.display = 'block';
+        err.innerText = '❌ Неверный пароль';
+        input.value = '';
+        input.focus();
+        if (typeof playSound === 'function') playSound('error');
+      }
+    };
+
+    window.openPcAuthScreen = function() {
+      document.getElementById('tgRequiredScreen').style.display = 'none';
+      document.getElementById('pcAuthScreen').style.display = 'flex';
+      setTimeout(() => { document.getElementById('pcAuthInput')?.focus(); }, 100);
+    };
+
+    window.submitAccessInviteCode = function() {
+      const input = document.getElementById('accessInviteInput');
+      const err = document.getElementById('accessErrorMsg');
+      if (!input || !err) return;
+
+      const code = input.value.trim();
+      if (!code) {
+        err.style.display = 'block';
+        err.innerText = '❌ Введите инвайт-код';
+        return;
+      }
+
+      if (window.AccessControl && typeof window.AccessControl.redeemInviteCode === 'function') {
+        window.AccessControl.redeemInviteCode(code)
+          .then(res => {
+            if (res && res.success) {
+              err.style.display = 'none';
+              document.getElementById('accessDeniedScreen').style.display = 'none';
+              document.getElementById('appShell').style.display = 'flex';
+              if (typeof startGame === 'function') startGame();
+            } else {
+              err.style.display = 'block';
+              err.innerText = '❌ ' + (res?.error || 'Неверный код');
+            }
+          })
+          .catch(e => {
+            err.style.display = 'block';
+            err.innerText = '❌ Ошибка: ' + (e.message || e);
+          });
+      } else {
+        err.style.display = 'block';
+        err.innerText = '⚠️ Модуль допуска ещё не загружен';
+      }
+    };
+
+    function decideStartupScreen() {
+      if (isTelegram) {
+        document.getElementById('appShell').style.display = 'flex';
+        startGame();
+        return;
+      }
+
+      if (forceDev || savedAuth) {
+        if (savedAuth) {
+          isPcAuthenticated = true;
+          document.getElementById('appShell').style.display = 'flex';
+          window.tgUserId = window.tgUserId || ('pc_dev_' + Date.now());
+          startGame();
+        } else {
+          document.getElementById('pcAuthScreen').style.display = 'flex';
+        }
+        return;
+      }
+
+      document.getElementById('tgRequiredScreen').style.display = 'flex';
+    }
+
+    const scriptQueue = [
+        // Утилиты
+        'js/utils/event-bus.js',
+        'js/utils/safe-state.js',
+        'js/utils/game-helpers.js',
+        'js/utils/money-manager.js',
+
+        // Access
+        'js/access-control.js',
+
+        // Менеджеры
+        'js/plates-manager.js',
+        'js/notification-center.js',
+        'js/realtime-manager.js',
+        'js/theme-manager.js',
+
+        // Данные
+        'data/data_core.js',
+        'data/data_economy.js',
+        'js/data-defects.js',
+        'data/data_cars_fallbacks.js',
+        'data/data_cars_helpers.js',
+
+        // Каталог машин
+        'data/cars/atv.js',
+        'data/cars/comfort.js',
+        'data/cars/economy.js',
+        'data/cars/hyper.js',
+        'data/cars/moto.js',
+        'data/cars/premium.js',
+        'data/cars/scooter.js',
+        'data/cars/truck.js',
+        'data/cars/yacht.js',
+        'data/data_cars.js',
+
+        // Активности
+        'data/data_barn.js',
+        'data/data_dialogues.js',
+        'data/data_activities_life.js',
+        'data/data_activities_port.js',
+        'data/data_activities_quests.js',
+
+        // Аудио
+        'js/app/audio-fx.js',
+
+        // M-Hub
+        'js/m-hub/m-clubs.js',
+        'js/m-hub/m-events.js',
+        'js/m-hub/m-leaderboard.js',
+
+        // Телефон
+        'js/phone/phone-autostock.js',
+        'js/phone/phone-bank.js',
+        'js/phone/phone-barn.js',
+        'js/phone/phone-business.js',
+        'js/phone/phone-darknet.js',
+        'js/phone/phone-gosuslugi.js',
+        'js/phone/phone-housing.js',
+        'js/phone/phone-media.js',
+        'js/phone/phone-port.js',
+        'js/phone/phone-post.js',
+        'js/phone/phone-racing.js',
+        'js/phone/phone-radar.js',
+        'js/phone/phone-m.js',
+        'js/phone/phone.js',
+
+        // Гараж
+        'js/garage/garage-calc.js',
+        'js/garage/garage-services.js',
+        'js/garage/garage-dialogs.js',
+        'js/garage/garage.js',
+
+        // Рынок
+        'js/market/market-generator.js',
+        'js/market/market-inspection.js',
+        'js/market/market-deal.js',
+        'js/market/market-map.js',
+        'js/market/market.js',
+        'js/salesLot.js',
+        'js/player-listings.js',
+
+        // Геймплей
+        'js/life.js',
+        'js/street.js',
+        'js/syndicate.js',
+        'js/storage-wars-p2p.js',
+
+        // DEV
+        'js/dev/dev-logger.js',
+        'js/dev/dev-data-checker.js',
+        'js/dev/phone-dev.js',
+        'js/dev/dev-studio.js',
+
+        // Финал
+        'js/app/app.js'
+    ];
+
+    function loadScript(path) {
+      return new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = path + '?v=' + CACHE_VER;
+        s.onload = () => resolve(true);
+        s.onerror = () => {
+          console.warn('[Loader] Ошибка загрузки скрипта: ' + path);
+          resolve(false);
+        };
+        document.body.appendChild(s);
+      });
+    }
+
+    async function initAllModules() {
+      for (const scriptPath of scriptQueue) {
+        await loadScript(scriptPath);
+      }
+      if (typeof initApp === 'function') {
+        initApp();
+      }
+    }
+
+    function startGame() {
+      if (window.Telegram?.WebApp) {
+        try {
+          window.Telegram.WebApp.ready();
+          window.Telegram.WebApp.expand();
+        } catch (e) {}
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAllModules);
+      } else {
+        initAllModules();
+      }
+    }
+
+    window.startGame = startGame;
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', decideStartupScreen);
+    } else {
+      decideStartupScreen();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const authScreen = document.getElementById('pcAuthScreen');
+        if (authScreen && authScreen.style.display === 'flex') {
+          window.submitPcAuthPassword();
+        }
+      }
+    });
+  })();
+</script>
+
+</body>
+</html>

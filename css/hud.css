@@ -1,6 +1,12 @@
 /* ========================================================
-   css/hud.css — ВЕРХНЯЯ ПАНЕЛЬ + ЭФФЕКТЫ НИКНЕЙМОВ И АВАТАРА (v4.0.0)
+   css/hud.css — ВЕРХНЯЯ ПАНЕЛЬ + ЭФФЕКТЫ НИКНЕЙМОВ И АВАТАРА (v4.1.0)
    Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+   ⭐ v4.1.0:
+     - Улучшенные превью-боксы для модалки кастомизации
+     - Новые стили интерактивных карточек косметики
+     - Живой превью-док для ника и аватара
+     - Плавные hover/active эффекты
+     - Улучшенные карточки с ценами
    ⭐ v4.0.0 (ПЛАТНАЯ КАСТОМИЗАЦИЯ):
      - Стили для карточек с ценами в модалке кастомизации
      - Золотые рамки для глитч-предметов (.theme-exclusive-frame)
@@ -55,6 +61,7 @@
   cursor: pointer;
   min-width: 0;
   flex: 1;
+  transition: transform 0.15s ease;
 }
 .user-profile:active { transform: scale(0.97); }
 
@@ -75,7 +82,7 @@
   background: var(--cyan, #00f2fe);
   opacity: 0.35;
   filter: blur(4px);
-  transition: background 0.3s ease;
+  transition: background 0.3s ease, opacity 0.3s ease;
 }
 
 .avatar-fx-glow {
@@ -100,6 +107,7 @@
   color: var(--cyan, #00f2fe);
   overflow: hidden;
   z-index: 2;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .avatar img {
@@ -140,6 +148,7 @@
   gap: 3px;
   width: 100%;
   box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .user-name-row {
@@ -237,7 +246,11 @@
   white-space: nowrap;
   flex-shrink: 0;
   cursor: pointer;
-  transition: transform 0.1s ease, background 0.2s ease;
+  transition: transform 0.12s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .stat-pill:active {
@@ -282,7 +295,13 @@
     0 0 12px rgba(0, 230, 118, 0.25),
     inset 0 0 12px rgba(0, 230, 118, 0.08);
   animation: walletBreath 3s ease-in-out infinite;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.wallet-capsule-box:hover {
+  box-shadow:
+    0 0 20px rgba(0, 230, 118, 0.5),
+    inset 0 0 16px rgba(0, 230, 118, 0.15);
 }
 
 .wallet-capsule-box:active {
@@ -443,10 +462,22 @@
   align-items: center;
   gap: 5px;
   border: none;
+  transition: transform 0.12s ease, filter 0.15s ease, box-shadow 0.2s ease;
 }
+
+.hud-btn:hover {
+  filter: brightness(1.15);
+}
+
+.hud-btn:active {
+  transform: scale(0.95);
+}
+
 .btn-theme-custom { background: rgba(192, 132, 252, 0.2); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.4); }
+.btn-theme-custom:hover { box-shadow: 0 0 12px rgba(192, 132, 252, 0.4); }
 .btn-lang { background: rgba(255, 255, 255, 0.05); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.1); }
 .btn-bonus { background: rgba(255, 179, 0, 0.2); color: #ffd700; border: 1px solid rgba(255, 215, 0, 0.5); }
+.btn-bonus:hover { box-shadow: 0 0 12px rgba(255, 215, 0, 0.4); }
 .bonus-icon-pulse { animation: bonusPulse 1.5s infinite alternate ease-in-out; }
 @keyframes bonusPulse {
   0% { transform: scale(1); filter: drop-shadow(0 0 2px #ffd700); }
@@ -454,7 +485,7 @@
 }
 
 /* ========================================================
-   5. НИК-ЭФФЕКТЫ — 8 ПРОДВИНУТЫХ (v4.0.0)
+   5. НИК-ЭФФЕКТЫ — 8 ПРОДВИНУТЫХ
    ======================================================== */
 
 /* ===== 5.1. HOLOGRAPHIC SHIFT ===== */
@@ -706,7 +737,7 @@
 }
 
 /* ========================================================
-   6. АУРЫ АВАТАРА — 10 ПРОДВИНУТЫХ (v4.0.0)
+   6. АУРЫ АВАТАРА — 10 ПРОДВИНУТЫХ
    ======================================================== */
 
 /* ===== 6.1. FIRE RING ===== */
@@ -1153,6 +1184,12 @@
   justify-content: center;
   min-height: 54px;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nick-preview-box:hover {
+  border-color: rgba(0, 242, 254, 0.25);
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
 }
 
 .nick-preview-text {
@@ -1175,6 +1212,12 @@
   justify-content: center;
   min-height: 110px;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.avatar-preview-box:hover {
+  border-color: rgba(0, 242, 254, 0.25);
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
 }
 
 .avatar-preview-box .avatar-ring {
@@ -1188,7 +1231,428 @@
 }
 
 /* ========================================================
-   ⭐ v4.0.0: СТИЛИ ДЛЯ ПЛАТНОЙ КАСТОМИЗАЦИИ
+   ⭐ v4.1.0: ЖИВОЙ ПРЕВЬЮ-ДОК В МОДАЛКЕ КАСТОМИЗАЦИИ
+   ======================================================== */
+
+/* Sticky-превью сверху модалки */
+.cosmetics-live-preview {
+  position: sticky;
+  top: -18px;
+  z-index: 20;
+  background: linear-gradient(180deg, 
+    rgba(9, 14, 24, 0.99) 0%, 
+    rgba(9, 14, 24, 0.94) 85%, 
+    rgba(9, 14, 24, 0) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 14px 18px 18px 18px;
+  margin: -18px -18px 14px -18px;
+  border-bottom: 1px solid rgba(0, 242, 254, 0.15);
+  transition: box-shadow 0.3s ease;
+}
+
+.cosmetics-live-preview.scrolled {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+.cosmetics-live-preview-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cosmetics-live-avatar {
+  flex-shrink: 0;
+}
+
+.cosmetics-live-nick {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.cosmetics-live-nick::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, 
+    rgba(0, 242, 254, 0.3), 
+    rgba(192, 132, 252, 0.3));
+  opacity: 0;
+  z-index: -1;
+  filter: blur(6px);
+  transition: opacity 0.3s ease;
+}
+
+.cosmetics-live-nick.active::after {
+  opacity: 1;
+}
+
+/* Заголовок секции */
+.cosmetics-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16px 0 10px 0;
+  padding: 0 2px;
+}
+
+.cosmetics-section-title {
+  font-size: 12px;
+  font-weight: 900;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cosmetics-section-title::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--cyan), var(--purple));
+  box-shadow: 0 0 8px var(--cyan-glow);
+}
+
+.cosmetics-section-count {
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--text-sub);
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Горизонтальный скролл-контейнер */
+.cosmetics-scroll-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 2px 14px 2px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.cosmetics-scroll-row::-webkit-scrollbar { display: none; }
+
+/* Карточка косметики */
+.cosmetic-card {
+  flex: 0 0 auto;
+  width: 152px;
+  scroll-snap-align: start;
+  background: linear-gradient(160deg, 
+    rgba(20, 30, 48, 0.95) 0%, 
+    rgba(9, 14, 25, 0.98) 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              box-shadow 0.25s ease;
+  animation: cardStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.cosmetic-card:nth-child(1) { animation-delay: 0.03s; }
+.cosmetic-card:nth-child(2) { animation-delay: 0.06s; }
+.cosmetic-card:nth-child(3) { animation-delay: 0.09s; }
+.cosmetic-card:nth-child(4) { animation-delay: 0.12s; }
+.cosmetic-card:nth-child(5) { animation-delay: 0.15s; }
+.cosmetic-card:nth-child(6) { animation-delay: 0.18s; }
+.cosmetic-card:nth-child(7) { animation-delay: 0.21s; }
+.cosmetic-card:nth-child(8) { animation-delay: 0.24s; }
+
+.cosmetic-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, 
+    rgba(0, 242, 254, 0.1) 0%, 
+    transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.cosmetic-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(0, 242, 254, 0.4);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5),
+              0 0 18px rgba(0, 242, 254, 0.18);
+}
+.cosmetic-card:hover::before { opacity: 1; }
+
+.cosmetic-card:active {
+  transform: scale(0.97);
+}
+
+.cosmetic-card.selected {
+  border-color: var(--cyan);
+  background: linear-gradient(160deg, 
+    rgba(0, 242, 254, 0.14) 0%, 
+    rgba(9, 14, 25, 0.98) 100%);
+  box-shadow: 0 0 20px var(--cyan-glow),
+              inset 0 0 14px rgba(0, 242, 254, 0.08);
+}
+
+.cosmetic-card.selected::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--cyan);
+  color: #000;
+  font-size: 13px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 12px var(--cyan-glow);
+  z-index: 5;
+  animation: checkPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes checkPop {
+  0% { transform: scale(0) rotate(-180deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* Превью эффекта в карточке */
+.cosmetic-card-preview {
+  height: 56px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.cosmetic-card-preview-text {
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+  padding: 0 6px;
+}
+
+.cosmetic-card-preview-avatar {
+  width: 42px;
+  height: 42px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cosmetic-card-preview-avatar .avatar-ring {
+  width: 42px;
+  height: 42px;
+  position: relative;
+}
+.cosmetic-card-preview-avatar .avatar {
+  width: 34px;
+  height: 34px;
+  font-size: 14px;
+}
+
+/* Инфо-блок карточки */
+.cosmetic-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 34px;
+  flex: 1;
+}
+
+.cosmetic-card-name {
+  font-size: 10.5px;
+  font-weight: 900;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.2px;
+}
+
+.cosmetic-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Кнопка действия в карточке */
+.cosmetic-card-action {
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 8px;
+  border: none;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: transform 0.12s ease, filter 0.15s ease, box-shadow 0.2s ease;
+  text-transform: uppercase;
+  font-family: inherit;
+}
+
+.cosmetic-card-action:active { transform: scale(0.95); }
+
+.cosmetic-card-action.action-apply {
+  background: linear-gradient(135deg, var(--cyan), #0284c7);
+  color: #000;
+  box-shadow: 0 0 10px var(--cyan-glow);
+}
+.cosmetic-card-action.action-apply:hover {
+  box-shadow: 0 0 16px var(--cyan-glow);
+}
+
+.cosmetic-card-action.action-buy {
+  background: linear-gradient(135deg, var(--green), #059669);
+  color: #000;
+  box-shadow: 0 0 10px var(--green-glow);
+}
+.cosmetic-card-action.action-buy:hover {
+  box-shadow: 0 0 16px var(--green-glow);
+}
+
+.cosmetic-card-action.action-buy-tickets {
+  background: linear-gradient(135deg, #ffd700, #f59e0b);
+  color: #000;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.5);
+}
+.cosmetic-card-action.action-buy-tickets:hover {
+  box-shadow: 0 0 18px rgba(255, 215, 0, 0.7);
+}
+
+.cosmetic-card-action.action-locked {
+  background: rgba(255, 255, 255, 0.05);
+  color: #64748b;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.cosmetic-card-action.action-active {
+  background: rgba(0, 230, 118, 0.15);
+  color: var(--green);
+  border: 1px solid rgba(0, 230, 118, 0.4);
+  cursor: default;
+}
+
+/* Заблокированная карточка */
+.cosmetic-card.locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.cosmetic-card.locked:hover {
+  transform: none;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+.cosmetic-card.locked:hover::before {
+  opacity: 0;
+}
+
+/* Табы категорий (Ники / Аватары / Ауры) */
+.cosmetics-tabs-row {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: rgba(9, 14, 24, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+.cosmetics-tab {
+  flex: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #94a3b8;
+  border-radius: 9px;
+  padding: 8px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.2s ease;
+  outline: none;
+  font-family: inherit;
+}
+
+.cosmetics-tab i { font-size: 15px; }
+.cosmetics-tab span { font-size: 9px; }
+
+.cosmetics-tab:active { transform: scale(0.95); }
+
+.cosmetics-tab.active {
+  background: linear-gradient(135deg, 
+    rgba(0, 242, 254, 0.18), 
+    rgba(121, 40, 202, 0.22));
+  border-color: rgba(0, 242, 254, 0.55);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.25);
+}
+
+.cosmetics-tab.active i {
+  color: var(--cyan);
+  filter: drop-shadow(0 0 5px var(--cyan-glow));
+}
+
+/* Пустое состояние */
+.cosmetics-empty-state {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--text-sub);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cosmetics-empty-state i {
+  font-size: 32px;
+  color: rgba(148, 163, 184, 0.3);
+  display: block;
+  margin-bottom: 10px;
+}
+
+/* ========================================================
+   8. СТИЛИ ДЛЯ ПЛАТНОЙ КАСТОМИЗАЦИИ (v4.0.0)
    ======================================================== */
 
 /* Шапка модалки с балансом валют */
@@ -1329,7 +1793,7 @@
   50%      { transform: scale(1.15) rotate(-10deg); opacity: 1; }
 }
 
-/* Кнопка покупки в карточке */
+/* Кнопка покупки в карточке (устаревшая, для совместимости) */
 .theme-buy-btn {
   display: inline-flex;
   align-items: center;
@@ -1367,7 +1831,7 @@
   box-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
 }
 
-/* Карточка косметики в сетке */
+/* Карточка косметики в сетке (устаревшая, для совместимости) */
 .cosmetic-tile {
   background: rgba(14, 22, 38, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1377,13 +1841,14 @@
   align-items: center;
   gap: 10px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
   position: relative;
   box-sizing: border-box;
 }
 .cosmetic-tile:hover {
   background: rgba(20, 32, 54, 0.95);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(0, 242, 254, 0.3);
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.15);
 }
 .cosmetic-tile.selected {
   border-color: var(--cyan, #00f2fe);
@@ -1392,7 +1857,7 @@
 }
 
 /* ========================================================
-   8. АДАПТИВ
+   9. АДАПТИВ
    ======================================================== */
 @media (max-width: 380px) {
   .player-name-text { font-size: 12.5px; }
@@ -1404,4 +1869,15 @@
   .nick-preview-text { font-size: 17px; }
   .cosmetics-balance-item { font-size: 9px; }
   .theme-buy-btn { font-size: 8px; padding: 3px 8px; }
+  
+  /* Новое меню кастомизации */
+  .cosmetic-card { width: 138px; padding: 8px; }
+  .cosmetic-card-preview { height: 50px; }
+  .cosmetic-card-preview-text { font-size: 12.5px; }
+  .cosmetic-card-name { font-size: 9.5px; }
+  .cosmetic-card-action { font-size: 9px; padding: 6px 6px; }
+  .cosmetics-live-nick { font-size: 16px; padding: 6px 10px; }
+  .cosmetics-tab { font-size: 9px; padding: 6px 3px; }
+  .cosmetics-tab i { font-size: 13px; }
+  .cosmetics-tab span { font-size: 8px; }
 }

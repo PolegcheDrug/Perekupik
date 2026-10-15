@@ -1,28 +1,34 @@
 /* ========================================================
-   css/base.css — БАЗОВЫЕ ПЕРЕМЕННЫЕ (ТОЛЬКО ТЁМНАЯ ТЕМА) (v2.1.0)
+   css/base.css — БАЗОВЫЕ ПЕРЕМЕННЫЕ И АДАПТИВ (v3.1.0)
    Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-   ⭐ v2.1.0:
-   - Убрана светлая тема полностью
-   - Только тёмный неоновый дизайн
-   - Переменные для DEV-режима
+   ⭐ v3.1.0:
+   - Плавные stagger-анимации появления карточек
+   - Улучшенные hover-эффекты для ПК
+   - Микроанимации кнопок (ripple-like)
+   - Улучшенные скроллбары с glow
+   - АДАПТИВ: mobile-first, планшеты (768px+), ПК (1200px+)
+   - clamp() для шрифтов и отступов
+   - safe-area-inset для iPhone
+   - AccessControl стили (экран "Доступ закрыт", owner-бейдж)
+   - prefers-reduced-motion для доступности
    ======================================================== */
 
 /* ========================================================
-   1. ПЕРЕМЕННЫЕ ТЁМНОЙ ТЕМЫ (по умолчанию)
+   1. ПЕРЕМЕННЫЕ ТЁМНОЙ ТЕМЫ (ЕДИНЫЙ ИСТОЧНИК)
    ======================================================== */
 :root {
-  /* Фоны */
+  /* ─── Фоны ─── */
   --bg-body: #05080f;
   --bg-surface: #0b101a;
   --bg-card: linear-gradient(145deg, rgba(20, 27, 43, 0.94) 0%, rgba(10, 15, 25, 0.96) 100%);
   --bg-card-hover: rgba(26, 36, 54, 0.95);
   --bg-modal: radial-gradient(circle at 50% 0%, rgba(26, 38, 64, 0.98) 0%, rgba(9, 14, 24, 0.98) 100%);
 
-  /* Рамки */
+  /* ─── Рамки ─── */
   --border-glass: rgba(255, 255, 255, 0.08);
   --border-glow: rgba(0, 242, 254, 0.25);
 
-  /* Акцентные цвета */
+  /* ─── Акцентные цвета ─── */
   --cyan: #00f2fe;
   --cyan-glow: rgba(0, 242, 254, 0.45);
   --green: #00e676;
@@ -34,40 +40,56 @@
   --purple: #c084fc;
   --purple-dark: #7e22ce;
   --purple-glow: rgba(192, 132, 252, 0.4);
+  --teal: #14b8a6;
 
-  /* Молния (Lightning theme) */
+  /* ─── Молния (Lightning theme) ─── */
   --lightning-secondary: #7928ca;
   --lightning-glow: rgba(121, 40, 202, 0.45);
 
-  /* Кастомные цвета (перезаписываются из theme-manager.js) */
+  /* ─── Кастомные цвета (перезаписываются из theme-manager.js) ─── */
   --custom-fx-color: #00f2fe;
   --custom-fx-glow: rgba(0, 242, 254, 0.45);
 
-  /* Текст */
+  /* ─── Текст ─── */
   --text-main: #f8fafc;
   --text-sub: #94a3b8;
   --text-muted: #64748b;
 
-  /* Радиусы */
+  /* ─── Радиусы ─── */
   --radius-xl: 20px;
   --radius-lg: 16px;
   --radius-md: 12px;
   --radius-sm: 8px;
 
-  /* HUD и NAV */
+  /* ─── HUD и NAV ─── */
   --hud-bg-custom: linear-gradient(180deg, rgba(8, 13, 24, 0.98) 0%, rgba(5, 8, 15, 0.94) 100%);
   --nav-bg-custom: rgba(11, 16, 26, 0.98);
 
-  /* Тени */
+  /* ─── Тени ─── */
   --shadow-card: 0 10px 28px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --shadow-card-hover: 0 12px 32px rgba(0, 0, 0, 0.85);
   --shadow-modal: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 20px var(--cyan-glow);
 
-  /* ⭐ v2.1.0: DEV-режим */
+  /* ─── DEV-режим ─── */
   --dev-accent: #00e676;
   --dev-bg: #05080f;
   --dev-border: rgba(0, 230, 118, 0.5);
   --dev-glow: rgba(0, 230, 118, 0.35);
+
+  /* ══════════════════════════════════════════════════════
+     АДАПТИВНЫЕ РАЗМЕРЫ (clamp = fluid typography)
+     ══════════════════════════════════════════════════════ */
+  --app-max-width: 480px;
+  --font-xs: clamp(9px, 2.5vw, 11px);
+  --font-sm: clamp(10px, 2.8vw, 12px);
+  --font-md: clamp(11px, 3vw, 13px);
+  --font-lg: clamp(13px, 3.5vw, 16px);
+  --font-xl: clamp(16px, 4vw, 22px);
+  --font-2xl: clamp(20px, 5vw, 28px);
+  --space-xs: clamp(4px, 1vw, 6px);
+  --space-sm: clamp(6px, 1.5vw, 10px);
+  --space-md: clamp(10px, 2.5vw, 14px);
+  --space-lg: clamp(14px, 3.5vw, 20px);
 }
 
 /* ========================================================
@@ -91,28 +113,43 @@ html, body {
   background-color: var(--bg-body);
   color: var(--text-main);
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 /* Скрытие мусора от хостинга */
-div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="tiiny"] {
+div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"],
+[class*="tiiny"], [id*="tiiny"] {
   display: none !important;
   height: 0 !important;
   pointer-events: none !important;
 }
 
 /* ========================================================
-   3. СКРОЛЛБАРЫ
+   3. СКРОЛЛБАРЫ (тонкие неоновые с glow)
    ======================================================== */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: rgba(5, 8, 15, 0.7);
+  border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, var(--cyan), #0284c7);
   border-radius: 8px;
+  box-shadow: 0 0 8px var(--cyan-glow);
+  transition: background 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--cyan), var(--purple));
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cyan) rgba(5, 8, 15, 0.7);
 }
 
 /* ========================================================
@@ -124,7 +161,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   width: 100%;
   height: 100%;
   height: 100dvh;
-  max-width: 480px;
+  max-width: var(--app-max-width);
   margin: 0 auto;
   position: relative;
   background:
@@ -132,6 +169,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
     radial-gradient(circle at 80% 90%, rgba(192, 132, 252, 0.06) 0%, transparent 50%),
     linear-gradient(180deg, #0f1728 0%, var(--bg-body) 100%);
   overflow: hidden;
+  transition: max-width 0.3s ease;
 }
 
 /* ========================================================
@@ -143,7 +181,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: 10px 12px 75px 12px !important;
+  padding: var(--space-md) var(--space-md) 75px var(--space-md) !important;
   position: relative;
   z-index: 10;
 }
@@ -154,12 +192,37 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 .tab-screen.active {
   display: block !important;
-  animation: fadeIn 0.2s ease-in-out;
+  animation: fadeIn 0.25s ease-in-out;
 }
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ⭐ v3.1.0: Каскадное появление карточек */
+@keyframes cardStaggerIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.tab-screen.active > .glass-card {
+  animation: cardStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.tab-screen.active > .glass-card:nth-child(1) { animation-delay: 0.03s; }
+.tab-screen.active > .glass-card:nth-child(2) { animation-delay: 0.07s; }
+.tab-screen.active > .glass-card:nth-child(3) { animation-delay: 0.11s; }
+.tab-screen.active > .glass-card:nth-child(4) { animation-delay: 0.15s; }
+.tab-screen.active > .glass-card:nth-child(5) { animation-delay: 0.19s; }
+.tab-screen.active > .glass-card:nth-child(6) { animation-delay: 0.23s; }
+.tab-screen.active > .glass-card:nth-child(7) { animation-delay: 0.27s; }
+.tab-screen.active > .glass-card:nth-child(8) { animation-delay: 0.31s; }
 
 /* ========================================================
    6. КАРТОЧКИ GLASS
@@ -170,14 +233,29 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   border: 1px solid var(--border-glass);
   border-top: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-xl);
-  padding: 14px;
-  margin-bottom: 14px;
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
   box-shadow: var(--shadow-card);
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.25s ease,
-              border-color 0.25s ease;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s ease,
+              border-color 0.3s ease;
   overflow: hidden;
 }
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, 
+    rgba(0, 242, 254, 0.04) 0%, 
+    transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glass-card:hover::before { opacity: 1; }
 
 .glass-card:active {
   transform: scale(0.992);
@@ -189,17 +267,26 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   box-shadow: 0 0 24px rgba(255, 179, 0, 0.35), inset 0 0 15px rgba(255, 179, 0, 0.08) !important;
 }
 
+/* Owner-карточка (для владельца игры) */
+.glass-card.owner-card {
+  border: 1.5px solid rgba(255, 215, 0, 0.9) !important;
+  background:
+    linear-gradient(145deg, rgba(40, 35, 15, 0.95) 0%, rgba(15, 15, 25, 0.98) 100%) !important;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.08) !important;
+}
+
 /* ========================================================
-   7. КНОПКИ
+   7. КНОПКИ (с микроанимациями)
    ======================================================== */
 .btn {
+  position: relative;
   width: 100%;
   min-height: 42px;
-  padding: 10px 16px;
+  padding: var(--space-sm) var(--space-md);
   border-radius: var(--radius-md);
   border: none;
   font-weight: 800;
-  font-size: 11.5px;
+  font-size: var(--font-sm);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -209,32 +296,137 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   letter-spacing: 0.4px;
   line-height: 1.25;
   text-align: center;
-  transition: transform 0.1s ease, filter 0.1s ease, box-shadow 0.2s ease;
+  transition: transform 0.12s ease, 
+              filter 0.15s ease, 
+              box-shadow 0.25s ease;
   flex-shrink: 0;
   outline: none;
+  overflow: hidden;
 }
-.btn:active { transform: scale(0.97); filter: brightness(1.1); }
-.btn:disabled { opacity: 0.35 !important; cursor: not-allowed; }
 
-.btn-cyan { background: linear-gradient(135deg, var(--cyan), #0284c7) !important; color: #000 !important; box-shadow: 0 0 12px var(--cyan-glow) !important; }
-.btn-green { background: linear-gradient(135deg, var(--green), #059669) !important; color: #000 !important; box-shadow: 0 0 12px var(--green-glow) !important; }
-.btn-amber { background: linear-gradient(135deg, #ffd700, var(--amber)) !important; color: #000 !important; box-shadow: 0 0 12px var(--amber-glow) !important; }
-.btn-purple { background: linear-gradient(135deg, #c084fc, #9333ea) !important; color: #fff !important; box-shadow: 0 0 14px var(--purple-glow) !important; }
-.btn-red { background: linear-gradient(135deg, var(--red), #dc2626) !important; color: #fff !important; box-shadow: 0 0 12px var(--red-glow) !important; }
-.btn-dark { background: rgba(255, 255, 255, 0.07) !important; color: #e2e8f0 !important; border: 1px solid var(--border-glass) !important; }
-.btn-danger { background: #dc2626 !important; color: #fff !important; box-shadow: 0 0 12px rgba(220, 38, 38, 0.4) !important; }
+/* Ripple-эффект при клике */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, 
+    rgba(255, 255, 255, 0.35) 0%, 
+    transparent 60%);
+  opacity: 0;
+  transform: scale(0);
+  transition: transform 0.4s ease, opacity 0.4s ease;
+  pointer-events: none;
+}
 
-.btn-sm { min-height: 36px; font-size: 11px; padding: 6px 12px; }
-.btn-auto { width: auto; min-width: max-content; padding: 8px 16px; font-size: 11px; white-space: nowrap; flex-shrink: 0; }
+.btn:active::after {
+  opacity: 1;
+  transform: scale(2);
+  transition: transform 0s, opacity 0s;
+}
+
+.btn:active { 
+  transform: scale(0.97); 
+  filter: brightness(1.1); 
+}
+
+.btn:disabled { 
+  opacity: 0.35 !important; 
+  cursor: not-allowed; 
+}
+
+.btn-cyan {
+  background: linear-gradient(135deg, var(--cyan), #0284c7) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px var(--cyan-glow) !important;
+}
+.btn-cyan:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--cyan-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-green {
+  background: linear-gradient(135deg, var(--green), #059669) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px var(--green-glow) !important;
+}
+.btn-green:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--green-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-amber {
+  background: linear-gradient(135deg, #ffd700, var(--amber)) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px var(--amber-glow) !important;
+}
+.btn-amber:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--amber-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-purple {
+  background: linear-gradient(135deg, #c084fc, #9333ea) !important;
+  color: #fff !important;
+  box-shadow: 0 0 14px var(--purple-glow) !important;
+}
+.btn-purple:hover:not(:disabled) {
+  box-shadow: 0 0 22px var(--purple-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-red {
+  background: linear-gradient(135deg, var(--red), #dc2626) !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px var(--red-glow) !important;
+}
+.btn-red:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--red-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-dark {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid var(--border-glass) !important;
+}
+.btn-dark:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(0, 242, 254, 0.3) !important;
+}
+
+.btn-danger {
+  background: #dc2626 !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.4) !important;
+}
+
+.btn-teal {
+  background: linear-gradient(135deg, #14b8a6, #0f766e) !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(20, 184, 166, 0.35) !important;
+}
+
+.btn-sm { 
+  min-height: 36px; 
+  font-size: var(--font-xs); 
+  padding: 6px 12px; 
+}
+
+.btn-auto { 
+  width: auto; 
+  min-width: max-content; 
+  padding: 8px 16px; 
+  font-size: var(--font-xs); 
+  white-space: nowrap; 
+  flex-shrink: 0; 
+}
 
 /* ========================================================
    8. СЕТКИ И УТИЛИТЫ
    ======================================================== */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-sm); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-xs); }
+.grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-xs); }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .flex-gap { display: flex; gap: 7px; }
+.flex-center { display: flex; justify-content: center; align-items: center; }
+.flex-col { display: flex; flex-direction: column; }
 
 /* Цвета */
 .color-cyan { color: var(--cyan); }
@@ -242,13 +434,15 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .color-amber { color: var(--amber); }
 .color-red { color: var(--red); }
 .color-purple { color: var(--purple); }
+.color-teal { color: var(--teal); }
 .color-sub { color: var(--text-sub); }
 .color-muted { color: var(--text-muted); }
 .color-main { color: var(--text-main); }
 
 /* Утилиты */
-.sub-label { font-size: 11px; color: var(--text-sub); }
+.sub-label { font-size: var(--font-xs); color: var(--text-sub); }
 .font-bold { font-weight: 800; }
+.font-mono { font-family: monospace, sans-serif; }
 .mb-1 { margin-bottom: 4px; }
 .mb-2 { margin-bottom: 8px; }
 .mb-3 { margin-bottom: 12px; }
@@ -260,7 +454,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .p-3 { padding: 12px; }
 .text-center { text-align: center; }
 .text-right { text-align: right; }
-.text-xs { font-size: 10px; }
+.text-xs { font-size: var(--font-xs); }
 .w-full { width: 100%; }
 .block { display: block; }
 .space-y-1 > * + * { margin-top: 4px; }
@@ -268,12 +462,13 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .space-y-3 > * + * { margin-top: 12px; }
 .opacity-50 { opacity: 0.5; }
 .opacity-60 { opacity: 0.6; }
+.pointer { cursor: pointer; }
 
 /* ========================================================
    9. TAG-BADGES
    ======================================================== */
 .tag-badge {
-  font-size: 9px;
+  font-size: var(--font-xs);
   font-weight: 800;
   padding: 3px 7px;
   border-radius: 4px;
@@ -281,6 +476,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  white-space: nowrap;
 }
 .bg-tag-cyan { background: #06283d; color: var(--cyan); }
 .bg-tag-amber { background: #3b2a05; color: var(--amber); }
@@ -316,33 +512,28 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 .censor-badge::before { content: '⚠'; font-size: 8px; opacity: 0.9; }
 
 /* ========================================================
-   11. БАЗОВЫЕ НИК-ЭФФЕКТЫ (старые, для совместимости)
-   Новые — в hud.css
+   11. БАЗОВЫЕ НИК-ЭФФЕКТЫ (совместимость, новые — в hud.css)
    ======================================================== */
 @keyframes nickLightningAnim {
   0% { color: #fff; text-shadow: 0 0 5px var(--cyan), 0 0 10px var(--cyan); }
   50% { color: var(--cyan); text-shadow: 0 0 15px var(--cyan), 0 0 25px var(--lightning-secondary); }
   100% { color: #fff; text-shadow: 0 0 5px var(--cyan), 0 0 10px var(--cyan); }
 }
-
 @keyframes nickFireAnim {
   0% { color: #ff3366; text-shadow: 0 0 6px #ff3366, 0 0 12px #ff6600; }
   50% { color: #ffcc00; text-shadow: 0 0 15px #ff6600, 0 0 25px #ff3366; }
   100% { color: #ff3366; text-shadow: 0 0 6px #ff3366, 0 0 12px #ff6600; }
 }
-
 @keyframes nickGoldAnim {
   0% { color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
   50% { color: #fff; text-shadow: 0 0 18px rgba(255, 215, 0, 0.9), 0 0 5px #b45309; }
   100% { color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
 }
-
 @keyframes nickMatrixAnim {
   0% { color: #00e676; text-shadow: 0 0 8px #00e676; }
   50% { color: #fff; text-shadow: 0 0 16px #00e676; }
   100% { color: #00e676; text-shadow: 0 0 8px #00e676; }
 }
-
 @keyframes nickSakuraAnim {
   0% { color: #f43f5e; text-shadow: 0 0 8px #f43f5e; }
   50% { color: #c084fc; text-shadow: 0 0 16px #c084fc; }
@@ -362,7 +553,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
-
 .avatar-fx-lightning-ring .avatar-glow {
   background: conic-gradient(from 0deg, var(--cyan), var(--lightning-secondary), transparent, var(--cyan));
   animation: ringSpin 4s linear infinite;
@@ -385,10 +575,8 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
 }
 
 /* ========================================================
-   ⭐ v2.1.0: 13. DEV-РЕЖИМ ДЛЯ ПК
+   13. DEV-РЕЖИМ ДЛЯ ПК
    ======================================================== */
-
-/* DEV-бейдж в профиле */
 .dev-mode-badge {
   display: inline-block;
   background: linear-gradient(135deg, #00e676, #059669);
@@ -403,7 +591,6 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   box-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
 }
 
-/* DEV-панель быстрого доступа (появляется при isPcDevMode) */
 .dev-quick-panel {
   position: fixed;
   bottom: 80px;
@@ -414,9 +601,7 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   gap: 6px;
   pointer-events: none;
 }
-.dev-quick-panel > * {
-  pointer-events: auto;
-}
+.dev-quick-panel > * { pointer-events: auto; }
 .dev-quick-btn {
   width: 42px;
   height: 42px;
@@ -431,16 +616,14 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 230, 118, 0.4);
-  transition: transform 0.15s ease, filter 0.15s ease;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.2s ease;
 }
-.dev-quick-btn:active {
-  transform: scale(0.92);
-}
-.dev-quick-btn:hover {
-  filter: brightness(1.15);
+.dev-quick-btn:active { transform: scale(0.92); }
+.dev-quick-btn:hover { 
+  filter: brightness(1.15); 
+  box-shadow: 0 6px 18px rgba(0, 230, 118, 0.6);
 }
 
-/* DEV-индикатор в углу */
 .dev-corner-indicator {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 8px);
@@ -459,47 +642,208 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"], [class*="tiiny"], [id*="t
   pointer-events: none;
   animation: devCornerPulse 2s infinite alternate ease-in-out;
 }
-
 @keyframes devCornerPulse {
   0% { box-shadow: 0 0 6px var(--dev-glow); }
   100% { box-shadow: 0 0 14px var(--dev-glow); }
 }
 
 /* ========================================================
-   14. ПРОЧИЕ БАЗОВЫЕ ЭЛЕМЕНТЫ
+   14. OWNER-БЕЙДЖ (для владельца игры)
+   ======================================================== */
+.owner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #ffd700, #f59e0b);
+  color: #000;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  animation: ownerBadgePulse 2s infinite alternate ease-in-out;
+}
+@keyframes ownerBadgePulse {
+  0% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
+  100% { box-shadow: 0 0 18px rgba(255, 215, 0, 0.8); }
+}
+
+.owner-crown-icon {
+  color: #ffd700;
+  filter: drop-shadow(0 0 4px #ffd700);
+}
+
+/* ========================================================
+   15. ACCESS CONTROL — ЭКРАН "ДОСТУП ЗАКРЫТ"
+   ======================================================== */
+.access-denied-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, #1f0a0e 0%, #05080f 100%);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.access-denied-box {
+  width: 100%;
+  max-width: 400px;
+  background: linear-gradient(145deg, rgba(30, 15, 20, 0.98) 0%, rgba(10, 15, 25, 0.98) 100%);
+  border: 1.5px solid rgba(255, 51, 102, 0.5);
+  border-radius: 20px;
+  padding: 32px 24px 24px 24px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(255, 51, 102, 0.2);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.access-denied-icon {
+  font-size: 56px;
+  color: #ff3366;
+  margin-bottom: 12px;
+  text-shadow: 0 0 25px rgba(255, 51, 102, 0.6);
+  animation: deniedIconShake 2.5s infinite ease-in-out;
+}
+@keyframes deniedIconShake {
+  0%, 100% { transform: rotate(0deg); }
+  10%, 30%, 50% { transform: rotate(-5deg); }
+  20%, 40%, 60% { transform: rotate(5deg); }
+  70% { transform: rotate(0deg); }
+}
+
+.access-denied-title {
+  font-size: 22px;
+  font-weight: 900;
+  color: #ff3366;
+  letter-spacing: 1.5px;
+  margin: 0 0 8px 0;
+  text-shadow: 0 0 15px rgba(255, 51, 102, 0.5);
+}
+
+.access-denied-subtitle {
+  font-size: 12px;
+  color: #fca5a5;
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.access-denied-hint {
+  padding: 12px;
+  background: rgba(255, 51, 102, 0.08);
+  border: 1px solid rgba(255, 51, 102, 0.3);
+  border-radius: 10px;
+  color: #fca5a5;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.access-invite-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: #05080f;
+  border: 1.5px solid rgba(255, 51, 102, 0.35);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-align: center;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  font-family: monospace, sans-serif;
+  margin-bottom: 12px;
+}
+.access-invite-input:focus {
+  border-color: #ff3366;
+  box-shadow: 0 0 16px rgba(255, 51, 102, 0.4);
+}
+
+.access-denied-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #c084fc, #9333ea);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(192, 132, 252, 0.4);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.access-denied-btn:hover { filter: brightness(1.1); }
+.access-denied-btn:active { transform: scale(0.97); }
+
+.access-pending-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 179, 0, 0.12);
+  border: 1px solid rgba(255, 179, 0, 0.4);
+  border-radius: 10px;
+  color: #ffb300;
+  font-size: 11px;
+  font-weight: 800;
+  margin-top: 12px;
+}
+.access-pending-status .spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 179, 0, 0.2);
+  border-top-color: #ffb300;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ========================================================
+   16. ПРОЧИЕ БАЗОВЫЕ ЭЛЕМЕНТЫ
    ======================================================== */
 
 /* Инпуты */
 .chat-input,
+.input-dark,
 input[type="text"],
 input[type="number"],
+input[type="password"],
 textarea {
   background: #090e18;
   color: #fff;
   border: 1px solid var(--border-glow);
   border-radius: 8px;
   padding: 8px 10px;
-  font-size: 12px;
+  font-size: var(--font-sm);
   outline: none;
   width: 100%;
   box-sizing: border-box;
   font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .chat-input:focus,
+.input-dark:focus,
 input[type="text"]:focus,
 input[type="number"]:focus,
+input[type="password"]:focus,
 textarea:focus {
   border-color: var(--cyan);
-  box-shadow: 0 0 10px var(--cyan-glow);
+  box-shadow: 0 0 12px var(--cyan-glow);
 }
 
 .chat-input::placeholder,
 input::placeholder,
-textarea::placeholder {
-  color: #64748b;
-}
+textarea::placeholder { color: #64748b; }
 
 /* Select */
 select {
@@ -508,10 +852,14 @@ select {
   border: 1px solid var(--border-glass);
   border-radius: 8px;
   padding: 6px 8px;
-  font-size: 11px;
+  font-size: var(--font-sm);
   outline: none;
   font-family: inherit;
   cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+select:hover {
+  border-color: rgba(0, 242, 254, 0.3);
 }
 
 /* Убираем стрелки у number */
@@ -537,54 +885,325 @@ input[type="range"] {
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--cyan);
   cursor: pointer;
-  box-shadow: 0 0 8px var(--cyan-glow);
+  box-shadow: 0 0 10px var(--cyan-glow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 14px var(--cyan-glow);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: var(--cyan);
   cursor: pointer;
   border: none;
-  box-shadow: 0 0 8px var(--cyan-glow);
+  box-shadow: 0 0 10px var(--cyan-glow);
 }
 
 /* ========================================================
-   15. СКРЫТИЕ ЭЛЕМЕНТОВ
+   17. СКРЫТИЕ ЭЛЕМЕНТОВ
    ======================================================== */
 .hidden { display: none !important; }
 .invisible { visibility: hidden; }
 
 /* ========================================================
-   16. АНИМАЦИИ ОБЩИЕ
+   18. АНИМАЦИИ ОБЩИЕ
    ======================================================== */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes pulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.05); }
 }
-
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ⭐ v3.1.0: Появление карточек в списке */
+@keyframes listItemIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.list-stagger > * {
+  animation: listItemIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.list-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.list-stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.list-stagger > *:nth-child(3) { animation-delay: 0.08s; }
+.list-stagger > *:nth-child(4) { animation-delay: 0.11s; }
+.list-stagger > *:nth-child(5) { animation-delay: 0.14s; }
+.list-stagger > *:nth-child(6) { animation-delay: 0.17s; }
+.list-stagger > *:nth-child(7) { animation-delay: 0.20s; }
+.list-stagger > *:nth-child(8) { animation-delay: 0.23s; }
 
 /* ========================================================
-   17. АДАПТИВНОСТЬ
+   ══════════════════════════════════════════════════════
+   19. АДАПТИВ: БОЛЬШИЕ ТЕЛЕФОНЫ (iPhone Pro Max, Galaxy Ultra)
+   ══════════════════════════════════════════════════════
    ======================================================== */
-@media (max-width: 380px) {
-  .grid-4 { gap: 4px; }
-  .grid-3 { gap: 5px; }
-  .btn { font-size: 11px; }
-  .btn-sm { font-size: 10px; }
-  .sub-label { font-size: 10px; }
+@media (min-width: 480px) {
+  :root {
+    --app-max-width: 520px;
+  }
+
+  .main-content {
+    padding-left: var(--space-lg);
+    padding-right: var(--space-lg);
+  }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   20. АДАПТИВ: ПЛАНШЕТЫ (iPad Mini/Air/Pro, Galaxy Tab)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (min-width: 768px) {
+  :root {
+    --app-max-width: 720px;
+    --font-xs: 11px;
+    --font-sm: 13px;
+    --font-md: 14px;
+    --font-lg: 17px;
+    --font-xl: 22px;
+    --font-2xl: 28px;
+    --space-xs: 6px;
+    --space-sm: 10px;
+    --space-md: 16px;
+    --space-lg: 22px;
+  }
+
+  .app-shell {
+    max-width: var(--app-max-width);
+    border-left: 1px solid var(--border-glow);
+    border-right: 1px solid var(--border-glow);
+    box-shadow:
+      0 0 40px rgba(0, 242, 254, 0.08),
+      inset 0 0 30px rgba(0, 242, 254, 0.02);
+  }
+
+  .grid-2.tablet-2col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .modal-box {
+    max-width: 520px;
+  }
+
+  .btn { min-height: 46px; font-size: 13px; }
+  .btn-sm { min-height: 38px; font-size: 12px; }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   21. АДАПТИВ: ПК / НОУТБУКИ (1200px+)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (min-width: 1200px) {
+  :root {
+    --app-max-width: 840px;
+    --font-xs: 12px;
+    --font-sm: 13px;
+    --font-md: 15px;
+    --font-lg: 18px;
+    --font-xl: 24px;
+    --font-2xl: 30px;
+    --space-xs: 8px;
+    --space-sm: 12px;
+    --space-md: 18px;
+    --space-lg: 26px;
+  }
+
+  .app-shell {
+    max-width: var(--app-max-width);
+    border-left: 1px solid var(--border-glow);
+    border-right: 1px solid var(--border-glow);
+    box-shadow:
+      0 0 60px rgba(0, 242, 254, 0.12),
+      0 0 100px rgba(0, 0, 0, 0.8),
+      inset 0 0 40px rgba(0, 242, 254, 0.02);
+  }
+
+  .grid-3.pc-2col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .glass-card {
+    padding: 20px;
+  }
+
+  .main-content {
+    padding-left: var(--space-lg);
+    padding-right: var(--space-lg);
+  }
+
+  .glass-card:hover,
+  .btn:not(:disabled):hover {
+    cursor: pointer;
+  }
+
+  .glass-card:hover {
+    box-shadow: var(--shadow-card-hover);
+    border-color: rgba(0, 242, 254, 0.2);
+    transform: translateY(-2px);
+  }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   22. АДАПТИВ: ОЧЕНЬ МАЛЕНЬКИЕ ЭКРАНЫ (iPhone SE, старые)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (max-width: 360px) {
+  :root {
+    --font-xs: 9px;
+    --font-sm: 10px;
+    --font-md: 11px;
+    --font-lg: 13px;
+    --space-xs: 3px;
+    --space-sm: 5px;
+    --space-md: 8px;
+  }
+
+  .grid-4 { gap: 3px; }
+  .grid-3 { gap: 4px; }
+  .btn { font-size: 10px; padding: 8px 10px; min-height: 38px; }
+  .btn-sm { font-size: 9.5px; padding: 5px 8px; min-height: 32px; }
+  .sub-label { font-size: 9.5px; }
+  .glass-card { padding: 10px; }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   23. АДАПТИВ: ЛАНДШАФТ НА ТЕЛЕФОНЕ (маленькая высота)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hud-header {
+    padding: 4px 8px 6px 8px;
+  }
+
+  .hud-bottom-row {
+    display: none;
+  }
+
+  .bottom-nav {
+    height: calc(48px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .main-content {
+    padding-bottom: 60px !important;
+  }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   24. PREFERS-REDUCED-MOTION (доступность)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   25. SAFE-AREA (iPhone с чёлкой / Dynamic Island)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .hud-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  }
+
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ========================================================
+   26. ОФФЛАЙН-ИНДИКАТОР
+   ======================================================== */
+.offline-banner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 6px 14px;
+  border-radius: 20px;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.5);
+  animation: offlinePulse 2s infinite alternate ease-in-out;
+  display: none;
+}
+.offline-banner.visible {
+  display: block;
+}
+@keyframes offlinePulse {
+  0% { box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4); }
+  100% { box-shadow: 0 4px 24px rgba(220, 38, 38, 0.8); }
+}
+
+/* ========================================================
+   27. ВЛАДЕЛЬЦУ — СПЕЦИАЛЬНЫЕ КНОПКИ
+   ======================================================== */
+.owner-panel-btn {
+  position: fixed;
+  bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  right: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ffd700, #f59e0b);
+  border: 2px solid #000;
+  color: #000;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    0 6px 20px rgba(255, 215, 0, 0.5),
+    0 0 30px rgba(255, 215, 0, 0.3);
+  z-index: 4500;
+  transition: transform 0.15s ease;
+  animation: ownerPanelPulse 2s infinite alternate ease-in-out;
+}
+.owner-panel-btn:active {
+  transform: scale(0.9);
+}
+@keyframes ownerPanelPulse {
+  0% { box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4), 0 0 30px rgba(255, 215, 0, 0.2); }
+  100% { box-shadow: 0 6px 24px rgba(255, 215, 0, 0.7), 0 0 40px rgba(255, 215, 0, 0.5); }
 }
