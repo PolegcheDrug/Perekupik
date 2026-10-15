@@ -1,20 +1,13 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v5.0.0)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v5.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v5.0.0 (ПРОКАЧКА + ФИКС ПУСТЫХ КАРТОЧЕК):
-//   - ФИКС: ensureState() с retry (ждёт BUSINESS_DATA до 3 сек)
-//   - ФИКС: защита от дубликатов бизнесов по id
-//   - НОВОЕ: экономические циклы (Boom/Bust/Stable)
-//   - НОВОЕ: дашборд доходности (день/неделя/месяц)
-//   - НОВОЕ: ежедневные челленджи бизнеса
-//   - НОВОЕ: оффлайн-капитализация (+5% за 3+ дня)
-//   - НОВОЕ: целевые уровни (5/10/20 точек)
-//   - НОВОЕ: прогноз окупаемости точки
-//   - НОВОЕ: умные уведомления (касса, stock, кризис)
-//   - НОВОЕ: бонус за разнообразие (+15% при 5+ типах)
-//   - НОВОЕ: рабочий автосбор кассы (Управляющий)
-// ⭐ v4.1.0:
-//   - getBizIncomeWithBonuses, _syncActiveBonus
+// ⭐ v5.2.0 (ПОЛНЫЙ РЕДИЗАЙН КАРТОЧЕК В СТИЛЕ АВТО):
+//   - Новый Hero-баннер со статусом и стикерами
+//   - Виджет дохода/цены в правом углу с трендом
+//   - Сетка из 3 плашек параметров (Касса, Сырьё, ДНК)
+//   - Блок-цитата текущего статуса и перка
+//   - Анимированная полоса сырья и прогноз окупаемости
+//   - Синхронизация табов под обновленный phone.css
 // ========================================================
 
 const PhoneBusiness = {
@@ -27,14 +20,14 @@ const PhoneBusiness = {
     _upgradePending: false,
     _collectPending: false,
 
-    // ⭐ v5.0.0: экономические циклы
+    // Экономические циклы
     ECONOMIC_CYCLES: {
         boom:   { id: 'boom',   name: '📈 Экономический бум',   incomeMul: 1.30, daysLeft: 0, color: 'color-green',  desc: '+30% выручки у всех точек' },
         stable: { id: 'stable', name: '⚖️ Стабильный рынок',    incomeMul: 1.00, daysLeft: 0, color: 'color-cyan',   desc: 'Обычная выручка' },
         bust:   { id: 'bust',   name: '📉 Кризис рынка',        incomeMul: 0.70, daysLeft: 0, color: 'color-red',    desc: '-30% выручки у всех точек' }
     },
 
-    // ⭐ v5.0.0: целевые уровни сети
+    // Целевые уровни сети
     NETWORK_MILESTONES: [
         { count: 5,  id: 'm5',  name: '🌱 Малая сеть',      bonus: '+5% к выручке',    incomeBonus: 0.05 },
         { count: 10, id: 'm10', name: '🏪 Средняя сеть',    bonus: '+10% к выручке',   incomeBonus: 0.10 },
@@ -132,9 +125,6 @@ const PhoneBusiness = {
         { id: 'inspection_pass', icon: '✅', name: 'Плановый осмотр пройден', desc: '+15% к репутации.',                                                          buffPct: 15,       buffDays: 5 }
     ],
 
-    // ========================================================
-    // ⭐ v5.0.0: ЕЖЕДНЕВНЫЕ ЧЕЛЛЕНДЖИ БИЗНЕСА
-    // ========================================================
     DAILY_BIZ_CHALLENGES: [
         { id: 'collect_5',   text: 'Собрать кассу с 5 точек',      target: 5, action: 'collect',   reward: 80000,  xp: 80 },
         { id: 'upgrade_2',   text: 'Улучшить 2 предприятия',       target: 2, action: 'upgrade',   reward: 100000, xp: 100 },
@@ -143,8 +133,22 @@ const PhoneBusiness = {
         { id: 'expand_1',    text: 'Купить новое предприятие',     target: 1, action: 'new_biz',   reward: 150000, xp: 150 }
     ],
 
+    _bizIconsFA: {
+        wash: 'fa-shower',
+        shina: 'fa-circle-dot',
+        sto: 'fa-screwdriver-wrench',
+        tow_truck: 'fa-truck-pickup',
+        paint_shop: 'fa-paint-roller',
+        chip_tuning: 'fa-microchip',
+        detailing: 'fa-sparkles',
+        razborka: 'fa-gears',
+        autopodbor: 'fa-clipboard-check',
+        taxi: 'fa-taxi',
+        customs_hub: 'fa-landmark'
+    },
+
     // ========================================================
-    // ИНИЦИАЛИЗАЦИЯ (⭐ ГЛАВНЫЙ ФИКС)
+    // ИНИЦИАЛИЗАЦИЯ
     // ========================================================
     ensureState() {
         if (!window.state) return;
@@ -153,7 +157,6 @@ const PhoneBusiness = {
 
         const baseData = (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA)) ? BUSINESS_DATA : [];
 
-        // ⭐ ГЛАВНЫЙ ФИКС: если BUSINESS_DATA ещё не загружен — retry
         if (baseData.length === 0) {
             if (!this._ensureStateRetries) this._ensureStateRetries = 0;
             this._ensureStateRetries++;
@@ -168,10 +171,8 @@ const PhoneBusiness = {
             }
         }
 
-        // Сбрасываем счётчик — данные есть
         this._ensureStateRetries = 0;
 
-        // ⭐ ГЛАВНЫЙ ФИКС: добавляем отсутствующие бизнесы без перезаписи существующих
         const existingIds = new Set(
             window.state.businesses
                 .filter(b => b && b.id)
@@ -186,7 +187,7 @@ const PhoneBusiness = {
                 name: b.name,
                 customName: b.name,
                 slogan: '',
-                icon: this._iconForBiz(b.id),
+                icon: b.icon || this._iconForBiz(b.id),
                 level: 0,
                 cost: b.cost,
                 reqStars: b.reqStars || 0,
@@ -215,11 +216,9 @@ const PhoneBusiness = {
             window.state.businesses = [...window.state.businesses, ...newBusinesses]
                 .sort((a, b) => (a.minLevel || 1) - (b.minLevel || 1));
 
-            // Сохраняем сразу
             if (typeof saveState === 'function') saveState();
         }
 
-        // Валидация полей
         window.state.businesses.forEach(b => {
             if (!b) return;
             if (typeof b.stored !== 'number') b.stored = 0;
@@ -241,31 +240,26 @@ const PhoneBusiness = {
             if (b.level > 0 && !b.dna) b.dna = this._generateDNA(b.id);
         });
 
-        // Инфраструктура
         if (!window.state.businessWorkshop) window.state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
         if (!window.state.businessStaff) window.state.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
         if (!Array.isArray(window.state.businessFleet)) window.state.businessFleet = [];
         if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
         if (!window.state.player.businessAdBonus) window.state.player.businessAdBonus = null;
 
-        // ⭐ v5.0.0: экономический цикл
         if (!window.state.player.economicCycle) {
             window.state.player.economicCycle = this._generateEconomicCycle();
         }
 
-        // ⭐ v5.0.0: ежедневные челленджи
         if (!Array.isArray(window.state.player.dailyBizChallenges) || window.state.player.dailyBizChallenges.length === 0) {
             this._generateDailyBizChallenges();
         }
 
-        // ⭐ v5.0.0: оффлайн-капитализация
         this._checkOfflineCapitalization();
-
         this._syncActiveBonus();
     },
 
     // ========================================================
-    // ⭐ v5.0.0: ЭКОНОМИЧЕСКИЙ ЦИКЛ
+    // ЭКОНОМИЧЕСКИЙ ЦИКЛ
     // ========================================================
     _generateEconomicCycle() {
         const roll = Math.random();
@@ -274,8 +268,8 @@ const PhoneBusiness = {
         else if (roll < 0.55) cycleId = 'bust';
 
         const cycle = { ...this.ECONOMIC_CYCLES[cycleId] };
-        cycle.daysLeft = Math.floor(2 + Math.random() * 4); // 2-5 дней
-        cycle.startedDay = window.state.player.day || 1;
+        cycle.daysLeft = Math.floor(2 + Math.random() * 4);
+        cycle.startedDay = window.state.player?.day || 1;
 
         console.log(`[PhoneBusiness] 🌍 Новый экономический цикл: ${cycle.name} (${cycle.daysLeft} дн.)`);
         return cycle;
@@ -307,7 +301,7 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // ⭐ v5.0.0: ЕЖЕДНЕВНЫЕ ЧЕЛЛЕНДЖИ БИЗНЕСА
+    // ЕЖЕДНЕВНЫЕ ЧЕЛЛЕНДЖИ
     // ========================================================
     _generateDailyBizChallenges() {
         const shuffled = [...this.DAILY_BIZ_CHALLENGES].sort(() => 0.5 - Math.random());
@@ -358,7 +352,7 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // ⭐ v5.0.0: ОФФЛАЙН-КАПИТАЛИЗАЦИЯ
+    // ОФФЛАЙН-КАПИТАЛИЗАЦИЯ
     // ========================================================
     _checkOfflineCapitalization() {
         const lastVisit = window.state.player?.lastBizVisitDay || 0;
@@ -366,7 +360,6 @@ const PhoneBusiness = {
         const daysAway = curDay - lastVisit;
 
         if (daysAway >= 3 && lastVisit > 0) {
-            // Начисляем +5% бонус к кассе за каждый день оффлайна
             let bonus = 0;
             window.state.businesses.forEach(b => {
                 if (b && b.level > 0 && b.stored > 0) {
@@ -390,7 +383,7 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // ⭐ v5.0.0: ЦЕЛЕВЫЕ УРОВНИ СЕТИ
+    // ЦЕЛЕВЫЕ УРОВНИ СЕТИ
     // ========================================================
     _getNetworkMilestoneBonus() {
         const owned = this.countOwned();
@@ -410,7 +403,7 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // ⭐ v5.0.0: БОНУС ЗА РАЗНООБРАЗИЕ
+    // БОНУС ЗА РАЗНООБРАЗИЕ
     // ========================================================
     _getDiversityBonus() {
         if (!Array.isArray(window.state.businesses)) return 0;
@@ -456,12 +449,8 @@ const PhoneBusiness = {
     },
 
     _iconForBiz(id) {
-        const map = {
-            wash: '🧼', shina: '🛞', sto: '🔧', tow_truck: '🚨',
-            paint_shop: '🎨', chip_tuning: '🏎️', detailing: '✨',
-            razborka: '🔩', autopodbor: '📋', taxi: '📱', customs_hub: '🏛️'
-        };
-        return map[id] || '💼';
+        const faClass = this._bizIconsFA[id] || 'fa-briefcase';
+        return `<i class="fa-solid ${faClass}"></i>`;
     },
 
     _syncActiveBonus() {
@@ -521,38 +510,27 @@ const PhoneBusiness = {
         return Math.round(inc);
     },
 
-    // ⭐ v5.0.0: доход с ВСЕМИ бонусами (workshop + staff + ad + corp + цикл + milestone + diversity)
     getBizIncomeWithBonuses(b) {
         const base = this.getBizIncome(b);
         if (base <= 0) return 0;
 
         let total = base;
 
-        // Цех
         total *= (1 + this.getWorkshopBonus('equipment') * 0.15);
         total *= (1 + this.getWorkshopBonus('brand') * 0.20);
 
-        // Бухгалтер
         if ((window.state.businessStaff?.accountant || 0) > 0) {
             total *= 1.08;
         }
 
-        // Реклама
         this._syncActiveBonus();
         if (this._activeBonus && this._activeBonus.expiresDay >= (window.state.player?.day || 1)) {
             total *= (1 + (this._activeBonus.bonusPct || 0) / 100);
         }
 
-        // Корпорация
         total *= (1 + this._getCorporationBonus());
-
-        // ⭐ v5.0.0: экономический цикл
         total *= this._getEconomicCycleMultiplier();
-
-        // ⭐ v5.0.0: сетевой milestone
         total *= (1 + this._getNetworkMilestoneBonus());
-
-        // ⭐ v5.0.0: бонус разнообразия
         total *= (1 + this._getDiversityBonus());
 
         return Math.round(total);
@@ -601,23 +579,23 @@ const PhoneBusiness = {
     },
 
     workshopUpgrades: [
-        { id: 'equipment',   icon: '🛠',  name: 'Оснащение цеха',          desc: '+15% к выручке сети за уровень',        baseCost: 147000, costMul: 1.70, maxLevel: 3 },
-        { id: 'storage',     icon: '📦',  name: 'Склад и ёмкости',         desc: 'Вместимость сырья +50% за уровень',      baseCost: 105000, costMul: 1.60, maxLevel: 3 },
-        { id: 'brand',       icon: '🎨',  name: 'Брендирование и реклама', desc: '+20% пассивного дохода за уровень',      baseCost: 220000, costMul: 1.80, maxLevel: 3 },
-        { id: 'diagnostics', icon: '💻',  name: 'Компьютерный стенд',      desc: '+10% к шансу выявить скрытые косяки',    baseCost: 310000, costMul: 1.90, maxLevel: 3 }
+        { id: 'equipment',   fa: 'fa-wrench',         name: 'Оснащение цеха',          desc: '+15% к выручке сети за уровень',        baseCost: 147000, costMul: 1.70, maxLevel: 3 },
+        { id: 'storage',     fa: 'fa-boxes-stacked',  name: 'Склад и ёмкости',         desc: 'Вместимость сырья +50% за уровень',      baseCost: 105000, costMul: 1.60, maxLevel: 3 },
+        { id: 'brand',       fa: 'fa-bullhorn',       name: 'Брендирование и реклама', desc: '+20% пассивного дохода за уровень',      baseCost: 220000, costMul: 1.80, maxLevel: 3 },
+        { id: 'diagnostics', fa: 'fa-laptop-code',    name: 'Компьютерный стенд',      desc: '+10% к шансу выявить скрытые косяки',    baseCost: 310000, costMul: 1.90, maxLevel: 3 }
     ],
 
     staffList: [
-        { id: 'mechanic',   icon: '👨‍🔧', name: 'Мастер-универсал',     role: 'Ремонт и слесарка',    salary: 45000, maxHired: 5, perk: '+10% к скорости ремонта' },
-        { id: 'painter',    icon: '🥽',  name: 'Колорист-маляр',       role: 'Покраска',              salary: 60000, maxHired: 3, perk: '-15% к расходу краски' },
-        { id: 'manager',    icon: '👔',  name: 'Управляющий филиалом', role: 'Администрирование',    salary: 85000, maxHired: 2, perk: 'Автосбор кассы раз в день' },
-        { id: 'accountant', icon: '💼',  name: 'Главный бухгалтер',    role: 'Финансы и налоги',     salary: 75000, maxHired: 1, perk: '+8% к чистой выручке' }
+        { id: 'mechanic',   fa: 'fa-screwdriver-wrench', name: 'Мастер-универсал',     role: 'Ремонт и слесарка',    salary: 45000, maxHired: 5, perk: '+10% к скорости ремонта' },
+        { id: 'painter',    fa: 'fa-spray-can',           name: 'Колорист-маляр',       role: 'Покраска',              salary: 60000, maxHired: 3, perk: '-15% к расходу краски' },
+        { id: 'manager',    fa: 'fa-user-tie',            name: 'Управляющий филиалом', role: 'Администрирование',    salary: 85000, maxHired: 2, perk: 'Автосбор кассы раз в день' },
+        { id: 'accountant', fa: 'fa-calculator',          name: 'Главный бухгалтер',    role: 'Финансы и налоги',     salary: 75000, maxHired: 1, perk: '+8% к чистой выручке' }
     ],
 
     fleetVehicles: [
-        { id: 'gazelle',     icon: '🚐',  name: 'ГАЗель NEXT (Фургон)',           cost: 850000,  dailyCost: 1200, bonus: 'Доставка сырья дешевле на 30%' },
-        { id: 'tow_truck',   icon: '🚛',  name: 'Эвакуатор ГАЗон NEXT',           cost: 1650000, dailyCost: 2400, bonus: 'Бесплатный выезд за авто дальше 25 км' },
-        { id: 'service_van', icon: '🛠️', name: 'Mercedes Sprinter (Моб. сервис)', cost: 3200000, dailyCost: 4500, bonus: 'Осмотр авто на выезде без СТО' }
+        { id: 'gazelle',     fa: 'fa-truck',          name: 'ГАЗель NEXT (Фургон)',           cost: 850000,  dailyCost: 1200, bonus: 'Доставка сырья дешевле на 30%' },
+        { id: 'tow_truck',   fa: 'fa-truck-pickup',   name: 'Эвакуатор ГАЗон NEXT',           cost: 1650000, dailyCost: 2400, bonus: 'Бесплатный выезд за авто дальше 25 км' },
+        { id: 'service_van', fa: 'fa-shuttle-van',    name: 'Mercedes Sprinter (Моб. сервис)', cost: 3200000, dailyCost: 4500, bonus: 'Осмотр авто на выезде без СТО' }
     ],
 
     achievements: [
@@ -670,11 +648,11 @@ const PhoneBusiness = {
                     </div>
                     <div class="biz-summary-cell">
                         <div class="biz-summary-label">Доход</div>
-                        <div class="biz-summary-value color-green">+${dailyIncome.toLocaleString()} ₽</div>
+                        <div class="biz-summary-value value-green">+${dailyIncome.toLocaleString()} ₽</div>
                     </div>
                     <div class="biz-summary-cell">
                         <div class="biz-summary-label">В кассах</div>
-                        <div class="biz-summary-value color-cyan">${accumulated.toLocaleString()} ₽</div>
+                        <div class="biz-summary-value value-cyan">${accumulated.toLocaleString()} ₽</div>
                     </div>
                     <button onclick="PhoneBusiness.collectAllCash()" class="biz-collect-btn" ${accumulated <= 0 ? 'disabled' : ''} title="Собрать всю кассу">
                         <i class="fa-solid fa-hand-holding-dollar"></i>
@@ -683,47 +661,52 @@ const PhoneBusiness = {
 
                 <!-- ЭКОНОМИЧЕСКИЙ ЦИКЛ -->
                 ${cycle ? `
-                    <div class="glass-card mb-2 p-2" style="background:linear-gradient(135deg, rgba(0,242,254,0.06), rgba(9,14,24,0.95)); border-left:4px solid ${cycle.id === 'boom' ? 'var(--green)' : (cycle.id === 'bust' ? 'var(--red)' : 'var(--cyan)')};">
-                        <div class="flex-between mb-1">
-                            <b class="text-xs ${cycle.color || 'color-cyan'}">${cycle.name}</b>
-                            <span class="tag-badge bg-tag-${cycle.id === 'boom' ? 'green' : (cycle.id === 'bust' ? 'red' : 'cyan')}" style="font-size:8px;">
-                                ×${cycleMul.toFixed(2)} • ${cycle.daysLeft - ((window.state.player.day || 1) - (cycle.startedDay || 1))}д
-                            </span>
+                    <div class="biz-event-card ${cycle.id === 'boom' ? 'event-bonus' : (cycle.id === 'bust' ? 'event-crisis' : '')} mb-2">
+                        <div class="biz-event-icon">
+                            ${cycle.id === 'boom' ? '<i class="fa-solid fa-arrow-trend-up"></i>' : (cycle.id === 'bust' ? '<i class="fa-solid fa-arrow-trend-down"></i>' : '<i class="fa-solid fa-scale-balanced"></i>')}
                         </div>
-                        <div class="sub-label" style="font-size:9px;">${cycle.desc}</div>
+                        <div class="biz-event-body">
+                            <div class="biz-event-title">${cycle.name.replace(/[📈📉⚖️]\s?/, '')}</div>
+                            <div class="biz-event-desc">${cycle.desc}</div>
+                        </div>
+                        <div class="biz-event-badge ${cycle.id === 'boom' ? 'badge-green' : (cycle.id === 'bust' ? 'badge-red' : '')}" style="${cycle.id === 'stable' ? 'background:rgba(0,242,254,0.15); color:#00f2fe; border:1px solid rgba(0,242,254,0.4);' : ''}">
+                            ×${cycleMul.toFixed(2)} · ${Math.max(0, cycle.daysLeft - ((window.state.player.day || 1) - (cycle.startedDay || 1)))}д
+                        </div>
                     </div>
                 ` : ''}
 
                 <!-- БОНУСЫ СЕТИ -->
-                ${(milestoneBonus > 0 || diversityBonus > 0) ? `
-                    <div class="glass-card mb-2 p-2" style="background:rgba(0,230,118,0.06); border-color:rgba(0,230,118,0.3);">
-                        <b class="text-xs color-green mb-1 block">🎁 Активные бонусы сети:</b>
-                        <div class="space-y-1" style="font-size:9px;">
-                            ${milestoneBonus > 0 ? `<div class="flex-between"><span>🏆 Milestone сети:</span> <b class="color-green">+${milestoneBonus}%</b></div>` : ''}
-                            ${diversityBonus > 0 ? `<div class="flex-between"><span>🌟 Разнообразие типов:</span> <b class="color-green">+${diversityBonus}%</b></div>` : ''}
-                            ${corpBonus > 0 ? `<div class="flex-between"><span>🏢 Корпорация:</span> <b class="color-green">+${corpBonus}%</b></div>` : ''}
+                ${(milestoneBonus > 0 || diversityBonus > 0 || corpBonus > 0) ? `
+                    <div class="biz-progress-block mb-2" style="border-color:rgba(0,230,118,0.3);">
+                        <div class="biz-progress-header">
+                            <div class="biz-progress-title"><i class="fa-solid fa-gift"></i> Активные бонусы сети</div>
+                        </div>
+                        <div class="space-y-1" style="font-size:10px;">
+                            ${milestoneBonus > 0 ? `<div class="flex-between"><span><i class="fa-solid fa-trophy color-amber"></i> Milestone сети:</span> <b class="color-green">+${milestoneBonus}%</b></div>` : ''}
+                            ${diversityBonus > 0 ? `<div class="flex-between"><span><i class="fa-solid fa-star color-cyan"></i> Разнообразие типов:</span> <b class="color-green">+${diversityBonus}%</b></div>` : ''}
+                            ${corpBonus > 0 ? `<div class="flex-between"><span><i class="fa-solid fa-building color-purple"></i> Корпорация:</span> <b class="color-green">+${corpBonus}%</b></div>` : ''}
                         </div>
                     </div>
                 ` : ''}
 
                 <!-- ПРОГРЕСС ДО СЛЕДУЮЩЕГО MILESTONE -->
                 ${nextMilestone ? `
-                    <div class="glass-card mb-2 p-2">
-                        <div class="flex-between mb-1">
-                            <b class="text-xs color-cyan">${nextMilestone.name}</b>
-                            <span class="tag-badge bg-tag-cyan" style="font-size:8px;">${ownedCount} / ${nextMilestone.count}</span>
+                    <div class="biz-progress-block mb-2">
+                        <div class="biz-progress-header">
+                            <div class="biz-progress-title"><i class="fa-solid fa-network-wired"></i> ${nextMilestone.name.replace(/[🌱🏪🏙🌐]\s?/, '')}</div>
+                            <div class="biz-progress-value">${ownedCount} / ${nextMilestone.count}</div>
                         </div>
-                        <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; margin-bottom:4px;">
-                            <div style="width:${Math.min(100, (ownedCount / nextMilestone.count) * 100)}%; height:100%; background:linear-gradient(90deg,var(--cyan),var(--green));"></div>
+                        <div class="biz-progress-track">
+                            <div class="biz-progress-fill" style="width:${Math.min(100, (ownedCount / nextMilestone.count) * 100)}%;"></div>
                         </div>
-                        <div class="sub-label" style="font-size:8.5px;">Награда: <b class="color-green">${nextMilestone.bonus}</b></div>
+                        <div class="biz-progress-hint">Награда: <b class="color-green">${nextMilestone.bonus}</b></div>
                     </div>
                 ` : ''}
 
                 <!-- АКТИВНАЯ РЕКЛАМА -->
                 ${this._activeBonus && this._activeBonus.expiresDay >= (window.state.player?.day || 1) ? `
                     <div class="biz-ad-bonus mb-2">
-                        📻 <b>Реклама активна!</b> +${this._activeBonus.bonusPct}% до дня ${this._activeBonus.expiresDay}
+                        <i class="fa-solid fa-bullhorn"></i> <b>Реклама активна!</b> +${this._activeBonus.bonusPct}% до дня ${this._activeBonus.expiresDay}
                     </div>
                 ` : ''}
 
@@ -746,9 +729,6 @@ const PhoneBusiness = {
                     </button>
                 </div>
 
-                <!-- ЧЕЛЛЕНДЖИ -->
-                ${this._renderDailyChallenges()}
-
                 <div id="bizTabContent"></div>
             </div>
         `;
@@ -767,7 +747,7 @@ const PhoneBusiness = {
             console.error('[PhoneBusiness] Ошибка рендера таба:', tab, e);
             content.innerHTML = `
                 <div class="glass-card p-3 text-center" style="border-color: var(--red);">
-                    <div style="font-size: 28px; margin-bottom: 6px;">⚠️</div>
+                    <div style="font-size: 28px; margin-bottom: 6px;"><i class="fa-solid fa-triangle-exclamation color-red"></i></div>
                     <b class="color-red text-xs">Ошибка рендера бизнес-сети</b>
                     <div class="sub-label mt-1" style="font-size: 9.5px;">${String(e.message || e).substring(0, 120)}</div>
                     <div class="sub-label mt-1" style="font-size: 9px;">Проверьте консоль (F12)</div>
@@ -777,7 +757,7 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // ⭐ v5.0.0: РЕНДЕР ЧЕЛЛЕНДЖЕЙ
+    // РЕНДЕР ЧЕЛЛЕНДЖЕЙ (ВНИЗУ)
     // ========================================================
     _renderDailyChallenges() {
         const challenges = window.state.player?.dailyBizChallenges;
@@ -786,20 +766,26 @@ const PhoneBusiness = {
         const doneCount = challenges.filter(c => c.done).length;
 
         return `
-            <div class="glass-card mb-2 p-2" style="background:linear-gradient(135deg, rgba(255,215,0,0.08), rgba(9,14,24,0.95)); border-color:rgba(255,215,0,0.35);">
-                <div class="flex-between mb-2">
-                    <b class="text-xs color-amber">🎯 Ежедневные челленджи</b>
-                    <span class="tag-badge bg-tag-amber" style="font-size:8px;">${doneCount} / ${challenges.length}</span>
-                </div>
-                <div class="space-y-1">
-                    ${challenges.map(ch => `
-                        <div class="flex-between p-1" style="background:rgba(0,0,0,0.3); border-radius:6px; font-size:9px;">
-                            <div style="flex:1; min-width:0;">
-                                <div class="${ch.done ? 'color-green' : 'color-main'}" style="font-size:9.5px;">${ch.done ? '✅' : '⏳'} ${ch.text}</div>
-                                <div class="sub-label" style="font-size:8px;">${ch.cur || 0} / ${ch.max} • +${ch.reward.toLocaleString()} ₽</div>
+            <div class="biz-bottom-quests">
+                <div class="phone-quests-widget">
+                    <div class="quest-widget-header">
+                        <b class="text-xs color-amber"><i class="fa-solid fa-bullseye"></i> Ежедневные челленджи</b>
+                        <span class="tag-badge bg-tag-amber" style="font-size:8px;">${doneCount} / ${challenges.length}</span>
+                    </div>
+                    <div class="space-y-2">
+                        ${challenges.map(ch => `
+                            <div class="quest-card-item ${ch.done ? 'quest-completed' : ''}">
+                                <div class="quest-card-info">
+                                    <div class="quest-card-title">${ch.text}</div>
+                                    <div class="quest-card-sub">
+                                        <span class="sub-label">${ch.cur || 0} / ${ch.max}</span>
+                                        <span class="color-green font-bold">+${ch.reward.toLocaleString()} ₽</span>
+                                    </div>
+                                </div>
+                                ${ch.done ? '<span class="quest-done-badge"><i class="fa-solid fa-check"></i></span>' : '<i class="fa-solid fa-hourglass-half color-amber"></i>'}
                             </div>
-                        </div>
-                    `).join('')}
+                        `).join('')}
+                    </div>
                 </div>
             </div>
         `;
@@ -845,6 +831,8 @@ const PhoneBusiness = {
         });
 
         html += this.renderAchievementsBlock();
+        html += this._renderDailyChallenges();
+
         container.innerHTML = html;
 
         window.state.businesses.forEach(b => {
@@ -854,6 +842,9 @@ const PhoneBusiness = {
         });
     },
 
+    // ========================================================
+    // НОВЫЙ РЕНДЕР КАРТОЧКИ БИЗНЕСА (ПО ОБРАЗЦУ КАРТОЧЕК АВТО)
+    // ========================================================
     _renderBizCard(b, pLvl, curDay) {
         const isOwned = b.level > 0;
         const upgradeCost = Math.round((b.cost || 0) * Math.pow(1.65, b.level || 0));
@@ -865,52 +856,10 @@ const PhoneBusiness = {
         const stock = Math.round(b.stock || 0);
         const maxStock = b.maxStock || 100;
         const stockPct = Math.round((stock / maxStock) * 100);
-        const stockColor = stock < 30 ? 'color-red' : (stock < 60 ? 'color-amber' : 'color-green');
 
-        // ⭐ v5.0.0: прогноз окупаемости
-        let paybackHtml = '';
-        if (isOwned && currentIncome > 0) {
-            const totalInvested = (b.cost || 0) * (Math.pow(1.65, b.level) - 1) / 0.65;
-            const paybackDays = Math.ceil(totalInvested / currentIncome);
-            paybackHtml = `<div class="sub-label" style="font-size:8px;">💸 Окупится за ~<b class="color-cyan">${paybackDays} дн.</b></div>`;
-        }
+        const dna = b.dna ? this._getDNAObject(b.dna) : null;
+        const dnaMult = this.getDNAMultiplier(b.dna);
 
-        const statusBadge = this._renderBizStatusBadge(b, pLvl, isMaxed);
-        const coverHtml = this._renderBizCover(b, statusBadge);
-        const statsHtml = this._renderBizStats(b, isOwned, currentIncome, cash, stockPct, stockColor);
-        const dnaHtml = isOwned ? this._renderBizDNA(b, curDay) : '';
-        const effectsHtml = this._renderBizEffects(b, curDay);
-        const actionsHtml = this._renderBizActions(b, pLvl, isOwned, isMaxed, upgradeCost);
-
-        const skin = this._getCoverSkins().find(s => s.id === b.coverSkin) || this._getCoverSkins()[0];
-
-        return `
-            <div class="glass-card biz-card mb-2 ${skin.cssClass || ''}" style="border-left: 3px solid ${isOwned ? skin.color : (isLockedByLevel ? 'rgba(255,255,255,0.1)' : 'var(--cyan)')}; ${isLockedByLevel ? 'opacity:0.75;' : ''}">
-                ${coverHtml}
-                <div class="sub-label mb-2" style="font-size:9px; line-height:1.35;">${b.desc || ''}</div>
-                ${statsHtml}
-                ${paybackHtml}
-                ${dnaHtml}
-                ${effectsHtml}
-                ${isOwned ? this.renderSparkline(b) : ''}
-                ${actionsHtml}
-            </div>
-        `;
-    },
-
-    _renderBizStatusBadge(b, pLvl, isMaxed) {
-        const isOwned = b.level > 0;
-        const isLockedByLevel = !isOwned && pLvl < (b.minLevel || 1);
-
-        if (!isOwned && isLockedByLevel) return `<span class="tag-badge bg-tag-red">🔒 ${b.minLevel} ур.</span>`;
-        if (!isOwned)                    return `<span class="tag-badge bg-tag-cyan">Доступен</span>`;
-        if (isMaxed)                     return `<span class="tag-badge bg-tag-amber">MAX ур.</span>`;
-        return `<span class="tag-badge bg-tag-green">Ур. ${b.level}</span>`;
-    },
-
-    _renderBizCover(b, statusBadge) {
-        const isOwned = b.level > 0;
-        const isLockedByLevel = !isOwned && ((window.state.player?.level || 1) < (b.minLevel || 1));
         const skin = this._getCoverSkins().find(s => s.id === b.coverSkin) || this._getCoverSkins()[0];
         const sticker = this._getOwnerStickers().find(s => s.id === b.ownerSticker) || this._getOwnerStickers()[0];
 
@@ -932,96 +881,138 @@ const PhoneBusiness = {
             </div>
         ` : '';
 
-        return `
-            <div class="biz-cover" style="${isLockedByLevel ? 'filter:grayscale(0.85) brightness(0.55);' : ''}">
-                <img ${imgAttrs} class="biz-cover-img"
-                     onerror="if(this.dataset.fbAttempted!=='1'){this.dataset.fbAttempted='1'; this.src='${fallbackImg}';}else{this.style.display='none'; this.parentNode.style.background='linear-gradient(135deg,#090e18,#050914)'; this.parentNode.innerHTML='<div style=\\'display:flex;align-items:center;justify-content:center;height:100%;font-size:52px;opacity:0.35;\\'>${b.icon}</div>';}">
+        const bizIcon = b.icon && b.icon.startsWith('<i') ? b.icon : this._iconForBiz(b.id);
+        const statusBadge = this._renderBizStatusBadge(b, pLvl, isMaxed);
+        const effectsHtml = this._renderBizEffects(b, curDay);
 
-                <div class="biz-cover-icon">${b.icon}</div>
-                ${stickerHtml}
-                <div class="biz-cover-status">${statusBadge}</div>
-                <div class="biz-cover-overlay"></div>
-                <div class="biz-cover-title">
-                    <b class="${isOwned ? 'color-green' : 'color-cyan'}">${b.customName || b.name}</b>
-                    ${b.slogan ? `<div class="biz-cover-slogan" style="color:${skin.color};">«${b.slogan}»</div>` : ''}
-                </div>
-            </div>
-        `;
-    },
-
-    _renderBizStats(b, isOwned, currentIncome, cash, stockPct, stockColor) {
-        if (isOwned) {
-            return `
-                <div class="biz-stats-panel">
-                    <div class="sub-label mb-1" style="font-size:8.5px;">⭐ ${b.perk || ''}</div>
-                    <div class="biz-stats-grid">
-                        <div class="biz-stat-cell">
-                            <span class="biz-stat-label">Доход</span>
-                            <b class="biz-stat-val color-green">+${currentIncome.toLocaleString()}</b>
-                        </div>
-                        <div class="biz-stat-cell">
-                            <span class="biz-stat-label">Касса</span>
-                            <b class="biz-stat-val color-cyan">${(cash / 1000).toFixed(1)}k</b>
-                        </div>
-                        <div class="biz-stat-cell">
-                            <span class="biz-stat-label">Сырьё</span>
-                            <b class="biz-stat-val ${stockColor}">${stockPct}%</b>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } else {
-            return `
-                <div class="biz-stats-panel">
-                    <div class="sub-label mb-1" style="font-size:8.5px;">⭐ ${b.perk || ''}</div>
-                    <div class="biz-stats-grid">
-                        <div class="biz-stat-cell">
-                            <span class="biz-stat-label">Старт</span>
-                            <b class="biz-stat-val color-green">+${(b.income || 0).toLocaleString()}</b>
-                        </div>
-                        <div class="biz-stat-cell">
-                            <span class="biz-stat-label">Цена</span>
-                            <b class="biz-stat-val color-amber">${(b.cost || 0).toLocaleString()}</b>
-                        </div>
-                    </div>
-                </div>
-            `;
+        // Расчет окупаемости / маржи
+        let paybackText = '';
+        if (isOwned && currentIncome > 0) {
+            const totalInvested = (b.cost || 0) * (Math.pow(1.65, b.level) - 1) / 0.65;
+            const paybackDays = Math.ceil(totalInvested / currentIncome);
+            paybackText = `▲ окупаемость ~${paybackDays} дн.`;
+        } else if (!isOwned && (b.income || 0) > 0) {
+            const estDays = Math.ceil((b.cost || 0) / (b.income || 1));
+            paybackText = `▲ расчетная ~${estDays} дн.`;
         }
-    },
-
-    _renderBizDNA(b, curDay) {
-        const dna = b.dna ? this._getDNAObject(b.dna) : null;
-        if (!dna) return '';
-        const dnaMult = this.getDNAMultiplier(b.dna);
 
         return `
-            <div class="biz-dna-panel">
-                <div class="biz-dna-header">
-                    <span class="biz-dna-title">🧬 ДНК</span>
-                    <span class="tag-badge ${dnaMult >= 1 ? 'bg-tag-green' : 'bg-tag-red'}" style="font-size:7px;">
-                        ${dnaMult >= 1 ? '+' : ''}${Math.round((dnaMult - 1) * 100)}%
-                    </span>
-                </div>
-                <div class="biz-dna-scroll">
-                    <div class="biz-dna-cell" title="${dna.location.name}">
-                        <span>${dna.location.icon}</span>
-                        <span class="biz-dna-cell-mult">×${dna.location.mult.toFixed(2)}</span>
-                    </div>
-                    <div class="biz-dna-cell" title="${dna.traffic.name}">
-                        <span>${dna.traffic.icon}</span>
-                        <span class="biz-dna-cell-mult">×${dna.traffic.mult.toFixed(2)}</span>
-                    </div>
-                    <div class="biz-dna-cell" title="${dna.condition.name}">
-                        <span>${dna.condition.icon}</span>
-                        <span class="biz-dna-cell-mult">×${dna.condition.mult.toFixed(2)}</span>
-                    </div>
-                    <div class="biz-dna-cell" title="${dna.staff.name}">
-                        <span>${dna.staff.icon}</span>
-                        <span class="biz-dna-cell-mult">×${dna.staff.mult.toFixed(2)}</span>
+            <div class="biz-card mb-3 ${skin.cssClass || ''}" style="border-top: 1px solid rgba(255,255,255,0.15); border-left: 2px solid ${isOwned ? skin.color : 'rgba(255,255,255,0.1)'}; ${isLockedByLevel ? 'opacity:0.75;' : ''}">
+                
+                <!-- 1. HERO-ОБЛОЖКА -->
+                <div class="biz-cover" style="${isLockedByLevel ? 'filter:grayscale(0.85) brightness(0.6);' : ''}">
+                    <img ${imgAttrs} class="biz-cover-img"
+                         onerror="if(this.dataset.fbAttempted!=='1'){this.dataset.fbAttempted='1'; this.src='${fallbackImg}';}else{this.style.display='none'; this.parentNode.style.background='linear-gradient(135deg,#090e18,#050914)';}">
+                    
+                    <div class="biz-cover-icon">${bizIcon}</div>
+                    ${stickerHtml}
+                    <div class="biz-cover-status">${statusBadge}</div>
+                    <div class="biz-cover-overlay"></div>
+                    
+                    <div class="biz-cover-title">
+                        <b class="${isOwned ? 'color-green' : 'color-cyan'}">${b.customName || b.name}</b>
+                        ${b.slogan ? `<div class="biz-cover-slogan" style="color:${skin.color};">«${b.slogan}»</div>` : ''}
                     </div>
                 </div>
+
+                <!-- 2. ГЛАВНАЯ СТРОКА: ИНФО СЛЕВА + ВИДЖЕТ ЦЕНЫ/ДОХОДА СПРАВА -->
+                <div class="biz-main-row">
+                    <div class="biz-head-block">
+                        <div class="biz-head-name">${b.customName || b.name}</div>
+                        <div class="biz-head-loc">
+                            <i class="fa-solid fa-location-dot"></i>
+                            <span>${dna ? dna.location.name : 'Городская локация'}</span>
+                        </div>
+                        <div class="biz-badges-row">
+                            <span class="tag-badge bg-tag-cyan">${b.id.toUpperCase()}</span>
+                            ${isOwned ? `<span class="tag-badge bg-tag-amber"><i class="fa-solid fa-bolt"></i> СЕТЬ</span>` : `<span class="tag-badge bg-tag-dark">ПОД ВЫКУП</span>`}
+                            ${dnaMult !== 1 ? `<span class="tag-badge ${dnaMult > 1 ? 'bg-tag-green' : 'bg-tag-red'}">${dnaMult > 1 ? '+' : ''}${Math.round((dnaMult - 1) * 100)}% ПОТОК</span>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- ВИДЖЕТ СПРАВА (КАК НА КАРТОЧКЕ АВТО) -->
+                    <div class="biz-price-badge-box ${!isOwned ? 'badge-box-locked' : ''}">
+                        <div class="biz-price-label">${isOwned ? 'ДОХОД В ДЕНЬ' : 'СТОИМОСТЬ'}</div>
+                        <div class="biz-price-num">${isOwned ? `+${currentIncome.toLocaleString()} ₽` : `${(b.cost || 0).toLocaleString()} ₽`}</div>
+                        <div class="biz-price-sub">${paybackText}</div>
+                    </div>
+                </div>
+
+                <!-- 3. СЕТКА ИЗ 3 ПЛАШЕК ХАРАКТЕРИСТИК (МОЩНОСТЬ / ПРОБЕГ / КУЗОВ) -->
+                <div class="biz-tri-props-grid">
+                    <!-- ПЛАШКА 1: КАССА / СТАРТ -->
+                    <div class="biz-prop-card">
+                        <div class="biz-prop-icon icon-amber">
+                            <i class="fa-solid fa-wallet"></i>
+                        </div>
+                        <div class="biz-prop-info">
+                            <span class="biz-prop-label">${isOwned ? 'В кассе' : 'Базовый'}</span>
+                            <b class="biz-prop-val color-amber">${isOwned ? `${cash.toLocaleString()} ₽` : `+${(b.income || 0).toLocaleString()}`}</b>
+                        </div>
+                    </div>
+
+                    <!-- ПЛАШКА 2: СЫРЬЁ / СКЛАД -->
+                    <div class="biz-prop-card">
+                        <div class="biz-prop-icon icon-green">
+                            <i class="fa-solid fa-boxes-stacked"></i>
+                        </div>
+                        <div class="biz-prop-info">
+                            <span class="biz-prop-label">Сырьё</span>
+                            <b class="biz-prop-val ${stockPct < 30 ? 'color-red' : (stockPct < 60 ? 'color-amber' : 'color-green')}">${isOwned ? `${stockPct}%` : '100%'}</b>
+                        </div>
+                    </div>
+
+                    <!-- ПЛАШКА 3: ДНК ЛОКАЦИИ -->
+                    <div class="biz-prop-card">
+                        <div class="biz-prop-icon icon-cyan">
+                            <i class="fa-solid fa-chart-simple"></i>
+                        </div>
+                        <div class="biz-prop-info">
+                            <span class="biz-prop-label">Трафик</span>
+                            <b class="biz-prop-val color-cyan">${dna ? dna.traffic.name : 'Норма'}</b>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ШКАЛА СЫРЬЯ (АНИМИРОВАННАЯ) -->
+                ${isOwned ? `
+                    <div class="biz-progress-track mt-1">
+                        <div class="biz-progress-fill ${stockPct < 30 ? 'fill-red' : (stockPct < 60 ? 'fill-amber' : '')}" style="width: ${stockPct}%;"></div>
+                    </div>
+                ` : ''}
+
+                <!-- 4. ЦИТАТА / СТАТУС / ИНФО (КАК ПЛАШКА ПРОДАВЦА) -->
+                <div class="biz-quote-block">
+                    <div class="biz-quote-icon">
+                        ${b.stock <= 0 ? '⚠️' : (isOwned ? '💼' : '🏢')}
+                    </div>
+                    <div class="biz-quote-text">
+                        ${b.stock <= 0
+                            ? '<span class="color-red font-bold">Сырьё на нуле! Выручка упала на 85%. Срочно пополните склад.</span>'
+                            : (b.perk ? `${b.perk}. ${b.desc || ''}` : (b.desc || 'Предприятие готово приносить пассивную прибыль сети.'))}
+                    </div>
+                </div>
+
+                <!-- ЭФФЕКТЫ И БАФФЫ -->
+                ${effectsHtml}
+
+                <!-- СПАРКЛАЙН ЗА 7 ДНЕЙ -->
+                ${isOwned ? this.renderSparkline(b) : ''}
+
+                <!-- 5. КНОПКИ ДЕЙСТВИЯ -->
+                ${this._renderBizActions(b, pLvl, isOwned, isMaxed, upgradeCost)}
             </div>
         `;
+    },
+
+    _renderBizStatusBadge(b, pLvl, isMaxed) {
+        const isOwned = b.level > 0;
+        const isLockedByLevel = !isOwned && pLvl < (b.minLevel || 1);
+
+        if (!isOwned && isLockedByLevel) return `<span class="tag-badge bg-tag-red"><i class="fa-solid fa-lock"></i> ${b.minLevel} УР.</span>`;
+        if (!isOwned)                    return `<span class="tag-badge bg-tag-cyan">ДОСТУПНО</span>`;
+        if (isMaxed)                     return `<span class="tag-badge bg-tag-amber"><i class="fa-solid fa-crown"></i> MAX LVL</span>`;
+        return `<span class="tag-badge bg-tag-green">LVL ${b.level}</span>`;
     },
 
     _renderBizEffects(b, curDay) {
@@ -1029,12 +1020,12 @@ const PhoneBusiness = {
         const activeDebuffs = (b.activeDebuffs || []).filter(x => x && (x.expiresDay || 0) >= curDay);
         if (activeBuffs.length === 0 && activeDebuffs.length === 0) return '';
 
-        let html = `<div class="biz-effects-row">`;
+        let html = `<div class="biz-effects-row" style="display:flex; flex-wrap:wrap; gap:5px;">`;
         activeBuffs.forEach(buff => {
-            html += `<span class="tag-badge bg-tag-green" style="font-size:7.5px;">✅ +${buff.pct}% (${buff.expiresDay - curDay + 1}д)</span>`;
+            html += `<span class="tag-badge bg-tag-green" style="font-size:8px;"><i class="fa-solid fa-circle-check"></i> +${buff.pct}% (${buff.expiresDay - curDay + 1}д)</span>`;
         });
         activeDebuffs.forEach(d => {
-            html += `<span class="tag-badge bg-tag-red" style="font-size:7.5px;">⚠ -${d.pct}% (${d.expiresDay - curDay + 1}д)</span>`;
+            html += `<span class="tag-badge bg-tag-red" style="font-size:8px;"><i class="fa-solid fa-triangle-exclamation"></i> -${d.pct}% (${d.expiresDay - curDay + 1}д)</span>`;
         });
         html += `</div>`;
         return html;
@@ -1044,13 +1035,13 @@ const PhoneBusiness = {
         const isLockedByLevel = !isOwned && pLvl < (b.minLevel || 1);
 
         if (isLockedByLevel) {
-            return `<button class="btn btn-dark btn-sm w-full opacity-50" disabled>🔒 Требуется ${b.minLevel} ур.</button>`;
+            return `<button class="btn btn-dark btn-sm w-full opacity-50" disabled><i class="fa-solid fa-lock"></i> Требуется ${b.minLevel} ур.</button>`;
         }
 
         if (!isOwned) {
             const canAfford = (window.state.player?.cash || 0) >= (b.cost || 0);
-            return `<button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn ${canAfford ? 'btn-green' : 'btn-dark opacity-50'} btn-sm w-full font-bold" ${canAfford ? '' : 'disabled'}>
-                🏗 Купить объект (${(b.cost || 0).toLocaleString()} ₽${b.reqStars ? ` + ${b.reqStars} ⭐` : ''})
+            return `<button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn ${canAfford ? 'btn-green' : 'btn-dark opacity-50'} btn-sm w-full font-bold" style="min-height:44px; font-size:12px;" ${canAfford ? '' : 'disabled'}>
+                <i class="fa-solid fa-plus-circle"></i> Купить объект (${(b.cost || 0).toLocaleString()} ₽${b.reqStars ? ` + ${b.reqStars} ⭐` : ''})
             </button>`;
         }
 
@@ -1058,24 +1049,24 @@ const PhoneBusiness = {
         return `
             <div class="biz-actions-grid">
                 <button onclick="PhoneBusiness.collectPointCash('${b.id}')" class="btn btn-green btn-sm" ${cash <= 0 ? 'disabled' : ''} title="Собрать кассу">
-                    <i class="fa-solid fa-hand-holding-dollar"></i> ${cash > 0 ? (cash/1000).toFixed(1) + 'k' : '0'}
+                    <i class="fa-solid fa-hand-holding-dollar"></i> ${cash > 0 ? (cash/1000).toFixed(1) + 'k' : 'Касса'}
                 </button>
                 <button onclick="PhoneBusiness.buySupplies('${b.id}')" class="btn btn-cyan btn-sm" title="Пополнить сырьё (15k)">
-                    <i class="fa-solid fa-box"></i> Сырьё
+                    <i class="fa-solid fa-boxes-stacked"></i> Сырьё
                 </button>
                 <button onclick="PhoneBusiness.openCustomizeModal('${b.id}')" class="btn btn-purple btn-sm" title="Изменить название/обложку">
-                    <i class="fa-solid fa-pen"></i> Изменить
+                    <i class="fa-solid fa-pen"></i> Инфо
                 </button>
             </div>
             ${!isMaxed ? `
-                <button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn btn-amber btn-sm w-full mb-2 mt-2" ${(window.state.player?.cash || 0) < upgradeCost ? 'disabled' : ''}>
-                    ⬆ Улучшить до ур. ${b.level + 1} (${upgradeCost.toLocaleString()} ₽)
+                <button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn btn-amber btn-sm w-full mt-1" ${(window.state.player?.cash || 0) < upgradeCost ? 'disabled' : ''}>
+                    <i class="fa-solid fa-arrow-up"></i> Улучшить до ур. ${b.level + 1} (${upgradeCost.toLocaleString()} ₽)
                 </button>
             ` : `
-                <button class="btn btn-dark btn-sm w-full mb-2 mt-2 opacity-50" disabled>🏆 Максимум уровня</button>
+                <button class="btn btn-dark btn-sm w-full mt-1 opacity-50" disabled><i class="fa-solid fa-crown color-amber"></i> Максимальный уровень</button>
             `}
-            <button onclick="PhoneBusiness.openSellModal('${b.id}')" class="btn btn-red btn-sm w-full" style="font-size:9.5px;">
-                💰 Продать на P2P бирже
+            <button onclick="PhoneBusiness.openSellModal('${b.id}')" class="btn btn-dark btn-sm w-full opacity-60 mt-1" style="font-size:9px; border-color:rgba(255,51,102,0.3);">
+                <i class="fa-solid fa-tag color-red"></i> Продать на P2P бирже
             </button>
         `;
     },
@@ -1087,7 +1078,7 @@ const PhoneBusiness = {
         return `
             <div class="biz-spark-panel">
                 <div class="biz-spark-header">
-                    <span>📈 Доход за 7 дней:</span>
+                    <span><i class="fa-solid fa-chart-line color-green"></i> Доход за 7 дней:</span>
                     <span id="sparkLabel_${biz.id}" class="biz-spark-label">—</span>
                 </div>
                 <canvas id="bizSpark_${biz.id}" width="360" height="50"></canvas>
@@ -1157,7 +1148,7 @@ const PhoneBusiness = {
                         <b class="text-xs ${isDone ? 'color-green' : 'color-main'}" style="font-size:11px;">${a.title}</b>
                         <div class="sub-label" style="font-size:8.5px;">Награда: ${a.reward.cash ? `+${a.reward.cash.toLocaleString()} ₽ ` : ''}${a.reward.stars ? `+${a.reward.stars} ⭐ ` : ''}${a.reward.xp ? `+${a.reward.xp} XP` : ''}</div>
                     </div>
-                    ${isDone ? '<span class="tag-badge bg-tag-green">✓</span>' : '<span class="tag-badge bg-tag-dark">🔒</span>'}
+                    ${isDone ? '<span class="tag-badge bg-tag-green"><i class="fa-solid fa-check"></i></span>' : '<span class="tag-badge bg-tag-dark"><i class="fa-solid fa-lock"></i></span>'}
                 </div>
             `;
         }).join('');
@@ -1165,7 +1156,7 @@ const PhoneBusiness = {
         return `
             <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(255,179,0,0.1), #090e18); border-color: rgba(255,179,0,0.3);">
                 <div class="flex-between mb-2">
-                    <b class="text-xs color-amber"><i class="fa-solid fa-trophy mr-1"></i> Достижения</b>
+                    <b class="text-xs color-amber"><i class="fa-solid fa-trophy"></i> Достижения</b>
                     <span class="tag-badge bg-tag-amber">${unlocked.length} / ${this.achievements.length}</span>
                 </div>
                 ${html}
@@ -1218,7 +1209,7 @@ const PhoneBusiness = {
         if (!container) return;
         let html = `
             <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0,242,254,0.12), #090e18); border-color: rgba(0,242,254,0.3);">
-                <b class="text-xs color-cyan"><i class="fa-solid fa-screwdriver-wrench mr-1"></i> Центральный цех сети</b>
+                <b class="text-xs color-cyan"><i class="fa-solid fa-screwdriver-wrench"></i> Центральный цех сети</b>
                 <div class="sub-label mt-1" style="font-size:9px;">Прокачка даёт пассивные бонусы всем точкам одновременно.</div>
             </div>
         `;
@@ -1230,28 +1221,23 @@ const PhoneBusiness = {
             const canAfford = (window.state.player?.cash || 0) >= cost;
 
             html += `
-                <div class="glass-card mb-2 p-2">
-                    <div class="flex-between mb-1">
-                        <div class="flex-gap" style="align-items:center;">
-                            <span style="font-size:22px;">${u.icon}</span>
-                            <div>
-                                <b class="text-xs color-cyan">${u.name}</b>
-                                <div class="sub-label" style="font-size:8.5px;">${u.desc}</div>
-                            </div>
-                        </div>
-                        <span class="tag-badge ${isMax ? 'bg-tag-amber' : 'bg-tag-cyan'}">${curLvl}/${u.maxLevel}</span>
+                <div class="biz-upgrade-item ${isMax ? 'item-maxed' : ''}">
+                    <div class="biz-upgrade-icon">
+                        <i class="fa-solid ${u.fa}"></i>
                     </div>
-                    <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden; margin-bottom:8px;">
-                        <div style="width:${(curLvl / u.maxLevel) * 100}%; height:100%; background:linear-gradient(90deg,var(--cyan),var(--green));"></div>
+                    <div class="biz-upgrade-body">
+                        <div class="biz-upgrade-name">${u.name}</div>
+                        <div class="biz-upgrade-desc">${u.desc}</div>
                     </div>
-                    ${isMax ? `
-                        <button class="btn btn-dark btn-sm w-full opacity-50" disabled>✓ Максимум прокачано</button>
-                    ` : `
-                        <button onclick="PhoneBusiness.upgradeWorkshop('${u.id}')" class="btn ${canAfford ? 'btn-cyan' : 'btn-dark opacity-50'} btn-sm w-full" ${canAfford ? '' : 'disabled'}>
-                            ⬆ Прокачать до ${curLvl + 1} ур. (${cost.toLocaleString()} ₽)
-                        </button>
-                    `}
+                    <div class="biz-upgrade-level ${isMax ? 'level-maxed' : ''}">${curLvl}/${u.maxLevel}</div>
                 </div>
+                ${!isMax ? `
+                    <button onclick="PhoneBusiness.upgradeWorkshop('${u.id}')" class="btn ${canAfford ? 'btn-cyan' : 'btn-dark opacity-50'} btn-sm w-full mb-2" ${canAfford ? '' : 'disabled'}>
+                        <i class="fa-solid fa-arrow-up"></i> Прокачать до ${curLvl + 1} ур. (${cost.toLocaleString()} ₽)
+                    </button>
+                ` : `
+                    <button class="btn btn-dark btn-sm w-full mb-2 opacity-50" disabled><i class="fa-solid fa-check"></i> Максимум прокачано</button>
+                `}
             `;
         });
         container.innerHTML = html;
@@ -1264,7 +1250,7 @@ const PhoneBusiness = {
         if (!container) return;
         let html = `
             <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(192,132,252,0.12), #090e18); border-color: rgba(192,132,252,0.3);">
-                <b class="text-xs color-purple"><i class="fa-solid fa-users mr-1"></i> Управление кадрами</b>
+                <b class="text-xs color-purple"><i class="fa-solid fa-users"></i> Управление кадрами</b>
                 <div class="sub-label mt-1" style="font-size:9px;">Специалисты автоматизируют рутину и увеличивают прибыль сети.</div>
             </div>
         `;
@@ -1278,7 +1264,9 @@ const PhoneBusiness = {
                 <div class="glass-card mb-2 p-2">
                     <div class="flex-between mb-1">
                         <div class="flex-gap" style="align-items:center;">
-                            <span style="font-size:22px;">${s.icon}</span>
+                            <div class="biz-point-icon" style="width:36px; height:36px;">
+                                <i class="fa-solid ${s.fa}"></i>
+                            </div>
                             <div>
                                 <b class="text-xs color-purple">${s.name}</b>
                                 <div class="sub-label" style="font-size:8.5px;">${s.role}</div>
@@ -1287,14 +1275,14 @@ const PhoneBusiness = {
                         <span class="tag-badge ${isMax ? 'bg-tag-amber' : 'bg-tag-purple'}">${hired}/${s.maxHired}</span>
                     </div>
                     <div class="p-2 mb-2" style="background:rgba(0,0,0,0.4); border-radius:8px;">
-                        <div class="sub-label" style="font-size:9px;">⭐ ${s.perk}</div>
+                        <div class="sub-label" style="font-size:9px;"><i class="fa-solid fa-star color-amber"></i> ${s.perk}</div>
                         <div class="sub-label mt-1" style="font-size:8.5px;">Оклад: <b class="color-amber">${s.salary.toLocaleString()} ₽</b> / мес.</div>
                     </div>
                     ${isMax ? `
                         <button class="btn btn-dark btn-sm w-full opacity-50" disabled>Штат укомплектован</button>
                     ` : `
                         <button onclick="PhoneBusiness.hireStaff('${s.id}')" class="btn ${canAfford ? 'btn-purple' : 'btn-dark opacity-50'} btn-sm w-full" ${canAfford ? '' : 'disabled'}>
-                            <i class="fa-solid fa-user-plus mr-1"></i> Нанять (${s.salary.toLocaleString()} ₽)
+                            <i class="fa-solid fa-user-plus"></i> Нанять (${s.salary.toLocaleString()} ₽)
                         </button>
                     `}
                 </div>
@@ -1310,7 +1298,7 @@ const PhoneBusiness = {
         if (!container) return;
         let html = `
             <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(255,179,0,0.12), #090e18); border-color: rgba(255,179,0,0.3);">
-                <b class="text-xs color-amber"><i class="fa-solid fa-truck mr-1"></i> Корпоративный транспорт</b>
+                <b class="text-xs color-amber"><i class="fa-solid fa-truck"></i> Корпоративный транспорт</b>
                 <div class="sub-label mt-1" style="font-size:9px;">Спецтехника снижает расходы и расширяет радиус.</div>
             </div>
         `;
@@ -1321,7 +1309,9 @@ const PhoneBusiness = {
                 <div class="glass-card mb-2 p-2">
                     <div class="flex-between mb-1">
                         <div class="flex-gap" style="align-items:center;">
-                            <span style="font-size:22px;">${v.icon}</span>
+                            <div class="biz-point-icon" style="width:36px; height:36px;">
+                                <i class="fa-solid ${v.fa}"></i>
+                            </div>
                             <div>
                                 <b class="text-xs color-amber">${v.name}</b>
                                 <div class="sub-label" style="font-size:8.5px;">${v.bonus}</div>
@@ -1330,10 +1320,10 @@ const PhoneBusiness = {
                         ${isOwned ? '<span class="tag-badge bg-tag-green">В парке ✓</span>' : `<span class="tag-badge bg-tag-dark">${v.cost.toLocaleString()} ₽</span>`}
                     </div>
                     ${isOwned ? `
-                        <button class="btn btn-dark btn-sm w-full opacity-50" disabled>✓ Куплено</button>
+                        <button class="btn btn-dark btn-sm w-full opacity-50" disabled><i class="fa-solid fa-check"></i> Куплено</button>
                     ` : `
                         <button onclick="PhoneBusiness.buyFleetVehicle('${v.id}')" class="btn ${canAfford ? 'btn-amber' : 'btn-dark opacity-50'} btn-sm w-full" ${canAfford ? '' : 'disabled'}>
-                            <i class="fa-solid fa-cart-shopping mr-1"></i> Купить (${v.cost.toLocaleString()} ₽)
+                            <i class="fa-solid fa-cart-shopping"></i> Купить (${v.cost.toLocaleString()} ₽)
                         </button>
                     `}
                 </div>
@@ -1374,7 +1364,7 @@ const PhoneBusiness = {
                             <div class="sub-label" style="font-size:8.5px;">Точек уровня 3+: <b>${eligible.length} / 3</b></div>
                         </div>
                         ${isCorp
-                            ? '<span class="tag-badge bg-tag-green">🏢 КОРПОРАЦИЯ +40%</span>'
+                            ? '<span class="tag-badge bg-tag-green"><i class="fa-solid fa-building"></i> КОРПОРАЦИЯ +40%</span>'
                             : `<span class="tag-badge bg-tag-dark">Не корпорация</span>`}
                     </div>
                     <div class="grid-2 text-xs" style="gap:4px;">
@@ -1392,7 +1382,7 @@ const PhoneBusiness = {
         container.innerHTML = `
             <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0,230,118,0.12), #090e18); border-color: rgba(0,230,118,0.4);">
                 <div class="flex-between mb-1">
-                    <b class="text-xs color-green"><i class="fa-solid fa-building mr-1"></i> Корпорации бизнесов</b>
+                    <b class="text-xs color-green"><i class="fa-solid fa-building"></i> Корпорации бизнесов</b>
                     <span class="tag-badge bg-tag-green">+40% к доходу</span>
                 </div>
                 <div class="sub-label" style="font-size:9px;">
@@ -1759,7 +1749,7 @@ const PhoneBusiness = {
         modal.innerHTML = `
             <div class="modal-box" style="max-width:420px;">
                 <div class="flex-between mb-2">
-                    <div class="modal-glow-badge" style="color:var(--cyan); border-color:var(--cyan);"><i class="fa-solid fa-pen mr-1"></i> КАСТОМИЗАЦИЯ</div>
+                    <div class="modal-glow-badge" style="color:var(--cyan); border-color:var(--cyan);"><i class="fa-solid fa-pen"></i> КАСТОМИЗАЦИЯ</div>
                     <button onclick="ModalManager.close('modalBizCustomize')" class="btn btn-dark btn-auto btn-sm">✕</button>
                 </div>
 
@@ -1773,14 +1763,14 @@ const PhoneBusiness = {
                     <input type="text" id="bizCustomSlogan" class="chat-input" maxlength="42" value="${b.slogan || ''}" placeholder="«Чистота как в аптеке!»" style="font-size:11px; padding:8px;">
                 </div>
 
-                <div class="sub-label mb-1" style="font-size:9px;">🎨 Обложка:</div>
+                <div class="sub-label mb-1" style="font-size:9px;"><i class="fa-solid fa-palette color-cyan"></i> Обложка:</div>
                 <div style="max-height:150px; overflow-y:auto; margin-bottom:10px;">${skinsHtml}</div>
 
-                <div class="sub-label mb-1" style="font-size:9px;">👑 Стикер:</div>
+                <div class="sub-label mb-1" style="font-size:9px;"><i class="fa-solid fa-crown color-amber"></i> Стикер:</div>
                 <div style="max-height:120px; overflow-y:auto; margin-bottom:10px;">${stickersHtml}</div>
 
                 <button onclick="PhoneBusiness.saveCustomization('${b.id}')" class="btn btn-green w-full font-bold">
-                    ✓ Сохранить
+                    <i class="fa-solid fa-check"></i> Сохранить
                 </button>
             </div>
         `;
@@ -1902,7 +1892,7 @@ const PhoneBusiness = {
         modal.innerHTML = `
             <div class="modal-box" style="max-width:420px;">
                 <div class="flex-between mb-2">
-                    <div class="modal-glow-badge" style="color:var(--green); border-color:rgba(0,230,118,0.4);"><i class="fa-solid fa-handshake mr-1"></i> ПРОДАЖА БИЗНЕСА</div>
+                    <div class="modal-glow-badge" style="color:var(--green); border-color:rgba(0,230,118,0.4);"><i class="fa-solid fa-handshake"></i> ПРОДАЖА БИЗНЕСА</div>
                     <button onclick="ModalManager.close('modalBizSell')" class="btn btn-dark btn-auto btn-sm">✕</button>
                 </div>
 
@@ -1931,10 +1921,10 @@ const PhoneBusiness = {
                 </div>
 
                 <button onclick="PhoneBusiness.sellToBot('${b.id}', ${quickSaleValue})" class="btn btn-amber w-full mb-2" style="font-size:11px;">
-                    ⚡ Быстрая продажа боту (${quickSaleValue.toLocaleString()} ₽)
+                    <i class="fa-solid fa-bolt"></i> Быстрая продажа боту (${quickSaleValue.toLocaleString()} ₽)
                 </button>
                 <button onclick="PhoneBusiness.listOnP2P('${b.id}', ${estimatedValue})" class="btn btn-green w-full mb-2" style="font-size:11px;">
-                    ☁️ На P2P биржу (${estimatedValue.toLocaleString()} ₽)
+                    <i class="fa-solid fa-cloud-arrow-up"></i> На P2P биржу (${estimatedValue.toLocaleString()} ₽)
                 </button>
                 <button onclick="ModalManager.close('modalBizSell')" class="btn btn-dark w-full">Отмена</button>
             </div>
@@ -2134,8 +2124,8 @@ const PhoneBusiness = {
                 ${isBuff ? `
                     <button onclick="PhoneBusiness.handleCrisisEvent('${b.id}', '${ev.id}', 'accept_buff')" class="btn btn-green w-full">🎉 Отлично!</button>
                 ` : `
-                    ${ev.bribeCost > 0 ? `<button onclick="PhoneBusiness.handleCrisisEvent('${b.id}', '${ev.id}', 'bribe')" class="btn btn-green w-full mb-2">💸 Откупиться (${ev.bribeCost.toLocaleString()} ₽)</button>` : ''}
-                    <button onclick="PhoneBusiness.handleCrisisEvent('${b.id}', '${ev.id}', 'accept')" class="btn btn-danger w-full mb-2">⚠️ Принять последствия</button>
+                    ${ev.bribeCost > 0 ? `<button onclick="PhoneBusiness.handleCrisisEvent('${b.id}', '${ev.id}', 'bribe')" class="btn btn-green w-full mb-2"><i class="fa-solid fa-money-bill-wave"></i> Откупиться (${ev.bribeCost.toLocaleString()} ₽)</button>` : ''}
+                    <button onclick="PhoneBusiness.handleCrisisEvent('${b.id}', '${ev.id}', 'accept')" class="btn btn-danger w-full mb-2"><i class="fa-solid fa-triangle-exclamation"></i> Принять последствия</button>
                 `}
             </div>
         `;
@@ -2222,11 +2212,8 @@ const PhoneBusiness = {
         if (!Array.isArray(window.state.businesses)) return;
 
         this._syncActiveBonus();
-
-        // ⭐ v5.0.0: обновляем экономический цикл
         this._tickEconomicCycle();
 
-        // ⭐ v5.0.0: обновляем челленджи
         if (!Array.isArray(window.state.player.dailyBizChallenges) ||
             window.state.player.dailyBizChallenges.every(c => c.done)) {
             this._generateDailyBizChallenges();
@@ -2268,7 +2255,6 @@ const PhoneBusiness = {
             }, 1000);
         }
 
-        // ⭐ v5.0.0: умное уведомление о кассе
         const totalStored = this.getAccumulatedCash();
         if (totalStored >= 500000 && (window.state.businessStaff?.manager || 0) === 0) {
             setTimeout(() => {
@@ -2305,4 +2291,4 @@ if (typeof document !== 'undefined') {
     });
 }
 
-console.log('[💼 phone-business v5.0.0] ПРОКАЧКА: циклы, челленджи, оффлайн-бонус, milestones, разнообразие ✓');
+console.log('[💼 phone-business v5.2.0] КАРТОЧКИ В СТИЛЕ АВТО + ТАБЫ ✓');

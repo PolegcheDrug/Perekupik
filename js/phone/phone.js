@@ -1,10 +1,15 @@
 // ========================================================
-// js/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.6.0)
+// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.7.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.7.0 (RADIO LIFECYCLE):
+//   - Интеграция с PhoneMedia: визуализатор НЕ паузится при goHome
+//   - При открытии радио — визуализатор возобновляется
+//   - При сворачивании телефона — аудио продолжает играть
+//   - Хуки onAppOpened / onAppClosed для радио
+//   - goHome НЕ убивает фоновое радио (Media Session + Wake Lock)
 // ⭐ v1.6.0 (ИНТЕГРАЦИЯ + ФИКСЫ):
 //   - ФИКС: убран несуществующий PhoneHousing.renderHousingApp
 //   - ФИКС: renderBusinessWidget использует PhoneBusiness API
-//     (раньше показывал устаревшую формулу — double bonus)
 //   - ФИКС: убран двойной рендер в collectAllBusinessCash
 //   - ИНТЕГРАЦИЯ: GameHelpers для escapeHtml/formatMoney/safeNum
 //   - Защита от двойного клика в claimQuestReward
@@ -256,6 +261,32 @@ const PhoneManager = {
     },
 
     // --------------------------------------------------------
+    // ⭐ v1.7.0: ХУКИ RADIO LIFECYCLE
+    // --------------------------------------------------------
+    _onAppOpened(appId) {
+        // Радио: визуализатор сам запустится, если playing
+        if (appId === 'radio' && window.PhoneMedia) {
+            if (typeof window.PhoneMedia._startVisualizer === 'function') {
+                if (window.PhoneMedia.radioPlaying) {
+                    window.PhoneMedia._startVisualizer();
+                }
+            }
+        }
+    },
+
+    _onAppClosed(appId) {
+        // Радио: НЕ паузим музыку — она играет в фоне.
+        // Но останавливаем визуализатор (rAF) для экономии CPU.
+        // При возврате в Магнитолу — визуализатор возобновится.
+        if (appId === 'radio' && window.PhoneMedia) {
+            if (typeof window.PhoneMedia._stopVisualizer === 'function') {
+                // keepState=true — сохраняем текущие уровни, чтобы не сбрасывать CSS-переменные
+                window.PhoneMedia._stopVisualizer(true);
+            }
+        }
+    },
+
+    // --------------------------------------------------------
     // ОТКРЫТИЕ ПРИЛОЖЕНИЙ
     // --------------------------------------------------------
     openApp(appId) {
@@ -275,6 +306,11 @@ const PhoneManager = {
         this._isOpeningApp = true;
 
         try {
+            // ⭐ v1.7.0: закрываем предыдущее приложение
+            if (this.currentApp && this.currentApp !== appId) {
+                this._onAppClosed(this.currentApp);
+            }
+
             this.currentApp = appId;
 
             if (homeScreen) {
@@ -282,6 +318,9 @@ const PhoneManager = {
             }
             appContainer.style.setProperty('display', 'flex', 'important');
             appContainer.innerHTML = '';
+
+            // ⭐ v1.7.0: хук открытия
+            this._onAppOpened(appId);
 
             // ============================================
             // 1. СЕТЬ M+ & P2P БИРЖА (AppM)
@@ -394,7 +433,6 @@ const PhoneManager = {
                     break;
 
                 case 'housing':
-                    // ⭐ v1.6.0: убран несуществующий renderHousingApp
                     if (window.PhoneHousing && typeof window.PhoneHousing.render === 'function') {
                         window.PhoneHousing.render(appContainer);
                     } else if (window.AppHousing && typeof window.AppHousing.render === 'function') {
@@ -451,6 +489,11 @@ const PhoneManager = {
     },
 
     goHome() {
+        // ⭐ v1.7.0: закрываем текущее приложение (в т.ч. останавливаем визуализатор радио)
+        if (this.currentApp) {
+            this._onAppClosed(this.currentApp);
+        }
+
         this.currentApp = null;
         const homeScreen = document.getElementById('phoneHomeScreen');
         const appContainer = document.getElementById('phoneAppContainer');
@@ -570,7 +613,6 @@ const PhoneManager = {
         `;
     },
 
-    // ⭐ v1.6.0: усилена защита от двойного клика
     claimQuestReward(idx) {
         const p = window.state?.player;
         if (!p) return;
@@ -602,7 +644,6 @@ const PhoneManager = {
 
     // ========================================================
     // ВИДЖЕТ БИЗНЕСА
-    // ⭐ v1.6.0: использует PhoneBusiness API (устранён double bonus)
     // ========================================================
     renderBusinessWidget() {
         const box = document.getElementById('phoneBizWidgetContainer');
@@ -616,7 +657,6 @@ const PhoneManager = {
             return;
         }
 
-        // ⭐ v1.6.0: делегируем в PhoneBusiness
         let totalDailyIncome = 0;
         let totalStoredCash = 0;
 
@@ -633,7 +673,6 @@ const PhoneManager = {
             }
         }
 
-        // Fallback если PhoneBusiness не загружен
         if (totalDailyIncome === 0 && totalStoredCash === 0) {
             ownedBusinesses.forEach(b => {
                 const supplyMul = (b.stock || 0) > 0 ? 1.0 : 0.15;
@@ -669,16 +708,12 @@ const PhoneManager = {
         `;
     },
 
-    // ⭐ v1.6.0: убран двойной рендер
     collectAllBusinessCash() {
-        // Делегируем в PhoneBusiness
         if (window.PhoneBusiness && typeof window.PhoneBusiness.collectAllCash === 'function') {
             window.PhoneBusiness.collectAllCash();
-            // PhoneBusiness.collectAllCash сам вызывает render
             return;
         }
 
-        // Fallback
         let total = 0;
         (window.state?.businesses || []).forEach(b => {
             if (b && b.stored && b.stored > 0) {
@@ -1079,7 +1114,6 @@ const AppNotepad = {
             if (g.targetHousing && (p.ownedHouses || []).includes(g.targetHousing)) done = true;
             if (g.targetCred && (p.streetCred || 0) >= g.targetCred) done = true;
 
-            // ⭐ v1.6.0: правильное использование platesInventory
             if (g.targetPlatesCount) {
                 const plates = (p.platesInventory && Array.isArray(p.platesInventory))
                     ? p.platesInventory
@@ -1139,4 +1173,4 @@ if (document.readyState === 'loading') {
     PhoneManager.init();
 }
 
-console.log('[📱 phone.js v1.6.0] ФИКС housing API + GameHelpers + интеграция PhoneBusiness ✓');
+console.log('[📱 phone.js v1.7.0] Radio Lifecycle + GameHelpers + PhoneBusiness + PhoneMedia hooks ✓');

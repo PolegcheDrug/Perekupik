@@ -1,19 +1,10 @@
 // ========================================================
-// js/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v3.0.0)
+// js/phone/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v3.1.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v3.0.0 (ИНТЕГРАЦИЯ MONEYMANAGER + EVENTBUS):
-//   - MoneyManager для всех списаний/начислений
-//   - EventBus для публикации media:super_spin_started, media:super_spin_prize, ...
-//   - SafeState для безопасного доступа к state
-//   - Защита от двойных кликов (_spinPending, _thimbleBetPending, _radioPending)
-//   - try/catch во всех критичных методах
-//   - ИСПРАВЛЕНО: claimAllThreePrizes обрабатывает все типы призов
-// ⭐ v2.0.0:
-//   - Косметика в СуперВилспине (темы, ник-эффекты, ауры, титулы)
-//   - Дубликаты конвертируются в Stars (10-30 ⭐)
-//   - Глитч-подсветка (золотая рамка)
-// ⭐ v1.5.0:
-//   - Галерея BARN_CARS_DATABASE с фиксацией главного фото
+// ⭐ v3.1.2 (ФИКС ПОВТОРНОГО ВКЛЮЧЕНИЯ И ПАУЗЫ):
+//   - Убрано разрушительное removeAttribute('src'), ломавшее аудиотракт браузера
+//   - Корректная пауза через стандартный pause() с сохранением User Gesture Context
+//   - При повторном старте поток обновляется на актуальный Live-стрим без задержек
 // ========================================================
 
 const PhoneMedia = {
@@ -21,11 +12,11 @@ const PhoneMedia = {
     // 1. АВТО-МАГНИТОЛА И ЖИВОЕ ОНЛАЙН-РАДИО
     // ====================================================
     radioPlaying: false,
+    radioLoading: false,
     activeStationIndex: 0,
     volume: 0.75,
     audioElement: null,
 
-    // ⭐ v3.0.0: защита от двойных кликов
     _radioPending: false,
 
     stations: [
@@ -35,8 +26,8 @@ const PhoneMedia = {
             freq: "106.3 FM",
             icon: "fa-bolt",
             color: "#ff0055",
-            streamUrl: "https://radiorecord.hostingradio.ru/rr_128.mp3",
-            backupUrl: "https://radiorecord.hostingradio.ru/rr_96.aacp"
+            streamUrl: "https://record2.radiorecord.ru/rr_320",
+            backupUrl: "https://hls-01-radiorecord.hostingradio.ru/record/playlist.m3u8"
         },
         {
             name: "Record Rock",
@@ -44,35 +35,44 @@ const PhoneMedia = {
             freq: "102.8 FM",
             icon: "fa-guitar",
             color: "#ff4400",
-            streamUrl: "https://radiorecord.hostingradio.ru/rock_128.mp3",
-            backupUrl: "https://radiorecord.hostingradio.ru/rock_96.aacp"
+            streamUrl: "https://record2.radiorecord.ru/rock_320",
+            backupUrl: "https://radiorecord.hostingradio.ru/rock96.aacp"
         },
         {
-            name: "Record Pirate Station",
+            name: "Pirate Station",
             genre: "Drum & Bass / Jungle",
             freq: "104.2 FM",
             icon: "fa-skull",
             color: "#00f2fe",
-            streamUrl: "https://radiorecord.hostingradio.ru/ps_128.mp3",
-            backupUrl: "https://radiorecord.hostingradio.ru/ps_96.aacp"
+            streamUrl: "https://record2.radiorecord.ru/ps_320",
+            backupUrl: "https://radiorecord.hostingradio.ru/ps96.aacp"
         },
         {
             name: "Record Black Rap",
-            genre: "Hip-Hop / Drift Trap",
+            genre: "Hip-Hop / Trap",
             freq: "98.7 FM",
             icon: "fa-fire",
             color: "#ffd700",
-            streamUrl: "https://radiorecord.hostingradio.ru/rap_128.mp3",
-            backupUrl: "https://radiorecord.hostingradio.ru/rap_96.aacp"
+            streamUrl: "https://record2.radiorecord.ru/rap_320",
+            backupUrl: "https://radiorecord.hostingradio.ru/rap96.aacp"
         },
         {
-            name: "DFM Dance",
-            genre: "Dance / House",
+            name: "DFM",
+            genre: "Dance Pop / Club",
             freq: "107.0 FM",
             icon: "fa-headphones",
             color: "#9333ea",
-            streamUrl: "https://dfm.hostingradio.ru/dfm128.mp3",
-            backupUrl: "https://dfm.hostingradio.ru/dfm96.aacp"
+            streamUrl: "https://dfm.hostingradio.ru/dfm96.aacp",
+            backupUrl: "https://icecast-dfm.cdnvideo.ru/dfm"
+        },
+        {
+            name: "Европа Плюс",
+            genre: "Top 40 / Pop",
+            freq: "100.5 FM",
+            icon: "fa-compact-disc",
+            color: "#00e676",
+            streamUrl: "https://emg01.hostingradio.ru/europaplus128.mp3",
+            backupUrl: "https://ep128.hostingradio.ru:8030/ep128"
         }
     ],
 
@@ -81,31 +81,39 @@ const PhoneMedia = {
             try {
                 this.audioElement = new Audio();
                 this.audioElement.preload = "none";
-                this.audioElement.crossOrigin = "anonymous";
                 this.audioElement.volume = this.volume;
 
+                this.audioElement.addEventListener("waiting", () => {
+                    this.radioLoading = true;
+                    this.syncRadioUI();
+                });
+
                 this.audioElement.addEventListener("playing", () => {
+                    this.radioLoading = false;
                     this.radioPlaying = true;
                     this.syncRadioUI();
                 });
 
                 this.audioElement.addEventListener("pause", () => {
+                    this.radioLoading = false;
                     this.radioPlaying = false;
                     this.syncRadioUI();
                 });
 
                 this.audioElement.addEventListener("error", (e) => {
-                    console.warn("[Radio Engine] Ошибка основного потока, переключение на резервный...", e);
+                    if (!this.audioElement || !this.audioElement.src || this.audioElement.src === "" || this.audioElement.src === window.location.href) {
+                        return;
+                    }
+                    console.warn("[Radio Engine] Ошибка воспроизведения, пробуем переподключиться...", e);
                     const st = this.stations[this.activeStationIndex];
                     if (st && st.backupUrl && this.audioElement.src !== st.backupUrl) {
                         this.audioElement.src = st.backupUrl;
-                        this.audioElement.play().catch(() => {});
+                        this.audioElement.play().catch(err => {
+                            console.error("[Radio Engine] Резервный поток также недоступен:", err);
+                            this.resetRadioState("Поток временно недоступен");
+                        });
                     } else {
-                        this.radioPlaying = false;
-                        this.syncRadioUI();
-                        if (typeof showToast === 'function') {
-                            showToast("Не удалось подключиться к радиопотоку.");
-                        }
+                        this.resetRadioState("Не удалось подключиться к радиостанции");
                     }
                 });
             } catch (e) {
@@ -114,16 +122,51 @@ const PhoneMedia = {
         }
     },
 
+    resetRadioState(msg) {
+        this.radioLoading = false;
+        this.radioPlaying = false;
+        if (this.audioElement) {
+            try {
+                this.audioElement.pause();
+            } catch (err) {}
+        }
+        this.syncRadioUI();
+        if (msg && typeof showToast === 'function') {
+            showToast(msg);
+        }
+    },
+
     syncRadioUI() {
         const btn = document.getElementById('radioMainPlayBtn');
         const eq = document.querySelector('.radio-equalizer-bars');
-        if (btn) {
-            btn.className = `btn ${this.radioPlaying ? 'btn-red' : 'btn-purple'} btn-sm`;
-            btn.innerHTML = `<i class="fa-solid ${this.radioPlaying ? 'fa-pause' : 'fa-play'}"></i> ${this.radioPlaying ? 'Пауза' : 'В эфир'}`;
+        const statusLabel = document.getElementById('radioStatusSubLabel');
+
+        if (statusLabel) {
+            if (this.radioLoading) {
+                statusLabel.innerHTML = '<span class="color-amber"><i class="fa-solid fa-spinner fa-spin"></i> ПОДКЛЮЧЕНИЕ К ЭФИРУ...</span>';
+            } else if (this.radioPlaying) {
+                statusLabel.innerHTML = '<span class="color-green font-bold"><i class="fa-solid fa-signal"></i> В ПРЯМОМ ЭФИРЕ</span>';
+            } else {
+                statusLabel.textContent = 'ЭФИР ПРИОСТАНОВЛЕН';
+            }
         }
+
+        if (btn) {
+            if (this.radioLoading) {
+                btn.className = `btn btn-dark btn-sm opacity-60`;
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Загрузка...`;
+            } else {
+                btn.className = `btn ${this.radioPlaying ? 'btn-red' : 'btn-purple'} btn-sm`;
+                btn.innerHTML = `<i class="fa-solid ${this.radioPlaying ? 'fa-pause' : 'fa-play'}"></i> ${this.radioPlaying ? 'Пауза' : 'В эфир'}`;
+            }
+        }
+
         if (eq) {
-            if (this.radioPlaying) eq.classList.add('playing');
-            else eq.classList.remove('playing');
+            if (this.radioPlaying && !this.radioLoading) {
+                eq.classList.add('playing');
+            } else {
+                eq.classList.remove('playing');
+            }
         }
     },
 
@@ -164,7 +207,9 @@ const PhoneMedia = {
                     </div>
 
                     <div class="text-center my-2">
-                        <div class="sub-label" style="font-size:10px;">ВОСПРОИЗВЕДЕНИЕ В ЭФИРЕ:</div>
+                        <div class="sub-label" id="radioStatusSubLabel" style="font-size:10px;">
+                            ${isPlay ? '<span class="color-green font-bold"><i class="fa-solid fa-signal"></i> В ПРЯМОМ ЭФИРЕ</span>' : 'ЭФИР ПРИОСТАНОВЛЕН'}
+                        </div>
                         <h3 class="font-bold text-xs color-cyan" style="font-size:16px;">${cur.name}</h3>
                         <div class="sub-label color-amber font-bold" style="font-size:11px;">${cur.freq} • ${cur.genre}</div>
                     </div>
@@ -209,35 +254,52 @@ const PhoneMedia = {
             this.initAudioEngine();
             const st = this.stations[this.activeStationIndex];
 
-            if (this.radioPlaying) {
-                this.audioElement.pause();
+            if (this.radioPlaying || this.radioLoading) {
+                // ПАУЗА: просто останавливаем воспроизведение, не ломая источник
                 this.radioPlaying = false;
-                this.syncRadioUI();
-                if (typeof showToast === 'function') showToast("Радио приостановлено.");
+                this.radioLoading = false;
 
-                // Публикуем событие
+                try {
+                    this.audioElement.pause();
+                } catch (e) {
+                    console.warn('[Radio Engine] Ошибка pause():', e);
+                }
+
+                this.syncRadioUI();
+                if (typeof showToast === 'function') showToast("Радио приостановлено");
+
                 if (window.EventBus) {
                     window.EventBus.emit('media:radio_paused', { station: st.name });
                 }
             } else {
-                if (!this.audioElement.src || this.audioElement.src === "" || !this.audioElement.src.includes("hostingradio.ru")) {
-                    this.audioElement.src = st.streamUrl;
-                }
-                this.audioElement.play().then(() => {
-                    this.radioPlaying = true;
-                    this.syncRadioUI();
-                    if (typeof showToast === 'function') showToast(`В эфире: «${st.name}» 📻`);
+                // В ЭФИР: подключаемся к прямому эфиру
+                this.radioLoading = true;
+                this.syncRadioUI();
 
-                    // Публикуем событие
-                    if (window.EventBus) {
-                        window.EventBus.emit('media:radio_changed', { station: st.name, freq: st.freq });
-                    }
-                }).catch(err => {
-                    console.warn("[Radio] Автозапуск блокирован браузером:", err);
-                    if (typeof showToast === 'function') {
-                        showToast("Нажмите еще раз для разрешения звука в браузере!");
-                    }
-                });
+                // Обновляем ссылку на поток для перехода к текущему моменту прямого эфира
+                this.audioElement.src = st.streamUrl;
+
+                const playPromise = this.audioElement.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        this.radioLoading = false;
+                        this.radioPlaying = true;
+                        this.syncRadioUI();
+                        if (typeof showToast === 'function') showToast(`В эфире: «${st.name}» 📻`);
+
+                        if (window.EventBus) {
+                            window.EventBus.emit('media:radio_changed', { station: st.name, freq: st.freq });
+                        }
+                    }).catch(err => {
+                        console.warn("[Radio] Ошибка запуска:", err);
+                        this.radioLoading = false;
+                        this.radioPlaying = false;
+                        this.syncRadioUI();
+                        if (typeof showToast === 'function') {
+                            showToast("Нажмите ещё раз для запуска звука!");
+                        }
+                    });
+                }
             }
 
             if (window.AudioFx) window.AudioFx.play('tick');
@@ -252,21 +314,33 @@ const PhoneMedia = {
         this.initAudioEngine();
 
         const st = this.stations[idx];
+        this.radioLoading = true;
+        this.syncRadioUI();
+
+        try {
+            this.audioElement.pause();
+        } catch (e) {}
+
         this.audioElement.src = st.streamUrl;
 
-        this.audioElement.play().then(() => {
-            this.radioPlaying = true;
-            this.syncRadioUI();
-            if (typeof showToast === 'function') showToast(`В эфире: «${st.name}»!`);
+        const playPromise = this.audioElement.play();
+        if (playPromise !== undefined) {
+            playPromise.then(() => {
+                this.radioLoading = false;
+                this.radioPlaying = true;
+                this.syncRadioUI();
+                if (typeof showToast === 'function') showToast(`В эфире: «${st.name}»!`);
 
-            // Публикуем событие
-            if (window.EventBus) {
-                window.EventBus.emit('media:radio_changed', { station: st.name, freq: st.freq, index: idx });
-            }
-        }).catch(() => {
-            this.radioPlaying = false;
-            this.syncRadioUI();
-        });
+                if (window.EventBus) {
+                    window.EventBus.emit('media:radio_changed', { station: st.name, freq: st.freq, index: idx });
+                }
+            }).catch(err => {
+                console.warn("[Radio] Ошибка переключения станции:", err);
+                this.radioLoading = false;
+                this.radioPlaying = false;
+                this.syncRadioUI();
+            });
+        }
 
         if (window.AudioFx) window.AudioFx.play('tick');
         if (window.AudioFx) window.AudioFx.haptic('light');
@@ -289,7 +363,6 @@ const PhoneMedia = {
     activeFortuneTab: 'superspin',
     isSuperSpinning: false,
 
-    // ⭐ v3.0.0: защита от двойных кликов
     _spinPending: false,
     _thimbleBetPending: false,
 
@@ -461,16 +534,11 @@ const PhoneMedia = {
         `;
     },
 
-    /**
-     * Покупка билета СуперВилспина.
-     * @returns {boolean} — успех
-     */
     purchaseSuperSpinTicket() {
         const cfg = this._getSuperSpinConfig();
         let success = false;
 
         try {
-            // ⭐ v3.0.0: через MoneyManager
             if (window.MoneyManager) {
                 const cashBalance = window.MoneyManager.getBalance();
                 const starsBalance = window.MoneyManager.getStars();
@@ -490,7 +558,6 @@ const PhoneMedia = {
                     return false;
                 }
             } else {
-                // Fallback
                 const cash = window.state.player?.cash || 0;
                 const stars = window.state.player?.stars || 0;
 
@@ -523,7 +590,6 @@ const PhoneMedia = {
                 if (window.AudioFx) window.AudioFx.haptic('success');
                 if (typeof showToast === 'function') showToast("Билет СуперВилспина куплен! (+1 🎟️)");
 
-                // Публикуем событие
                 if (window.EventBus) {
                     window.EventBus.emit('media:super_spin_ticket_bought', { ticketCount: window.state.player.superSpinTickets });
                 }
@@ -560,7 +626,6 @@ const PhoneMedia = {
             } else if (tickets > 0) {
                 window.state.player.superSpinTickets = tickets - 1;
             } else {
-                // Покупка через MoneyManager
                 let paid = false;
 
                 if (window.MoneyManager) {
@@ -573,7 +638,6 @@ const PhoneMedia = {
                         paid = window.MoneyManager.spend(cfg.costStars, 'Оплата спина Супер Вилспина', { currency: 'stars' });
                     }
                 } else {
-                    // Fallback
                     const cash = window.state.player?.cash || 0;
                     const stars = window.state.player?.stars || 0;
                     if (cash >= cfg.costCash) {
@@ -601,7 +665,6 @@ const PhoneMedia = {
             this.isSuperSpinning = true;
             this.renderFortuneApp(document.getElementById('phoneAppContainer'));
 
-            // Публикуем событие
             if (window.EventBus) {
                 window.EventBus.emit('media:super_spin_started', { usedFree: canFree, ticketsLeft: window.state.player.superSpinTickets });
             }
@@ -626,6 +689,11 @@ const PhoneMedia = {
             const prize1 = pool1[Math.floor(Math.random() * pool1.length)];
             const prize2 = pool2[Math.floor(Math.random() * pool2.length)];
             const prize3 = pool3[Math.floor(Math.random() * pool3.length)];
+
+            const setTxt = (id, txt) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = txt;
+            };
 
             let spinCount = 0;
             const spinInterval = setInterval(() => {
@@ -705,14 +773,11 @@ const PhoneMedia = {
         }
     },
 
-    // ====================================================
-    // ОБРАБОТКА ВСЕХ ТРЁХ ПРИЗОВ
-    // ====================================================
     claimAllThreePrizes(p1, p2, p3) {
         let rewardTokens = [];
 
         try {
-            // ═══ 1. БАРАБАН 1: ТЕХНИКА / ПРИБОРЫ / ТАЛОНЫ / ОПЫТ ═══
+            // 1. БАРАБАН 1: ТЕХНИКА
             if (p1.type === 'car') {
                 let matchedTemplate = null;
 
@@ -867,7 +932,7 @@ const PhoneMedia = {
                 });
             }
 
-            // ═══ 2. БАРАБАН 2: ВАЛЮТА И РЕСУРСЫ ═══
+            // 2. БАРАБАН 2: ВАЛЮТА И РЕСУРСЫ
             if (p2.type === 'cash' || p2.type === 'jackpot') {
                 if (typeof window.pushToMailbox === 'function') {
                     window.pushToMailbox({
@@ -960,7 +1025,7 @@ const PhoneMedia = {
                 });
             }
 
-            // ═══ 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ + КОСМЕТИКА ═══
+            // 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ И КОСМЕТИКА
             if (p3.type === 'stars') {
                 if (typeof window.pushToMailbox === 'function') {
                     window.pushToMailbox({
@@ -1037,7 +1102,6 @@ const PhoneMedia = {
                 const category = p3.category;
                 const itemId = p3.itemId;
                 const emoji = p3.emoji || '🎨';
-                const label = p3.label || 'Косметика';
                 const isExclusive = !!p3.isExclusive;
 
                 if (typeof ThemeManager !== 'undefined' && typeof ThemeManager.grantCosmeticFromSpin === 'function') {
@@ -1112,7 +1176,6 @@ const PhoneMedia = {
             if (window.AudioFx) window.AudioFx.play('win');
             if (window.AudioFx) window.AudioFx.haptic('success');
 
-            // Публикуем событие
             if (window.EventBus) {
                 window.EventBus.emit('media:super_spin_prize', {
                     prize1: p1.type,
@@ -1282,7 +1345,6 @@ const PhoneMedia = {
             } else {
                 this.thimblesState.isFreeGame = false;
 
-                // ⭐ v3.0.0: через MoneyManager
                 if (window.MoneyManager) {
                     const ok = window.MoneyManager.spend(bet, 'Ставка в напёрстках');
                     if (!ok) {
@@ -1313,7 +1375,6 @@ const PhoneMedia = {
             if (window.AudioFx) window.AudioFx.haptic('medium');
             this.renderFortuneApp(document.getElementById('phoneAppContainer'));
 
-            // Публикуем событие
             if (window.EventBus) {
                 window.EventBus.emit('media:thimbles_started', { bet, isFree: canFree, winningIndex: winIdx });
             }
@@ -1388,7 +1449,6 @@ const PhoneMedia = {
                     badge: "КУШ"
                 });
             } else {
-                // Fallback
                 if (window.MoneyManager) {
                     window.MoneyManager.earn(winCash, 'Выигрыш в напёрстках');
                 } else {
@@ -1405,7 +1465,6 @@ const PhoneMedia = {
             if (window.AudioFx) window.AudioFx.play('win');
             if (window.AudioFx) window.AudioFx.haptic('success');
 
-            // Публикуем событие
             if (window.EventBus) {
                 window.EventBus.emit('media:thimbles_win', { winCash, bet, isFree, chosenIdx });
             }
@@ -1427,7 +1486,6 @@ const PhoneMedia = {
                 showToast(`Мимо! Шарик был под #${this.thimblesState.winningIndex + 1}.`);
             }
 
-            // Публикуем событие
             if (window.EventBus) {
                 window.EventBus.emit('media:thimbles_lose', { bet, isFree, chosenIdx, actualIdx: this.thimblesState.winningIndex });
             }
@@ -1437,7 +1495,6 @@ const PhoneMedia = {
     }
 };
 
-// Экспорт
 window.PhoneMedia = PhoneMedia;
 
-console.log('[🎰 phone-media v3.0.0] MoneyManager + EventBus + SafeState + защита от двойных кликов ✓');
+console.log('[📻 phone-media v3.1.2] Корректная пауза и повторный запуск потока ✓');
