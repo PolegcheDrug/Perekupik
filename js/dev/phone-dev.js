@@ -1,7 +1,13 @@
 // ========================================================
-// js/dev/phone-dev.js — ПРИЛОЖЕНИЕ «DEV TERMINAL» (v1.0.0)
+// js/dev/phone-dev.js — ПРИЛОЖЕНИЕ «DEV TERMINAL» (v2.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.0.0 (ПОЛНЫЙ РЕФАКТОРИНГ):
+// ⭐ v2.0.0 (ВКЛАДКА ДОСТУП):
+//   - НОВАЯ ВКЛАДКА «ДОСТУП» — управление инвайтами и игроками
+//   - Видна ТОЛЬКО владельцу (проверка AccessControl.isOwner)
+//   - Быстрое создание кодов, список игроков, баны
+//   - Управление системой доступа (вкл/выкл)
+//   - Плавающая кнопка .owner-panel-btn убрана
+// ⭐ v1.0.0:
 //   - ИСПРАВЛЕНА синтаксическая ошибка DEV_PIN
 //   - try/catch во всех вкладках
 //   - Защита от отсутствия зависимостей
@@ -12,11 +18,10 @@
 // ========================================================
 
 const AppDev = {
-    // ⭐ ИСПРАВЛЕНО: было `DEV_PIN: 0852"` (синтаксическая ошибка)
     DEV_PIN: "0852",
     isAuthenticated: false,
     enteredPin: "",
-    activeSubTab: "overview",  // overview | studio | resources | sandbox | data_check | logs | events | money | state | firestore | modules
+    activeSubTab: "overview",
 
     // Для вкладки Logs
     logFilter: 'all',
@@ -31,6 +36,11 @@ const AppDev = {
     // Firestore
     firestoreStats: null,
     firestoreTesting: false,
+
+    // ⭐ v2.0.0: Кэш данных для вкладки ДОСТУП
+    _accessInvites: [],
+    _accessPlayers: [],
+    _accessLoading: false,
 
     // ========================================================
     // РЕНДЕР
@@ -60,6 +70,27 @@ const AppDev = {
                     </div>
                 </div>
             `;
+        }
+    },
+
+    // ========================================================
+    // ⭐ v2.0.0: ПРОВЕРКА ВЛАДЕЛЬЦА
+    // ========================================================
+    _isOwner() {
+        try {
+            const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+            const uid = tgUser?.id ? String(tgUser.id) : (window.tgUserId || window.state?.player?.uid);
+            if (!uid) return false;
+
+            if (window.AccessControl && typeof window.AccessControl.isOwner === 'function') {
+                return window.AccessControl.isOwner(uid);
+            }
+
+            // Fallback
+            const OWNER_ID = '1944392183';
+            return String(uid) === OWNER_ID;
+        } catch (e) {
+            return false;
         }
     },
 
@@ -196,10 +227,11 @@ const AppDev = {
     },
 
     // ========================================================
-    // 2. ГЛАВНАЯ ПАНЕЛЬ (10 вкладок)
+    // 2. ГЛАВНАЯ ПАНЕЛЬ (со ВКЛАДКОЙ ДОСТУП для владельца)
     // ========================================================
     renderDashboard(container) {
         const sub = this.activeSubTab;
+        const isOwner = this._isOwner();
 
         container.innerHTML = `
             <div class="phone-app-header" style="border-bottom-color: rgba(0, 230, 118, 0.4);">
@@ -248,11 +280,16 @@ const AppDev = {
                     </button>
                 </div>
 
-                <!-- ШЕСТАЯ ВКЛАДКА (МОДУЛИ) — на всю ширину -->
-                <div class="mb-2">
-                    <button onclick="AppDev.switchTab('modules')" class="btn ${sub === 'modules' ? 'btn-cyan' : 'btn-dark'} btn-sm w-full" style="padding:6px 2px; font-size:8.5px;">
+                <!-- НИЖНИЙ РЯД: МОДУЛИ + ДОСТУП (только для owner) -->
+                <div class="mb-2" style="display:grid; grid-template-columns: ${isOwner ? '2fr 1fr' : '1fr'}; gap: 4px;">
+                    <button onclick="AppDev.switchTab('modules')" class="btn ${sub === 'modules' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:6px 2px; font-size:8.5px;">
                         <i class="fa-solid fa-puzzle-piece"></i> ПРОВЕРИТЬ МОДУЛИ
                     </button>
+                    ${isOwner ? `
+                        <button onclick="AppDev.switchTab('access')" class="btn ${sub === 'access' ? 'btn-amber' : 'btn-dark'}" style="padding:6px 2px; font-size:8.5px; border:1.5px solid rgba(255,215,0,0.4); background:linear-gradient(135deg, rgba(255,215,0,0.1), rgba(255,179,0,0.05));">
+                            <i class="fa-solid fa-crown color-amber"></i> ДОСТУП
+                        </button>
+                    ` : ''}
                 </div>
 
                 <div id="devTabContentBox" style="min-height:300px;"></div>
@@ -274,6 +311,7 @@ const AppDev = {
             else if (sub === 'state')       this.renderStateTab(box);
             else if (sub === 'firestore')   this.renderFirestoreTab(box);
             else if (sub === 'modules')     this.renderModulesTab(box);
+            else if (sub === 'access' && isOwner) this.renderAccessTab(box);
         } catch (e) {
             console.error('[AppDev] Ошибка вкладки', sub, e);
             box.innerHTML = `
@@ -288,6 +326,11 @@ const AppDev = {
         if (sub === 'firestore') {
             setTimeout(() => this.refreshFirestoreStats(), 50);
         }
+
+        // Автозагрузка данных доступа
+        if (sub === 'access' && isOwner) {
+            setTimeout(() => this.loadAccessData(), 50);
+        }
     },
 
     _renderLogsBadge() {
@@ -295,6 +338,286 @@ const AppDev = {
         const errors = window.DevLogger.getFiltered('error').length;
         if (errors <= 0) return '';
         return `<span style="position:absolute; top:2px; right:2px; background:var(--red); color:#fff; font-size:7px; font-weight:900; padding:1px 4px; border-radius:6px;">${errors}</span>`;
+    },
+
+    // ========================================================
+    // ⭐ v2.0.0: ВКЛАДКА ДОСТУП (OWNER-PANEL)
+    // ========================================================
+    async loadAccessData() {
+        if (!this._isOwner()) return;
+        if (this._accessLoading) return;
+
+        this._accessLoading = true;
+        const box = document.getElementById('devTabContentBox');
+        if (box) {
+            box.innerHTML = `
+                <div class="text-center p-4">
+                    <div class="radar-spinner-ring mb-2" style="margin: 0 auto;"></div>
+                    <div class="sub-label" style="font-size:10px;">Загрузка данных доступа...</div>
+                </div>
+            `;
+        }
+
+        try {
+            const [invitesRes, playersRes] = await Promise.all([
+                window.AccessControl.listInvites(),
+                window.AccessControl.listWhitelist()
+            ]);
+
+            this._accessInvites = invitesRes.success ? invitesRes.invites : [];
+            this._accessPlayers = playersRes.success ? playersRes.players : [];
+
+            this.renderAccessTab(document.getElementById('devTabContentBox'));
+        } catch (e) {
+            console.error('[AppDev] Ошибка загрузки данных доступа:', e);
+            if (box) {
+                box.innerHTML = `
+                    <div class="glass-card p-3" style="border-color: var(--red);">
+                        <b class="color-red text-xs">Ошибка загрузки</b>
+                        <div class="sub-label mt-1" style="font-size:9.5px;">${String(e.message || e).substring(0, 150)}</div>
+                        <button onclick="AppDev.loadAccessData()" class="btn btn-cyan btn-sm w-full mt-2" style="font-size:9px;">
+                            <i class="fa-solid fa-rotate"></i> Повторить
+                        </button>
+                    </div>
+                `;
+            }
+        } finally {
+            this._accessLoading = false;
+        }
+    },
+
+    renderAccessTab(container) {
+        if (!container) return;
+        if (!this._isOwner()) {
+            container.innerHTML = `<div class="glass-card p-3 text-center sub-label">Доступ только для владельца</div>`;
+            return;
+        }
+
+        const invites = this._accessInvites || [];
+        const players = this._accessPlayers || [];
+
+        const activeInvites = invites.filter(i => i.isActive);
+        const totalPlayers = players.filter(p => !p.isBanned).length;
+        const bannedCount = players.filter(p => p.isBanned).length;
+
+        const systemEnabled = window.AccessControl?.isAccessControlEnabled?.() ?? true;
+
+        container.innerHTML = `
+            <!-- Статистика -->
+            <div class="grid-3 mb-2" style="gap:5px;">
+                <div class="dev-access-stat-tile tile-players">
+                    <div class="dev-access-stat-value color-green">${totalPlayers}</div>
+                    <div class="dev-access-stat-label color-green">ИГРОКИ</div>
+                </div>
+                <div class="dev-access-stat-tile tile-invites">
+                    <div class="dev-access-stat-value color-cyan">${activeInvites.length}</div>
+                    <div class="dev-access-stat-label color-cyan">КОДЫ</div>
+                </div>
+                <div class="dev-access-stat-tile tile-bans">
+                    <div class="dev-access-stat-value color-red">${bannedCount}</div>
+                    <div class="dev-access-stat-label color-red">БАНЫ</div>
+                </div>
+            </div>
+
+            <!-- Быстрое создание -->
+            <div class="glass-card p-2 mb-2" style="border-color:rgba(255,215,0,0.4); background:linear-gradient(135deg, rgba(255,215,0,0.06), #090e18);">
+                <b class="text-xs color-amber mb-2 block"><i class="fa-solid fa-bolt mr-1"></i> Быстрое создание кода</b>
+                <div class="grid-3 mb-1" style="gap:4px;">
+                    <button onclick="AppDev.quickCreate(1, 1)" class="btn btn-green btn-sm" style="font-size:8.5px; padding:6px 2px;">
+                        <i class="fa-solid fa-ticket"></i> 1 / 1д
+                    </button>
+                    <button onclick="AppDev.quickCreate(1, 3)" class="btn btn-green btn-sm" style="font-size:8.5px; padding:6px 2px;">
+                        <i class="fa-solid fa-ticket"></i> 1 / 3д
+                    </button>
+                    <button onclick="AppDev.quickCreate(5, 7)" class="btn btn-cyan btn-sm" style="font-size:8.5px; padding:6px 2px;">
+                        <i class="fa-solid fa-users"></i> 5 / 7д
+                    </button>
+                </div>
+                <div class="sub-label" style="font-size:8.5px; color:#94a3b8;">
+                    Код автоматически копируется в буфер обмена
+                </div>
+            </div>
+
+            <!-- Инвайты -->
+            <div class="glass-card p-2 mb-2">
+                <div class="flex-between mb-2">
+                    <b class="text-xs color-cyan"><i class="fa-solid fa-ticket mr-1"></i> Инвайт-коды (${invites.length})</b>
+                    <button onclick="AppDev.loadAccessData()" class="btn btn-dark btn-auto btn-sm" style="font-size:8px; padding:3px 8px;">
+                        <i class="fa-solid fa-rotate"></i>
+                    </button>
+                </div>
+                <div style="max-height:280px; overflow-y:auto;">
+                    ${invites.length === 0 ? `
+                        <div class="sub-label text-center py-4" style="font-size:10px;">Нет созданных кодов</div>
+                    ` : invites.slice(0, 30).map(inv => {
+                        const status = inv.isExpired ? 'ИСТЁК' : (inv.isUsed ? 'ИСПОЛЬЗОВАН' : 'АКТИВЕН');
+                        const statusClass = inv.isExpired ? 'color-red' : (inv.isUsed ? 'color-amber' : 'color-green');
+                        const daysLeft = inv.expiresAt ? Math.max(0, Math.ceil((inv.expiresAt - Date.now()) / 86400000)) : 0;
+                        const cardClass = inv.isExpired ? 'is-expired' : (inv.isUsed ? 'is-used' : '');
+
+                        return `
+                            <div class="dev-access-invite-card ${cardClass}">
+                                <div class="flex-between mb-1">
+                                    <div class="flex-gap" style="align-items:center; gap:6px;">
+                                        <b class="dev-access-invite-code">${inv.code}</b>
+                                        <button onclick="AppDev.copyCode('${inv.code}')" class="btn btn-dark btn-auto" style="font-size:8px; padding:2px 6px; min-height:auto;" title="Копировать">
+                                            <i class="fa-solid fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <span class="${statusClass}" style="font-size:8.5px; font-weight:900; letter-spacing:0.3px;">${status}</span>
+                                </div>
+                                <div class="flex-between" style="font-size:8.5px;">
+                                    <span class="sub-label">Использовано: <b>${inv.usedCount || 0}/${inv.maxUses || 1}</b></span>
+                                    <span class="sub-label">${inv.isActive ? `⏳ ${daysLeft} дн.` : ''}</span>
+                                </div>
+                                ${inv.isActive ? `
+                                    <button onclick="AppDev.deleteCode('${inv.code}')" class="btn btn-red btn-sm w-full mt-1" style="font-size:8.5px; padding:3px;">
+                                        <i class="fa-solid fa-trash"></i> Удалить
+                                    </button>
+                                ` : ''}
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+
+            <!-- Игроки -->
+            <div class="glass-card p-2 mb-2">
+                <b class="text-xs color-green mb-2 block"><i class="fa-solid fa-users mr-1"></i> Whitelist игроков (${players.length})</b>
+                <div style="max-height:320px; overflow-y:auto;">
+                    ${players.length === 0 ? `
+                        <div class="sub-label text-center py-4" style="font-size:10px;">Пока никого нет</div>
+                    ` : players.map(p => `
+                        <div class="dev-access-player-card ${p.isBanned ? 'is-banned' : ''}">
+                            <div class="flex-between mb-1">
+                                <div style="min-width:0; flex:1;">
+                                    <b class="text-xs ${p.isBanned ? 'color-red' : 'color-green'}" style="font-size:11px;">${p.name || 'Без имени'}</b>
+                                    <div class="sub-label font-mono" style="font-size:8px;">ID: ${p.telegramId}</div>
+                                </div>
+                                ${p.isBanned ? '<span class="tag-badge bg-tag-red" style="font-size:7px;">BAN</span>' : ''}
+                            </div>
+                            <div class="grid-2" style="gap:4px; margin-top:4px;">
+                                <button onclick="AppDev.toggleBan('${p.telegramId}')" class="btn ${p.isBanned ? 'btn-green' : 'btn-amber'} btn-sm" style="font-size:8.5px; padding:3px;">
+                                    ${p.isBanned ? '✓ Разбанить' : '🚫 Забанить'}
+                                </button>
+                                <button onclick="AppDev.revoke('${p.telegramId}')" class="btn btn-red btn-sm" style="font-size:8.5px; padding:3px;">
+                                    🗑 Отозвать
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+
+            <!-- Управление системой -->
+            <div class="glass-card p-2" style="border-color:rgba(255,179,0,0.3);">
+                <b class="text-xs color-amber mb-1 block"><i class="fa-solid fa-cog mr-1"></i> Система доступа</b>
+                <div class="sub-label mb-2" style="font-size:9px;">
+                    Статус: <b class="${systemEnabled ? 'color-green' : 'color-red'}">${systemEnabled ? 'ВКЛЮЧЕНА' : 'ОТКЛЮЧЕНА'}</b>
+                </div>
+                ${systemEnabled ? `
+                    <button onclick="AppDev.disableAccessSystem()" class="btn btn-amber btn-sm w-full" style="font-size:9.5px;">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Отключить (пускать всех)
+                    </button>
+                ` : `
+                    <button onclick="AppDev.enableAccessSystem()" class="btn btn-green btn-sm w-full" style="font-size:9.5px;">
+                        <i class="fa-solid fa-lock"></i> Включить доступ по приглашениям
+                    </button>
+                `}
+            </div>
+        `;
+    },
+
+    // Действия вкладки ДОСТУП
+    async quickCreate(maxUses, ttlDays) {
+        if (!window.AccessControl) return showToast("AccessControl не загружен");
+        const res = await window.AccessControl.createInviteCode({ maxUses, ttlDays });
+        if (res.success) {
+            try {
+                if (navigator.clipboard) {
+                    await navigator.clipboard.writeText(res.code);
+                }
+            } catch (e) {}
+            if (typeof showToast === 'function') showToast(`🎟 Код ${res.code} создан и скопирован!`);
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
+            setTimeout(() => this.loadAccessData(), 300);
+        } else {
+            if (typeof showToast === 'function') showToast(`❌ ${res.error}`);
+        }
+    },
+
+    async copyCode(code) {
+        try {
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(code);
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = code;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            if (typeof showToast === 'function') showToast(`📋 Код ${code} скопирован`);
+            if (typeof tgHaptic === 'function') tgHaptic('light');
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('❌ Не удалось скопировать');
+        }
+    },
+
+    async deleteCode(code) {
+        if (!confirm(`Удалить код ${code}?`)) return;
+        if (!window.AccessControl) return;
+        const res = await window.AccessControl.deleteInvite(code);
+        if (res.success) {
+            if (typeof showToast === 'function') showToast('🗑 Код удалён');
+            setTimeout(() => this.loadAccessData(), 300);
+        } else {
+            if (typeof showToast === 'function') showToast(`❌ ${res.error}`);
+        }
+    },
+
+    async toggleBan(targetUid) {
+        if (!window.AccessControl) return;
+        const res = await window.AccessControl.toggleBanPlayer(targetUid);
+        if (res.success) {
+            if (typeof showToast === 'function') showToast(res.isBanned ? '🚫 Игрок забанен' : '✓ Игрок разбанен');
+            setTimeout(() => this.loadAccessData(), 300);
+        } else {
+            if (typeof showToast === 'function') showToast(`❌ ${res.error}`);
+        }
+    },
+
+    async revoke(targetUid) {
+        if (!confirm('Полностью отозвать доступ у игрока?')) return;
+        if (!window.AccessControl) return;
+        const res = await window.AccessControl.revokeAccess(targetUid);
+        if (res.success) {
+            if (typeof showToast === 'function') showToast('🗑 Доступ отозван');
+            setTimeout(() => this.loadAccessData(), 300);
+        } else {
+            if (typeof showToast === 'function') showToast(`❌ ${res.error}`);
+        }
+    },
+
+    disableAccessSystem() {
+        if (!confirm('⚠️ Отключить систему доступа? ВСЕ игроки смогут играть.')) return;
+        if (window.AccessControl) {
+            window.AccessControl.disableAccessControl();
+            if (typeof showToast === 'function') showToast('⚠️ Система доступа отключена');
+            this.loadAccessData();
+        }
+    },
+
+    enableAccessSystem() {
+        if (window.AccessControl) {
+            window.AccessControl.enableAccessControl();
+            if (typeof showToast === 'function') showToast('🔒 Система доступа включена');
+            this.loadAccessData();
+        }
     },
 
     // ========================================================
@@ -705,10 +1028,7 @@ const AppDev = {
         }
 
         const lot = myLots[0];
-        const fakeBuyerId = 'bot_' + Date.now();
-        const fakeBuyerName = 'DEV Бот-Покупатель';
 
-        // Симулируем уведомление deal_payout
         const notif = {
             id: 'dev_notif_' + Date.now(),
             type: 'deal_payout',
@@ -808,7 +1128,6 @@ const AppDev = {
                 </div>
             </div>
 
-            <!-- ФИЛЬТРЫ -->
             <div class="grid-4 mb-1" style="gap:3px;">
                 <button onclick="AppDev.setLogFilter('all')" class="btn ${this.logFilter === 'all' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:8px; padding:4px 0;">Все</button>
                 <button onclick="AppDev.setLogFilter('error')" class="btn ${this.logFilter === 'error' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:8px; padding:4px 0;">Ошибки</button>
@@ -822,14 +1141,12 @@ const AppDev = {
                 <button onclick="AppDev.setLogFilter('system')" class="btn ${this.logFilter === 'system' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:8px; padding:4px 0;">System</button>
             </div>
 
-            <!-- ПОИСК -->
             <input type="text" id="devLogSearchInput" value="${this.logSearchQuery}"
                    oninput="AppDev.setLogSearch(this.value)"
                    placeholder="🔍 Поиск по тексту лога..."
                    class="chat-input mb-2"
                    style="font-size:10.5px; padding:6px 8px;">
 
-            <!-- КНОПКИ -->
             <div class="grid-3 mb-2" style="gap:3px;">
                 <button onclick="AppDev.copyLogToClipboard()" class="btn btn-cyan btn-sm" style="font-size:9px;">
                     <i class="fa-solid fa-copy"></i> Копи
@@ -842,7 +1159,6 @@ const AppDev = {
                 </button>
             </div>
 
-            <!-- СПИСОК -->
             <div id="devLogsListContainer" class="space-y-1" style="max-height: 50vh; overflow-y: auto;">
                 ${this.renderLogsListHtml()}
             </div>
@@ -903,7 +1219,6 @@ const AppDev = {
         if (typeof playSound === 'function') playSound('tick');
         const box = document.getElementById('devLogsListContainer');
         if (box) box.innerHTML = this.renderLogsListHtml();
-        // Перерисовываем только кнопки фильтра
         this.render(document.getElementById('phoneAppContainer'));
     },
 
@@ -1430,7 +1745,6 @@ const AppDev = {
         `;
     },
 
-    // ⭐ Список индексов, которые нужно создать в Firebase Console
     FIRESTORE_INDEXES: [
         { collection: 'market_lots',        fields: ['status ASC', 'timestamp DESC'],                          desc: 'Список активных лотов' },
         { collection: 'market_lots',        fields: ['sellerId ASC', 'status ASC', 'name ASC'],                desc: 'Проверка дубликатов лотов' },
@@ -1445,7 +1759,7 @@ const AppDev = {
     ],
 
     showFirestoreIndexes() {
-        const list = this.FIRESTORE_INDEXES.map((ix, i) => 
+        const list = this.FIRESTORE_INDEXES.map((ix, i) =>
             `${i + 1}. ${ix.collection}\n   Поля: ${ix.fields.join(', ')}\n   Назначение: ${ix.desc}`
         ).join('\n\n');
 
@@ -1612,7 +1926,8 @@ const AppDev = {
             { name: 'MEventsModule',      path: 'window.MEventsModule',                         critical: false },
             { name: 'MClubsModule',       path: 'window.MClubsModule',                          critical: false },
             { name: 'NotificationCenter', path: 'window.NotificationCenter',                    critical: false },
-            { name: 'ModalManager',       path: 'window.ModalManager',                          critical: true }
+            { name: 'ModalManager',       path: 'window.ModalManager',                          critical: true },
+            { name: 'AccessControl',      path: 'window.AccessControl',                         critical: false }
         ];
 
         const checkModule = (mod) => {
@@ -1664,4 +1979,4 @@ const AppDev = {
 // Экспорт
 window.AppDev = AppDev;
 
-console.log('[🔧 phone-dev v1.0.0] DEV PIN исправлен + 11 вкладок + EventBus/MoneyManager интеграция ✓');
+console.log('[🔧 phone-dev v2.0.0] ВКЛАДКА ДОСТУП для владельца + 11 вкладок + EventBus/MoneyManager ✓');
