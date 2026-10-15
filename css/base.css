@@ -1,6 +1,11 @@
 /* ========================================================
-   css/base.css — БАЗОВЫЕ ПЕРЕМЕННЫЕ И АДАПТИВ (v3.1.0)
+   css/base.css — БАЗОВЫЕ ПЕРЕМЕННЫЕ И АДАПТИВ (v3.2.0)
    Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+   ⭐ v3.2.0:
+   - OWNER-ПАНЕЛЬ ПЕРЕНЕСЕНА В DEV-ПРИЛОЖЕНИЕ
+   - Плавающая кнопка .owner-panel-btn убрана (display: none)
+   - Добавлены стили для вкладки ДОСТУП в DEV:
+     .dev-access-invite-card, .dev-access-player-card, .dev-access-stat-tile
    ⭐ v3.1.0:
    - Плавные stagger-анимации появления карточек
    - Улучшенные hover-эффекты для ПК
@@ -1176,34 +1181,105 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ========================================================
-   27. ВЛАДЕЛЬЦУ — СПЕЦИАЛЬНЫЕ КНОПКИ
+   ⭐ v3.2.0: 27. OWNER-ПАНЕЛЬ ПЕРЕНЕСЕНА В DEV-ПРИЛОЖЕНИЕ
    ======================================================== */
+
+/* Плавающая кнопка убрана — теперь управление доступом в DEV */
 .owner-panel-btn {
-  position: fixed;
-  bottom: calc(70px + env(safe-area-inset-bottom, 0px));
-  right: 12px;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ffd700, #f59e0b);
-  border: 2px solid #000;
-  color: #000;
-  font-size: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow:
-    0 6px 20px rgba(255, 215, 0, 0.5),
-    0 0 30px rgba(255, 215, 0, 0.3);
-  z-index: 4500;
-  transition: transform 0.15s ease;
-  animation: ownerPanelPulse 2s infinite alternate ease-in-out;
+  display: none !important;
 }
-.owner-panel-btn:active {
-  transform: scale(0.9);
+
+/* ---- Стили для вкладки ДОСТУП в DEV-приложении ---- */
+
+.dev-access-invite-card {
+  background: #050914;
+  border-radius: 8px;
+  border-left: 3px solid var(--green);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  transition: all 0.2s ease;
 }
-@keyframes ownerPanelPulse {
-  0% { box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4), 0 0 30px rgba(255, 215, 0, 0.2); }
-  100% { box-shadow: 0 6px 24px rgba(255, 215, 0, 0.7), 0 0 40px rgba(255, 215, 0, 0.5); }
+
+.dev-access-invite-card:hover {
+  background: #0a1220;
+  transform: translateX(2px);
+}
+
+.dev-access-invite-card.is-expired {
+  border-left-color: var(--red);
+  opacity: 0.7;
+}
+
+.dev-access-invite-card.is-used {
+  border-left-color: var(--amber);
+  opacity: 0.8;
+}
+
+.dev-access-invite-code {
+  font-family: monospace, sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  color: #ffd700;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+
+.dev-access-player-card {
+  background: #050914;
+  border-radius: 8px;
+  border-left: 3px solid var(--green);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  transition: all 0.2s ease;
+}
+
+.dev-access-player-card:hover {
+  background: #0a1220;
+  transform: translateX(2px);
+}
+
+.dev-access-player-card.is-banned {
+  border-left-color: var(--red);
+  background: rgba(255, 51, 102, 0.05);
+}
+
+.dev-access-stat-tile {
+  padding: 10px;
+  border-radius: 10px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.dev-access-stat-tile:hover {
+  transform: translateY(-2px);
+}
+
+.dev-access-stat-tile.tile-players {
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.dev-access-stat-tile.tile-invites {
+  background: rgba(0, 242, 254, 0.08);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+}
+
+.dev-access-stat-tile.tile-bans {
+  background: rgba(255, 51, 102, 0.08);
+  border: 1px solid rgba(255, 51, 102, 0.3);
+}
+
+.dev-access-stat-value {
+  font-size: 20px;
+  font-weight: 900;
+  font-family: monospace, sans-serif;
+  line-height: 1.1;
+}
+
+.dev-access-stat-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.8;
 }
