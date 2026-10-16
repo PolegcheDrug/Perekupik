@@ -1,37 +1,23 @@
 // ========================================================
-// js/firebase-market.js — P2P БИРЖА + REGISTERED PLATES (v1.2.0)
+// js/firebase-market.js — P2P БИРЖА + REGISTERED PLATES (v1.2.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.2.0 (SPRINT 3 — ФИКСЫ БЕЗ СОСТАВНЫХ ИНДЕКСОВ):
-//   - ФИКС: publishLot больше не использует 3-way where
-//     (sellerId + status + name) — теперь только where(sellerId),
-//     фильтр по status/name — НА КЛИЕНТЕ. Больше не требует
-//     составного индекса.
-//   - ФИКС: fetchLots убран orderBy('timestamp') — сортировка
-//     на клиенте. Не требует индекса.
-//   - ФИКС: subscribeToLots аналогично без orderBy.
-//   - ФИКС: buyLotAtomic теперь принимает 5-й параметр offerId
-//     и в той же транзакции помечает связанный оффер как completed.
-//   - ФИКС: cancelLot помечает все активные офферы по lotId
-//     как cancelled (без индексов, через клиентскую фильтрацию).
-//   - ФИКС: publishLot смягчена блокировка guest_-UID (только
-//     явно guest_777 и dev_ блокируются, p_ пропускаем).
+// ⭐ v1.2.1 (SPRINT 3 — КРИТИЧЕСКИЙ ФИКС ТРАНЗАКЦИЙ):
+//   - ФИКС: buyLotAtomic теперь читает offerRef ДО первой записи.
+//     Firestore требует: все reads → все writes. Раньше был
+//     'transactions require all reads to be executed before all
+//     writes', сделка падала после acceptOffer.
+//   - Структура транзакции: [read lot] → [read offer?] →
+//     [write lot] → [write tx] → [write notif] → [write plate?]
+//     → [write offer?].
+// ⭐ v1.2.0 (SPRINT 3):
+//   - publishLot без 3-way where, fetchLots/subscribeToLots
+//     без orderBy, cancelLot чистит офферы
 // ⭐ v1.1.0 (SPRINT 2 — OVERRIDE PRICE):
 //   - buyLotAtomic принимает 4-й параметр overridePrice
-//   - Все расчёты (комиссия, payout) идут от finalPrice
-//   - Защита от overridePrice ниже 10% и выше 200% от lot.price
-// ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ firebase-bridge.js):
-//   - MARKET_FEE_PERCENT (3% комиссия биржи)
-//   - MarketLotsManager (publishLot, fetchLots, subscribeToLots,
-//     buyLotAtomic, cancelLot)
-//   - RegisteredPlatesManager (claimPlateAtomic, releasePlate,
-//     isPlateAvailable, cleanPlateString)
-//   - TransactionsManager (алиас)
-//   - getCurrentPlayerProfile()
-//   - Экспорт в window.FB_Market
+//   - Защита от overridePrice ниже 10% и выше 200%
+// ⭐ v1.0.0: P2P, Plates, Transactions
 //
-// ВАЖНО: файл — ES-модуль (import), подключается через
-//   <script type="module" src="firebase-market.js?v=421"></script>
-// Должен быть загружен ПОСЛЕ firebase-core.js.
+// ВАЖНО: файл — ES-модуль (import).
 // ========================================================
 
 import {
@@ -52,7 +38,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ========================================================
-// 1. ИМПОРТ ЯДРА (db, auth, хелперы)
+// 1. ИМПОРТ ЯДРА
 // ========================================================
 const FB_Core = window.FB_Core;
 if (!FB_Core) {
@@ -68,21 +54,17 @@ const LIMITS = FB_Core.LIMITS;
 // ========================================================
 // 2. КОНСТАНТЫ
 // ========================================================
-const MARKET_FEE_PERCENT = 0.03; // 3% комиссия биржи
-
-// ⭐ v1.1.0: границы допустимого overridePrice
-const OVERRIDE_PRICE_MIN_RATIO = 0.10; // не ниже 10% от lot.price
-const OVERRIDE_PRICE_MAX_RATIO = 2.00; // не выше 200% от lot.price
+const MARKET_FEE_PERCENT = 0.03;
+const OVERRIDE_PRICE_MIN_RATIO = 0.10;
+const OVERRIDE_PRICE_MAX_RATIO = 2.00;
 
 // ========================================================
 // 3. ХЕЛПЕР: получить текущий профиль игрока
 // ========================================================
 function getCurrentPlayerProfile() {
-  // 1. Из Auth-менеджера
   const authProfile = FB_Core.Auth?.getUserProfile?.();
   if (authProfile && authProfile.id) return authProfile;
 
-  // 2. Fallback на Telegram
   const tgUser = FB_Core.getTelegramUser?.();
   if (tgUser && tgUser.id) {
     const names = [];
@@ -98,7 +80,6 @@ function getCurrentPlayerProfile() {
     };
   }
 
-  // 3. Fallback на state
   if (window.state?.player?.uid) {
     return {
       id: String(window.state.player.uid),
@@ -114,23 +95,13 @@ function getCurrentPlayerProfile() {
 
 // ========================================================
 // 4. REGISTERED PLATES MANAGER
-// (атомарная регистрация номеров в Firestore)
 // ========================================================
 const RegisteredPlatesManager = {
-  /**
-   * Нормализация номера.
-   */
   cleanPlateString(plateStr) {
     if (!plateStr) return "";
     return String(plateStr).toUpperCase().replace(/\s+/g, " ").trim();
   },
 
-  /**
-   * Атомарная регистрация номера за игроком.
-   * @param {string} plateStr — 'А777АА 77'
-   * @param {string} ownerId — UID игрока
-   * @param {string|null} carId — UID машины (опционально)
-   */
   async claimPlateAtomic(plateStr, ownerId, carId = null) {
     const cleanPlate = this.cleanPlateString(plateStr);
     if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) {
@@ -166,12 +137,6 @@ const RegisteredPlatesManager = {
     }
   },
 
-  /**
-   * Освободить номер (снять с игрока).
-   * @param {string} plateStr
-   * @param {string} ownerId
-   * @param {boolean} archive — в архив или в storage
-   */
   async releasePlate(plateStr, ownerId, archive = false) {
     const cleanPlate = this.cleanPlateString(plateStr);
     if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) return true;
@@ -200,9 +165,6 @@ const RegisteredPlatesManager = {
     }
   },
 
-  /**
-   * Проверить, свободен ли номер.
-   */
   async isPlateAvailable(plateStr) {
     const cleanPlate = this.cleanPlateString(plateStr);
     if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) return true;
@@ -223,13 +185,6 @@ const RegisteredPlatesManager = {
 const MarketLotsManager = {
   _listeners: [],
 
-  /**
-   * Публикация лота с защитой от дубликатов.
-   * ⭐ v1.2.0: проверка дубликата через клиентскую фильтрацию
-   * (без составного индекса Firestore).
-   * @param {Object} lotData — { type, name, price, itemData }
-   * @param {Object} sellerProfile — { id, name }
-   */
   async publishLot(lotData, sellerProfile) {
     const profile = sellerProfile || getCurrentPlayerProfile();
     if (!lotData || !profile?.id) return { success: false, error: "Нет данных" };
@@ -250,8 +205,6 @@ const MarketLotsManager = {
         }
       }
 
-      // ⭐ v1.2.0: проверка дубликата — single-field where + клиентский фильтр
-      // (раньше было 3 where, требовался составной индекс)
       try {
         const dupCheckQuery = query(
           collection(db, "market_lots"),
@@ -268,7 +221,6 @@ const MarketLotsManager = {
           return { success: false, error: "У вас уже есть активный лот с таким же названием" };
         }
       } catch (dupErr) {
-        // Не блокируем публикацию, если проверка упала
         console.warn('[MarketLots] Дубликат-чек упал:', dupErr);
       }
 
@@ -287,7 +239,6 @@ const MarketLotsManager = {
         expireAt: Date.now() + TTL_CONFIG.market_lots
       };
 
-      // Если лот — номер, регистрируем его на продавца
       if (lotData.type === "plate" || lotData.type === "plates") {
         const plateStr = lotData.itemData?.plate || lotData.name;
         const clean = RegisteredPlatesManager.cleanPlateString(plateStr);
@@ -312,11 +263,6 @@ const MarketLotsManager = {
     }
   },
 
-  /**
-   * Получить активные лоты.
-   * ⭐ v1.2.0: single-field where + клиентская сортировка
-   * (раньше был orderBy + where, требовался индекс).
-   */
   async fetchLots(force = false) {
     try {
       const now = Date.now();
@@ -333,10 +279,7 @@ const MarketLotsManager = {
         if (item.expireAt && item.expireAt < now) return;
         lots.push(item);
       });
-
-      // ⭐ Клиентская сортировка по timestamp (свежие сверху)
       lots.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
       devLogFirestore('fetchLots OK', `${lots.length} лотов`);
       return lots;
     } catch (e) {
@@ -345,10 +288,6 @@ const MarketLotsManager = {
     }
   },
 
-  /**
-   * Real-time подписка на активные лоты.
-   * ⭐ v1.2.0: без orderBy (индекс не нужен), сортировка на клиенте.
-   */
   subscribeToLots(callback) {
     if (typeof callback !== 'function') return () => {};
     try {
@@ -367,10 +306,7 @@ const MarketLotsManager = {
           if (item.expireAt && item.expireAt < now) return;
           lots.push(item);
         });
-
-        // ⭐ Клиентская сортировка
         lots.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
         try { callback(lots); } catch (e) { console.warn('[MarketLots] callback error:', e); }
       }, (error) => {
         console.warn('[MarketLots] subscribeToLots error:', error);
@@ -385,15 +321,16 @@ const MarketLotsManager = {
   },
 
   /**
-   * ⭐ v1.1.0 / v1.2.0: Атомарная покупка лота через транзакцию.
+   * ⭐ v1.2.1: КРИТИЧЕСКИЙ ФИКС.
+   * Firestore требует: все read (tx.get) → все write (tx.set/update/delete).
+   * Порядок: read lot → read offer (если есть) → write lot →
+   *          write tx → write notif → write plate (если) → write offer (если).
    *
-   * @param {string} lotId — ID лота
-   * @param {Object} buyerProfile — профиль покупателя
-   * @param {number} buyerCash — баланс покупателя
-   * @param {number|null} overridePrice — сторгованная цена (если null — используется lot.price)
-   * @param {string|null} offerId — ⭐ НОВОЕ в v1.2.0: ID оффера в p2p_offers,
-   *                               который будет помечен как completed в той же транзакции
-   * @returns {Promise<{success, lot, finalPrice?, error}>}
+   * @param {string} lotId
+   * @param {Object} buyerProfile
+   * @param {number} buyerCash
+   * @param {number|null} overridePrice
+   * @param {string|null} offerId
    */
   async buyLotAtomic(lotId, buyerProfile, buyerCash, overridePrice = null, offerId = null) {
     const profile = buyerProfile || getCurrentPlayerProfile();
@@ -404,7 +341,7 @@ const MarketLotsManager = {
     const txRef = doc(db, "transactions", txId);
     const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
 
-    // ⭐ v1.2.0: ссылка на оффер (если передан) — обновим в той же транзакции
+    // ⭐ v1.2.1: ссылка на оффер (если передан)
     let offerRef = null;
     if (offerId) {
       offerRef = doc(db, "p2p_offers", String(offerId));
@@ -412,6 +349,11 @@ const MarketLotsManager = {
 
     try {
       const transactionResult = await runTransaction(db, async (tx) => {
+        // ═══════════════════════════════════════════════════
+        // ЭТАП 1: ВСЕ READS — ДО ЛЮБЫХ WRITES
+        // ═══════════════════════════════════════════════════
+
+        // READ 1: лот
         const lotSnap = await tx.get(lotRef);
         if (!lotSnap.exists()) throw new Error("Лот снят с продажи!");
 
@@ -419,7 +361,31 @@ const MarketLotsManager = {
         if (lot.status !== "active") throw new Error("Лот уже куплен!");
         if (String(lot.sellerId) === String(profile.id)) throw new Error("Нельзя купить свой лот!");
 
-        // ⭐ v1.1.0: определяем финальную цену с учётом overridePrice
+        // ⭐ v1.2.1: READ 2: оффер (если передан) — ДО всех writes
+        let offerSnap = null;
+        let offerExists = false;
+        if (offerRef) {
+          offerSnap = await tx.get(offerRef);
+          offerExists = offerSnap.exists();
+          if (offerExists) {
+            const offerData = offerSnap.data();
+            // Валидация: оффер должен быть принят, и покупатель — тот самый
+            if (offerData.status !== 'accepted' && offerData.status !== 'completed') {
+              console.warn('[MarketLots] buyLotAtomic: оффер не в статусе accepted, игнорируем offerId');
+              offerRef = null;
+              offerExists = false;
+            } else if (String(offerData.buyerId) !== String(profile.id)) {
+              console.warn('[MarketLots] buyLotAtomic: оффер принадлежит другому покупателю, игнорируем offerId');
+              offerRef = null;
+              offerExists = false;
+            }
+          }
+        }
+
+        // ═══════════════════════════════════════════════════
+        // ЭТАП 2: РАСЧЁТЫ (без чтений, без записей)
+        // ═══════════════════════════════════════════════════
+
         let finalPrice = Number(lot.price) || 0;
 
         if (overridePrice !== null && overridePrice !== undefined) {
@@ -427,41 +393,40 @@ const MarketLotsManager = {
           if (isNaN(ovr) || ovr < 1000) {
             throw new Error("Некорректная сторгованная цена");
           }
-
-          // Защита от подделки цены:
           const minAllowed = Math.round((Number(lot.price) || 0) * OVERRIDE_PRICE_MIN_RATIO);
           const maxAllowed = Math.round((Number(lot.price) || 0) * OVERRIDE_PRICE_MAX_RATIO);
-
           if (ovr < minAllowed || ovr > maxAllowed) {
-            devLogFirestore(
-              'buyLotAtomic overridePrice отклонён',
-              `override=${ovr}, lotPrice=${lot.price}, min=${minAllowed}, max=${maxAllowed}`
-            );
+            devLogFirestore('buyLotAtomic overridePrice отклонён',
+              `override=${ovr}, lotPrice=${lot.price}, min=${minAllowed}, max=${maxAllowed}`);
             finalPrice = Number(lot.price) || 0;
           } else {
             finalPrice = ovr;
           }
         }
 
-        // Проверка баланса покупателя
         if (Number(buyerCash) < finalPrice) {
           throw new Error("Недостаточно денег!");
         }
 
         const marketFee = Math.round(finalPrice * MARKET_FEE_PERCENT);
         const sellerPayout = finalPrice - marketFee;
+        const nowTs = Date.now();
 
-        // 1. Помечаем лот проданным
+        // ═══════════════════════════════════════════════════
+        // ЭТАП 3: ВСЕ WRITES — ПОСЛЕ ЧТЕНИЙ
+        // ═══════════════════════════════════════════════════
+
+        // WRITE 1: помечаем лот проданным
         tx.update(lotRef, {
           status: "sold",
           buyerId: String(profile.id),
           buyerName: profile.name || "Покупатель",
-          soldAt: Date.now(),
+          soldAt: nowTs,
           finalPrice: finalPrice,
           originalPrice: Number(lot.price) || 0
         });
 
-        // 2. Создаём транзакцию (аудит)
+        // WRITE 2: транзакция (аудит)
         tx.set(txRef, {
           tx_id: txId,
           lot_id: String(lotId),
@@ -477,11 +442,11 @@ const MarketLotsManager = {
           fee: marketFee,
           payout: sellerPayout,
           offerId: offerId || null,
-          timestamp: Date.now(),
-          expireAt: Date.now() + TTL_CONFIG.transactions
+          timestamp: nowTs,
+          expireAt: nowTs + TTL_CONFIG.transactions
         });
 
-        // 3. Уведомление продавцу (в его Почту)
+        // WRITE 3: уведомление продавцу
         const isNegotiated = overridePrice !== null && overridePrice !== undefined && finalPrice !== Number(lot.price);
         const notifText = isNegotiated
           ? `Покупатель ${profile.name} приобрёл «${lot.name}» после торга за ${finalPrice.toLocaleString()} ₽ (начислено: +${sellerPayout.toLocaleString()} ₽).`
@@ -496,11 +461,11 @@ const MarketLotsManager = {
           offerId: String(lotId),
           read: false,
           claimed: false,
-          timestamp: Date.now(),
-          expireAt: Date.now() + TTL_CONFIG.notifications
+          timestamp: nowTs,
+          expireAt: nowTs + TTL_CONFIG.notifications
         });
 
-        // 4. Если лот — номер, передаём права покупателю
+        // WRITE 4: если лот — номер, передаём права покупателю
         if (lot.type === "plate" || lot.type === "plates") {
           const plateStr = lot.itemData?.plate || lot.name;
           const clean = RegisteredPlatesManager.cleanPlateString(plateStr);
@@ -511,21 +476,19 @@ const MarketLotsManager = {
               ownerId: String(profile.id),
               carId: null,
               status: "owned",
-              updatedAt: Date.now()
+              updatedAt: nowTs
             }, { merge: true });
           }
         }
 
-        // ⭐ v1.2.0: помечаем связанный оффер как completed в той же транзакции
-        if (offerRef) {
-          const offerSnap = await tx.get(offerRef);
-          if (offerSnap.exists()) {
-            tx.update(offerRef, {
-              status: "completed",
-              completedAt: Date.now(),
-              finalPrice: finalPrice
-            });
-          }
+        // ⭐ v1.2.1: WRITE 5: помечаем оффер как completed
+        // (все reads уже сделаны выше, это чистая запись)
+        if (offerRef && offerExists) {
+          tx.update(offerRef, {
+            status: "completed",
+            completedAt: nowTs,
+            finalPrice: finalPrice
+          });
         }
 
         return { ...lot, _finalPrice: finalPrice };
@@ -544,11 +507,6 @@ const MarketLotsManager = {
     }
   },
 
-  /**
-   * Атомарная отмена лота.
-   * ⭐ v1.2.0: помечает связанные офферы как cancelled
-   * (без составных индексов, через клиентскую фильтрацию).
-   */
   async cancelLot(lotId, sellerId) {
     const targetUid = sellerId || FB_Core.Auth.getVerifiedUserId();
     if (!targetUid) return false;
@@ -568,13 +526,11 @@ const MarketLotsManager = {
       });
 
       if (cancelled && lotData) {
-        // Если лот — номер, возвращаем в storage
         if (lotData.type === "plate" || lotData.type === "plates") {
           const plateStr = lotData.itemData?.plate || lotData.name;
           await RegisteredPlatesManager.releasePlate(plateStr, targetUid, false);
         }
 
-        // ⭐ v1.2.0: пометить связанные офферы как cancelled
         try {
           const now = Date.now();
           const offersQ = query(
@@ -615,9 +571,6 @@ const MarketLotsManager = {
     }
   },
 
-  /**
-   * Отписаться от всех подписок (для cleanup при выходе).
-   */
   unsubscribeAll() {
     this._listeners.forEach(unsub => {
       try { unsub(); } catch (e) {}
@@ -635,7 +588,7 @@ const TransactionsManager = {
 };
 
 // ========================================================
-// 7. ЭКСПОРТ В WINDOW
+// 7. ЭКСПОРТ
 // ========================================================
 window.FB_Market = {
   MARKET_FEE_PERCENT,
@@ -647,8 +600,7 @@ window.FB_Market = {
   getCurrentPlayerProfile
 };
 
-// Алиасы для совместимости со старым кодом
 window.FB_MarketLots = MarketLotsManager;
 window.FB_RegisteredPlates = RegisteredPlatesManager;
 
-console.log('[💱 FB_Market v1.2.0] P2P биржа: без составных индексов + offerId в buyLotAtomic + cancelLot чистит офферы ✓');
+console.log('[💱 FB_Market v1.2.1] ФИКС транзакций: все reads до writes в buyLotAtomic ✓');
