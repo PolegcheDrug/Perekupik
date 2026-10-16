@@ -1,6 +1,12 @@
 // ========================================================
-// js/firebase-market.js — P2P БИРЖА + REGISTERED PLATES (v1.0.0)
+// js/firebase-market.js — P2P БИРЖА + REGISTERED PLATES (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.1.0 (SPRINT 2 — OVERRIDE PRICE):
+//   - buyLotAtomic теперь принимает 4-й параметр overridePrice
+//   - Если overridePrice валиден — используется как finalPrice
+//   - Все расчёты (комиссия, payout, баланс покупателя) идут от finalPrice
+//   - В transactions пишется именно сторгованная цена
+//   - Защита от overridePrice ниже 10% и выше 200% от lot.price
 // ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ firebase-bridge.js):
 //   - MARKET_FEE_PERCENT (3% комиссия биржи)
 //   - MarketLotsManager (publishLot, fetchLots, subscribeToLots,
@@ -12,7 +18,7 @@
 //   - Экспорт в window.FB_Market
 //
 // ВАЖНО: файл — ES-модуль (import), подключается через
-//   <script type="module" src="firebase-market.js?v=410"></script>
+//   <script type="module" src="firebase-market.js?v=421"></script>
 // Должен быть загружен ПОСЛЕ firebase-core.js.
 // ========================================================
 
@@ -50,6 +56,10 @@ const LIMITS = FB_Core.LIMITS;
 // 2. КОНСТАНТЫ
 // ========================================================
 const MARKET_FEE_PERCENT = 0.03; // 3% комиссия биржи
+
+// ⭐ v1.1.0: границы допустимого overridePrice
+const OVERRIDE_PRICE_MIN_RATIO = 0.10; // не ниже 10% от lot.price
+const OVERRIDE_PRICE_MAX_RATIO = 2.00; // не выше 200% от lot.price
 
 // ========================================================
 // 3. ХЕЛПЕР: получить текущий профиль игрока
@@ -338,13 +348,15 @@ const MarketLotsManager = {
   },
 
   /**
-   * ⭐ Атомарная покупка лота через транзакцию.
-   * @param {string} lotId
-   * @param {Object} buyerProfile
-   * @param {number} buyerCash
-   * @returns {Promise<{success, lot, error}>}
+   * ⭐ v1.1.0: Атомарная покупка лота через транзакцию.
+   *
+   * @param {string} lotId — ID лота
+   * @param {Object} buyerProfile — профиль покупателя
+   * @param {number} buyerCash — баланс покупателя
+   * @param {number|null} overridePrice — ⭐ НОВОЕ: сторгованная цена (если null — используется lot.price)
+   * @returns {Promise<{success, lot, finalPrice?, error}>}
    */
-  async buyLotAtomic(lotId, buyerProfile, buyerCash) {
+  async buyLotAtomic(lotId, buyerProfile, buyerCash, overridePrice = null) {
     const profile = buyerProfile || getCurrentPlayerProfile();
     if (!lotId || !profile?.id) return { success: false, error: "Неверные данные" };
 
@@ -361,17 +373,50 @@ const MarketLotsManager = {
         const lot = lotSnap.data();
         if (lot.status !== "active") throw new Error("Лот уже куплен!");
         if (String(lot.sellerId) === String(profile.id)) throw new Error("Нельзя купить свой лот!");
-        if (buyerCash < lot.price) throw new Error("Недостаточно денег!");
 
-        const marketFee = Math.round(lot.price * MARKET_FEE_PERCENT);
-        const sellerPayout = lot.price - marketFee;
+        // ⭐ v1.1.0: определяем финальную цену с учётом overridePrice
+        let finalPrice = Number(lot.price) || 0;
+
+        if (overridePrice !== null && overridePrice !== undefined) {
+          const ovr = Number(overridePrice);
+          if (isNaN(ovr) || ovr < 1000) {
+            throw new Error("Некорректная сторгованная цена");
+          }
+
+          // Защита от подделки цены:
+          // - не ниже 10% от lot.price
+          // - не выше 200% от lot.price
+          const minAllowed = Math.round((Number(lot.price) || 0) * OVERRIDE_PRICE_MIN_RATIO);
+          const maxAllowed = Math.round((Number(lot.price) || 0) * OVERRIDE_PRICE_MAX_RATIO);
+
+          if (ovr < minAllowed || ovr > maxAllowed) {
+            devLogFirestore(
+              'buyLotAtomic overridePrice отклонён',
+              `override=${ovr}, lotPrice=${lot.price}, min=${minAllowed}, max=${maxAllowed}`
+            );
+            // Не блокируем сделку — просто игнорируем подозрительный override
+            finalPrice = Number(lot.price) || 0;
+          } else {
+            finalPrice = ovr;
+          }
+        }
+
+        // Проверка баланса покупателя
+        if (Number(buyerCash) < finalPrice) {
+          throw new Error("Недостаточно денег!");
+        }
+
+        const marketFee = Math.round(finalPrice * MARKET_FEE_PERCENT);
+        const sellerPayout = finalPrice - marketFee;
 
         // 1. Помечаем лот проданным
         tx.update(lotRef, {
           status: "sold",
           buyerId: String(profile.id),
           buyerName: profile.name || "Покупатель",
-          soldAt: Date.now()
+          soldAt: Date.now(),
+          finalPrice: finalPrice,          // ⭐ фиксируем сторгованную цену
+          originalPrice: Number(lot.price) || 0
         });
 
         // 2. Создаём транзакцию (аудит)
@@ -384,7 +429,9 @@ const MarketLotsManager = {
           sellerName: lot.sellerName || "Продавец",
           item: lot.name,
           type: lot.type,
-          price: lot.price,
+          price: finalPrice,               // ⭐ сторгованная цена
+          originalPrice: Number(lot.price) || 0,
+          wasNegotiated: overridePrice !== null && overridePrice !== undefined && finalPrice !== Number(lot.price),
           fee: marketFee,
           payout: sellerPayout,
           timestamp: Date.now(),
@@ -392,11 +439,16 @@ const MarketLotsManager = {
         });
 
         // 3. Уведомление продавцу (в его Почту)
+        const isNegotiated = overridePrice !== null && overridePrice !== undefined && finalPrice !== Number(lot.price);
+        const notifText = isNegotiated
+          ? `Покупатель ${profile.name} приобрёл «${lot.name}» после торга за ${finalPrice.toLocaleString()} ₽ (начислено: +${sellerPayout.toLocaleString()} ₽).`
+          : `Покупатель ${profile.name} приобрёл «${lot.name}» за ${finalPrice.toLocaleString()} ₽ (начислено: +${sellerPayout.toLocaleString()} ₽).`;
+
         tx.set(notifRef, {
           toUser: String(lot.sellerId),
           type: "deal_payout",
-          title: "Продажа на P2P бирже!",
-          text: `Покупатель ${profile.name} приобрёл «${lot.name}» за ${lot.price.toLocaleString()} ₽ (начислено: +${sellerPayout.toLocaleString()} ₽).`,
+          title: isNegotiated ? "Продажа после торга на P2P!" : "Продажа на P2P бирже!",
+          text: notifText,
           amount: sellerPayout,
           offerId: String(lotId),
           read: false,
@@ -421,11 +473,16 @@ const MarketLotsManager = {
           }
         }
 
-        return lot;
+        return { ...lot, _finalPrice: finalPrice };
       });
 
-      devLogFirestore('buyLotAtomic OK', lotId);
-      return { success: true, lot: transactionResult };
+      devLogFirestore('buyLotAtomic OK', `${lotId} → ${transactionResult._finalPrice}`);
+
+      return {
+        success: true,
+        lot: transactionResult,
+        finalPrice: transactionResult._finalPrice || Number(transactionResult.price) || 0
+      };
     } catch (e) {
       devLogFirestore('buyLotAtomic ERROR', e.message);
       return { success: false, error: e.message };
@@ -433,7 +490,7 @@ const MarketLotsManager = {
   },
 
   /**
-   * ⭐ Атомарная отмена лота.
+   * Атомарная отмена лота.
    */
   async cancelLot(lotId, sellerId) {
     const targetUid = sellerId || FB_Core.Auth.getVerifiedUserId();
@@ -484,8 +541,8 @@ const MarketLotsManager = {
 // 6. TRANSACTIONS MANAGER (алиас)
 // ========================================================
 const TransactionsManager = {
-  buyLot: (lotId, buyerProfile, buyerCash) =>
-    MarketLotsManager.buyLotAtomic(lotId, buyerProfile, buyerCash)
+  buyLot: (lotId, buyerProfile, buyerCash, overridePrice = null) =>
+    MarketLotsManager.buyLotAtomic(lotId, buyerProfile, buyerCash, overridePrice)
 };
 
 // ========================================================
@@ -493,6 +550,8 @@ const TransactionsManager = {
 // ========================================================
 window.FB_Market = {
   MARKET_FEE_PERCENT,
+  OVERRIDE_PRICE_MIN_RATIO,
+  OVERRIDE_PRICE_MAX_RATIO,
   MarketLots: MarketLotsManager,
   Plates: RegisteredPlatesManager,
   Transactions: TransactionsManager,
@@ -503,4 +562,4 @@ window.FB_Market = {
 window.FB_MarketLots = MarketLotsManager;
 window.FB_RegisteredPlates = RegisteredPlatesManager;
 
-console.log('[💱 FB_Market v1.0.0] P2P биржа + RegisteredPlates загружены. MarketLots, Plates, Transactions ✓');
+console.log('[💱 FB_Market v1.1.0] P2P биржа + overridePrice в buyLotAtomic + RegisteredPlates ✓');
