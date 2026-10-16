@@ -413,6 +413,7 @@ const PlayerListings = {
             </div>
         `;
 
+        
         if (typeof ModalManager !== 'undefined') {
             ModalManager.open('modalIncomingBuyerOffer');
         } else {

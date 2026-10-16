@@ -1,6 +1,15 @@
 // ========================================================
-// js/market-deal.js — ТОРГ У КАПОТА 4.7.0 (v4.7.0)
+// js/market-deal.js — ТОРГ У КАПОТА 4.8.0 (v4.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v4.8.0 (SPRINT 3 — ФИКС КНОПКИ «ПОЗВОНИТЬ»):
+//   - ДОБАВЛЕНА ФУНКЦИЯ initiateBuyMarketCar.
+//     Она была потеряна при рефакторинге, из-за чего кнопка
+//     «Позвонить» на карточке товара в market.js не работала.
+//   - Теперь функция initiateBuyMarketCar корректно инициирует
+//     звонок: открывает модалку, запускает таймер гудков и
+//     либо перенаправляет на торг, либо показывает, что абонент занят.
+//   - Логика P2P-роутинга (openP2PDealModal) сохранена и перенесена
+//     в начало функции initiateBuyMarketCar.
 // ⭐ v4.7.0 (SPRINT 2 — P2P РОУТИНГ):
 //   - openP2PDealModal корректно заполняет sellerId, dialogId
 //   - Открытие P2P-лота → M+ диалог с isP2PMarket:true
@@ -41,7 +50,7 @@ window.__resetDKPFlags = function() {
 };
 
 // ========================================================
-// ЗВОНОК ПРОДАВЦУ
+// ⭐ v4.8.0: ЗВОНОК ПРОДАВЦУ (ВОССТАНОВЛЕНА)
 // ========================================================
 function initiateBuyMarketCar(carId) {
     if (buyCallTimeoutTimer) { clearTimeout(buyCallTimeoutTimer); buyCallTimeoutTimer = null; }
@@ -1478,4 +1487,4 @@ window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v4.7.0] P2P роутинг: sellerId + dialogId + реальный торг M+ ✓');
+console.log('[🤝 market-deal v4.8.0] ФИКС: функция initiateBuyMarketCar восстановлена ✓');

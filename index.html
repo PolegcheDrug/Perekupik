@@ -15,8 +15,11 @@
 <link rel="stylesheet" href="css/hud.css?v=421">
 <link rel="stylesheet" href="css/market.css?v=421">
 <link rel="stylesheet" href="css/phone.css?v=421">
+<!-- ⭐ НОВЫЙ ПРЕМИАЛЬНЫЙ ДИЗАЙН M+ HUB -->
+<link rel="stylesheet" href="css/m-hub.css?v=421">
 <link rel="stylesheet" href="css/radio.css?v=421">
 <link rel="stylesheet" href="css/modals.css?v=421">
+<link rel="stylesheet" href="css/p2p-deals.css?v=421">
 <link rel="stylesheet" href="css/nav.css?v=421">
 
 <!-- ═══════════ БИБЛИОТЕКИ ═══════════ -->
@@ -147,7 +150,6 @@
 
         <div class="user-details">
           <div class="player-capsule-box">
-            <!-- ⭐ v4.3.0: только ник (уровень переехал в stats-row) -->
             <div class="user-name-row">
               <span id="playerName" data-text="Перекуп #777" class="player-name-text">Перекуп #777</span>
             </div>
@@ -158,11 +160,9 @@
             </div>
           </div>
 
-          <!-- ⭐ v4.3.0: обёртка .user-stats-scroll для автовращения -->
           <div class="user-stats-scroll">
             <div class="user-stats-row" id="userStatsRow">
 
-              <!-- ⭐ v4.3.0: УРОВЕНЬ — первый пилл, крупный -->
               <button type="button" class="stat-pill stat-pill-level" onclick="event.stopPropagation(); switchTab('tabProfile');" title="Уровень игрока">
                 <i class="fa-solid fa-crown"></i> <span id="playerLvl">Ур. 1</span>
               </button>
@@ -517,7 +517,7 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
-     МОДАЛЬНЫЕ ОКНА — ПОЛНЫЕ, БЕЗ СОКРАЩЕНИЙ
+     МОДАЛЬНЫЕ ОКНА
      ═══════════════════════════════════════════════════════ -->
 
 <div id="modalDevStudio" class="modal-overlay">
@@ -545,28 +545,146 @@
 <!-- Owner-панель доступа -->
 <div id="modalAccessManager" class="modal-overlay"></div>
 
-<!-- P2P чат -->
-<div id="modalP2PChat" class="modal-overlay">
-  <div class="modal-box chat-deal-box" style="max-width: 430px;">
-    <div class="chat-header-bar flex-between mb-2">
-      <div class="flex-gap" style="align-items:center;">
-        <div class="chat-avatar-circle" id="p2pChatSellerAvatar">👤</div>
-        <div>
-          <div class="font-bold text-xs" id="p2pChatSellerTitle">Продавец</div>
-          <div class="text-xs color-green" id="p2pChatLotSubtitle">Лот: —</div>
+<!-- ⭐ НОВАЯ МОДАЛКА: ДКП МЕЖДУ ИГРОКАМИ (P2P) -->
+<div id="modalP2PDKP" class="modal-overlay">
+  <div class="modal-box dkp-official-blank">
+    <div class="dkp-blank-border">
+      <div class="dkp-header text-center mb-2">
+        <div class="dkp-flag-row mb-1">
+          <span class="dkp-flag-icon">🇷🇺</span>
+        </div>
+        <div class="dkp-title-small">ЭЛЕКТРОННЫЙ ДОГОВОР КУПЛИ-ПРОДАЖИ</div>
+        <h4 class="dkp-title-main">ДКП · P2P СДЕЛКА</h4>
+        <div class="dkp-contract-num">
+          № <b id="p2pDkpDealId">—</b> от <b id="p2pDkpDate">—</b>
         </div>
       </div>
-      <button onclick="ModalManager.close('modalP2PChat')" class="btn btn-dark btn-auto btn-sm">✕</button>
-    </div>
 
-    <div class="chat-thread-container mb-2" id="p2pChatMessagesBox" style="min-height: 200px; max-height: 320px;"></div>
+      <!-- Статус сделки -->
+      <div id="p2pDkpStatusBadge" class="p-2 mb-2 text-center" style="background:rgba(0, 242, 254, 0.08); border:1px solid rgba(0, 242, 254, 0.35); border-radius:8px;">
+        <b class="text-xs color-cyan" id="p2pDkpStatusText">📝 Черновик · ожидание подписей</b>
+        <div class="sub-label mt-1" style="font-size:9px;">⏱ До истечения: <b class="color-amber" id="p2pDkpTimer">30:00</b></div>
+      </div>
 
-    <div class="sub-label mb-1" style="font-size:9.5px;">Быстрые фразы:</div>
-    <div class="mplus-nav-scroll-bar mb-2" id="p2pCannedChipsBox"></div>
+      <!-- Стороны -->
+      <div class="dkp-two-col mb-2">
+        <div class="dkp-section-compact">
+          <div class="dkp-section-title">ПРОДАВЕЦ</div>
+          <div class="dkp-row-compact">
+            <span class="dkp-value" id="p2pDkpSellerName">—</span>
+          </div>
+          <div class="dkp-row-compact">
+            <span class="dkp-label">ID:</span>
+            <span class="dkp-value-mono" id="p2pDkpSellerId">—</span>
+          </div>
+        </div>
+        <div class="dkp-section-compact">
+          <div class="dkp-section-title">ПОКУПАТЕЛЬ</div>
+          <div class="dkp-row-compact">
+            <span class="dkp-value" id="p2pDkpBuyerName">—</span>
+          </div>
+          <div class="dkp-row-compact">
+            <span class="dkp-label">ID:</span>
+            <span class="dkp-value-mono" id="p2pDkpBuyerId">—</span>
+          </div>
+        </div>
+      </div>
 
-    <div class="grid-2">
-      <button onclick="ModalManager.close('modalP2PChat')" class="btn btn-dark">Закрыть</button>
-      <button id="p2pChatBuyBtn" class="btn btn-green">Купить 🤝</button>
+      <!-- Автомобиль -->
+      <div class="dkp-section-compact mb-2">
+        <div class="dkp-section-title">ТРАНСПОРТНОЕ СРЕДСТВО</div>
+        <div class="dkp-car-info-box">
+          <div class="font-bold text-xs color-cyan mb-1" id="p2pDkpCarName">—</div>
+          <div class="dkp-row-compact">
+            <span class="dkp-label">Мощность:</span>
+            <span class="dkp-value" id="p2pDkpCarPower">—</span>
+          </div>
+          <div class="dkp-row-compact">
+            <span class="dkp-label">Пробег:</span>
+            <span class="dkp-value" id="p2pDkpCarMileage">—</span>
+          </div>
+          <div class="dkp-row-compact">
+            <span class="dkp-label">Госномер:</span>
+            <span class="license-plate" style="font-size:10px; padding:1px 6px;" id="p2pDkpCarPlate">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Цена -->
+      <div class="dkp-section-compact mb-2">
+        <div class="dkp-section-title">ЦЕНА СДЕЛКИ</div>
+        <div id="p2pDkpPriceEditWrap">
+          <div class="flex-between" style="gap:8px;">
+            <input type="number"
+                   id="p2pDkpPriceInput"
+                   class="chat-input font-bold"
+                   style="font-size:16px; padding:8px 12px; text-align:right; color:var(--green);"
+                   min="1000"
+                   step="1000">
+            <span class="font-bold color-green" style="font-size:15px;">₽</span>
+          </div>
+          <div class="sub-label mt-1" style="font-size:8.5px;">
+            Диапазон допустимых значений: <b id="p2pDkpPriceRange">—</b>
+          </div>
+        </div>
+        <div id="p2pDkpPriceLockedWrap" style="display:none;">
+          <div class="dkp-price-line-highlight">
+            <div class="flex-between">
+              <span class="font-bold text-xs">ИТОГО:</span>
+              <b class="price-val text-xs color-green" id="p2pDkpPriceLocked">—</b>
+            </div>
+          </div>
+          <div class="sub-label mt-1 text-center" style="font-size:8.5px; color:var(--amber);">
+            🔒 Цена зафиксирована после первой подписи
+          </div>
+        </div>
+      </div>
+
+      <!-- Комиссия биржи -->
+      <div class="dkp-section-compact mb-2" style="border-left-color: rgba(255,179,0,0.5);">
+        <div class="dkp-row-compact">
+          <span class="dkp-label">Комиссия биржи (3%):</span>
+          <span class="dkp-value color-amber" id="p2pDkpFee">—</span>
+        </div>
+        <div class="dkp-row-compact">
+          <span class="dkp-label">Продавец получит:</span>
+          <span class="dkp-value color-green" id="p2pDkpPayout">—</span>
+        </div>
+      </div>
+
+      <!-- ПОДПИСИ -->
+      <div class="dkp-signatures-area dkp-compact-sigs">
+        <div class="dkp-sig-col">
+          <span class="dkp-sig-label">Продавец:</span>
+          <div class="dkp-handwrite" id="p2pDkpSellerSig">✍️ Ожидает...</div>
+          <div class="dkp-sig-date" id="p2pDkpSellerSigDate"></div>
+        </div>
+        <div class="dkp-sig-col text-right">
+          <span class="dkp-sig-label">Покупатель:</span>
+          <div class="dkp-handwrite" id="p2pDkpBuyerSig">✍️ Ожидает...</div>
+          <div class="dkp-sig-date" id="p2pDkpBuyerSigDate"></div>
+        </div>
+        <div id="p2pDkpStamp" class="official-mreo-stamp">
+          <div class="stamp-inner">
+            <span>МРЭО ГИБДД</span>
+            <span>СДЕЛКА<br>ЗАКРЫТА</span>
+            <span>РФ</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Кнопки -->
+      <div class="space-y-2 mt-2">
+        <button id="p2pDkpSignBtn" class="btn btn-green w-full">
+          ✍️ Поставить подпись
+        </button>
+        <button id="p2pDkpCancelBtn" class="btn btn-danger btn-sm w-full">
+          ❌ Отменить ДКП
+        </button>
+        <button id="p2pDkpCloseBtn" class="btn btn-dark w-full" style="display:none;">
+          Готово
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -593,18 +711,19 @@
     <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
     <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #421</div>
     <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-      <div class="patch-item"><b>🔐 AccessControl:</b> закрытая бета по приглашениям.</div>
-      <div class="patch-item"><b>👑 Owner-панель:</b> кнопка внизу справа — управление инвайтами.</div>
-      <div class="patch-item"><b>📱 Модульный Firebase:</b> core/market/friendships/notifications/p2p.</div>
-      <div class="patch-item"><b>📶 Offline-баннер:</b> уведомление при потере сети.</div>
-      <div class="patch-item"><b>🎨 Адаптив:</b> полная поддержка планшетов и ПК.</div>
-      <div class="patch-item"><b>🐛 Фиксы:</b> убран монолит firebase-bridge.js.</div>
+      <div class="patch-item"><b>💬 M+ РЕДИЗАЙН:</b> 4 таба — ЧАТЫ / БИРЖА / СОЦИУМ / Я.</div>
+      <div class="patch-item"><b>💰 P2P ТОРГ:</b> обычный чат + ДКП с двумя подписями.</div>
+      <div class="patch-item"><b>📝 ДКП между игроками:</b> покупатель подписывает — продавец получает уведомление, оба ставят подпись → автотранзакция.</div>
+      <div class="patch-item"><b>🚗 Авто покупателю:</b> машина едет на платную парковку.</div>
+      <div class="patch-item"><b>💸 Комиссия биржи:</b> 3% с продавца.</div>
+      <div class="patch-item"><b>👥 СОЦИУМ:</b> Лента + Топ + Друзья + Клубы в одном месте.</div>
+      <div class="patch-item"><b>🐛 Фиксы:</b> убрана старая система p2p-offers.js.</div>
     </div>
     <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
   </div>
 </div>
 
-<!-- ⭐ Страховка — ПОЛНАЯ -->
+<!-- ⭐ Страховка -->
 <div id="modalInsurance" class="modal-overlay">
   <div class="modal-box insurance-contract-blank" style="max-width: 420px;">
     <div class="flex-between mb-2 pb-2" style="border-bottom: 1px solid var(--border-glass);">
@@ -687,7 +806,7 @@
   </div>
 </div>
 
-<!-- ⭐ Регистрация — ПОЛНАЯ -->
+<!-- ⭐ Регистрация -->
 <div id="modalRegistrationChoice" class="modal-overlay">
   <div class="modal-box text-center" style="max-width: 410px;">
     <div class="radar-spinner-ring mb-2"><div class="radar-spinner-center">📑</div></div>
@@ -712,7 +831,7 @@
   </div>
 </div>
 
-<!-- ⭐ ДКП — ПОЛНЫЙ -->
+<!-- ⭐ ДКП (старая — для NPC-покупателей) -->
 <div id="modalDKP" class="modal-overlay">
   <div class="modal-box dkp-official-blank">
     <div class="dkp-blank-border">
@@ -765,7 +884,7 @@
   </div>
 </div>
 
-<!-- ⭐ Гараж-инцидент — ПОЛНЫЙ -->
+<!-- ⭐ Гараж-инцидент -->
 <div id="modalGarageEvent" class="modal-overlay">
   <div class="modal-box text-center">
     <div class="radar-spinner-ring mb-2">
@@ -781,7 +900,7 @@
   </div>
 </div>
 
-<!-- ⭐ Контракт-ПодКлюч — ПОЛНЫЙ -->
+<!-- ⭐ Контракт-ПодКлюч -->
 <div id="modalSelectContractCar" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -794,7 +913,7 @@
   </div>
 </div>
 
-<!-- ⭐ SaveManager — ПОЛНЫЙ -->
+<!-- ⭐ SaveManager -->
 <div id="modalSaveManager" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -811,7 +930,7 @@
   </div>
 </div>
 
-<!-- ⭐ Тюнинг — ПОЛНЫЙ -->
+<!-- ⭐ Тюнинг -->
 <div id="modalTuning" class="modal-overlay">
   <div class="modal-box" style="max-width: 420px;">
     <div class="flex-between mb-2">
@@ -837,7 +956,7 @@
   </div>
 </div>
 
-<!-- ⭐ MarketDeal — ПОЛНЫЙ -->
+<!-- ⭐ MarketDeal (торг с NPC) -->
 <div id="modalMarketDeal" class="modal-overlay">
   <div class="modal-box chat-deal-box">
     <div class="chat-header-bar flex-between mb-2">
@@ -870,7 +989,7 @@
   </div>
 </div>
 
-<!-- ⭐ Autoteka — ПОЛНЫЙ -->
+<!-- ⭐ Autoteka -->
 <div id="modalAutoteka" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -882,10 +1001,10 @@
   </div>
 </div>
 
-<!-- ⭐ PreSale — ПОЛНЫЙ -->
+<!-- ⭐ PreSale -->
 <div id="modalPreSale" class="modal-overlay"></div>
 
-<!-- ⭐ BuyCall — ПОЛНЫЙ -->
+<!-- ⭐ BuyCall -->
 <div id="modalBuyCall" class="modal-overlay">
   <div class="modal-box text-center">
     <div class="radar-spinner-ring mb-2">
@@ -898,7 +1017,7 @@
   </div>
 </div>
 
-<!-- ⭐ DailyBonus — ПОЛНЫЙ -->
+<!-- ⭐ DailyBonus -->
 <div id="modalDailyBonus" class="modal-overlay">
   <div class="modal-box text-center">
     <div class="modal-glow-badge mb-1" style="color:#ffd700; border-color:rgba(255,179,0,0.4);"><i class="fa-solid fa-gift"></i> ЕЖЕДНЕВНЫЙ ПОДАРОК</div>
@@ -909,7 +1028,7 @@
   </div>
 </div>
 
-<!-- ⭐ DealVerdict — ПОЛНЫЙ -->
+<!-- ⭐ DealVerdict -->
 <div id="modalDealVerdict" class="modal-overlay">
   <div class="modal-box text-center">
     <div class="radar-spinner-ring mb-2" id="verdictRingAnim">
@@ -927,7 +1046,7 @@
   </div>
 </div>
 
-<!-- ⭐ OBD2 — ПОЛНЫЙ -->
+<!-- ⭐ OBD2 -->
 <div id="modalOBD2" class="modal-overlay">
   <div class="modal-box" style="max-width:440px;">
     <div class="flex-between mb-2 border-b pb-2" style="border-bottom: 1px solid var(--border-glass);">
@@ -942,7 +1061,7 @@
   </div>
 </div>
 
-<!-- ⭐ PutOnLot — ПОЛНЫЙ -->
+<!-- ⭐ PutOnLot -->
 <div id="modalPutOnLot" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -962,7 +1081,7 @@
 <div id="modalPreview" class="modal-overlay"></div>
 <div id="modalChangePlate" class="modal-overlay"></div>
 
-<!-- ⭐ Gauge — ПОЛНЫЙ -->
+<!-- ⭐ Gauge -->
 <div id="modalGauge" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -1003,7 +1122,7 @@
   </div>
 </div>
 
-<!-- ⭐ CreateP2P — ПОЛНЫЙ -->
+<!-- ⭐ CreateP2P -->
 <div id="modalCreateP2P" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -1090,7 +1209,7 @@
 </style>
 
 <!-- ═══════════════════════════════════════════════════════
-     СИСТЕМНЫЙ ЗАГРУЗЧИК — точные пути под твою структуру
+     СИСТЕМНЫЙ ЗАГРУЗЧИК
      ═══════════════════════════════════════════════════════ -->
 <script>
   (function() {
@@ -1227,7 +1346,10 @@
         'js/plates-manager.js',
         'js/notification-center.js',
         'js/realtime-manager.js',
-        'js/p2p-offers.js',
+
+        // ⭐ ЯДРО P2P ДКП (заменяет p2p-offers.js)
+        'js/p2p-deals.js',
+
         'js/theme-manager.js',
 
         // Данные
@@ -1278,6 +1400,10 @@
         'js/phone/phone-racing.js',
         'js/phone/phone-radar.js',
         'js/phone/phone-m.js',
+
+        // ⭐ UI-слой модалки P2P ДКП (загружается ПОСЛЕ phone-m.js)
+        'js/p2p-deals-modal.js',
+
         'js/phone/phone.js',
 
         // Гараж
