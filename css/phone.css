@@ -2598,3 +2598,159 @@
     transition: none !important;
   }
 }
+
+/* ========================================================
+   ⭐ v3.4.0: SUPER WHEELSPIN — REEL CARDS (ФИКС)
+   Классы .fortune-reel-card и .reel-spinning-anim
+   отсутствовали в CSS — добавлены по плану доработки.
+   ======================================================== */
+
+.fortune-reel-card {
+  position: relative;
+  width: 100%;
+  min-height: 110px;
+  background: linear-gradient(160deg,
+    rgba(20, 30, 48, 0.98) 0%,
+    rgba(9, 14, 25, 0.99) 100%);
+  border: 1.5px solid rgba(0, 242, 254, 0.25);
+  border-radius: 14px;
+  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-sizing: border-box;
+  overflow: hidden;
+  box-shadow:
+    inset 0 0 20px rgba(0, 0, 0, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  animation: fortuneCardIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.fortune-reel-card:nth-child(1) { animation-delay: 0.05s; }
+.fortune-reel-card:nth-child(2) { animation-delay: 0.10s; }
+.fortune-reel-card:nth-child(3) { animation-delay: 0.15s; }
+
+@keyframes fortuneCardIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Скан-линии внутри карточки (кибер-стиль) */
+.fortune-reel-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 242, 254, 0.025) 0px,
+    rgba(0, 242, 254, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Верхний блик */
+.fortune-reel-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 35%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.fortune-reel-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.fortune-reel-card .sub-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  line-height: 1.1;
+  text-align: center;
+  color: #94a3b8;
+}
+
+/* Эмодзи внутри карточки */
+.fortune-reel-card [id^="reelEmoji"] {
+  font-size: 26px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.3));
+  transition: transform 0.2s ease;
+}
+
+/* Имя приза */
+.fortune-reel-card [id^="reelName"] {
+  text-align: center;
+  font-size: 9.5px;
+  font-weight: 900;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  padding: 0 2px;
+}
+
+/* ============ АНИМАЦИЯ ВРАЩЕНИЯ ============ */
+.reel-spinning-anim {
+  animation: reelSpinShake 0.18s linear infinite;
+  border-color: rgba(0, 242, 254, 0.8) !important;
+  box-shadow:
+    inset 0 0 25px rgba(0, 242, 254, 0.15),
+    0 0 22px rgba(0, 242, 254, 0.35) !important;
+}
+
+.reel-spinning-anim [id^="reelEmoji"] {
+  animation: reelEmojiBlur 0.15s linear infinite;
+}
+
+.reel-spinning-anim [id^="reelName"] {
+  opacity: 0.7;
+  animation: reelTextFlicker 0.25s linear infinite;
+}
+
+@keyframes reelSpinShake {
+  0%   { transform: translateY(0); }
+  25%  { transform: translateY(-3px); }
+  50%  { transform: translateY(0); }
+  75%  { transform: translateY(3px); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes reelEmojiBlur {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(0, 242, 254, 0.5)); }
+  50%      { transform: scale(1.08); filter: drop-shadow(0 0 14px rgba(0, 242, 254, 0.9)); }
+}
+
+@keyframes reelTextFlicker {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* Малые экраны */
+@media (max-width: 380px) {
+  .fortune-reel-card {
+    min-height: 100px;
+    padding: 8px 4px;
+  }
+  .fortune-reel-card [id^="reelEmoji"] {
+    font-size: 22px;
+  }
+  .fortune-reel-card [id^="reelName"] {
+    font-size: 9px;
+  }
+  .fortune-reel-card .sub-label {
+    font-size: 7px;
+  }
+}
