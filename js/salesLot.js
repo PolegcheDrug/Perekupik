@@ -1,30 +1,37 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v2.7.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v2.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.8.0 (SPRINT 3 — ФИКС КРИТИЧЕСКОГО БАГА «state is not defined»):
+//   - ФИКС: initSalesLotTimer() больше НЕ вызывается в конце файла
+//     синхронно, т.к. state создаётся позже в app.js. Теперь таймер
+//     запускается через _startSalesLotTimerWhenReady(), которая
+//     дожидается state:loaded (через EventBus) или поллит state.
+//   - ФИКС: все top-level обращения к state защищены через _isStateReady().
+//   - ФИКС: updateSalesLotTimers() / renderSalesLot() возвращаются
+//     безопасно, если state ещё не готов.
 // ⭐ v2.7.0 (SPRINT 2 — ФИКСЫ ИНДЕКСОВ И ГОНОК):
-//   - ФИКС C4: activeSalesLotHaggleIndex корректно сдвигается
-//     после splice в finishSalesLotDeal и reclaimCarFromLot
-//   - ФИКС: если activeSalesLotHaggleIndex === удалённому индексу,
-//     модалка торгов принудительно закрывается
-//   - ФИКС: _finishing явно сбрасывается в finally
-//   - ФИКС: updateSalesLotTimers корректно обрабатывает undefined
-//     buyerTimerLeft без застревания лота
-//   - ФИКС: syncBuyerToMNetwork проверяет существующий диалог
-//     не только по id, но и по carUid (защита от дублей)
-//   - ФИКС: renderSalesLot пропускает повреждённые лоты без .car
+//   - activeSalesLotHaggleIndex корректно сдвигается после splice
+//   - При совпадении — модалка торгов принудительно закрывается
+//   - _finishing явно сбрасывается в finally
+//   - updateSalesLotTimers корректно обрабатывает undefined buyerTimerLeft
+//   - syncBuyerToMNetwork проверяет диалог по id и carUid (защита от дублей)
+//   - renderSalesLot пропускает повреждённые лоты без .car
 // ⭐ v2.6.0:
-//   - ФИКС: updateSalesLotTimers защищён от сдвига индексов
-//     при splice (использует обратный for)
-//   - ФИКС: speedUpLotSearch явно сбрасывает
-//     lot.buyerGenerationPending = false после sync
+//   - updateSalesLotTimers защищён от сдвига индексов при splice
+//   - speedUpLotSearch сбрасывает lot.buyerGenerationPending
 //   - Lot-flags: _finishing, _buyerTimerActive
-//   - В finishSalesLotDeal сбрасывается window.previewCarIndex,
-//     если он указывает на удалённую машину
 // ⭐ v2.5.0: Убран дубль buyGarageSlot/upgradeExpressCapacity.
 // ========================================================
 
 let salesLotTimerInterval = null;
 let activeSalesLotHaggleIndex = null;
+
+// --------------------------------------------------------
+// ⭐ v2.8.0: ЗАЩИТНЫЙ ХЕЛПЕР — ГЛАВНЫЙ ФИКС БАГА
+// --------------------------------------------------------
+function _isStateReady() {
+    return typeof state !== 'undefined' && state !== null && !!state.player;
+}
 
 const BUYER_ARCHETYPES = [
     {
@@ -83,7 +90,8 @@ const BUYER_ARCHETYPES = [
  * Также закрывает активный диалог в AppM, если он ссылался на этот лот.
  */
 function removeDialogByCarIndex(idx) {
-    if (!state.player || !Array.isArray(state.player.phoneMessages)) return false;
+    if (!_isStateReady()) return false;
+    if (!Array.isArray(state.player.phoneMessages)) return false;
 
     const toRemove = state.player.phoneMessages
         .filter(m => m && m.category === 'buyers' && m.carIndex === idx)
@@ -124,7 +132,8 @@ function removeDialogByCarIndex(idx) {
  * Сдвигает carIndex у всех M+ диалогов после удаления лота с индексом removedIdx.
  */
 function shiftDialogIndicesAfterRemoval(removedIdx) {
-    if (!state.player || !Array.isArray(state.player.phoneMessages)) return;
+    if (!_isStateReady()) return;
+    if (!Array.isArray(state.player.phoneMessages)) return;
     state.player.phoneMessages.forEach(m => {
         if (m && m.category === 'buyers' && typeof m.carIndex === 'number') {
             if (m.carIndex > removedIdx) m.carIndex -= 1;
@@ -162,7 +171,8 @@ function _adjustHaggleIndexAfterRemoval(removedIdx) {
  * Удаляет все M+ диалоги, ссылающиеся на несуществующие лоты.
  */
 function cleanupOrphanedDialogs() {
-    if (!state.player || !Array.isArray(state.player.phoneMessages)) return 0;
+    if (!_isStateReady()) return 0;
+    if (!Array.isArray(state.player.phoneMessages)) return 0;
     const totalLots = Array.isArray(state.salesLot) ? state.salesLot.length : 0;
     const before = state.player.phoneMessages.length;
 
@@ -185,13 +195,63 @@ function cleanupOrphanedDialogs() {
 // ТАЙМЕР ПЛОЩАДКИ ПРОДАЖ
 // ========================================================
 function initSalesLotTimer() {
+    if (!_isStateReady()) {
+        // Не запускаем таймер, пока state не готов
+        return;
+    }
     if (salesLotTimerInterval) clearInterval(salesLotTimerInterval);
     salesLotTimerInterval = setInterval(() => {
         updateSalesLotTimers();
     }, 1000);
 }
 
+// ⭐ v2.8.0: безопасный запуск таймера — ждём state
+function _startSalesLotTimerWhenReady() {
+    if (_isStateReady()) {
+        initSalesLotTimer();
+        return;
+    }
+
+    // Попытка 1: подписка на EventBus state:loaded
+    if (typeof window.EventBus !== 'undefined' && typeof window.EventBus.on === 'function') {
+        try {
+            let _handled = false;
+            const handler = function () {
+                if (_handled) return;
+                _handled = true;
+                initSalesLotTimer();
+            };
+            window.EventBus.on('state:loaded', handler);
+            // На случай, если state:loaded уже проходил до нас — проверим с задержкой
+            setTimeout(() => {
+                if (!_handled && _isStateReady()) {
+                    _handled = true;
+                    initSalesLotTimer();
+                }
+            }, 500);
+            return;
+        } catch (e) {
+            console.warn('[SalesLot] EventBus.on state:loaded упал:', e);
+        }
+    }
+
+    // Fallback: поллинг
+    let attempts = 0;
+    const check = setInterval(() => {
+        attempts++;
+        if (_isStateReady()) {
+            clearInterval(check);
+            initSalesLotTimer();
+        } else if (attempts > 100) { // ~10 секунд
+            clearInterval(check);
+            console.warn('[SalesLot] state так и не загрузился за 10с — таймер не запущен');
+        }
+    }, 100);
+}
+
 function renderSalesLot() {
+    if (!_isStateReady()) return;
+
     const container = document.getElementById('salesLotList');
     if (!container) return;
 
@@ -482,6 +542,7 @@ function generateRandomLotBuyer(car, askingPrice) {
  */
 function syncBuyerToMNetwork(lot, idx) {
     if (!lot || !lot.buyer || lot.buyer.dealType !== 'chat') return;
+    if (!_isStateReady()) return;
     if (!state.player) state.player = {};
     if (!state.player.phoneMessages) state.player.phoneMessages = [];
 
@@ -540,6 +601,7 @@ function syncBuyerToMNetwork(lot, idx) {
 // МОДАЛЬНОЕ ОКНО ТОРГА У КАПОТА
 // ========================================================
 function openLotHoodHaggleModal(idx) {
+    if (!_isStateReady()) return;
     const lot = state.salesLot[idx];
     if (!lot) return showToast("❌ Лот не найден");
 
@@ -555,6 +617,7 @@ function openLotHoodHaggleModal(idx) {
 }
 
 function renderLotHoodHaggleModalContent() {
+    if (!_isStateReady()) return;
     const modal = document.getElementById('modalLotHoodDeal');
     if (!modal || activeSalesLotHaggleIndex === null) return;
 
@@ -672,6 +735,7 @@ function renderLotHoodHaggleModalContent() {
 }
 
 function executeModalHaggleStep(percent, failRisk) {
+    if (!_isStateReady()) return;
     if (activeSalesLotHaggleIndex === null) return;
     const lot = state.salesLot[activeSalesLotHaggleIndex];
     if (!lot || !lot.buyer) return;
@@ -776,6 +840,7 @@ function confirmLotHoodDKP() {
 }
 
 function acceptLotBuyerDeal(idx) {
+    if (!_isStateReady()) return;
     const lot = state.salesLot[idx];
     if (!lot) return;
     const buyer = lot.currentBuyer || lot.buyer;
@@ -805,6 +870,7 @@ function acceptLotBuyerDeal(idx) {
 
 // ⭐ v2.7.0: защита от двойного вызова + корректный сдвиг activeSalesLotHaggleIndex
 function finishSalesLotDeal(idx, price, profit) {
+    if (!_isStateReady()) return;
     const lot = state.salesLot[idx];
     if (!lot) return;
 
@@ -878,6 +944,7 @@ function finishSalesLotDeal(idx, price, profit) {
 }
 
 function rejectLotBuyer(idx) {
+    if (!_isStateReady()) return;
     const lot = state.salesLot[idx];
     if (!lot) return;
 
@@ -905,6 +972,7 @@ function rejectLotBuyer(idx) {
 }
 
 function openLotBuyerInNetworkM(idx) {
+    if (!_isStateReady()) return;
     const lot = state.salesLot[idx];
     if (!lot) return;
     const buyer = lot.currentBuyer || lot.buyer;
@@ -945,8 +1013,9 @@ function openLotBuyerInNetworkM(idx) {
     }, 120);
 }
 
-// ⭐ v2.7.0: корректная обработка undefined buyerTimerLeft + сдвиг modal index
+// ⭐ v2.8.0: главный фикс — защита от отсутствия state
 function updateSalesLotTimers() {
+    if (!_isStateReady()) return;
     if (!state.salesLot || state.salesLot.length === 0) return;
 
     let needReRender = false;
@@ -1027,6 +1096,7 @@ function updateSalesLotTimers() {
 }
 
 function speedUpLotSearch(idx, type) {
+    if (!_isStateReady()) return;
     const lot = state.salesLot[idx];
     if (!lot) return;
 
@@ -1065,6 +1135,7 @@ function speedUpLotSearch(idx, type) {
 
 // ⭐ v2.7.0: защита от отсутствия lot + корректный сдвиг activeSalesLotHaggleIndex
 function reclaimCarFromLot(idx) {
+    if (!_isStateReady()) return;
     const lot = state.salesLot[idx];
     if (!lot) {
         console.warn('[SalesLot] reclaimCarFromLot: лот не найден, idx=' + idx);
@@ -1123,10 +1194,12 @@ window.finishSalesLotDeal = finishSalesLotDeal;
 window.rejectLotBuyer = rejectLotBuyer;
 window.openLotBuyerInNetworkM = openLotBuyerInNetworkM;
 
+// ⭐ v2.8.0: ГЛАВНЫЙ ФИКС — не запускаем таймер синхронно.
+// Ждём state:loaded через EventBus или поллим state.
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { initSalesLotTimer(); });
+    document.addEventListener('DOMContentLoaded', _startSalesLotTimerWhenReady);
 } else {
-    initSalesLotTimer();
+    _startSalesLotTimerWhenReady();
 }
 
-console.log('[🏪 salesLot v2.7.0] Фикс сдвига activeSalesLotHaggleIndex + защита от гонок + дубли диалогов устранены ✓');
+console.log('[🏪 salesLot v2.8.0] ФИКС: таймер ждёт state:loaded + все state-обращения защищены ✓');
