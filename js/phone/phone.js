@@ -1,6 +1,12 @@
 // ========================================================
-// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.7.0)
+// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.8.0 (SPRINT 2 — ФИКС C1):
+//   - ФИКС C1: убраны вызовы несуществующих _startVisualizer/_stopVisualizer
+//   - _onAppOpened('radio') теперь вызывает PhoneMedia.syncRadioUI()
+//     — визуализатор корректно продолжает работу после сворачивания
+//   - _onAppClosed('radio') ничего не делает — аудио играет в фоне
+//   - openApp для 'shop'/'notepad'/'post' защищён проверками
 // ⭐ v1.7.0 (RADIO LIFECYCLE):
 //   - Интеграция с PhoneMedia: визуализатор НЕ паузится при goHome
 //   - При открытии радио — визуализатор возобновляется
@@ -261,29 +267,32 @@ const PhoneManager = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v1.7.0: ХУКИ RADIO LIFECYCLE
+    // ⭐ v1.8.0: ХУКИ RADIO LIFECYCLE (ФИКС C1)
     // --------------------------------------------------------
     _onAppOpened(appId) {
-        // Радио: визуализатор сам запустится, если playing
+        // Радио: синхронизируем UI с текущим состоянием radioPlaying.
+        // Audio-элемент продолжает играть в фоне (не паузится), а CSS-класс
+        // .playing на эквалайзере нужно переустановить — при сворачивании
+        // экран радио уничтожался, и класс мог слететь.
         if (appId === 'radio' && window.PhoneMedia) {
-            if (typeof window.PhoneMedia._startVisualizer === 'function') {
-                if (window.PhoneMedia.radioPlaying) {
-                    window.PhoneMedia._startVisualizer();
+            if (typeof window.PhoneMedia.syncRadioUI === 'function') {
+                try {
+                    window.PhoneMedia.syncRadioUI();
+                } catch (e) {
+                    console.warn('[Phone] syncRadioUI error:', e);
                 }
             }
         }
     },
 
     _onAppClosed(appId) {
-        // Радио: НЕ паузим музыку — она играет в фоне.
-        // Но останавливаем визуализатор (rAF) для экономии CPU.
-        // При возврате в Магнитолу — визуализатор возобновится.
-        if (appId === 'radio' && window.PhoneMedia) {
-            if (typeof window.PhoneMedia._stopVisualizer === 'function') {
-                // keepState=true — сохраняем текущие уровни, чтобы не сбрасывать CSS-переменные
-                window.PhoneMedia._stopVisualizer(true);
-            }
-        }
+        // ⭐ v1.8.0 (ФИКС C1): ничего не делаем.
+        // Радио продолжает играть в фоне, а при повторном открытии
+        // _onAppOpened вызовет syncRadioUI() — эквалайзер корректно
+        // восстановит класс .playing.
+        //
+        // Раньше здесь был вызов несуществующего _stopVisualizer(),
+        // который только засорял консоль.
     },
 
     // --------------------------------------------------------
@@ -342,13 +351,19 @@ const PhoneManager = {
                     window.AppPost.render(appContainer);
                     return;
                 }
+                this.renderGenericFallback(appId, appContainer);
+                return;
             }
 
             // ============================================
             // 3. АВТО-МАРКЕТ
             // ============================================
             if (appId === 'shop') {
-                AppShop.render(appContainer);
+                if (window.AppShop && typeof window.AppShop.render === 'function') {
+                    window.AppShop.render(appContainer);
+                    return;
+                }
+                this.renderGenericFallback(appId, appContainer);
                 return;
             }
 
@@ -368,7 +383,11 @@ const PhoneManager = {
             // 5. БЛОКНОТ
             // ============================================
             if (appId === 'notepad') {
-                AppNotepad.render(appContainer);
+                if (window.AppNotepad && typeof window.AppNotepad.render === 'function') {
+                    window.AppNotepad.render(appContainer);
+                    return;
+                }
+                this.renderGenericFallback(appId, appContainer);
                 return;
             }
 
@@ -1173,4 +1192,4 @@ if (document.readyState === 'loading') {
     PhoneManager.init();
 }
 
-console.log('[📱 phone.js v1.7.0] Radio Lifecycle + GameHelpers + PhoneBusiness + PhoneMedia hooks ✓');
+console.log('[📱 phone.js v1.8.0] ФИКС C1: syncRadioUI вместо несуществующего _startVisualizer + защита openApp ✓');
