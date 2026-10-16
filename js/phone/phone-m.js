@@ -1,17 +1,21 @@
 // ========================================================
-// js/phone-m.js — M+ HUB & P2P БИРЖА (v7.2.0)
+// js/phone-m.js — M+ HUB & P2P БИРЖА (v7.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v7.2.0 (SPRINT 3 — ФИКС P2P UI):
-//   - openDialog теперь async + подгрузка оффера с сервера
-//   - renderP2PConversationScreen различает buyer/seller
-//   - _renderActiveP2POfferScreen: разные views для покупателя
-//     и продавца (продавец видит кнопки Принять/Встречная/Отказ)
-//   - startBuyP2P использует window.openP2PDealModal (в p2p-offers)
-//   - _getActiveOfferForLot с fallback через fetchMyOffers
-//   - _refreshMyP2POffersFromServer() при открытии чатов
-//   - acceptIncomingOffer открывает диалог с покупателем
-// ⭐ v7.1.0 (SPRINT 1):
-//   - Компактный P2P чат + кнопка «💰 Предложить цену»
+// ⭐ v7.3.0 (SPRINT 3 — ФИКС ДУБЛЕЙ И ДИАЛОГА ПРОДАВЦА):
+//   - ФИКС: _subscribeRealtime для лотов — надёжный dedup
+//     по id + lot_id + itemData.uid. Больше никаких дублей.
+//   - ФИКС: renderP2PLotsHtml — финальная клиентская дедупликация
+//     (страховка на случай гонки).
+//   - ФИКС: при получении входящих офферов создаётся chat-диалог
+//     в phoneMessages продавца → он видит оффер и в «Торг».
+//   - ФИКС: _getActiveOfferForLotAsync теперь ищет оффер и
+//     во входящих (продавец видит свои входящие как активные).
+//   - ФИКС: startBuyP2P — fallback на lot_id/itemData.uid,
+//     если id пустой.
+//   - ФИКС: _ensureSellerChatDialogs — автогенерация диалогов
+//     для продавца из incoming offers.
+// ⭐ v7.2.0 (SPRINT 3): buyer/seller views + async openDialog
+// ⭐ v7.1.0 (SPRINT 1): компактный P2P чат
 // ========================================================
 
 if (typeof window.BUSINESS_TITLE_STYLES === 'undefined') window.BUSINESS_TITLE_STYLES = [];
@@ -63,6 +67,11 @@ const AppM = {
                 this._refreshConversation();
             }
         });
+
+        // ⭐ v7.3.0: при создании оффера обновляем UI продавца
+        window.EventBus.on('p2p:offer_created', () => {
+            this._updateMPlusBadge();
+        });
     },
 
     _updateMPlusBadge() {
@@ -103,20 +112,43 @@ const AppM = {
             try {
                 window.RealtimeManager.subscribe('lots', null, (lots) => {
                     if (!Array.isArray(lots)) return;
-                    const localIds = new Set((window.state.p2pMarketListings || []).map(l => l.id));
-                    lots.forEach(cl => {
-                        if (!localIds.has(cl.lot_id || cl.id)) {
-                            window.state.p2pMarketListings.unshift({
-                                id: cl.lot_id || cl.id,
-                                sellerId: cl.sellerId,
-                                sellerName: cl.sellerName || "Игрок сети",
-                                type: cl.type,
-                                name: cl.name,
-                                price: cl.price,
-                                itemData: cl.itemData || {}
-                            });
-                        }
+
+                    // ⭐ v7.3.0: надёжная дедупликация
+                    const existingIds = new Set();
+                    (window.state.p2pMarketListings || []).forEach(l => {
+                        if (!l) return;
+                        if (l.id) existingIds.add(String(l.id));
+                        if (l.lot_id) existingIds.add(String(l.lot_id));
+                        if (l.itemData?.uid) existingIds.add('uid:' + String(l.itemData.uid));
                     });
+
+                    let addedCount = 0;
+                    lots.forEach(cl => {
+                        if (!cl) return;
+                        const clId = String(cl.lot_id || cl.id || '');
+                        const clUid = cl.itemData?.uid ? 'uid:' + String(cl.itemData.uid) : null;
+
+                        if (clId && existingIds.has(clId)) return;
+                        if (clUid && existingIds.has(clUid)) return;
+
+                        window.state.p2pMarketListings.unshift({
+                            id: clId,
+                            lot_id: clId,
+                            sellerId: cl.sellerId,
+                            sellerName: cl.sellerName || "Игрок сети",
+                            sellerAvatar: cl.sellerAvatar || '🧔',
+                            type: cl.type,
+                            name: cl.name,
+                            price: cl.price,
+                            itemData: cl.itemData || {}
+                        });
+
+                        if (clId) existingIds.add(clId);
+                        if (clUid) existingIds.add(clUid);
+                        addedCount++;
+                    });
+
+                    // Обновляем UI только если что-то реально добавилось или по запросу
                     const area = document.getElementById('p2pLotsArea');
                     if (area) area.innerHTML = this.renderP2PLotsHtml(this.marketFilter || 'cars');
                 });
@@ -172,6 +204,8 @@ const AppM = {
                 window.RealtimeManager.subscribe('p2pOffersIncoming', null, (offers) => {
                     window.state.player._incomingP2POffers = offers || [];
                     window.state.player.pendingP2POffersCount = offers?.length || 0;
+                    // ⭐ v7.3.0: создаём локальные чат-диалоги для продавца
+                    this._ensureSellerChatDialogs(offers);
                     this._updateMPlusBadge();
                     this._refreshP2PIncomingList();
                 });
@@ -185,6 +219,73 @@ const AppM = {
                     this._refreshFriendsList();
                 });
             } catch (e) {}
+        }
+    },
+
+    // ⭐ v7.3.0: создаёт чат-диалоги в phoneMessages продавца
+    // для каждого входящего оффера, чтобы они отображались в «Торг»
+    _ensureSellerChatDialogs(offers) {
+        if (!Array.isArray(offers) || offers.length === 0) return;
+        if (!window.state.player) return;
+        if (!Array.isArray(window.state.player.phoneMessages)) {
+            window.state.player.phoneMessages = [];
+        }
+
+        let changed = false;
+
+        offers.forEach(offer => {
+            if (!offer || !offer.offerId) return;
+
+            const dialogId = `dlg_p2p_seller_${offer.offerId}`;
+            let exists = window.state.player.phoneMessages.find(m => m && m.id === dialogId);
+
+            const carData = {
+                name: offer.lotName || 'Автомобиль',
+                img: offer.lotImage || '',
+                type: offer.lotType || 'cars',
+                price: offer.originalPrice
+            };
+
+            const previewText = offer.buyerMessage
+                ? `«${offer.buyerMessage.substring(0, 80)}»`
+                : `Предлагает ${Number(offer.offeredPrice || 0).toLocaleString()} ₽ за ваш лот`;
+
+            if (!exists) {
+                window.state.player.phoneMessages.unshift({
+                    id: dialogId,
+                    dialogId: dialogId,
+                    category: 'buyers',
+                    isP2PMarket: true,
+                    p2pId: offer.lotId,
+                    p2pOfferId: offer.offerId,
+                    p2pRole: 'seller',    // ⭐ роль продавца
+                    sender: `${offer.buyerAvatar || '🧔'} ${offer.buyerName || 'Покупатель'}`,
+                    time: "Сейчас",
+                    unread: true,
+                    viewed: false,
+                    carData: carData,
+                    askingPrice: offer.originalPrice,
+                    offerPrice: offer.offeredPrice,
+                    preview: previewText,
+                    chatHistory: [
+                        { from: 'them', text: `«Здравствуйте! Предлагаю ${Number(offer.offeredPrice || 0).toLocaleString()} ₽ за «${offer.lotName}».»` }
+                    ]
+                });
+                changed = true;
+            } else {
+                // Обновляем статус / непрочитанность
+                exists.unread = true;
+                exists.offerPrice = offer.offeredPrice;
+                exists.preview = previewText;
+                exists.p2pRole = 'seller';
+            }
+        });
+
+        if (changed) {
+            if (typeof saveState === 'function') saveState();
+            if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.updateUnreadBadge === 'function') {
+                PhoneManager.updateUnreadBadge();
+            }
         }
     },
 
@@ -229,7 +330,6 @@ const AppM = {
         });
     },
 
-    // ⭐ v7.2.0: подгрузка моих офферов с сервера (для восстановления после перезапуска)
     async _refreshMyP2POffersFromServer() {
         if (!window.P2POffersManager?.fetchMyOffers) return;
         const myUid = String(window.state?.player?.uid || window.tgUserId || '');
@@ -246,10 +346,7 @@ const AppM = {
             serverOffers.forEach(offer => {
                 if (!offer || !offer.offerId) return;
                 const idx = window.state.player._myP2POffers.findIndex(o => o && o.id === offer.offerId);
-                const normalized = {
-                    ...offer,
-                    id: offer.offerId || offer.id
-                };
+                const normalized = { ...offer, id: offer.offerId || offer.id };
                 if (idx >= 0) window.state.player._myP2POffers[idx] = normalized;
                 else window.state.player._myP2POffers.push(normalized);
             });
@@ -382,13 +479,31 @@ const AppM = {
             try { window.cleanupOrphanedDialogs(); } catch (e) {}
         }
 
-        // ⭐ v7.2.0: подгружаем с сервера мои офферы (после перезапуска игры)
         this._refreshMyP2POffersFromServer().then(() => {
             const listEl = document.getElementById('mDialogsListContainer');
             if (listEl) {
                 listEl.innerHTML = this.renderDialogsListHtml(window.state.player?.phoneMessages || []);
             }
         });
+
+        // ⭐ v7.3.0: подтягиваем входящие офферы (продавец) и создаём диалоги
+        if (window.P2POffersManager?.fetchIncomingOffers) {
+            const myUid = String(window.state?.player?.uid || window.tgUserId || '');
+            if (myUid) {
+                window.P2POffersManager.fetchIncomingOffers(myUid).then(offers => {
+                    if (Array.isArray(offers) && offers.length > 0) {
+                        window.state.player._incomingP2POffers = offers;
+                        window.state.player.pendingP2POffersCount = offers.length;
+                        this._ensureSellerChatDialogs(offers);
+                        this._updateMPlusBadge();
+                        const listEl = document.getElementById('mDialogsListContainer');
+                        if (listEl) {
+                            listEl.innerHTML = this.renderDialogsListHtml(window.state.player?.phoneMessages || []);
+                        }
+                    }
+                }).catch(() => {});
+            }
+        }
 
         container.innerHTML = `
             <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.14), #090e18); border-color: var(--cyan);">
@@ -450,18 +565,15 @@ const AppM = {
                 ? `<span class="tag-badge bg-tag-red" style="font-weight:900;"><span class="led-dot led-red"></span> НОВОЕ</span>`
                 : (isViewed ? `<span class="tag-badge bg-tag-dark" style="border-color:rgba(255,255,255,0.2);"><i class="fa-solid fa-eye color-cyan mr-1"></i> ПРОСМОТРЕНО</span>` : '');
 
-            let senderLabel = isP2P ? "Собеседник:" : "Покупатель:";
-
-            let activeOfferBadge = '';
-            if (isP2P && m.p2pId) {
-                const activeOffer = this._getActiveOfferForLot(m.p2pId);
-                if (activeOffer) {
-                    const label = window.P2POffersManager?.getStatusLabel(activeOffer.status) || activeOffer.status;
-                    activeOfferBadge = `<div class="p-1 mt-1 text-center" style="background:rgba(0,242,254,0.1); border-radius:6px; border:1px solid rgba(0,242,254,0.3);">
-                        <span class="sub-label" style="font-size:8.5px; color:#67e8f9;">${label} · ${Number(activeOffer.offeredPrice || activeOffer.currentPrice).toLocaleString()} ₽</span>
-                    </div>`;
-                }
+            // ⭐ v7.3.0: показываем роль (продавец/покупатель)
+            let roleBadge = '';
+            if (isP2P && m.p2pRole === 'seller') {
+                roleBadge = `<span class="tag-badge" style="background:rgba(255,179,0,0.15); color:var(--amber); font-size:7.5px;">ВЫ — ПРОДАВЕЦ</span>`;
+            } else if (isP2P) {
+                roleBadge = `<span class="tag-badge" style="background:rgba(0,242,254,0.15); color:var(--cyan); font-size:7.5px;">ВЫ — ПОКУПАТЕЛЬ</span>`;
             }
+
+            let senderLabel = isP2P ? "Собеседник:" : "Покупатель:";
 
             return `
                 <div onclick="AppM.openDialog('${m.id}')" class="glass-card mb-2 p-2 cursor-pointer ${isUnread ? 'card-glow-deal' : ''}" style="border-left: 3px solid ${isUnread ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}; background: #090e18;">
@@ -470,6 +582,7 @@ const AppM = {
                         <div class="badge-tag badge-br">
                             ${viewStatusBadge}
                         </div>
+                        ${roleBadge ? `<div class="badge-tag badge-bl">${roleBadge}</div>` : ''}
                     </div>
 
                     <div class="flex-between mb-1">
@@ -491,8 +604,6 @@ const AppM = {
                         </span>
                     </div>
 
-                    ${activeOfferBadge}
-
                     <button class="btn btn-cyan btn-sm w-full font-bold" style="padding:6px 0; font-size:10px;">
                         <i class="fa-solid fa-comments mr-1"></i> ОТКРЫТЬ ДИАЛОГ 💬
                     </button>
@@ -501,7 +612,6 @@ const AppM = {
         }).join('');
     },
 
-    // ⭐ v7.2.0: fallback на сервер, если локально оффера нет
     _getActiveOfferForLot(lotId) {
         if (!lotId) return null;
         try {
@@ -513,41 +623,68 @@ const AppM = {
         return null;
     },
 
-    // ⭐ v7.2.0: async-версия с подгрузкой с сервера
+    // ⭐ v7.3.0: ищет и в исходящих (я покупатель), и во входящих (я продавец)
     async _getActiveOfferForLotAsync(lotId) {
         if (!lotId) return null;
 
+        // 1. Локальный поиск в исходящих
         const local = this._getActiveOfferForLot(lotId);
         if (local) return local;
 
-        // Подгружаем с сервера
+        // ⭐ 2. Локальный поиск во входящих (я — продавец)
+        const incoming = window.state?.player?._incomingP2POffers || [];
+        const incomingLocal = incoming.find(o => o && o.lotId === lotId &&
+            ['pending', 'countered'].includes(o.status));
+        if (incomingLocal) return incomingLocal;
+
+        // 3. Подгрузка с сервера (я — покупатель)
         if (window.P2POffersManager?.fetchMyOffers) {
             try {
                 const myUid = String(window.state?.player?.uid || window.tgUserId || '');
-                if (!myUid) return null;
+                if (myUid) {
+                    const serverOffers = await window.P2POffersManager.fetchMyOffers(myUid);
+                    if (Array.isArray(serverOffers)) {
+                        const found = serverOffers.find(o => o && o.lotId === lotId &&
+                            ['pending', 'countered'].includes(o.status));
 
-                const serverOffers = await window.P2POffersManager.fetchMyOffers(myUid);
-                if (!Array.isArray(serverOffers)) return null;
+                        if (found && found.offerId) {
+                            if (!Array.isArray(window.state.player._myP2POffers)) {
+                                window.state.player._myP2POffers = [];
+                            }
+                            const normalized = { ...found, id: found.offerId };
+                            const idx = window.state.player._myP2POffers.findIndex(o => o && o.id === normalized.id);
+                            if (idx >= 0) window.state.player._myP2POffers[idx] = normalized;
+                            else window.state.player._myP2POffers.push(normalized);
 
-                const found = serverOffers.find(o => o && o.lotId === lotId &&
-                    ['pending', 'countered'].includes(o.status));
-
-                if (found && found.offerId) {
-                    // Кэшируем локально
-                    if (!Array.isArray(window.state.player._myP2POffers)) {
-                        window.state.player._myP2POffers = [];
+                            return normalized;
+                        }
                     }
-                    const normalized = { ...found, id: found.offerId };
-                    const idx = window.state.player._myP2POffers.findIndex(o => o && o.id === normalized.id);
-                    if (idx >= 0) window.state.player._myP2POffers[idx] = normalized;
-                    else window.state.player._myP2POffers.push(normalized);
-
-                    return normalized;
                 }
             } catch (e) {
-                console.warn('[AppM] _getActiveOfferForLotAsync:', e);
+                console.warn('[AppM] _getActiveOfferForLotAsync (buyer):', e);
             }
         }
+
+        // ⭐ 4. Подгрузка с сервера (я — продавец)
+        if (window.P2POffersManager?.fetchIncomingOffers) {
+            try {
+                const myUid = String(window.state?.player?.uid || window.tgUserId || '');
+                if (myUid) {
+                    const serverIncoming = await window.P2POffersManager.fetchIncomingOffers(myUid);
+                    if (Array.isArray(serverIncoming)) {
+                        const found = serverIncoming.find(o => o && o.lotId === lotId &&
+                            ['pending', 'countered'].includes(o.status));
+                        if (found) {
+                            window.state.player._incomingP2POffers = serverIncoming;
+                            return found;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('[AppM] _getActiveOfferForLotAsync (seller):', e);
+            }
+        }
+
         return null;
     },
 
@@ -570,9 +707,6 @@ const AppM = {
         this.renderNPCConversationScreen(container, msg);
     },
 
-    // ====================================================
-    // NPC-ДИАЛОГ
-    // ====================================================
     renderNPCConversationScreen(container, msg) {
         let slot = null;
         if (msg.carUid) slot = this.findLotByUid(msg.carUid);
@@ -713,13 +847,9 @@ const AppM = {
         `;
     },
 
-    // ====================================================
-    // P2P ДИАЛОГ
-    // ====================================================
     renderP2PConversationScreen(container, msg) {
         const lotId = msg.p2pId;
 
-        // Показываем загрузку
         container.innerHTML = `
             <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.4);">
                 <button onclick="AppM.closeDialog()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
@@ -732,7 +862,6 @@ const AppM = {
             </div>
         `;
 
-        // ⭐ v7.2.0: сначала пытаемся найти оффер (с подгрузкой с сервера)
         this._getActiveOfferForLotAsync(lotId).then(myActiveOffer => {
             if (myActiveOffer) {
                 this.activeP2POfferId = myActiveOffer.id || myActiveOffer.offerId;
@@ -747,7 +876,6 @@ const AppM = {
         });
     },
 
-    // ---------- ЭКРАН СТАРТА P2P ТОРГА (покупатель, ещё не сделал оффер) ----------
     _renderP2PStartScreen(container, msg) {
         const car = msg.carData || {};
         const lotPrice = Number(msg.askingPrice || car.price || 0);
@@ -830,22 +958,18 @@ const AppM = {
         this._subscribeRealtime();
     },
 
-    // ---------- ЭКРАН АКТИВНОГО P2P ОФФЕРА (⭐ v7.2.0: buyer/seller views) ----------
     _renderActiveP2POfferScreen(container, msg, offer) {
         const status = offer.status;
         const lotPrice = Number(offer.originalPrice || msg.askingPrice || 0);
         const car = msg.carData || {};
         const myUid = String(window.state?.player?.uid || window.tgUserId || '');
-        const isSeller = String(offer.sellerId) === myUid;
-        const isBuyer = String(offer.buyerId) === myUid;
+        const isSeller = String(offer.sellerId) === myUid || msg.p2pRole === 'seller';
+        const isBuyer = String(offer.buyerId) === myUid || msg.p2pRole === 'buyer';
 
         let rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
         let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         let fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(car.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
 
-        // ==========================================
-        // PENDING
-        // ==========================================
         if (status === 'pending') {
             const myOffer = Number(offer.offeredPrice || 0);
             const diff = lotPrice - myOffer;
@@ -853,7 +977,6 @@ const AppM = {
             const timeLeftSec = window.P2POffersManager?.getTimeLeft(offer) || 0;
 
             if (isSeller) {
-                // ⭐ ПРОДАВЕЦ: экран ответа на оффер
                 container.innerHTML = `
                     <div class="phone-app-header" style="border-bottom-color: rgba(255, 179, 0, 0.4); flex-shrink: 0;">
                         <button onclick="AppM.closeDialog()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
@@ -915,7 +1038,6 @@ const AppM = {
                     </div>
                 `;
             } else {
-                // ПОКУПАТЕЛЬ: экран ожидания
                 container.innerHTML = `
                     <div class="phone-app-header" style="border-bottom-color: rgba(255, 179, 0, 0.4); flex-shrink: 0;">
                         <button onclick="AppM.closeDialog()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
@@ -927,73 +1049,35 @@ const AppM = {
                     </div>
 
                     <div class="phone-app-body" style="display:flex; flex-direction:column; height: calc(100% - 46px); padding: 8px 6px; gap: 8px; overflow-y:auto;">
-                        <div class="glass-card p-2" style="border: 1.5px solid var(--cyan); background: #060a14;">
-                            <div class="deal-car-preview-card" style="height:72px; min-height:72px; padding: 6px 10px;">
-                                <img src="${carImg}" class="deal-car-thumb" style="width:90px; height:60px; min-width:90px; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
-                                <div style="flex:1; min-width:0;">
-                                    <b class="text-xs color-cyan block" style="font-size:12px;">${car.name || 'Объект сделки'}</b>
-                                    <div class="sub-label mt-1" style="font-size:9px;">Продавец: <b class="color-amber">${msg.sender}</b></div>
-                                    <div class="sub-label" style="font-size:8.5px;">Цена: <b>${lotPrice.toLocaleString()} ₽</b></div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="glass-card p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(255, 179, 0, 0.15), #090e18); border-color: var(--amber);">
                             <div style="font-size:36px; margin-bottom:6px;">⏳</div>
                             <b class="text-xs color-amber block mb-2" style="font-size:13px;">Ваш оффер отправлен!</b>
-                            <div class="sub-label mb-3" style="font-size:10px;">Ждём ответа продавца. Он увидит ваше предложение в реальном времени.</div>
+                            <div class="sub-label mb-3" style="font-size:10px;">Ждём ответа продавца.</div>
 
                             <div class="p-3 mb-2" style="background:#050914; border-radius:10px; border:1px solid rgba(0, 242, 254, 0.3);">
                                 <div class="sub-label" style="font-size:9px;">Ваше предложение:</div>
                                 <b class="color-green" style="font-size:20px;">${myOffer.toLocaleString()} ₽</b>
-                                ${diff > 0 ? `<div class="sub-label mt-1" style="font-size:9px;">Экономия: <b class="color-green">-${diff.toLocaleString()} ₽ (${diffPct}%)</b></div>` : ''}
                             </div>
 
                             <div class="p-2 mb-2" style="background:#050914; border-radius:8px;">
                                 <div class="sub-label" style="font-size:9px;">⏱ До истечения оффера:</div>
                                 <b class="color-amber" id="mP2POfferTimer" style="font-size:16px;">${this._formatTime(timeLeftSec)}</b>
                             </div>
-
-                            ${offer.buyerMessage ? `
-                                <div class="p-2 mb-2" style="background:rgba(0, 242, 254, 0.06); border-radius:8px; border-left:3px solid var(--cyan); text-align:left;">
-                                    <div class="sub-label" style="font-size:8.5px;">Ваше сообщение:</div>
-                                    <div style="font-size:10px; color:#f1f5f9; margin-top:3px;">«${offer.buyerMessage}»</div>
-                                </div>
-                            ` : ''}
                         </div>
 
                         <button onclick="AppM.cancelActiveP2POffer()" class="btn btn-danger btn-sm w-full" style="flex-shrink:0;">
                             <i class="fa-solid fa-xmark mr-1"></i> ОТМЕНИТЬ ТОРГ
                         </button>
-
-                        <div class="glass-card p-2" style="background:#090e18; flex:1; display:flex; flex-direction:column; min-height:180px;">
-                            <b class="text-xs color-cyan mb-2 block" style="font-size:10px;">💬 Чат с продавцом</b>
-                            <div id="mChatScrollBox" class="chat-thread-container" style="flex:1; max-height:none; padding:6px; background:#04070e; border-radius:8px; border:1px solid rgba(255,255,255,0.06); overflow-y:auto;">
-                                ${(msg.chatHistory || []).map(item => `
-                                    <div class="chat-msg ${item.from === 'me' ? 'msg-player' : 'msg-seller'}" style="margin-bottom:6px; font-size:10px;">
-                                        ${item.text}
-                                    </div>
-                                `).join('')}
-                            </div>
-                            <div class="mt-2">
-                                ${this._renderP2PCompactComposer(msg.id)}
-                            </div>
-                        </div>
                     </div>
                 `;
             }
 
             this._startP2POfferTimer();
         }
-
-        // ==========================================
-        // COUNTERED
-        // ==========================================
         else if (status === 'countered') {
             const counterPrice = Number(offer.counterPrice || 0);
             const myOffer = Number(offer.offeredPrice || 0);
 
-            // Покупатель отвечает на встречную цену
             if (isBuyer) {
                 container.innerHTML = `
                     <div class="phone-app-header" style="border-bottom-color: rgba(192, 132, 252, 0.4); flex-shrink: 0;">
@@ -1006,22 +1090,12 @@ const AppM = {
                     </div>
 
                     <div class="phone-app-body" style="display:flex; flex-direction:column; height: calc(100% - 46px); padding: 8px 6px; gap: 8px; overflow-y:auto;">
-                        <div class="glass-card p-2" style="border: 1.5px solid var(--purple); background: #060a14;">
-                            <div class="deal-car-preview-card" style="height:72px; min-height:72px; padding: 6px 10px;">
-                                <img src="${carImg}" class="deal-car-thumb" style="width:90px; height:60px; min-width:90px; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
-                                <div style="flex:1; min-width:0;">
-                                    <b class="text-xs color-cyan block" style="font-size:12px;">${car.name || 'Объект сделки'}</b>
-                                    <div class="sub-label mt-1" style="font-size:9px;">Продавец: <b class="color-amber">${msg.sender}</b></div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="glass-card p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(192, 132, 252, 0.15), #090e18); border-color: var(--purple);">
                             <div style="font-size:36px; margin-bottom:6px;">🔄</div>
                             <b class="text-xs color-purple block mb-2" style="font-size:13px;">Встречное предложение!</b>
 
                             <div class="grid-2 mb-2" style="gap:8px;">
-                                <div class="p-2" style="background:#050914; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
+                                <div class="p-2" style="background:#050914; border-radius:8px;">
                                     <div class="sub-label" style="font-size:8.5px;">Ваш оффер:</div>
                                     <b class="color-cyan" style="font-size:14px;">${myOffer.toLocaleString()} ₽</b>
                                 </div>
@@ -1030,30 +1104,22 @@ const AppM = {
                                     <b class="color-purple" style="font-size:14px;">${counterPrice.toLocaleString()} ₽</b>
                                 </div>
                             </div>
-
-                            ${offer.sellerMessage ? `
-                                <div class="p-2 mb-2" style="background:rgba(192, 132, 252, 0.06); border-radius:8px; border-left:3px solid var(--purple); text-align:left;">
-                                    <div class="sub-label" style="font-size:8.5px;">Сообщение продавца:</div>
-                                    <div style="font-size:10.5px; color:#f1f5f9; margin-top:3px;">«${offer.sellerMessage}»</div>
-                                </div>
-                            ` : ''}
                         </div>
 
                         <div class="glass-card p-2" style="background:#090e18;">
                             <b class="text-xs color-cyan mb-2 block" style="font-size:10.5px;">Ваше решение:</b>
                             <div style="display:flex; flex-direction:column; gap:6px;">
                                 <button onclick="AppM.acceptP2PCounter()" class="btn btn-green btn-sm w-full" style="padding:10px 0; font-size:11px;">
-                                    ✅ ПРИНЯТЬ ${counterPrice.toLocaleString()} ₽ И ОФОРМИТЬ ДКП
+                                    ✅ ПРИНЯТЬ ${counterPrice.toLocaleString()} ₽
                                 </button>
                                 <button onclick="AppM.rejectP2PCounter()" class="btn btn-danger btn-sm w-full" style="padding:9px 0; font-size:10.5px;">
-                                    ✕ ОТКАЗАТЬСЯ ОТ СДЕЛКИ
+                                    ✕ ОТКАЗАТЬСЯ
                                 </button>
                             </div>
                         </div>
                     </div>
                 `;
             } else {
-                // Продавец смотрит, что покупатель ещё не ответил на counter
                 container.innerHTML = `
                     <div class="phone-app-header" style="border-bottom-color: rgba(192, 132, 252, 0.4); flex-shrink: 0;">
                         <button onclick="AppM.closeDialog()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
@@ -1068,21 +1134,13 @@ const AppM = {
                         <div class="glass-card p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(192, 132, 252, 0.12), #090e18); border-color: var(--purple);">
                             <div style="font-size:42px; margin-bottom:8px;">🔄</div>
                             <b class="text-xs color-purple block mb-2" style="font-size:14px;">Встречная цена отправлена</b>
-                            <div class="sub-label mb-3" style="font-size:10.5px;">Ждём ответа покупателя на ваше предложение ${counterPrice.toLocaleString()} ₽.</div>
-                            <div class="p-3 mb-2" style="background:#050914; border-radius:10px; border:1px solid var(--purple);">
-                                <div class="sub-label" style="font-size:9px;">Ваша встречная цена:</div>
-                                <b class="color-purple" style="font-size:20px;">${counterPrice.toLocaleString()} ₽</b>
-                            </div>
+                            <div class="sub-label mb-3" style="font-size:10.5px;">Ждём ответа покупателя на ${counterPrice.toLocaleString()} ₽.</div>
                         </div>
                         <button onclick="AppM.closeDialog()" class="btn btn-dark w-full">К бирже</button>
                     </div>
                 `;
             }
         }
-
-        // ==========================================
-        // ACCEPTED
-        // ==========================================
         else if (status === 'accepted') {
             const finalPrice = Number(offer.currentPrice || offer.counterPrice || offer.offeredPrice || 0);
 
@@ -1096,11 +1154,13 @@ const AppM = {
                     <div style="width:40px;"></div>
                 </div>
 
-                <div class="phone-app-body" style="display:flex; flex-direction:column; height: calc(100% - 46px); padding: 8px 6px; gap: 8px; overflow-y:auto;">
+                <div class="phone-app-body" style="padding: 8px 6px; gap: 8px; overflow-y:auto;">
                     <div class="glass-card p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.18), #090e18); border-color: var(--green);">
                         <div style="font-size:42px; margin-bottom:8px;">✅</div>
                         <b class="text-xs color-green block mb-2" style="font-size:14px;">СДЕЛКА СОГЛАСОВАНА!</b>
-                        <div class="sub-label mb-3" style="font-size:10px;">${isSeller ? 'Вы приняли предложение покупателя.' : 'Продавец принял вашу цену.'} Осталось оформить ДКП.</div>
+                        <div class="sub-label mb-3" style="font-size:10px;">
+                            ${isSeller ? 'Вы приняли предложение покупателя.' : 'Продавец принял вашу цену.'} Осталось оформить ДКП.
+                        </div>
 
                         <div class="p-3 mb-2" style="background:#050914; border-radius:10px; border:1px solid rgba(0, 230, 118, 0.3);">
                             <div class="sub-label" style="font-size:9px;">Итоговая цена:</div>
@@ -1108,20 +1168,14 @@ const AppM = {
                         </div>
                     </div>
 
-                    <button onclick="AppM.confirmP2PDeal()" class="btn btn-green w-full" style="padding:12px 0; font-size:12px; box-shadow: 0 0 16px var(--green-glow);">
-                        <i class="fa-solid fa-file-signature mr-1"></i> ОФОРМИТЬ ДКП И ВЫКУПИТЬ 🤝
+                    <button onclick="AppM.confirmP2PDeal()" class="btn btn-green w-full" style="padding:12px 0; font-size:12px;">
+                        <i class="fa-solid fa-file-signature mr-1"></i> ОФОРМИТЬ ДКП 🤝
                     </button>
 
-                    <button onclick="AppM.closeDialog()" class="btn btn-dark w-full">
-                        Позже
-                    </button>
+                    <button onclick="AppM.closeDialog()" class="btn btn-dark w-full">Позже</button>
                 </div>
             `;
         }
-
-        // ==========================================
-        // REJECTED / CANCELLED / EXPIRED / COMPLETED
-        // ==========================================
         else {
             let icon = '❌';
             let color = 'var(--red)';
@@ -1132,8 +1186,6 @@ const AppM = {
             else if (status === 'cancelled') { icon = '⛔'; color = 'var(--amber)'; titleText = 'Торг отменён'; descText = 'Оффер был отменён.'; }
             else if (status === 'expired') { icon = '⌛'; color = 'var(--amber)'; titleText = 'Срок торга истёк'; descText = 'Ответ не поступил в течение 30 минут.'; }
             else if (status === 'completed') { icon = '🎉'; color = 'var(--green)'; titleText = 'Сделка завершена'; descText = 'Автомобиль успешно оформлен!'; }
-
-            const canRetry = (status === 'rejected' || status === 'cancelled' || status === 'expired');
 
             container.innerHTML = `
                 <div class="phone-app-header" style="border-bottom-color: ${color}; flex-shrink: 0;">
@@ -1151,16 +1203,6 @@ const AppM = {
                         <b class="text-xs block mb-2" style="font-size:14px; color:${color};">${titleText}</b>
                         <div class="sub-label mb-3" style="font-size:10.5px;">${descText}</div>
                     </div>
-
-                    ${canRetry ? `
-                        <div class="glass-card p-3">
-                            <b class="text-xs color-cyan block mb-2" style="font-size:11px;">Сделать новое предложение?</b>
-                            <button onclick="AppM.retryP2POffer()" class="btn btn-cyan btn-sm w-full">
-                                <i class="fa-solid fa-redo mr-1"></i> Вернуться к торгу
-                            </button>
-                        </div>
-                    ` : ''}
-
                     <button onclick="AppM.closeDialog()" class="btn btn-dark w-full mt-2">К бирже</button>
                 </div>
             `;
@@ -1337,7 +1379,7 @@ const AppM = {
 
     async cancelActiveP2POffer() {
         if (!this.activeP2POfferId) return;
-        if (!confirm('Отменить торг? Продавец увидит, что вы вышли из переговоров.')) return;
+        if (!confirm('Отменить торг?')) return;
         if (this._offerRespondPending) return;
         this._offerRespondPending = true;
 
@@ -1452,7 +1494,7 @@ const AppM = {
             }
 
             if (!lot) {
-                return showToast('❌ Лот больше не активен на бирже', 'error');
+                return showToast('❌ Лот больше не активен', 'error');
             }
 
             const myCash = window.state?.player?.cash || 0;
@@ -1469,7 +1511,8 @@ const AppM = {
             if (window.FB_Bridge?.P2P?.buyLotAtomic) {
                 showToast('⏳ Оформление сделки...', 'info');
                 const profile = window.FB_Bridge.getProfile?.() || { id: myUid, name: window.state.player.name };
-                const res = await window.FB_Bridge.P2P.buyLotAtomic(lotId, profile, myCash, finalPrice);
+                // ⭐ v7.3.0: передаём offerId 5-м параметром, чтобы транзакция сразу закрыла оффер
+                const res = await window.FB_Bridge.P2P.buyLotAtomic(lotId, profile, myCash, finalPrice, this.activeP2POfferId);
                 if (!res || !res.success) {
                     return showToast(`❌ ${res?.error || 'Ошибка сделки'}`, 'error');
                 }
@@ -1511,10 +1554,10 @@ const AppM = {
                         const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
                         if ((window.state.garage?.length || 0) < maxSlots) {
                             window.state.garage.push(carObj);
-                            showToast(`🚗 «${lot.name}» доставлен в Гараж (склад переполнен)!`, 'success');
+                            showToast(`🚗 «${lot.name}» доставлен в Гараж!`, 'success');
                         } else {
                             if (window.MoneyManager) {
-                                window.MoneyManager.earn(finalPrice, `Возврат за переполненный склад: ${lot.name}`, { silent: true });
+                                window.MoneyManager.earn(finalPrice, `Возврат: ${lot.name}`, { silent: true });
                             } else {
                                 window.state.player.cash += finalPrice;
                             }
@@ -1523,7 +1566,7 @@ const AppM = {
                     } else {
                         window.state.player.paidParking.cars.push(carObj);
                         carObj.isStoredInWarehouse = false;
-                        showToast(`🅿️ «${lot.name}» на Парковке (${window.state.player.paidParking.dailyRate} ₽/день)!`, 'success');
+                        showToast(`🅿️ «${lot.name}» на Парковке!`, 'success');
                     }
                 }
                 if (typeof renderGarage === 'function') renderGarage();
@@ -1532,19 +1575,6 @@ const AppM = {
                 if (window.PlatesManager) {
                     window.PlatesManager.addPlate(plateNumber, 'p2p_buy', { silent: false });
                 }
-            } else if (lot.type === 'business') {
-                let bizId = itemData?.bizId || lot.id;
-                let targetBiz = (window.state.businesses || []).find(b => b.id === bizId);
-                if (targetBiz) {
-                    targetBiz.level = Math.max(targetBiz.level || 0, itemData?.level || 1);
-                    targetBiz.stock = 100;
-                }
-            } else if (lot.type === 'housing') {
-                let hId = itemData?.houseId || 'gsk_box';
-                if (!window.state.player.ownedHouses) window.state.player.ownedHouses = [];
-                if (!window.state.player.ownedHouses.includes(hId)) window.state.player.ownedHouses.push(hId);
-                window.state.player.housingId = hId;
-                window.state.player.housingType = 'own';
             }
 
             window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l => l.id !== lotId);
@@ -1588,9 +1618,6 @@ const AppM = {
         }
     },
 
-    // ====================================================
-    // СОЗДАНИЕ P2P ЛОТА
-    // ====================================================
     openCreateListingModal() {
         this.selectP2PListingType('cars');
         ModalManager.open('modalCreateP2P');
@@ -1769,7 +1796,7 @@ const AppM = {
             let myUid = String(window.state.player?.uid || window.tgUserId || "guest_777");
 
             let newListing = {
-                id: "p2p_item_" + Date.now(),
+                id: "p2p_item_" + Date.now() + "_" + Math.random().toString(36).substring(2, 5),
                 sellerId: myUid,
                 sellerName: myName,
                 type: type,
@@ -1781,7 +1808,8 @@ const AppM = {
                 let car = window.state.garage[idx];
                 if (!car) return showToast("Машина не найдена в гараже!", 'error');
                 if (typeof window.ensureCarIdentity === 'function') {
-                    window.ensureCarIdentity(car);
+                    const ensured = window.ensureCarIdentity(car);
+                    if (ensured) { /* используем ensured как car */ }
                 }
                 newListing.name = car.name;
                 newListing.itemData = Object.assign({}, car);
@@ -1827,11 +1855,20 @@ const AppM = {
                 window.state.player.ownedHouses = window.state.player.ownedHouses.filter(id => id !== hId);
             }
 
+            // ⭐ v7.3.0: сохраняем uid машины в listingId для дедупа
+            if (type === 'cars' && newListing.itemData?.uid) {
+                newListing.lot_uid = newListing.itemData.uid;
+            }
+
             if (window.FB_Bridge?.MarketLots?.publishLot) {
                 try {
                     showToast("Публикация в облако...", 'info');
                     let pubRes = await window.FB_Bridge.MarketLots.publishLot(newListing, { id: myUid, name: myName });
-                    if (pubRes && pubRes.lotId) newListing.id = pubRes.lotId;
+                    if (pubRes && pubRes.lotId) {
+                        // ⭐ v7.3.0: заменяем локальный id на серверный
+                        newListing.id = pubRes.lotId;
+                        newListing.lot_id = pubRes.lotId;
+                    }
                     if (pubRes && pubRes.success === false) {
                         return showToast(`❌ ${pubRes.error || 'Ошибка публикации'}`, 'error');
                     }
@@ -1841,7 +1878,19 @@ const AppM = {
             }
 
             if (!window.state.p2pMarketListings) window.state.p2pMarketListings = [];
-            window.state.p2pMarketListings.unshift(newListing);
+
+            // ⭐ v7.3.0: дедуп перед unshift — не публикуем тот же uid
+            const existing = window.state.p2pMarketListings.find(l => {
+                if (!l) return false;
+                if (newListing.id && l.id === newListing.id) return true;
+                if (newListing.lot_id && l.lot_id === newListing.lot_id) return true;
+                if (newListing.lot_uid && l.itemData?.uid === newListing.lot_uid) return true;
+                return false;
+            });
+
+            if (!existing) {
+                window.state.p2pMarketListings.unshift(newListing);
+            }
 
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -1867,12 +1916,12 @@ const AppM = {
     async cancelP2PListing(lotId) {
         if (!confirm("Снять лот с биржи?")) return;
 
-        let lot = (window.state.p2pMarketListings || []).find(l => l.id === lotId);
+        let lot = (window.state.p2pMarketListings || []).find(l => l.id === lotId || l.lot_id === lotId);
         if (!lot) return;
 
         if (window.FB_Bridge?.MarketLots?.cancelLot) {
             try {
-                await window.FB_Bridge.MarketLots.cancelLot(lotId, window.state.player?.uid);
+                await window.FB_Bridge.MarketLots.cancelLot(lot.id || lotId, window.state.player?.uid);
             } catch (e) {
                 console.warn('[AppM] cancelLot error:', e);
             }
@@ -1898,7 +1947,9 @@ const AppM = {
             }
         }
 
-        window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l => l.id !== lotId);
+        window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
+            l && l.id !== lotId && l.lot_id !== lotId
+        );
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
 
@@ -1910,9 +1961,6 @@ const AppM = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // ====================================================
-    // NPC-ФУНКЦИИ
-    // ====================================================
     executeChatHaggle(msgId, percent, failRisk) {
         let msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
@@ -1926,7 +1974,7 @@ const AppM = {
         if (!slot && msg.carIndex !== undefined) slot = window.state.salesLot?.[msg.carIndex];
 
         if (!slot) {
-            showToast("⚠️ Лот больше не на площадке. Диалог закрыт.", 'warning');
+            showToast("⚠️ Лот больше не на площадке.", 'warning');
             this.deleteOrphanDialog(msgId);
             return;
         }
@@ -1951,10 +1999,10 @@ const AppM = {
             if (window.AudioFx) window.AudioFx.play('error');
             if (window.AudioFx) window.AudioFx.haptic('error');
             msg.chatHistory.push({ from: 'me', text: `Скидывай ещё ${percent}%, заберу прямо сейчас!` });
-            msg.chatHistory.push({ from: 'them', text: "«Не устраивает цена — ищи другой вариант. На такое не пойду!»" });
+            msg.chatHistory.push({ from: 'them', text: "«Не устраивает цена.»" });
 
             if (msg.patience <= 0 || roll < 10) {
-                msg.chatHistory.push({ from: 'them', text: "«С вами каши не сваришь. Сделки не будет!»" });
+                msg.chatHistory.push({ from: 'them', text: "«Сделки не будет!»" });
                 showToast("Собеседник прервал сделку!", 'error');
                 if (slot) {
                     slot.currentBuyer = null;
@@ -1980,8 +2028,8 @@ const AppM = {
             }
 
             msg.chatHistory.push({ from: 'me', text: `Давай добавим +${delta.toLocaleString()} ₽ на дорогу!` });
-            msg.chatHistory.push({ from: 'them', text: `«Ладно, твоя взяла! Накидываю +${delta.toLocaleString()} ₽, оформляем 🤝»` });
-            showToast("Успешный торг! Предложение выросло.", 'success');
+            msg.chatHistory.push({ from: 'them', text: `«Ладно, твоя взяла! +${delta.toLocaleString()} ₽»` });
+            showToast("Успешный торг!", 'success');
         }
 
         if (typeof saveState === 'function') saveState();
@@ -2045,7 +2093,6 @@ const AppM = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // ⭐ v7.2.0: async, подгружает оффер с сервера
     async openDialog(msgId) {
         const msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
@@ -2058,10 +2105,14 @@ const AppM = {
         msg.viewed = true;
 
         if (msg.isP2PMarket && msg.p2pId) {
-            // ⭐ v7.2.0: async-подгрузка оффера (может быть на сервере)
+            // ⭐ v7.3.0: для seller-диалогов берём offerId из msg
+            if (msg.p2pOfferId) {
+                this.activeP2POfferId = msg.p2pOfferId;
+            }
+
             const activeOffer = await this._getActiveOfferForLotAsync(msg.p2pId);
             if (activeOffer) {
-                this.activeP2POfferId = activeOffer.id || activeOffer.offerId;
+                this.activeP2POfferId = activeOffer.id || activeOffer.offerId || this.activeP2POfferId;
                 this.activeP2POffer = activeOffer;
             }
         }
@@ -2090,9 +2141,6 @@ const AppM = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // ====================================================
-    // P2P БИРЖА
-    // ====================================================
     renderMarketScreen(container) {
         if (!container) return;
 
@@ -2137,11 +2185,36 @@ const AppM = {
 
     renderP2PLotsHtml(filter) {
         let lots = window.state.p2pMarketListings || [];
-        if (lots.length === 0) {
+
+        // ⭐ v7.3.0: жёсткая дедупликация — по id, lot_id и itemData.uid
+        const seen = new Set();
+        const dedupedLots = [];
+        lots.forEach(l => {
+            if (!l) return;
+            const keyId = l.id ? String(l.id) : null;
+            const keyLotId = l.lot_id ? String(l.lot_id) : null;
+            const keyUid = l.itemData?.uid ? 'uid:' + String(l.itemData.uid) : null;
+
+            // Если уже видели по любому из ключей — пропускаем
+            if (keyId && seen.has(keyId)) return;
+            if (keyLotId && seen.has(keyLotId)) return;
+            if (keyUid && seen.has(keyUid)) return;
+
+            if (keyId) seen.add(keyId);
+            if (keyLotId) seen.add(keyLotId);
+            if (keyUid) seen.add(keyUid);
+
+            dedupedLots.push(l);
+        });
+
+        // Обновляем стейт (дедуплицированный)
+        window.state.p2pMarketListings = dedupedLots;
+
+        if (dedupedLots.length === 0) {
             return `<div class="glass-card text-center sub-label py-6" style="background:#090e18;">В категории «${filter.toUpperCase()}» активных лотов пока нет.</div>`;
         }
 
-        let filtered = lots.filter(l => {
+        let filtered = dedupedLots.filter(l => {
             if (filter === 'cars') return l.type === 'car' || l.type === 'cars';
             if (filter === 'plates') return l.type === 'plate' || l.type === 'plates';
             return l.type === filter;
@@ -2157,20 +2230,27 @@ const AppM = {
         return filtered.map(item => {
             let isMine = (item.sellerId && String(item.sellerId) === myUid) || (String(item.sellerName) === myName);
 
+            // ⭐ v7.3.0: для своих лотов показываем подсказку о ожидании покупателей
             let actionBtn = isMine
-                ? `<button onclick="AppM.cancelP2PListing('${item.id}')" class="btn btn-danger btn-sm w-full font-bold">Снять свой лот с продажи</button>`
+                ? `<div class="p-2 mb-1 text-center" style="background:rgba(0,230,118,0.08); border-radius:8px; border:1px solid rgba(0,230,118,0.3);">
+                       <span class="sub-label" style="font-size:9px; color:#6ee7b7;">
+                           <i class="fa-solid fa-eye mr-1"></i> Ожидаем предложений от покупателей
+                       </span>
+                   </div>
+                   <button onclick="AppM.cancelP2PListing('${item.id || item.lot_id}')" class="btn btn-danger btn-sm w-full font-bold" style="font-size:10px;">
+                       <i class="fa-solid fa-xmark mr-1"></i> Снять свой лот с продажи
+                   </button>`
                 : `<div class="grid-2" style="gap:4px;">
-                       <button onclick="AppM.sendTradeOfferForLot('${item.id}')" class="btn btn-purple btn-sm font-bold" style="padding:6px 2px; font-size:9.5px;">
+                       <button onclick="AppM.sendTradeOfferForLot('${item.id || item.lot_id}')" class="btn btn-purple btn-sm font-bold" style="padding:6px 2px; font-size:9.5px;">
                            <i class="fa-solid fa-arrows-rotate mr-1"></i> Обмен ⚔️
                        </button>
-                       <button onclick="AppM.startBuyP2P('${item.id}')" class="btn btn-green btn-sm font-bold" style="padding:6px 2px; font-size:9.5px;">
+                       <button onclick="AppM.startBuyP2P('${item.id || item.lot_id}')" class="btn btn-green btn-sm font-bold" style="padding:6px 2px; font-size:9.5px;">
                            <i class="fa-solid fa-comments mr-1"></i> Торг ${Number(item.price).toLocaleString()} ₽
                        </button>
                    </div>`;
 
             let descText = "";
             let imgBlockHtml = "";
-            let animClass = "";
 
             if (item.type === 'cars' || item.type === 'car') {
                 let rawImg = item.itemData?.img || item.img || "assets/cars/economy/2101/vaz-2101.jpg";
@@ -2180,7 +2260,7 @@ const AppM = {
                 let plateStr = item.itemData?.plate ? `<span class="license-plate" style="font-size:9.5px; padding:1px 5px;">${item.itemData.plate}</span>` : '';
                 let tuningObj = item.itemData?.tuning || {};
                 let tuningCount = Object.keys(tuningObj).filter(k => tuningObj[k] === true).length;
-                let tuningDesc = tuningCount > 0 ? `⚡ Тюнинг (модификаций: ${tuningCount})` : '📦 Стоковое состояние';
+                let tuningDesc = tuningCount > 0 ? `⚡ Тюнинг (${tuningCount} мод.)` : '📦 Стоковое состояние';
 
                 descText = `Мощность: <b>${item.itemData?.power || 100} л.с.</b> • Кузов: ${item.itemData?.condition || 85}%<br>${tuningDesc}`;
 
@@ -2195,7 +2275,7 @@ const AppM = {
                 let bData = item.itemData || {};
                 let bName = bData.customName || item.name;
                 let bIncome = bData.income || 25000;
-                descText = `Ежедневный доход: <b class="color-green">+${Number(bIncome).toLocaleString()} ₽/день</b> • Уровень: <b>${bData.level || 1}</b>`;
+                descText = `Доход: <b class="color-green">+${Number(bIncome).toLocaleString()} ₽/день</b> • Ур: <b>${bData.level || 1}</b>`;
                 imgBlockHtml = `
                     <div class="p-3 mb-2 text-center" style="background:#050914; border-radius:10px; border:1px solid rgba(0, 230, 118, 0.3);">
                         <b class="color-green">${bName}</b>
@@ -2226,7 +2306,7 @@ const AppM = {
             }
 
             return `
-                <div class="glass-card mb-2 p-2 ${animClass}" style="border-left: 3px solid ${isMine ? 'var(--green)' : 'var(--cyan)'}; background:#090e18;">
+                <div class="glass-card mb-2 p-2" style="border-left: 3px solid ${isMine ? 'var(--green)' : 'var(--cyan)'}; background:#090e18;">
                     ${imgBlockHtml}
                     <div class="flex-between mb-1">
                         <div>
@@ -2242,23 +2322,41 @@ const AppM = {
         }).join('');
     },
 
-    // ⭐ v7.2.0: использует window.openP2PDealModal из p2p-offers.js
+    // ⭐ v7.3.0: fallback на lot_id и itemData.uid
     startBuyP2P(lotId) {
-        let lot = (window.state.p2pMarketListings || []).find(l => l.id === lotId);
+        // Ищем по id, lot_id, uid
+        let lot = (window.state.p2pMarketListings || []).find(l => {
+            if (!l) return false;
+            if (l.id === lotId) return true;
+            if (l.lot_id === lotId) return true;
+            if (l.itemData?.uid === lotId) return true;
+            return false;
+        });
+
         if (!lot) {
             showToast("⚠️ Лот не найден", 'warning');
             return;
         }
 
+        // Проверяем, что это не наш лот
+        const myUid = String(window.state.player?.uid || window.tgUserId || "");
+        if (String(lot.sellerId) === myUid) {
+            showToast("⚠️ Это ваш собственный лот", 'warning');
+            return;
+        }
+
+        // ⭐ v7.3.0: используем реальный ID для модалки
+        const realLotId = lot.lot_id || lot.id || lot.itemData?.uid;
+
         if (typeof window.openP2PDealModal === 'function') {
-            window.openP2PDealModal(lot.id);
+            window.openP2PDealModal(realLotId);
         } else {
-            showToast("⚠️ Модуль торга не загружен (openP2PDealModal)", 'warning');
+            showToast("⚠️ Модуль торга не загружен", 'warning');
         }
     },
 
     sendTradeOfferForLot(lotId) {
-        let lot = (window.state.p2pMarketListings || []).find(l => l.id === lotId);
+        let lot = (window.state.p2pMarketListings || []).find(l => l && (l.id === lotId || l.lot_id === lotId));
         if (!lot) return;
 
         let myGarage = (window.state.garage || []).filter(c => c && typeof c === 'object' && !c.isPersonal);
@@ -2286,25 +2384,25 @@ const AppM = {
                 </div>
 
                 <div class="glass-card p-2 mb-2" style="background:#090e18;">
-                    <span class="sub-label" style="font-size:9px;">Вы предлагаете обмен на:</span>
+                    <span class="sub-label" style="font-size:9px;">Обмен на:</span>
                     <b class="text-xs color-cyan block mt-1">${lot.name}</b>
-                    <div class="sub-label mt-1" style="font-size:9px;">Цена лота: <b class="color-green">${Number(lot.price).toLocaleString()} ₽</b></div>
+                    <div class="sub-label mt-1" style="font-size:9px;">Цена: <b class="color-green">${Number(lot.price).toLocaleString()} ₽</b></div>
                 </div>
 
                 <div class="mb-2">
-                    <label class="sub-label block mb-1" style="font-size:9.5px;">Выберите свою машину для обмена:</label>
+                    <label class="sub-label block mb-1" style="font-size:9.5px;">Ваша машина для обмена:</label>
                     <select id="tradeOfferCarSelect" class="chat-input" style="font-size:11px; padding:8px;">
                         ${options}
                     </select>
                 </div>
 
                 <div class="mb-3">
-                    <label class="sub-label block mb-1" style="font-size:9.5px;">Сообщение (опционально):</label>
-                    <input type="text" id="tradeOfferMessage" class="chat-input" maxlength="120" placeholder="Обмен + доплата 50k ₽..." style="font-size:11px; padding:8px;">
+                    <label class="sub-label block mb-1" style="font-size:9.5px;">Сообщение:</label>
+                    <input type="text" id="tradeOfferMessage" class="chat-input" maxlength="120" placeholder="Обмен + доплата..." style="font-size:11px; padding:8px;">
                 </div>
 
                 <button onclick="AppM.confirmSendTradeOffer('${lotId}')" class="btn btn-purple w-full font-bold">
-                    <i class="fa-solid fa-paper-plane mr-1"></i> Отправить предложение
+                    <i class="fa-solid fa-paper-plane mr-1"></i> Отправить
                 </button>
             </div>
         `;
@@ -2313,7 +2411,7 @@ const AppM = {
     },
 
     async confirmSendTradeOffer(lotId) {
-        let lot = (window.state.p2pMarketListings || []).find(l => l.id === lotId);
+        let lot = (window.state.p2pMarketListings || []).find(l => l && (l.id === lotId || l.lot_id === lotId));
         if (!lot) return;
 
         const selectEl = document.getElementById('tradeOfferCarSelect');
@@ -2331,7 +2429,7 @@ const AppM = {
             return showToast("⚠️ Модуль обмена недоступен", 'warning');
         }
 
-        showToast("⏳ Отправка предложения...", 'info');
+        showToast("⏳ Отправка...", 'info');
 
         const res = await window.FB_Bridge.P2PTrade.sendTradeOffer(lot.sellerId, {
             myItem: {
@@ -2341,22 +2439,19 @@ const AppM = {
                 power: myCar.power,
                 marketValue: myCar.marketValue || myCar.basePrice
             },
-            theirItemId: lotId,
+            theirItemId: lot.lot_id || lot.id,
             message: message
         });
 
         if (res && res.success) {
             ModalManager.close('modalTradeOffer');
             if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
-            showToast(`✅ Предложение отправлено игроку ${lot.sellerName}!`, 'success');
+            showToast(`✅ Предложение отправлено!`, 'success');
         } else {
             showToast(`❌ Ошибка: ${res?.error || 'неизвестная'}`, 'error');
         }
     },
 
-    // ====================================================
-    // РАЗДЕЛ «СДЕЛКИ»
-    // ====================================================
     renderTradeScreen(container) {
         if (!container) return;
 
@@ -2442,7 +2537,7 @@ const AppM = {
             box.innerHTML = `
                 <div class="glass-card text-center sub-label py-6" style="background:#090e18;">
                     <i class="fa-solid fa-arrows-rotate color-purple mb-2" style="font-size:26px;"></i>
-                    <div>${sub === 'incoming' ? 'Нет входящих предложений обмена' : 'Нет отправленных предложений'}</div>
+                    <div>${sub === 'incoming' ? 'Нет входящих обменов' : 'Нет отправленных обменов'}</div>
                 </div>
             `;
             return;
@@ -2522,6 +2617,9 @@ const AppM = {
             window.state.player._incomingP2POffers = offers;
             window.state.player.pendingP2POffersCount = offers.length;
         }
+
+        // ⭐ v7.3.0: создаём чат-диалоги
+        this._ensureSellerChatDialogs(offers);
         this._updateMPlusBadge();
 
         if (offers.length === 0) {
@@ -2540,7 +2638,7 @@ const AppM = {
             const timeLeft = window.P2POffersManager?.getTimeLeft(offer) || 0;
             const statusBadge = offer.status === 'countered'
                 ? `<span class="tag-badge bg-tag-purple" style="font-size:8px;">🔄 ВСТРЕЧНАЯ</span>`
-                : `<span class="tag-badge bg-tag-amber" style="font-size:8px;">ОЖИДАЕТ ОТВЕТА</span>`;
+                : `<span class="tag-badge bg-tag-amber" style="font-size:8px;">ОЖИДАЕТ</span>`;
 
             return `
                 <div class="glass-card mb-2 p-2" style="border-left: 3px solid var(--amber); background:#090e18;">
@@ -2641,16 +2739,16 @@ const AppM = {
         const suggestedPrice = Math.round((buyerOffer + originalPrice) / 2 / 1000) * 1000;
 
         const priceStr = prompt(
-            `Встречная цена (между ${buyerOffer.toLocaleString()} и ${originalPrice.toLocaleString()} ₽):`,
+            `Встречная цена (${buyerOffer.toLocaleString()}—${originalPrice.toLocaleString()} ₽):`,
             String(suggestedPrice)
         );
         if (!priceStr) return;
         const price = parseInt(priceStr, 10);
         if (isNaN(price) || price <= buyerOffer || price > originalPrice) {
-            return showToast(`❌ Цена должна быть в диапазоне ${buyerOffer.toLocaleString()}—${originalPrice.toLocaleString()} ₽`, 'error');
+            return showToast(`❌ Цена: ${buyerOffer.toLocaleString()}—${originalPrice.toLocaleString()} ₽`, 'error');
         }
 
-        const msgStr = prompt('Сообщение покупателю (опционально):', '') || '';
+        const msgStr = prompt('Сообщение покупателю:', '') || '';
 
         this._offerRespondPending = true;
         try {
@@ -2660,7 +2758,7 @@ const AppM = {
                     window.AudioFx.play('win');
                     window.AudioFx.haptic('success');
                 }
-                showToast(`🔄 Встречное предложение: ${price.toLocaleString()} ₽`, 'success');
+                showToast(`🔄 Встречная: ${price.toLocaleString()} ₽`, 'success');
                 this._refreshP2PIncomingList();
             } else {
                 showToast(`❌ ${res.error}`, 'error');
@@ -2706,9 +2804,6 @@ const AppM = {
         }
     },
 
-    // ====================================================
-    // ДРУЗЬЯ
-    // ====================================================
     renderFriendsScreen(container) {
         if (!container) return;
         const sub = this.friendsSubTab || 'friends';
@@ -2883,9 +2978,6 @@ const AppM = {
         showToast("Функция удаления будет в следующем обновлении.", 'info');
     },
 
-    // ====================================================
-    // ВИЗИТКА
-    // ====================================================
     renderProfileScreen(container) {
         if (!container) return;
         let p = window.state.player || {};
@@ -2923,9 +3015,6 @@ const AppM = {
         `;
     },
 
-    // ====================================================
-    // ВСПОМОГАТЕЛЬНЫЕ
-    // ====================================================
     _formatTimeAgo(timestamp) {
         if (!timestamp) return 'Недавно';
         const diff = Date.now() - timestamp;
@@ -2970,7 +3059,7 @@ const AppM = {
                         offerPrice: offer,
                         patience: buyer.patience || 4,
                         maxPatience: 4,
-                        preview: buyer.lastReply || `Готов забрать авто за ${Number(offer).toLocaleString()} ₽!`,
+                        preview: buyer.lastReply || `Готов забрать за ${Number(offer).toLocaleString()} ₽!`,
                         chatHistory: [
                             { from: 'them', text: `Здравствуйте! Пишу по объявлению на «${slot.car.name}». Готов забрать за ${Number(offer).toLocaleString()} ₽!` }
                         ]
@@ -2989,4 +3078,4 @@ const AppM = {
 window.AppM = AppM;
 window.AppMessenger = AppM;
 
-console.log('[💬 phone-m v7.2.0] SPRINT 3: P2P UI фиксы — buyer/seller views + async openDialog + fallback fetch ✓');
+console.log('[💬 phone-m v7.3.0] SPRINT 3: дедуп лотов + чат-диалоги продавца + seller/buyer views ✓');
