@@ -1,21 +1,19 @@
 /* ========================================================
-   css/base.css — БАЗОВЫЕ ПЕРЕМЕННЫЕ И АДАПТИВ (v3.2.0)
+   css/base.css — БАЗОВЫЕ ПЕРЕМЕННЫЕ И АДАПТИВ (v3.3.0)
    Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+   ⭐ v3.3.0 (SPRINT 1 — КРИТИЧЕСКИЙ ФИКС ВВОДА):
+   - ФИКС: user-select:none на * блокировал IME на Android WebView.
+     Теперь input/textarea всегда могут принимать текст.
+   - ФИКС: -webkit-text-fill-color переопределён на currentColor —
+     каскад от .nick-fx-* больше не делает текст в input прозрачным.
+   - ФИКС: caret-color явно задан (видна каретка).
+   - ФИКС: text-transform:none для полей (каскад от .btn не ломает).
+   - ФИКС: background-clip:border-box для полей.
+   - Улучшенный :focus для полей ввода (glow + ring).
    ⭐ v3.2.0:
    - OWNER-ПАНЕЛЬ ПЕРЕНЕСЕНА В DEV-ПРИЛОЖЕНИЕ
    - Плавающая кнопка .owner-panel-btn убрана (display: none)
-   - Добавлены стили для вкладки ДОСТУП в DEV:
-     .dev-access-invite-card, .dev-access-player-card, .dev-access-stat-tile
-   ⭐ v3.1.0:
-   - Плавные stagger-анимации появления карточек
-   - Улучшенные hover-эффекты для ПК
-   - Микроанимации кнопок (ripple-like)
-   - Улучшенные скроллбары с glow
-   - АДАПТИВ: mobile-first, планшеты (768px+), ПК (1200px+)
-   - clamp() для шрифтов и отступов
-   - safe-area-inset для iPhone
-   - AccessControl стили (экран "Доступ закрыт", owner-бейдж)
-   - prefers-reduced-motion для доступности
+   - Добавлены стили для вкладки ДОСТУП в DEV
    ======================================================== */
 
 /* ========================================================
@@ -99,6 +97,7 @@
 
 /* ========================================================
    2. ГЛОБАЛЬНЫЙ RESET
+   ⭐ v3.3.0: user-select:none ТЕПЕРЬ НЕ применяется к inputs
    ======================================================== */
 * {
   box-sizing: border-box;
@@ -106,7 +105,12 @@
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* user-select:none — для ВСЕХ, кроме полей ввода */
+*:not(input):not(textarea):not(select) {
   user-select: none;
+  -webkit-user-select: none;
 }
 
 html, body {
@@ -813,15 +817,78 @@ div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"],
 }
 
 /* ========================================================
-   16. ПРОЧИЕ БАЗОВЫЕ ЭЛЕМЕНТЫ
+   ⭐ v3.3.0: 16. ПОЛЯ ВВОДА — КРИТИЧЕСКИЙ ФИКС
    ======================================================== */
 
-/* Инпуты */
+/* Убеждаемся, что поля ввода получают фокус, текст и каретку */
+input,
+textarea,
+.chat-input,
+.input-dark,
+.access-invite-input,
+#pcAuthInput,
+#accessInviteInput,
+#listingPriceInput,
+#p2pPriceInput,
+#lotAskingPriceInput,
+#chatReplyInput,
+#mP2PChatInput,
+#feedMessageInput,
+#bankExchangeInput,
+#bizCustomName,
+#bizCustomSlogan,
+#devLogSearchInput,
+#devStateSearchInput,
+#onboardingNickInput,
+#newClubNameInput,
+#newClubMottoInput,
+#saveExportArea {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+
+  /* Перебиваем каскад от .nick-fx-* (делал текст невидимым) */
+  -webkit-text-fill-color: currentColor !important;
+  text-fill-color: currentColor !important;
+  -webkit-background-clip: border-box !important;
+  background-clip: border-box !important;
+
+  /* Перебиваем каскад от .btn */
+  text-transform: none !important;
+
+  /* Каретка всегда видна */
+  caret-color: var(--cyan, #00f2fe) !important;
+
+  /* Touch-манипуляции для мобильного ввода */
+  touch-action: manipulation;
+  -webkit-touch-callout: default;
+}
+
+/* Дефолтная подсветка при выделении текста в полях */
+input::selection,
+textarea::selection {
+  background: rgba(0, 242, 254, 0.35);
+  color: #fff;
+}
+input::-webkit-selection,
+textarea::-webkit-selection {
+  background: rgba(0, 242, 254, 0.35);
+  color: #fff;
+}
+
+/* ========================================================
+   17. ПРОЧИЕ БАЗОВЫЕ ЭЛЕМЕНТЫ
+   ======================================================== */
+
+/* Инпуты (базовый стиль) */
 .chat-input,
 .input-dark,
 input[type="text"],
 input[type="number"],
 input[type="password"],
+input[type="email"],
+input[type="search"],
 textarea {
   background: #090e18;
   color: #fff;
@@ -833,7 +900,7 @@ textarea {
   width: 100%;
   box-sizing: border-box;
   font-family: inherit;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .chat-input:focus,
@@ -841,14 +908,21 @@ textarea {
 input[type="text"]:focus,
 input[type="number"]:focus,
 input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="search"]:focus,
 textarea:focus {
   border-color: var(--cyan);
-  box-shadow: 0 0 12px var(--cyan-glow);
+  box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.15),
+              0 0 14px var(--cyan-glow);
+  background: #0c1322;
 }
 
 .chat-input::placeholder,
 input::placeholder,
-textarea::placeholder { color: #64748b; }
+textarea::placeholder { 
+  color: #64748b; 
+  opacity: 0.7;
+}
 
 /* Select */
 select {
@@ -862,6 +936,7 @@ select {
   font-family: inherit;
   cursor: pointer;
   transition: border-color 0.2s ease;
+  user-select: none;
 }
 select:hover {
   border-color: rgba(0, 242, 254, 0.3);
@@ -886,6 +961,7 @@ input[type="range"] {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   outline: none;
+  user-select: none;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -913,13 +989,13 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ========================================================
-   17. СКРЫТИЕ ЭЛЕМЕНТОВ
+   18. СКРЫТИЕ ЭЛЕМЕНТОВ
    ======================================================== */
 .hidden { display: none !important; }
 .invisible { visibility: hidden; }
 
 /* ========================================================
-   18. АНИМАЦИИ ОБЩИЕ
+   19. АНИМАЦИИ ОБЩИЕ
    ======================================================== */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(8px); }
@@ -964,7 +1040,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ========================================================
    ══════════════════════════════════════════════════════
-   19. АДАПТИВ: БОЛЬШИЕ ТЕЛЕФОНЫ (iPhone Pro Max, Galaxy Ultra)
+   20. АДАПТИВ: БОЛЬШИЕ ТЕЛЕФОНЫ (iPhone Pro Max, Galaxy Ultra)
    ══════════════════════════════════════════════════════
    ======================================================== */
 @media (min-width: 480px) {
@@ -980,7 +1056,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ========================================================
    ══════════════════════════════════════════════════════
-   20. АДАПТИВ: ПЛАНШЕТЫ (iPad Mini/Air/Pro, Galaxy Tab)
+   21. АДАПТИВ: ПЛАНШЕТЫ (iPad Mini/Air/Pro, Galaxy Tab)
    ══════════════════════════════════════════════════════
    ======================================================== */
 @media (min-width: 768px) {
@@ -1021,7 +1097,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ========================================================
    ══════════════════════════════════════════════════════
-   21. АДАПТИВ: ПК / НОУТБУКИ (1200px+)
+   22. АДАПТИВ: ПК / НОУТБУКИ (1200px+)
    ══════════════════════════════════════════════════════
    ======================================================== */
 @media (min-width: 1200px) {
@@ -1076,7 +1152,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ========================================================
    ══════════════════════════════════════════════════════
-   22. АДАПТИВ: ОЧЕНЬ МАЛЕНЬКИЕ ЭКРАНЫ (iPhone SE, старые)
+   23. АДАПТИВ: ОЧЕНЬ МАЛЕНЬКИЕ ЭКРАНЫ (iPhone SE, старые)
    ══════════════════════════════════════════════════════
    ======================================================== */
 @media (max-width: 360px) {
@@ -1100,7 +1176,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ========================================================
    ══════════════════════════════════════════════════════
-   23. АДАПТИВ: ЛАНДШАФТ НА ТЕЛЕФОНЕ (маленькая высота)
+   24. АДАПТИВ: ЛАНДШАФТ НА ТЕЛЕФОНЕ (маленькая высота)
    ══════════════════════════════════════════════════════
    ======================================================== */
 @media (max-height: 500px) and (orientation: landscape) {
@@ -1123,7 +1199,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ========================================================
    ══════════════════════════════════════════════════════
-   24. PREFERS-REDUCED-MOTION (доступность)
+   25. PREFERS-REDUCED-MOTION (доступность)
    ══════════════════════════════════════════════════════
    ======================================================== */
 @media (prefers-reduced-motion: reduce) {
@@ -1139,7 +1215,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* ========================================================
    ══════════════════════════════════════════════════════
-   25. SAFE-AREA (iPhone с чёлкой / Dynamic Island)
+   26. SAFE-AREA (iPhone с чёлкой / Dynamic Island)
    ══════════════════════════════════════════════════════
    ======================================================== */
 @supports (padding: env(safe-area-inset-bottom)) {
@@ -1154,7 +1230,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ========================================================
-   26. ОФФЛАЙН-ИНДИКАТОР
+   27. ОФФЛАЙН-ИНДИКАТОР
    ======================================================== */
 .offline-banner {
   position: fixed;
@@ -1181,7 +1257,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ========================================================
-   ⭐ v3.2.0: 27. OWNER-ПАНЕЛЬ ПЕРЕНЕСЕНА В DEV-ПРИЛОЖЕНИЕ
+   ⭐ v3.2.0: 28. OWNER-ПАНЕЛЬ ПЕРЕНЕСЕНА В DEV-ПРИЛОЖЕНИЕ
    ======================================================== */
 
 /* Плавающая кнопка убрана — теперь управление доступом в DEV */
