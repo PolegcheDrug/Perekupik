@@ -1,6 +1,11 @@
 // ========================================================
-// js/realtime-manager.js — ЕДИНЫЙ МЕНЕДЖЕР REAL-TIME ПОДПИСОК (v1.0.0)
+// js/realtime-manager.js — ЕДИНЫЙ МЕНЕДЖЕР REAL-TIME ПОДПИСОК (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.1.0 (SPRINT 2 — P2P ТОРГ):
+//   - ДОБАВЛЕНЫ каналы p2pOffers и p2pOffersIncoming
+//   - p2pOffers: подписка на конкретный оффер по offerId
+//   - p2pOffersIncoming: подписка на все входящие офферы продавца
+//   - Маршрутизация через window.P2POffersManager
 // ⭐ v1.0.0:
 //   - Центральный менеджер всех real-time подписок Firestore
 //   - subscribe(channel, key, callback, options)
@@ -17,6 +22,8 @@
 // ИСПОЛЬЗОВАНИЕ:
 //   RealtimeManager.subscribe('lots', null, (lots) => { ... });
 //   RealtimeManager.subscribe('chat', dialogId, (msgs) => { ... });
+//   RealtimeManager.subscribe('p2pOffers', offerId, (offer) => { ... });
+//   RealtimeManager.subscribe('p2pOffersIncoming', null, (offers) => { ... });
 //   RealtimeManager.unsubscribe('chat', dialogId);
 //   RealtimeManager.unsubscribeChannel('lots');
 //   RealtimeManager.unsubscribeAll();
@@ -28,8 +35,8 @@
     /**
      * Внутренняя структура:
      *   _subscriptions: Map<string, Map<string, {callback, unsubscribe, channel, key, createdAt}>>
-     *   Ключ первого уровня — channel (lots, chat, ...)
-     *   Ключ второго уровня — key (null для глобальных, dialogId для chat, ...)
+     *   Ключ первого уровня — channel (lots, chat, p2pOffers, ...)
+     *   Ключ второго уровня — key (null для глобальных, dialogId для chat, offerId для p2pOffers, ...)
      */
     const _subscriptions = new Map();
 
@@ -140,6 +147,25 @@
                     }
                     break;
 
+                // ⭐ v1.1.0: канал P2P офферов (подписка на конкретный оффер)
+                case 'p2pOffers':
+                    if (window.P2POffersManager?.subscribeToMyOffer && key) {
+                        return window.P2POffersManager.subscribeToMyOffer(key, wrappedCallback);
+                    } else {
+                        console.warn('[RealtimeManager] p2pOffers требует key (offerId)');
+                    }
+                    break;
+
+                // ⭐ v1.1.0: канал входящих P2P офферов (для продавца)
+                case 'p2pOffersIncoming':
+                    if (window.P2POffersManager?.subscribeToIncomingOffers) {
+                        const uid = window.TelegramAuthManager?.getVerifiedUserId() || window.state?.player?.uid;
+                        if (uid) return window.P2POffersManager.subscribeToIncomingOffers(uid, wrappedCallback);
+                    } else {
+                        console.warn('[RealtimeManager] P2POffersManager не загружен');
+                    }
+                    break;
+
                 case 'storage_wars':
                     // Storage Wars использует свой механизм через StorageWarsP2P._subscribeToLobby
                     // Менеджер здесь только регистрирует факт подписки, сама подписка — внутри модуля
@@ -161,8 +187,8 @@
     const RealtimeManager = {
         /**
          * Подписаться на real-time события канала.
-         * @param {string} channel — 'lots' | 'notifications' | 'chat' | 'tradeOffers' | 'friendships' | 'clubs' | 'leaderboard' | 'events'
-         * @param {string|null} key — идентификатор (для chat — dialogId; для остальных — null)
+         * @param {string} channel — 'lots' | 'notifications' | 'chat' | 'tradeOffers' | 'friendships' | 'clubs' | 'leaderboard' | 'events' | 'p2pOffers' | 'p2pOffersIncoming'
+         * @param {string|null} key — идентификатор (для chat — dialogId; для p2pOffers — offerId; для остальных — null)
          * @param {Function} callback — обработчик
          * @param {Object} [options] — { force: bool } — пересоздать подписку, даже если уже есть
          * @returns {Function} — unsubscribe
@@ -376,6 +402,6 @@
     // Автоматическая установка слушателя онлайна
     RealtimeManager._setupOnlineListener();
 
-    console.log('[📡 RealtimeManager v1.0.0] Единый менеджер real-time подписок загружен. Каналы: lots, notifications, chat, tradeOffers, friendships, clubs, leaderboard, events ✓');
+    console.log('[📡 RealtimeManager v1.1.0] Единый менеджер real-time подписок загружен. Каналы: lots, notifications, chat, tradeOffers, friendships, clubs, leaderboard, events, p2pOffers, p2pOffersIncoming ✓');
 
 })();
