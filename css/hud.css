@@ -1,20 +1,13 @@
 /* ========================================================
-   css/hud.css — ВЕРХНЯЯ ПАНЕЛЬ + ЭФФЕКТЫ НИКНЕЙМОВ И АВАТАРА (v4.2.0)
+   css/hud.css — ВЕРХНЯЯ ПАНЕЛЬ + ЭФФЕКТЫ (v4.3.0)
    Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-   ⭐ v4.2.0:
-     - НОВОЕ МЕНЮ КАСТОМИЗАЦИИ: ГОРИЗОНТАЛЬНЫЙ СЛАЙДЕР
-     - Крупные карточки (220px) с живым превью
-     - Табы категорий (HUD / Ники / Аватары / Титулы)
-     - Индикатор прокрутки (точки)
-     - Sticky живой превью-док
-   ⭐ v4.0.0 (ПЛАТНАЯ КАСТОМИЗАЦИЯ):
-     - Стили для карточек с ценами в модалке кастомизации
-     - Золотые рамки для глитч-предметов (.theme-exclusive-frame)
-     - Плашки цен (.theme-price-badge)
-     - Бейджи владения (.theme-owned-badge)
-     - Добавлены ник-эффекты: Aurora, Ember, Plasma (глитч-версии)
-     - Добавлена аура: Supernova (глитч-версия)
-     - Строка баланса валют в шапке модалки (.cosmetics-balance-bar)
+   ⭐ v4.3.0 (SPRINT 1 — ГЛАВНЫЙ ФИКС HUD):
+   - Крупный бейдж уровня рядом с ником (.lvl-badge-hero)
+   - Автовращение иконок ресурсов (.user-stats-scroll + marquee)
+   - Микроанимации иконок (.stat-pill i)
+   - Пауза при hover/tap
+   ⭐ v4.2.0: Новое меню кастомизации (горизонтальный слайдер)
+   ⭐ v4.0.0: Платная кастомизация, глитч-предметы
    ======================================================== */
 
 /* ========================================================
@@ -148,10 +141,13 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* ⭐ v4.3.0: НИК + УРОВЕНЬ В ОДНОЙ СТРОКЕ */
 .user-name-row {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
-  text-align: center;
 }
 
 .player-name-text {
@@ -161,21 +157,80 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  width: 100%;
-  text-align: center;
-  display: block;
+  max-width: 130px;
   letter-spacing: 0.3px;
   line-height: 1.2;
+  text-align: center;
 }
 
+/* ⭐ v4.3.0: КРУПНЫЙ БЕЙДЖ УРОВНЯ */
+.lvl-badge,
+.lvl-badge-hero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-family: monospace, sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.25), rgba(121, 40, 202, 0.2));
+  color: #00f2fe;
+  border: 1px solid rgba(0, 242, 254, 0.6);
+  box-shadow:
+    0 0 10px rgba(0, 242, 254, 0.4),
+    inset 0 0 6px rgba(0, 242, 254, 0.15);
+  text-shadow: 0 0 6px rgba(0, 242, 254, 0.8);
+  white-space: nowrap;
+  flex-shrink: 0;
+  animation: lvlBadgePulse 3s infinite alternate ease-in-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.lvl-badge-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -60%;
+  width: 40%;
+  height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: rotate(25deg);
+  animation: lvlShimmer 4s infinite ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes lvlBadgePulse {
+  0% {
+    box-shadow: 0 0 8px rgba(0, 242, 254, 0.35),
+                inset 0 0 4px rgba(0, 242, 254, 0.1);
+    border-color: rgba(0, 242, 254, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 16px rgba(0, 242, 254, 0.65),
+                inset 0 0 8px rgba(0, 242, 254, 0.25);
+    border-color: rgba(0, 242, 254, 0.9);
+  }
+}
+
+@keyframes lvlShimmer {
+  0% { left: -60%; }
+  40%, 100% { left: 160%; }
+}
+
+/* Старый класс для обратной совместимости */
 .lvl-badge {
   font-size: 8.5px;
-  font-weight: 900;
   padding: 1px 5px;
   border-radius: 5px;
   background: rgba(0, 242, 254, 0.15);
   color: var(--cyan, #00f2fe);
   border: 1px solid var(--border-glow, rgba(0, 242, 254, 0.25));
+  box-shadow: none;
+  animation: none;
 }
 
 .xp-bar-wrap {
@@ -209,26 +264,55 @@
 }
 
 /* ========================================================
-   СТРОКА СТАТОВ И ВАЛЮТ С ГОРИЗОНТАЛЬНЫМ СКРОЛЛОМ
+   ⭐ v4.3.0: СТРОКА СТАТОВ — АВТОВРАЩЕНИЕ (MARQUEE)
    ======================================================== */
-.user-stats-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+
+/* Обёртка — маскирует края, отсекает overflow */
+.user-stats-scroll {
+  position: relative;
   width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  margin-top: 2px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+}
+
+/* Внутренняя лента — анимация прокрутки */
+.user-stats-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: max-content !important;
   padding: 2px 0 4px 0;
-  flex-wrap: nowrap;
+  flex-wrap: nowrap !important;
+  animation: statsAutoScroll 30s linear infinite !important;
+  will-change: transform;
 }
 
-.user-stats-row::-webkit-scrollbar {
-  display: none;
+/* Пауза при касании/наведении */
+.user-stats-scroll:hover .user-stats-row,
+.user-stats-scroll:active .user-stats-row,
+.user-stats-scroll:focus-within .user-stats-row {
+  animation-play-state: paused !important;
 }
 
+@keyframes statsAutoScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Fallback: если контент не продублирован — не показываем пустоту */
+.user-stats-row:not(.duplicated) {
+  animation-duration: 30s;
+}
+
+/* Скрываем скроллбар у обёртки */
+.user-stats-scroll::-webkit-scrollbar { display: none; }
+.user-stats-scroll { scrollbar-width: none; }
+
+/* ========================================================
+   3. СТАТ-ПИЛЛЫ (ИКОНКИ РЕСУРСОВ)
+   ======================================================== */
 .stat-pill {
   font-size: 9.5px;
   font-weight: 800;
@@ -246,26 +330,81 @@
   transition: transform 0.12s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* ⭐ v4.3.0: Микроанимация иконок внутри пиллов */
+.stat-pill i {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), 
+              filter 0.25s ease;
+  display: inline-block;
+}
+
 .stat-pill:hover {
   background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.stat-pill:hover i {
+  transform: scale(1.18);
+  filter: drop-shadow(0 0 6px currentColor);
 }
 
 .stat-pill:active {
   transform: scale(0.95);
 }
 
+/* Мягкий bounce иконок периодически */
+@keyframes iconSoftBounce {
+  0%, 88%, 100% { transform: translateY(0) scale(1); }
+  90%           { transform: translateY(-2px) scale(1.08); }
+  94%           { transform: translateY(0) scale(1); }
+}
+
+.stat-pill i.fa-handshake,
+.stat-pill i.fa-face-smile,
+.stat-pill i.fa-warehouse,
+.stat-pill i.fa-money-bill-wave,
+.stat-pill i.fa-dharmachakra,
+.stat-pill i.fa-gas-pump,
+.stat-pill i.fa-ticket {
+  animation: iconSoftBounce 6s infinite ease-in-out;
+}
+
+/* Каждая иконка — своя задержка, чтобы не совпадали */
+.stat-pill:nth-child(1) i { animation-delay: 0s; }
+.stat-pill:nth-child(2) i { animation-delay: 0.4s; }
+.stat-pill:nth-child(3) i { animation-delay: 0.8s; }
+.stat-pill:nth-child(4) i { animation-delay: 1.2s; }
+.stat-pill:nth-child(5) i { animation-delay: 1.6s; }
+.stat-pill:nth-child(6) i { animation-delay: 2.0s; }
+.stat-pill:nth-child(7) i { animation-delay: 2.4s; }
+
+/* Цветовые схемы по типам ресурсов */
 .stat-pill-conn { color: var(--purple, #c084fc); border-color: rgba(192, 132, 252, 0.25); }
 .stat-pill-karma { color: var(--amber, #ffb300); border-color: rgba(255, 179, 0, 0.25); }
-.stat-pill-garage { color: var(--cyan, #00f2fe); border-color: var(--border-glow, rgba(0, 242, 254, 0.25)); cursor: pointer; }
+.stat-pill-garage { color: var(--cyan, #00f2fe); border-color: var(--border-glow, rgba(0, 242, 254, 0.25)); }
 .stat-pill-note { color: #34d399; border-color: rgba(52, 211, 153, 0.35); background: rgba(16, 185, 129, 0.08); }
 .stat-pill-superspin { color: #fbbf24; border-color: rgba(251, 191, 36, 0.35); background: rgba(245, 158, 11, 0.08); }
 .stat-pill-fuel { color: #38bdf8; border-color: rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.08); }
 .stat-pill-ticket { color: #c084fc; border-color: rgba(192, 132, 252, 0.35); background: rgba(192, 132, 252, 0.08); }
 
-.wallet-stats-row {
-  display: none;
+/* Пульсация при > 5 ресурсов (класс добавляется из JS) */
+.res-pulse-active {
+  animation: neonPulseGlow 1.8s infinite alternate ease-in-out !important;
 }
 
+@keyframes neonPulseGlow {
+  0% {
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.1);
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 14px currentColor, inset 0 0 8px currentColor;
+    transform: scale(1.05);
+  }
+}
+
+/* ========================================================
+   4. КОШЕЛЁК
+   ======================================================== */
 .wallet-dashboard {
   display: flex;
   flex-direction: column;
@@ -274,9 +413,6 @@
   flex-shrink: 0;
 }
 
-/* ========================================================
-   ЖИВОЙ БАЛАНС РУБЛЕЙ
-   ======================================================== */
 .wallet-capsule-box {
   position: relative;
   cursor: pointer;
@@ -393,7 +529,7 @@
 }
 
 /* ========================================================
-   4. НИЖНИЙ РЯД HUD
+   5. НИЖНИЙ РЯД HUD
    ======================================================== */
 .hud-bottom-row {
   display: flex;
@@ -482,21 +618,12 @@
 }
 
 /* ========================================================
-   5. НИК-ЭФФЕКТЫ — 8 ПРОДВИНУТЫХ
+   6. НИК-ЭФФЕКТЫ — 8 ПРОДВИНУТЫХ (без изменений)
    ======================================================== */
 
-/* ===== 5.1. HOLOGRAPHIC SHIFT ===== */
+/* ===== 6.1. HOLOGRAPHIC SHIFT ===== */
 .nick-fx-holographic {
-  background: linear-gradient(
-    90deg,
-    #ff0080 0%,
-    #ff8c00 15%,
-    #ffd700 30%,
-    #00ff88 45%,
-    #00d4ff 60%,
-    #7b2ff7 75%,
-    #ff0080 100%
-  );
+  background: linear-gradient(90deg, #ff0080 0%, #ff8c00 15%, #ffd700 30%, #00ff88 45%, #00d4ff 60%, #7b2ff7 75%, #ff0080 100%);
   background-size: 400% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -512,18 +639,9 @@
   100% { background-position: 400% 50%; filter: drop-shadow(0 0 4px rgba(255, 0, 128, 0.5)); }
 }
 
-/* ===== 5.2. LIQUID CHROME ===== */
+/* ===== 6.2. LIQUID CHROME ===== */
 .nick-fx-chrome {
-  background: linear-gradient(
-    100deg,
-    #8a8a8a 0%,
-    #f5f5f5 20%,
-    #c0c0c0 35%,
-    #ffffff 50%,
-    #a8a8a8 65%,
-    #f0f0f0 80%,
-    #8a8a8a 100%
-  );
+  background: linear-gradient(100deg, #8a8a8a 0%, #f5f5f5 20%, #c0c0c0 35%, #ffffff 50%, #a8a8a8 65%, #f0f0f0 80%, #8a8a8a 100%);
   background-size: 250% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -536,13 +654,10 @@
   50%      { background-position: 100% 50%; }
 }
 
-/* ===== 5.3. CYBER GLITCH ===== */
+/* ===== 6.3. CYBER GLITCH ===== */
 .nick-fx-glitch {
   color: #fff;
-  text-shadow:
-    2px 0 0 #ff0080,
-   -2px 0 0 #00f2fe,
-    0  2px 0 #00ff88;
+  text-shadow: 2px 0 0 #ff0080, -2px 0 0 #00f2fe, 0 2px 0 #00ff88;
   animation: glitchShift 1.8s infinite steps(8, end);
   position: relative;
 }
@@ -587,16 +702,9 @@
   50%      { opacity: 0.4; transform: translate(3px, 0); }
 }
 
-/* ===== 5.4. AURORA FLOW ===== */
+/* ===== 6.4. AURORA FLOW ===== */
 .nick-fx-aurora {
-  background: linear-gradient(
-    90deg,
-    #00ff88 0%,
-    #00d4ff 25%,
-    #7b2ff7 50%,
-    #00d4ff 75%,
-    #00ff88 100%
-  );
+  background: linear-gradient(90deg, #00ff88 0%, #00d4ff 25%, #7b2ff7 50%, #00d4ff 75%, #00ff88 100%);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -610,16 +718,9 @@
   66%      { background-position: 100% 50%; filter: drop-shadow(0 0 8px rgba(123, 47, 247, 0.6)); }
 }
 
-/* ===== 5.5. PLASMA STORM ===== */
+/* ===== 6.5. PLASMA STORM ===== */
 .nick-fx-plasma {
-  background: linear-gradient(
-    90deg,
-    #a855f7 0%,
-    #f43f5e 30%,
-    #ffffff 50%,
-    #f43f5e 70%,
-    #a855f7 100%
-  );
+  background: linear-gradient(90deg, #a855f7 0%, #f43f5e 30%, #ffffff 50%, #f43f5e 70%, #a855f7 100%);
   background-size: 250% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -628,26 +729,13 @@
   filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.7)) drop-shadow(0 0 12px rgba(244, 63, 94, 0.5));
 }
 @keyframes plasmaPulse {
-  0%, 100% {
-    background-position: 0% 50%;
-    filter: drop-shadow(0 0 5px rgba(168, 85, 247, 0.6)) drop-shadow(0 0 10px rgba(244, 63, 94, 0.4));
-  }
-  50% {
-    background-position: 100% 50%;
-    filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.9)) drop-shadow(0 0 18px rgba(244, 63, 94, 0.7));
-  }
+  0%, 100% { background-position: 0% 50%; filter: drop-shadow(0 0 5px rgba(168, 85, 247, 0.6)) drop-shadow(0 0 10px rgba(244, 63, 94, 0.4)); }
+  50%      { background-position: 100% 50%; filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.9)) drop-shadow(0 0 18px rgba(244, 63, 94, 0.7)); }
 }
 
-/* ===== 5.6. EMBER SPARKS ===== */
+/* ===== 6.6. EMBER SPARKS ===== */
 .nick-fx-ember {
-  background: linear-gradient(
-    90deg,
-    #ff6600 0%,
-    #ffb300 30%,
-    #ffd700 50%,
-    #ffb300 70%,
-    #ff6600 100%
-  );
+  background: linear-gradient(90deg, #ff6600 0%, #ffb300 30%, #ffd700 50%, #ffb300 70%, #ff6600 100%);
   background-size: 250% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -669,30 +757,17 @@
   filter: blur(1px);
 }
 @keyframes emberGlow {
-  0%, 100% {
-    background-position: 0% 50%;
-    filter: drop-shadow(0 0 4px rgba(255, 102, 0, 0.6)) drop-shadow(0 0 8px rgba(255, 179, 0, 0.4));
-  }
-  50% {
-    background-position: 100% 50%;
-    filter: drop-shadow(0 0 8px rgba(255, 102, 0, 0.9)) drop-shadow(0 0 16px rgba(255, 179, 0, 0.7));
-  }
+  0%, 100% { background-position: 0% 50%; filter: drop-shadow(0 0 4px rgba(255, 102, 0, 0.6)) drop-shadow(0 0 8px rgba(255, 179, 0, 0.4)); }
+  50%      { background-position: 100% 50%; filter: drop-shadow(0 0 8px rgba(255, 102, 0, 0.9)) drop-shadow(0 0 16px rgba(255, 179, 0, 0.7)); }
 }
 @keyframes emberSpark {
   0%, 100% { opacity: 0.6; transform: scaleX(0.9); }
   50%      { opacity: 1;   transform: scaleX(1.05); }
 }
 
-/* ===== 5.7. QUANTUM (ГЛИТЧ-НИК) ===== */
+/* ===== 6.7. QUANTUM (ГЛИТЧ-НИК) ===== */
 .nick-fx-quantum {
-  background: linear-gradient(
-    90deg,
-    #00f2fe 0%,
-    #7b2ff7 25%,
-    #ff0080 50%,
-    #7b2ff7 75%,
-    #00f2fe 100%
-  );
+  background: linear-gradient(90deg, #00f2fe 0%, #7b2ff7 25%, #ff0080 50%, #7b2ff7 75%, #00f2fe 100%);
   background-size: 300% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -723,27 +798,16 @@
   z-index: -1;
 }
 @keyframes quantumNick {
-  0%, 100% {
-    background-position: 0% 50%;
-    filter: drop-shadow(0 0 6px rgba(123, 47, 247, 0.7)) drop-shadow(0 0 12px rgba(0, 242, 254, 0.5));
-  }
-  50% {
-    background-position: 100% 50%;
-    filter: drop-shadow(0 0 14px rgba(123, 47, 247, 1)) drop-shadow(0 0 24px rgba(0, 242, 254, 0.8));
-  }
+  0%, 100% { background-position: 0% 50%; filter: drop-shadow(0 0 6px rgba(123, 47, 247, 0.7)) drop-shadow(0 0 12px rgba(0, 242, 254, 0.5)); }
+  50%      { background-position: 100% 50%; filter: drop-shadow(0 0 14px rgba(123, 47, 247, 1)) drop-shadow(0 0 24px rgba(0, 242, 254, 0.8)); }
 }
 
 /* ========================================================
-   6. АУРЫ АВАТАРА — 10 ПРОДВИНУТЫХ
+   7. АУРЫ АВАТАРА — 10 ПРОДВИНУТЫХ (без изменений)
    ======================================================== */
 
-/* ===== 6.1. FIRE RING ===== */
 .avatar-fx-fire-ring .avatar-fx-glow {
-  background: radial-gradient(circle,
-    rgba(255, 102, 0, 0.95) 0%,
-    rgba(255, 179, 0, 0.7) 40%,
-    rgba(255, 51, 0, 0.3) 70%,
-    transparent 100%);
+  background: radial-gradient(circle, rgba(255, 102, 0, 0.95) 0%, rgba(255, 179, 0, 0.7) 40%, rgba(255, 51, 0, 0.3) 70%, transparent 100%);
   animation: fireRing 1.5s ease-in-out infinite;
   opacity: 0.95;
   filter: blur(6px);
@@ -754,15 +818,7 @@
   inset: -8px;
   border-radius: 50%;
   pointer-events: none;
-  background: conic-gradient(
-    from 0deg,
-    #ff3300 0%,
-    #ff6600 20%,
-    #ffb300 40%,
-    #ffd700 60%,
-    #ff6600 80%,
-    #ff3300 100%
-  );
+  background: conic-gradient(from 0deg, #ff3300 0%, #ff6600 20%, #ffb300 40%, #ffd700 60%, #ff6600 80%, #ff3300 100%);
   animation: fireRingSpin 2s linear infinite;
   filter: blur(6px) brightness(1.4);
   opacity: 0.85;
@@ -782,22 +838,14 @@
   0%, 100% { transform: scale(0.95); opacity: 0.85; filter: blur(5px); }
   50%      { transform: scale(1.12); opacity: 1; filter: blur(8px); }
 }
-@keyframes fireRingSpin {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+@keyframes fireRingSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes fireFlame {
   0%   { transform: scale(0.9) translateY(0); opacity: 0.8; }
   100% { transform: scale(1.2) translateY(-3px); opacity: 1; }
 }
 
-/* ===== 6.2. SNOW STORM ===== */
 .avatar-fx-snow-storm .avatar-fx-glow {
-  background: radial-gradient(circle,
-    rgba(200, 230, 255, 0.9) 0%,
-    rgba(0, 212, 255, 0.6) 40%,
-    rgba(255, 255, 255, 0.3) 70%,
-    transparent 100%);
+  background: radial-gradient(circle, rgba(200, 230, 255, 0.9) 0%, rgba(0, 212, 255, 0.6) 40%, rgba(255, 255, 255, 0.3) 70%, transparent 100%);
   animation: snowPulse 2.5s ease-in-out infinite;
   opacity: 0.85;
   filter: blur(7px);
@@ -828,13 +876,8 @@
   100% { transform: translateY(8px) rotate(20deg); opacity: 0.6; }
 }
 
-/* ===== 6.3. LAVA CORE ===== */
 .avatar-fx-lava-core .avatar-fx-glow {
-  background: radial-gradient(circle,
-    rgba(255, 204, 0, 0.95) 0%,
-    rgba(255, 60, 0, 0.85) 35%,
-    rgba(139, 0, 0, 0.5) 70%,
-    transparent 100%);
+  background: radial-gradient(circle, rgba(255, 204, 0, 0.95) 0%, rgba(255, 60, 0, 0.85) 35%, rgba(139, 0, 0, 0.5) 70%, transparent 100%);
   animation: lavaBubble 2s ease-in-out infinite;
   opacity: 0.95;
   filter: blur(7px);
@@ -864,13 +907,8 @@
   50%      { opacity: 1; transform: scale(1.15); }
 }
 
-/* ===== 6.4. SPINNING RIM ===== */
 .avatar-fx-spinning-rim .avatar-fx-glow {
-  background: radial-gradient(circle,
-    rgba(255, 255, 255, 0.5) 0%,
-    rgba(192, 192, 192, 0.4) 40%,
-    rgba(120, 120, 120, 0.3) 70%,
-    transparent 100%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, rgba(192, 192, 192, 0.4) 40%, rgba(120, 120, 120, 0.3) 70%, transparent 100%);
   animation: rimGlow 2s linear infinite;
   opacity: 0.8;
   filter: blur(5px);
@@ -901,22 +939,14 @@
   50%  { opacity: 1; }
   100% { transform: rotate(360deg); opacity: 0.7; }
 }
-@keyframes rimSpin {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+@keyframes rimSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes rimWobble {
   0%   { transform: translateX(0) rotate(-10deg); }
   100% { transform: translateX(3px) rotate(10deg); }
 }
 
-/* ===== 6.5. TIRE SMOKE ===== */
 .avatar-fx-tire-smoke .avatar-fx-glow {
-  background: radial-gradient(circle,
-    rgba(80, 80, 90, 0.85) 0%,
-    rgba(140, 140, 150, 0.55) 40%,
-    rgba(200, 200, 210, 0.25) 70%,
-    transparent 100%);
+  background: radial-gradient(circle, rgba(80, 80, 90, 0.85) 0%, rgba(140, 140, 150, 0.55) 40%, rgba(200, 200, 210, 0.25) 70%, transparent 100%);
   animation: smokePuff 2.5s ease-in-out infinite;
   opacity: 0.85;
   filter: blur(8px);
@@ -958,16 +988,8 @@
   50%      { opacity: 0.9; transform: translate(4px, -4px) scale(1.15); }
 }
 
-/* ===== 6.6. AURORA HALO ===== */
 .avatar-fx-aurora-halo .avatar-fx-glow {
-  background: conic-gradient(
-    from 0deg,
-    #00ff88 0%,
-    #00d4ff 25%,
-    #7b2ff7 50%,
-    #00d4ff 75%,
-    #00ff88 100%
-  );
+  background: conic-gradient(from 0deg, #00ff88 0%, #00d4ff 25%, #7b2ff7 50%, #00d4ff 75%, #00ff88 100%);
   animation: auroraHaloSpin 4s linear infinite;
   opacity: 0.85;
   filter: blur(7px);
@@ -977,29 +999,16 @@
   position: absolute;
   inset: -6px;
   border-radius: 50%;
-  background: conic-gradient(
-    from 180deg,
-    rgba(0, 255, 136, 0.4),
-    rgba(0, 212, 255, 0.5),
-    rgba(123, 47, 247, 0.4),
-    rgba(0, 212, 255, 0.5),
-    rgba(0, 255, 136, 0.4)
-  );
+  background: conic-gradient(from 180deg, rgba(0, 255, 136, 0.4), rgba(0, 212, 255, 0.5), rgba(123, 47, 247, 0.4), rgba(0, 212, 255, 0.5), rgba(0, 255, 136, 0.4));
   animation: auroraHaloSpin 5s linear infinite reverse;
   filter: blur(10px);
   pointer-events: none;
   z-index: 1;
 }
-@keyframes auroraHaloSpin {
-  0%   { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+@keyframes auroraHaloSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-/* ===== 6.7. CYBER SCAN ===== */
 .avatar-fx-cyber-scan .avatar-fx-glow {
-  background: radial-gradient(circle,
-    rgba(0, 242, 254, 0.6) 0%,
-    transparent 70%);
+  background: radial-gradient(circle, rgba(0, 242, 254, 0.6) 0%, transparent 70%);
   animation: cyberPulse 2s ease-in-out infinite;
   opacity: 0.7;
   filter: blur(6px);
@@ -1022,16 +1031,7 @@
   left: -6px;
   right: -6px;
   border-radius: 50%;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    transparent 45%,
-    rgba(0, 242, 254, 0.8) 48%,
-    rgba(0, 242, 254, 1) 50%,
-    rgba(0, 242, 254, 0.8) 52%,
-    transparent 55%,
-    transparent 100%
-  );
+  background: linear-gradient(180deg, transparent 0%, transparent 45%, rgba(0, 242, 254, 0.8) 48%, rgba(0, 242, 254, 1) 50%, rgba(0, 242, 254, 0.8) 52%, transparent 55%, transparent 100%);
   animation: cyberScanMove 2s linear infinite;
   pointer-events: none;
   z-index: 3;
@@ -1048,12 +1048,8 @@
   100% { transform: translateY(100%); opacity: 0; }
 }
 
-/* ===== 6.8. QUANTUM SHIELD ===== */
 .avatar-fx-quantum .avatar-fx-glow {
-  background: radial-gradient(circle,
-    rgba(168, 85, 247, 0.8) 0%,
-    rgba(99, 102, 241, 0.5) 50%,
-    transparent 100%);
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.8) 0%, rgba(99, 102, 241, 0.5) 50%, transparent 100%);
   animation: quantumPulse 2.5s ease-in-out infinite;
   opacity: 0.9;
   filter: blur(6px);
@@ -1089,19 +1085,10 @@
   50%  { transform: rotate(180deg) scale(1.05); }
   100% { transform: rotate(360deg) scale(1); }
 }
-@keyframes quantumRing2 {
-  0%   { transform: rotate(0deg) scale(1); }
-  100% { transform: rotate(360deg) scale(1); }
-}
+@keyframes quantumRing2 { 0% { transform: rotate(0deg) scale(1); } 100% { transform: rotate(360deg) scale(1); } }
 
-/* ===== 6.9. SUPERNOVA (ГЛИТЧ-АУРА) ===== */
 .avatar-fx-supernova .avatar-fx-glow {
-  background: radial-gradient(circle,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(0, 242, 254, 0.85) 25%,
-    rgba(192, 132, 252, 0.6) 55%,
-    rgba(255, 0, 128, 0.3) 80%,
-    transparent 100%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(0, 242, 254, 0.85) 25%, rgba(192, 132, 252, 0.6) 55%, rgba(255, 0, 128, 0.3) 80%, transparent 100%);
   animation: supernovaPulse 2s ease-in-out infinite;
   opacity: 1;
   filter: blur(8px);
@@ -1112,23 +1099,7 @@
   inset: -14px;
   border-radius: 50%;
   pointer-events: none;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0%,
-    rgba(0, 242, 254, 0.9) 8%,
-    transparent 15%,
-    rgba(255, 0, 128, 0.9) 22%,
-    transparent 30%,
-    rgba(192, 132, 252, 0.9) 38%,
-    transparent 45%,
-    rgba(0, 242, 254, 0.9) 52%,
-    transparent 60%,
-    rgba(255, 0, 128, 0.9) 68%,
-    transparent 75%,
-    rgba(192, 132, 252, 0.9) 82%,
-    transparent 90%,
-    rgba(0, 242, 254, 0.9) 100%
-  );
+  background: conic-gradient(from 0deg, transparent 0%, rgba(0, 242, 254, 0.9) 8%, transparent 15%, rgba(255, 0, 128, 0.9) 22%, transparent 30%, rgba(192, 132, 252, 0.9) 38%, transparent 45%, rgba(0, 242, 254, 0.9) 52%, transparent 60%, rgba(255, 0, 128, 0.9) 68%, transparent 75%, rgba(192, 132, 252, 0.9) 82%, transparent 90%, rgba(0, 242, 254, 0.9) 100%);
   animation: supernovaRays 3s linear infinite;
   filter: blur(5px) brightness(1.5);
   opacity: 0.9;
@@ -1145,16 +1116,8 @@
   z-index: 5;
 }
 @keyframes supernovaPulse {
-  0%, 100% {
-    transform: scale(0.94);
-    opacity: 0.85;
-    filter: blur(7px) brightness(1);
-  }
-  50% {
-    transform: scale(1.18);
-    opacity: 1;
-    filter: blur(11px) brightness(1.4);
-  }
+  0%, 100% { transform: scale(0.94); opacity: 0.85; filter: blur(7px) brightness(1); }
+  50%      { transform: scale(1.18); opacity: 1; filter: blur(11px) brightness(1.4); }
 }
 @keyframes supernovaRays {
   0%   { transform: rotate(0deg) scale(1); }
@@ -1167,18 +1130,13 @@
 }
 
 /* ========================================================
-   ⭐ v4.2.0: НОВОЕ МЕНЮ КАСТОМИЗАЦИИ — ГОРИЗОНТАЛЬНЫЙ СЛАЙДЕР
+   8. НОВОЕ МЕНЮ КАСТОМИЗАЦИИ (без изменений)
    ======================================================== */
-
-/* Sticky-превью сверху модалки */
 .cosmetics-live-preview {
   position: sticky;
   top: -18px;
   z-index: 20;
-  background: linear-gradient(180deg, 
-    rgba(9, 14, 24, 0.99) 0%, 
-    rgba(9, 14, 24, 0.94) 85%, 
-    rgba(9, 14, 24, 0) 100%);
+  background: linear-gradient(180deg, rgba(9, 14, 24, 0.99) 0%, rgba(9, 14, 24, 0.94) 85%, rgba(9, 14, 24, 0) 100%);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   padding: 14px 18px 18px 18px;
@@ -1186,21 +1144,9 @@
   border-bottom: 1px solid rgba(0, 242, 254, 0.15);
   transition: box-shadow 0.3s ease;
 }
-
-.cosmetics-live-preview.scrolled {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-}
-
-.cosmetics-live-preview-inner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.cosmetics-live-avatar {
-  flex-shrink: 0;
-}
-
+.cosmetics-live-preview.scrolled { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
+.cosmetics-live-preview-inner { display: flex; align-items: center; gap: 12px; }
+.cosmetics-live-avatar { flex-shrink: 0; }
 .cosmetics-live-nick {
   flex: 1;
   min-width: 0;
@@ -1219,27 +1165,6 @@
   position: relative;
 }
 
-.cosmetics-live-nick::after {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, 
-    rgba(0, 242, 254, 0.3), 
-    rgba(192, 132, 252, 0.3));
-  opacity: 0;
-  z-index: -1;
-  filter: blur(6px);
-  transition: opacity 0.3s ease;
-}
-
-.cosmetics-live-nick.active::after {
-  opacity: 1;
-}
-
-/* ========================================================
-   ТАБЫ КАТЕГОРИЙ (HUD / НИКИ / АВАТАРЫ / ТИТУЛЫ)
-   ======================================================== */
 .cosmetics-tabs-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1250,7 +1175,6 @@
   border-radius: 12px;
   margin-bottom: 14px;
 }
-
 .cosmetics-tab {
   background: transparent;
   border: 1px solid transparent;
@@ -1270,50 +1194,32 @@
   position: relative;
   overflow: hidden;
 }
-
 .cosmetics-tab::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 100%, 
-    rgba(0, 242, 254, 0.15) 0%, 
-    transparent 70%);
+  background: radial-gradient(circle at 50% 100%, rgba(0, 242, 254, 0.15) 0%, transparent 70%);
   opacity: 0;
   transition: opacity 0.25s ease;
   pointer-events: none;
 }
-
 .cosmetics-tab:hover::before { opacity: 1; }
-
-.cosmetics-tab i { 
-  font-size: 15px; 
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
+.cosmetics-tab i { font-size: 15px; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
 .cosmetics-tab span { font-size: 8.5px; letter-spacing: 0.2px; }
-
 .cosmetics-tab:hover i { transform: translateY(-1px) scale(1.1); }
-
 .cosmetics-tab:active { transform: scale(0.95); }
-
 .cosmetics-tab.active {
-  background: linear-gradient(135deg, 
-    rgba(0, 242, 254, 0.2), 
-    rgba(121, 40, 202, 0.25));
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.2), rgba(121, 40, 202, 0.25));
   border-color: rgba(0, 242, 254, 0.55);
   color: #fff;
-  box-shadow: 0 0 14px rgba(0, 242, 254, 0.3),
-              inset 0 0 10px rgba(0, 242, 254, 0.08);
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.3), inset 0 0 10px rgba(0, 242, 254, 0.08);
 }
-
 .cosmetics-tab.active i {
   color: var(--cyan);
   filter: drop-shadow(0 0 6px var(--cyan-glow));
   transform: translateY(-1px) scale(1.12);
 }
 
-/* ========================================================
-   ГОРИЗОНТАЛЬНЫЙ СЛАЙДЕР КАРТОЧЕК
-   ======================================================== */
 .cosmetics-scroll-row {
   display: flex;
   gap: 12px;
@@ -1327,14 +1233,11 @@
 }
 .cosmetics-scroll-row::-webkit-scrollbar { display: none; }
 
-/* Карточка косметики — крупная */
 .cosmetic-card {
   flex: 0 0 auto;
   width: 220px;
   scroll-snap-align: center;
-  background: linear-gradient(160deg, 
-    rgba(20, 30, 48, 0.98) 0%, 
-    rgba(9, 14, 25, 0.99) 100%);
+  background: linear-gradient(160deg, rgba(20, 30, 48, 0.98) 0%, rgba(9, 14, 25, 0.99) 100%);
   border: 1.5px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   padding: 14px;
@@ -1344,54 +1247,19 @@
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.25s ease,
-              box-shadow 0.3s ease;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease, box-shadow 0.3s ease;
   animation: cardStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
-
-.cosmetic-card:nth-child(1) { animation-delay: 0.03s; }
-.cosmetic-card:nth-child(2) { animation-delay: 0.06s; }
-.cosmetic-card:nth-child(3) { animation-delay: 0.09s; }
-.cosmetic-card:nth-child(4) { animation-delay: 0.12s; }
-.cosmetic-card:nth-child(5) { animation-delay: 0.15s; }
-.cosmetic-card:nth-child(6) { animation-delay: 0.18s; }
-.cosmetic-card:nth-child(7) { animation-delay: 0.21s; }
-.cosmetic-card:nth-child(8) { animation-delay: 0.24s; }
-
-.cosmetic-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 50% 0%, 
-    rgba(0, 242, 254, 0.1) 0%, 
-    transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-}
-
 .cosmetic-card:hover {
   transform: translateY(-4px);
   border-color: rgba(0, 242, 254, 0.45);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6),
-              0 0 24px rgba(0, 242, 254, 0.2);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 242, 254, 0.2);
 }
-.cosmetic-card:hover::before { opacity: 1; }
-
-.cosmetic-card:active {
-  transform: scale(0.98);
-}
-
 .cosmetic-card.selected {
   border-color: var(--cyan);
-  background: linear-gradient(160deg, 
-    rgba(0, 242, 254, 0.16) 0%, 
-    rgba(9, 14, 25, 0.99) 100%);
-  box-shadow: 0 0 26px var(--cyan-glow),
-              inset 0 0 16px rgba(0, 242, 254, 0.1);
+  background: linear-gradient(160deg, rgba(0, 242, 254, 0.16) 0%, rgba(9, 14, 25, 0.99) 100%);
+  box-shadow: 0 0 26px var(--cyan-glow), inset 0 0 16px rgba(0, 242, 254, 0.1);
 }
-
 .cosmetic-card.selected::after {
   content: '✓';
   position: absolute;
@@ -1411,13 +1279,11 @@
   z-index: 5;
   animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
 @keyframes checkPop {
   0% { transform: scale(0) rotate(-180deg); }
   100% { transform: scale(1) rotate(0); }
 }
 
-/* Превью эффекта в карточке — БОЛЬШОЕ */
 .cosmetic-card-preview {
   height: 76px;
   border-radius: 12px;
@@ -1429,7 +1295,6 @@
   overflow: hidden;
   position: relative;
 }
-
 .cosmetic-card-preview::after {
   content: '';
   position: absolute;
@@ -1437,12 +1302,9 @@
   left: 0;
   right: 0;
   height: 50%;
-  background: linear-gradient(to top, 
-    rgba(0, 0, 0, 0.4) 0%, 
-    transparent 100%);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.4) 0%, transparent 100%);
   pointer-events: none;
 }
-
 .cosmetic-card-preview-text {
   font-size: 17px;
   font-weight: 900;
@@ -1451,7 +1313,6 @@
   position: relative;
   z-index: 1;
 }
-
 .cosmetic-card-preview-avatar {
   width: 60px;
   height: 60px;
@@ -1461,25 +1322,10 @@
   justify-content: center;
   z-index: 1;
 }
+.cosmetic-card-preview-avatar .avatar-ring { width: 60px; height: 60px; }
+.cosmetic-card-preview-avatar .avatar { width: 48px; height: 48px; font-size: 20px; }
 
-.cosmetic-card-preview-avatar .avatar-ring {
-  width: 60px;
-  height: 60px;
-}
-.cosmetic-card-preview-avatar .avatar {
-  width: 48px;
-  height: 48px;
-  font-size: 20px;
-}
-
-/* Инфо-блок карточки */
-.cosmetic-card-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-
+.cosmetic-card-info { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .cosmetic-card-name {
   font-size: 13px;
   font-weight: 900;
@@ -1489,7 +1335,6 @@
   text-overflow: ellipsis;
   letter-spacing: 0.2px;
 }
-
 .cosmetic-card-desc {
   font-size: 9.5px;
   color: #94a3b8;
@@ -1500,17 +1345,8 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.cosmetic-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
 
-.cosmetic-card-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 2px;
-}
-
-/* Кнопка действия */
 .cosmetic-card-action {
   width: 100%;
   padding: 10px 12px;
@@ -1524,52 +1360,32 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: transform 0.15s ease, 
-              filter 0.15s ease, 
-              box-shadow 0.25s ease;
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.25s ease;
   text-transform: uppercase;
   font-family: inherit;
 }
-
 .cosmetic-card-action:active { transform: scale(0.96); }
-
 .cosmetic-card-action.action-apply {
   background: linear-gradient(135deg, var(--cyan), #0284c7);
   color: #000;
   box-shadow: 0 0 14px var(--cyan-glow);
 }
-.cosmetic-card-action.action-apply:hover {
-  box-shadow: 0 0 22px var(--cyan-glow);
-  filter: brightness(1.1);
-}
-
 .cosmetic-card-action.action-buy {
   background: linear-gradient(135deg, var(--green), #059669);
   color: #000;
   box-shadow: 0 0 14px var(--green-glow);
 }
-.cosmetic-card-action.action-buy:hover {
-  box-shadow: 0 0 22px var(--green-glow);
-  filter: brightness(1.1);
-}
-
 .cosmetic-card-action.action-buy-tickets {
   background: linear-gradient(135deg, #ffd700, #f59e0b);
   color: #000;
   box-shadow: 0 0 14px rgba(255, 215, 0, 0.5);
 }
-.cosmetic-card-action.action-buy-tickets:hover {
-  box-shadow: 0 0 22px rgba(255, 215, 0, 0.75);
-  filter: brightness(1.1);
-}
-
 .cosmetic-card-action.action-locked {
   background: rgba(255, 255, 255, 0.05);
   color: #64748b;
   cursor: not-allowed;
   box-shadow: none;
 }
-
 .cosmetic-card-action.action-active {
   background: rgba(0, 230, 118, 0.15);
   color: var(--green);
@@ -1577,27 +1393,14 @@
   cursor: default;
 }
 
-/* Заблокированная карточка */
-.cosmetic-card.locked {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.cosmetic-card.locked:hover {
-  transform: none;
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: none;
-}
-.cosmetic-card.locked:hover::before {
-  opacity: 0;
-}
+.cosmetic-card.locked { opacity: 0.55; cursor: not-allowed; }
+.cosmetic-card.locked:hover { transform: none; border-color: rgba(255, 255, 255, 0.08); box-shadow: none; }
+.cosmetic-card.locked:hover::before { opacity: 0; }
 
-/* Глитч-карточка (золотая рамка) */
 .cosmetic-card.glitch-exclusive {
   border-color: rgba(255, 215, 0, 0.7);
-  box-shadow: 0 0 18px rgba(255, 215, 0, 0.35),
-              inset 0 0 12px rgba(255, 215, 0, 0.06);
+  box-shadow: 0 0 18px rgba(255, 215, 0, 0.35), inset 0 0 12px rgba(255, 215, 0, 0.06);
 }
-
 .cosmetic-card.glitch-exclusive::before {
   content: '🎰';
   position: absolute;
@@ -1608,21 +1411,12 @@
   filter: drop-shadow(0 0 6px #ffd700);
   animation: glitchStarPulse 2s ease-in-out infinite;
 }
-
 @keyframes glitchStarPulse {
   0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.9; }
   50%      { transform: scale(1.2) rotate(-10deg); opacity: 1; }
 }
 
-/* Индикатор прокрутки (точки) */
-.cosmetics-scroll-indicator {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 4px;
-  margin-bottom: 14px;
-}
-
+.cosmetics-scroll-indicator { display: flex; justify-content: center; gap: 6px; margin-top: 4px; margin-bottom: 14px; }
 .cosmetics-scroll-dot {
   width: 6px;
   height: 6px;
@@ -1630,7 +1424,6 @@
   background: rgba(255, 255, 255, 0.15);
   transition: all 0.3s ease;
 }
-
 .cosmetics-scroll-dot.active {
   width: 20px;
   border-radius: 4px;
@@ -1638,23 +1431,9 @@
   box-shadow: 0 0 8px var(--cyan-glow);
 }
 
-/* Пустое состояние */
-.cosmetics-empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--text-sub);
-  font-size: 12px;
-  line-height: 1.5;
-}
+.cosmetics-empty-state { text-align: center; padding: 40px 20px; color: var(--text-sub); font-size: 12px; line-height: 1.5; }
+.cosmetics-empty-state i { font-size: 40px; color: rgba(148, 163, 184, 0.3); display: block; margin-bottom: 12px; }
 
-.cosmetics-empty-state i {
-  font-size: 40px;
-  color: rgba(148, 163, 184, 0.3);
-  display: block;
-  margin-bottom: 12px;
-}
-
-/* Строка баланса */
 .cosmetics-balance-bar {
   display: flex;
   align-items: center;
@@ -1664,29 +1443,14 @@
   background: linear-gradient(135deg, rgba(5, 9, 20, 0.95), rgba(15, 23, 42, 0.9));
   border-radius: 12px;
   border: 1px solid rgba(255, 215, 0, 0.3);
-  box-shadow: 0 0 14px rgba(255, 215, 0, 0.15), 
-              inset 0 0 10px rgba(255, 215, 0, 0.05);
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.15), inset 0 0 10px rgba(255, 215, 0, 0.05);
   flex-wrap: wrap;
   margin-bottom: 12px;
 }
+.cosmetics-balance-item { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; letter-spacing: 0.3px; }
+.cosmetics-balance-item b { font-size: 12px; font-weight: 900; }
 
-.cosmetics-balance-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-}
-
-.cosmetics-balance-item b {
-  font-size: 12px;
-  font-weight: 900;
-}
-
-/* ========================================================
-   8. СТИЛИ ДЛЯ ПЛАТНОЙ КАСТОМИЗАЦИИ (совместимость)
-   ======================================================== */
+/* Плашки платных предметов */
 .theme-price-badge {
   display: inline-flex;
   align-items: center;
@@ -1701,20 +1465,13 @@
   border: 1px solid rgba(0, 230, 118, 0.4);
   white-space: nowrap;
 }
-
-.theme-price-badge.price-stars {
-  background: rgba(0, 242, 254, 0.15);
-  color: var(--cyan, #00f2fe);
-  border-color: rgba(0, 242, 254, 0.4);
-}
-
+.theme-price-badge.price-stars { background: rgba(0, 242, 254, 0.15); color: var(--cyan, #00f2fe); border-color: rgba(0, 242, 254, 0.4); }
 .theme-price-badge.price-tickets {
   background: rgba(255, 215, 0, 0.18);
   color: #ffd700;
   border-color: rgba(255, 215, 0, 0.55);
   box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
 }
-
 .theme-price-badge.price-mixed {
   background: linear-gradient(135deg, rgba(0, 230, 118, 0.15), rgba(0, 242, 254, 0.15));
   color: #a7f3d0;
@@ -1733,20 +1490,17 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
-
 .theme-owned-badge.owned-active {
   background: rgba(0, 230, 118, 0.2);
   color: var(--green, #00e676);
   border: 1px solid rgba(0, 230, 118, 0.5);
   box-shadow: 0 0 8px rgba(0, 230, 118, 0.3);
 }
-
 .theme-owned-badge.owned-inactive {
   background: rgba(0, 242, 254, 0.12);
   color: var(--cyan, #00f2fe);
   border: 1px solid rgba(0, 242, 254, 0.4);
 }
-
 .theme-owned-badge.locked-level {
   background: rgba(148, 163, 184, 0.15);
   color: #94a3b8;
@@ -1756,30 +1510,20 @@
 .theme-exclusive-frame {
   position: relative;
   border: 1.5px solid #ffd700 !important;
-  box-shadow:
-    0 0 12px rgba(255, 215, 0, 0.4),
-    inset 0 0 8px rgba(255, 215, 0, 0.08) !important;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4), inset 0 0 8px rgba(255, 215, 0, 0.08) !important;
   animation: exclusivePulse 2.5s ease-in-out infinite;
 }
-
 @keyframes exclusivePulse {
   0%, 100% {
-    box-shadow:
-      0 0 10px rgba(255, 215, 0, 0.35),
-      inset 0 0 6px rgba(255, 215, 0, 0.06);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.35), inset 0 0 6px rgba(255, 215, 0, 0.06);
     border-color: rgba(255, 215, 0, 0.85);
   }
   50% {
-    box-shadow:
-      0 0 20px rgba(255, 215, 0, 0.65),
-      inset 0 0 12px rgba(255, 215, 0, 0.15);
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.65), inset 0 0 12px rgba(255, 215, 0, 0.15);
     border-color: #ffd700;
   }
 }
 
-/* ========================================================
-   9. ПРЕВЬЮ-БОКСЫ (для совместимости)
-   ======================================================== */
 .nick-preview-box {
   background: linear-gradient(135deg, rgba(0, 0, 0, 0.4), rgba(15, 23, 42, 0.5));
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -1793,12 +1537,7 @@
   overflow: hidden;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-
-.nick-preview-box:hover {
-  border-color: rgba(0, 242, 254, 0.25);
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
-}
-
+.nick-preview-box:hover { border-color: rgba(0, 242, 254, 0.25); box-shadow: 0 0 15px rgba(0, 242, 254, 0.1); }
 .nick-preview-text {
   font-size: 20px;
   font-weight: 900;
@@ -1821,36 +1560,23 @@
   overflow: hidden;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-
-.avatar-preview-box:hover {
-  border-color: rgba(0, 242, 254, 0.25);
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.1);
-}
-
-.avatar-preview-box .avatar-ring {
-  width: 62px;
-  height: 62px;
-}
-.avatar-preview-box .avatar {
-  width: 48px;
-  height: 48px;
-  font-size: 20px;
-}
+.avatar-preview-box:hover { border-color: rgba(0, 242, 254, 0.25); box-shadow: 0 0 15px rgba(0, 242, 254, 0.1); }
+.avatar-preview-box .avatar-ring { width: 62px; height: 62px; }
+.avatar-preview-box .avatar { width: 48px; height: 48px; font-size: 20px; }
 
 /* ========================================================
-   10. АДАПТИВ
+   9. АДАПТИВ
    ======================================================== */
 @media (max-width: 380px) {
-  .player-name-text { font-size: 12.5px; }
+  .player-name-text { font-size: 12.5px; max-width: 100px; }
+  .lvl-badge-hero { font-size: 10px; padding: 2px 6px; }
   .cash-val { font-size: 14px; }
   .stat-pill { font-size: 8.5px; padding: 2px 5px; }
-  .stat-pill-lvl span { font-size: 8.5px !important; }
   .hud-btn { font-size: 9px; padding: 0 6px; }
   .need-text { font-size: 8.5px; min-width: 22px; }
   .nick-preview-text { font-size: 17px; }
   .cosmetics-balance-item { font-size: 9px; }
-  
-  /* Новое меню кастомизации */
+
   .cosmetic-card { width: 190px; padding: 12px; }
   .cosmetic-card-preview { height: 66px; }
   .cosmetic-card-preview-text { font-size: 15px; }
@@ -1860,4 +1586,16 @@
   .cosmetics-tab { font-size: 8.5px; padding: 6px 2px; }
   .cosmetics-tab i { font-size: 13px; }
   .cosmetics-tab span { font-size: 7.5px; }
+}
+
+/* ========================================================
+   10. PREFERS-REDUCED-MOTION
+   ======================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .user-stats-row,
+  .stat-pill i,
+  .lvl-badge-hero,
+  .lvl-badge-hero::before {
+    animation: none !important;
+  }
 }
