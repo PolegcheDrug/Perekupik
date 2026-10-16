@@ -1,31 +1,28 @@
 // ========================================================
-// js/app/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И ACCESS CONTROL (v4.1.0)
+// js/app/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И ACCESS CONTROL (v4.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v4.2.0 (SPRINT 1):
+//   - Клонирование .user-stats-row для marquee-прокрутки
+//   - #playerLvl обновляется во всех клонах через data-clone-of
+//   - showToast(msg, type) — варианты success/error/warning/info
+//   - Плавающий курс Stars (динамическая ставка в банке)
+//   - Save v14: миграция Stars ×10 (курс 2,500 → 25,000 ₽)
+//   - Фикс конфликта window.AppMessenger (M+ побеждает)
 // ⭐ v4.1.0 (ФИКСЫ БИЗНЕСА И ГЕНЕРАЦИИ ТРАНСПОРТА):
-//   - ФИКС: Форсированный populateMarketFeed через 1.5 сек
-//     (лечит пустой рынок, если data/cars/*.js не успели)
-//   - ФИКС: Форсированный PhoneBusiness.ensureState через 0.8 сек
-//     (лечит пустые карточки бизнеса)
-//   - ФИКС: Диагностика в консоль — что загружено, что нет
-//   - ФИКС: Owner-кнопка внизу справа + кнопка в профиле
-//   - ФИКС: Offline-баннер
-// ⭐ v4.0.0:
-//   - AccessControl интеграция
-//   - Модульный Firebase (FB_Bridge собирается в firebase-p2p.js)
-// ⭐ v3.1.0:
-//   - GameHelpers (safeNum, formatMoney, isOwnerUser)
-//   - Owner автоматически получает unlockedApps
-//   - NotificationCenter интеграция
+//   - Форсированный populateMarketFeed через 1.5 сек
+//   - Форсированный PhoneBusiness.ensureState через 0.8 сек
+//   - Owner-кнопка внизу справа + кнопка в профиле
+//   - Offline-баннер
 // ========================================================
 
-window.CURRENT_GAME_VERSION = "v4.1.0";
+window.CURRENT_GAME_VERSION = "v4.2.0";
 
 let tgUserId = null;
 let tgUserData = null;
 let isPcDevSession = false;
 
-const SAVE_VERSION = 13;
-let SAVE_KEY_PREFIX = "perekup_v13_";
+const SAVE_VERSION = 14;
+let SAVE_KEY_PREFIX = "perekup_v14_";
 
 let cloudSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
@@ -36,6 +33,11 @@ let activeNumberAnimators = {};
 
 let _notificationUnsubscribe = null;
 let _isOnline = true;
+
+// ⭐ v4.2.0: плавающий курс Stars
+const STAR_RATE_MIN = 22000;
+const STAR_RATE_MAX = 28000;
+const STAR_RATE_DEFAULT = 25000;
 
 window.isPcDevMode = function() {
     return isPcDevSession === true || String(tgUserId || '').startsWith('pc_dev_');
@@ -191,18 +193,41 @@ function spawnFloatingReward(text) {
 function setTxt(id, val) {
     const el = document.getElementById(id);
     if (el) el.innerHTML = val;
+
+    // ⭐ v4.2.0: обновляем все клоны (для marquee-анимации)
+    try {
+        document.querySelectorAll(`[data-clone-of="${id}"]`).forEach(cloneEl => {
+            cloneEl.innerHTML = val;
+        });
+    } catch (e) {}
 }
 
-function showToast(msg) {
-    if (window.GameHelpers && window.GameHelpers.safeShowToast) {
-        window.GameHelpers.safeShowToast(msg);
-        return;
-    }
+// ⭐ v4.2.0: showToast с вариантами
+let _toastHideTimer = null;
+
+function showToast(msg, type = 'default') {
     const t = document.getElementById('toastNotification');
     if (!t) return;
+
+    // Сброс прежнего состояния
+    t.className = 'toast';
+
+    // Накатываем variant-класс
+    if (type && type !== 'default') {
+        t.classList.add('toast-' + type);
+    }
+
     t.innerText = msg;
+
+    // Форсируем reflow для перезапуска анимации
+    void t.offsetWidth;
+
     t.classList.add('show');
-    setTimeout(() => { t.classList.remove('show'); }, 2500);
+
+    if (_toastHideTimer) clearTimeout(_toastHideTimer);
+    _toastHideTimer = setTimeout(() => {
+        t.classList.remove('show');
+    }, 2500);
 }
 
 function logBankTransaction(title, amount, isIncome) {
@@ -471,7 +496,7 @@ function createOwnerPanelButton() {
         if (window.AccessControl && typeof window.AccessControl.openOwnerPanel === 'function') {
             window.AccessControl.openOwnerPanel();
         } else {
-            showToast('⚠️ AccessControl не загружен');
+            showToast('⚠️ AccessControl не загружен', 'warning');
         }
     };
     document.body.appendChild(btn);
@@ -500,7 +525,7 @@ function updateOnlineStatus(online) {
         banner.classList.toggle('visible', !online);
     }
     if (!online && typeof showToast === 'function') {
-        showToast('⚠️ Потеряно соединение с сетью');
+        showToast('⚠️ Потеряно соединение с сетью', 'warning');
     }
 }
 
@@ -582,7 +607,10 @@ const DEFAULT_STATE = {
         _processedNotifIds: [],
         pendingFriendRequests: [],
         incomingTradeOffers: [],
-        platesInventory: []
+        platesInventory: [],
+        // ⭐ v4.2.0: плавающий курс Stars
+        dynamicStarRate: STAR_RATE_DEFAULT,
+        dynamicStarRateHistory: []
     },
     garage: [], salesLot: [], contracts: [], plateCatalog: [],
     ownedPlates: ["В777ВВ 77"], registeredPlates: ["В777ВВ 77"],
@@ -629,7 +657,7 @@ function setGameLanguage(lang) {
         window.AudioFx.play('tick');
         window.AudioFx.haptic('light');
     }
-    showToast(lang === 'ru' ? "Язык: Русский 🇷🇺" : "Language: English 🇬🇧");
+    showToast(lang === 'ru' ? "Язык: Русский 🇷🇺" : "Language: English 🇬🇧", 'info');
 }
 
 function applyLanguageToDOM() {
@@ -661,7 +689,7 @@ function trackQuestProgress(actionType, count = 1) {
             q.cur = Math.min(q.max || q.target || 1, (q.cur || 0) + count);
             questsUpdated = true;
             if (q.cur >= (q.max || q.target || 1)) {
-                showToast(`🎯 Выполнено задание: «${q.text}»!`);
+                showToast(`🎯 Выполнено задание: «${q.text}»!`, 'success');
                 if (window.AudioFx) window.AudioFx.haptic('success');
             }
         }
@@ -684,12 +712,12 @@ function checkNotepadMilestones() {
 
     if (netProfit >= 1000000 && !state.player.milestoneMilClaimed) {
         state.player.milestoneMilClaimed = true;
-        showToast("🏆 Веха: Первый 1,000,000 ₽ чистой прибыли!");
+        showToast("🏆 Веха: Первый 1,000,000 ₽ чистой прибыли!", 'success');
         if (window.AudioFx) window.AudioFx.play('win');
     }
     if (sold >= 10 && !state.player.milestoneSalesClaimed) {
         state.player.milestoneSalesClaimed = true;
-        showToast("🏆 Веха: Закрыто 10 успешных продаж!");
+        showToast("🏆 Веха: Закрыто 10 успешных продаж!", 'success');
         if (window.AudioFx) window.AudioFx.play('win');
     }
 }
@@ -781,7 +809,7 @@ function saveToTelegramCloud(jsonString, callback) {
 }
 
 // ========================================================
-// 13. МИГРАЦИЯ СЕЙВА
+// ⭐ v4.2.0: 13. МИГРАЦИЯ СЕЙВА (Stars ×10, Save v14)
 // ========================================================
 function migrateSave(parsed) {
     if (!parsed || typeof parsed !== 'object') return parsed;
@@ -875,6 +903,30 @@ function migrateSave(parsed) {
             if (!Array.isArray(parsed.player.pendingFriendRequests)) parsed.player.pendingFriendRequests = [];
             if (!Array.isArray(parsed.player.incomingTradeOffers)) parsed.player.incomingTradeOffers = [];
             if (!Array.isArray(parsed.player.platesInventory)) parsed.player.platesInventory = [];
+        }
+    }
+
+    // ⭐ v4.2.0: v13 → v14 (Stars ×10 + плавающий курс)
+    if (currentVersion < 14) {
+        console.log(`[Migration] v${currentVersion} → v14 (Stars ×10, курс 25,000 ₽)`);
+        if (parsed.player && typeof parsed.player === 'object') {
+            // Старые Stars ×10 (курс 2,500 → 25,000 ₽)
+            if (typeof parsed.player.stars === 'number' && parsed.player.stars > 0) {
+                const oldStars = parsed.player.stars;
+                parsed.player.stars = oldStars * 10;
+                console.log(`[Migration] Stars: ${oldStars} → ${parsed.player.stars} (×10)`);
+            }
+
+            // Все цены в Stars, которые были в сейве (суперспин-билеты и т.п.)
+            // пересчитывать не нужно — они и так в штуках, не в рублях
+
+            // Динамический курс Stars
+            if (typeof parsed.player.dynamicStarRate !== 'number') {
+                parsed.player.dynamicStarRate = STAR_RATE_DEFAULT;
+            }
+            if (!Array.isArray(parsed.player.dynamicStarRateHistory)) {
+                parsed.player.dynamicStarRateHistory = [];
+            }
         }
     }
 
@@ -979,11 +1031,12 @@ async function initTelegramAuthAndStorage(callback) {
 
                 const reason = accessRes?.reason || '';
                 let msg = 'Требуется приглашение';
-                if (reason === 'banned') msg = '🚫 Вы забанены владельцем игры';
-                else if (reason === 'not_whitelisted') msg = '🔒 Игра доступна только по приглашению';
-                else if (reason === 'offline_no_cache') msg = '⚠️ Нет сети и нет сохранённого доступа';
+                let type = 'warning';
+                if (reason === 'banned') { msg = '🚫 Вы забанены владельцем игры'; type = 'error'; }
+                else if (reason === 'not_whitelisted') { msg = '🔒 Игра доступна только по приглашению'; type = 'warning'; }
+                else if (reason === 'offline_no_cache') { msg = '⚠️ Нет сети и нет сохранённого доступа'; type = 'warning'; }
 
-                setTimeout(() => { if (typeof showToast === 'function') showToast(msg); }, 500);
+                setTimeout(() => { if (typeof showToast === 'function') showToast(msg, type); }, 500);
                 return;
             }
 
@@ -1021,7 +1074,7 @@ async function initTelegramAuthAndStorage(callback) {
             if (cloudSave) {
                 applyLoadedState(cloudSave);
                 console.log("[Cloud] Прогресс восстановлен из Firestore");
-                showToast("☁️ Прогресс синхронизирован из облака!");
+                showToast("☁️ Прогресс синхронизирован из облака!", 'success');
             }
         } catch (e) {
             console.warn("[Cloud] Ошибка pullSave:", e);
@@ -1075,6 +1128,7 @@ function loadFromLocalStorage() {
     if (!tgUserId) return false;
     try {
         let saved = localStorage.getItem("perekup_save_" + tgUserId);
+        if (!saved) saved = localStorage.getItem("perekup_v13_" + tgUserId);
         if (!saved) saved = localStorage.getItem("perekup_v12_" + tgUserId);
         if (!saved) saved = localStorage.getItem("perekup_v11_" + tgUserId);
         if (!saved) saved = localStorage.getItem(SAVE_KEY_PREFIX + tgUserId);
@@ -1140,6 +1194,14 @@ function applyLoadedState(parsed) {
         if (!Array.isArray(state.player.pendingFriendRequests)) state.player.pendingFriendRequests = [];
         if (!Array.isArray(state.player.incomingTradeOffers)) state.player.incomingTradeOffers = [];
         if (!Array.isArray(state.player.platesInventory)) state.player.platesInventory = [];
+
+        // ⭐ v4.2.0: динамический курс
+        if (typeof state.player.dynamicStarRate !== 'number') {
+            state.player.dynamicStarRate = STAR_RATE_DEFAULT;
+        }
+        if (!Array.isArray(state.player.dynamicStarRateHistory)) {
+            state.player.dynamicStarRateHistory = [];
+        }
 
         if (parsed.player.warehouse && typeof parsed.player.warehouse === 'object') {
             state.player.warehouse = { ...DEFAULT_STATE.player.warehouse, ...parsed.player.warehouse };
@@ -1244,6 +1306,14 @@ function sanitizeState() {
         state.player.streakDay = 1;
     }
 
+    // ⭐ v4.2.0: динамический курс
+    if (typeof state.player.dynamicStarRate !== 'number') {
+        state.player.dynamicStarRate = STAR_RATE_DEFAULT;
+    }
+    if (!Array.isArray(state.player.dynamicStarRateHistory)) {
+        state.player.dynamicStarRateHistory = [];
+    }
+
     if (!state.player.paidParking || typeof state.player.paidParking !== 'object') {
         state.player.paidParking = { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 };
     } else {
@@ -1343,6 +1413,7 @@ function resetGameData() {
         keysToRemove.add("perekup_v10_" + tgUserId);
         keysToRemove.add("perekup_v11_" + tgUserId);
         keysToRemove.add("perekup_v12_" + tgUserId);
+        keysToRemove.add("perekup_v13_" + tgUserId);
         keysToRemove.add(SAVE_KEY_PREFIX + tgUserId);
         keysToRemove.add("perekup_save_guest_777");
         keysToRemove.add("perekup_save_777");
@@ -1414,7 +1485,7 @@ function resetGameData() {
         } catch (e) {}
 
         if (window.AudioFx) window.AudioFx.haptic('warning');
-        if (typeof showToast === 'function') showToast("🗑️ Прогресс полностью сброшен! Перезагрузка...");
+        if (typeof showToast === 'function') showToast("🗑️ Прогресс полностью сброшен! Перезагрузка...", 'success');
 
         if (window.EventBus) {
             window.EventBus.emit('state:reset', { reason: 'user_action' });
@@ -1438,10 +1509,10 @@ function resetGameData() {
 // ========================================================
 function syncCloudStorageManual() {
     if (isPcDevSession) {
-        return showToast("DEV-режим: сохранение только локально");
+        return showToast("DEV-режим: сохранение только локально", 'info');
     }
     saveState();
-    showToast("Синхронизация с облаком Firestore запущена ✓");
+    showToast("Синхронизация с облаком Firestore запущена ✓", 'success');
     if (window.AudioFx) {
         window.AudioFx.play('win');
         window.AudioFx.haptic('success');
@@ -1462,7 +1533,7 @@ function exportSaveCodeAction() {
     const area = document.getElementById('saveExportArea');
     if (!area || !area.value) return;
     navigator.clipboard.writeText(area.value).then(() => {
-        showToast("Код сейва скопирован!");
+        showToast("Код сейва скопирован!", 'success');
         if (window.AudioFx) {
             window.AudioFx.haptic('success');
             window.AudioFx.play('win');
@@ -1470,13 +1541,13 @@ function exportSaveCodeAction() {
     }).catch(() => {
         area.select();
         document.execCommand('copy');
-        showToast("Код скопирован!");
+        showToast("Код скопирован!", 'success');
     });
 }
 
 function importSaveCodeAction() {
     const area = document.getElementById('saveExportArea');
-    if (!area || !area.value.trim()) return showToast("Вставьте код сохранения!");
+    if (!area || !area.value.trim()) return showToast("Вставьте код сохранения!", 'warning');
     try {
         let rawStr = area.value.trim();
         let jsonStr = "";
@@ -1491,7 +1562,7 @@ function importSaveCodeAction() {
         location.reload();
     } catch(err) {
         if (window.AudioFx) window.AudioFx.haptic('error');
-        showToast("Некорректный код сейва!");
+        showToast("Некорректный код сейва!", 'error');
     }
 }
 
@@ -1511,18 +1582,61 @@ function checkRealTimeDayChange() {
     if (isDifferentDay) executeDayCycleMidnight(now);
 }
 
+// ⭐ v4.2.0: динамический курс Stars — плавный дрейф
+function _updateDynamicStarRate() {
+    if (!state.player) return;
+
+    const prev = state.player.dynamicStarRate || STAR_RATE_DEFAULT;
+    // Плавный дрейф: ±0.5% от предыдущего значения
+    const drift = (Math.random() - 0.5) * 0.01; // ±0.5%
+    let next = Math.round(prev * (1 + drift));
+
+    // Ограничиваем коридор
+    next = Math.max(STAR_RATE_MIN, Math.min(STAR_RATE_MAX, next));
+
+    // Округляем до 100 ₽ — красиво
+    next = Math.round(next / 100) * 100;
+
+    state.player.dynamicStarRate = next;
+
+    // Пишем в историю (последние 30 дней)
+    if (!Array.isArray(state.player.dynamicStarRateHistory)) {
+        state.player.dynamicStarRateHistory = [];
+    }
+    state.player.dynamicStarRateHistory.push(next);
+    if (state.player.dynamicStarRateHistory.length > 30) {
+        state.player.dynamicStarRateHistory = state.player.dynamicStarRateHistory.slice(-30);
+    }
+
+    console.log(`[Stars] Динамический курс: ${next.toLocaleString()} ₽ (было ${prev.toLocaleString()})`);
+}
+
+// ⭐ v4.2.0: синхронизация курса в BANK_EXCHANGE_RATES
+function _syncStarRateToBank() {
+    if (!state.player) return;
+    const rate = state.player.dynamicStarRate || STAR_RATE_DEFAULT;
+    if (window.BANK_EXCHANGE_RATES && window.BANK_EXCHANGE_RATES.stars) {
+        window.BANK_EXCHANGE_RATES.stars.buyRub = rate;
+        window.BANK_EXCHANGE_RATES.stars.sellRub = Math.round(rate * 0.96); // спред 4%
+    }
+}
+
 function executeDayCycleMidnight(currentDateObj) {
     state.player.day = (state.player.day || 1) + 1;
     state.player.lastRealDayTimestamp = currentDateObj.getTime();
     state.player.expressTickets = state.player.maxExpressTickets || 25;
     state.player.consecutiveRaces = 0;
 
+    // ⭐ v4.2.0: Обновляем динамический курс Stars
+    _updateDynamicStarRate();
+    _syncStarRateToBank();
+
     state.player.streakDay = (state.player.streakDay || 0) + 1;
     if (state.player.streakDay >= 7) {
         state.player.streakDay = 0;
         state.player.superSpinTickets = (state.player.superSpinTickets || 0) + 1;
         if (typeof showToast === 'function') {
-            setTimeout(() => showToast("🎟️ 7-дневный стрик! +1 билет СуперВилспина"), 3200);
+            setTimeout(() => showToast("🎟️ 7-дневный стрик! +1 билет СуперВилспина", 'success'), 3200);
         }
         if (typeof logBankTransaction === 'function') {
             logBankTransaction("Бонус за 7-дневный стрик: +1 билет", 0, true);
@@ -1553,7 +1667,7 @@ function executeDayCycleMidnight(currentDateObj) {
 
                 if (typeof showToast === 'function') {
                     setTimeout(() => {
-                        showToast(`🏠 «${activeHouse.name}»: ${activeHouse.moodBonus >= 0 ? '+' : ''}${activeHouse.moodBonus}% к куражу`);
+                        showToast(`🏠 «${activeHouse.name}»: ${activeHouse.moodBonus >= 0 ? '+' : ''}${activeHouse.moodBonus}% к куражу`, 'info');
                     }, 2200);
                 }
             }
@@ -1617,13 +1731,13 @@ function executeDayCycleMidnight(currentDateObj) {
                             logBankTransaction(`Аренда жилья: ${activeHouse.name}`, rent, false);
                         }
                         if (typeof showToast === 'function') {
-                            setTimeout(() => showToast(`🏠 Списана аренда жилья: -${rent.toLocaleString()} ₽`), 2800);
+                            setTimeout(() => showToast(`🏠 Списана аренда жилья: -${rent.toLocaleString()} ₽`, 'info'), 2800);
                         }
                     } else {
                         state.player.housingId = 'trailer';
                         state.player.housingType = 'own';
                         if (typeof showToast === 'function') {
-                            setTimeout(() => showToast("⚠️ Не хватило денег на аренду! Вы переехали в бытовку."), 2800);
+                            setTimeout(() => showToast("⚠️ Не хватило денег на аренду! Вы переехали в бытовку.", 'warning'), 2800);
                         }
                     }
                 }
@@ -1638,7 +1752,7 @@ function executeDayCycleMidnight(currentDateObj) {
             const parkingResult = window.AppPost.chargeDailyParking();
             if (parkingResult.charged > 0) {
                 setTimeout(() => {
-                    showToast(`🅿️ Списано за парковку: -${parkingResult.charged.toLocaleString()} ₽`);
+                    showToast(`🅿️ Списано за парковку: -${parkingResult.charged.toLocaleString()} ₽`, 'info');
                 }, 3500);
             }
             if (parkingResult.lostCars > 0) {
@@ -1650,7 +1764,7 @@ function executeDayCycleMidnight(currentDateObj) {
                             false
                         );
                     } else {
-                        showToast(`⚠️ ${parkingResult.lostCars} авто утилизированы с парковки!`);
+                        showToast(`⚠️ ${parkingResult.lostCars} авто утилизированы с парковки!`, 'error');
                     }
                 }, 4200);
             }
@@ -1662,7 +1776,7 @@ function executeDayCycleMidnight(currentDateObj) {
     saveState();
     updateHeaderUI();
 
-    if (typeof showToast === 'function') showToast("🌙 Наступил новый день!");
+    if (typeof showToast === 'function') showToast("🌙 Наступил новый день!", 'info');
     if (typeof playSound === 'function') playSound('win');
     if (typeof tgHaptic === 'function') tgHaptic('success');
 }
@@ -1770,14 +1884,14 @@ function submitPlayerOnboarding() {
     const input = document.getElementById('onboardingNickInput');
     let val = input ? input.value.trim() : "";
     if (!val || val.length < 2) {
-        showToast("Позывной должен быть не короче 2 символов!");
+        showToast("Позывной должен быть не короче 2 символов!", 'warning');
         if (window.AudioFx) window.AudioFx.play('error');
         return;
     }
 
     const validUid = tgUserId || window.tgUserId;
     if (!validUid) {
-        showToast("Ошибка: нет ID");
+        showToast("Ошибка: нет ID", 'error');
         return;
     }
 
@@ -1801,7 +1915,7 @@ function submitPlayerOnboarding() {
         window.AudioFx.play('win');
         window.AudioFx.haptic('success');
     }
-    showToast(`Добро пожаловать в игру, ${val}!`);
+    showToast(`Добро пожаловать в игру, ${val}!`, 'success');
 
     if (typeof window._onboardingCallback === 'function') {
         window._onboardingCallback();
@@ -1811,7 +1925,39 @@ function submitPlayerOnboarding() {
 window.submitPlayerOnboarding = submitPlayerOnboarding;
 
 // ========================================================
-// 22. HUD
+// ⭐ v4.2.0: 22. КЛОНИРОВАНИЕ STATS-ROW ДЛЯ MARQUEE
+// ========================================================
+function _cloneStatsRow() {
+    const row = document.getElementById('userStatsRow');
+    if (!row) return;
+    if (row.dataset.cloned === '1') return;
+
+    try {
+        // Клонируем содержимое
+        const originalChildren = Array.from(row.children);
+        originalChildren.forEach(child => {
+            const clone = child.cloneNode(true);
+            // Заменяем id на data-clone-of, чтобы избежать дублей
+            if (clone.id) {
+                clone.dataset.cloneOf = clone.id;
+                clone.removeAttribute('id');
+            }
+            clone.querySelectorAll('[id]').forEach(el => {
+                el.dataset.cloneOf = el.id;
+                el.removeAttribute('id');
+            });
+            row.appendChild(clone);
+        });
+
+        row.dataset.cloned = '1';
+        console.log('[App] ✅ Stats-row клонирован для marquee (всего элементов:', row.children.length, ')');
+    } catch (e) {
+        console.warn('[App] Ошибка клонирования stats-row:', e);
+    }
+}
+
+// ========================================================
+// 23. HUD
 // ========================================================
 function updateHeaderUI() {
     let targetCash = state.player?.cash || 0;
@@ -1835,6 +1981,7 @@ function updateHeaderUI() {
     setTxt('fuelAmount', fuel);
     setTxt('ticketsAmount', tck + "/" + mTck);
     setTxt('playerName', pName);
+    // ⭐ v4.2.0: Уровень через setTxt → обновляет и клоны
     setTxt('playerLvl', "Ур. " + lvl);
     setTxt('connectionsText', conn);
     setTxt('karmaText', karma);
@@ -1920,21 +2067,21 @@ function adjustResource(type, delta) {
     if (!state.player) return;
     if (type === 'cash') {
         state.player.cash = Math.max(0, (state.player.cash || 0) + delta);
-        showToast((delta > 0 ? "+" : "") + delta.toLocaleString() + " ₽");
+        showToast((delta > 0 ? "+" : "") + delta.toLocaleString() + " ₽", delta > 0 ? 'success' : 'warning');
     } else if (type === 'level') {
         state.player.level = Math.max(1, Math.min(100, (state.player.level || 1) + delta));
         updateLevelGatesUI();
-        showToast((delta > 0 ? "+" : "") + delta + " Ур");
+        showToast((delta > 0 ? "+" : "") + delta + " Ур", 'info');
     } else if (type === 'stars') {
         state.player.stars = Math.max(0, (state.player.stars || 0) + delta);
-        showToast((delta > 0 ? "+" : "") + delta + " 💵 Банкнот");
+        showToast((delta > 0 ? "+" : "") + delta + " 💵 Банкнот", delta > 0 ? 'success' : 'warning');
     } else if (type === 'tickets') {
         let max = state.player.maxExpressTickets || 25;
         state.player.expressTickets = Math.max(0, Math.min(max, (state.player.expressTickets || 0) + delta));
-        showToast((delta > 0 ? "+" : "") + delta + " Талонов 🎟️");
+        showToast((delta > 0 ? "+" : "") + delta + " Талонов 🎟️", 'info');
     } else if (type === 'connections') {
         state.player.connections = Math.max(0, (state.player.connections || 0) + delta);
-        showToast((delta > 0 ? "+" : "") + delta + " Связей 🤝");
+        showToast((delta > 0 ? "+" : "") + delta + " Связей 🤝", 'info');
     }
     saveState();
     updateHeaderUI();
@@ -2070,7 +2217,7 @@ function renderProfileAnalytics() {
 }
 
 // ========================================================
-// 23. НАВИГАЦИЯ
+// 24. НАВИГАЦИЯ
 // ========================================================
 function switchTab(tabId) {
     if (window.AudioFx) {
@@ -2118,7 +2265,7 @@ function switchTab(tabId) {
 }
 
 // ========================================================
-// 24. СТАРТ (⭐ ГЛАВНЫЙ ФИКС: отложенная инициализация)
+// 25. СТАРТ
 // ========================================================
 function initApp() {
     if (window.isPcDevMode()) {
@@ -2126,6 +2273,12 @@ function initApp() {
     }
 
     setupOnlineListeners();
+
+    // ⭐ v4.2.0: Фикс конфликта window.AppMessenger (M+ побеждает)
+    if (window.AppM) {
+        window.AppMessenger = window.AppM;
+        console.log('[App] ✅ window.AppMessenger = AppM (M+ Hub)');
+    }
 
     initTelegramAuthAndStorage(async () => {
         if (!tgUserId) {
@@ -2144,11 +2297,17 @@ function initApp() {
             if (tgScreen) tgScreen.style.display = 'none';
             if (denied) denied.style.display = 'none';
 
+            // ⭐ v4.2.0: синхронизируем курс Stars с банком
+            _syncStarRateToBank();
+
             updateHeaderUI();
             updateLevelGatesUI();
             applyLanguageToDOM();
             if (window.ThemeManager) window.ThemeManager.init();
             checkRealTimeDayChange();
+
+            // ⭐ v4.2.0: клонируем stats-row для marquee
+            _cloneStatsRow();
 
             createOwnerPanelButton();
 
@@ -2157,7 +2316,7 @@ function initApp() {
             }
 
             // ═══════════════════════════════════════════════
-            // ⭐ v4.1.0: ГЛАВНЫЙ ФИКС БИЗНЕСА И ТРАНСПОРТА
+            // ФОРСИРОВАННАЯ ИНИЦИАЛИЗАЦИЯ БИЗНЕСА И РЫНКА
             // ═══════════════════════════════════════════════
 
             // 1. Форсируем PhoneBusiness.ensureState (пустые карточки бизнеса)
@@ -2260,7 +2419,7 @@ window.gameCycleInterval = setInterval(() => {
 }, 1000);
 
 // ========================================================
-// 25. ЭКСПОРТ
+// 26. ЭКСПОРТ
 // ========================================================
 window.initApp = initApp;
 window.switchTab = switchTab;
@@ -2292,5 +2451,8 @@ window.isOwnerUser = _isOwner;
 window.SAVE_VERSION = SAVE_VERSION;
 window.showAccessDeniedScreen = showAccessDeniedScreen;
 window.createOwnerPanelButton = createOwnerPanelButton;
+window._cloneStatsRow = _cloneStatsRow;
+window._updateDynamicStarRate = _updateDynamicStarRate;
+window._syncStarRateToBank = _syncStarRateToBank;
 
-console.log('[💠 app.js v4.1.0] ФИКСЫ БИЗНЕСА И ТРАНСПОРТА + AccessControl + Owner-панель + Offline ✓');
+console.log('[💠 app.js v4.2.0] SPRINT 1: HUD marquee + уровень в stats-row + showToast(type) + плавающий курс Stars + save v14 (Stars ×10) ✓');
