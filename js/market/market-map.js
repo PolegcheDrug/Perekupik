@@ -512,22 +512,22 @@ const MarketMap = {
 
         const travelCost = pin.distanceKm * 35;
 
-        // Проверяем баланс игрока на оплату выезда/бензина
-        if (typeof GameState !== 'undefined' && GameState.player) {
-            if (GameState.player.balance < travelCost) {
+        // Проверяем баланс игрока на оплату выезда/бензина (ФИКС: state.player.cash)
+        if (typeof state !== 'undefined' && state.player) {
+            if (state.player.cash < travelCost) {
                 alert(`Недостаточно денег на бензин для выезда! Требуется: ${travelCost} ₽`);
                 return;
             }
             // Списываем плату за дорогу
-            GameState.player.balance -= travelCost;
+            state.player.cash -= travelCost;
             if (typeof updateHUD === 'function') updateHUD();
         }
 
         this.hide();
 
-        // Вызываем функцию осмотра авто из существующего рынка
-        if (typeof openCarInspectionModal === 'function') {
-            openCarInspectionModal(carIndex);
+        // Вызываем функцию осмотра авто из существующего рынка (ФИКС: openMarketDeal)
+        if (typeof openMarketDeal === 'function') {
+            openMarketDeal(carIndex);
         } else if (typeof Market !== 'undefined' && typeof Market.inspectCar === 'function') {
             Market.inspectCar(carIndex);
         }
@@ -552,12 +552,13 @@ const MarketMap = {
 
         if (!confirmUpgrade) return;
 
-        if (typeof GameState !== 'undefined' && GameState.player) {
-            if (GameState.player.balance < nextLevel.cost) {
+        // ФИКС: state.player.cash вместо GameState.player.balance
+        if (typeof state !== 'undefined' && state.player) {
+            if (state.player.cash < nextLevel.cost) {
                 alert('Недостаточно средств для улучшения радара!');
                 return;
             }
-            GameState.player.balance -= nextLevel.cost;
+            state.player.cash -= nextLevel.cost;
             if (typeof updateHUD === 'function') updateHUD();
         }
 
