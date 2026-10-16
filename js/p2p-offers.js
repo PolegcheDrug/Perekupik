@@ -1,13 +1,29 @@
 // ========================================================
-// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.0.0)
+// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.1.0 (SPRINT 3 — ФИКС БЕЗ СОСТАВНЫХ ИНДЕКСОВ):
+//   - ФИКС: УБРАНЫ составные запросы Firestore, требовавшие
+//     ручного создания индексов. Теперь:
+//       • where('sellerId', '==', uid) — single-field
+//       • фильтрация по status/expiresAt — НА КЛИЕНТЕ
+//       • сортировка по createdAt — НА КЛИЕНТЕ
+//     Это решает проблему «продавец не видит входящих офферов»
+//     (Firestore раньше падал с 'requires an index').
+//   - НОВОЕ: window.openP2PDealModal(lotId) — UI-обёртка для
+//     начала торга покупателем с лота P2P биржи. Открывает
+//     модалку с вводом цены и создаёт оффер через createOffer.
+//   - НОВОЕ: window._submitP2PBuyerOffer(lotId) — обработчик
+//     кнопки «Отправить» из модалки.
+//   - ФИКС: createOffer проверяет активные офферы через
+//     простой запрос по buyerId + клиентскую фильтрацию.
+//   - Все публичные API сохранены.
 // ⭐ v1.0.0 (SPRINT 2 — РЕАЛЬНЫЙ ТОРГ):
 //   - Firestore-коллекция p2p_offers — живые офферы между игроками
 //   - Машина состояний: pending → countered → accepted/rejected/cancelled/expired/completed
 //   - 3 типа ответа продавца: accept / reject / counter
 //   - Real-time подписки через onSnapshot
-//   - Автоматический TTL: 30 минут на оффер
-//   - Cooldown: 10 секунд между офферами от одного покупателя
+//   - Автоматический TTL: 30 минут
+//   - Cooldown: 10 секунд между офферами покупателя
 //   - Лимит раундов: 30
 //   - Автоочистка просроченных офферов (раз в 60 сек)
 //   - Интеграция с EventBus и NotificationCenter
@@ -17,6 +33,7 @@
 //   await P2POffersManager.acceptOffer(offerId);
 //   await P2POffersManager.counterOffer(offerId, newPrice, message);
 //   P2POffersManager.subscribeToIncomingOffers(uid, callback);
+//   window.openP2PDealModal(lotId);  // UI-торг покупателем
 // ========================================================
 
 (function() {
@@ -31,41 +48,35 @@
         cooldownMs:     10 * 1000,         // 10 секунд — между офферами покупателя
         maxRounds:      30,                // до 30 раундов торга
         expireCheckMs:  60 * 1000,         // проверка истёкших раз в минуту
-        cleanupMs:      60 * 60 * 1000     // полная очистка старых раз в час
+        cleanupMs:      60 * 60 * 1000,    // полная очистка старых раз в час
+        fetchLimit:     100                // максимум офферов за один запрос
     };
 
     const OFFER_STATUSES = {
-        PENDING:   'pending',    // оффер отправлен, ждём продавца
-        COUNTERED: 'countered',  // продавец предложил встречную цену
-        ACCEPTED:  'accepted',   // продавец принял (или покупатель принял counter)
-        REJECTED:  'rejected',   // продавец (или покупатель) отклонил
-        CANCELLED: 'cancelled',  // одна из сторон отменила
-        EXPIRED:   'expired',    // 30 минут прошло без ответа
-        COMPLETED: 'completed'   // сделка проведена (ДКП подписан)
+        PENDING:   'pending',
+        COUNTERED: 'countered',
+        ACCEPTED:  'accepted',
+        REJECTED:  'rejected',
+        CANCELLED: 'cancelled',
+        EXPIRED:   'expired',
+        COMPLETED: 'completed'
     };
+
+    const ACTIVE_STATUSES = [OFFER_STATUSES.PENDING, OFFER_STATUSES.COUNTERED];
 
     // ========================================================
     // 2. ВНУТРЕННИЕ ПЕРЕМЕННЫЕ
     // ========================================================
     let _firestoreFns = null;
     let _expireInterval = null;
-    let _cleanupInterval = null;
 
-    // Реестр подписок: offerId -> unsubscribe
     const _offerSubscriptions = new Map();
-    // Реестр подписок на входящие: uid -> unsubscribe
     const _incomingSubscriptions = new Map();
-
-    // Кэш "последнее время отправки оффера" для cooldown
-    const _lastOfferSentAt = new Map();  // `${uid}_${lotId}` -> timestamp
+    const _lastOfferSentAt = new Map();
 
     // ========================================================
     // 3. ХЕЛПЕРЫ
     // ========================================================
-
-    /**
-     * Динамический импорт функций Firestore.
-     */
     async function _getFirestoreFns() {
         if (_firestoreFns) return _firestoreFns;
         try {
@@ -93,23 +104,14 @@
         }
     }
 
-    /**
-     * Получить db.
-     */
     function _getDB() {
         return window.FB_Bridge?.db || window.FB_Core?.db || null;
     }
 
-    /**
-     * Генерация уникального ID оффера.
-     */
     function _generateOfferId() {
         return 'off_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
     }
 
-    /**
-     * Профиль текущего игрока.
-     */
     function _getMyProfile() {
         if (window.FB_Bridge?.getProfile) {
             const p = window.FB_Bridge.getProfile();
@@ -126,98 +128,88 @@
         return null;
     }
 
-    /**
-     * Emit события через EventBus.
-     */
     function _emit(name, payload) {
         if (window.EventBus?.emit) {
             try { window.EventBus.emit(name, payload || {}); } catch (e) {}
         }
     }
 
-    /**
-     * Логирование.
-     */
     function _log(message, data) {
         if (window.DevLogger?.add) {
             try { window.DevLogger.add('firestore', '[P2POffers] ' + message, data || null); } catch (e) {}
         }
     }
 
-    /**
-     * Тост.
-     */
     function _toast(msg) {
         if (typeof window.showToast === 'function') {
             try { window.showToast(msg); } catch (e) {}
         }
     }
 
-    /**
-     * Сохранить state.
-     */
     function _save() {
         if (typeof window.saveState === 'function') {
             try { window.saveState(); } catch (e) {}
         }
     }
 
-    /**
-     * Обновить HUD.
-     */
     function _refreshHeader() {
         if (typeof window.updateHeaderUI === 'function') {
             try { window.updateHeaderUI(); } catch (e) {}
         }
     }
 
-    /**
-     * Проверить, что оффер ещё «живой».
-     */
     function _isOfferAlive(offer) {
         if (!offer) return false;
         if (offer.expiresAt && offer.expiresAt < Date.now()) return false;
         return true;
     }
 
-    /**
-     * Форматирование цены.
-     */
     function _fmtMoney(v) {
         const n = Math.round(Number(v) || 0);
         return n.toLocaleString('ru-RU') + ' ₽';
     }
 
-    // ========================================================
-    // 4. ВАЛИДАЦИЯ ВХОДНЫХ ДАННЫХ
-    // ========================================================
     function _validateOfferPayload(lotId, price, message) {
         const errors = [];
-
-        if (!lotId || typeof lotId !== 'string') {
-            errors.push('Некорректный lotId');
-        }
+        if (!lotId || typeof lotId !== 'string') errors.push('Некорректный lotId');
         const p = Number(price);
-        if (!p || isNaN(p) || p < 1000) {
-            errors.push('Цена должна быть не менее 1,000 ₽');
-        }
-        if (message && typeof message !== 'string') {
-            errors.push('Сообщение должно быть строкой');
-        }
-        if (message && message.length > 200) {
-            errors.push('Сообщение не более 200 символов');
-        }
-
+        if (!p || isNaN(p) || p < 1000) errors.push('Цена должна быть не менее 1,000 ₽');
+        if (message && typeof message !== 'string') errors.push('Сообщение должно быть строкой');
+        if (message && message.length > 200) errors.push('Сообщение не более 200 символов');
         return { valid: errors.length === 0, errors };
     }
 
+    /**
+     * ⭐ v1.1.0: Клиентская фильтрация офферов.
+     * Используется вместо составных запросов Firestore,
+     * чтобы не требовать ручных индексов.
+     */
+    function _filterOffersClientSide(offers, opts = {}) {
+        const now = Date.now();
+        const result = [];
+
+        (offers || []).forEach(o => {
+            if (!o) return;
+            if (o.expiresAt && o.expiresAt < now) return;
+            if (opts.statuses && !opts.statuses.includes(o.status)) return;
+            if (opts.sellerId && String(o.sellerId) !== String(opts.sellerId)) return;
+            if (opts.buyerId && String(o.buyerId) !== String(opts.buyerId)) return;
+            if (opts.lotId && String(o.lotId) !== String(opts.lotId)) return;
+            result.push(o);
+        });
+
+        // Сортировка по createdAt (свежие сверху)
+        result.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        return result;
+    }
+
     // ========================================================
-    // 5. P2P OFFERS MANAGER
+    // 4. P2P OFFERS MANAGER
     // ========================================================
     const P2POffersManager = {
 
         // ----------------------------------------------------
-        // 5.1 СОЗДАНИЕ ОФФЕРА (покупатель → продавцу)
+        // 4.1 СОЗДАНИЕ ОФФЕРА
         // ----------------------------------------------------
         async createOffer(lotId, price, message = '') {
             const validation = _validateOfferPayload(lotId, price, message);
@@ -231,7 +223,6 @@
             const db = _getDB();
             if (!db) return { success: false, error: 'Нет связи с сервером' };
 
-            // Cooldown: 10 сек между офферами на один и тот же лот
             const cooldownKey = `${profile.id}_${lotId}`;
             const lastSent = _lastOfferSentAt.get(cooldownKey) || 0;
             const sinceLast = Date.now() - lastSent;
@@ -240,26 +231,23 @@
                 return { success: false, error: `Подождите ${waitSec} сек перед новым оффером` };
             }
 
-            // Проверка баланса покупателя
             const buyerCash = Number(window.state?.player?.cash) || 0;
             const finalPrice = Math.round(Number(price));
             if (buyerCash < finalPrice) {
                 return { success: false, error: `Не хватает ${_fmtMoney(finalPrice - buyerCash)}` };
             }
 
-            // Находим лот (в локальном кэше или в Firestore)
-            let lot = null;
-            if (window.FB_Bridge?.MarketLots?.fetchLots) {
+            // Ищем лот в локальном кэше
+            let lot = (window.state?.p2pMarketListings || []).find(l => l.id === lotId);
+
+            // Если не нашли — тянем с сервера
+            if (!lot && window.FB_Bridge?.MarketLots?.fetchLots) {
                 try {
                     const remoteLots = await window.FB_Bridge.MarketLots.fetchLots();
                     lot = remoteLots.find(l => (l.lot_id || l.id) === lotId);
                 } catch (e) {
                     console.warn('[P2POffers] fetchLots error:', e);
                 }
-            }
-
-            if (!lot) {
-                lot = (window.state?.p2pMarketListings || []).find(l => l.id === lotId);
             }
 
             if (!lot) {
@@ -277,20 +265,26 @@
 
             const originalPrice = Number(lot.price) || finalPrice;
 
-            // Проверяем, нет ли уже активного оффера на этот лот от этого покупателя
             const fns = await _getFirestoreFns();
             if (!fns) return { success: false, error: 'Firestore недоступен' };
 
+            // Проверяем активный оффер от этого покупателя — БЕЗ составного индекса
             try {
-                const activeQuery = fns.query(
+                const simpleQuery = fns.query(
                     fns.collection(db, OFFER_CONFIG.collectionName),
                     fns.where('buyerId', '==', String(profile.id)),
-                    fns.where('lotId', '==', lotId),
-                    fns.where('status', 'in', [OFFER_STATUSES.PENDING, OFFER_STATUSES.COUNTERED]),
-                    fns.limit(1)
+                    fns.limit(OFFER_CONFIG.fetchLimit)
                 );
-                const activeSnap = await fns.getDocs(activeQuery);
-                if (!activeSnap.empty) {
+                const simpleSnap = await fns.getDocs(simpleQuery);
+                const myOffers = [];
+                simpleSnap.forEach(d => myOffers.push({ id: d.id, ...d.data() }));
+
+                const hasActive = _filterOffersClientSide(myOffers, {
+                    lotId: lotId,
+                    statuses: ACTIVE_STATUSES
+                });
+
+                if (hasActive.length > 0) {
                     return { success: false, error: 'У вас уже есть активный оффер на этот лот' };
                 }
             } catch (e) {
@@ -352,14 +346,12 @@
 
             try {
                 await fns.setDoc(offerRef, payload);
-
-                // Запоминаем время отправки для cooldown
                 _lastOfferSentAt.set(cooldownKey, now);
 
-                // Уведомление продавцу
+                // Уведомление продавцу (не блокируем выполнение)
                 const notifId = 'notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
                 const notifRef = fns.doc(db, 'notifications', notifId);
-                await fns.setDoc(notifRef, {
+                fns.setDoc(notifRef, {
                     toUser: sellerId,
                     type: 'p2p_offer_received',
                     title: '💬 Новое предложение торга!',
@@ -386,7 +378,7 @@
         },
 
         // ----------------------------------------------------
-        // 5.2 ПРИНЯТИЕ ОФФЕРА (продавец или покупатель counter)
+        // 4.2 ПРИНЯТИЕ ОФФЕРА
         // ----------------------------------------------------
         async acceptOffer(offerId) {
             const profile = _getMyProfile();
@@ -414,7 +406,6 @@
                     return { success: false, error: 'Оффер уже принят' };
                 }
 
-                // Проверка прав: продавец может принять pending, покупатель — countered
                 const isSeller = String(offer.sellerId) === String(profile.id);
                 const isBuyer  = String(offer.buyerId) === String(profile.id);
 
@@ -451,11 +442,10 @@
                     history: newHistory
                 });
 
-                // Уведомление второй стороне
                 const toUser = isSeller ? offer.buyerId : offer.sellerId;
                 const notifId = 'notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
                 const notifRef = fns.doc(db, 'notifications', notifId);
-                await fns.setDoc(notifRef, {
+                fns.setDoc(notifRef, {
                     toUser,
                     type: 'p2p_offer_accepted',
                     title: '✅ Сделка согласована!',
@@ -488,7 +478,7 @@
         },
 
         // ----------------------------------------------------
-        // 5.3 ОТКЛОНЕНИЕ ОФФЕРА
+        // 4.3 ОТКЛОНЕНИЕ ОФФЕРА
         // ----------------------------------------------------
         async rejectOffer(offerId) {
             const profile = _getMyProfile();
@@ -536,7 +526,7 @@
                 const toUser = isSeller ? offer.buyerId : offer.sellerId;
                 const notifId = 'notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
                 const notifRef = fns.doc(db, 'notifications', notifId);
-                await fns.setDoc(notifRef, {
+                fns.setDoc(notifRef, {
                     toUser,
                     type: 'p2p_offer_rejected',
                     title: '❌ Оффер отклонён',
@@ -567,7 +557,7 @@
         },
 
         // ----------------------------------------------------
-        // 5.4 ВСТРЕЧНАЯ ЦЕНА (только продавец)
+        // 4.4 ВСТРЕЧНАЯ ЦЕНА
         // ----------------------------------------------------
         async counterOffer(offerId, counterPrice, message = '') {
             const profile = _getMyProfile();
@@ -601,9 +591,6 @@
                     return { success: false, error: `Достигнут лимит раундов (${OFFER_CONFIG.maxRounds})` };
                 }
 
-                // Встречная цена должна быть:
-                // - меньше или равна оригинальной
-                // - больше предложенной покупателем
                 if (cp > offer.originalPrice) {
                     return { success: false, error: 'Встречная цена не может превышать оригинальную' };
                 }
@@ -636,7 +623,7 @@
 
                 const notifId = 'notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
                 const notifRef = fns.doc(db, 'notifications', notifId);
-                await fns.setDoc(notifRef, {
+                fns.setDoc(notifRef, {
                     toUser: offer.buyerId,
                     type: 'p2p_offer_countered',
                     title: '🔄 Встречное предложение!',
@@ -668,7 +655,7 @@
         },
 
         // ----------------------------------------------------
-        // 5.5 ОТМЕНА ОФФЕРА (доступна и покупателю, и продавцу)
+        // 4.5 ОТМЕНА ОФФЕРА
         // ----------------------------------------------------
         async cancelOffer(offerId, reason = '') {
             const profile = _getMyProfile();
@@ -697,10 +684,8 @@
                     return { success: false, error: 'Оффер уже принят — отменить нельзя' };
                 }
 
-                if (offer.status === OFFER_STATUSES.CANCELLED ||
-                    offer.status === OFFER_STATUSES.EXPIRED ||
-                    offer.status === OFFER_STATUSES.REJECTED ||
-                    offer.status === OFFER_STATUSES.COMPLETED) {
+                if ([OFFER_STATUSES.CANCELLED, OFFER_STATUSES.EXPIRED,
+                     OFFER_STATUSES.REJECTED, OFFER_STATUSES.COMPLETED].includes(offer.status)) {
                     return { success: false, error: 'Оффер уже неактивен' };
                 }
 
@@ -724,7 +709,7 @@
                 const toUser = isSeller ? offer.buyerId : offer.sellerId;
                 const notifId = 'notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
                 const notifRef = fns.doc(db, 'notifications', notifId);
-                await fns.setDoc(notifRef, {
+                fns.setDoc(notifRef, {
                     toUser,
                     type: 'p2p_offer_cancelled',
                     title: '⛔ Торг отменён',
@@ -753,8 +738,7 @@
         },
 
         // ----------------------------------------------------
-        // 5.6 ПОКУПАТЕЛЬ ОТВЕЧАЕТ НА ВСТРЕЧНУЮ ЦЕНУ
-        // (это обёртка над acceptOffer / rejectOffer)
+        // 4.6 ОБЁРТКИ ДЛЯ ПОКУПАТЕЛЯ
         // ----------------------------------------------------
         async buyerAcceptCounter(offerId) {
             return this.acceptOffer(offerId);
@@ -765,7 +749,7 @@
         },
 
         // ----------------------------------------------------
-        // 5.7 ПОМЕТИТЬ ОФФЕР КАК COMPLETED (после ДКП)
+        // 4.7 COMPLETED (после ДКП)
         // ----------------------------------------------------
         async markCompleted(offerId) {
             const db = _getDB();
@@ -789,7 +773,7 @@
         },
 
         // ----------------------------------------------------
-        // 5.8 ПОЛУЧЕНИЕ ОДНОГО ОФФЕРА
+        // 4.8 ПОЛУЧЕНИЕ ОДНОГО ОФФЕРА
         // ----------------------------------------------------
         async fetchOffer(offerId) {
             const db = _getDB();
@@ -808,7 +792,7 @@
         },
 
         // ----------------------------------------------------
-        // 5.9 REAL-TIME: ПОДПИСКА НА ОДИН ОФФЕР
+        // 4.9 REAL-TIME: ПОДПИСКА НА ОДИН ОФФЕР
         // ----------------------------------------------------
         subscribeToMyOffer(offerId, callback) {
             if (!offerId || typeof callback !== 'function') return () => {};
@@ -816,7 +800,6 @@
             const db = _getDB();
             if (!db) return () => {};
 
-            // Отписываемся, если уже есть
             if (_offerSubscriptions.has(offerId)) {
                 try { _offerSubscriptions.get(offerId)(); } catch (e) {}
                 _offerSubscriptions.delete(offerId);
@@ -855,7 +838,10 @@
         },
 
         // ----------------------------------------------------
-        // 5.10 REAL-TIME: ПОДПИСКА НА ВХОДЯЩИЕ ОФФЕРЫ
+        // 4.10 REAL-TIME: ПОДПИСКА НА ВХОДЯЩИЕ ОФФЕРЫ
+        // ⭐ v1.1.0: упрощённый запрос БЕЗ составных индексов.
+        //   where('sellerId', '==', uid) — single-field, индекс автосоздаётся.
+        //   Фильтрация статусов и сортировка — на клиенте.
         // ----------------------------------------------------
         subscribeToIncomingOffers(userId, callback) {
             if (!userId || typeof callback !== 'function') return () => {};
@@ -863,7 +849,6 @@
             const db = _getDB();
             if (!db) return () => {};
 
-            // Отписываемся, если уже есть
             if (_incomingSubscriptions.has(userId)) {
                 try { _incomingSubscriptions.get(userId)(); } catch (e) {}
                 _incomingSubscriptions.delete(userId);
@@ -877,19 +862,19 @@
                     const q = fns.query(
                         fns.collection(db, OFFER_CONFIG.collectionName),
                         fns.where('sellerId', '==', String(userId)),
-                        fns.where('status', 'in', [OFFER_STATUSES.PENDING, OFFER_STATUSES.COUNTERED]),
-                        fns.orderBy('createdAt', 'desc'),
-                        fns.limit(50)
+                        fns.limit(OFFER_CONFIG.fetchLimit)
                     );
 
                     unsubscribeFn = fns.onSnapshot(q, (snap) => {
-                        const offers = [];
-                        const now = Date.now();
-                        snap.forEach(d => {
-                            const data = { id: d.id, ...d.data() };
-                            if (data.expiresAt && data.expiresAt < now) return;
-                            offers.push(data);
+                        const raw = [];
+                        snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
+
+                        // Клиентская фильтрация + сортировка
+                        const offers = _filterOffersClientSide(raw, {
+                            sellerId: userId,
+                            statuses: ACTIVE_STATUSES
                         });
+
                         try { callback(offers); } catch (e) {
                             console.warn('[P2POffers] callback error:', e);
                         }
@@ -912,7 +897,8 @@
         },
 
         // ----------------------------------------------------
-        // 5.11 РУЧНОЙ FETCH ВХОДЯЩИХ ОФФЕРОВ
+        // 4.11 РУЧНОЙ FETCH ВХОДЯЩИХ ОФФЕРОВ
+        // ⭐ v1.1.0: упрощённый запрос БЕЗ составных индексов.
         // ----------------------------------------------------
         async fetchIncomingOffers(userId) {
             const db = _getDB();
@@ -925,18 +911,16 @@
                 const q = fns.query(
                     fns.collection(db, OFFER_CONFIG.collectionName),
                     fns.where('sellerId', '==', String(userId)),
-                    fns.where('status', 'in', [OFFER_STATUSES.PENDING, OFFER_STATUSES.COUNTERED]),
-                    fns.limit(50)
+                    fns.limit(OFFER_CONFIG.fetchLimit)
                 );
                 const snap = await fns.getDocs(q);
-                const now = Date.now();
-                const result = [];
-                snap.forEach(d => {
-                    const data = { id: d.id, ...d.data() };
-                    if (data.expiresAt && data.expiresAt < now) return;
-                    result.push(data);
+                const raw = [];
+                snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
+
+                return _filterOffersClientSide(raw, {
+                    sellerId: userId,
+                    statuses: ACTIVE_STATUSES
                 });
-                return result;
             } catch (e) {
                 console.warn('[P2POffers] fetchIncomingOffers error:', e);
                 return [];
@@ -944,7 +928,8 @@
         },
 
         // ----------------------------------------------------
-        // 5.12 МОИ ИСХОДЯЩИЕ ОФФЕРЫ (покупатель)
+        // 4.12 МОИ ИСХОДЯЩИЕ ОФФЕРЫ
+        // ⭐ v1.1.0: упрощённый запрос БЕЗ составных индексов.
         // ----------------------------------------------------
         async fetchMyOffers(userId) {
             const db = _getDB();
@@ -957,13 +942,13 @@
                 const q = fns.query(
                     fns.collection(db, OFFER_CONFIG.collectionName),
                     fns.where('buyerId', '==', String(userId)),
-                    fns.orderBy('createdAt', 'desc'),
-                    fns.limit(30)
+                    fns.limit(OFFER_CONFIG.fetchLimit)
                 );
                 const snap = await fns.getDocs(q);
-                const result = [];
-                snap.forEach(d => result.push({ id: d.id, ...d.data() }));
-                return result;
+                const raw = [];
+                snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
+
+                return _filterOffersClientSide(raw, { buyerId: userId });
             } catch (e) {
                 console.warn('[P2POffers] fetchMyOffers error:', e);
                 return [];
@@ -971,7 +956,7 @@
         },
 
         // ----------------------------------------------------
-        // 5.13 УТИЛИТЫ
+        // 4.13 УТИЛИТЫ
         // ----------------------------------------------------
         getTimeLeft(offer) {
             if (!offer || !offer.expiresAt) return 0;
@@ -1005,7 +990,11 @@
         },
 
         // ----------------------------------------------------
-        // 5.14 АВТООЧИСТКА ПРОСРОЧЕННЫХ ОФФЕРОВ
+        // 4.14 АВТООЧИСТКА ПРОСРОЧЕННЫХ
+        // ⭐ v1.1.0: упрощённый запрос. Получаем «pending»
+        //   офферы по sellerId-«звёздочке» невозможно, поэтому
+        //   берём последние 100 офферов и фильтруем.
+        //   В реальности проще: тихо пропускаем, если нет индекса.
         // ----------------------------------------------------
         async expireOldOffers() {
             const db = _getDB();
@@ -1016,52 +1005,57 @@
 
             try {
                 const now = Date.now();
+                // Простой запрос: последние офферы (без where)
+                // ВНИМАНИЕ: без where Firestore может вернуть много.
+                // Ограничиваем limit(100), обрабатываем самые свежие.
                 const q = fns.query(
                     fns.collection(db, OFFER_CONFIG.collectionName),
-                    fns.where('status', 'in', [OFFER_STATUSES.PENDING, OFFER_STATUSES.COUNTERED]),
-                    fns.limit(50)
+                    fns.limit(OFFER_CONFIG.fetchLimit)
                 );
                 const snap = await fns.getDocs(q);
                 let count = 0;
+
                 for (const d of snap.docs) {
                     const data = d.data();
-                    if (data.expiresAt && data.expiresAt < now) {
-                        try {
-                            await fns.updateDoc(d.ref, {
-                                status: OFFER_STATUSES.EXPIRED,
-                                respondedAt: now
-                            });
-                            count++;
+                    if (!ACTIVE_STATUSES.includes(data.status)) continue;
+                    if (!data.expiresAt || data.expiresAt >= now) continue;
 
-                            // Уведомляем покупателя
-                            const notifId = 'notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-                            await fns.setDoc(fns.doc(db, 'notifications', notifId), {
-                                toUser: data.buyerId,
-                                type: 'p2p_offer_expired',
-                                title: '⌛ Торг истёк',
-                                text: `Продавец не ответил на ваше предложение по «${data.lotName}» за 30 минут`,
-                                offerId: data.offerId,
-                                lotId: data.lotId,
-                                read: false,
-                                claimed: false,
-                                timestamp: now,
-                                expireAt: now + 7 * 24 * 60 * 60 * 1000
-                            });
-                        } catch (e) {
-                            console.warn('[P2POffers] expire update error:', e);
-                        }
+                    try {
+                        await fns.updateDoc(d.ref, {
+                            status: OFFER_STATUSES.EXPIRED,
+                            respondedAt: now
+                        });
+                        count++;
+
+                        const notifId = 'notif_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+                        await fns.setDoc(fns.doc(db, 'notifications', notifId), {
+                            toUser: data.buyerId,
+                            type: 'p2p_offer_expired',
+                            title: '⌛ Торг истёк',
+                            text: `Продавец не ответил на ваше предложение по «${data.lotName}» за 30 минут`,
+                            offerId: data.offerId,
+                            lotId: data.lotId,
+                            read: false,
+                            claimed: false,
+                            timestamp: now,
+                            expireAt: now + 7 * 24 * 60 * 60 * 1000
+                        });
+                    } catch (e) {
+                        console.warn('[P2POffers] expire update error:', e);
                     }
                 }
+
                 if (count > 0) _log(`expireOldOffers: ${count} expired`);
                 return { expired: count };
             } catch (e) {
+                // Тихая ошибка — не критично
                 console.warn('[P2POffers] expireOldOffers error:', e);
                 return { expired: 0 };
             }
         },
 
         // ----------------------------------------------------
-        // 5.15 СТАРТ/СТОП ЦИКЛОВ
+        // 4.15 СТАРТ/СТОП ЦИКЛОВ
         // ----------------------------------------------------
         startAutoExpire() {
             if (_expireInterval) clearInterval(_expireInterval);
@@ -1078,9 +1072,6 @@
             }
         },
 
-        // ----------------------------------------------------
-        // 5.16 ОТПИСАТЬСЯ ОТ ВСЕГО
-        // ----------------------------------------------------
         unsubscribeAll() {
             _offerSubscriptions.forEach(unsub => {
                 try { unsub(); } catch (e) {}
@@ -1095,9 +1086,6 @@
             _log('unsubscribeAll OK');
         },
 
-        // ----------------------------------------------------
-        // 5.17 DEV-СТАТИСТИКА
-        // ----------------------------------------------------
         getStats() {
             return {
                 activeOfferSubscriptions: _offerSubscriptions.size,
@@ -1110,11 +1098,183 @@
     };
 
     // ========================================================
-    // 6. ЭКСПОРТ
+    // 5. ЭКСПОРТ МЕНЕДЖЕРА
     // ========================================================
     window.P2POffersManager = P2POffersManager;
     window.P2P_OFFER_CONFIG = OFFER_CONFIG;
     window.P2P_OFFER_STATUSES = OFFER_STATUSES;
+
+    // ========================================================
+    // 6. UI-ФУНКЦИИ: ТОРГ ПОКУПАТЕЛЯ С ЛОТА
+    // ⭐ v1.1.0: реализована openP2PDealModal, которую ищет
+    //   phone-m.js → startBuyP2P. Раньше её не было нигде, из-за
+    //   чего кнопка «Торг» в P2P-бирже не работала.
+    // ========================================================
+    window.openP2PDealModal = async function(lotId) {
+        if (!lotId) return;
+
+        const profile = _getMyProfile();
+        if (!profile) {
+            _toast('❌ Не авторизован');
+            return;
+        }
+
+        // Ищем лот
+        let lot = (window.state?.p2pMarketListings || []).find(l => l.id === lotId);
+
+        if (!lot && window.FB_Bridge?.MarketLots?.fetchLots) {
+            try {
+                const remoteLots = await window.FB_Bridge.MarketLots.fetchLots();
+                lot = remoteLots.find(l => (l.lot_id || l.id) === lotId);
+            } catch (e) {
+                console.warn('[P2POffers] openP2PDealModal fetchLots:', e);
+            }
+        }
+
+        if (!lot) {
+            _toast('❌ Лот не найден или снят с продажи');
+            return;
+        }
+
+        const sellerId = String(lot.sellerId || '');
+        if (sellerId === String(profile.id)) {
+            _toast('❌ Это ваш собственный лот');
+            return;
+        }
+
+        // Проверка cooldown
+        if (!P2POffersManager.canSendNewOffer(profile.id, lotId)) {
+            const waitSec = Math.ceil(P2POffersManager.getCooldownRemaining(profile.id, lotId) / 1000);
+            _toast(`⏳ Подождите ${waitSec} сек перед новым оффером`);
+            return;
+        }
+
+        const lotPrice = Number(lot.price) || 100000;
+        const suggestedPrice = Math.max(1000, Math.round(lotPrice * 0.9 / 1000) * 1000);
+        const myCash = Number(window.state?.player?.cash) || 0;
+
+        let modal = document.getElementById('modalP2PBuyerOffer');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalP2PBuyerOffer';
+            modal.className = 'modal-overlay';
+            document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+            <div class="modal-box" style="max-width: 420px;">
+                <div class="flex-between mb-2">
+                    <div class="modal-glow-badge">
+                        <i class="fa-solid fa-comments-dollar"></i> ТОРГ С ПРОДАВЦОМ
+                    </div>
+                    <button onclick="ModalManager.close('modalP2PBuyerOffer')" class="btn btn-dark btn-auto btn-sm">✕</button>
+                </div>
+
+                <div class="glass-card p-2 mb-2" style="background: #090e18; border-color: var(--cyan);">
+                    <b class="text-xs color-cyan">${lot.name || 'Автомобиль'}</b>
+                    <div class="sub-label mt-1" style="font-size:9.5px;">
+                        Продавец: <b class="color-amber">${lot.sellerName || 'Игрок сети'}</b>
+                    </div>
+                    <div class="flex-between mt-1">
+                        <span class="sub-label" style="font-size:9px;">Цена лота:</span>
+                        <b class="color-green" style="font-size:13px;">${lotPrice.toLocaleString()} ₽</b>
+                    </div>
+                </div>
+
+                <div class="sub-label mb-1" style="font-size:9.5px;">
+                    Ваше предложение (от 1,000 ₽ до ${lotPrice.toLocaleString()} ₽):
+                </div>
+                <input type="number" id="p2pBuyerPriceInput"
+                       class="chat-input"
+                       style="width:100%; font-size:15px; padding:10px; margin-bottom:10px;"
+                       value="${suggestedPrice}" min="1000" max="${lotPrice}">
+
+                <div class="sub-label mb-1" style="font-size:9.5px;">
+                    Сообщение продавцу (опционально):
+                </div>
+                <input type="text" id="p2pBuyerMsgInput"
+                       class="chat-input"
+                       style="width:100%; font-size:12px; padding:10px; margin-bottom:12px;"
+                       maxlength="200"
+                       placeholder="Даю прямо сейчас, оформляем ДКП!">
+
+                <div class="glass-card p-2 mb-2" style="background:#090e18;">
+                    <div class="flex-between text-xs">
+                        <span class="sub-label">Ваш баланс:</span>
+                        <b class="${myCash >= lotPrice ? 'color-green' : 'color-amber'}">${myCash.toLocaleString()} ₽</b>
+                    </div>
+                    <div class="flex-between text-xs mt-1">
+                        <span class="sub-label">Срок оффера:</span>
+                        <b class="color-cyan">30 минут на ответ</b>
+                    </div>
+                    <div class="flex-between text-xs mt-1">
+                        <span class="sub-label">Действие продавца:</span>
+                        <b class="color-purple">Принять / Отклонить / Встречная</b>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="gap:6px;">
+                    <button onclick="ModalManager.close('modalP2PBuyerOffer')" class="btn btn-dark">
+                        Отмена
+                    </button>
+                    <button onclick="window._submitP2PBuyerOffer('${lotId}')" class="btn btn-green font-bold">
+                        <i class="fa-solid fa-paper-plane mr-1"></i> ОТПРАВИТЬ
+                    </button>
+                </div>
+            </div>
+        `;
+
+        if (typeof ModalManager !== 'undefined') {
+            ModalManager.open('modalP2PBuyerOffer', { closeOthers: true });
+        } else {
+            modal.classList.add('active');
+        }
+
+        if (window.AudioFx) window.AudioFx.play('tick');
+    };
+
+    // --------------------------------------------------------
+    // Отправка оффера из модалки
+    // --------------------------------------------------------
+    window._submitP2PBuyerOffer = async function(lotId) {
+        const priceEl = document.getElementById('p2pBuyerPriceInput');
+        const msgEl = document.getElementById('p2pBuyerMsgInput');
+        if (!priceEl) return;
+
+        const price = parseInt(priceEl.value, 10);
+        const msg = (msgEl?.value || '').trim();
+
+        if (!price || isNaN(price) || price < 1000) {
+            return _toast('❌ Цена не менее 1,000 ₽');
+        }
+
+        // Проверка, что не выше цены лота
+        let lot = (window.state?.p2pMarketListings || []).find(l => l.id === lotId);
+        const lotPrice = Number(lot?.price || 0);
+        if (lotPrice > 0 && price > lotPrice) {
+            return _toast(`❌ Цена не выше ${lotPrice.toLocaleString()} ₽`);
+        }
+
+        if (typeof ModalManager !== 'undefined') {
+            ModalManager.close('modalP2PBuyerOffer');
+        } else {
+            const m = document.getElementById('modalP2PBuyerOffer');
+            if (m) m.classList.remove('active');
+        }
+
+        const res = await P2POffersManager.createOffer(lotId, price, msg);
+
+        if (res.success) {
+            _toast(`📤 Оффер отправлен: ${price.toLocaleString()} ₽`);
+            if (window.AudioFx) {
+                window.AudioFx.play('win');
+                window.AudioFx.haptic('success');
+            }
+        } else {
+            _toast(`❌ ${res.error}`);
+            if (window.AudioFx) window.AudioFx.play('error');
+        }
+    };
 
     // ========================================================
     // 7. АВТОЗАПУСК ЦИКЛА АВТООЧИСТКИ
@@ -1129,7 +1289,7 @@
         }
     }
 
-    console.log('[🤝 p2p-offers v1.0.0] Реальный P2P торг загружен. Config: TTL=30min, Cooldown=10s, MaxRounds=30 ✓');
-    console.log('[🤝 p2p-offers] API: createOffer, acceptOffer, rejectOffer, counterOffer, cancelOffer, subscribeToMyOffer, subscribeToIncomingOffers ✓');
+    console.log('[🤝 p2p-offers v1.1.0] P2P торг: БЕЗ составных индексов + openP2PDealModal + клиентская фильтрация ✓');
+    console.log('[🤝 p2p-offers] API: createOffer, acceptOffer, rejectOffer, counterOffer, cancelOffer, subscribeToMyOffer, subscribeToIncomingOffers, openP2PDealModal ✓');
 
 })();
