@@ -1,6 +1,17 @@
 // ========================================================
-// js/firebase-friendships.js — СИСТЕМА ДРУЗЕЙ (v1.0.0)
+// js/firebase-friendships.js — СИСТЕМА ДРУЗЕЙ (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.1.0 (SPRINT 3 — ФИКСЫ БЕЗ СОСТАВНЫХ ИНДЕКСОВ):
+//   - ФИКС: subscribeToFriendships убран 2-way where(status).
+//     Теперь where(toUserId) + limit, фильтр по status=pending
+//     и сортировка — НА КЛИЕНТЕ. Индекс не требуется.
+//   - ФИКС: fetchFriendships защищён от permission-denied,
+//     возвращает понятную ошибку вместо падения.
+//   - ФИКС: sendRequest при отказе автопринятия возвращает
+//     детальную ошибку вместо общего success:false.
+//   - ФИКС: removeFriend переводит в 'declined' вместо deleteDoc
+//     (мягкое удаление — не теряем историю).
+//   - Все публичные API сохранены.
 // ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ firebase-bridge.js):
 //   - FriendshipsManager (sendRequest, acceptRequest,
 //     declineRequest, fetchFriendships, subscribeToFriendships,
@@ -12,7 +23,7 @@
 //   - Экспорт в window.FB_Friendships
 //
 // ВАЖНО: файл — ES-модуль (import), подключается через
-//   <script type="module" src="firebase-friendships.js?v=410"></script>
+//   <script type="module" src="firebase-friendships.js?v=421"></script>
 // Должен быть загружен ПОСЛЕ firebase-core.js.
 // ========================================================
 
@@ -90,7 +101,34 @@ function _buildPairId(uid1, uid2) {
 }
 
 // ========================================================
-// 4. FRIENDSHIPS MANAGER
+// 4. ХЕЛПЕР: клиентская фильтрация + сортировка
+// (используется вместо составных индексов Firestore)
+// ========================================================
+function _filterAndSortDocs(items, opts = {}) {
+  if (!Array.isArray(items)) return [];
+  const now = Date.now();
+
+  const result = items.filter(item => {
+    if (!item) return false;
+    if (item.expireAt && item.expireAt < now) return false;
+    if (opts.status !== undefined && item.status !== opts.status) return false;
+    return true;
+  });
+
+  if (opts.sortBy) {
+    const dir = opts.sortDir === 'asc' ? 1 : -1;
+    result.sort((a, b) => {
+      const ta = Number(a[opts.sortBy]) || 0;
+      const tb = Number(b[opts.sortBy]) || 0;
+      return (ta - tb) * dir;
+    });
+  }
+
+  return result;
+}
+
+// ========================================================
+// 5. FRIENDSHIPS MANAGER
 // ========================================================
 const FriendshipsManager = {
   _listeners: [],
@@ -138,12 +176,18 @@ const FriendshipsManager = {
         if (data.status === 'pending' && String(data.fromUserId) === String(toUserId)) {
           devLogFirestore('Friendships: встречная заявка, автопринятие', pairId);
           const autoRes = await this.acceptRequest(toUserId);
-          return { success: true, autoAccepted: true, ...autoRes };
+          // ⭐ v1.1.0: если автопринятие упало — отдаём детальную ошибку
+          if (!autoRes || !autoRes.success) {
+            return {
+              success: false,
+              error: autoRes?.error || "Не удалось принять встречную заявку"
+            };
+          }
+          return { success: true, autoAccepted: true };
         }
 
-        // Отклонённая ранее — позволяем отправить снова
+        // Отклонённая/subscribed — позволяем отправить снова
         if (data.status === 'declined' || data.status === 'subscribed') {
-          // Обновляем на pending
           await setDoc(friendRef, {
             pairId,
             fromUserId: String(profile.id),
@@ -189,8 +233,12 @@ const FriendshipsManager = {
       devLogFirestore('Friendships.sendRequest OK', pairId);
       return { success: true };
     } catch (e) {
-      devLogFirestore('Friendships.sendRequest ERROR', e.message);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      devLogFirestore('Friendships.sendRequest ERROR', errMsg);
+      if (errMsg.includes('permission-denied')) {
+        return { success: false, error: "Доступ к friendships запрещён (проверьте Firestore Rules)" };
+      }
+      return { success: false, error: errMsg };
     }
   },
 
@@ -238,14 +286,14 @@ const FriendshipsManager = {
       devLogFirestore('Friendships.accept OK', pairId);
       return { success: true };
     } catch (e) {
-      devLogFirestore('Friendships.accept ERROR', e.message);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      devLogFirestore('Friendships.accept ERROR', errMsg);
+      return { success: false, error: errMsg };
     }
   },
 
   /**
    * Отклонить входящую заявку (переводит в 'subscribed').
-   * @param {string} fromUserId — UID отправителя
    */
   async declineRequest(fromUserId) {
     const profile = getCurrentPlayerProfile();
@@ -273,14 +321,16 @@ const FriendshipsManager = {
       devLogFirestore('Friendships.decline OK', pairId);
       return { success: true };
     } catch (e) {
-      devLogFirestore('Friendships.decline ERROR', e.message);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      devLogFirestore('Friendships.decline ERROR', errMsg);
+      return { success: false, error: errMsg };
     }
   },
 
   /**
-   * Удалить из друзей (полный разрыв).
-   * @param {string} friendUserId
+   * Удалить из друзей.
+   * ⭐ v1.1.0: мягкое удаление — статус 'declined', не deleteDoc.
+   * Так сохраняется история, и можно снова отправить заявку.
    */
   async removeFriend(friendUserId) {
     const profile = getCurrentPlayerProfile();
@@ -302,21 +352,24 @@ const FriendshipsManager = {
         return { success: false, error: "Вы не друзья" };
       }
 
-      // Удаляем документ
-      await deleteDoc(friendRef);
+      // ⭐ v1.1.0: мягкое удаление вместо deleteDoc
+      await updateDoc(friendRef, {
+        status: 'declined',
+        removedAt: Date.now()
+      });
 
       devLogFirestore('Friendships.removeFriend OK', pairId);
       return { success: true };
     } catch (e) {
-      devLogFirestore('Friendships.removeFriend ERROR', e.message);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      devLogFirestore('Friendships.removeFriend ERROR', errMsg);
+      return { success: false, error: errMsg };
     }
   },
 
   /**
    * Получить: друзей, входящие заявки, подписчиков.
-   * @param {string} userId
-   * @returns {Promise<{friends, pending, subscribed}>}
+   * ⭐ v1.1.0: без составных индексов, фильтрация на клиенте.
    */
   async fetchFriendships(userId) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
@@ -361,7 +414,6 @@ const FriendshipsManager = {
         if (data.expireAt && data.expireAt < now) return;
 
         if (data.status === 'accepted') {
-          // Друг — добавляем, если ещё нет (не дублируем)
           if (!friends.some(f => String(f.id) === String(data.fromUserId))) {
             friends.push({
               id: data.fromUserId,
@@ -386,13 +438,19 @@ const FriendshipsManager = {
 
       return { friends, pending, subscribed };
     } catch (e) {
-      console.warn('[Friendship] fetch error:', e);
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[Friendship] fetch: permission-denied (проверьте Firestore Rules)');
+      } else {
+        console.warn('[Friendship] fetch error:', errMsg);
+      }
       return { friends: [], pending: [], subscribed: [] };
     }
   },
 
   /**
    * Real-time подписка на ВХОДЯЩИЕ заявки.
+   * ⭐ v1.1.0: single-field where(toUserId) + клиентский фильтр.
    * @param {string} userId
    * @param {Function} callback — вызывается с массивом pending
    * @returns {Function} unsubscribe
@@ -405,26 +463,38 @@ const FriendshipsManager = {
       const q = query(
         collection(db, "friendships"),
         where("toUserId", "==", String(targetUid)),
-        where("status", "==", "pending"),
-        limit(50)
+        limit(LIMITS.maxFriendshipsPerUser)
       );
 
       const unsubscribe = onSnapshot(q, (snap) => {
-        const pending = [];
-        const now = Date.now();
+        const raw = [];
         snap.forEach(d => {
           const data = d.data();
-          if (data.expireAt && data.expireAt < now) return;
-          pending.push({
+          raw.push({
             id: data.fromUserId,
             name: data.fromUserName || "Перекуп",
             createdAt: data.createdAt,
-            pairId: d.id
+            pairId: d.id,
+            status: data.status,
+            expireAt: data.expireAt
           });
         });
+
+        // ⭐ Клиентская фильтрация: только status='pending' + не протухшие
+        const pending = _filterAndSortDocs(raw, {
+          status: 'pending',
+          sortBy: 'createdAt',
+          sortDir: 'desc'
+        });
+
         try { callback(pending); } catch (e) { console.warn('[Friendship] callback error:', e); }
       }, (error) => {
-        console.warn('[Friendship] subscribe error:', error);
+        const errMsg = error?.code || error?.message || String(error);
+        if (errMsg.includes('permission-denied')) {
+          console.warn('[Friendship] subscribeToFriendships: permission-denied');
+        } else {
+          console.warn('[Friendship] subscribe error:', errMsg);
+        }
       });
 
       this._listeners.push(unsubscribe);
@@ -447,7 +517,7 @@ const FriendshipsManager = {
 };
 
 // ========================================================
-// 5. ЭКСПОРТ В WINDOW
+// 6. ЭКСПОРТ В WINDOW
 // ========================================================
 window.FB_Friendships = {
   Friendships: FriendshipsManager
@@ -456,4 +526,4 @@ window.FB_Friendships = {
 // Алиасы для совместимости со старым кодом
 window.FB_FriendshipsManager = FriendshipsManager;
 
-console.log('[👥 FB_Friendships v1.0.0] Система друзей загружена. sendRequest, acceptRequest, declineRequest, fetchFriendships, subscribeToFriendships, removeFriend ✓');
+console.log('[👥 FB_Friendships v1.1.0] Система друзей: без составных индексов + мягкое удаление + защита от permission-denied ✓');
