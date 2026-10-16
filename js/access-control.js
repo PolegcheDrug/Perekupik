@@ -1,23 +1,21 @@
 // ========================================================
-// js/access-control.js — СИСТЕМА ДОСТУПА ПО ПРИГЛАШЕНИЯМ (v1.0.0)
+// js/access-control.js — СИСТЕМА ДОСТУПА ПО ПРИГЛАШЕНИЯМ (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.0.0 (СПРИНТ 3 — ЗАКРЫТАЯ БЕТА):
+// ⭐ v1.1.0 (SPRINT 3 — ГЛОБАЛЬНЫЙ ФЛАГ ДОСТУПА):
+//   - Глобальный флаг access_settings/global.accessDisabled
+//     хранится в Firestore, а не в localStorage.
+//     Теперь при выключении системы доступа пускает ВСЕХ игроков,
+//     а не только владельца.
+//   - Кэш флага 60 секунд (чтобы не читать Firestore каждый checkAccess)
+//   - Fallback на localStorage при offline
+//   - disableAccessControl / enableAccessControl стали async
+//   - В Owner-панели кнопка-переключатель «Открыт для всех»
+//   - Fail-safe: ошибка чтения из Firestore → пускаем (лучше, чем
+//     заблокировать весь мир из-за сетевой ошибки на одном клиенте)
+// ⭐ v1.0.0:
 //   - Владелец игры автоматически получает доступ (по Telegram ID)
-//   - Инвайт-коды для приглашения игроков
-//   - Whitelist разрешённых Telegram ID
-//   - Owner-панель: управление инвайтами и игроками
-//   - Firestore-хранилище (бесплатный Spark план)
-//   - Кэш на 5 минут, чтобы экономить лимит чтений
-//   - Offline-режим: если Firestore недоступен → пропускаем
-//     только владельца и тех, кто уже в локальном кэше
-//
-// ИСПОЛЬЗОВАНИЕ:
-//   const res = await AccessControl.checkAccess(tgUserId);
-//   if (res.success) { запускаем игру }
-//   else { показываем экран "Доступ закрыт" }
-//
-// ВАЖНО: файл — обычный <script>, не ES-модуль.
-// Подключается ПОСЛЕ firebase-core.js и ДО app.js.
+//   - Инвайт-коды, whitelist, баны, Owner-панель
+//   - Firestore-хранилище, кэш 5 мин
 // ========================================================
 
 (function() {
@@ -27,20 +25,27 @@
     // 1. КОНСТАНТЫ
     // ========================================================
 
-    // ⭐ ID владельца игры (проверь, что это ТВОЙ Telegram ID!)
+    // ⭐ ID владельца игры
     const OWNER_TELEGRAM_ID = '1944392183';
 
     // Username владельца (для резервной проверки)
     const OWNER_USERNAME = 'taktojenorm';
 
-    // Кэш доступа в localStorage (5 минут)
+    // Кэш доступа игрока (5 минут)
     const CACHE_KEY_PREFIX = 'perekup_access_cache_';
     const CACHE_TTL_MS = 5 * 60 * 1000;
+
+    // ⭐ v1.1.0: локальный флаг-кэш для глобального доступа
+    const GLOBAL_ACCESS_FLAG_KEY = 'perekup_access_disabled';
+    const GLOBAL_ACCESS_FLAG_TTL_KEY = 'perekup_access_disabled_ts';
+    const GLOBAL_ACCESS_FLAG_TTL_MS = 60 * 1000;  // 60 секунд
 
     // Коллекции Firestore
     const COL_WHITELIST = 'access_whitelist';   // { telegramId, name, addedAt, addedBy, isBanned }
     const COL_INVITES   = 'access_invites';     // { code, createdBy, createdAt, expiresAt, maxUses, usedCount, usedBy[] }
     const COL_REQUESTS  = 'access_requests';    // { telegramId, name, username, requestedAt, status }
+    const COL_SETTINGS  = 'access_settings';    // ⭐ v1.1.0: коллекция настроек
+    const DOC_GLOBAL    = 'global';             // ⭐ v1.1.0: документ глобальных настроек
 
     // Лимиты
     const MAX_ACTIVE_INVITES = 50;
@@ -48,18 +53,21 @@
     // ========================================================
     // 2. ВНУТРЕННЕЕ СОСТОЯНИЕ
     // ========================================================
-    let _fbCore = null;        // Ссылка на window.FB_Core
-    let _db = null;            // Firestore instance
-    let _firestoreFns = null;  // Кэш функций Firestore (динамический import)
+    let _fbCore = null;
+    let _db = null;
+    let _firestoreFns = null;
+
+    // ⭐ v1.1.0: кэш глобального флага в памяти
+    let _globalFlagCache = {
+        value: null,      // null = неизвестно, true/false = значение
+        ts: 0,            // время последней синхронизации
+        loading: false    // идёт запрос?
+    };
 
     // ========================================================
     // 3. ХЕЛПЕРЫ
     // ========================================================
 
-    /**
-     * Получить Firestore функции через динамический import.
-     * Это позволяет не дублировать импорты — они уже есть в firebase-core.js.
-     */
     async function _getFirestoreFns() {
         if (_firestoreFns) return _firestoreFns;
         try {
@@ -81,15 +89,11 @@
             };
             return _firestoreFns;
         } catch (e) {
-            console.warn('[AccessControl] Не удалось загрузить Firestore функции:', e);
+            console.warn('[AccessControl] Не удалось загрузить Firestore:', e);
             return null;
         }
     }
 
-    /**
-     * Инициализация ссылки на FB_Core.
-     * Вызывается лениво — при первом запросе.
-     */
     async function _ensureInit() {
         if (_db) return true;
 
@@ -104,16 +108,11 @@
         return true;
     }
 
-    /**
-     * Проверка: текущий UID — владелец?
-     */
     function _isOwner(uid) {
         if (!uid) return false;
 
-        // Проверка 1: по числовому ID
         if (OWNER_TELEGRAM_ID && String(uid) === String(OWNER_TELEGRAM_ID)) return true;
 
-        // Проверка 2: по username из Telegram
         try {
             const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
             if (tgUser && tgUser.username) {
@@ -125,9 +124,6 @@
         return false;
     }
 
-    /**
-     * Кэш доступа в localStorage.
-     */
     function _readCache(uid) {
         try {
             const raw = localStorage.getItem(CACHE_KEY_PREFIX + uid);
@@ -159,9 +155,6 @@
         } catch (e) {}
     }
 
-    /**
-     * Генератор инвайт-кода: 8 символов, A-Z + 2-9 (без 0/O/1/I, чтобы не путать).
-     */
     function _generateInviteCode() {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         let code = '';
@@ -171,27 +164,170 @@
         return code;
     }
 
+    // ========================================================
+    // ⭐ v1.1.0: ГЛОБАЛЬНЫЙ ФЛАГ ДОСТУПА
+    // ========================================================
+
     /**
-     * Проверка, включена ли система доступа вообще.
-     * Если в localStorage стоит флаг `perekup_access_disabled` — пускаем всех.
+     * Прочитать флаг из локального кэша (localStorage).
      */
-    function _isAccessControlDisabled() {
+    function _readGlobalFlagLocal() {
         try {
-            return localStorage.getItem('perekup_access_disabled') === 'true';
+            const value = localStorage.getItem(GLOBAL_ACCESS_FLAG_KEY);
+            const ts = parseInt(localStorage.getItem(GLOBAL_ACCESS_FLAG_TTL_KEY) || '0', 10);
+            if (value === null) return { value: null, ts: 0 };
+            return {
+                value: value === 'true',
+                ts: isNaN(ts) ? 0 : ts
+            };
         } catch (e) {
+            return { value: null, ts: 0 };
+        }
+    }
+
+    /**
+     * Записать флаг в локальный кэш.
+     */
+    function _writeGlobalFlagLocal(value) {
+        try {
+            localStorage.setItem(GLOBAL_ACCESS_FLAG_KEY, String(!!value));
+            localStorage.setItem(GLOBAL_ACCESS_FLAG_TTL_KEY, String(Date.now()));
+        } catch (e) {}
+    }
+
+    /**
+     * ⭐ v1.1.0: прочитать флаг из Firestore.
+     * @returns {Promise<boolean|null>} — true/false или null при ошибке
+     */
+    async function _readGlobalFlagCloud() {
+        const fbReady = await _ensureInit();
+        if (!fbReady) return null;
+
+        try {
+            const fns = _firestoreFns;
+            const ref = fns.doc(_db, COL_SETTINGS, DOC_GLOBAL);
+            const snap = await fns.getDoc(ref);
+
+            if (!snap.exists()) {
+                // Документ ещё не создан — считаем, что система доступа включена
+                return false;
+            }
+
+            const data = snap.data();
+            return data.accessDisabled === true;
+        } catch (e) {
+            console.warn('[AccessControl] Ошибка чтения глобального флага:', e);
+            return null;
+        }
+    }
+
+    /**
+     * ⭐ v1.1.0: синхронизировать глобальный флаг из облака в локальный кэш.
+     * Кэш TTL 60 сек, чтобы не спамить Firestore.
+     */
+    async function _syncGlobalFlagFromCloud(force = false) {
+        const now = Date.now();
+
+        // Если недавно синхронизировали — используем кэш
+        if (!force &&
+            _globalFlagCache.value !== null &&
+            (now - _globalFlagCache.ts) < GLOBAL_ACCESS_FLAG_TTL_MS) {
+            return _globalFlagCache.value;
+        }
+
+        // Если уже идёт загрузка — ждём
+        if (_globalFlagCache.loading) {
+            // Простое ожидание: не блокируем, возвращаем последнее известное
+            return _globalFlagCache.value;
+        }
+
+        // Сначала смотрим локальный кэш — если свежий, возвращаем его
+        const localCached = _readGlobalFlagLocal();
+        if (!force && localCached.value !== null && (now - localCached.ts) < GLOBAL_ACCESS_FLAG_TTL_MS) {
+            _globalFlagCache = { value: localCached.value, ts: localCached.ts, loading: false };
+            return localCached.value;
+        }
+
+        _globalFlagCache.loading = true;
+        try {
+            const cloudValue = await _readGlobalFlagCloud();
+
+            if (cloudValue === null) {
+                // Firestore недоступен — используем локальный кэш (если он есть)
+                if (localCached.value !== null) {
+                    console.log('[AccessControl] Firestore недоступен, используем локальный флаг:', localCached.value);
+                    _globalFlagCache = { value: localCached.value, ts: now, loading: false };
+                    return localCached.value;
+                }
+                // Совсем нет данных — считаем, что система включена
+                console.log('[AccessControl] Нет данных о флаге, считаем что система включена');
+                _globalFlagCache = { value: false, ts: now, loading: false };
+                return false;
+            }
+
+            // Успешно прочитали из Firestore
+            _globalFlagCache = { value: cloudValue, ts: now, loading: false };
+            _writeGlobalFlagLocal(cloudValue);
+            console.log('[AccessControl] Глобальный флаг синхронизирован:', cloudValue ? 'ДОСТУП ОТКРЫТ' : 'ДОСТУП ПО ПРИГЛАШЕНИЯМ');
+            return cloudValue;
+
+        } catch (e) {
+            console.warn('[AccessControl] syncGlobalFlag error:', e);
+            _globalFlagCache.loading = false;
+            // Fallback на локальный кэш
+            if (localCached.value !== null) return localCached.value;
             return false;
         }
+    }
+
+    /**
+     * ⭐ v1.1.0: записать глобальный флаг в Firestore + локально.
+     * @returns {Promise<boolean>} — успех
+     */
+    async function _writeGlobalFlagCloud(value) {
+        // Сначала локально — чтобы UI сразу показал переключение
+        _writeGlobalFlagLocal(value);
+        _globalFlagCache = { value: value, ts: Date.now(), loading: false };
+
+        const fbReady = await _ensureInit();
+        if (!fbReady) {
+            console.warn('[AccessControl] Firestore недоступен, флаг записан только локально');
+            return false;
+        }
+
+        try {
+            const fns = _firestoreFns;
+            const ref = fns.doc(_db, COL_SETTINGS, DOC_GLOBAL);
+
+            await fns.setDoc(ref, {
+                accessDisabled: !!value,
+                updatedAt: Date.now(),
+                updatedBy: window.Telegram?.WebApp?.initDataUnsafe?.user?.id
+                    ? String(window.Telegram.WebApp.initDataUnsafe.user.id)
+                    : 'unknown'
+            }, { merge: true });
+
+            console.log('[AccessControl] Глобальный флаг записан в Firestore:', value);
+            return true;
+        } catch (e) {
+            console.error('[AccessControl] Ошибка записи глобального флага:', e);
+            return false;
+        }
+    }
+
+    /**
+     * ⭐ v1.1.0: синхронная проверка локального флага (для UI).
+     * ВАЖНО: используйте _syncGlobalFlagFromCloud() для актуальных данных.
+     */
+    function _isAccessControlDisabled() {
+        if (_globalFlagCache.value !== null) return _globalFlagCache.value;
+        const local = _readGlobalFlagLocal();
+        return local.value === true;
     }
 
     // ========================================================
     // 4. ГЛАВНЫЙ МЕТОД: ПРОВЕРКА ДОСТУПА
     // ========================================================
-
-    /**
-     * Проверить доступ игрока к игре.
-     * @param {string} uid — Telegram ID (обязательно)
-     * @returns {Promise<{success: boolean, reason: string, isOwner?: boolean, name?: string}>}
-     */
     async function checkAccess(uid) {
         if (!uid) {
             return { success: false, reason: 'no_uid' };
@@ -205,19 +341,25 @@
             return { success: true, reason: 'owner', isOwner: true };
         }
 
-        // ─── 2. Если система отключена — пускаем всех ───
-        if (_isAccessControlDisabled()) {
-            console.log('[AccessControl] Система отключена — доступ разрешён');
-            return { success: true, reason: 'disabled' };
-        }
-
-        // ─── 3. DEV-режим (ПК) — пускаем ───
+        // ─── 2. DEV-режим (ПК) — пускаем ───
         if (cleanUid.startsWith('pc_dev_') || cleanUid.startsWith('dev_')) {
             console.log('[AccessControl] DEV-режим — доступ разрешён');
             return { success: true, reason: 'dev_mode' };
         }
 
-        // ─── 4. Проверка локального кэша ───
+        // ─── ⭐ v1.1.0: 3. Глобальный флаг «открыто для всех» ───
+        try {
+            const isGloballyDisabled = await _syncGlobalFlagFromCloud();
+            if (isGloballyDisabled === true) {
+                console.log('[AccessControl] 🌐 Глобальный доступ ОТКРЫТ для всех');
+                return { success: true, reason: 'global_disabled' };
+            }
+        } catch (e) {
+            // fail-safe: при ошибке синхронизации флага — продолжаем обычную проверку
+            console.warn('[AccessControl] Ошибка проверки глобального флага, продолжаем:', e);
+        }
+
+        // ─── 4. Проверка локального кэша игрока ───
         const cached = _readCache(cleanUid);
         if (cached && cached.allowed === true) {
             console.log('[AccessControl] Доступ из кэша (allowed)');
@@ -233,7 +375,6 @@
             const fbReady = await _ensureInit();
 
             if (!fbReady) {
-                // Offline fallback: пускаем только если кэш есть, иначе отказ
                 console.warn('[AccessControl] Firestore недоступен, и кэша нет — доступ запрещён');
                 return { success: false, reason: 'offline_no_cache' };
             }
@@ -279,13 +420,6 @@
     // ========================================================
     // 5. ПОЛЬЗОВАТЕЛЬ ВВОДИТ ИНВАЙТ-КОД
     // ========================================================
-
-    /**
-     * Активировать инвайт-код.
-     * @param {string} code — код (например, "AB3K7XYZ")
-     * @param {Object} userInfo — { uid, name, username } (необязательно, берётся из Telegram)
-     * @returns {Promise<{success: boolean, error?: string}>}
-     */
     async function redeemInviteCode(code, userInfo = null) {
         if (!code || typeof code !== 'string') {
             return { success: false, error: 'Пустой код' };
@@ -338,19 +472,16 @@
 
             const inviteData = inviteSnap.data();
 
-            // Проверка срока действия
             if (inviteData.expiresAt && inviteData.expiresAt < Date.now()) {
                 return { success: false, error: 'Код просрочен' };
             }
 
-            // Проверка лимита использований
             const usedCount = inviteData.usedCount || 0;
             const maxUses = inviteData.maxUses || 1;
             if (usedCount >= maxUses) {
                 return { success: false, error: 'Код уже полностью использован' };
             }
 
-            // ─── Активируем: добавляем в whitelist + обновляем invite ───
             const now = Date.now();
 
             // 1. Добавляем в whitelist
@@ -377,7 +508,7 @@
                 usedBy: usedByList
             });
 
-            // 3. Очищаем локальный кэш, чтобы при следующей проверке подтянулись свежие данные
+            // 3. Очищаем локальный кэш
             _clearCache(uid);
 
             console.log('[AccessControl] 🎉 Код активирован:', cleanCode, '→', uid);
@@ -390,13 +521,8 @@
     }
 
     // ========================================================
-    // 6. OWNER-ФУНКЦИИ: ГЕНЕРАЦИЯ ИНВАЙТОВ, УПРАВЛЕНИЕ
+    // 6. OWNER-ФУНКЦИИ
     // ========================================================
-
-    /**
-     * Создать новый инвайт-код (только для владельца).
-     * @param {Object} options — { maxUses: 1, ttlDays: 7, note: '' }
-     */
     async function createInviteCode(options = {}) {
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const uid = tgUser?.id ? String(tgUser.id) : null;
@@ -413,7 +539,6 @@
         try {
             const fns = _firestoreFns;
 
-            // Проверка лимита активных инвайтов
             const activeQuery = fns.query(
                 fns.collection(_db, COL_INVITES),
                 fns.limit(MAX_ACTIVE_INVITES + 1)
@@ -450,9 +575,6 @@
         }
     }
 
-    /**
-     * Получить список всех инвайтов (для owner-панели).
-     */
     async function listInvites() {
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const uid = tgUser?.id ? String(tgUser.id) : null;
@@ -466,10 +588,7 @@
 
         try {
             const fns = _firestoreFns;
-            const q = fns.query(
-                fns.collection(_db, COL_INVITES),
-                fns.limit(100)
-            );
+            const q = fns.query(fns.collection(_db, COL_INVITES), fns.limit(100));
             const snap = await fns.getDocs(q);
             const invites = [];
             const now = Date.now();
@@ -487,7 +606,6 @@
                 });
             });
 
-            // Сортировка: активные вверх
             invites.sort((a, b) => {
                 if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
                 return (b.createdAt || 0) - (a.createdAt || 0);
@@ -499,9 +617,6 @@
         }
     }
 
-    /**
-     * Удалить инвайт.
-     */
     async function deleteInvite(code) {
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const uid = tgUser?.id ? String(tgUser.id) : null;
@@ -521,9 +636,6 @@
         }
     }
 
-    /**
-     * Получить список игроков в whitelist.
-     */
     async function listWhitelist() {
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const uid = tgUser?.id ? String(tgUser.id) : null;
@@ -535,10 +647,7 @@
 
         try {
             const fns = _firestoreFns;
-            const q = fns.query(
-                fns.collection(_db, COL_WHITELIST),
-                fns.limit(200)
-            );
+            const q = fns.query(fns.collection(_db, COL_WHITELIST), fns.limit(200));
             const snap = await fns.getDocs(q);
             const players = [];
 
@@ -554,9 +663,6 @@
         }
     }
 
-    /**
-     * Забанить / разбанить игрока.
-     */
     async function toggleBanPlayer(targetUid) {
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const uid = tgUser?.id ? String(tgUser.id) : null;
@@ -590,9 +696,6 @@
         }
     }
 
-    /**
-     * Полностью удалить игрока из whitelist (отозвать доступ).
-     */
     async function revokeAccess(targetUid) {
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const uid = tgUser?.id ? String(tgUser.id) : null;
@@ -616,18 +719,13 @@
         }
     }
 
-    /**
-     * Создать инвайт-код "мгновенно" и скопировать в буфер (быстрая кнопка).
-     */
     async function quickCreateAndCopy() {
         const res = await createInviteCode({ maxUses: 1, ttlDays: 3 });
         if (res.success && res.code) {
-            // Копируем в буфер
             try {
                 if (navigator.clipboard) {
                     await navigator.clipboard.writeText(res.code);
                 } else {
-                    // Fallback
                     const ta = document.createElement('textarea');
                     ta.value = res.code;
                     ta.style.position = 'fixed';
@@ -650,39 +748,58 @@
     }
 
     // ========================================================
-    // 7. DEV: ВКЛЮЧИТЬ / ОТКЛЮЧИТЬ СИСТЕМУ ДОСТУПА
+    // ⭐ v1.1.0: 7. УПРАВЛЕНИЕ СИСТЕМОЙ ДОСТУПА (ASYNC)
     // ========================================================
-    function disableAccessControl() {
+
+    /**
+     * Отключить систему доступа — ВСЕ игроки смогут играть.
+     * Записывает флаг в Firestore + локально.
+     */
+    async function disableAccessControl() {
         try {
-            localStorage.setItem('perekup_access_disabled', 'true');
-            console.log('[AccessControl] 🚫 Система доступа ОТКЛЮЧЕНА (пускаем всех)');
-            return true;
+            const ok = await _writeGlobalFlagCloud(true);
+            console.log('[AccessControl] 🌐 Система доступа ОТКЛЮЧЕНА (пускаем всех)');
+            return { success: true, cloudWritten: ok };
         } catch (e) {
-            return false;
+            console.error('[AccessControl] Ошибка отключения:', e);
+            return { success: false, error: e.message };
         }
     }
 
-    function enableAccessControl() {
+    /**
+     * Включить систему доступа — только whitelist.
+     */
+    async function enableAccessControl() {
         try {
-            localStorage.removeItem('perekup_access_disabled');
+            const ok = await _writeGlobalFlagCloud(false);
             console.log('[AccessControl] 🔒 Система доступа ВКЛЮЧЕНА');
-            return true;
+            return { success: true, cloudWritten: ok };
         } catch (e) {
-            return false;
+            console.error('[AccessControl] Ошибка включения:', e);
+            return { success: false, error: e.message };
         }
     }
 
+    /**
+     * Синхронная проверка (использует последнее известное значение).
+     * Для UI Owner-панели.
+     */
     function isAccessControlEnabled() {
         return !_isAccessControlDisabled();
     }
 
-    // ========================================================
-    // 8. OWNER-ПАНЕЛЬ UI (модальное окно)
-    // ========================================================
-
     /**
-     * Открыть owner-панель управления доступом.
+     * ⭐ v1.1.0: принудительная синхронизация флага из Firestore.
+     * Вызывается Owner-панелью при открытии.
      */
+    async function refreshAccessFlag() {
+        await _syncGlobalFlagFromCloud(true);
+        return _globalFlagCache.value === true ? false : true;
+    }
+
+    // ========================================================
+    // 8. OWNER-ПАНЕЛЬ UI
+    // ========================================================
     async function openOwnerPanel() {
         const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
         const uid = tgUser?.id ? String(tgUser.id) : null;
@@ -692,7 +809,6 @@
             return;
         }
 
-        // Создаём модалку, если нет
         let modal = document.getElementById('modalAccessManager');
         if (!modal) {
             modal = document.createElement('div');
@@ -701,7 +817,7 @@
             document.body.appendChild(modal);
         }
 
-        // Показываем загрузку
+        // Загрузка
         modal.innerHTML = `
             <div class="modal-box" style="max-width: 480px;">
                 <div class="flex-between mb-2">
@@ -723,7 +839,9 @@
             modal.classList.add('active');
         }
 
-        // Загружаем данные
+        // ⭐ Синхронизируем актуальный флаг из облака
+        await refreshAccessFlag();
+
         const [invitesRes, whitelistRes] = await Promise.all([
             listInvites(),
             listWhitelist()
@@ -735,8 +853,8 @@
         const activeInvites = invites.filter(i => i.isActive);
         const totalPlayers = players.filter(p => !p.isBanned).length;
         const bannedCount = players.filter(p => p.isBanned).length;
+        const systemEnabled = isAccessControlEnabled();
 
-        // Рендер панели
         modal.innerHTML = `
             <div class="modal-box" style="max-width: 480px; max-height: 90vh; overflow-y: auto;">
                 <div class="flex-between mb-2">
@@ -744,6 +862,35 @@
                         <i class="fa-solid fa-crown"></i> OWNER-ПАНЕЛЬ
                     </div>
                     <button onclick="AccessControl.closeOwnerPanel()" class="btn btn-dark btn-auto btn-sm">✕</button>
+                </div>
+
+                <!-- ⭐ v1.1.0: ГЛОБАЛЬНЫЙ ФЛАГ ДОСТУПА -->
+                <div class="glass-card p-3 mb-3" style="border: 1.5px solid ${systemEnabled ? 'rgba(0,230,118,0.5)' : 'rgba(255,179,0,0.6)'}; background:${systemEnabled ? 'rgba(0,230,118,0.06)' : 'rgba(255,179,0,0.08)'};">
+                    <div class="flex-between mb-2">
+                        <div>
+                            <b class="text-xs ${systemEnabled ? 'color-green' : 'color-amber'}">
+                                <i class="fa-solid fa-globe mr-1"></i>
+                                Система доступа
+                            </b>
+                            <div class="sub-label" style="font-size:9.5px;">
+                                ${systemEnabled
+                                    ? 'Только игроки из whitelist могут войти в игру'
+                                    : '⚠️ ИГРА ОТКРЫТА ДЛЯ ВСЕХ игроков без инвайтов'}
+                            </div>
+                        </div>
+                        <span class="tag-badge ${systemEnabled ? 'bg-tag-green' : 'bg-tag-amber'}" style="font-size:8px;">
+                            ${systemEnabled ? 'ВКЛЮЧЕНА' : 'ОТКРЫТА ДЛЯ ВСЕХ'}
+                        </span>
+                    </div>
+                    ${systemEnabled ? `
+                        <button onclick="AccessControl.disableSystem()" class="btn btn-amber btn-sm w-full" style="font-size:11px;">
+                            🌐 ОТКРЫТЬ ИГРУ ДЛЯ ВСЕХ (пускать без инвайтов)
+                        </button>
+                    ` : `
+                        <button onclick="AccessControl.enableSystem()" class="btn btn-green btn-sm w-full" style="font-size:11px;">
+                            🔒 ВКЛЮЧИТЬ ДОСТУП ПО ПРИГЛАШЕНИЯМ
+                        </button>
+                    `}
                 </div>
 
                 <!-- Статистика -->
@@ -762,7 +909,7 @@
                     </div>
                 </div>
 
-                <!-- Быстрые действия -->
+                <!-- Быстрое создание -->
                 <div class="glass-card p-2 mb-3" style="border-color:rgba(255,215,0,0.4);">
                     <b class="text-xs color-amber mb-2 block"><i class="fa-solid fa-bolt mr-1"></i> Быстрое создание кода</b>
                     <div class="grid-2" style="gap:6px;">
@@ -843,23 +990,6 @@
                         `).join('')}
                     </div>
                 </div>
-
-                <!-- Управление системой -->
-                <div class="glass-card p-2" style="border-color:rgba(255,179,0,0.3);">
-                    <b class="text-xs color-amber mb-1 block"><i class="fa-solid fa-cog mr-1"></i> Система доступа</b>
-                    <div class="sub-label mb-2" style="font-size:9px;">
-                        Статус: <b class="${isAccessControlEnabled() ? 'color-green' : 'color-red'}">${isAccessControlEnabled() ? 'ВКЛЮЧЕНА' : 'ОТКЛЮЧЕНА'}</b>
-                    </div>
-                    ${isAccessControlEnabled() ? `
-                        <button onclick="AccessControl.disableSystem()" class="btn btn-amber btn-sm w-full" style="font-size:10px;">
-                            ⚠️ Отключить доступ по приглашениям (пускать всех)
-                        </button>
-                    ` : `
-                        <button onclick="AccessControl.enableSystem()" class="btn btn-green btn-sm w-full" style="font-size:10px;">
-                            🔒 Включить доступ по приглашениям
-                        </button>
-                    `}
-                </div>
             </div>
         `;
     }
@@ -874,13 +1004,13 @@
     }
 
     async function refreshPanel() {
+        await refreshAccessFlag();
         await openOwnerPanel();
     }
 
     async function quickCreate(maxUses, ttlDays) {
         const res = await createInviteCode({ maxUses: maxUses, ttlDays: ttlDays });
         if (res.success) {
-            // Копируем код
             try {
                 if (navigator.clipboard) {
                     await navigator.clipboard.writeText(res.code);
@@ -946,17 +1076,26 @@
         }
     }
 
-    function disableSystem() {
-        if (!confirm('⚠️ Отключить систему доступа? ВСЕ игроки смогут играть.')) return;
-        disableAccessControl();
-        if (typeof showToast === 'function') showToast('⚠️ Система доступа отключена');
-        setTimeout(() => refreshPanel(), 300);
+    async function disableSystem() {
+        if (!confirm('⚠️ ОТКРЫТЬ ИГРУ ДЛЯ ВСЕХ?\n\nИгроки без инвайт-кодов смогут войти. Whitelist и баны сохранятся, но перестанут действовать, пока система отключена.')) return;
+        const res = await disableAccessControl();
+        if (res.success) {
+            if (typeof showToast === 'function') showToast('🌐 Система доступа отключена — игра открыта для всех');
+            setTimeout(() => refreshPanel(), 300);
+        } else {
+            if (typeof showToast === 'function') showToast(`❌ ${res.error}`);
+        }
     }
 
-    function enableSystem() {
-        enableAccessControl();
-        if (typeof showToast === 'function') showToast('🔒 Система доступа включена');
-        setTimeout(() => refreshPanel(), 300);
+    async function enableSystem() {
+        if (!confirm('🔒 ВКЛЮЧИТЬ ДОСТУП ПО ПРИГЛАШЕНИЯМ?\n\nИгроки без инвайт-кодов будут заблокированы.')) return;
+        const res = await enableAccessControl();
+        if (res.success) {
+            if (typeof showToast === 'function') showToast('🔒 Система доступа включена');
+            setTimeout(() => refreshPanel(), 300);
+        } else {
+            if (typeof showToast === 'function') showToast(`❌ ${res.error}`);
+        }
     }
 
     // ========================================================
@@ -977,10 +1116,11 @@
         revokeAccess: revokeAccess,
         quickCreateAndCopy: quickCreateAndCopy,
 
-        // Управление системой
+        // ⭐ v1.1.0: глобальный флаг доступа
         disableAccessControl: disableAccessControl,
         enableAccessControl: enableAccessControl,
         isAccessControlEnabled: isAccessControlEnabled,
+        refreshAccessFlag: refreshAccessFlag,
 
         // UI Owner-панели
         openOwnerPanel: openOwnerPanel,
@@ -999,8 +1139,8 @@
         OWNER_USERNAME: OWNER_USERNAME
     };
 
-    console.log('[🔐 AccessControl v1.0.0] Система доступа по приглашениям загружена');
+    console.log('[🔐 AccessControl v1.1.0] Глобальный флаг доступа в Firestore + кэш 60 сек ✓');
     console.log('[🔐 AccessControl] Владелец:', OWNER_TELEGRAM_ID, '(@' + OWNER_USERNAME + ')');
-    console.log('[🔐 AccessControl] API: checkAccess, redeemInviteCode, openOwnerPanel, createInviteCode, ...');
+    console.log('[🔐 AccessControl] API: checkAccess, redeemInviteCode, openOwnerPanel, disableSystem, enableSystem, refreshAccessFlag ✓');
 
 })();
