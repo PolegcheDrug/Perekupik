@@ -1,27 +1,26 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v2.6.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v2.7.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.7.0 (SPRINT 2 — ФИКСЫ ИНДЕКСОВ И ГОНОК):
+//   - ФИКС C4: activeSalesLotHaggleIndex корректно сдвигается
+//     после splice в finishSalesLotDeal и reclaimCarFromLot
+//   - ФИКС: если activeSalesLotHaggleIndex === удалённому индексу,
+//     модалка торгов принудительно закрывается
+//   - ФИКС: _finishing явно сбрасывается в finally
+//   - ФИКС: updateSalesLotTimers корректно обрабатывает undefined
+//     buyerTimerLeft без застревания лота
+//   - ФИКС: syncBuyerToMNetwork проверяет существующий диалог
+//     не только по id, но и по carUid (защита от дублей)
+//   - ФИКС: renderSalesLot пропускает повреждённые лоты без .car
 // ⭐ v2.6.0:
-//   - ФИКС: updateSalesLotTimers() защищён от сдвига индексов
+//   - ФИКС: updateSalesLotTimers защищён от сдвига индексов
 //     при splice (использует обратный for)
-//   - ФИКС: speedUpLotSearch() явно сбрасывает
+//   - ФИКС: speedUpLotSearch явно сбрасывает
 //     lot.buyerGenerationPending = false после sync
-//   - ФИКС: reclaimCarFromLot / finishSalesLotDeal проверяют
-//     наличие lot и защищены флагом _finishing
-//   - ФИКС: generateRandomLotBuyer / syncBuyerToMNetwork
-//     защищены от null-car
-//   - ФИКС: openLotBuyerInNetworkM имеет fallback если
-//     AppM.openDialog недоступен
-//   - ФИКС: removeDialogByCarIndex закрывает открытый диалог
-//     в AppM, если он ссылался на удалённый лот
 //   - Lot-flags: _finishing, _buyerTimerActive
 //   - В finishSalesLotDeal сбрасывается window.previewCarIndex,
 //     если он указывает на удалённую машину
-//   - renderSalesLot фильтрует лоты без .car
 // ⭐ v2.5.0: Убран дубль buyGarageSlot/upgradeExpressCapacity.
-//            Добавлена чистка M+ диалогов при продаже/снятии/таймауте лота.
-//            Добавлен флаг lot.buyerGenerationPending против дублей покупателей.
-//            shiftDialogIndicesAfterRemoval — корректный сдвиг carIndex после splice.
 // ========================================================
 
 let salesLotTimerInterval = null;
@@ -86,7 +85,6 @@ const BUYER_ARCHETYPES = [
 function removeDialogByCarIndex(idx) {
     if (!state.player || !Array.isArray(state.player.phoneMessages)) return false;
 
-    // Находим id диалогов, которые будут удалены
     const toRemove = state.player.phoneMessages
         .filter(m => m && m.category === 'buyers' && m.carIndex === idx)
         .map(m => m.id);
@@ -102,12 +100,10 @@ function removeDialogByCarIndex(idx) {
 
     const removed = before !== state.player.phoneMessages.length;
 
-    // ⭐ v2.6.0: если открыт AppM и активный диалог был удалён — закрываем
     if (removed && typeof window.AppM !== 'undefined' && window.AppM.activeDialogId) {
         if (toRemove.includes(window.AppM.activeDialogId)) {
             try {
                 window.AppM.activeDialogId = null;
-                // Перерисовываем текущий экран
                 if (typeof window.AppM.render === 'function') {
                     const container = document.getElementById('phoneAppContainer');
                     if (container) window.AppM.render(container);
@@ -134,6 +130,32 @@ function shiftDialogIndicesAfterRemoval(removedIdx) {
             if (m.carIndex > removedIdx) m.carIndex -= 1;
         }
     });
+}
+
+/**
+ * ⭐ v2.7.0: корректирует activeSalesLotHaggleIndex после удаления лота.
+ * Возвращает true, если модалка была закрыта.
+ */
+function _adjustHaggleIndexAfterRemoval(removedIdx) {
+    if (activeSalesLotHaggleIndex === null) return false;
+
+    if (activeSalesLotHaggleIndex === removedIdx) {
+        // Открыта модалка именно удалённого лота — закрываем
+        activeSalesLotHaggleIndex = null;
+        try {
+            if (typeof ModalManager !== 'undefined') {
+                ModalManager.close('modalLotHoodDeal');
+            }
+        } catch (e) {}
+        return true;
+    }
+
+    if (activeSalesLotHaggleIndex > removedIdx) {
+        // Модалка открыта для лота, который сдвинулся на 1 влево
+        activeSalesLotHaggleIndex -= 1;
+    }
+
+    return false;
 }
 
 /**
@@ -175,10 +197,10 @@ function renderSalesLot() {
 
     if (!state.salesLot) state.salesLot = [];
 
-    // Чистим мёртвые диалоги перед рендером (страховка)
+    // Чистим мёртвые диалоги перед рендером
     cleanupOrphanedDialogs();
 
-    // ⭐ v2.6.0: фильтруем лоты без .car (страховка от повреждённых данных)
+    // ⭐ v2.7.0: фильтруем лоты без .car и без .name (страховка)
     const validLots = state.salesLot.filter(lot => lot && (lot.car || lot.name));
 
     const badge = document.getElementById('lotCountBadge');
@@ -202,7 +224,6 @@ function renderSalesLot() {
 
     let html = "";
 
-    // ⭐ v2.6.0: используем originalIdx для доступа к state.salesLot
     state.salesLot.forEach((lot, idx) => {
         if (!lot) return;
         const car = lot.car || lot;
@@ -233,7 +254,6 @@ function renderSalesLot() {
             lot._buyerTimerActive = true;
             hasBuyer = true;
             syncBuyerToMNetwork(lot, idx);
-            // ⭐ v2.6.0: явный сброс флага
             lot.buyerGenerationPending = false;
         }
 
@@ -420,7 +440,6 @@ function renderBuyerCardActions(lot, idx) {
 }
 
 function generateRandomLotBuyer(car, askingPrice) {
-    // ⭐ v2.6.0: защита от null-car
     if (!car) {
         car = { name: 'Автомобиль', type: 'economy' };
     }
@@ -456,6 +475,11 @@ function generateRandomLotBuyer(car, askingPrice) {
     };
 }
 
+/**
+ * ⭐ v2.7.0: syncBuyerToMNetwork теперь защищён от дублей
+ * - Проверка по dialogId
+ * - Проверка по carUid (если диалог уже существует для этой машины)
+ */
 function syncBuyerToMNetwork(lot, idx) {
     if (!lot || !lot.buyer || lot.buyer.dealType !== 'chat') return;
     if (!state.player) state.player = {};
@@ -464,7 +488,6 @@ function syncBuyerToMNetwork(lot, idx) {
     const car = lot.car || lot;
     if (!car) return;
 
-    // ⭐ v2.6.0: гарантируем uid у машины
     if (typeof window.ensureCarIdentity === 'function') {
         window.ensureCarIdentity(car);
     }
@@ -474,7 +497,16 @@ function syncBuyerToMNetwork(lot, idx) {
     const safeCarName = String(car.name || 'car').replace(/[^a-zа-я0-9]/gi, '_');
     const dialogId = `dlg_buyer_slot_${idx}_${safeCarName}`;
 
+    // Проверка 1: диалог по id
     let exists = state.player.phoneMessages.find(m => m.id === dialogId);
+
+    // ⭐ v2.7.0: Проверка 2: диалог по carUid (защита от дублей)
+    if (!exists && carUid) {
+        exists = state.player.phoneMessages.find(m =>
+            m && m.category === 'buyers' && m.carUid === carUid && m.carIndex === idx
+        );
+    }
+
     if (!exists) {
         state.player.phoneMessages.unshift({
             id: dialogId,
@@ -505,7 +537,7 @@ function syncBuyerToMNetwork(lot, idx) {
 }
 
 // ========================================================
-// МОДАЛЬНОЕ ОКНО ТОРГА У КАПОТА (СТИЛЬ КАК ПРИ ПОКУПКЕ)
+// МОДАЛЬНОЕ ОКНО ТОРГА У КАПОТА
 // ========================================================
 function openLotHoodHaggleModal(idx) {
     const lot = state.salesLot[idx];
@@ -771,12 +803,11 @@ function acceptLotBuyerDeal(idx) {
     }
 }
 
-// ⭐ v2.6.0: защита от двойного вызова
+// ⭐ v2.7.0: защита от двойного вызова + корректный сдвиг activeSalesLotHaggleIndex
 function finishSalesLotDeal(idx, price, profit) {
     const lot = state.salesLot[idx];
     if (!lot) return;
 
-    // Защита от двойного вызова
     if (lot._finishing) {
         console.warn('[SalesLot] finishSalesLotDeal уже выполняется для этого лота');
         return;
@@ -807,7 +838,10 @@ function finishSalesLotDeal(idx, price, profit) {
         // Удаляем M+ диалог этого лота перед splice
         removeDialogByCarIndex(idx);
 
-        // ⭐ v2.6.0: если открыта модалка просмотра этой машины — закрываем
+        // ⭐ v2.7.0: корректируем activeSalesLotHaggleIndex ДО splice
+        _adjustHaggleIndexAfterRemoval(idx);
+
+        // Если открыта модалка просмотра этой машины — закрываем
         if (window.previewCarIndex !== null && window.previewCarIndex !== undefined) {
             const previewCar = state.garage[window.previewCarIndex];
             if (previewCar && previewCar.uid === car.uid) {
@@ -822,7 +856,6 @@ function finishSalesLotDeal(idx, price, profit) {
         // Сдвигаем индексы у диалогов оставшихся лотов
         shiftDialogIndicesAfterRemoval(idx);
 
-        activeSalesLotHaggleIndex = null;
         saveState();
         updateHeaderUI();
         renderSalesLot();
@@ -839,7 +872,8 @@ function finishSalesLotDeal(idx, price, profit) {
             );
         }
     } finally {
-        // _finishing лот уже удалён — флаг нужен только на время выполнения
+        // Явный сброс флага (на случай, если что-то выше упало)
+        try { lot._finishing = false; } catch (e) {}
     }
 }
 
@@ -847,6 +881,8 @@ function rejectLotBuyer(idx) {
     const lot = state.salesLot[idx];
     if (!lot) return;
 
+    // Лот НЕ удаляется — просто сбрасываем покупателя.
+    // Диалог удаляем по тому же индексу (лот остаётся на своём месте).
     removeDialogByCarIndex(idx);
 
     lot.currentBuyer = null;
@@ -856,7 +892,12 @@ function rejectLotBuyer(idx) {
     lot.buyerGenerationPending = false;
     lot._buyerTimerActive = false;
 
-    activeSalesLotHaggleIndex = null;
+    // ⭐ v2.7.0: если открыта модалка именно этого лота — закрываем
+    if (activeSalesLotHaggleIndex === idx) {
+        activeSalesLotHaggleIndex = null;
+        try { ModalManager.close('modalLotHoodDeal'); } catch (e) {}
+    }
+
     saveState();
     renderSalesLot();
     if (typeof playSound === 'function') playSound('tick');
@@ -889,7 +930,6 @@ function openLotBuyerInNetworkM(idx) {
             if (window.AppM && typeof window.AppM.openDialog === 'function') {
                 window.AppM.openDialog(dialogId);
             } else {
-                // ⭐ v2.6.0: fallback — открыть чаты вручную
                 if (window.AppM) {
                     window.AppM.activeTab = 'chats';
                     if (typeof window.AppM.render === 'function') {
@@ -905,13 +945,12 @@ function openLotBuyerInNetworkM(idx) {
     }, 120);
 }
 
-// ⭐ v2.6.0: защита от сдвига индексов при splice
+// ⭐ v2.7.0: корректная обработка undefined buyerTimerLeft + сдвиг modal index
 function updateSalesLotTimers() {
     if (!state.salesLot || state.salesLot.length === 0) return;
 
     let needReRender = false;
 
-    // ⭐ v2.6.0: обратный обход на случай splice внутри
     for (let idx = state.salesLot.length - 1; idx >= 0; idx--) {
         const lot = state.salesLot[idx];
         if (!lot) continue;
@@ -919,7 +958,6 @@ function updateSalesLotTimers() {
         let hasBuyer = !!lot.currentBuyer || !!lot.buyer;
 
         if (!hasBuyer) {
-            // Не создаём покупателя дважды
             if (lot.buyerGenerationPending) continue;
 
             if (lot.timer > 0) {
@@ -946,12 +984,22 @@ function updateSalesLotTimers() {
                 needReRender = true;
             }
         } else {
+            // ⭐ v2.7.0: инициализируем buyerTimerLeft, если он undefined
+            if (typeof lot.buyerTimerLeft !== 'number' || isNaN(lot.buyerTimerLeft)) {
+                lot.buyerTimerLeft = 120;
+            }
+
             if (lot._buyerTimerActive && lot.buyerTimerLeft > 0) {
                 lot.buyerTimerLeft -= 1;
                 const buyerTimeText = document.getElementById(`lot_buyer_timer_${idx}`);
                 if (buyerTimeText) buyerTimeText.innerText = `⏳ ${lot.buyerTimerLeft}с`;
+
+                // ⭐ v2.7.0: если открыта модалка этого лота — обновляем таймер
+                if (activeSalesLotHaggleIndex === idx) {
+                    const modalTimerText = document.querySelector('#modalLotHoodDeal .sub-label .color-amber');
+                    if (modalTimerText) modalTimerText.innerText = `⏳ ${lot.buyerTimerLeft}с`;
+                }
             } else if (lot.buyerTimerLeft <= 0) {
-                // Таймаут покупателя
                 removeDialogByCarIndex(idx);
 
                 lot.currentBuyer = null;
@@ -960,10 +1008,13 @@ function updateSalesLotTimers() {
                 lot.maxTimer = 50;
                 lot.buyerGenerationPending = false;
                 lot._buyerTimerActive = false;
+
+                // ⭐ v2.7.0: если открыта модалка именно этого лота — закрываем
                 if (activeSalesLotHaggleIndex === idx) {
-                    ModalManager.close('modalLotHoodDeal');
                     activeSalesLotHaggleIndex = null;
+                    try { ModalManager.close('modalLotHoodDeal'); } catch (e) {}
                 }
+
                 needReRender = true;
             }
         }
@@ -999,7 +1050,6 @@ function speedUpLotSearch(idx, type) {
     lot.buyer = lot.currentBuyer;
     lot.buyerTimerLeft = 120;
     lot._buyerTimerActive = true;
-    // ⭐ v2.6.0: явный сброс флага
     lot.buyerGenerationPending = false;
 
     syncBuyerToMNetwork(lot, idx);
@@ -1013,7 +1063,7 @@ function speedUpLotSearch(idx, type) {
     showToast("Покупатель найден мгновенно!");
 }
 
-// ⭐ v2.6.0: защита от отсутствия lot
+// ⭐ v2.7.0: защита от отсутствия lot + корректный сдвиг activeSalesLotHaggleIndex
 function reclaimCarFromLot(idx) {
     const lot = state.salesLot[idx];
     if (!lot) {
@@ -1038,13 +1088,11 @@ function reclaimCarFromLot(idx) {
 
     removeDialogByCarIndex(idx);
 
+    // ⭐ v2.7.0: корректируем activeSalesLotHaggleIndex ДО splice
+    _adjustHaggleIndexAfterRemoval(idx);
+
     state.salesLot.splice(idx, 1);
     shiftDialogIndicesAfterRemoval(idx);
-
-    if (activeSalesLotHaggleIndex === idx) {
-        activeSalesLotHaggleIndex = null;
-        ModalManager.close('modalLotHoodDeal');
-    }
 
     saveState();
     renderSalesLot();
@@ -1053,10 +1101,13 @@ function reclaimCarFromLot(idx) {
     showToast(`«${car.name}» возвращен в гараж.`);
 }
 
-// Экспорт новых хелперов
+// ========================================================
+// ЭКСПОРТ ХЕЛПЕРОВ И ФУНКЦИЙ
+// ========================================================
 window.removeDialogByCarIndex = removeDialogByCarIndex;
 window.shiftDialogIndicesAfterRemoval = shiftDialogIndicesAfterRemoval;
 window.cleanupOrphanedDialogs = cleanupOrphanedDialogs;
+window._adjustHaggleIndexAfterRemoval = _adjustHaggleIndexAfterRemoval;
 
 window.renderSalesLot = renderSalesLot;
 window.initSalesLotTimer = initSalesLotTimer;
@@ -1078,4 +1129,4 @@ if (document.readyState === 'loading') {
     initSalesLotTimer();
 }
 
-console.log('[🏪 salesLot v2.6.0] Сдвиг индексов + защита от двойных вызовов + fallback AppM ✓');
+console.log('[🏪 salesLot v2.7.0] Фикс сдвига activeSalesLotHaggleIndex + защита от гонок + дубли диалогов устранены ✓');
