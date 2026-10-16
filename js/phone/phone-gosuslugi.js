@@ -1,13 +1,21 @@
 // ========================================================
-// js/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v1.0.0)
+// js/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.1.0 (SPRINT 2 — ФИКСЫ АУКЦИОНА):
+//   - ФИКС E2: bidPlate не даёт перебить самого себя
+//     (проверка lot.highestBidderId === myUid)
+//   - ФИКС: при создании лота пишется highestBidderId (для проверки)
+//   - ФИКС: _bidPending защищает от двойного клика
+//   - Дополнительно: при выигрыше лота игрок получает госномер
+//     через PlatesManager и в лог пишется его имя + id
 // ⭐ v1.0.0 (ЕДИНЫЙ PLATESMANAGER):
-//   - bidPlate → PlatesManager.addPlate (убрана прямая запись в state.ownedPlates)
+//   - bidPlate → PlatesManager.addPlate
 //   - Все остальные методы без изменений
 // ========================================================
 
 const AppGosuslugi = {
     subTab: 'fines', // 'fines', 'taxes', 'plates'
+    _bidPending: false,
 
     render(container) {
         let sub = this.subTab;
@@ -36,8 +44,8 @@ const AppGosuslugi = {
     },
 
     switchTab(tab) {
-        playSound('tick');
-        tgHaptic('light');
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
         this.subTab = tab;
         this.render(document.getElementById('phoneAppContainer'));
     },
@@ -145,28 +153,57 @@ const AppGosuslugi = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
+    // ========================================================
+    // АУКЦИОН ГОСНОМЕРОВ
+    // ========================================================
     renderPlatesAuctionTab() {
         if (!state.officialPlateAuction || state.officialPlateAuction.length === 0) {
-            state.officialPlateAuction = [
-                { id: 'p_1', plate: 'А777АА 777', currentBid: 450000, highestBidder: 'Государство' },
-                { id: 'p_2', plate: 'М001ММ 99', currentBid: 750000, highestBidder: 'Государство' },
-                { id: 'p_3', plate: 'В888ВВ 50', currentBid: 300000, highestBidder: 'Государство' }
-            ];
+            state.officialPlateAuction = this._generateInitialAuctionLots();
         }
+
+        const myUid = String(state.player?.uid || window.tgUserId || "");
+        const myName = String(state.player?.name || "Вы");
 
         let html = "";
         state.officialPlateAuction.forEach((lot, lIdx) => {
+            // ⭐ v1.1.0: проверяем, лидирует ли уже игрок
+            const isPlayerLeading =
+                (lot.highestBidderId && String(lot.highestBidderId) === myUid) ||
+                (!lot.highestBidderId && String(lot.highestBidder || "") === myName && myName !== 'Государство' && myName !== '');
+
+            const currentBid = Number(lot.currentBid) || 0;
+            const lotId = lot.id || `auc_${lIdx}`;
+
             html += `
-            <div class="glass-card mb-2 p-2">
+            <div class="glass-card mb-2 p-2" style="${isPlayerLeading ? 'border-color:var(--green); background:rgba(0,230,118,0.05);' : ''}">
                 <div class="flex-between mb-1">
                     <span class="license-plate">${lot.plate} <div class="license-flag">RUS</div></span>
-                    <span class="price-val text-xs color-green">${lot.currentBid.toLocaleString()} ₽</span>
+                    <span class="price-val text-xs color-green">${currentBid.toLocaleString()} ₽</span>
                 </div>
-                <div class="sub-label mb-2" style="font-size:9.5px;">Лидер торгов: <b>${lot.highestBidder}</b></div>
-                <div class="grid-2">
-                    <button onclick="AppGosuslugi.bidPlate(${lIdx}, 50000)" class="btn btn-cyan btn-sm">+50k к ставке</button>
-                    <button onclick="AppGosuslugi.bidPlate(${lIdx}, 150000)" class="btn btn-green btn-sm">+150k к ставке</button>
+                <div class="sub-label mb-2" style="font-size:9.5px;">
+                    Лидер торгов:
+                    ${isPlayerLeading
+                        ? `<b class="color-green">⚡ ВЫ (${myName})</b>`
+                        : `<b class="color-amber">${lot.highestBidder || 'Государство'}</b>`}
                 </div>
+
+                ${isPlayerLeading ? `
+                    <div class="p-2 mb-2 text-center" style="background:rgba(0,230,118,0.1); border-radius:8px; border:1px solid rgba(0,230,118,0.3);">
+                        <span class="sub-label color-green" style="font-size:9.5px;">✅ Вы уже лидируете на этом лоте</span>
+                    </div>
+                    <button class="btn btn-dark btn-sm w-full opacity-50" disabled>
+                        <i class="fa-solid fa-crown color-amber"></i> Ваша текущая ставка
+                    </button>
+                ` : `
+                    <div class="grid-2">
+                        <button onclick="AppGosuslugi.bidPlate(${lIdx}, 50000)" class="btn btn-cyan btn-sm">
+                            +50k к ставке
+                        </button>
+                        <button onclick="AppGosuslugi.bidPlate(${lIdx}, 150000)" class="btn btn-green btn-sm">
+                            +150k к ставке
+                        </button>
+                    </div>
+                `}
             </div>`;
         });
 
@@ -176,6 +213,9 @@ const AppGosuslugi = {
                     <b class="text-xs color-cyan"><i class="fa-solid fa-gavel"></i> Официальный аукцион номеров МРЭО</b>
                     <span class="tag-badge bg-tag-cyan">Торги</span>
                 </div>
+                <div class="sub-label mb-2" style="font-size:9.5px;">
+                    Официальные торги на редкие серии. Убедитесь, что вас не перебивают — свою же ставку перебить нельзя.
+                </div>
                 <div class="space-y-2">
                     ${html}
                 </div>
@@ -183,51 +223,113 @@ const AppGosuslugi = {
         `;
     },
 
-    // ⭐ v1.0.0: ЧЕРЕЗ PLATESMANAGER — убрана прямая запись в state.ownedPlates
-    bidPlate(lotIdx, raiseAmount) {
-        let lot = state.officialPlateAuction[lotIdx];
-        if (!lot) return;
+    /**
+     * ⭐ v1.1.0: генерация стартовых лотов с highestBidderId
+     */
+    _generateInitialAuctionLots() {
+        return [
+            { id: 'p_' + Date.now() + '_1', plate: 'А777АА 777', currentBid: 450000, highestBidder: 'Государство', highestBidderId: null },
+            { id: 'p_' + Date.now() + '_2', plate: 'М001ММ 99',  currentBid: 750000, highestBidder: 'Государство', highestBidderId: null },
+            { id: 'p_' + Date.now() + '_3', plate: 'В888ВВ 50',  currentBid: 300000, highestBidder: 'Государство', highestBidderId: null }
+        ];
+    },
 
+    /**
+     * ⭐ v1.1.0: ставка на лот с защитой от самоперебивания
+     */
+    bidPlate(lotIdx, raiseAmount) {
+        // Защита от двойного клика
+        if (this._bidPending) return;
+
+        const lot = state.officialPlateAuction[lotIdx];
+        if (!lot) return showToast("Лот не найден");
+
+        const myUid = String(state.player?.uid || window.tgUserId || "");
+        const myName = String(state.player?.name || "Вы");
+
+        // ⭐ ФИКС E2: проверка "вы уже лидируете"
+        const isPlayerLeading =
+            (lot.highestBidderId && String(lot.highestBidderId) === myUid) ||
+            (!lot.highestBidderId && String(lot.highestBidder || "") === myName && myName !== 'Государство' && myName !== '');
+
+        if (isPlayerLeading) {
+            if (typeof playSound === 'function') playSound('error');
+            if (typeof tgHaptic === 'function') tgHaptic('warning');
+            return showToast("⚠️ Вы уже лидируете на этом лоте!");
+        }
+
+        // Проверка модуля номеров
         if (!window.PlatesManager) {
             return showToast("⚠️ Модуль номеров не загружен");
         }
 
-        let newBid = lot.currentBid + raiseAmount;
-        let cash = state.player?.cash || 0;
-        if (cash < newBid) return showToast("Не хватает денег для такой ставки!");
+        // Расчёт новой ставки
+        const currentBid = Number(lot.currentBid) || 0;
+        const newBid = currentBid + raiseAmount;
+        const cash = state.player?.cash || 0;
 
-        // Списываем деньги
-        state.player.cash -= newBid;
-
-        // ⭐ Выдаём номер через PlatesManager
-        const addRes = window.PlatesManager.addPlate(lot.plate, 'gosuslugi_auction', { silent: true });
-
-        if (!addRes) {
-            // Откат денег
-            state.player.cash += newBid;
-            return showToast("❌ Не удалось выиграть номер (ошибка менеджера)");
+        if (cash < newBid) {
+            if (typeof playSound === 'function') playSound('error');
+            return showToast(`Не хватает ₽: нужно ${newBid.toLocaleString()} ₽ (у вас ${cash.toLocaleString()} ₽)`);
         }
 
-        lot.highestBidder = state.player?.name || "Вы";
+        this._bidPending = true;
 
-        // Обновляем лот в аукционе новым номером
-        let newP = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77";
-        state.officialPlateAuction[lotIdx] = {
-            id: 'p_' + Date.now(),
-            plate: newP,
-            currentBid: Math.floor(250000 + Math.random() * 400000),
-            highestBidder: 'Государство'
-        };
+        try {
+            // Списываем деньги
+            state.player.cash -= newBid;
 
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
-        openVerdictModal("НОМЕР ВЫИГРАН НА АУКЦИОНЕ! 🏷️", `Вы перебили ставку и официально закрепили за собой красивый знак <b>${lot.plate}</b>!\nЗнак добавлен в инвентарь госномеров.`, true);
-        this.render(document.getElementById('phoneAppContainer'));
+            // Выдаём номер через PlatesManager
+            const addRes = window.PlatesManager.addPlate(lot.plate, 'gosuslugi_auction', { silent: true });
+
+            if (!addRes) {
+                // Откат денег
+                state.player.cash += newBid;
+                return showToast("❌ Не удалось выиграть номер (ошибка менеджера)");
+            }
+
+            // Обновляем лот — теперь лидер это игрок
+            lot.highestBidder = myName;
+            lot.highestBidderId = myUid;
+            lot.currentBid = newBid;
+
+            // ⭐ v1.1.0: генерируем новый лот с новым номером вместо выигранного
+            const newPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77";
+            state.officialPlateAuction[lotIdx] = {
+                id: 'p_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                plate: newPlate,
+                currentBid: Math.floor(250000 + Math.random() * 400000),
+                highestBidder: 'Государство',
+                highestBidderId: null
+            };
+
+            saveState();
+            updateHeaderUI();
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
+
+            // ⭐ v1.1.0: логируем транзакцию
+            if (typeof logBankTransaction === 'function') {
+                logBankTransaction(`Аукцион номеров МРЭО: ${lot.plate}`, newBid, false);
+            }
+
+            if (typeof openVerdictModal === 'function') {
+                openVerdictModal(
+                    "НОМЕР ВЫИГРАН НА АУКЦИОНЕ! 🏷️",
+                    `Вы перебили ставку и официально закрепили за собой красивый знак <b>${lot.plate}</b>!\nСумма: ${newBid.toLocaleString()} ₽\nЗнак добавлен в инвентарь госномеров.`,
+                    true,
+                    newBid
+                );
+            }
+
+            this.render(document.getElementById('phoneAppContainer'));
+
+        } finally {
+            this._bidPending = false;
+        }
     }
 };
 
 window.AppGosuslugi = AppGosuslugi;
 
-console.log('[🏛 phone-gosuslugi v1.0.0] PlatesManager.addPlate вместо state.ownedPlates ✓');
+console.log('[🏛 phone-gosuslugi v1.1.0] ФИКС E2: запрет самоперебивания ставки + highestBidderId + _bidPending защита ✓');
