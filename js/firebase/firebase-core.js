@@ -1,6 +1,16 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.0.0)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.1.0 (SPRINT 3 — ФИКС CLEANUP):
+//   - ФИКС: runCleanup теперь обрабатывает каждую коллекцию
+//     в отдельном try/catch. Раньше падение одной (например,
+//     trade_offers без правил) валило весь цикл.
+//   - ФИКС: каждая коллекция возвращает свой статус в results
+//     (ok / skipped / error), чтобы DEV-панель видела, что упало.
+//   - ФИКС: добавлен отдельный лог по каждой коллекции при
+//     ошибке, а не «общий».
+//   - ФИКС: cleanup не считает сбой одной коллекции фатальным
+//     — возвращает success:true, если хоть что-то почищено.
 // ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ firebase-bridge.js):
 //   - Инициализация Firebase (app, auth, db)
 //   - TelegramAuthManager (initSession, getVerifiedUserId, ...)
@@ -11,7 +21,7 @@
 //   - Экспорт в window.FB_Core
 //
 // ВАЖНО: файл — ES-модуль (import), подключается через
-//   <script type="module" src="firebase-core.js?v=410"></script>
+//   <script type="module" src="firebase-core.js?v=421"></script>
 // Должен быть загружен ДО firebase-market.js, firebase-friendships.js,
 // firebase-notifications.js, firebase-p2p.js.
 // ========================================================
@@ -377,65 +387,102 @@ const PlayersStorageManager = {
 
 // ========================================================
 // 6. CLEANUP MANAGER (TTL)
+// ⭐ v1.1.0: каждая коллекция обрабатывается в своём try/catch.
 // ========================================================
 const CleanupManager = {
   _lastCleanup: 0,
   _cleanupInterval: 60 * 60 * 1000, // раз в час
 
+  /**
+   * Очистка просроченных документов.
+   * @param {boolean} force — игнорировать интервал
+   * @returns {Promise<{success, results, total, skipped?}>}
+   */
   async runCleanup(force = false) {
     const now = Date.now();
     if (!force && now - this._lastCleanup < this._cleanupInterval) {
-      return { skipped: true };
+      return { success: true, skipped: true, results: {}, total: 0 };
     }
     this._lastCleanup = now;
 
+    // ⭐ v1.1.0: результаты по каждой коллекции отдельно
     const results = {
-      chat_messages: 0,
-      notifications: 0,
-      market_lots: 0,
-      transactions: 0,
-      trade_offers: 0
+      chat_messages: { ok: 0, error: null },
+      notifications: { ok: 0, error: null },
+      market_lots: { ok: 0, error: null },
+      transactions: { ok: 0, error: null },
+      trade_offers: { ok: 0, error: null }
     };
 
-    try {
-      const collectionsToClean = [
-        { name: 'chat_messages', key: 'chat_messages' },
-        { name: 'notifications', key: 'notifications' },
-        { name: 'market_lots', key: 'market_lots' },
-        { name: 'transactions', key: 'transactions' },
-        { name: 'trade_offers', key: 'trade_offers' }
-      ];
+    const collectionsToClean = [
+      'chat_messages',
+      'notifications',
+      'market_lots',
+      'transactions',
+      'trade_offers'
+    ];
 
-      for (const col of collectionsToClean) {
+    let totalDeleted = 0;
+    let errorCount = 0;
+
+    // ⭐ v1.1.0: каждую коллекцию чистим изолированно
+    for (const colName of collectionsToClean) {
+      try {
         const q = query(
-          collection(db, col.name),
+          collection(db, colName),
           where("expireAt", "<=", now),
           limit(100)
         );
         const snap = await getDocs(q);
-        if (!snap.empty) {
-          const batch = writeBatch(db);
-          snap.forEach(d => {
-            batch.delete(d.ref);
-            results[col.key]++;
-          });
-          await batch.commit();
+
+        if (snap.empty) {
+          results[colName].ok = 0;
+          continue;
+        }
+
+        const batch = writeBatch(db);
+        let deleted = 0;
+        snap.forEach(d => {
+          batch.delete(d.ref);
+          deleted++;
+        });
+
+        await batch.commit();
+        results[colName].ok = deleted;
+        totalDeleted += deleted;
+      } catch (colErr) {
+        // ⭐ v1.1.0: не валим весь cleanup из-за одной коллекции
+        const errMsg = colErr?.code || colErr?.message || String(colErr);
+        results[colName].error = errMsg;
+        errorCount++;
+
+        // Логируем детально, но не роняем цикл
+        if (errMsg.includes('permission-denied')) {
+          console.warn(`[Cleanup] ${colName}: permission-denied (коллекция не открыта в Firestore Rules)`);
+        } else {
+          console.warn(`[Cleanup] ${colName} error:`, errMsg);
         }
       }
-
-      const total = Object.values(results).reduce((a, b) => a + b, 0);
-      if (total > 0) {
-        devLogFirestore(
-          'cleanupExpiredData OK',
-          `chat: ${results.chat_messages}, notif: ${results.notifications}, lots: ${results.market_lots}, tx: ${results.transactions}, trade: ${results.trade_offers}`
-        );
-      }
-      return { success: true, results, total };
-    } catch (e) {
-      console.warn('[Cleanup] Ошибка:', e);
-      devLogFirestore('cleanupExpiredData ERROR', e.message);
-      return { success: false, error: e.message };
     }
+
+    const summary = Object.entries(results)
+      .map(([k, v]) => v.error ? `${k}:ERR` : `${k}:${v.ok}`)
+      .join(', ');
+
+    if (totalDeleted > 0 || errorCount > 0) {
+      devLogFirestore(
+        'cleanupExpiredData',
+        `${summary} | total=${totalDeleted}, errors=${errorCount}`
+      );
+    }
+
+    // ⭐ v1.1.0: успех, если хоть что-то почищено или не было ошибок
+    return {
+      success: errorCount === 0 || totalDeleted > 0,
+      results,
+      total: totalDeleted,
+      errors: errorCount
+    };
   }
 };
 
@@ -508,7 +555,7 @@ window.FB_Core = {
 // Алиасы для совместимости со старым кодом
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Core v1.0.0] Ядро Firebase загружено. Auth, Players, Cleanup, Stats ✓");
+console.log("[☁️ FB_Core v1.1.0] Ядро Firebase загружено. Auth, Players, Cleanup (isolated per-collection), Stats ✓");
 
 // ========================================================
 // 9. АВТОЗАПУСК CLEANUP
