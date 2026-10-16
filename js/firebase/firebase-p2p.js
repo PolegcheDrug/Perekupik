@@ -1,6 +1,17 @@
 // ========================================================
-// js/firebase-p2p.js — P2P TRADE, CLUBS, LEADERBOARD, CARS (v1.0.0)
+// js/firebase-p2p.js — P2P TRADE, CLUBS, LEADERBOARD, CARS (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.1.0 (SPRINT 2 — A3 + B3):
+//   - ФИКС A3: acceptTradeOffer теперь АТОМАРНО обменивает машины
+//     между гаражами через Firestore-транзакцию. Раньше менялся
+//     только статус оффера — предметы не перекладывались.
+//   - ФИКС B3: sendTradeOffer валидирует, что myItem реально
+//     в гараже отправителя. Запрещает обмен личного авто
+//     (isPersonal), машины на штрафстоянке (impounded) и т.д.
+//   - После успешного обмена — pullSave для синхронизации
+//     локального стейта игрока B (который принял оффер).
+//   - Добавлена ссылка FB_Bridge.Offers → P2POffersManager
+//     для удобства DEV-вкладки.
 // ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ firebase-bridge.js + СОБРАН FB_Bridge):
 //   - P2PTradeManager (sendTradeOffer, acceptTradeOffer,
 //     rejectTradeOffer, cancelTradeOffer, fetchTradeOffers,
@@ -16,7 +27,7 @@
 //       FB_Core, FB_Market, FB_Friendships, FB_Notifications, FB_P2P
 //
 // ВАЖНО: файл — ES-модуль (import), подключается через
-//   <script type="module" src="firebase-p2p.js?v=410"></script>
+//   <script type="module" src="firebase-p2p.js?v=421"></script>
 // Должен быть загружен ПОСЛЕДНИМ из firebase-*.js.
 // ========================================================
 
@@ -100,6 +111,7 @@ const P2PTradeManager = {
 
   /**
    * Отправить trade offer другому игроку.
+   * ⭐ ФИКС B3: валидация myItem в гараже отправителя.
    * @param {string} toUserId — кому
    * @param {Object} offerData — { myItem: {...}, theirItemId: 'lot_xxx' | null, message: '' }
    */
@@ -108,6 +120,33 @@ const P2PTradeManager = {
     if (!profile?.id) return { success: false, error: "Нет профиля" };
     if (!toUserId || String(toUserId) === String(profile.id)) {
       return { success: false, error: "Нельзя отправить оффер самому себе" };
+    }
+
+    // ⭐ ФИКС B3: проверка myItem в гараже отправителя
+    const myItemUid = offerData?.myItem?.uid;
+    if (!myItemUid) {
+      return { success: false, error: "Не указан предмет для обмена" };
+    }
+
+    const myGarage = Array.isArray(window.state?.garage) ? window.state.garage : [];
+    const myCar = myGarage.find(c => c && (c.uid === myItemUid || c.id === myItemUid));
+
+    if (!myCar) {
+      devLogFirestore('sendTradeOffer BLOCKED', 'myItem не в гараже');
+      return { success: false, error: "Предмет не найден в вашем гараже" };
+    }
+
+    if (myCar.isPersonal) {
+      return { success: false, error: "Нельзя обменять личный автомобиль" };
+    }
+
+    if (myCar.impounded) {
+      return { success: false, error: "Машина на штрафстоянке — нельзя обменять" };
+    }
+
+    if (myCar.isStolen) {
+      // Можно предупредить, но не блокировать — с stolen тоже можно обмениваться
+      console.warn('[P2PTrade] Попытка обмена машины в розыске:', myItemUid);
     }
 
     try {
@@ -151,47 +190,220 @@ const P2PTradeManager = {
   },
 
   /**
-   * Принять trade offer.
+   * ⭐ ФИКС A3: Принять trade offer с АТОМАРНЫМ ОБМЕНОМ машин.
+   *
+   * Логика:
+   *  1. Читаем оффер → получаем myItemUid (машина отправителя A) и lotId (лот B)
+   *  2. Читаем лот → получаем myCarUid (машина получателя B, из lot.itemData.uid)
+   *  3. Читаем оба гаража: A и B
+   *  4. Валидация: машина A в гараже A, машина B в гараже B, обе не Personal/Impounded
+   *  5. Атомарно: удаляем carA из A, добавляем в B; удаляем carB из B, добавляем в A
+   *  6. Помечаем лот status='sold', оффер status='accepted'
+   *  7. Уведомление отправителю
+   *  8. Синхронизация локального стейта игрока B (pullSave)
    */
   async acceptTradeOffer(offerId) {
     const profile = getCurrentPlayerProfile();
     if (!profile?.id) return { success: false, error: "Нет профиля" };
 
+    const offerRef = doc(db, "trade_offers", offerId);
+
+    let result = null;
+
     try {
-      const offerRef = doc(db, "trade_offers", offerId);
-      let offerData = null;
-
       await runTransaction(db, async (tx) => {
-        const snap = await tx.get(offerRef);
-        if (!snap.exists()) throw new Error("Оффер не найден");
-        const data = snap.data();
-        if (String(data.toUserId) !== String(profile.id)) throw new Error("Этот оффер не вам");
-        if (data.status !== "pending") throw new Error("Оффер уже неактуален");
-        if (data.expireAt && data.expireAt < Date.now()) throw new Error("Оффер просрочен");
-        offerData = data;
+        // =====================================================
+        // 1. ЧИТАЕМ ОФФЕР
+        // =====================================================
+        const offerSnap = await tx.get(offerRef);
+        if (!offerSnap.exists()) throw new Error("Оффер не найден");
 
+        const offerData = offerSnap.data();
+
+        if (String(offerData.toUserId) !== String(profile.id)) {
+          throw new Error("Этот оффер не вам");
+        }
+        if (offerData.status !== "pending") {
+          throw new Error("Оффер уже неактуален");
+        }
+        if (offerData.expireAt && offerData.expireAt < Date.now()) {
+          throw new Error("Оффер просрочен");
+        }
+
+        const fromUserId = String(offerData.fromUserId);
+        const toUserId = String(offerData.toUserId);
+        const myItemUid = offerData.myItem?.uid;
+        const lotId = offerData.theirItemId;
+
+        if (!myItemUid) throw new Error("В оффере нет машины отправителя");
+        if (!lotId) throw new Error("В оффере нет ссылки на ваш лот");
+
+        // =====================================================
+        // 2. ЧИТАЕМ ЛОТ, ЧТОБЫ УЗНАТЬ uid МАШИНЫ ПОЛУЧАТЕЛЯ (B)
+        // =====================================================
+        const lotRef = doc(db, "market_lots", String(lotId));
+        const lotSnap = await tx.get(lotRef);
+        if (!lotSnap.exists()) throw new Error("Лот больше не активен");
+        const lotData = lotSnap.data();
+        if (lotData.status !== "active") throw new Error("Лот снят с продажи");
+        if (String(lotData.sellerId) !== toUserId) throw new Error("Вы не владелец лота");
+
+        const myCarUid = lotData.itemData?.uid || lotData.itemData?.id;
+        if (!myCarUid) throw new Error("У лота нет привязки к uid машины");
+
+        // =====================================================
+        // 3. ЧИТАЕМ ОБА ГАРАЖА
+        // =====================================================
+        const garageARef = doc(db, "garages", fromUserId);
+        const garageBRef = doc(db, "garages", toUserId);
+
+        const garageASnap = await tx.get(garageARef);
+        const garageBSnap = await tx.get(garageBRef);
+
+        const garageAData = garageASnap.exists() ? garageASnap.data() : {};
+        const garageBData = garageBSnap.exists() ? garageBSnap.data() : {};
+
+        const carsA = Array.isArray(garageAData.cars) ? [...garageAData.cars] : [];
+        const carsB = Array.isArray(garageBData.cars) ? [...garageBData.cars] : [];
+
+        // =====================================================
+        // 4. ВАЛИДАЦИЯ МАШИН
+        // =====================================================
+        const idxA = carsA.findIndex(c => c && (c.uid === myItemUid || c.id === myItemUid));
+        if (idxA === -1) throw new Error("Машина отправителя не найдена в гараже A");
+
+        const carA = carsA[idxA];
+        if (carA.isPersonal) throw new Error("Машина отправителя помечена как личная");
+        if (carA.impounded) throw new Error("Машина отправителя на штрафстоянке");
+
+        const idxB = carsB.findIndex(c => c && (c.uid === myCarUid || c.id === myCarUid));
+        if (idxB === -1) throw new Error("Ваша машина не найдена в гараже");
+
+        const carB = carsB[idxB];
+        if (carB.isPersonal) throw new Error("Ваша машина помечена как личная");
+        if (carB.impounded) throw new Error("Ваша машина на штрафстоянке");
+
+        // =====================================================
+        // 5. АТОМАРНЫЙ ОБМЕН
+        // =====================================================
+        carsA.splice(idxA, 1);
+        carsB.splice(idxB, 1);
+
+        // Обнуляем владение
+        carA.ownershipDays = 0;
+        carA.isRegisteredOnPlayer = false;
+        carA.impounded = false;
+
+        carB.ownershipDays = 0;
+        carB.isRegisteredOnPlayer = false;
+        carB.impounded = false;
+
+        carsB.push(carA);
+        carsA.push(carB);
+
+        // =====================================================
+        // 6. ЗАПИСЬ ГАРАЖЕЙ
+        // =====================================================
+        const nowTs = Date.now();
+
+        tx.set(garageARef, {
+          ...garageAData,
+          telegram_id: String(fromUserId),
+          cars: carsA,
+          updatedAt: nowTs
+        }, { merge: true });
+
+        tx.set(garageBRef, {
+          ...garageBData,
+          telegram_id: String(toUserId),
+          cars: carsB,
+          updatedAt: nowTs
+        }, { merge: true });
+
+        // =====================================================
+        // 7. ПОМЕЧАЕМ ЛОТ КАК ПРОДАННЫЙ (через обмен)
+        // =====================================================
+        tx.update(lotRef, {
+          status: "sold",
+          swappedAt: nowTs,
+          swappedWith: fromUserId
+        });
+
+        // =====================================================
+        // 8. ПОМЕЧАЕМ ОФФЕР КАК ПРИНЯТЫЙ
+        // =====================================================
         tx.update(offerRef, {
           status: "accepted",
-          acceptedAt: Date.now()
+          acceptedAt: nowTs
         });
+
+        // Возвращаем результат из транзакции
+        result = {
+          fromUserId,
+          toUserId,
+          carA: { uid: myItemUid, name: carA.name || "Авто A" },
+          carB: { uid: myCarUid, name: carB.name || "Авто B" },
+          fromUserName: offerData.fromUserName || "Игрок"
+        };
       });
 
-      // Уведомление отправителю
-      const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
-      await setDoc(notifRef, {
-        toUser: String(offerData.fromUserId),
-        type: "trade_accepted",
-        title: "✅ Ваш оффер принят!",
-        text: `${profile.name} принял ваше предложение обмена. Свяжитесь для оформления сделки.`,
-        offerId: offerId,
-        read: false,
-        claimed: false,
-        timestamp: Date.now(),
-        expireAt: Date.now() + TTL_CONFIG.notifications
-      });
+      // =====================================================
+      // 9. ПОСТ-ОБРАБОТКА (после успешной транзакции)
+      // =====================================================
+      if (result) {
+        // Уведомление отправителю (A)
+        try {
+          const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
+          await setDoc(notifRef, {
+            toUser: result.fromUserId,
+            type: "trade_accepted",
+            title: "✅ Оффер принят!",
+            text: `${profile.name} принял обмен: вы отдали «${result.carA.name}» и получили «${result.carB.name}».`,
+            offerId: offerId,
+            read: false,
+            claimed: false,
+            timestamp: Date.now(),
+            expireAt: Date.now() + TTL_CONFIG.notifications
+          });
+        } catch (notifErr) {
+          console.warn('[P2PTrade] Уведомление не отправлено:', notifErr);
+        }
 
-      devLogFirestore('acceptTradeOffer OK', offerId);
-      return { success: true, offer: offerData };
+        // EventBus — UI-слой реагирует
+        if (window.EventBus) {
+          window.EventBus.emit('p2p:trade_accepted', {
+            offerId,
+            fromUserId: result.fromUserId,
+            toUserId: result.toUserId,
+            swapped: [result.carA, result.carB]
+          });
+          window.EventBus.emit('p2p:trade_completed', {
+            offerId,
+            fromUserId: result.fromUserId,
+            toUserId: result.toUserId
+          });
+        }
+
+        // Синхронизация локального стейта игрока B (который принял оффер)
+        // через pullSave (чтобы в памяти отражались актуальные машины)
+        try {
+          const fresh = await FB_Core.Players.pullSave(profile.id);
+          if (fresh && typeof window.applyLoadedState === 'function') {
+            window.applyLoadedState(fresh);
+            if (typeof window.saveState === 'function') window.saveState();
+            if (typeof window.updateHeaderUI === 'function') window.updateHeaderUI();
+            if (typeof window.renderGarage === 'function') window.renderGarage();
+          }
+        } catch (syncErr) {
+          console.warn('[P2PTrade] Не удалось синхронизировать локальный стейт:', syncErr);
+        }
+
+        devLogFirestore('acceptTradeOffer OK', `${offerId}: ${result.carA.name} ↔ ${result.carB.name}`);
+        return { success: true, offer: result };
+      }
+
+      return { success: false, error: "Транзакция не дала результата" };
+
     } catch (e) {
       devLogFirestore('acceptTradeOffer ERROR', e.message);
       return { success: false, error: e.message };
@@ -772,6 +984,9 @@ const FB_Bridge = {
   Transactions: FB_Market.Transactions,
   Plates: FB_Market.Plates,
 
+  // ⭐ v1.1.0: ссылка на P2POffersManager (для DEV-вкладки)
+  Offers: window.P2POffersManager,
+
   // Friendships
   Friendships: FB_Friendships.Friendships,
 
@@ -780,7 +995,7 @@ const FB_Bridge = {
   ChatMessages: FB_Notifications.ChatMessages,
   Events: FB_Notifications.Events,
 
-  // P2P Trade
+  // P2P Trade (обмен предметами через trade_offers)
   P2PTrade: P2PTradeManager,
 
   // Clubs
@@ -816,6 +1031,6 @@ window.FB_P2P = {
 // ⭐ ГЛАВНЫЙ ЭКСПОРТ — единый FB_Bridge
 window.FB_Bridge = FB_Bridge;
 
-console.log('[🤝 FB_P2P v1.0.0] Trade, Clubs, Leaderboard, CarsCatalog, QuickChat загружены ✓');
-console.log('[🌟 FB_Bridge v2.0.0] Единый шлюз восстановлен. Модули: Core, Market, Friendships, Notifications, P2P ✓');
+console.log('[🤝 FB_P2P v1.1.0] Trade (атомарный обмен), Clubs, Leaderboard, CarsCatalog, QuickChat загружены ✓');
+console.log('[🌟 FB_Bridge v2.1.0] Единый шлюз восстановлен. Offers → P2POffersManager ✓');
 console.log('[🌟 FB_Bridge] Доступные методы:', Object.keys(FB_Bridge).filter(k => typeof FB_Bridge[k] === 'object' || typeof FB_Bridge[k] === 'function').join(', '));
