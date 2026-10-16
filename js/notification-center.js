@@ -1,6 +1,16 @@
 // ========================================================
-// js/notification-center.js — ЕДИНЫЙ ЦЕНТР УВЕДОМЛЕНИЙ (v1.0.0)
+// js/notification-center.js — ЕДИНЫЙ ЦЕНТР УВЕДОМЛЕНИЙ (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.1.0 (SPRINT 2 — P2P ТОРГ):
+//   - ДОБАВЛЕНЫ 6 типов уведомлений:
+//       p2p_offer_received  → новый оффер продавцу
+//       p2p_offer_accepted  → оффер принят
+//       p2p_offer_rejected  → оффер отклонён
+//       p2p_offer_countered → встречное предложение
+//       p2p_offer_cancelled → оффер отменён
+//       p2p_offer_expired   → оффер истёк (30 мин)
+//   - Хелпер _isAppOnScreen() для проверки активного экрана M+
+//   - EventBus-эмиты: p2p:incoming_offer, p2p:offer_ui_update
 // ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ app.js):
 //   - NotificationCenter — единый обработчик уведомлений
 //   - handleIncomingNotification — идемпотентная обработка
@@ -20,7 +30,8 @@
 //   - Экспорт в window.NotificationCenter
 //
 // ВАЖНО: файл подключается через <script src="js/notification-center.js"></script>
-// НЕ является ES-модулем, загружается ПОСЛЕ firebase-p2p.js.
+// НЕ является ES-модулем, загружается ПОСЛЕ firebase-p2p.js
+// и ПОСЛЕ p2p-offers.js.
 // ========================================================
 
 (function() {
@@ -58,6 +69,7 @@
 
             try {
                 switch (notif.type) {
+                    // === СУЩЕСТВУЮЩИЕ ТИПЫ ===
                     case 'deal_payout':
                         handled = this._handleDealPayout(notif);
                         break;
@@ -85,6 +97,27 @@
                     case 'lot_sold':
                         handled = this._handleLotSold(notif);
                         break;
+
+                    // ⭐ v1.1.0: НОВЫЕ P2P ТИПЫ ===
+                    case 'p2p_offer_received':
+                        handled = this._handleP2POfferReceived(notif);
+                        break;
+                    case 'p2p_offer_accepted':
+                        handled = this._handleP2POfferAccepted(notif);
+                        break;
+                    case 'p2p_offer_rejected':
+                        handled = this._handleP2POfferRejected(notif);
+                        break;
+                    case 'p2p_offer_countered':
+                        handled = this._handleP2POfferCountered(notif);
+                        break;
+                    case 'p2p_offer_cancelled':
+                        handled = this._handleP2POfferCancelled(notif);
+                        break;
+                    case 'p2p_offer_expired':
+                        handled = this._handleP2POfferExpired(notif);
+                        break;
+
                     default:
                         console.log('[NotificationCenter] Неизвестный тип:', notif.type);
                         handled = true;
@@ -124,13 +157,241 @@
         },
 
         /**
-         * ⭐ ПРОДАЖА P2P — деньги в ПОЧТУ (не в карман).
+         * Проверить, открыт ли сейчас экран M+ на конкретной вкладке.
+         * @param {string} [tabName] — 'trade' | 'chats' | 'market' | null (любая вкладка M+)
+         */
+        _isAppOnScreen(tabName) {
+            try {
+                if (!window.AppM) return false;
+                if (!window.PhoneManager) return false;
+                if (window.PhoneManager.currentApp !== 'm') return false;
+                if (tabName && window.AppM.activeTab !== tabName) return false;
+                return true;
+            } catch (e) {
+                return false;
+            }
+        },
+
+        /**
+         * Форсированно обновить UI M+ (если открыт).
+         */
+        _refreshAppM() {
+            try {
+                if (!this._isAppOnScreen()) return;
+                const container = document.getElementById('phoneAppContainer');
+                if (container && window.AppM?.render) {
+                    window.AppM.render(container);
+                }
+            } catch (e) {
+                console.warn('[NotificationCenter] _refreshAppM error:', e);
+            }
+        },
+
+        // ====================================================
+        // ⭐ P2P ОФФЕР: НОВЫЙ ОФФЕР ОТ ПОКУПАТЕЛЯ (продавцу)
+        // ====================================================
+        _handleP2POfferReceived(notif) {
+            const offerId = notif.offerId;
+            const buyerName = notif.buyerName || 'Покупатель';
+            const price = Number(notif.price) || 0;
+
+            // Тост
+            if (typeof showToast === 'function') {
+                showToast(`💬 ${buyerName}: ${price.toLocaleString()} ₽ за «${notif.lotName || 'авто'}»`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('win');
+                window.AudioFx.haptic('success');
+            }
+
+            // EventBus — для UI-слоя
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:incoming_offer', {
+                    offerId,
+                    lotId: notif.lotId,
+                    lotName: notif.lotName,
+                    buyerId: notif.buyerId,
+                    buyerName,
+                    price
+                });
+            }
+
+            // Если открыт M+ → «Торг» — обновить список
+            if (this._isAppOnScreen('trade')) {
+                this._refreshAppM();
+            }
+
+            return true;
+        },
+
+        // ====================================================
+        // ⭐ P2P ОФФЕР: ПРИНЯТ
+        // ====================================================
+        _handleP2POfferAccepted(notif) {
+            const offerId = notif.offerId;
+            const price = Number(notif.price) || 0;
+
+            if (typeof showToast === 'function') {
+                showToast(`✅ Сделка согласована: ${price.toLocaleString()} ₽!`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('win');
+                window.AudioFx.haptic('success');
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_accepted', {
+                    offerId,
+                    lotId: notif.lotId,
+                    price,
+                    forUser: notif.toUser
+                });
+            }
+
+            // Если открыт M+ → «Торг» — обновить UI
+            if (this._isAppOnScreen('trade')) {
+                this._refreshAppM();
+            }
+
+            // Если открыт чат этого оффера — перейти на экран ДКП
+            // (это делает AppM через подписку RealtimeManager, а не отсюда)
+
+            return true;
+        },
+
+        // ====================================================
+        // ⭐ P2P ОФФЕР: ОТКЛОНЁН
+        // ====================================================
+        _handleP2POfferRejected(notif) {
+            const offerId = notif.offerId;
+
+            if (typeof showToast === 'function') {
+                showToast(`❌ Продавец отклонил ваше предложение по «${notif.lotName || 'авто'}»`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('error');
+                window.AudioFx.haptic('warning');
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_rejected', {
+                    offerId,
+                    lotId: notif.lotId,
+                    forUser: notif.toUser
+                });
+            }
+
+            if (this._isAppOnScreen('trade')) {
+                this._refreshAppM();
+            }
+
+            return true;
+        },
+
+        // ====================================================
+        // ⭐ P2P ОФФЕР: ВСТРЕЧНОЕ ПРЕДЛОЖЕНИЕ
+        // ====================================================
+        _handleP2POfferCountered(notif) {
+            const offerId = notif.offerId;
+            const counterPrice = Number(notif.counterPrice) || 0;
+            const sellerName = notif.sellerName || 'Продавец';
+
+            if (typeof showToast === 'function') {
+                showToast(`🔄 ${sellerName} предлагает ${counterPrice.toLocaleString()} ₽`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('win');
+                window.AudioFx.haptic('medium');
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_countered', {
+                    offerId,
+                    lotId: notif.lotId,
+                    counterPrice,
+                    sellerId: notif.sellerId,
+                    sellerName,
+                    forUser: notif.toUser
+                });
+            }
+
+            if (this._isAppOnScreen('trade')) {
+                this._refreshAppM();
+            }
+
+            return true;
+        },
+
+        // ====================================================
+        // ⭐ P2P ОФФЕР: ОТМЕНЁН
+        // ====================================================
+        _handleP2POfferCancelled(notif) {
+            const offerId = notif.offerId;
+
+            if (typeof showToast === 'function') {
+                showToast(`⛔ Торг по «${notif.lotName || 'авто'}» отменён`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('error');
+                window.AudioFx.haptic('warning');
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_cancelled', {
+                    offerId,
+                    lotId: notif.lotId,
+                    forUser: notif.toUser
+                });
+            }
+
+            if (this._isAppOnScreen('trade')) {
+                this._refreshAppM();
+            }
+
+            return true;
+        },
+
+        // ====================================================
+        // ⭐ P2P ОФФЕР: ИСТЁК (30 минут)
+        // ====================================================
+        _handleP2POfferExpired(notif) {
+            const offerId = notif.offerId;
+
+            if (typeof showToast === 'function') {
+                showToast(`⌛ Срок торга по «${notif.lotName || 'авто'}» истёк`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('error');
+                window.AudioFx.haptic('warning');
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_expired', {
+                    offerId,
+                    lotId: notif.lotId,
+                    forUser: notif.toUser
+                });
+            }
+
+            if (this._isAppOnScreen('trade')) {
+                this._refreshAppM();
+            }
+
+            return true;
+        },
+
+        // ====================================================
+        // СУЩЕСТВУЮЩИЕ ОБРАБОТЧИКИ
+        // ====================================================
+
+        /**
+         * ПРОДАЖА P2P — деньги в ПОЧТУ (не в карман).
          */
         _handleDealPayout(notif) {
             const amount = Number(notif.amount) || 0;
             if (amount <= 0) return false;
 
-            // ⭐ Кладём в Почту, а не на баланс
+            // Кладём в Почту, а не на баланс
             if (typeof window.pushToMailbox === 'function') {
                 window.pushToMailbox({
                     type: "cash",
@@ -341,14 +602,12 @@
         },
 
         /**
-         * ⭐ Ваш лот кто-то купил (уведомление покупателю/продавцу).
+         * Ваш лот кто-то купил (уведомление покупателю/продавцу).
          */
         _handleLotBought(notif) {
             const amount = Number(notif.amount) || 0;
             if (amount <= 0) return false;
 
-            // Здесь мы уже получаем deal_payout (см. _handleDealPayout) — это дубль
-            // Но если пришло отдельное уведомление lot_bought — обновляем UI
             try {
                 if (Array.isArray(window.state.p2pMarketListings)) {
                     window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l =>
@@ -365,7 +624,7 @@
         },
 
         /**
-         * ⭐ Вы купили лот (уведомление покупателю).
+         * Вы купили лот (уведомление покупателю).
          */
         _handleLotSold(notif) {
             if (typeof showToast === 'function') {
@@ -438,6 +697,6 @@
     // Экспорт
     window.NotificationCenter = NotificationCenter;
 
-    console.log('[🔔 NotificationCenter v1.0.0] Единый центр уведомлений загружен. Идемпотентность, все типы уведомлений, real-time ✓');
+    console.log('[🔔 NotificationCenter v1.1.0] Единый центр уведомлений загружен. 6 типов P2P-офферов + существующие типы ✓');
 
 })();
