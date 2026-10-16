@@ -1,16 +1,10 @@
 // ========================================================
 // data_core.js — ЯДРО, СИСТЕМНЫЕ ДАННЫЕ И КАСТОМИЗАЦИЯ
-// ⭐ v4.3.0 (SPRINT 3 — ФИКС КУРСОВ И ОБМЕННИКА):
-//   - BANK_EXCHANGE_RATES: курс ⭐ = 25 000 ₽ (было 2 500)
-//   - Добавлен superSpinTicket (билет СуперВилспина) = 150 000 ₽
-//   - expressTicket переименован явно (было tickets)
-//   - У всех валют появился sellRub (спред 4%)
-//   - Добавлена утилита formatRate() для UI
-//   - GAME_METADATA обновлён до v4.3.0
-// ⭐ v3.0.0:
-//   - ПЛАТНАЯ КАСТОМИЗАЦИЯ ПРОФИЛЯ
+// ⭐ v3.0.0: ПЛАТНАЯ КАСТОМИЗАЦИЯ ПРОФИЛЯ
+//   - Все темы, ник-эффекты, ауры, титулы — платные
 //   - Три валюты: ₽ (рубли), ⭐ (Stars), 🎟️ (билеты)
 //   - SUPER_SPIN_TIERS расширены: может выдать ЛЮБУЮ косметику
+//   - HUD_THEMES_CATALOG теперь полный источник тем (legacy)
 // ========================================================
 
 const GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/PolegcheDrug/Perekupik/main/";
@@ -31,26 +25,26 @@ window.resolveCarAssetUrl = resolveCarAssetUrl;
 // МЕТАДАННЫЕ ИГРЫ
 // --------------------------------------------------------
 const GAME_METADATA = {
-    version: "v4.3.0",
-    build: 430,
+    version: "v3.0.0",
+    build: 403,
     authors: "Tak Toje, Max, Sergo, gemini, Илья Чепиль",
-    releaseDate: "2026-10-16",
+    releaseDate: "2026-10-20",
     patchNotes: [
         {
-            title: "💱 РЕБАЛАНС КУРСА STARS",
-            text: "Курс ⭐ пересчитан: 1 ⭐ = 25 000 ₽ (было 2 500). Старые сейвы автомигрируются (Stars ×10)."
-        },
-        {
-            title: "🎫 БИЛЕТЫ В ОБМЕННИКЕ",
-            text: "В обменник добавлены билеты СуперВилспина (🎟️) и экспресс-талоны (🎫). Полноценная покупка/продажа за рубли и звёзды."
-        },
-        {
             title: "💰 ПЛАТНАЯ КАСТОМИЗАЦИЯ ПРОФИЛЯ",
-            text: "Все темы HUD, ник-эффекты, ауры аватара и титулы покупаются за рубли, Stars и Билеты. Эксклюзивные глитч-предметы — только за билеты."
+            text: "Все темы HUD, ник-эффекты, ауры аватара и титулы теперь покупаются за рубли, Stars и Билеты. Эксклюзивные глитч-предметы — только за билеты!"
         },
         {
             title: "🎰 СУПЕРВИЛСПИН ВЫДАЁТ КОСМЕТИКУ",
-            text: "Колесо Фортуны теперь может выдать любую тему, ник-эффект, ауру или титул, включая эксклюзивы за билеты."
+            text: "Колесо Фортуны теперь может выдать любую тему, ник-эффект, ауру или титул, включая эксклюзивы за билеты. Повторно выпавшие предметы конвертируются в Stars."
+        },
+        {
+            title: "🎟️ БИЛЕТ РАЗ В 7 ДНЕЙ",
+            text: "Заходите раз в неделю — получайте 1 билет СуперВилспина бесплатно."
+        },
+        {
+            title: "💰 РЕБАЛАНС ЭКОНОМИКИ",
+            text: "Бизнесы окупаются за 20-40 дней. Курс Stars: 1 ⭐ = 2,500 ₽. Депозит: 0.3% в день."
         },
         {
             title: "🚢 Storage Wars & Порт 2.0",
@@ -109,10 +103,14 @@ const SUPER_SPIN_TIERS = {
         { type: "conn",     label: "+2 Связи 🤝",      amount: 2 },
         { type: "xp",       label: "+200 XP",          amount: 200 }
     ],
+    // ⭐ v3.0.0: reelExclusives теперь содержит косметические предметы.
+    // Каждый элемент — указатель на каталог. При выпадении
+    // phone-media.js найдёт предмет, проверит владение, выдаст или
+    // конвертирует в Stars.
     reelExclusives: [
         // ─── Рубли ───
-        { type: "stars",     label: "30 ⭐ (750,000 ₽)",      amount: 30,  emoji: "⭐" },
-        { type: "stars",     label: "75 ⭐ (1,875,000 ₽)",    amount: 75,  emoji: "⭐" },
+        { type: "stars",     label: "30 ⭐ (75,000 ₽)",      amount: 30,  emoji: "⭐" },
+        { type: "stars",     label: "75 ⭐ (187,500 ₽)",     amount: 75,  emoji: "⭐" },
         { type: "plate",     label: "Номер А777АА 77",       plate: "А777АА 77",  emoji: "🏷️" },
         { type: "plate",     label: "Номер В888ВВ 777",      plate: "В888ВВ 777", emoji: "🏷️" },
         { type: "mod_cert",  label: "Сертификат на Stage 2", cashValue: 120000, emoji: "🔧" },
@@ -157,36 +155,17 @@ const SUPER_SPIN_TIERS = {
 };
 
 // --------------------------------------------------------
-// ⭐ v4.3.0: КУРСЫ ВАЛЮТ БАНКА
-// --------------------------------------------------------
-// ВАЖНО: базовая таблица курсов. При старте игры app.js
-// вызывает _syncStarRateToBank(), который переписывает
-// stars.buyRub на актуальный плавающий курс (STAR_RATE_DEFAULT..MAX).
-//
-// Спред: sellRub = buyRub × 0.96 (4% комиссия банка при продаже).
+// ⭐ v3.0.0: КУРСЫ ВАЛЮТ БАНКА
 // --------------------------------------------------------
 const BANK_EXCHANGE_RATES = {
-    rub:             { buyRub: 1,       sellRub: 1,       name: "Рубли" },
-    stars:           { buyRub: 25000,   sellRub: 24000,   icon: "fa-star",         emoji: "⭐",  name: "Stars (звёзды)" },
-    fuel:            { buyRub: 2000,    sellRub: 1900,    icon: "fa-gas-pump",     emoji: "⛽",  name: "Топливо (л)" },
-    tickets:         { buyRub: 7500,    sellRub: 7000,    icon: "fa-ticket",       emoji: "🎫",  name: "Экспресс-талоны" },
-    superSpinTicket: { buyRub: 150000,  sellRub: 140000,  icon: "fa-dharmachakra", emoji: "🎟️", name: "Билет СуперВилспина" },
-    conn:            { buyRub: 175000,  sellRub: 165000,  icon: "fa-handshake",    emoji: "🤝",  name: "Связи" },
-    btc:             { buyRub: 9500000, sellRub: 9200000, icon: "fa-bitcoin",      emoji: "₿",   name: "Bitcoin" },
-    eth:             { buyRub: 340000,  sellRub: 330000,  icon: "fa-ethereum",     emoji: "Ξ",   name: "Ethereum" }
+    rub:     { buyRub: 1,       sellRub: 1,       name: "Рубли" },
+    stars:   { buyRub: 2500,    sellRub: 2500,    icon: "fa-star",         emoji: "⭐",  name: "Stars" },
+    fuel:    { buyRub: 2000,    sellRub: 2000,    icon: "fa-gas-pump",     emoji: "⛽",  name: "Топливо (л)" },
+    tickets: { buyRub: 7500,    sellRub: 7500,    icon: "fa-ticket",       emoji: "🎟️", name: "Талоны" },
+    conn:    { buyRub: 175000,  sellRub: 175000,  icon: "fa-handshake",    emoji: "🤝",  name: "Связи" },
+    btc:     { buyRub: 9500000, sellRub: 9500000, icon: "fa-bitcoin",      emoji: "₿",   name: "Bitcoin" },
+    eth:     { buyRub: 340000,  sellRub: 340000,  icon: "fa-ethereum",     emoji: "Ξ",   name: "Ethereum" }
 };
-
-// --------------------------------------------------------
-// ⭐ v4.3.0: УТИЛИТА ФОРМАТИРОВАНИЯ КУРСА
-// Используется в обменнике (phone-bank.js) и каталогах
-// для показа актуальной цены валюты.
-// --------------------------------------------------------
-function formatRate(currency, useSell = false) {
-    const cfg = BANK_EXCHANGE_RATES[currency];
-    if (!cfg) return '—';
-    const value = useSell ? (cfg.sellRub || 0) : (cfg.buyRub || 0);
-    return `${value.toLocaleString('ru-RU')} ₽`;
-}
 
 // --------------------------------------------------------
 // ⚠️ ЗАГЛУШКИ (активные каталоги живут в theme-manager.js)
@@ -196,9 +175,9 @@ const NICKNAME_EFFECTS_CATALOG = [];
 const AVATAR_EFFECTS_CATALOG = [];
 
 // --------------------------------------------------------
-// ⭐ v3.0.0: HUD_THEMES_CATALOG — синхронизирован с ThemeManager
-// ВАЖНО: этот каталог — legacy, используется только для миграции
-// старых сейвов. Источник правды — ThemeManager.themes.
+// ⭐ v3.0.0: HUD_THEMES_CATALOG — legacy
+// Активный источник правды: theme-manager.js (11 тем).
+// Каталог синхронизирован с theme-manager.js по cost/reqStars/reqTickets/reqLevel.
 // --------------------------------------------------------
 const HUD_THEMES_CATALOG = [
     { id: "cyber_neon",       name: "Cyber Neon",                    desc: "Бирюзовый неоновый стиль с глубоким контрастным черным фоном.",                colorId: "cyan",      cost: 0,      reqStars: 0,  reqTickets: 0, reqLevel: 1 },
@@ -304,7 +283,7 @@ const I18N_TRANSLATIONS = {
         garage_capacity: "Вместимость",
         saleslot_title: "Площадка продаж",
         saleslot_desc: "Покупатели оценивают машины с учётом состояния, эксклюзивности госномеров и вашей репутации.",
-        express_passes: "Экспресс-пропуски",
+        express_passes: "Экспресс-пропуска",
         express_desc: "Ускоряют поиск клиента до 0 сек.",
         waiting_client: "Ожидание клиента",
         busy_subscriber: "Абонент занят",
@@ -359,6 +338,5 @@ window.HUD_THEMES_CATALOG = HUD_THEMES_CATALOG;
 window.STREET_RACE_ANIM_CONFIG = STREET_RACE_ANIM_CONFIG;
 window.calculatePlateValue = calculatePlateValue;
 window.I18N_TRANSLATIONS = I18N_TRANSLATIONS;
-window.formatRate = formatRate;
 
-console.log('[💠 data_core v4.3.0] Курс ⭐ = 25 000 ₽ + билеты СуперВилспина (150 000 ₽) + экспресс-талоны (7 500 ₽) + formatRate() ✓');
+console.log('[💠 data_core v3.0.0] Платная кастомизация + SUPER_SPIN с косметикой + билетные эксклюзивы ✓');
