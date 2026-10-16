@@ -1,6 +1,12 @@
 // ========================================================
-// js/market-deal.js — ТОРГ У КАПОТА 4.6.0 (v4.6.0)
+// js/market-deal.js — ТОРГ У КАПОТА 4.7.0 (v4.7.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v4.7.0 (SPRINT 2 — P2P РОУТИНГ):
+//   - openP2PDealModal корректно заполняет sellerId, dialogId
+//   - Открытие P2P-лота → M+ диалог с isP2PMarket:true
+//   - Мгновенный редирект в AppM для реального торга
+//   - Если у игрока есть активный P2P-оффер — UI откроет экран торга
+//   - Убрана старая RNG-логика для P2P (оставлена только для NPC)
 // ⭐ v4.6.0 (КОМПАКТНЫЙ ДКП):
 //   - Сокращены размеры бланка, padding, шрифты.
 //   - Убраны лишние разделы (паспорт, адрес).
@@ -41,6 +47,7 @@ function initiateBuyMarketCar(carId) {
     if (buyCallTimeoutTimer) { clearTimeout(buyCallTimeoutTimer); buyCallTimeoutTimer = null; }
     if (!carId) return;
 
+    // ⭐ v4.7.0: P2P-лот → сразу в реальный торг M+
     let p2pItem = (state.p2pMarketListings || []).find(l => l && l.id === carId);
     if (p2pItem) { openP2PDealModal(p2pItem.id); return; }
 
@@ -106,62 +113,159 @@ function initiateBuyMarketCar(carId) {
 }
 
 // ========================================================
-// P2P ДИАЛОГ
+// ⭐ v4.7.0: P2P ДИАЛОГ — РЕАЛЬНЫЙ ТОРГ ЧЕРЕЗ M+
 // ========================================================
 function openP2PDealModal(p2pId) {
     if (!p2pId) return;
+
+    // 1. Ищем лот в локальном кэше
     let p2pItem = (state.p2pMarketListings || []).find(l => l && l.id === p2pId);
-    if (!p2pItem) return showToast("Лот не найден на бирже!");
+
+    // 2. Если нет — асинхронно тянем из Firestore
+    if (!p2pItem && window.FB_Bridge?.MarketLots?.fetchLots) {
+        showToast('⏳ Синхронизация P2P лота...');
+        window.FB_Bridge.MarketLots.fetchLots(true).then(remoteLots => {
+            if (!Array.isArray(remoteLots)) {
+                return showToast("❌ Лот не найден на бирже!");
+            }
+            const remote = remoteLots.find(l => (l.lot_id || l.id) === p2pId);
+            if (!remote) {
+                return showToast("❌ Лот больше не активен!");
+            }
+            // Кэшируем
+            if (!state.p2pMarketListings) state.p2pMarketListings = [];
+            const cachedLot = {
+                id: remote.lot_id || remote.id,
+                sellerId: remote.sellerId,
+                sellerName: remote.sellerName || "Игрок сети",
+                type: remote.type,
+                name: remote.name,
+                price: remote.price,
+                itemData: remote.itemData || {}
+            };
+            if (!state.p2pMarketListings.find(l => l.id === cachedLot.id)) {
+                state.p2pMarketListings.push(cachedLot);
+            }
+            openP2PDealModal(p2pId);  // Повторный вызов с заполненным кэшем
+        }).catch(err => {
+            console.warn('[MarketDeal] fetchLots fallback error:', err);
+            showToast("❌ Не удалось загрузить лот");
+        });
+        return;
+    }
+
+    if (!p2pItem) return showToast("❌ Лот не найден на бирже!");
 
     if (!state.player) state.player = {};
     if (!state.player.phoneMessages) state.player.phoneMessages = [];
 
-    let dialogId = `p2p_deal_${p2pItem.id}`;
-    let existingMsg = state.player.phoneMessages.find(m => m.id === dialogId);
+    const myUid = String(state.player?.uid || window.tgUserId || "");
 
-    let askingPrice = p2pItem.price || 100000;
-    let initialOffer = p2pItem.currentOffer || Math.round(askingPrice * 0.85);
+    // ⭐ Проверка: нельзя торговаться с самим собой
+    if (String(p2pItem.sellerId || "") === myUid) {
+        return showToast("🚫 Вы не можете торговаться по своему лоту!");
+    }
+
+    // ⭐ Формируем стабильный dialogId (совместим с Firestore chat_messages)
+    const dialogId = `p2p_deal_${p2pItem.id}`;
+    let existingMsg = state.player.phoneMessages.find(m => m && m.id === dialogId);
+
+    const askingPrice = Number(p2pItem.price) || 100000;
+
+    // Проверяем — есть ли уже активный оффер от меня (покупателя)
+    let activeOffer = null;
+    try {
+        const myOffers = state.player._myP2POffers || [];
+        activeOffer = myOffers.find(o => o.lotId === p2pItem.id &&
+            ['pending', 'countered', 'accepted'].includes(o.status));
+    } catch (e) {}
 
     if (!existingMsg) {
+        // Убедимся, что у машины есть uid (для P2P цепочек)
         if ((p2pItem.type === 'car' || p2pItem.type === 'cars') && p2pItem.itemData) {
-            if (typeof window.ensureCarIdentity === 'function') window.ensureCarIdentity(p2pItem.itemData);
+            if (typeof window.ensureCarIdentity === 'function') {
+                window.ensureCarIdentity(p2pItem.itemData);
+            }
         }
 
         existingMsg = {
             id: dialogId,
+            dialogId: dialogId,
             category: 'p2p_market',
             sender: `${p2pItem.sellerName || 'Игрок P2P'}`,
             time: "Сейчас",
             unread: false,
             viewed: true,
+
+            // ⭐ Ключевые поля для P2P торга
             isP2PMarket: true,
             p2pId: p2pItem.id,
+            sellerId: String(p2pItem.sellerId || ""),
+            sellerName: p2pItem.sellerName || "Продавец",
+
             carData: {
                 name: p2pItem.name || 'Имущество P2P',
                 img: p2pItem.itemData?.img || p2pItem.img || "assets/cars/economy/2101/vaz-2101.jpg",
                 images: p2pItem.itemData?.images || [],
-                type: p2pItem.type || 'economy',
-                price: askingPrice
+                type: p2pItem.itemData?.type || p2pItem.type || 'economy',
+                price: askingPrice,
+                power: p2pItem.itemData?.power || 100,
+                condition: p2pItem.itemData?.condition || 85
             },
             askingPrice: askingPrice,
-            offerPrice: initialOffer,
-            patience: p2pItem.patience !== undefined ? p2pItem.patience : 4,
-            maxPatience: 4,
-            chatHistory: [{ from: 'them', text: `«Здорово! Пишу по объявлению на «${p2pItem.name}». Готов обсудить условия.»` }]
+            offerPrice: activeOffer ? (activeOffer.offeredPrice || 0) : 0,
+            preview: "Нажмите, чтобы обсудить условия торга",
+
+            // Начальное приветствие
+            chatHistory: [
+                { from: 'them', text: `«Здорово! Пишу по объявлению на «${p2pItem.name}». Готов обсудить условия.»` }
+            ]
         };
         state.player.phoneMessages.unshift(existingMsg);
+    } else {
+        // Обновляем метаданные (могли измениться)
+        existingMsg.p2pId = p2pItem.id;
+        existingMsg.sellerId = String(p2pItem.sellerId || "");
+        existingMsg.sellerName = p2pItem.sellerName || existingMsg.sellerName;
+        existingMsg.isP2PMarket = true;
+        existingMsg.askingPrice = askingPrice;
+        if (existingMsg.carData) {
+            existingMsg.carData.price = askingPrice;
+        }
     }
 
+    // ⭐ Сбрасываем флаг "прочитано"
+    existingMsg.unread = false;
+    existingMsg.viewed = true;
+
     if (typeof saveState === 'function') saveState();
+
+    // ⭐ Редирект в M+ → раздел «Торг» → открыть этот диалог
     if (typeof switchTab === 'function') switchTab('tabPhone');
+
     setTimeout(() => {
-        if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('m');
-        if (typeof AppM !== 'undefined') {
-            AppM.activeTab = 'chats';
-            AppM.activeDialogId = dialogId;
-            let c = document.getElementById('phoneAppContainer');
-            if (c && typeof AppM.render === 'function') AppM.render(c);
+        if (typeof PhoneManager !== 'undefined' && PhoneManager.openApp) {
+            PhoneManager.openApp('m');
         }
+
+        setTimeout(() => {
+            if (typeof AppM !== 'undefined') {
+                AppM.activeTab = 'chats';
+                AppM.activeDialogId = dialogId;
+
+                // Если есть активный оффер — подтягиваем его в AppM
+                if (activeOffer) {
+                    AppM.activeP2POfferId = activeOffer.id;
+                    AppM.activeP2POffer = activeOffer;
+                } else {
+                    AppM.activeP2POfferId = null;
+                    AppM.activeP2POffer = null;
+                }
+
+                const c = document.getElementById('phoneAppContainer');
+                if (c && typeof AppM.render === 'function') AppM.render(c);
+            }
+        }, 150);
     }, 100);
 }
 
@@ -184,13 +288,18 @@ function paidCallMarketCar(carId) {
 }
 
 // ========================================================
-// ВСТРЕЧА У КАПОТА
+// ВСТРЕЧА У КАПОТА (NPC — НЕ ТРОГАЕМ)
 // ========================================================
 function openMarketDeal(carId) {
     if (!carId) return;
 
     const car = (state.marketFeed || []).find(c => c && c.id === carId);
     if (!car) return showToast("Автомобиль недоступен!");
+
+    // ⭐ v4.7.0: P2P лоты в marketFeed не должны сюда попадать
+    if (car.isP2PUserListing) {
+        return openP2PDealModal(car.id);
+    }
 
     _dealActionPending = false;
     window.__DKP_PENDING__ = false;
@@ -284,13 +393,25 @@ function startMarketTestDrive(carId) {
 }
 
 // ========================================================
-// ПАНЕЛЬ ТОРГА
+// ПАНЕЛЬ ТОРГА (NPC — НЕ ТРОГАЕМ)
 // ========================================================
 function renderMarketHaggleControls() {
     const haggleArea = document.getElementById("dealHaggleArea");
     if (!haggleArea || !pendingMarketCar || !pendingMarketCar.car) return;
 
     const car = pendingMarketCar.car;
+
+    // ⭐ v4.7.0: если P2P — не рендерим NPC-торг
+    if (car.isP2PUserListing) {
+        haggleArea.innerHTML = `
+            <div class="p-2 mb-2" style="background:rgba(0,242,254,0.08); border-radius:8px; border:1px solid rgba(0,242,254,0.3);">
+                <b class="text-xs color-cyan">💬 P2P ЛОТ — торг ведётся в M+ Hub</b>
+                <div class="sub-label mt-1" style="font-size:9px;">Используйте кнопку «Торг» для реального диалога с игроком.</div>
+            </div>
+        `;
+        return;
+    }
+
     const seller = (typeof SELLER_ARCHETYPES !== 'undefined' ? SELLER_ARCHETYPES : []).find(s => s.id === car.sellerArchetype) || null;
 
     let hasGauge = !!(state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_pro));
@@ -632,7 +753,7 @@ function buyCarDirectToScrapYard(price) {
 }
 
 // ========================================================
-// ТОРГ ПО ПРОЦЕНТАМ
+// ТОРГ ПО ПРОЦЕНТАМ (NPC)
 // ========================================================
 function attemptMarketHaggle(percent, failRisk = 25) {
     if (!pendingMarketCar || !pendingMarketCar.car) return showToast("Машина недоступна!");
@@ -720,7 +841,7 @@ function attemptMarketHaggle(percent, failRisk = 25) {
 }
 
 // ========================================================
-// НАЧАЛО ПОКУПКИ (кнопка «Оформить ДКП 🤝»)
+// НАЧАЛО ПОКУПКИ (NPC)
 // ========================================================
 function confirmMarketPurchaseSuccess() {
     if (_dealActionPending) return;
@@ -804,7 +925,7 @@ function confirmRegistrationChoice(registerOnPlayer) {
 }
 
 // ========================================================
-// ⭐ v4.6.0: КОМПАКТНЫЙ БЛАНК ДКП
+// КОМПАКТНЫЙ БЛАНК ДКП
 // ========================================================
 function openDKPModal(deal) {
     if (!deal || !deal.car) {
@@ -966,8 +1087,6 @@ function openDKPModal(deal) {
         if (btnSign) { btnSign.onclick = confirmSignDKP; btnSign.style.display = 'block'; btnSign.disabled = false; }
         if (btnAbort) { btnAbort.onclick = abortDKPDeal; btnAbort.style.display = hasLegalDefect ? 'block' : 'none'; }
         if (btnClose) { btnClose.style.display = 'none'; }
-
-        console.log('[DKP] Модалка открыта, кнопки ре-биндингнуты.');
     }, 50);
 }
 
@@ -1359,4 +1478,4 @@ window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v4.6.0] Компактный ДКП + PDF + оспаривание ✓');
+console.log('[🤝 market-deal v4.7.0] P2P роутинг: sellerId + dialogId + реальный торг M+ ✓');
