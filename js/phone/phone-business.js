@@ -1,6 +1,14 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v5.2.0)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v5.2.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v5.2.1 (SPRINT 2 — ФИКСЫ D1, D2):
+//   - ФИКС D1: разделены _collectPending на два независимых флага
+//     • _collectAllPending — для кнопки «Собрать всё» в шапке
+//     • _collectPointPending — для кнопки «Собрать» в конкретной точке
+//     Раньше клик по одной кнопке блокировал другую.
+//   - ФИКС D2: drawSparkline вызывается через requestAnimationFrame —
+//     canvas гарантированно в DOM перед отрисовкой.
+//     Плюс проверка canvas.isConnected в самом drawSparkline.
 // ⭐ v5.2.0 (ПОЛНЫЙ РЕДИЗАЙН КАРТОЧЕК В СТИЛЕ АВТО):
 //   - Новый Hero-баннер со статусом и стикерами
 //   - Виджет дохода/цены в правом углу с трендом
@@ -15,10 +23,11 @@ const PhoneBusiness = {
     _tickInterval: null,
     _activeBonus: null,
 
-    // Защита от двойных кликов
+    // ⭐ v5.2.1 (ФИКС D1): разделены на два независимых флага
+    _collectAllPending: false,     // для кнопки «Собрать всё» в шапке
+    _collectPointPending: false,   // для кнопки «Собрать» в карточке точки
     _tickPending: false,
     _upgradePending: false,
-    _collectPending: false,
 
     // Экономические циклы
     ECONOMIC_CYCLES: {
@@ -835,15 +844,19 @@ const PhoneBusiness = {
 
         container.innerHTML = html;
 
-        window.state.businesses.forEach(b => {
-            if (b && b.level > 0) {
-                try { this.drawSparkline(b); } catch (e) {}
-            }
+        // ⭐ v5.2.1 (ФИКС D2): отрисовка графиков через requestAnimationFrame,
+        // чтобы canvas гарантированно был в DOM
+        requestAnimationFrame(() => {
+            window.state.businesses.forEach(b => {
+                if (b && b.level > 0) {
+                    try { this.drawSparkline(b); } catch (e) {}
+                }
+            });
         });
     },
 
     // ========================================================
-    // НОВЫЙ РЕНДЕР КАРТОЧКИ БИЗНЕСА (ПО ОБРАЗЦУ КАРТОЧЕК АВТО)
+    // НОВЫЙ РЕНДЕР КАРТОЧКИ БИЗНЕСА
     // ========================================================
     _renderBizCard(b, pLvl, curDay) {
         const isOwned = b.level > 0;
@@ -938,7 +951,7 @@ const PhoneBusiness = {
                     </div>
                 </div>
 
-                <!-- 3. СЕТКА ИЗ 3 ПЛАШЕК ХАРАКТЕРИСТИК (МОЩНОСТЬ / ПРОБЕГ / КУЗОВ) -->
+                <!-- 3. СЕТКА ИЗ 3 ПЛАШЕК ХАРАКТЕРИСТИК -->
                 <div class="biz-tri-props-grid">
                     <!-- ПЛАШКА 1: КАССА / СТАРТ -->
                     <div class="biz-prop-card">
@@ -981,7 +994,7 @@ const PhoneBusiness = {
                     </div>
                 ` : ''}
 
-                <!-- 4. ЦИТАТА / СТАТУС / ИНФО (КАК ПЛАШКА ПРОДАВЦА) -->
+                <!-- 4. ЦИТАТА / СТАТУС / ИНФО -->
                 <div class="biz-quote-block">
                     <div class="biz-quote-icon">
                         ${b.stock <= 0 ? '⚠️' : (isOwned ? '💼' : '🏢')}
@@ -1086,9 +1099,17 @@ const PhoneBusiness = {
         `;
     },
 
+    // ⭐ v5.2.1 (ФИКС D2): защита от отсутствия canvas в DOM
     drawSparkline(biz) {
         const canvas = document.getElementById(`bizSpark_${biz.id}`);
         if (!canvas) return;
+
+        // ⭐ ФИКС D2: canvas откреплён от DOM — пропускаем
+        if (!canvas.isConnected) {
+            console.warn(`[PhoneBusiness] drawSparkline: canvas для ${biz.id} не в DOM`);
+            return;
+        }
+
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         const W = canvas.width, H = canvas.height;
@@ -1395,10 +1416,12 @@ const PhoneBusiness = {
 
     // ========================================================
     // ДЕЙСТВИЯ
+    // ⭐ v5.2.1 (ФИКС D1): _collectAllPending и _collectPointPending независимы
     // ========================================================
     collectAllCash() {
-        if (this._collectPending) return;
-        this._collectPending = true;
+        // ⭐ ФИКС D1: отдельный флаг для кнопки в шапке
+        if (this._collectAllPending) return;
+        this._collectAllPending = true;
 
         try {
             this.ensureState();
@@ -1440,18 +1463,19 @@ const PhoneBusiness = {
             this.checkAchievements();
             this.render(document.getElementById('phoneAppContainer'));
         } finally {
-            this._collectPending = false;
+            this._collectAllPending = false;
         }
     },
 
     collectPointCash(bizId) {
-        if (this._collectPending) return;
+        // ⭐ ФИКС D1: отдельный флаг для кнопки в карточке точки
+        if (this._collectPointPending) return;
 
         this.ensureState();
         const b = window.state.businesses.find(x => x && x.id === bizId);
         if (!b || b.stored <= 0) return;
 
-        this._collectPending = true;
+        this._collectPointPending = true;
         try {
             const amount = Math.floor(b.stored);
             b.stored = 0;
@@ -1479,7 +1503,7 @@ const PhoneBusiness = {
             this.checkAchievements();
             this.render(document.getElementById('phoneAppContainer'));
         } finally {
-            this._collectPending = false;
+            this._collectPointPending = false;
         }
     },
 
@@ -2291,4 +2315,4 @@ if (typeof document !== 'undefined') {
     });
 }
 
-console.log('[💼 phone-business v5.2.0] КАРТОЧКИ В СТИЛЕ АВТО + ТАБЫ ✓');
+console.log('[💼 phone-business v5.2.1] ФИКС D1 (независимые флаги сбора) + D2 (drawSparkline через rAF) ✓');
