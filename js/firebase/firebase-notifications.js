@@ -1,6 +1,19 @@
 // ========================================================
-// js/firebase-notifications.js — УВЕДОМЛЕНИЯ, ЧАТ, СОБЫТИЯ (v1.0.0)
+// js/firebase-notifications.js — УВЕДОМЛЕНИЯ, ЧАТ, СОБЫТИЯ (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.1.0 (SPRINT 3 — ФИКСЫ БЕЗ СОСТАВНЫХ ИНДЕКСОВ):
+//   - ФИКС: fetchMyNotifications — убран 3-way where + orderBy
+//     (требовал индекса). Теперь single-field where(toUser)
+//     + клиентская фильтрация по claimed/expireAt и сортировка.
+//   - ФИКС: subscribeToNotifications — то же самое.
+//   - ФИКС: fetchMessagesForDialog — убран orderBy, сортировка
+//     на клиенте. Требовал индекса dialogId+timestamp.
+//   - ФИКС: subscribeToDialog — то же самое.
+//   - ФИКС: fetchEvents / subscribeToEvents — orderBy убран,
+//     сортировка на клиенте (single-field auto-index уже есть,
+//     но избегаем любых сюрпризов с коллекциями).
+//   - ФИКС: sendMessage и pushEvent — защита от ошибок, возврат
+//     осмысленного сообщения при permission-denied.
 // ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ firebase-bridge.js):
 //   - NotificationsManager (fetchMyNotifications,
 //     subscribeToNotifications, claimNotificationPayout,
@@ -13,7 +26,7 @@
 //   - Экспорт в window.FB_Notifications
 //
 // ВАЖНО: файл — ES-модуль (import), подключается через
-//   <script type="module" src="firebase-notifications.js?v=410"></script>
+//   <script type="module" src="firebase-notifications.js?v=421"></script>
 // Должен быть загружен ПОСЛЕ firebase-core.js.
 // ========================================================
 
@@ -83,7 +96,37 @@ function getCurrentPlayerProfile() {
 }
 
 // ========================================================
-// 3. QUICK-CHAT ФРАЗЫ (для M+ мессенджера)
+// 3. ХЕЛПЕР: клиентская фильтрация + сортировка
+// (используется вместо составных индексов Firestore)
+// ========================================================
+function _filterAndSortDocs(items, opts = {}) {
+  if (!Array.isArray(items)) return [];
+  const now = Date.now();
+
+  const result = items.filter(item => {
+    if (!item) return false;
+    // Отсеиваем протухшие (если есть expireAt)
+    if (item.expireAt && item.expireAt < now) return false;
+    // Фильтр по claimed (для уведомлений)
+    if (opts.claimed !== undefined && item.claimed !== opts.claimed) return false;
+    return true;
+  });
+
+  // Сортировка по timestamp
+  if (opts.sortBy) {
+    const dir = opts.sortDir === 'asc' ? 1 : -1;
+    result.sort((a, b) => {
+      const ta = Number(a[opts.sortBy]) || 0;
+      const tb = Number(b[opts.sortBy]) || 0;
+      return (ta - tb) * dir;
+    });
+  }
+
+  return result;
+}
+
+// ========================================================
+// 4. QUICK-CHAT ФРАЗЫ (для M+ мессенджера)
 // ========================================================
 const CANNED_PHRASES = {
   greet_1: { id: "greet_1", text: "«Салам, перекуп! Что по технике?»", category: "greet" },
@@ -118,42 +161,52 @@ const CANNED_PHRASES = {
 };
 
 // ========================================================
-// 4. NOTIFICATIONS MANAGER
+// 5. NOTIFICATIONS MANAGER
 // ========================================================
 const NotificationsManager = {
   _listeners: new Map(),
 
   /**
    * Получить все непрочитанные уведомления игрока.
+   * ⭐ v1.1.0: single-field where(toUser) + клиентская фильтрация.
    */
   async fetchMyNotifications(userId) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
     if (!targetUid) return [];
+
     try {
       const q = query(
         collection(db, "notifications"),
         where("toUser", "==", String(targetUid)),
-        where("claimed", "==", false),
-        orderBy("timestamp", "desc"),
-        limit(LIMITS.maxNotificationsPerUser)
+        limit(LIMITS.maxNotificationsPerUser * 2)
       );
       const snap = await getDocs(q);
-      const notifs = [];
-      const now = Date.now();
-      snap.forEach(d => {
-        const it = d.data();
-        if (it.expireAt && it.expireAt < now) return;
-        notifs.push({ id: d.id, ...it });
+
+      const raw = [];
+      snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
+
+      // ⭐ Клиентская фильтрация: только claimed=false + сортировка timestamp desc
+      const filtered = _filterAndSortDocs(raw, {
+        claimed: false,
+        sortBy: 'timestamp',
+        sortDir: 'desc'
       });
-      return notifs;
+
+      return filtered.slice(0, LIMITS.maxNotificationsPerUser);
     } catch (e) {
-      console.warn('[Notifications] fetch error:', e);
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[Notifications] fetchMyNotifications: permission-denied (проверьте Firestore Rules)');
+      } else {
+        console.warn('[Notifications] fetch error:', errMsg);
+      }
       return [];
     }
   },
 
   /**
    * Real-time подписка на уведомления.
+   * ⭐ v1.1.0: single-field where(toUser) + клиентский фильтр.
    * @param {string} userId
    * @param {Function} callback — вызывается с массивом уведомлений
    * @returns {Function} unsubscribe
@@ -166,22 +219,27 @@ const NotificationsManager = {
       const q = query(
         collection(db, "notifications"),
         where("toUser", "==", String(targetUid)),
-        where("claimed", "==", false),
-        orderBy("timestamp", "desc"),
-        limit(LIMITS.maxNotificationsPerUser)
+        limit(LIMITS.maxNotificationsPerUser * 2)
       );
 
       const unsubscribe = onSnapshot(q, (snap) => {
-        const notifs = [];
-        const now = Date.now();
-        snap.forEach(d => {
-          const it = d.data();
-          if (it.expireAt && it.expireAt < now) return;
-          notifs.push({ id: d.id, ...it });
-        });
+        const raw = [];
+        snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
+
+        const notifs = _filterAndSortDocs(raw, {
+          claimed: false,
+          sortBy: 'timestamp',
+          sortDir: 'desc'
+        }).slice(0, LIMITS.maxNotificationsPerUser);
+
         try { callback(notifs); } catch (e) { console.warn('[Notifications] callback error:', e); }
       }, (error) => {
-        console.warn('[Notifications] subscribeToNotifications error:', error);
+        const errMsg = error?.code || error?.message || String(error);
+        if (errMsg.includes('permission-denied')) {
+          console.warn('[Notifications] subscribeToNotifications: permission-denied');
+        } else {
+          console.warn('[Notifications] subscribeToNotifications error:', errMsg);
+        }
       });
 
       this._listeners.set(String(targetUid), unsubscribe);
@@ -220,7 +278,7 @@ const NotificationsManager = {
 };
 
 // ========================================================
-// 5. CHAT MESSAGES MANAGER
+// 6. CHAT MESSAGES MANAGER
 // ========================================================
 const ChatMessagesManager = {
   _listeners: [],
@@ -250,38 +308,54 @@ const ChatMessagesManager = {
       await setDoc(doc(db, "chat_messages", msgId), payload);
       return { success: true, msg: payload };
     } catch (e) {
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[ChatMessages] sendMessage: permission-denied');
+      } else {
+        console.warn('[ChatMessages] sendMessage error:', errMsg);
+      }
+      return { success: false, error: errMsg };
     }
   },
 
   /**
    * Получить сообщения диалога (одноразово).
+   * ⭐ v1.1.0: single-field where(dialogId) + клиентская сортировка.
    */
   async fetchMessagesForDialog(dialogId) {
+    if (!dialogId) return [];
     try {
       const q = query(
         collection(db, "chat_messages"),
         where("dialogId", "==", dialogId),
-        orderBy("timestamp", "asc"),
-        limit(LIMITS.maxMessagesPerDialog)
+        limit(LIMITS.maxMessagesPerDialog * 2)
       );
       const snap = await getDocs(q);
-      const list = [];
-      const now = Date.now();
-      snap.forEach(d => {
-        const it = d.data();
-        if (it.expireAt && it.expireAt < now) return;
-        list.push(it);
+
+      const raw = [];
+      snap.forEach(d => raw.push(d.data()));
+
+      // ⭐ Клиентская сортировка по timestamp asc
+      const sorted = _filterAndSortDocs(raw, {
+        sortBy: 'timestamp',
+        sortDir: 'asc'
       });
-      return list;
+
+      return sorted.slice(0, LIMITS.maxMessagesPerDialog);
     } catch (e) {
-      console.warn('[ChatMessages] fetch error:', e);
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[ChatMessages] fetchMessagesForDialog: permission-denied');
+      } else {
+        console.warn('[ChatMessages] fetch error:', errMsg);
+      }
       return [];
     }
   },
 
   /**
    * Real-time подписка на сообщения диалога.
+   * ⭐ v1.1.0: single-field where(dialogId) + клиентская сортировка.
    */
   subscribeToDialog(dialogId, callback) {
     if (!dialogId || typeof callback !== 'function') return () => {};
@@ -290,21 +364,26 @@ const ChatMessagesManager = {
       const q = query(
         collection(db, "chat_messages"),
         where("dialogId", "==", dialogId),
-        orderBy("timestamp", "asc"),
-        limit(LIMITS.maxMessagesPerDialog)
+        limit(LIMITS.maxMessagesPerDialog * 2)
       );
 
       const unsubscribe = onSnapshot(q, (snap) => {
-        const messages = [];
-        const now = Date.now();
-        snap.forEach(d => {
-          const it = d.data();
-          if (it.expireAt && it.expireAt < now) return;
-          messages.push(it);
-        });
+        const raw = [];
+        snap.forEach(d => raw.push(d.data()));
+
+        const messages = _filterAndSortDocs(raw, {
+          sortBy: 'timestamp',
+          sortDir: 'asc'
+        }).slice(0, LIMITS.maxMessagesPerDialog);
+
         try { callback(messages); } catch (e) { console.warn('[ChatMessages] callback error:', e); }
       }, (error) => {
-        console.warn('[ChatMessages] subscribeToDialog error:', error);
+        const errMsg = error?.code || error?.message || String(error);
+        if (errMsg.includes('permission-denied')) {
+          console.warn('[ChatMessages] subscribeToDialog: permission-denied');
+        } else {
+          console.warn('[ChatMessages] subscribeToDialog error:', errMsg);
+        }
       });
 
       this._listeners.push(unsubscribe);
@@ -327,25 +406,40 @@ const ChatMessagesManager = {
 };
 
 // ========================================================
-// 6. EVENTS MANAGER (уличные события M+)
+// 7. EVENTS MANAGER (уличные события M+)
 // ========================================================
 const EventsManager = {
+  _listeners: [],
+
   /**
    * Получить последние события.
+   * ⭐ v1.1.0: клиентская сортировка вместо orderBy.
    */
   async fetchEvents(limitCount = 35) {
     try {
       const q = query(
         collection(db, "street_events"),
-        orderBy("timestamp", "desc"),
-        limit(limitCount)
+        limit(limitCount * 2)
       );
       const snap = await getDocs(q);
-      const events = [];
-      snap.forEach(d => events.push({ id: d.id, ...d.data() }));
-      return events;
+
+      const raw = [];
+      snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
+
+      // ⭐ Клиентская сортировка по timestamp desc
+      const sorted = _filterAndSortDocs(raw, {
+        sortBy: 'timestamp',
+        sortDir: 'desc'
+      });
+
+      return sorted.slice(0, limitCount);
     } catch (e) {
-      console.warn('[Events] fetch error:', e);
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[Events] fetchEvents: permission-denied (добавьте street_events в Rules)');
+      } else {
+        console.warn('[Events] fetch error:', errMsg);
+      }
       return [];
     }
   },
@@ -376,8 +470,13 @@ const EventsManager = {
       await setDoc(doc(db, "street_events", eventId), payload);
       return { success: true, eventId };
     } catch (e) {
-      console.warn('[Events] push error:', e);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[Events] pushEvent: permission-denied');
+      } else {
+        console.warn('[Events] push error:', errMsg);
+      }
+      return { success: false, error: errMsg };
     }
   },
 
@@ -398,34 +497,57 @@ const EventsManager = {
         tx.update(eventRef, { likes });
       });
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      return false;
+    }
   },
 
   /**
    * Real-time подписка на ленту событий.
+   * ⭐ v1.1.0: клиентская сортировка.
    */
   subscribeToEvents(callback, limitCount = 35) {
     if (typeof callback !== 'function') return () => {};
     try {
       const q = query(
         collection(db, "street_events"),
-        orderBy("timestamp", "desc"),
-        limit(limitCount)
+        limit(limitCount * 2)
       );
+
       const unsubscribe = onSnapshot(q, (snap) => {
-        const events = [];
-        snap.forEach(d => events.push({ id: d.id, ...d.data() }));
+        const raw = [];
+        snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
+
+        const events = _filterAndSortDocs(raw, {
+          sortBy: 'timestamp',
+          sortDir: 'desc'
+        }).slice(0, limitCount);
+
         try { callback(events); } catch (e) {}
       }, (error) => {
-        console.warn('[Events] subscribe error:', error);
+        const errMsg = error?.code || error?.message || String(error);
+        if (errMsg.includes('permission-denied')) {
+          console.warn('[Events] subscribeToEvents: permission-denied');
+        } else {
+          console.warn('[Events] subscribe error:', errMsg);
+        }
       });
+
+      this._listeners.push(unsubscribe);
       return unsubscribe;
     } catch (e) { return () => {}; }
+  },
+
+  unsubscribeAll() {
+    this._listeners.forEach(unsub => {
+      try { unsub(); } catch (e) {}
+    });
+    this._listeners = [];
   }
 };
 
 // ========================================================
-// 7. ЭКСПОРТ В WINDOW
+// 8. ЭКСПОРТ В WINDOW
 // ========================================================
 window.FB_Notifications = {
   Notifications: NotificationsManager,
@@ -439,4 +561,4 @@ window.FB_NotificationsManager = NotificationsManager;
 window.FB_ChatMessagesManager = ChatMessagesManager;
 window.FB_EventsManager = EventsManager;
 
-console.log('[🔔 FB_Notifications v1.0.0] Уведомления, чат, события загружены. Notifications, ChatMessages, Events, CANNED_PHRASES ✓');
+console.log('[🔔 FB_Notifications v1.1.0] Без составных индексов. Notifications, ChatMessages, Events, CANNED_PHRASES ✓');
