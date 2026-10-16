@@ -1,6 +1,12 @@
 // ========================================================
-// js/theme-manager.js — МЕНЕДЖЕР ТЕМ И КАСТОМИЗАЦИИ (v4.0.0)
+// js/theme-manager.js — МЕНЕДЖЕР ТЕМ И КАСТОМИЗАЦИИ (v4.0.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v4.0.1 (SPRINT 2 — ФИКС C2):
+//   - grantCosmeticFromSpin теперь вызывает saveState() и updateHeaderUI()
+//   - При выдаче предмета и при конвертации в Stars — стейт сохраняется
+//   - Добавлены EventBus-эмиты: cosmetic:granted, cosmetic:converted_to_stars
+//   - UI-подписка на эти события (см. phone-media.js) мгновенно обновляет
+//     вкладку «Скин», если она открыта
 // ⭐ v4.0.0 (ПЛАТНАЯ КАСТОМИЗАЦИЯ ПРОФИЛЯ):
 //   - ТРИ ВАЛЮТЫ: ₽ (рубли), ⭐ (Stars), 🎟️ (билеты)
 //   - reqTickets в темах, ник-эффектах, аурах, титулах
@@ -9,20 +15,13 @@
 //   - Валидация в applyTheme (откат, если тема не куплена)
 //   - Баланс валют в шапке модалки
 //   - Тема Cyber Black Neo — платная (1 🎟️)
-//   - Убраны 4 дублирующих темы: midnight_purple, tokyo_night,
-//     neon_samurai, midnight_gold, cyberpunk_2077 → в HUD_THEMES_CATALOG
-//     (здесь же в themes для рендера)
-// ⭐ v3.4.0:
-//   - 8 аур аватара (Fire, Snow, Lava, Rim, Smoke, Aurora, Scan, Quantum)
-// ⭐ v3.3.0:
-//   - 3 новые темы (Neon Samurai, Midnight Gold, Cyberpunk 2077)
 // ========================================================
 
 const ThemeManager = {
     activeCustomizerTab: 'colors',
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: 11 ТЕМ (10 игровых + DEV)
+    // 11 ТЕМ (10 игровых + DEV)
     // Три валюты: cost (₽), reqStars (⭐), reqTickets (🎟️)
     // isExclusive — глитч-предметы (покупаются ТОЛЬКО за билеты)
     // --------------------------------------------------------
@@ -163,7 +162,7 @@ const ThemeManager = {
     ],
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: 8 НИК-ЭФФЕКТОВ
+    // 8 НИК-ЭФФЕКТОВ
     // --------------------------------------------------------
     nickEffects: [
         {
@@ -227,7 +226,7 @@ const ThemeManager = {
     ],
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: 10 АУР АВАТАРА
+    // 10 АУР АВАТАРА
     // --------------------------------------------------------
     avatarEffects: [
         {
@@ -305,7 +304,7 @@ const ThemeManager = {
     ],
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: 8 ТИТУЛОВ
+    // 8 ТИТУЛОВ
     // --------------------------------------------------------
     traderTitles: [
         { id: 'cash_buyer',     title: 'Быстрый выкуп за кэш 💸', minLvl: 1,  cost: 0,       reqStars: 0,  reqTickets: 0, desc: 'Деньги сразу без долгих проверок' },
@@ -334,7 +333,7 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: ВАЛИДАЦИЯ ВЛАДЕНИЯ
+    // ВАЛИДАЦИЯ ВЛАДЕНИЯ
     // --------------------------------------------------------
     ownsThem(themeId) {
         const p = state.player || {};
@@ -364,8 +363,7 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ПРИМЕНЕНИЕ ТЕМЫ
-    // ⭐ v4.0.0: с валидацией владения
+    // ПРИМЕНЕНИЕ ТЕМЫ (с валидацией владения)
     // --------------------------------------------------------
     applyTheme() {
         const root = document.documentElement;
@@ -376,7 +374,7 @@ const ThemeManager = {
 
         let curColorId = state.player.hudColorId || 'cyber_neon';
 
-        // ⭐ v4.0.0: валидация владения — если не куплено, откат на базовую
+        // Валидация владения — если не куплено, откат на базовую
         if (!isDev && !this.ownsThem(curColorId)) {
             console.warn(`[ThemeManager] Тема «${curColorId}» не куплена → откат на cyber_neon`);
             curColorId = 'cyber_neon';
@@ -501,7 +499,7 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: ХЕЛПЕР — формат цены
+    // ХЕЛПЕР — формат цены
     // --------------------------------------------------------
     _formatPrice(item) {
         const parts = [];
@@ -778,7 +776,7 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: ПОКУПКА ТЕМЫ
+    // ПОКУПКА ТЕМЫ
     // --------------------------------------------------------
     buyTheme(themeId) {
         const isDev = (typeof window.isPcDevMode === 'function') ? window.isPcDevMode() : false;
@@ -834,7 +832,6 @@ const ThemeManager = {
             return;
         }
 
-        // ⭐ v4.0.0: валидация владения
         if (!this.ownsThem(colorId)) {
             return this.buyTheme(colorId);
         }
@@ -865,13 +862,12 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: CYBER BLACK NEO — ПЛАТНЫЙ
+    // CYBER BLACK NEO — ПЛАТНЫЙ
     // --------------------------------------------------------
     toggleCyberTheme() {
         const isActive = state.player.themePresetId === 'cyber_black_neo';
 
         if (isActive) {
-            // Выключаем — просто возвращаемся к default
             state.player.themePresetId = 'default';
             if (typeof saveState === 'function') saveState();
             this.applyTheme();
@@ -881,7 +877,6 @@ const ThemeManager = {
             return;
         }
 
-        // Пытаемся включить — нужно ли купить?
         if (this.ownsThem('cyber_black_neo')) {
             state.player.themePresetId = 'cyber_black_neo';
             if (typeof saveState === 'function') saveState();
@@ -892,7 +887,6 @@ const ThemeManager = {
             return;
         }
 
-        // Покупка
         const cost = 380000, reqStars = 20, reqTickets = 1, reqLevel = 10;
         const bal = this._playerBalances();
 
@@ -923,7 +917,7 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: ПОКУПКА НИК-ЭФФЕКТА
+    // ПОКУПКА НИК-ЭФФЕКТА
     // --------------------------------------------------------
     buyNickEffect(fxId) {
         const fx = this.nickEffects.find(f => f.id === fxId);
@@ -971,7 +965,7 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: ПОКУПКА АУРЫ
+    // ПОКУПКА АУРЫ
     // --------------------------------------------------------
     buyAvatarEffect(fxId) {
         const fx = this.avatarEffects.find(f => f.id === fxId);
@@ -1019,7 +1013,7 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: ПОКУПКА ТИТУЛА
+    // ПОКУПКА ТИТУЛА
     // --------------------------------------------------------
     buyTraderTitle(titleId) {
         const t = this.traderTitles.find(x => x.id === titleId);
@@ -1076,8 +1070,13 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v4.0.0: ВЫДАЧА ПРЕДМЕТА ИЗ СУПЕРВИЛСПИНА
+    // ⭐ v4.0.1 (ФИКС C2): ВЫДАЧА ПРЕДМЕТА ИЗ СУПЕРВИЛСПИНА
     // Возвращает {success, item, convertedToStars}
+    //
+    // ФИКС: добавлен saveState() + updateHeaderUI() во все ветки,
+    //       чтобы предмет не потерялся, если игрок сразу закроет игру.
+    //       Также эмитятся EventBus-события для UI-слоя
+    //       (см. phone-media.js — обновление вкладки «Скин» в реальном времени).
     // --------------------------------------------------------
     grantCosmeticFromSpin(category, itemId) {
         const p = state.player;
@@ -1085,37 +1084,49 @@ const ThemeManager = {
 
         // Найти предмет
         let item = null;
-        let list = null;
         let ownedList = null;
 
         if (category === 'themes') {
             item = this.themes.find(t => t.id === itemId);
-            list = this.themes;
             if (!p.ownedThemes) p.ownedThemes = ['cyber_neon'];
             ownedList = p.ownedThemes;
         } else if (category === 'nickEffects') {
             item = this.nickEffects.find(f => f.id === itemId);
-            list = this.nickEffects;
             if (!p.ownedNickEffects) p.ownedNickEffects = ['none'];
             ownedList = p.ownedNickEffects;
         } else if (category === 'avatarEffects') {
             item = this.avatarEffects.find(f => f.id === itemId);
-            list = this.avatarEffects;
             if (!p.ownedAvatarEffects) p.ownedAvatarEffects = ['none'];
             ownedList = p.ownedAvatarEffects;
         } else if (category === 'titles') {
             item = this.traderTitles.find(t => t.id === itemId);
-            list = this.traderTitles;
             if (!p.ownedTitles) p.ownedTitles = ['cash_buyer'];
             ownedList = p.ownedTitles;
         }
 
-        if (!item) return { success: false };
+        if (!item || !ownedList) return { success: false };
 
-        // Уже владеет → конвертируем в Stars
+        // ═════════════════════════════════════════════════════
+        // ВЕТКА 1: Уже владеет → конвертируем в Stars
+        // ═════════════════════════════════════════════════════
         if (ownedList.includes(itemId)) {
             const compensation = 10 + Math.floor(Math.random() * 20); // 10-30 ⭐
             p.stars = (p.stars || 0) + compensation;
+
+            // ⭐ ФИКС C2: сохраняем стейт
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+
+            // EventBus — UI-слой реагирует
+            if (window.EventBus) {
+                window.EventBus.emit('cosmetic:converted_to_stars', {
+                    category,
+                    itemId,
+                    itemName: item.name,
+                    stars: compensation
+                });
+            }
+
             return {
                 success: true,
                 item: item,
@@ -1123,8 +1134,24 @@ const ThemeManager = {
             };
         }
 
-        // Выдаём
+        // ═════════════════════════════════════════════════════
+        // ВЕТКА 2: Новый предмет → выдаём
+        // ═════════════════════════════════════════════════════
         ownedList.push(itemId);
+
+        // ⭐ ФИКС C2: сохраняем стейт
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+
+        // EventBus — UI-слой реагирует
+        if (window.EventBus) {
+            window.EventBus.emit('cosmetic:granted', {
+                category,
+                itemId,
+                itemName: item.name
+            });
+        }
+
         return {
             success: true,
             item: item,
@@ -1153,4 +1180,4 @@ window.setAvatarEffectAction = (id) => ThemeManager.setAvatarEffect(id);
 window.setSoundProfileAction = (p) => ThemeManager.setSoundProfile(p);
 window.grantCosmeticFromSpin = (cat, id) => ThemeManager.grantCosmeticFromSpin(cat, id);
 
-console.log('[🎨 theme-manager v4.0.0] Платная кастомизация: 11 тем, 8 ников, 10 аур, 8 титулов + билеты 🎟️ + SuperSpin grant ✓');
+console.log('[🎨 theme-manager v4.0.1] ФИКС C2: saveState + EventBus в grantCosmeticFromSpin ✓');
