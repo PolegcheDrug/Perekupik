@@ -1,21 +1,25 @@
 // ========================================================
-// js/app/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И ACCESS CONTROL (v4.2.0)
+// js/app/app.js — ЯДРО СИМУЛЯТОРА, РОЛЛЕР И ACCESS CONTROL (v4.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v4.3.0 (SPRINT 3 — DEEP-LINK ИНВАЙТОВ):
+//   - ДОБАВЛЕНО: _processStartParam() — читает Telegram.WebApp
+//     .initDataUnsafe.start_param и активирует инвайт-код
+//     через AccessControl.redeemInviteCode()
+//   - Дедупликация: обработанный код хранится в sessionStorage
+//   - start_param обрабатывается ДО checkAccess (свежий whitelist)
+//   - Валидация формата кода: 8 символов A-HJ-NP-Z2-9
+//   - _syncStarRateToBank() вызывается и в applyLoadedState
+//     (курс ⭐ синхронизируется сразу после загрузки сейва)
 // ⭐ v4.2.0 (SPRINT 1):
 //   - Клонирование .user-stats-row для marquee-прокрутки
 //   - #playerLvl обновляется во всех клонах через data-clone-of
 //   - showToast(msg, type) — варианты success/error/warning/info
 //   - Плавающий курс Stars (динамическая ставка в банке)
-//   - Save v14: миграция Stars ×10 (курс 2,500 → 25,000 ₽)
+//   - Save v14: миграция Stars ×10 (курс 2 500 → 25 000 ₽)
 //   - Фикс конфликта window.AppMessenger (M+ побеждает)
-// ⭐ v4.1.0 (ФИКСЫ БИЗНЕСА И ГЕНЕРАЦИИ ТРАНСПОРТА):
-//   - Форсированный populateMarketFeed через 1.5 сек
-//   - Форсированный PhoneBusiness.ensureState через 0.8 сек
-//   - Owner-кнопка внизу справа + кнопка в профиле
-//   - Offline-баннер
 // ========================================================
 
-window.CURRENT_GAME_VERSION = "v4.2.0";
+window.CURRENT_GAME_VERSION = "v4.3.0";
 
 let tgUserId = null;
 let tgUserData = null;
@@ -84,6 +88,99 @@ function getCarImage(template) {
     return "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80";
 }
 window.getCarImage = getCarImage;
+
+// ========================================================
+// ⭐ v4.3.0: ОБРАБОТКА TELEGRAM START_PARAM (DEEP-LINK ИНВАЙТ)
+// ========================================================
+/**
+ * Читает start_param из Telegram WebApp и, если это валидный
+ * инвайт-код, активирует его через AccessControl.redeemInviteCode().
+ *
+ * Формат кода: 8 символов, A-HJ-NP-Z2-9 (без 0/O/1/I).
+ * Дедупликация через sessionStorage: один и тот же код не активируется
+ * дважды в одной сессии.
+ *
+ * @returns {Promise<{success: boolean, code?: string, reason?: string}>}
+ */
+async function _processStartParam() {
+    const result = { success: false };
+
+    try {
+        const startParam =
+            window.Telegram?.WebApp?.initDataUnsafe?.start_param ||
+            window.Telegram?.WebApp?.initDataUnsafe?.startPayload ||
+            null;
+
+        if (!startParam) {
+            return result;
+        }
+
+        const rawParam = String(startParam).trim();
+        const code = rawParam.toUpperCase();
+
+        // Формат 8 символов, исключая 0/O/1/I (как в _generateInviteCode)
+        const CODE_REGEX = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
+
+        if (!CODE_REGEX.test(code)) {
+            console.log('[StartParam] Не похоже на инвайт-код, игнорируем:', rawParam);
+            return { ...result, reason: 'not_a_code' };
+        }
+
+        // Дедупликация в рамках сессии
+        const sessionKey = 'perekup_redeemed_code_' + code;
+        try {
+            if (sessionStorage.getItem(sessionKey) === 'true') {
+                console.log('[StartParam] Код уже активирован в этой сессии:', code);
+                return { ...result, reason: 'already_redeemed_session' };
+            }
+        } catch (e) {}
+
+        if (!window.AccessControl || typeof window.AccessControl.redeemInviteCode !== 'function') {
+            console.warn('[StartParam] AccessControl не загружен — код не активирован');
+            return { ...result, reason: 'no_access_control' };
+        }
+
+        console.log('[StartParam] 🎟️ Обнаружен инвайт-код, активируем:', code);
+
+        const redeemRes = await window.AccessControl.redeemInviteCode(code);
+
+        if (redeemRes && redeemRes.success) {
+            try {
+                sessionStorage.setItem(sessionKey, 'true');
+            } catch (e) {}
+
+            console.log('[StartParam] ✅ Инвайт-код активирован:', code);
+
+            if (window.DevLogger) {
+                window.DevLogger.add('system', 'Deep-link инвайт активирован', { code });
+            }
+
+            if (typeof showToast === 'function') {
+                setTimeout(() => {
+                    showToast('🎟️ Инвайт-код активирован! Добро пожаловать!', 'success');
+                }, 800);
+            }
+
+            return { success: true, code };
+        } else {
+            const err = redeemRes?.error || 'Неверный код';
+            console.warn('[StartParam] ❌ Ошибка активации кода:', err);
+
+            if (typeof showToast === 'function') {
+                setTimeout(() => {
+                    showToast(`❌ ${err}`, 'error');
+                }, 800);
+            }
+
+            return { ...result, reason: 'redeem_failed', error: err };
+        }
+    } catch (e) {
+        console.warn('[StartParam] Ошибка обработки:', e);
+        return { ...result, reason: 'exception', error: e.message };
+    }
+}
+
+window._processStartParam = _processStartParam;
 
 // ========================================================
 // 2. МЕНЕДЖЕР МОДАЛЬНЫХ ОКОН
@@ -917,10 +1014,6 @@ function migrateSave(parsed) {
                 console.log(`[Migration] Stars: ${oldStars} → ${parsed.player.stars} (×10)`);
             }
 
-            // Все цены в Stars, которые были в сейве (суперспин-билеты и т.п.)
-            // пересчитывать не нужно — они и так в штуках, не в рублях
-
-            // Динамический курс Stars
             if (typeof parsed.player.dynamicStarRate !== 'number') {
                 parsed.player.dynamicStarRate = STAR_RATE_DEFAULT;
             }
@@ -1018,7 +1111,18 @@ async function initTelegramAuthAndStorage(callback) {
         tgUserId = String(tgUser.id);
     }
 
-    // ─── ЭТАП 2: AccessControl ───
+    // ─── ⭐ v4.3.0: ЭТАП 2 (НОВЫЙ): Deep-link инвайт-код ───
+    // Обрабатываем ДО checkAccess, чтобы свежий whitelist подхватился
+    try {
+        const startParamRes = await _processStartParam();
+        if (startParamRes && startParamRes.success) {
+            console.log('[App] 🎟️ Инвайт активирован через deep-link:', startParamRes.code);
+        }
+    } catch (e) {
+        console.warn('[App] Ошибка обработки start_param:', e);
+    }
+
+    // ─── ЭТАП 3: AccessControl ───
     try {
         if (window.AccessControl && typeof window.AccessControl.checkAccess === 'function') {
             console.log('[App] 🔐 Проверка доступа через AccessControl...');
@@ -1051,7 +1155,7 @@ async function initTelegramAuthAndStorage(callback) {
         console.warn('[App] Ошибка AccessControl, продолжаем (fallback):', e);
     }
 
-    // ─── ЭТАП 3: Firebase Auth ───
+    // ─── ЭТАП 4: Firebase Auth ───
     if (window.FB_Bridge?.Auth) {
         try {
             const authRes = await window.FB_Bridge.Auth.initSession();
@@ -1065,7 +1169,7 @@ async function initTelegramAuthAndStorage(callback) {
         window.FB_Bridge.Auth._forceVerifiedUserId(tgUserId);
     }
 
-    // ─── ЭТАП 4: Сейв ───
+    // ─── ЭТАП 5: Сейв ───
     const hadLocalSave = loadFromLocalStorage();
 
     if (!hadLocalSave && !isPcDevSession && window.FB_Bridge?.Players?.pullSave) {
@@ -1081,7 +1185,7 @@ async function initTelegramAuthAndStorage(callback) {
         }
     }
 
-    // ─── ЭТАП 5: Имя и аватар ───
+    // ─── ЭТАП 6: Имя и аватар ───
     if (tgUser && state.player) {
         let names = [];
         if (tgUser.first_name) names.push(tgUser.first_name);
@@ -1103,7 +1207,7 @@ async function initTelegramAuthAndStorage(callback) {
 
     state.player.uid = String(tgUserId);
 
-    // ─── ЭТАП 6: Owner — все приложения ───
+    // ─── ЭТАП 7: Owner — все приложения ───
     if (_isOwner() && state.player) {
         if (!Array.isArray(state.player.unlockedApps)) state.player.unlockedApps = [];
         const allApps = ['barn', 'containers', 'autopodbor_order', 'street', 'darknet'];
@@ -1115,7 +1219,7 @@ async function initTelegramAuthAndStorage(callback) {
         console.log('[App] 👑 Owner получил все приложения:', allApps);
     }
 
-    // ─── ЭТАП 7: Каталог машин из Firestore ───
+    // ─── ЭТАП 8: Каталог машин из Firestore ───
     if (window.FB_Bridge?.CarsCatalog && !isPcDevSession) {
         try { await window.FB_Bridge.CarsCatalog.seedDefaultCarsCatalog(); } catch (e) {}
     }
@@ -1240,6 +1344,9 @@ function applyLoadedState(parsed) {
     if (Array.isArray(parsed.businessFleet)) state.businessFleet = parsed.businessFleet;
 
     sanitizeState();
+
+    // ⭐ v4.3.0: синхронизируем курс ⭐ в BANK_EXCHANGE_RATES сразу после загрузки
+    try { _syncStarRateToBank(); } catch (e) {}
 
     if (window.PlatesManager && typeof window.PlatesManager.syncLegacyOwnedPlates === 'function') {
         try {
@@ -2455,4 +2562,4 @@ window._cloneStatsRow = _cloneStatsRow;
 window._updateDynamicStarRate = _updateDynamicStarRate;
 window._syncStarRateToBank = _syncStarRateToBank;
 
-console.log('[💠 app.js v4.2.0] SPRINT 1: HUD marquee + уровень в stats-row + showToast(type) + плавающий курс Stars + save v14 (Stars ×10) ✓');
+console.log('[💠 app.js v4.3.0] SPRINT 3: deep-link инвайтов (start_param) + _syncStarRateToBank в applyLoadedState + save v14 ✓');
