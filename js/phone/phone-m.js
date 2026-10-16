@@ -1,20 +1,19 @@
 // ========================================================
-// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO HUB» (v7.0.0)
+// js/phone-m.js — СОЦИАЛЬНАЯ СЕТЬ & P2P БИРЖА «M+ PRO HUB» (v7.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v7.1.0 (SPRINT 1 — КОМПАКТНЫЙ P2P ЧАТ):
+//   - Убраны кнопки тактик (-3% / -7% / -12%) — дублировали оффер
+//   - Компактная строка ввода: [поле] [💰 Цена] [➤]
+//   - Кнопка «Предложить цену» — вызывает openCustomP2POfferPrompt
+//   - Кнопка «Отправить» — квадратная 40×40
+//   - Скрыт блок быстрых фраз в P2P (оставлен в NPC)
+//   - Фикс: input теперь type="text" + .chat-input для корректного ввода
 // ⭐ v7.0.0 (РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ):
-//   - P2POffersManager интеграция (создание, принятие, counter, отмена)
+//   - P2POffersManager интеграция
 //   - Экран ожидания ответа продавца (таймер 30 мин)
-//   - Экран встречного предложения (принять/своё/отказ)
+//   - Экран встречного предложения
 //   - Экран принятого оффера → ДКП
-//   - Новая подвкладка «💬 Офферы» в разделе Торг (входящие продавцу)
-//   - Модалка ответа на входящий оффер (продавец)
-//   - Автоподписки RealtimeManager на p2pOffers
-//   - Новая логика executeChatHaggle для P2P (createOffer)
-//   - Новая логика dealAcceptFromChat для P2P (acceptOffer)
-//   - EventBus-подписки (p2p:offer_accepted и др.) для мгновенного UI
-// ⭐ v6.0.0:
-//   - RealtimeManager, EventBus, MoneyManager, SafeState
-//   - P2P покупка с каскадом Склад → Парковка → Гараж
+//   - Новая подвкладка «💬 Офферы» в разделе Торг
 // ========================================================
 
 if (typeof window.BUSINESS_TITLE_STYLES === 'undefined') {
@@ -31,19 +30,19 @@ const AppM = {
     selectedListingType: 'cars',
     selectedItemIndex: null,
 
-    // ⭐ v7.0.0: состояние P2P торга
-    activeP2POfferId: null,       // какой оффер сейчас открыт
-    activeP2POffer: null,          // данные оффера
-    _p2pOfferSubCallback: null,    // сохранённый unsubscribe от RealtimeManager
-    _p2pTimerInterval: null,       // локальный таймер до истечения оффера
+    // P2P состояние
+    activeP2POfferId: null,
+    activeP2POffer: null,
+    _p2pOfferSubCallback: null,
+    _p2pTimerInterval: null,
 
-    // Для вкладки друзей
+    // Друзья
     friendsSubTab: 'friends',
 
-    // Для вкладки трейда
+    // Trade
     tradeSubTab: 'incoming',
 
-    // Защита от двойных кликов
+    // Защита
     _buyPending: false,
     _publishPending: false,
     _offerCreatePending: false,
@@ -51,8 +50,6 @@ const AppM = {
 
     init() {
         this.syncSalesLotBuyersToMessages();
-
-        // ⭐ v7.0.0: глобальная подписка на EventBus для UI реакций
         this._bindP2PEvents();
     },
 
@@ -63,7 +60,6 @@ const AppM = {
         if (!window.EventBus) return;
 
         window.EventBus.on('p2p:incoming_offer', () => {
-            // Продавцу пришёл новый оффер → обновить бейдж и список
             this._updateMPlusBadge();
             if (this.activeTab === 'trade' && this.tradeSubTab === 'p2p_offers') {
                 this._refreshP2PIncomingList();
@@ -71,16 +67,13 @@ const AppM = {
         });
 
         window.EventBus.on('p2p:offer_accepted', (payload) => {
-            // Если это наш оффер (мы покупатель) → показать экран ДКП
             if (payload?.offerId === this.activeP2POfferId) {
-                // UI обновится через realtime-подписку
                 this._refreshConversation();
             }
         });
     },
 
     _updateMPlusBadge() {
-        // Обновить бейдж на иконке M+ — количество непрочитанных
         try {
             const badge = document.getElementById('phoneAppSmsBadge');
             if (badge) {
@@ -118,7 +111,7 @@ const AppM = {
 
         const myUid = String(window.state?.player?.uid || window.tgUserId || "");
 
-        // Подписка на лоты (только на вкладке 'market')
+        // Подписка на лоты
         if (this.activeTab === 'market') {
             try {
                 window.RealtimeManager.subscribe('lots', null, (lots) => {
@@ -145,7 +138,7 @@ const AppM = {
             }
         }
 
-        // Подписка на уведомления (на вкладке 'chats')
+        // Подписка на уведомления
         if (this.activeTab === 'chats' && myUid) {
             try {
                 window.RealtimeManager.subscribe('notifications', null, () => {
@@ -157,11 +150,10 @@ const AppM = {
             }
         }
 
-        // Подписка на сообщения диалога (на вкладке с активным диалогом)
+        // Подписка на сообщения диалога (только NPC)
         if (this.activeDialogId) {
             const msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
             if (msg && !msg.isP2PMarket) {
-                // Только для NPC-чатов
                 const dialogId = msg.dialogId || msg.id;
                 try {
                     window.RealtimeManager.subscribe('chat', dialogId, (messages) => {
@@ -186,7 +178,7 @@ const AppM = {
             }
         }
 
-        // Подписка на trade offers (на вкладке 'trade' и sub-tab 'incoming' или 'outgoing')
+        // Подписка на трейд-офферы
         if (this.activeTab === 'trade' && myUid &&
             (this.tradeSubTab === 'incoming' || this.tradeSubTab === 'outgoing')) {
             try {
@@ -199,7 +191,7 @@ const AppM = {
             }
         }
 
-        // ⭐ v7.0.0: подписка на входящие P2P офферы (на вкладке 'trade' и sub-tab 'p2p_offers')
+        // Подписка на входящие P2P офферы
         if (this.activeTab === 'trade' && this.tradeSubTab === 'p2p_offers' && myUid) {
             try {
                 window.RealtimeManager.subscribe('p2pOffersIncoming', null, (offers) => {
@@ -213,7 +205,7 @@ const AppM = {
             }
         }
 
-        // Подписка на дружбы (на вкладке 'friends')
+        // Подписка на дружбы
         if (this.activeTab === 'friends' && myUid) {
             try {
                 window.RealtimeManager.subscribe('friendships', null, (pending) => {
@@ -233,14 +225,12 @@ const AppM = {
             window.RealtimeManager.unsubscribeChannel('chat');
             window.RealtimeManager.unsubscribeChannel('tradeOffers');
             window.RealtimeManager.unsubscribeChannel('friendships');
-            // ⭐ v7.0.0
             if (this.activeP2POfferId) {
                 window.RealtimeManager.unsubscribe('p2pOffers', this.activeP2POfferId);
             }
             window.RealtimeManager.unsubscribeChannel('p2pOffersIncoming');
         }
 
-        // ⭐ v7.0.0: очистка локального таймера
         if (this._p2pTimerInterval) {
             clearInterval(this._p2pTimerInterval);
             this._p2pTimerInterval = null;
@@ -278,7 +268,6 @@ const AppM = {
     render(container) {
         if (!container) return;
 
-        // Отписываемся от предыдущих подписок перед перерисовкой
         this.destroy();
 
         if (this.activeDialogId) {
@@ -392,7 +381,6 @@ const AppM = {
         return (window.state.player?.incomingTradeOffers || []).length;
     },
 
-    // ⭐ v7.0.0
     _getPendingP2POffersCount() {
         return Number(window.state?.player?.pendingP2POffersCount) || 0;
     },
@@ -455,7 +443,6 @@ const AppM = {
             }
 
             if (isP2P) {
-                // Для P2P чатов — показываем цену лота
                 priceText = `${Number(carData.price || 0).toLocaleString()} ₽`;
             } else if (liveLot) {
                 let b = liveLot.currentBuyer || liveLot.buyer;
@@ -471,7 +458,6 @@ const AppM = {
 
             let senderLabel = isP2P ? "Продавец P2P:" : "Покупатель:";
 
-            // ⭐ v7.0.0: проверяем активный оффер для этого лота
             let activeOfferBadge = '';
             if (isP2P && m.p2pId) {
                 const activeOffer = this._getActiveOfferForLot(m.p2pId);
@@ -521,7 +507,6 @@ const AppM = {
         }).join('');
     },
 
-    // ⭐ v7.0.0: поиск активного оффера по lotId для UI
     _getActiveOfferForLot(lotId) {
         if (!lotId) return null;
         try {
@@ -534,7 +519,7 @@ const AppM = {
     },
 
     // ====================================================
-    // 2. ЭКРАН ДИАЛОГА (разделение P2P и NPC)
+    // 2. ЭКРАН ДИАЛОГА
     // ====================================================
     renderConversationScreen(container) {
         let msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
@@ -547,21 +532,18 @@ const AppM = {
         msg.unread = false;
         msg.viewed = true;
 
-        // ⭐ v7.0.0: если это P2P — отдельный рендер
         if (msg.isP2PMarket) {
             this.renderP2PConversationScreen(container, msg);
             return;
         }
 
-        // === NPC-покупатель (старая логика) ===
         this.renderNPCConversationScreen(container, msg);
     },
 
     // ====================================================
-    // 2.1. NPC-ДИАЛОГ (старая логика из v6.0.0)
+    // 2.1. NPC-ДИАЛОГ (старая логика)
     // ====================================================
     renderNPCConversationScreen(container, msg) {
-        let isP2P = false;
         let slot = null;
         if (msg.carUid) slot = this.findLotByUid(msg.carUid);
         if (!slot && msg.carIndex !== undefined && window.state.salesLot?.[msg.carIndex]) {
@@ -683,20 +665,47 @@ const AppM = {
     },
 
     // ====================================================
-    // 2.2. ⭐ v7.0.0: P2P ДИАЛОГ (новый UI)
+    // ⭐ v7.1.0: КОМПАКТНАЯ СТРОКА ВВОДА ДЛЯ P2P
+    // ====================================================
+    _renderP2PCompactComposer(msgId) {
+        return `
+            <div class="p2p-compact-composer">
+                <input 
+                    type="text" 
+                    id="mP2PChatInput" 
+                    class="chat-input p2p-compact-input" 
+                    placeholder="Написать сообщение..." 
+                    maxlength="200"
+                    autocomplete="off"
+                    onkeydown="if(event.key==='Enter'){AppM.sendP2PChatMessage('${msgId}');}">
+                <button 
+                    onclick="AppM.openCustomP2POfferPromptForDialog('${msgId}')" 
+                    class="p2p-compact-btn p2p-compact-btn-price" 
+                    title="Предложить свою цену">
+                    <i class="fa-solid fa-money-bill-wave"></i>
+                </button>
+                <button 
+                    onclick="AppM.sendP2PChatMessage('${msgId}')" 
+                    class="p2p-compact-btn p2p-compact-btn-send" 
+                    title="Отправить сообщение">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        `;
+    },
+
+    // ====================================================
+    // 2.2. P2P ДИАЛОГ
     // ====================================================
     renderP2PConversationScreen(container, msg) {
-        // Проверяем — есть ли активный оффер от меня (покупателя) для этого лота
         const lotId = msg.p2pId;
         const myActiveOffer = this._getActiveOfferForLot(lotId);
 
         if (myActiveOffer) {
-            // Есть активный оффер — показываем экран торга
             this.activeP2POfferId = myActiveOffer.id || myActiveOffer.offerId;
             this.activeP2POffer = myActiveOffer;
             this._renderActiveP2POfferScreen(container, msg, myActiveOffer);
         } else {
-            // Нет активного оффера — показываем экран "сделать предложение"
             this._renderP2PStartScreen(container, msg);
         }
     },
@@ -710,11 +719,6 @@ const AppM = {
         let rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
         let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         let fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(car.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
-
-        // Предлагаемые варианты цен
-        const offer3 = Math.round(lotPrice * 0.97 / 1000) * 1000;
-        const offer7 = Math.round(lotPrice * 0.93 / 1000) * 1000;
-        const offer12 = Math.round(lotPrice * 0.88 / 1000) * 1000;
 
         const myCash = window.state?.player?.cash || 0;
 
@@ -754,67 +758,33 @@ const AppM = {
                         Продавец увидит ваш оффер в реальном времени и сможет принять его, отклонить или предложить встречную цену. У вас 30 минут на ответ.
                     </div>
 
-                    <div class="grid-1 mb-2" style="display:flex; flex-direction:column; gap:6px;">
-                        <button onclick="AppM.sendP2POffer(${offer3}, 'Скинь 3% на дорогу и бензин, забираю сразу!')" class="btn btn-dark btn-sm text-left" style="padding:9px 10px; min-height:48px; border-color:var(--green);" ${myCash < offer3 ? 'disabled' : ''}>
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <div class="font-bold color-green text-xs" style="font-size:11px;">-3% НА ДОРОГУ</div>
-                                    <div class="sub-label" style="font-size:8.5px;">Символическая уступка</div>
-                                </div>
-                                <div class="text-right">
-                                    <b class="color-green" style="font-size:12px;">${offer3.toLocaleString()} ₽</b>
-                                </div>
-                            </div>
-                        </button>
-
-                        <button onclick="AppM.sendP2POffer(${offer7}, 'Посмотрел рынок: давай подвинься на 7%, оформляем ДКП!')" class="btn btn-dark btn-sm text-left" style="padding:9px 10px; min-height:48px; border-color:var(--amber);" ${myCash < offer7 ? 'disabled' : ''}>
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <div class="font-bold color-amber text-xs" style="font-size:11px;">-7% ПО ФАКТУ</div>
-                                    <div class="sub-label" style="font-size:8.5px;">Аргументированный торг</div>
-                                </div>
-                                <div class="text-right">
-                                    <b class="color-amber" style="font-size:12px;">${offer7.toLocaleString()} ₽</b>
-                                </div>
-                            </div>
-                        </button>
-
-                        <button onclick="AppM.sendP2POffer(${offer12}, 'Деньги на руках. Минус 12% и жму выкуп без лишних слов!')" class="btn btn-dark btn-sm text-left" style="padding:9px 10px; min-height:48px; border-color:var(--red);" ${myCash < offer12 ? 'disabled' : ''}>
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div>
-                                    <div class="font-bold color-red text-xs" style="font-size:11px;">-12% ЖЁСТКО</div>
-                                    <div class="sub-label" style="font-size:8.5px;">Наглое давление</div>
-                                </div>
-                                <div class="text-right">
-                                    <b class="color-red" style="font-size:12px;">${offer12.toLocaleString()} ₽</b>
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-
-                    <button onclick="AppM.openCustomP2POfferPrompt('${lotId}')" class="btn btn-cyan btn-sm w-full mt-1" style="font-size:10px;">
-                        <i class="fa-solid fa-pen mr-1"></i> Предложить свою цену
+                    <button onclick="AppM.openCustomP2POfferPrompt('${lotId}')" class="btn btn-cyan w-full font-bold" style="padding:12px 0; font-size:12px;">
+                        <i class="fa-solid fa-pen-to-square mr-1"></i> Предложить свою цену
                     </button>
+
+                    <div class="p-2 mt-2" style="background:#050914; border-radius:8px; border:1px solid rgba(0,242,254,0.2);">
+                        <div class="flex-between" style="font-size:9.5px;">
+                            <span class="sub-label">Ваш баланс:</span>
+                            <b class="${myCash >= lotPrice ? 'color-green' : 'color-red'}">${myCash.toLocaleString()} ₽</b>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="glass-card p-2" style="background:#090e18;">
-                    <b class="text-xs color-cyan mb-1 block" style="font-size:10px;">💬 Сообщения в чате</b>
-                    <div id="mChatScrollBox" class="chat-thread-container" style="max-height:150px; padding:6px; background:#04070e; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+                <div class="glass-card p-2" style="background:#090e18; flex:1; display:flex; flex-direction:column; min-height:200px;">
+                    <b class="text-xs color-cyan mb-2 block" style="font-size:10px;">💬 Сообщения в чате</b>
+                    <div id="mChatScrollBox" class="chat-thread-container" style="flex:1; max-height:none; padding:6px; background:#04070e; border-radius:8px; border:1px solid rgba(255,255,255,0.06); overflow-y:auto;">
                         ${(msg.chatHistory || []).map(item => `
                             <div class="chat-msg ${item.from === 'me' ? 'msg-player' : 'msg-seller'}" style="margin-bottom:6px; font-size:10px;">
                                 ${item.text}
                             </div>
                         `).join('')}
                     </div>
-                    <div class="chat-compose-box mt-2" style="display:flex; gap:6px; align-items:center;">
-                        <input type="text" id="mP2PChatInput" class="chat-input" placeholder="Написать продавцу..." maxlength="200" style="flex:1; font-size:10px; padding:6px 8px;">
-                        <button onclick="AppM.sendP2PChatMessage('${msg.id}')" class="chat-send-btn btn btn-cyan btn-sm" style="min-width:40px; padding:6px 10px;">
-                            <i class="fa-solid fa-paper-plane"></i>
-                        </button>
+                    <div class="mt-2">
+                        ${this._renderP2PCompactComposer(msg.id)}
                     </div>
                 </div>
 
-                <button onclick="AppM.closeDialog()" class="btn btn-dark w-full" style="margin-top:auto;">
+                <button onclick="AppM.closeDialog()" class="btn btn-dark w-full" style="flex-shrink:0;">
                     <i class="fa-solid fa-arrow-left mr-1"></i> Вернуться к бирже
                 </button>
             </div>
@@ -833,7 +803,7 @@ const AppM = {
         let carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         let fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(car.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
 
-        // ==== PENDING (мы ждём продавца) ====
+        // ==== PENDING ====
         if (status === 'pending') {
             const myOffer = Number(offer.offeredPrice || 0);
             const diff = lotPrice - myOffer;
@@ -892,24 +862,21 @@ const AppM = {
                         ` : ''}
                     </div>
 
-                    <button onclick="AppM.cancelActiveP2POffer()" class="btn btn-danger btn-sm w-full">
+                    <button onclick="AppM.cancelActiveP2POffer()" class="btn btn-danger btn-sm w-full" style="flex-shrink:0;">
                         <i class="fa-solid fa-xmark mr-1"></i> ОТМЕНИТЬ ТОРГ
                     </button>
 
-                    <div class="glass-card p-2" style="background:#090e18;">
-                        <b class="text-xs color-cyan mb-1 block" style="font-size:10px;">💬 Чат с продавцом</b>
-                        <div id="mChatScrollBox" class="chat-thread-container" style="max-height:130px; padding:6px; background:#04070e; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+                    <div class="glass-card p-2" style="background:#090e18; flex:1; display:flex; flex-direction:column; min-height:180px;">
+                        <b class="text-xs color-cyan mb-2 block" style="font-size:10px;">💬 Чат с продавцом</b>
+                        <div id="mChatScrollBox" class="chat-thread-container" style="flex:1; max-height:none; padding:6px; background:#04070e; border-radius:8px; border:1px solid rgba(255,255,255,0.06); overflow-y:auto;">
                             ${(msg.chatHistory || []).map(item => `
                                 <div class="chat-msg ${item.from === 'me' ? 'msg-player' : 'msg-seller'}" style="margin-bottom:6px; font-size:10px;">
                                     ${item.text}
                                 </div>
                             `).join('')}
                         </div>
-                        <div class="chat-compose-box mt-2" style="display:flex; gap:6px; align-items:center;">
-                            <input type="text" id="mP2PChatInput" class="chat-input" placeholder="Написать продавцу..." maxlength="200" style="flex:1; font-size:10px; padding:6px 8px;">
-                            <button onclick="AppM.sendP2PChatMessage('${msg.id}')" class="chat-send-btn btn btn-cyan btn-sm" style="min-width:40px; padding:6px 10px;">
-                                <i class="fa-solid fa-paper-plane"></i>
-                            </button>
+                        <div class="mt-2">
+                            ${this._renderP2PCompactComposer(msg.id)}
                         </div>
                     </div>
                 </div>
@@ -918,7 +885,7 @@ const AppM = {
             this._startP2POfferTimer();
         }
 
-        // ==== COUNTERED (продавец предложил встречную) ====
+        // ==== COUNTERED ====
         else if (status === 'countered') {
             const counterPrice = Number(offer.counterPrice || 0);
             const myOffer = Number(offer.offeredPrice || 0);
@@ -978,16 +945,13 @@ const AppM = {
                             <button onclick="AppM.rejectP2PCounter()" class="btn btn-danger btn-sm w-full" style="padding:9px 0; font-size:10.5px;">
                                 ✕ ОТКАЗАТЬСЯ ОТ СДЕЛКИ
                             </button>
-                            <button onclick="AppM.openCounterBackPrompt()" class="btn btn-dark btn-sm w-full" style="padding:9px 0; font-size:10.5px;">
-                                <i class="fa-solid fa-arrows-rotate mr-1"></i> ПРЕДЛОЖИТЬ СВОЮ ЦЕНУ
-                            </button>
                         </div>
                     </div>
                 </div>
             `;
         }
 
-        // ==== ACCEPTED (сделка согласована) ====
+        // ==== ACCEPTED ====
         else if (status === 'accepted') {
             const finalPrice = Number(offer.currentPrice || offer.counterPrice || offer.offeredPrice || 0);
 
@@ -1084,7 +1048,6 @@ const AppM = {
             `;
         }
 
-        // ⭐ Подписка на изменения оффера в реальном времени
         this._subscribeToActiveOffer();
     },
 
@@ -1115,7 +1078,6 @@ const AppM = {
         }, 1000);
     },
 
-    // ⭐ v7.0.0: подписка на текущий активный оффер
     _subscribeToActiveOffer() {
         if (!this.activeP2POfferId || !window.RealtimeManager) return;
 
@@ -1123,11 +1085,9 @@ const AppM = {
             window.RealtimeManager.subscribe('p2pOffers', this.activeP2POfferId, (offer) => {
                 if (!offer) return;
 
-                // Сохраняем в стейт
                 this.activeP2POffer = offer;
                 this._saveMyP2POffer(offer);
 
-                // Перерисовываем экран в зависимости от статуса
                 const msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
                 const container = document.getElementById('phoneAppContainer');
                 if (msg && container) {
@@ -1139,7 +1099,6 @@ const AppM = {
         }
     },
 
-    // ⭐ v7.0.0: сохранить оффер в локальный список
     _saveMyP2POffer(offer) {
         if (!window.state.player) window.state.player = {};
         if (!Array.isArray(window.state.player._myP2POffers)) {
@@ -1160,22 +1119,21 @@ const AppM = {
         try {
             const msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
             if (!msg || !msg.p2pId) {
-                return showToast('❌ Ошибка: лот не найден');
+                return showToast('❌ Ошибка: лот не найден', 'error');
             }
 
             if (!window.P2POffersManager) {
-                return showToast('⚠️ Модуль P2P торга не загружен');
+                return showToast('⚠️ Модуль P2P торга не загружен', 'warning');
             }
 
             const res = await window.P2POffersManager.createOffer(msg.p2pId, price, message);
 
             if (!res.success) {
-                showToast(`❌ ${res.error}`);
+                showToast(`❌ ${res.error}`, 'error');
                 if (window.AudioFx) window.AudioFx.play('error');
                 return;
             }
 
-            // Сохраняем оффер локально
             this.activeP2POfferId = res.offerId;
             this.activeP2POffer = res.offer;
             this._saveMyP2POffer(res.offer);
@@ -1186,21 +1144,27 @@ const AppM = {
                 window.AudioFx.haptic('success');
             }
 
-            showToast(`📤 Оффер отправлен: ${price.toLocaleString()} ₽`);
+            showToast(`📤 Оффер отправлен: ${price.toLocaleString()} ₽`, 'success');
 
-            // Перерисовываем экран
             const container = document.getElementById('phoneAppContainer');
             if (container) this.render(container);
 
         } catch (e) {
             console.error('[AppM] sendP2POffer error:', e);
-            showToast(`❌ Ошибка: ${e.message}`);
+            showToast(`❌ Ошибка: ${e.message}`, 'error');
         } finally {
             this._offerCreatePending = false;
         }
     },
 
-    // ⭐ v7.0.0: модалка ввода своей цены
+    // ⭐ v7.1.0: новый метод для вызова из компактной кнопки «💰»
+    openCustomP2POfferPromptForDialog(msgId) {
+        this.activeDialogId = msgId;
+        const msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === msgId);
+        if (!msg || !msg.p2pId) return showToast('❌ Лот не найден', 'error');
+        this.openCustomP2POfferPrompt(msg.p2pId);
+    },
+
     openCustomP2POfferPrompt(lotId) {
         const msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
         if (!msg) return;
@@ -1217,17 +1181,16 @@ const AppM = {
         const price = parseInt(priceStr, 10);
 
         if (isNaN(price) || price < 1000) {
-            return showToast('❌ Некорректная цена (мин. 1,000 ₽)');
+            return showToast('❌ Некорректная цена (мин. 1,000 ₽)', 'error');
         }
 
         if (price > lotPrice) {
-            return showToast(`❌ Цена не может быть выше ${lotPrice.toLocaleString()} ₽`);
+            return showToast(`❌ Цена не может быть выше ${lotPrice.toLocaleString()} ₽`, 'error');
         }
 
         this.sendP2POffer(price, `«Даю ${price.toLocaleString()} ₽ прямо сейчас, оформляем ДКП!»`);
     },
 
-    // ⭐ v7.0.0: сообщение в P2P чат
     sendP2PChatMessage(msgId) {
         const input = document.getElementById('mP2PChatInput');
         if (!input || !input.value.trim()) return;
@@ -1241,7 +1204,7 @@ const AppM = {
         if (!msg.chatHistory) msg.chatHistory = [];
         msg.chatHistory.push({ from: 'me', text: text });
 
-        // Отправляем в Firestore через ChatMessages
+        // Отправка в Firestore через ChatMessages
         if (window.FB_Bridge?.ChatMessages?.sendMessage && msg.dialogId) {
             window.FB_Bridge.ChatMessages.sendMessage({
                 dialogId: msg.dialogId,
@@ -1260,7 +1223,6 @@ const AppM = {
         }
     },
 
-    // ⭐ v7.0.0: отмена P2P оффера
     async cancelActiveP2POffer() {
         if (!this.activeP2POfferId) return;
         if (!confirm('Отменить торг? Продавец увидит, что вы вышли из переговоров.')) return;
@@ -1270,20 +1232,18 @@ const AppM = {
         try {
             const res = await window.P2POffersManager.cancelOffer(this.activeP2POfferId, 'Отменено покупателем');
             if (!res.success) {
-                showToast(`❌ ${res.error}`);
+                showToast(`❌ ${res.error}`, 'error');
                 return;
             }
 
-            // Убираем из локального списка
             this._removeMyP2POffer(this.activeP2POfferId);
             this.activeP2POfferId = null;
             this.activeP2POffer = null;
 
             if (typeof saveState === 'function') saveState();
             if (window.AudioFx) window.AudioFx.play('tick');
-            showToast('⛔ Торг отменён');
+            showToast('⛔ Торг отменён', 'warning');
 
-            // Перерисовываем
             const container = document.getElementById('phoneAppContainer');
             if (container) this.render(container);
 
@@ -1292,7 +1252,6 @@ const AppM = {
         }
     },
 
-    // ⭐ v7.0.0: принять встречную цену продавца
     async acceptP2PCounter() {
         if (!this.activeP2POfferId) return;
         if (this._offerRespondPending) return;
@@ -1301,24 +1260,20 @@ const AppM = {
         try {
             const res = await window.P2POffersManager.acceptOffer(this.activeP2POfferId);
             if (!res.success) {
-                showToast(`❌ ${res.error}`);
+                showToast(`❌ ${res.error}`, 'error');
                 return;
             }
 
-            showToast(`✅ Согласовано за ${res.price.toLocaleString()} ₽!`);
+            showToast(`✅ Согласовано за ${res.price.toLocaleString()} ₽!`, 'success');
             if (window.AudioFx) {
                 window.AudioFx.play('win');
                 window.AudioFx.haptic('success');
             }
-
-            // UI обновится через подписку (см. _subscribeToActiveOffer)
-
         } finally {
             this._offerRespondPending = false;
         }
     },
 
-    // ⭐ v7.0.0: отклонить встречную цену продавца
     async rejectP2PCounter() {
         if (!this.activeP2POfferId) return;
         if (!confirm('Отклонить встречную цену? Продавец увидит ваш отказ.')) return;
@@ -1328,76 +1283,39 @@ const AppM = {
         try {
             const res = await window.P2POffersManager.rejectOffer(this.activeP2POfferId);
             if (!res.success) {
-                showToast(`❌ ${res.error}`);
+                showToast(`❌ ${res.error}`, 'error');
                 return;
             }
 
-            showToast('❌ Встречная цена отклонена');
-
-            // UI обновится через подписку
-
+            showToast('❌ Встречная цена отклонена', 'warning');
         } finally {
             this._offerRespondPending = false;
         }
     },
 
-    // ⭐ v7.0.0: предложить свою цену в ответ на counter продавца
-    openCounterBackPrompt() {
-        if (!this.activeP2POffer) return;
-
-        const counterPrice = Number(this.activeP2POffer.counterPrice || 0);
-        const myOffer = Number(this.activeP2POffer.offeredPrice || 0);
-
-        if (counterPrice <= myOffer) {
-            return showToast('⚠️ Некорректное состояние оффера');
-        }
-
-        const suggestedPrice = Math.round((myOffer + counterPrice) / 2 / 1000) * 1000;
-
-        const priceStr = prompt(
-            `Встречная цена продавца: ${counterPrice.toLocaleString()} ₽\nВаш предыдущий оффер: ${myOffer.toLocaleString()} ₽\n\nВведите новую цену (не выше ${counterPrice.toLocaleString()} ₽, не ниже ${myOffer.toLocaleString()} ₽):`,
-            String(suggestedPrice)
-        );
-
-        if (!priceStr) return;
-        const price = parseInt(priceStr, 10);
-
-        if (isNaN(price) || price < myOffer || price >= counterPrice) {
-            return showToast(`❌ Цена должна быть в диапазоне ${myOffer.toLocaleString()} — ${(counterPrice - 1000).toLocaleString()} ₽`);
-        }
-
-        // Отменяем старый оффер и создаём новый (или пробуем через createOffer — но т.к. активный есть, он заблокирует)
-        // Проще — предложить продавцу обратно через cancelOffer + createOffer
-        showToast(`⚠️ Функция обратного counter временно недоступна. Используйте кнопки принять/отказаться.`);
-    },
-
-    // ⭐ v7.0.0: удалить оффер из локального списка
     _removeMyP2POffer(offerId) {
         if (!window.state?.player?._myP2POffers) return;
         window.state.player._myP2POffers = window.state.player._myP2POffers.filter(o => o.id !== offerId);
     },
 
-    // ⭐ v7.0.0: перезапуск торга после reject/expired
     retryP2POffer() {
-        // Закрываем текущий оффер и обновляем экран
         this.activeP2POfferId = null;
         this.activeP2POffer = null;
         const container = document.getElementById('phoneAppContainer');
         if (container) this.render(container);
     },
 
-    // ⭐ v7.0.0: финальное подтверждение сделки (после ACCEPTED)
     async confirmP2PDeal() {
         if (this._buyPending) return;
 
         const msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
         if (!msg || !msg.p2pId) {
-            return showToast('❌ Ошибка: диалог не найден');
+            return showToast('❌ Ошибка: диалог не найден', 'error');
         }
 
         const offer = this.activeP2POffer;
         if (!offer || offer.status !== 'accepted') {
-            return showToast('❌ Оффер ещё не принят');
+            return showToast('❌ Оффер ещё не принят', 'error');
         }
 
         const finalPrice = Number(offer.currentPrice || offer.counterPrice || offer.offeredPrice || 0);
@@ -1406,11 +1324,10 @@ const AppM = {
         this._buyPending = true;
 
         try {
-            // Загружаем лот из Firestore (fallback если нет в локальном кэше)
             let lot = (window.state.p2pMarketListings || []).find(l => l.id === lotId);
             if (!lot && window.FB_Bridge?.MarketLots?.fetchLots) {
                 try {
-                    showToast('⏳ Синхронизация лота...');
+                    showToast('⏳ Синхронизация лота...', 'info');
                     const remoteLots = await window.FB_Bridge.MarketLots.fetchLots(true);
                     lot = remoteLots.find(l => (l.lot_id || l.id) === lotId);
                     if (lot) {
@@ -1423,34 +1340,31 @@ const AppM = {
             }
 
             if (!lot) {
-                return showToast('❌ Лот больше не активен на бирже');
+                return showToast('❌ Лот больше не активен на бирже', 'error');
             }
 
             const myCash = window.state?.player?.cash || 0;
             if (myCash < finalPrice) {
-                return showToast(`❌ Не хватает ${(finalPrice - myCash).toLocaleString()} ₽`);
+                return showToast(`❌ Не хватает ${(finalPrice - myCash).toLocaleString()} ₽`, 'error');
             }
 
             const myUid = String(window.state.player?.uid || window.tgUserId || "");
             const sellerUid = String(lot.sellerId || "");
             if (sellerUid === myUid) {
-                return showToast('❌ Нельзя купить собственный лот');
+                return showToast('❌ Нельзя купить собственный лот', 'error');
             }
 
-            // Атомарная покупка через FB_Bridge
             if (window.FB_Bridge?.P2P?.buyLotAtomic) {
-                showToast('⏳ Оформление сделки...');
+                showToast('⏳ Оформление сделки...', 'info');
                 const profile = window.FB_Bridge.getProfile?.() || { id: myUid, name: window.state.player.name };
 
-                // ⭐ Передаём finalPrice (сторгованную цену), а не lot.price
                 const res = await window.FB_Bridge.P2P.buyLotAtomic(lotId, profile, myCash, finalPrice);
 
                 if (!res || !res.success) {
-                    return showToast(`❌ ${res?.error || 'Ошибка сделки'}`);
+                    return showToast(`❌ ${res?.error || 'Ошибка сделки'}`, 'error');
                 }
             }
 
-            // Списание денег
             if (window.MoneyManager) {
                 window.MoneyManager.spend(finalPrice, `P2P Покупка: ${lot.name}`);
             } else {
@@ -1460,7 +1374,6 @@ const AppM = {
                 }
             }
 
-            // Купленный лот → Склад (если есть бизнес) или Парковка
             const hasBiz = (window.state.businesses || []).some(b => b && b.level > 0);
             const itemData = lot.itemData || {};
 
@@ -1481,26 +1394,26 @@ const AppM = {
                     if (!window.state.player.warehouse) window.state.player.warehouse = { maxCars: 6, maxItems: 12, cars: [], items: [] };
                     window.state.player.warehouse.cars.push(carObj);
                     carObj.isStoredInWarehouse = true;
-                    showToast(`🚗 «${lot.name}» доставлен на Склад!`);
+                    showToast(`🚗 «${lot.name}» доставлен на Склад!`, 'success');
                 } else {
                     if (!window.state.player.paidParking) window.state.player.paidParking = { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 };
                     if (window.state.player.paidParking.cars.length >= window.state.player.paidParking.maxCars) {
                         const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
                         if ((window.state.garage?.length || 0) < maxSlots) {
                             window.state.garage.push(carObj);
-                            showToast(`🚗 «${lot.name}» доставлен в Гараж (склад переполнен)!`);
+                            showToast(`🚗 «${lot.name}» доставлен в Гараж (склад переполнен)!`, 'success');
                         } else {
                             if (window.MoneyManager) {
                                 window.MoneyManager.earn(finalPrice, `Возврат за переполненный склад: ${lot.name}`, { silent: true });
                             } else {
                                 window.state.player.cash += finalPrice;
                             }
-                            showToast(`⚠️ Нет места — деньги возвращены`);
+                            showToast(`⚠️ Нет места — деньги возвращены`, 'warning');
                         }
                     } else {
                         window.state.player.paidParking.cars.push(carObj);
                         carObj.isStoredInWarehouse = false;
-                        showToast(`🅿️ «${lot.name}» на Парковке (${window.state.player.paidParking.dailyRate} ₽/день)!`);
+                        showToast(`🅿️ «${lot.name}» на Парковке (${window.state.player.paidParking.dailyRate} ₽/день)!`, 'success');
                     }
                 }
                 if (typeof renderGarage === 'function') renderGarage();
@@ -1524,16 +1437,13 @@ const AppM = {
                 window.state.player.housingType = 'own';
             }
 
-            // Убираем лот из локального кэша
             window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l => l.id !== lotId);
 
-            // Помечаем оффер как completed
             if (window.P2POffersManager?.markCompleted) {
                 window.P2POffersManager.markCompleted(this.activeP2POfferId).catch(() => {});
             }
             this._removeMyP2POffer(this.activeP2POfferId);
 
-            // Убираем диалог с P2P (сделка закрыта)
             window.state.player.phoneMessages = window.state.player.phoneMessages.filter(m => m.id !== this.activeDialogId);
 
             if (typeof saveState === 'function') saveState();
@@ -1544,7 +1454,6 @@ const AppM = {
                 window.AudioFx.haptic('success');
             }
 
-            // Закрываем диалог и показываем вердикт
             this.activeDialogId = null;
             this.activeP2POfferId = null;
             this.activeP2POffer = null;
@@ -1558,20 +1467,19 @@ const AppM = {
                 );
             }
 
-            // Перерисовываем UI
             const c = document.getElementById('phoneAppContainer');
             if (c) this.render(c);
 
         } catch (e) {
             console.error('[AppM] confirmP2PDeal error:', e);
-            showToast(`❌ Ошибка: ${e.message}`);
+            showToast(`❌ Ошибка: ${e.message}`, 'error');
         } finally {
             this._buyPending = false;
         }
     },
 
     // ====================================================
-    // СОЗДАНИЕ P2P ЛОТА (продавцом)
+    // СОЗДАНИЕ P2P ЛОТА
     // ====================================================
     openCreateListingModal() {
         this.selectP2PListingType('cars');
@@ -1744,7 +1652,7 @@ const AppM = {
             let idx = this.selectedItemIndex;
 
             if (idx === null || idx === undefined || isNaN(price) || price <= 500) {
-                return showToast("Выберите объект и укажите цену!");
+                return showToast("Выберите объект и укажите цену!", 'warning');
             }
 
             let type = this.selectedListingType;
@@ -1762,7 +1670,7 @@ const AppM = {
 
             if (type === 'cars') {
                 let car = window.state.garage[idx];
-                if (!car) return showToast("Машина не найдена в гараже!");
+                if (!car) return showToast("Машина не найдена в гараже!", 'error');
                 if (typeof window.ensureCarIdentity === 'function') {
                     window.ensureCarIdentity(car);
                 }
@@ -1791,7 +1699,7 @@ const AppM = {
             } else if (type === 'business') {
                 let bizList = (window.state.businesses || []).filter(b => b && b.level > 0);
                 let b = bizList[idx];
-                if (!b) return showToast("Бизнес не найден!");
+                if (!b) return showToast("Бизнес не найден!", 'error');
                 newListing.name = b.customName || b.name;
                 newListing.itemData = {
                     bizId: b.id,
@@ -1812,11 +1720,11 @@ const AppM = {
 
             if (window.FB_Bridge?.MarketLots?.publishLot) {
                 try {
-                    showToast("Публикация в облако...");
+                    showToast("Публикация в облако...", 'info');
                     let pubRes = await window.FB_Bridge.MarketLots.publishLot(newListing, { id: myUid, name: myName });
                     if (pubRes && pubRes.lotId) newListing.id = pubRes.lotId;
                     if (pubRes && pubRes.success === false) {
-                        return showToast(`❌ ${pubRes.error || 'Ошибка публикации'}`);
+                        return showToast(`❌ ${pubRes.error || 'Ошибка публикации'}`, 'error');
                     }
                 } catch (e) {
                     console.warn("[P2P] Ошибка облачной публикации:", e);
@@ -1840,7 +1748,7 @@ const AppM = {
                 if (m) m.classList.remove('active');
             }
 
-            showToast("✓ Объект выставлен на биржу!");
+            showToast("✓ Объект выставлен на биржу!", 'success');
             this.render(document.getElementById('phoneAppContainer'));
         } finally {
             this._publishPending = false;
@@ -1889,20 +1797,19 @@ const AppM = {
             window.EventBus.emit('p2p:lot_cancelled', { lotId, itemType: lot.type });
         }
 
-        showToast("Лот снят с биржи и возвращён владельцу.");
+        showToast("Лот снят с биржи и возвращён владельцу.", 'info');
         this.render(document.getElementById('phoneAppContainer'));
     },
 
     // ====================================================
-    // СТАРЫЕ NPC-ФУНКЦИИ (СОХРАНЕНЫ)
+    // NPC-ФУНКЦИИ
     // ====================================================
     executeChatHaggle(msgId, percent, failRisk) {
         let msg = (window.state.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
 
-        // ⭐ v7.0.0: если это P2P — не запускаем NPC-логику, требуем правильный вызов
         if (msg.isP2PMarket) {
-            showToast('⚠️ Для P2P используйте кнопки предложений на экране торга');
+            showToast('⚠️ Для P2P используйте кнопки предложений на экране торга', 'warning');
             return;
         }
 
@@ -1911,7 +1818,7 @@ const AppM = {
         if (!slot && msg.carIndex !== undefined) slot = window.state.salesLot?.[msg.carIndex];
 
         if (!slot) {
-            showToast("⚠️ Лот больше не на площадке. Диалог закрыт.");
+            showToast("⚠️ Лот больше не на площадке. Диалог закрыт.", 'warning');
             this.deleteOrphanDialog(msgId);
             return;
         }
@@ -1919,7 +1826,7 @@ const AppM = {
         let buyer = slot?.currentBuyer || slot?.buyer;
         let currentPatience = buyer ? buyer.patience : (msg.patience !== undefined ? msg.patience : 4);
         if (currentPatience <= 0) {
-            return showToast("Собеседник больше не готов вести диалог!");
+            return showToast("Собеседник больше не готов вести диалог!", 'warning');
         }
 
         if (buyer) buyer.patience -= 1;
@@ -1941,7 +1848,7 @@ const AppM = {
 
             if (msg.patience <= 0 || roll < 10) {
                 msg.chatHistory.push({ from: 'them', text: "«С вами каши не сваришь. Сделки не будет!»" });
-                showToast("Собеседник прервал сделку!");
+                showToast("Собеседник прервал сделку!", 'error');
                 if (slot) {
                     slot.currentBuyer = null;
                     slot.buyer = null;
@@ -1967,7 +1874,7 @@ const AppM = {
 
             msg.chatHistory.push({ from: 'me', text: `Давай добавим +${delta.toLocaleString()} ₽ на дорогу!` });
             msg.chatHistory.push({ from: 'them', text: `«Ладно, твоя взяла! Накидываю +${delta.toLocaleString()} ₽, оформляем 🤝»` });
-            showToast("Успешный торг! Предложение выросло.");
+            showToast("Успешный торг! Предложение выросло.", 'success');
         }
 
         if (typeof saveState === 'function') saveState();
@@ -1983,19 +1890,17 @@ const AppM = {
             if (!msg) return;
 
             if (msg.isP2PMarket) {
-                // ⭐ v7.0.0: для P2P вызываем новый метод
-                showToast('⚠️ Для P2P используйте кнопку на экране торга');
+                showToast('⚠️ Для P2P используйте кнопку на экране торга', 'warning');
                 this._buyPending = false;
                 return;
             }
 
-            // === NPC логика (старая) ===
             let slot = null;
             if (msg.carUid) slot = this.findLotByUid(msg.carUid);
             if (!slot && msg.carIndex !== undefined) slot = window.state.salesLot?.[msg.carIndex];
 
             if (!slot) {
-                showToast("⚠️ Лот больше не на площадке.");
+                showToast("⚠️ Лот больше не на площадке.", 'warning');
                 this.deleteOrphanDialog(msgId);
                 return;
             }
@@ -2004,7 +1909,7 @@ const AppM = {
             let idx = window.state.salesLot.indexOf(slot);
 
             if (idx === -1) {
-                showToast("⚠️ Лот потерян.");
+                showToast("⚠️ Лот потерян.", 'error');
                 this.deleteOrphanDialog(msgId);
                 return;
             }
@@ -2045,7 +1950,6 @@ const AppM = {
         msg.unread = false;
         msg.viewed = true;
 
-        // ⭐ v7.0.0: если это P2P — пытаемся подтянуть активный оффер
         if (msg.isP2PMarket && msg.p2pId) {
             const activeOffer = this._getActiveOfferForLot(msg.p2pId);
             if (activeOffer) {
@@ -2062,7 +1966,6 @@ const AppM = {
     },
 
     closeDialog() {
-        // ⭐ v7.0.0: отписываемся от активного оффера
         if (this.activeP2POfferId && window.RealtimeManager) {
             window.RealtimeManager.unsubscribe('p2pOffers', this.activeP2POfferId);
         }
@@ -2080,7 +1983,7 @@ const AppM = {
     },
 
     // ====================================================
-    // P2P БИРЖА (старая логика, без изменений)
+    // P2P БИРЖА
     // ====================================================
     renderMarketScreen(container) {
         if (!container) return;
@@ -2114,9 +2017,9 @@ const AppM = {
 
     setMarketFilter(filter) {
         let pLvl = window.state.player?.level || 1;
-        if (filter === 'plates' && pLvl < 3) return showToast("Категория «Номера» с 3 уровня!");
-        if (filter === 'housing' && pLvl < 4) return showToast("Категория «Жильё» с 4 уровня!");
-        if (filter === 'business' && pLvl < 6) return showToast("Категория «Бизнес» с 6 уровня!");
+        if (filter === 'plates' && pLvl < 3) return showToast("Категория «Номера» с 3 уровня!", 'warning');
+        if (filter === 'housing' && pLvl < 4) return showToast("Категория «Жильё» с 4 уровня!", 'warning');
+        if (filter === 'business' && pLvl < 6) return showToast("Категория «Бизнес» с 6 уровня!", 'warning');
 
         this.marketFilter = filter;
         if (window.AudioFx) window.AudioFx.play('tick');
@@ -2238,7 +2141,7 @@ const AppM = {
         if (typeof openP2PDealModal === 'function') {
             openP2PDealModal(lot.id);
         } else {
-            showToast("⚠️ Модуль торга недоступен");
+            showToast("⚠️ Модуль торга недоступен", 'warning');
         }
     },
 
@@ -2248,7 +2151,7 @@ const AppM = {
 
         let myGarage = (window.state.garage || []).filter(c => c && typeof c === 'object' && !c.isPersonal);
         if (myGarage.length === 0) {
-            return showToast("⚠️ У вас нет машин для обмена!");
+            return showToast("⚠️ У вас нет машин для обмена!", 'warning');
         }
 
         let options = myGarage.map((c, i) => `<option value="${i}">${c.name} (${c.power || 100} л.с.)</option>`).join('');
@@ -2308,15 +2211,15 @@ const AppM = {
         let idx = parseInt(selectEl.value, 10);
         let myGarage = (window.state.garage || []).filter(c => c && typeof c === 'object' && !c.isPersonal);
         let myCar = myGarage[idx];
-        if (!myCar) return showToast("Машина не найдена!");
+        if (!myCar) return showToast("Машина не найдена!", 'error');
 
         let message = (msgEl?.value || '').trim();
 
         if (!window.FB_Bridge?.P2PTrade?.sendTradeOffer) {
-            return showToast("⚠️ Модуль обмена недоступен");
+            return showToast("⚠️ Модуль обмена недоступен", 'warning');
         }
 
-        showToast("⏳ Отправка предложения...");
+        showToast("⏳ Отправка предложения...", 'info');
 
         const res = await window.FB_Bridge.P2PTrade.sendTradeOffer(lot.sellerId, {
             myItem: {
@@ -2333,14 +2236,14 @@ const AppM = {
         if (res && res.success) {
             ModalManager.close('modalTradeOffer');
             if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
-            showToast(`✅ Предложение отправлено игроку ${lot.sellerName}!`);
+            showToast(`✅ Предложение отправлено игроку ${lot.sellerName}!`, 'success');
         } else {
-            showToast(`❌ Ошибка: ${res?.error || 'неизвестная'}`);
+            showToast(`❌ Ошибка: ${res?.error || 'неизвестная'}`, 'error');
         }
     },
 
     // ====================================================
-    // ⭐ v7.0.0: РАЗДЕЛ «СДЕЛКИ» — 3 ПОДВКЛАДКИ
+    // РАЗДЕЛ «СДЕЛКИ»
     // ====================================================
     renderTradeScreen(container) {
         if (!container) return;
@@ -2388,7 +2291,6 @@ const AppM = {
         this.tradeSubTab = sub;
         if (window.AudioFx) window.AudioFx.play('tick');
 
-        // Пересобираем подписки
         this.destroy();
         this._subscribeRealtime();
 
@@ -2398,12 +2300,10 @@ const AppM = {
             this._refreshTradeList();
         }
 
-        // Обновляем кнопки
         const container = document.getElementById('phoneAppContainer');
         if (container) this.render(container);
     },
 
-    // ---------- Старая логика трейд-офферов ----------
     async _refreshTradeList() {
         const box = document.getElementById('mTradeListBox');
         if (!box) return;
@@ -2487,7 +2387,6 @@ const AppM = {
         }).join('');
     },
 
-    // ---------- ⭐ v7.0.0: Входящие P2P офферы (продавцу) ----------
     async _refreshP2PIncomingList() {
         const box = document.getElementById('mTradeListBox');
         if (!box) return;
@@ -2508,7 +2407,6 @@ const AppM = {
             }
         }
 
-        // Сохраняем в стейт для бейджа
         if (window.state.player) {
             window.state.player._incomingP2POffers = offers;
             window.state.player.pendingP2POffersCount = offers.length;
@@ -2580,7 +2478,6 @@ const AppM = {
         }).join('');
     },
 
-    // ---------- Ответы продавца ----------
     async acceptIncomingOffer(offerId) {
         if (this._offerRespondPending) return;
         if (!confirm('Принять предложение покупателя?')) return;
@@ -2593,10 +2490,10 @@ const AppM = {
                     window.AudioFx.play('win');
                     window.AudioFx.haptic('success');
                 }
-                showToast(`✅ Согласовано за ${res.price.toLocaleString()} ₽`);
+                showToast(`✅ Согласовано за ${res.price.toLocaleString()} ₽`, 'success');
                 this._refreshP2PIncomingList();
             } else {
-                showToast(`❌ ${res.error}`);
+                showToast(`❌ ${res.error}`, 'error');
             }
         } finally {
             this._offerRespondPending = false;
@@ -2611,10 +2508,10 @@ const AppM = {
         try {
             const res = await window.P2POffersManager.rejectOffer(offerId);
             if (res.success) {
-                showToast('❌ Оффер отклонён');
+                showToast('❌ Оффер отклонён', 'warning');
                 this._refreshP2PIncomingList();
             } else {
-                showToast(`❌ ${res.error}`);
+                showToast(`❌ ${res.error}`, 'error');
             }
         } finally {
             this._offerRespondPending = false;
@@ -2626,7 +2523,7 @@ const AppM = {
 
         const offers = window.state.player?._incomingP2POffers || [];
         const offer = offers.find(o => (o.offerId || o.id) === offerId);
-        if (!offer) return showToast('Оффер не найден');
+        if (!offer) return showToast('Оффер не найден', 'error');
 
         const buyerOffer = Number(offer.offeredPrice || 0);
         const originalPrice = Number(offer.originalPrice || 0);
@@ -2640,7 +2537,7 @@ const AppM = {
         if (!priceStr) return;
         const price = parseInt(priceStr, 10);
         if (isNaN(price) || price <= buyerOffer || price > originalPrice) {
-            return showToast(`❌ Цена должна быть в диапазоне ${buyerOffer.toLocaleString()}—${originalPrice.toLocaleString()} ₽`);
+            return showToast(`❌ Цена должна быть в диапазоне ${buyerOffer.toLocaleString()}—${originalPrice.toLocaleString()} ₽`, 'error');
         }
 
         const msgStr = prompt('Сообщение покупателю (опционально):', '') || '';
@@ -2653,30 +2550,29 @@ const AppM = {
                     window.AudioFx.play('win');
                     window.AudioFx.haptic('success');
                 }
-                showToast(`🔄 Встречное предложение: ${price.toLocaleString()} ₽`);
+                showToast(`🔄 Встречное предложение: ${price.toLocaleString()} ₽`, 'success');
                 this._refreshP2PIncomingList();
             } else {
-                showToast(`❌ ${res.error}`);
+                showToast(`❌ ${res.error}`, 'error');
             }
         } finally {
             this._offerRespondPending = false;
         }
     },
 
-    // ---------- Старые обработчики трейд-офферов (без изменений) ----------
     async acceptTradeOffer(offerId) {
         if (!confirm("Принять предложение обмена?")) return;
-        if (!window.FB_Bridge?.P2PTrade?.acceptTradeOffer) return showToast("⚠️ Модуль недоступен");
+        if (!window.FB_Bridge?.P2PTrade?.acceptTradeOffer) return showToast("⚠️ Модуль недоступен", 'warning');
 
-        showToast("⏳ Обработка...");
+        showToast("⏳ Обработка...", 'info');
         const res = await window.FB_Bridge.P2PTrade.acceptTradeOffer(offerId);
 
         if (res && res.success) {
             if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
-            showToast("✅ Оффер принят!");
+            showToast("✅ Оффер принят!", 'success');
             this._refreshTradeList();
         } else {
-            showToast(`❌ Ошибка: ${res?.error || 'неизвестная'}`);
+            showToast(`❌ Ошибка: ${res?.error || 'неизвестная'}`, 'error');
         }
     },
 
@@ -2685,7 +2581,7 @@ const AppM = {
         if (!window.FB_Bridge?.P2PTrade?.rejectTradeOffer) return;
         const res = await window.FB_Bridge.P2PTrade.rejectTradeOffer(offerId);
         if (res && res.success) {
-            showToast("Оффер отклонён.");
+            showToast("Оффер отклонён.", 'info');
             this._refreshTradeList();
         }
     },
@@ -2695,13 +2591,13 @@ const AppM = {
         if (!window.FB_Bridge?.P2PTrade?.cancelTradeOffer) return;
         const res = await window.FB_Bridge.P2PTrade.cancelTradeOffer(offerId);
         if (res && res.success) {
-            showToast("Оффер отменён.");
+            showToast("Оффер отменён.", 'info');
             this._refreshTradeList();
         }
     },
 
     // ====================================================
-    // ДРУЗЬЯ (без изменений)
+    // ДРУЗЬЯ
     // ====================================================
     renderFriendsScreen(container) {
         if (!container) return;
@@ -2828,14 +2724,14 @@ const AppM = {
     },
 
     async acceptFriendRequest(fromUserId) {
-        if (!window.FB_Bridge?.Friendships?.acceptRequest) return showToast("⚠️ Модуль недоступен");
+        if (!window.FB_Bridge?.Friendships?.acceptRequest) return showToast("⚠️ Модуль недоступен", 'warning');
         const res = await window.FB_Bridge.Friendships.acceptRequest(fromUserId);
         if (res && res.success) {
             if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
-            showToast("✅ Заявка принята!");
+            showToast("✅ Заявка принята!", 'success');
             this._refreshFriendsList();
         } else {
-            showToast(`❌ ${res?.error || 'Ошибка'}`);
+            showToast(`❌ ${res?.error || 'Ошибка'}`, 'error');
         }
     },
 
@@ -2843,7 +2739,7 @@ const AppM = {
         if (!window.FB_Bridge?.Friendships?.declineRequest) return;
         const res = await window.FB_Bridge.Friendships.declineRequest(fromUserId);
         if (res && res.success) {
-            showToast("Заявка отклонена.");
+            showToast("Заявка отклонена.", 'info');
             this._refreshFriendsList();
         }
     },
@@ -2876,11 +2772,11 @@ const AppM = {
 
     removeFriend(friendUid, friendName) {
         if (!confirm(`Удалить ${friendName} из друзей?`)) return;
-        showToast("Функция удаления будет в следующем обновлении.");
+        showToast("Функция удаления будет в следующем обновлении.", 'info');
     },
 
     // ====================================================
-    // ВИЗИТКА (без изменений)
+    // ВИЗИТКА
     // ====================================================
     renderProfileScreen(container) {
         if (!container) return;
@@ -2986,4 +2882,4 @@ const AppM = {
 window.AppM = AppM;
 window.AppMessenger = AppM;
 
-console.log('[💬 phone-m v7.0.0] РЕАЛЬНЫЙ P2P ТОРГ: ожидание ответа, встречные офферы, подписка на изменения, входящие офферы для продавца ✓');
+console.log('[💬 phone-m v7.1.0] SPRINT 1: компактный P2P чат + убраны тактики торга + кнопка «💰 Предложить цену» ✓');
