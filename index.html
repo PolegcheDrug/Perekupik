@@ -147,9 +147,9 @@
 
         <div class="user-details">
           <div class="player-capsule-box">
+            <!-- ⭐ v4.3.0: только ник (уровень переехал в stats-row) -->
             <div class="user-name-row">
               <span id="playerName" data-text="Перекуп #777" class="player-name-text">Перекуп #777</span>
-              <span class="lvl-badge" id="playerLvl" style="display:none;">Ур. 1</span>
             </div>
             <div class="xp-bar-wrap" title="Прогресс опыта">
               <div class="xp-bar-fill" id="xpBar">
@@ -158,28 +158,44 @@
             </div>
           </div>
 
-          <div class="user-stats-row">
-            <div class="stat-pill stat-pill-conn" title="Теневые связи">
-              <i class="fa-solid fa-handshake"></i> <span id="connectionsText">1</span>
+          <!-- ⭐ v4.3.0: обёртка .user-stats-scroll для автовращения -->
+          <div class="user-stats-scroll">
+            <div class="user-stats-row" id="userStatsRow">
+
+              <!-- ⭐ v4.3.0: УРОВЕНЬ — первый пилл, крупный -->
+              <button type="button" class="stat-pill stat-pill-level" onclick="event.stopPropagation(); switchTab('tabProfile');" title="Уровень игрока">
+                <i class="fa-solid fa-crown"></i> <span id="playerLvl">Ур. 1</span>
+              </button>
+
+              <button type="button" class="stat-pill stat-pill-conn" onclick="event.stopPropagation(); switchTab('tabProfile');" title="Теневые связи">
+                <i class="fa-solid fa-handshake"></i> <span id="connectionsText">1</span>
+              </button>
+
+              <button type="button" class="stat-pill stat-pill-karma" onclick="event.stopPropagation(); switchTab('tabProfile');" title="Карма">
+                <i class="fa-solid fa-face-smile"></i> <span id="karmaText">50</span>
+              </button>
+
+              <button type="button" class="stat-pill stat-pill-garage" onclick="event.stopPropagation(); switchTab('tabGarage');" title="Вместимость автопарка">
+                <i class="fa-solid fa-warehouse"></i> <span id="garageHeaderSlots">0/2</span>
+              </button>
+
+              <button type="button" class="stat-pill stat-pill-note" onclick="event.stopPropagation(); switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты">
+                <i class="fa-solid fa-money-bill-wave"></i> <span id="starsAmount">15</span>
+              </button>
+
+              <button type="button" class="stat-pill stat-pill-superspin" onclick="event.stopPropagation(); switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('fortune'); }, 100);" title="Билеты СуперВилспина">
+                <i class="fa-solid fa-dharmachakra"></i> <span id="superSpinTicketsAmount">1</span>
+              </button>
+
+              <button type="button" class="stat-pill stat-pill-fuel" onclick="event.stopPropagation(); refuelAction('cash')" title="Заправить бак">
+                <i class="fa-solid fa-gas-pump"></i> <span id="fuelAmount">100</span><span class="res-max">/100</span>
+              </button>
+
+              <button type="button" class="stat-pill stat-pill-ticket" onclick="event.stopPropagation(); upgradeExpressCapacity()" title="Экспресс-талоны">
+                <i class="fa-solid fa-ticket"></i> <span id="ticketsAmount">25/25</span>
+              </button>
+
             </div>
-            <div class="stat-pill stat-pill-karma" title="Карма">
-              <i class="fa-solid fa-face-smile"></i> <span id="karmaText">50</span>
-            </div>
-            <div class="stat-pill stat-pill-garage" title="Вместимость автопарка" onclick="event.stopPropagation(); switchTab('tabGarage');">
-              <i class="fa-solid fa-warehouse"></i> <span id="garageHeaderSlots">0/2</span>
-            </div>
-            <button type="button" class="stat-pill stat-pill-note" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('bank'); }, 100);" title="Неоновые банкноты">
-              <i class="fa-solid fa-money-bill-wave"></i> <span id="starsAmount">15</span>
-            </button>
-            <button type="button" class="stat-pill stat-pill-superspin" onclick="switchTab('tabPhone'); setTimeout(() => { if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('fortune'); }, 100);" title="Билеты СуперВилспина">
-              <i class="fa-solid fa-dharmachakra"></i> <span id="superSpinTicketsAmount">1</span>
-            </button>
-            <button type="button" class="stat-pill stat-pill-fuel" onclick="refuelAction('cash')" title="Заправить бак">
-              <i class="fa-solid fa-gas-pump"></i> <span id="fuelAmount">100</span><span class="res-max">/100</span>
-            </button>
-            <button type="button" class="stat-pill stat-pill-ticket" onclick="upgradeExpressCapacity()" title="Экспресс-талоны">
-              <i class="fa-solid fa-ticket"></i> <span id="ticketsAmount">25/25</span>
-            </button>
           </div>
         </div>
       </div>
@@ -1211,7 +1227,7 @@
         'js/plates-manager.js',
         'js/notification-center.js',
         'js/realtime-manager.js',
-        'js/p2p-offers.js',           // ⭐ НОВЫЙ — реальный P2P торг между игроками
+        'js/p2p-offers.js',
         'js/theme-manager.js',
 
         // Данные
