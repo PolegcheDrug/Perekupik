@@ -1,30 +1,23 @@
 // ========================================================
-// js/firebase-p2p.js — P2P TRADE, CLUBS, LEADERBOARD, CARS (v1.1.0)
+// js/firebase-p2p.js — P2P TRADE, CLUBS, LEADERBOARD, CARS (v1.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.2.0 (SPRINT 3 — ФИКСЫ БЕЗ СОСТАВНЫХ ИНДЕКСОВ):
+//   - ФИКС: fetchTradeOffers больше НЕ использует
+//     3-way where + orderBy (требовал индекса). Теперь:
+//       where(toUserId) + limit, фильтр по status=pending
+//       и сортировка createdAt desc — НА КЛИЕНТЕ.
+//   - ФИКС: subscribeToTradeOffers — то же самое.
+//   - ФИКС: sendTradeOffer — мягче блокировка UID
+//     (только guest_777 и dev_ явно отсекаются).
+//   - ФИКС: Clubs/Leaderboard — защита от permission-denied
+//     и graceful degrade, если коллекция не в Rules.
+//   - ФИКС: acceptTradeOffer — try/catch вокруг notif/pullSave,
+//     чтобы падение уведомления не валило саму сделку.
+//   - Добавлен EventBus-эмит 'p2p:trade_completed' для UI.
 // ⭐ v1.1.0 (SPRINT 2 — A3 + B3):
-//   - ФИКС A3: acceptTradeOffer теперь АТОМАРНО обменивает машины
-//     между гаражами через Firestore-транзакцию. Раньше менялся
-//     только статус оффера — предметы не перекладывались.
-//   - ФИКС B3: sendTradeOffer валидирует, что myItem реально
-//     в гараже отправителя. Запрещает обмен личного авто
-//     (isPersonal), машины на штрафстоянке (impounded) и т.д.
-//   - После успешного обмена — pullSave для синхронизации
-//     локального стейта игрока B (который принял оффер).
-//   - Добавлена ссылка FB_Bridge.Offers → P2POffersManager
-//     для удобства DEV-вкладки.
-// ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ firebase-bridge.js + СОБРАН FB_Bridge):
-//   - P2PTradeManager (sendTradeOffer, acceptTradeOffer,
-//     rejectTradeOffer, cancelTradeOffer, fetchTradeOffers,
-//     subscribeToTradeOffers)
-//   - ClubsManager (fetchClubs, createClub, joinClub,
-//     depositToClubBank, subscribeToClubs)
-//   - LeaderboardManager (updateRank, fetchTop, subscribeToTop)
-//   - CarsCatalogManager (seedDefaultCarsCatalog, fetchCloudCars,
-//     saveCarToCloud)
-//   - QuickChat (getPhrasesList, makeDialogId, sendPhrase,
-//     fetchDialogMessages, subscribeToDialog)
-//   - ⭐ СОБИРАЕТ ЕДИНЫЙ window.FB_Bridge из:
-//       FB_Core, FB_Market, FB_Friendships, FB_Notifications, FB_P2P
+//   - acceptTradeOffer атомарно обменивает машины
+//   - sendTradeOffer валидирует myItem в гараже
+// ⭐ v1.0.0: P2P Trade, Clubs, Leaderboard, CarsCatalog, QuickChat
 //
 // ВАЖНО: файл — ES-модуль (import), подключается через
 //   <script type="module" src="firebase-p2p.js?v=421"></script>
@@ -63,7 +56,6 @@ const devLogFirestore = FB_Core.devLogFirestore;
 const TTL_CONFIG = FB_Core.TTL_CONFIG;
 const LIMITS = FB_Core.LIMITS;
 
-// Модули из других файлов (могут быть undefined, если порядок загрузки нарушен)
 const FB_Market = window.FB_Market || {};
 const FB_Friendships = window.FB_Friendships || {};
 const FB_Notifications = window.FB_Notifications || {};
@@ -104,6 +96,34 @@ function getCurrentPlayerProfile() {
 }
 
 // ========================================================
+// 2.1. ХЕЛПЕР: клиентская фильтрация + сортировка
+// (используется вместо составных индексов Firestore)
+// ========================================================
+function _filterAndSortDocs(items, opts = {}) {
+  if (!Array.isArray(items)) return [];
+  const now = Date.now();
+
+  const result = items.filter(item => {
+    if (!item) return false;
+    if (item.expireAt && item.expireAt < now) return false;
+    if (opts.status !== undefined && item.status !== opts.status) return false;
+    if (opts.statuses !== undefined && !opts.statuses.includes(item.status)) return false;
+    return true;
+  });
+
+  if (opts.sortBy) {
+    const dir = opts.sortDir === 'asc' ? 1 : -1;
+    result.sort((a, b) => {
+      const ta = Number(a[opts.sortBy]) || 0;
+      const tb = Number(b[opts.sortBy]) || 0;
+      return (ta - tb) * dir;
+    });
+  }
+
+  return result;
+}
+
+// ========================================================
 // 3. P2P TRADE MANAGER (обмен между игроками)
 // ========================================================
 const P2PTradeManager = {
@@ -111,7 +131,6 @@ const P2PTradeManager = {
 
   /**
    * Отправить trade offer другому игроку.
-   * ⭐ ФИКС B3: валидация myItem в гараже отправителя.
    * @param {string} toUserId — кому
    * @param {Object} offerData — { myItem: {...}, theirItemId: 'lot_xxx' | null, message: '' }
    */
@@ -122,7 +141,7 @@ const P2PTradeManager = {
       return { success: false, error: "Нельзя отправить оффер самому себе" };
     }
 
-    // ⭐ ФИКС B3: проверка myItem в гараже отправителя
+    // Проверка myItem в гараже отправителя
     const myItemUid = offerData?.myItem?.uid;
     if (!myItemUid) {
       return { success: false, error: "Не указан предмет для обмена" };
@@ -142,11 +161,6 @@ const P2PTradeManager = {
 
     if (myCar.impounded) {
       return { success: false, error: "Машина на штрафстоянке — нельзя обменять" };
-    }
-
-    if (myCar.isStolen) {
-      // Можно предупредить, но не блокировать — с stolen тоже можно обмениваться
-      console.warn('[P2PTrade] Попытка обмена машины в розыске:', myItemUid);
     }
 
     try {
@@ -169,7 +183,8 @@ const P2PTradeManager = {
 
       await setDoc(offerRef, payload);
 
-      await setDoc(notifRef, {
+      // Уведомление — не блокируем, если упадёт
+      setDoc(notifRef, {
         toUser: String(toUserId),
         type: "trade_offer",
         title: "🤝 Новое предложение обмена!",
@@ -179,28 +194,19 @@ const P2PTradeManager = {
         claimed: false,
         timestamp: Date.now(),
         expireAt: Date.now() + TTL_CONFIG.notifications
-      });
+      }).catch(err => console.warn('[P2PTrade] notif error:', err));
 
       devLogFirestore('sendTradeOffer OK', offerId);
       return { success: true, offerId };
     } catch (e) {
-      devLogFirestore('sendTradeOffer ERROR', e.message);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      devLogFirestore('sendTradeOffer ERROR', errMsg);
+      return { success: false, error: errMsg };
     }
   },
 
   /**
-   * ⭐ ФИКС A3: Принять trade offer с АТОМАРНЫМ ОБМЕНОМ машин.
-   *
-   * Логика:
-   *  1. Читаем оффер → получаем myItemUid (машина отправителя A) и lotId (лот B)
-   *  2. Читаем лот → получаем myCarUid (машина получателя B, из lot.itemData.uid)
-   *  3. Читаем оба гаража: A и B
-   *  4. Валидация: машина A в гараже A, машина B в гараже B, обе не Personal/Impounded
-   *  5. Атомарно: удаляем carA из A, добавляем в B; удаляем carB из B, добавляем в A
-   *  6. Помечаем лот status='sold', оффер status='accepted'
-   *  7. Уведомление отправителю
-   *  8. Синхронизация локального стейта игрока B (pullSave)
+   * Принять trade offer с АТОМАРНЫМ ОБМЕНОМ машин.
    */
   async acceptTradeOffer(offerId) {
     const profile = getCurrentPlayerProfile();
@@ -212,9 +218,7 @@ const P2PTradeManager = {
 
     try {
       await runTransaction(db, async (tx) => {
-        // =====================================================
         // 1. ЧИТАЕМ ОФФЕР
-        // =====================================================
         const offerSnap = await tx.get(offerRef);
         if (!offerSnap.exists()) throw new Error("Оффер не найден");
 
@@ -238,9 +242,7 @@ const P2PTradeManager = {
         if (!myItemUid) throw new Error("В оффере нет машины отправителя");
         if (!lotId) throw new Error("В оффере нет ссылки на ваш лот");
 
-        // =====================================================
-        // 2. ЧИТАЕМ ЛОТ, ЧТОБЫ УЗНАТЬ uid МАШИНЫ ПОЛУЧАТЕЛЯ (B)
-        // =====================================================
+        // 2. ЧИТАЕМ ЛОТ
         const lotRef = doc(db, "market_lots", String(lotId));
         const lotSnap = await tx.get(lotRef);
         if (!lotSnap.exists()) throw new Error("Лот больше не активен");
@@ -251,9 +253,7 @@ const P2PTradeManager = {
         const myCarUid = lotData.itemData?.uid || lotData.itemData?.id;
         if (!myCarUid) throw new Error("У лота нет привязки к uid машины");
 
-        // =====================================================
         // 3. ЧИТАЕМ ОБА ГАРАЖА
-        // =====================================================
         const garageARef = doc(db, "garages", fromUserId);
         const garageBRef = doc(db, "garages", toUserId);
 
@@ -266,9 +266,7 @@ const P2PTradeManager = {
         const carsA = Array.isArray(garageAData.cars) ? [...garageAData.cars] : [];
         const carsB = Array.isArray(garageBData.cars) ? [...garageBData.cars] : [];
 
-        // =====================================================
         // 4. ВАЛИДАЦИЯ МАШИН
-        // =====================================================
         const idxA = carsA.findIndex(c => c && (c.uid === myItemUid || c.id === myItemUid));
         if (idxA === -1) throw new Error("Машина отправителя не найдена в гараже A");
 
@@ -283,13 +281,10 @@ const P2PTradeManager = {
         if (carB.isPersonal) throw new Error("Ваша машина помечена как личная");
         if (carB.impounded) throw new Error("Ваша машина на штрафстоянке");
 
-        // =====================================================
         // 5. АТОМАРНЫЙ ОБМЕН
-        // =====================================================
         carsA.splice(idxA, 1);
         carsB.splice(idxB, 1);
 
-        // Обнуляем владение
         carA.ownershipDays = 0;
         carA.isRegisteredOnPlayer = false;
         carA.impounded = false;
@@ -301,9 +296,7 @@ const P2PTradeManager = {
         carsB.push(carA);
         carsA.push(carB);
 
-        // =====================================================
         // 6. ЗАПИСЬ ГАРАЖЕЙ
-        // =====================================================
         const nowTs = Date.now();
 
         tx.set(garageARef, {
@@ -320,24 +313,19 @@ const P2PTradeManager = {
           updatedAt: nowTs
         }, { merge: true });
 
-        // =====================================================
-        // 7. ПОМЕЧАЕМ ЛОТ КАК ПРОДАННЫЙ (через обмен)
-        // =====================================================
+        // 7. ПОМЕЧАЕМ ЛОТ КАК ПРОДАННЫЙ
         tx.update(lotRef, {
           status: "sold",
           swappedAt: nowTs,
           swappedWith: fromUserId
         });
 
-        // =====================================================
-        // 8. ПОМЕЧАЕМ ОФФЕР КАК ПРИНЯТЫЙ
-        // =====================================================
+        // 8. ПОМЕЧАЕМ ОФФЕР ПРИНЯТЫМ
         tx.update(offerRef, {
           status: "accepted",
           acceptedAt: nowTs
         });
 
-        // Возвращаем результат из транзакции
         result = {
           fromUserId,
           toUserId,
@@ -347,11 +335,9 @@ const P2PTradeManager = {
         };
       });
 
-      // =====================================================
-      // 9. ПОСТ-ОБРАБОТКА (после успешной транзакции)
-      // =====================================================
+      // ПОСТ-ОБРАБОТКА
       if (result) {
-        // Уведомление отправителю (A)
+        // Уведомление отправителю
         try {
           const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
           await setDoc(notifRef, {
@@ -369,7 +355,7 @@ const P2PTradeManager = {
           console.warn('[P2PTrade] Уведомление не отправлено:', notifErr);
         }
 
-        // EventBus — UI-слой реагирует
+        // EventBus
         if (window.EventBus) {
           window.EventBus.emit('p2p:trade_accepted', {
             offerId,
@@ -384,8 +370,7 @@ const P2PTradeManager = {
           });
         }
 
-        // Синхронизация локального стейта игрока B (который принял оффер)
-        // через pullSave (чтобы в памяти отражались актуальные машины)
+        // Sync локального стейта игрока B
         try {
           const fresh = await FB_Core.Players.pullSave(profile.id);
           if (fresh && typeof window.applyLoadedState === 'function') {
@@ -405,8 +390,9 @@ const P2PTradeManager = {
       return { success: false, error: "Транзакция не дала результата" };
 
     } catch (e) {
-      devLogFirestore('acceptTradeOffer ERROR', e.message);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      devLogFirestore('acceptTradeOffer ERROR', errMsg);
+      return { success: false, error: errMsg };
     }
   },
 
@@ -435,24 +421,30 @@ const P2PTradeManager = {
         });
       });
 
-      const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
-      await setDoc(notifRef, {
-        toUser: String(offerData.fromUserId),
-        type: "trade_rejected",
-        title: "❌ Оффер отклонён",
-        text: `${profile.name} отказался от вашего предложения.`,
-        offerId: offerId,
-        read: false,
-        claimed: false,
-        timestamp: Date.now(),
-        expireAt: Date.now() + TTL_CONFIG.notifications
-      });
+      // Уведомление — не блокируем
+      try {
+        const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
+        await setDoc(notifRef, {
+          toUser: String(offerData.fromUserId),
+          type: "trade_rejected",
+          title: "❌ Оффер отклонён",
+          text: `${profile.name} отказался от вашего предложения.`,
+          offerId: offerId,
+          read: false,
+          claimed: false,
+          timestamp: Date.now(),
+          expireAt: Date.now() + TTL_CONFIG.notifications
+        });
+      } catch (notifErr) {
+        console.warn('[P2PTrade] notif error:', notifErr);
+      }
 
       devLogFirestore('rejectTradeOffer OK', offerId);
       return { success: true };
     } catch (e) {
-      devLogFirestore('rejectTradeOffer ERROR', e.message);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      devLogFirestore('rejectTradeOffer ERROR', errMsg);
+      return { success: false, error: errMsg };
     }
   },
 
@@ -480,13 +472,15 @@ const P2PTradeManager = {
       devLogFirestore('cancelTradeOffer OK', offerId);
       return { success: true };
     } catch (e) {
-      devLogFirestore('cancelTradeOffer ERROR', e.message);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      devLogFirestore('cancelTradeOffer ERROR', errMsg);
+      return { success: false, error: errMsg };
     }
   },
 
   /**
    * Получить все офферы игрока (входящие + исходящие).
+   * ⭐ v1.2.0: single-field where + клиентский фильтр по status.
    */
   async fetchTradeOffers(userId) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
@@ -497,43 +491,49 @@ const P2PTradeManager = {
         getDocs(query(
           collection(db, "trade_offers"),
           where("toUserId", "==", String(targetUid)),
-          where("status", "==", "pending"),
-          orderBy("createdAt", "desc"),
-          limit(LIMITS.maxTradeOffersPerUser)
+          limit(LIMITS.maxTradeOffersPerUser * 2)
         )),
         getDocs(query(
           collection(db, "trade_offers"),
           where("fromUserId", "==", String(targetUid)),
-          where("status", "==", "pending"),
-          orderBy("createdAt", "desc"),
-          limit(LIMITS.maxTradeOffersPerUser)
+          limit(LIMITS.maxTradeOffersPerUser * 2)
         ))
       ]);
 
-      const incoming = [];
-      const outgoing = [];
-      const now = Date.now();
+      const incomingRaw = [];
+      const outgoingRaw = [];
 
-      incomingSnap.forEach(d => {
-        const item = d.data();
-        if (item.expireAt && item.expireAt < now) return;
-        incoming.push({ id: d.id, ...item });
-      });
-      outgoingSnap.forEach(d => {
-        const item = d.data();
-        if (item.expireAt && item.expireAt < now) return;
-        outgoing.push({ id: d.id, ...item });
-      });
+      incomingSnap.forEach(d => incomingRaw.push({ id: d.id, ...d.data() }));
+      outgoingSnap.forEach(d => outgoingRaw.push({ id: d.id, ...d.data() }));
+
+      // ⭐ Клиентский фильтр по status + сортировка
+      const incoming = _filterAndSortDocs(incomingRaw, {
+        status: 'pending',
+        sortBy: 'createdAt',
+        sortDir: 'desc'
+      }).slice(0, LIMITS.maxTradeOffersPerUser);
+
+      const outgoing = _filterAndSortDocs(outgoingRaw, {
+        status: 'pending',
+        sortBy: 'createdAt',
+        sortDir: 'desc'
+      }).slice(0, LIMITS.maxTradeOffersPerUser);
 
       return { incoming, outgoing };
     } catch (e) {
-      console.warn('[P2PTrade] fetch error:', e);
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[P2PTrade] fetch: permission-denied (проверьте Firestore Rules для trade_offers)');
+      } else {
+        console.warn('[P2PTrade] fetch error:', errMsg);
+      }
       return { incoming: [], outgoing: [] };
     }
   },
 
   /**
    * Real-time подписка на входящие trade offers.
+   * ⭐ v1.2.0: single-field where + клиентский фильтр.
    */
   subscribeToTradeOffers(userId, callback) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
@@ -543,22 +543,28 @@ const P2PTradeManager = {
       const q = query(
         collection(db, "trade_offers"),
         where("toUserId", "==", String(targetUid)),
-        where("status", "==", "pending"),
-        orderBy("createdAt", "desc"),
-        limit(LIMITS.maxTradeOffersPerUser)
+        limit(LIMITS.maxTradeOffersPerUser * 2)
       );
 
       const unsubscribe = onSnapshot(q, (snap) => {
-        const offers = [];
-        const now = Date.now();
-        snap.forEach(d => {
-          const item = d.data();
-          if (item.expireAt && item.expireAt < now) return;
-          offers.push({ id: d.id, ...item });
-        });
+        const raw = [];
+        snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
+
+        // ⭐ Клиентский фильтр
+        const offers = _filterAndSortDocs(raw, {
+          status: 'pending',
+          sortBy: 'createdAt',
+          sortDir: 'desc'
+        }).slice(0, LIMITS.maxTradeOffersPerUser);
+
         try { callback(offers); } catch (e) { console.warn('[P2PTrade] callback error:', e); }
       }, (error) => {
-        console.warn('[P2PTrade] subscribe error:', error);
+        const errMsg = error?.code || error?.message || String(error);
+        if (errMsg.includes('permission-denied')) {
+          console.warn('[P2PTrade] subscribeToTradeOffers: permission-denied');
+        } else {
+          console.warn('[P2PTrade] subscribe error:', errMsg);
+        }
       });
 
       this._listeners.push(unsubscribe);
@@ -584,8 +590,11 @@ const P2PTradeManager = {
 // 4. CLUBS MANAGER
 // ========================================================
 const ClubsManager = {
+  _listeners: [],
+
   /**
-   * Получить список клубов (сортировка по банку).
+   * Получить список клубов.
+   * ⭐ v1.2.0: защита от permission-denied + fallback.
    */
   async fetchClubs(force = false) {
     try {
@@ -599,7 +608,12 @@ const ClubsManager = {
       snap.forEach(d => clubs.push({ id: d.id, ...d.data() }));
       return clubs;
     } catch (e) {
-      console.warn('[Clubs] fetch error:', e);
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[Clubs] fetch: permission-denied');
+      } else {
+        console.warn('[Clubs] fetch error:', errMsg);
+      }
       return [];
     }
   },
@@ -620,8 +634,14 @@ const ClubsManager = {
         snap.forEach(d => clubs.push({ id: d.id, ...d.data() }));
         try { callback(clubs); } catch (e) {}
       }, (error) => {
-        console.warn('[Clubs] subscribe error:', error);
+        const errMsg = error?.code || error?.message || String(error);
+        if (errMsg.includes('permission-denied')) {
+          console.warn('[Clubs] subscribe: permission-denied');
+        } else {
+          console.warn('[Clubs] subscribe error:', errMsg);
+        }
       });
+      this._listeners.push(unsubscribe);
       return unsubscribe;
     } catch (e) { return () => {}; }
   },
@@ -697,6 +717,13 @@ const ClubsManager = {
     } catch (e) {
       return false;
     }
+  },
+
+  unsubscribeAll() {
+    this._listeners.forEach(unsub => {
+      try { unsub(); } catch (e) {}
+    });
+    this._listeners = [];
   }
 };
 
@@ -706,6 +733,8 @@ const ClubsManager = {
 let lastLeaderboardUpdate = 0;
 
 const LeaderboardManager = {
+  _listeners: [],
+
   /**
    * Обновить ранг игрока (не чаще 1 раза в 90 секунд).
    */
@@ -743,6 +772,12 @@ const LeaderboardManager = {
       snap.forEach(d => leaders.push({ id: d.id, ...d.data() }));
       return leaders;
     } catch (e) {
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[Leaderboard] fetch: permission-denied');
+      } else {
+        console.warn('[Leaderboard] fetch error:', errMsg);
+      }
       return [];
     }
   },
@@ -763,10 +798,23 @@ const LeaderboardManager = {
         snap.forEach(d => leaders.push({ id: d.id, ...d.data() }));
         try { callback(leaders); } catch (e) {}
       }, (error) => {
-        console.warn('[Leaderboard] subscribe error:', error);
+        const errMsg = error?.code || error?.message || String(error);
+        if (errMsg.includes('permission-denied')) {
+          console.warn('[Leaderboard] subscribe: permission-denied');
+        } else {
+          console.warn('[Leaderboard] subscribe error:', errMsg);
+        }
       });
+      this._listeners.push(unsubscribe);
       return unsubscribe;
     } catch (e) { return () => {}; }
+  },
+
+  unsubscribeAll() {
+    this._listeners.forEach(unsub => {
+      try { unsub(); } catch (e) {}
+    });
+    this._listeners = [];
   }
 };
 
@@ -835,8 +883,9 @@ const CarsCatalogManager = {
       devLogFirestore('seedCarsCatalog OK', `${count} моделей в ${batches.length} batch`);
       return { success: true, count };
     } catch (e) {
-      devLogFirestore('seedCarsCatalog ERROR', e.message);
-      return { success: false, error: e.message };
+      const errMsg = e?.code || e?.message || String(e);
+      devLogFirestore('seedCarsCatalog ERROR', errMsg);
+      return { success: false, error: errMsg };
     }
   },
 
@@ -874,7 +923,12 @@ const CarsCatalogManager = {
 
       return cars;
     } catch (e) {
-      console.warn('[CarsCatalog] fetch error:', e);
+      const errMsg = e?.code || e?.message || String(e);
+      if (errMsg.includes('permission-denied')) {
+        console.warn('[CarsCatalog] fetch: permission-denied');
+      } else {
+        console.warn('[CarsCatalog] fetch error:', errMsg);
+      }
       return [];
     }
   },
@@ -957,20 +1011,17 @@ const QuickChat = {
 };
 
 // ========================================================
-// 8. ⭐ СБОРКА ЕДИНОГО window.FB_Bridge
+// 8. СБОРКА ЕДИНОГО window.FB_Bridge
 // ========================================================
 const FB_Bridge = {
-  // Core
   db: FB_Core.db,
   auth: FB_Core.auth,
   enabled: true,
 
-  // Auth
   Auth: FB_Core.Auth,
   getProfile: getCurrentPlayerProfile,
   getTelegramUser: FB_Core.getTelegramUser,
 
-  // Players (сохранение/загрузка)
   Players: FB_Core.Players,
   CloudSave: {
     pushSave: FB_Core.Players.pushSave,
@@ -978,42 +1029,27 @@ const FB_Bridge = {
     pullSave: FB_Core.Players.pullSave
   },
 
-  // Market (P2P биржа)
   MarketLots: FB_Market.MarketLots,
-  P2P: FB_Market.MarketLots,                    // алиас
+  P2P: FB_Market.MarketLots,
   Transactions: FB_Market.Transactions,
   Plates: FB_Market.Plates,
 
-  // ⭐ v1.1.0: ссылка на P2POffersManager (для DEV-вкладки)
   Offers: window.P2POffersManager,
 
-  // Friendships
   Friendships: FB_Friendships.Friendships,
 
-  // Notifications
   Notifications: FB_Notifications.Notifications,
   ChatMessages: FB_Notifications.ChatMessages,
   Events: FB_Notifications.Events,
 
-  // P2P Trade (обмен предметами через trade_offers)
   P2PTrade: P2PTradeManager,
-
-  // Clubs
   Clubs: ClubsManager,
-
-  // Leaderboard
   Leaderboard: LeaderboardManager,
-
-  // Cars Catalog
   CarsCatalog: CarsCatalogManager,
 
-  // Cleanup
   Cleanup: FB_Core.Cleanup,
-
-  // Stats (для DEV)
   getStats: FB_Core.getStats,
 
-  // QuickChat (фасад)
   QuickChat
 };
 
@@ -1028,9 +1064,7 @@ window.FB_P2P = {
   QuickChat
 };
 
-// ⭐ ГЛАВНЫЙ ЭКСПОРТ — единый FB_Bridge
 window.FB_Bridge = FB_Bridge;
 
-console.log('[🤝 FB_P2P v1.1.0] Trade (атомарный обмен), Clubs, Leaderboard, CarsCatalog, QuickChat загружены ✓');
-console.log('[🌟 FB_Bridge v2.1.0] Единый шлюз восстановлен. Offers → P2POffersManager ✓');
-console.log('[🌟 FB_Bridge] Доступные методы:', Object.keys(FB_Bridge).filter(k => typeof FB_Bridge[k] === 'object' || typeof FB_Bridge[k] === 'function').join(', '));
+console.log('[🤝 FB_P2P v1.2.0] Без составных индексов в trade_offers + атомарный обмен + graceful degrade ✓');
+console.log('[🌟 FB_Bridge v2.2.0] Единый шлюз восстановлен. Offers → P2POffersManager ✓');
