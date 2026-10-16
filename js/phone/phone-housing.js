@@ -1,6 +1,12 @@
 // ========================================================
-// js/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v1.1.0)
+// js/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v1.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.2.0 (SPRINT 2 — ФИКС E3):
+//   - ФИКС E3: buyHouse проверяет владение перед списанием.
+//     Нельзя купить одно жильё дважды.
+//   - rentHouse: повторная аренда того же жилья блокируется
+//   - buyInteriorItem: защита от повторной покупки одного предмета
+//   - moveToHouse: если игрок уже здесь — короткое сообщение и выход
 // ⭐ v1.1.0 (КРИТИЧЕСКИЙ ФИКС):
 //   - ФИКС: applyHousingBonuses больше НЕ мутирует mood.
 //     Раньше игрок мог кликать moveToHouse много раз и
@@ -282,12 +288,21 @@ const PhoneHousing = {
 
     // --------------------------------------------------------
     // ПОКУПКА ДОМА
+    // ⭐ v1.2.0 (ФИКС E3): защита от повторной покупки того же жилья
     // --------------------------------------------------------
     buyHouse(houseId) {
         this.ensureHousingState();
         const db = this.getHousingDatabase();
         const target = db.find(h => h.id === houseId);
         if (!target) return showToast("❌ Объект не найден!");
+
+        // ⭐ ФИКС E3: проверка — не куплено ли уже
+        const alreadyOwned = (state.player.ownedHouses || []).includes(houseId);
+        if (alreadyOwned) {
+            if (typeof playSound === 'function') playSound('tick');
+            if (typeof tgHaptic === 'function') tgHaptic('light');
+            return showToast(`✅ Жильё «${target.name}» уже в вашей собственности!`);
+        }
 
         let price = target.buyPrice || target.price || 0;
         let reqStars = target.reqStars || 0;
@@ -309,6 +324,7 @@ const PhoneHousing = {
         state.player.cash -= price;
         if (reqStars > 0) state.player.stars -= reqStars;
 
+        // ⭐ ФИКС E3: двойная защита от дубликата
         if (!state.player.ownedHouses.includes(houseId)) {
             state.player.ownedHouses.push(houseId);
         }
@@ -320,8 +336,8 @@ const PhoneHousing = {
             logBankTransaction(`Покупка недвижимости: ${target.name}`, price, false);
         }
 
-        // ⭐ v1.1.0: НЕ применяем mood здесь — только валидация
         // Mood-бонус применится ежедневно в app.js → executeDayCycleMidnight
+        // (не мутируем mood вручную, чтобы не накрутить его кликами)
 
         const slotsGranted = target.slots !== undefined ? target.slots : (target.slotsBonus || 0);
 
@@ -345,12 +361,19 @@ const PhoneHousing = {
 
     // --------------------------------------------------------
     // АРЕНДА ДОМА
+    // ⭐ v1.2.0: повторная аренда того же жилья блокируется
     // --------------------------------------------------------
     rentHouse(houseId) {
         this.ensureHousingState();
         const db = this.getHousingDatabase();
         const target = db.find(h => h.id === houseId);
         if (!target) return showToast("❌ Объект не найден!");
+
+        // ⭐ ФИКС: если игрок уже здесь и арендует — не брать залог повторно
+        if (state.player.housingId === houseId && state.player.housingType === 'rent') {
+            if (typeof playSound === 'function') playSound('tick');
+            return showToast(`✅ Вы уже арендуете «${target.name}»!`);
+        }
 
         let rent = target.rent || target.rentPerDay || 0;
         let deposit = rent * 3;
@@ -380,7 +403,8 @@ const PhoneHousing = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v1.1.0: ПЕРЕЕЗД С ПРОВЕРКОЙ ПРАВ
+    // ПЕРЕЕЗД
+    // ⭐ v1.2.0: короткое сообщение, если игрок уже здесь
     // --------------------------------------------------------
     moveToHouse(houseId) {
         this.ensureHousingState();
@@ -388,7 +412,13 @@ const PhoneHousing = {
         const target = db.find(h => h.id === houseId);
         if (!target) return showToast("❌ Объект не найден!");
 
-        // ⭐ v1.1.0: нельзя переехать в чужой дом
+        // ⭐ ФИКС: уже здесь — не делать лишнюю работу
+        if (state.player.housingId === houseId) {
+            if (typeof playSound === 'function') playSound('tick');
+            return showToast(`✅ Вы уже находитесь в «${target.name}»`);
+        }
+
+        // Проверка прав: нельзя переехать в чужое
         const isOwned = (state.player.ownedHouses || []).includes(houseId);
         const isCurrentRent = (state.player.housingId === houseId && state.player.housingType === 'rent');
 
@@ -399,7 +429,7 @@ const PhoneHousing = {
         state.player.housingId = houseId;
         state.player.housingType = isOwned ? 'own' : 'rent';
 
-        // ⭐ v1.1.0: НЕ применяем mood напрямую. Применяется в executeDayCycleMidnight.
+        // Mood-бонус применится в executeDayCycleMidnight
 
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -413,10 +443,24 @@ const PhoneHousing = {
 
     // --------------------------------------------------------
     // ПОКУПКА МЕБЕЛИ / ИНТЕРЬЕРА
+    // ⭐ v1.2.0: защита от повторной покупки одного предмета
     // --------------------------------------------------------
     buyInteriorItem(houseId, itemId, cost) {
         this.ensureHousingState();
         if (!state.player) return;
+
+        // ⭐ ФИКС: защита от дубликата
+        if (!state.player.interior || typeof state.player.interior !== 'object') {
+            state.player.interior = {};
+        }
+        if (!Array.isArray(state.player.interior[houseId])) {
+            state.player.interior[houseId] = [];
+        }
+
+        if (state.player.interior[houseId].includes(itemId)) {
+            if (typeof playSound === 'function') playSound('tick');
+            return showToast("✅ Этот предмет уже установлен!");
+        }
 
         let cash = state.player.cash || 0;
         if (cash < cost) {
@@ -425,16 +469,8 @@ const PhoneHousing = {
 
         state.player.cash -= cost;
 
-        // ⭐ v1.1.0: защита от null
-        if (!state.player.interior || typeof state.player.interior !== 'object') {
-            state.player.interior = {};
-        }
-        if (!Array.isArray(state.player.interior[houseId])) {
-            state.player.interior[houseId] = [];
-        }
-        if (!state.player.interior[houseId].includes(itemId)) {
-            state.player.interior[houseId].push(itemId);
-        }
+        // Добавляем в интерьер
+        state.player.interior[houseId].push(itemId);
 
         // Разово даём +15 mood за установку (это не «накрутка», а сюрприз)
         state.player.mood = Math.min(100, (state.player.mood || 80) + 15);
@@ -453,7 +489,7 @@ const PhoneHousing = {
     },
 
     // --------------------------------------------------------
-    // ⭐ v1.1.0: applyHousingBonuses больше НЕ мутирует mood
+    // applyHousingBonuses больше НЕ мутирует mood
     // --------------------------------------------------------
     // Раньше: state.player.mood += houseObj.moodBonus → можно
     //         было накрутить mood до 100, переключаясь между домами.
@@ -474,4 +510,4 @@ const PhoneHousing = {
 window.PhoneHousing = PhoneHousing;
 window.AppHousing = PhoneHousing;
 
-console.log('[🏠 phone-housing v1.1.0] Убран накопитель mood + защита от null + блокировка переезда в чужое жильё ✓');
+console.log('[🏠 phone-housing v1.2.0] ФИКС E3: защита от дубликатов в buyHouse/rentHouse/buyInteriorItem/moveToHouse ✓');
