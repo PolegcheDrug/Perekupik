@@ -1,6 +1,12 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v2.8.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v2.9.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.9.0 (ДИНАМИЧЕСКИЕ ОБЛОЖКИ & ЗАКРЕПЛЕНИЕ КАРТИНОК):
+//   - Добавлена функция getOrAssignLotCarImage(): выбирает обложку
+//     из доступных вариантов (например, charger_srt, charger_srt_1)
+//     и навсегда закрепляет её за лотом/машиной на время продажи.
+//   - Двухуровневый fallback в onerror: при отсутствии доп. картинки
+//     автоматически подставляется базовая обложка модели.
 // ⭐ v2.8.0 (SPRINT 3 — ФИКС КРИТИЧЕСКОГО БАГА «state is not defined»):
 //   - ФИКС: initSalesLotTimer() больше НЕ вызывается в конце файла
 //     синхронно, т.к. state создаётся позже в app.js. Теперь таймер
@@ -80,6 +86,86 @@ const BUYER_ARCHETYPES = [
         inspectionSkill: "low"
     }
 ];
+
+// ========================================================
+// ⭐ v2.9.0: ВЫБОР И ЗАКРЕПЛЕНИЕ ОБЛОЖКИ ДЛЯ РАЗНООБРАЗИЯ
+// ========================================================
+/**
+ * Находит доступные обложки автомобиля, выбирает одну случайную
+ * и закрепляет её за объектом машины/лота на всё время взаимодействия.
+ */
+function getOrAssignLotCarImage(car, lot) {
+    const defaultPlaceholder = "assets/cars/economy/2101/vaz-2101.jpg";
+    if (!car) {
+        return {
+            src: defaultPlaceholder,
+            baseFallback: defaultPlaceholder,
+            fallback: defaultPlaceholder
+        };
+    }
+
+    // 1. Поиск базы авто (сараи, основные каталоги)
+    let catalogCar = null;
+    if (typeof window.BARN_CARS_DATABASE !== 'undefined' && Array.isArray(window.BARN_CARS_DATABASE)) {
+        catalogCar = window.BARN_CARS_DATABASE.find(b => b && (b.id === car.id || b.name === car.name));
+    }
+    if (!catalogCar && typeof window.CARS_DATABASE !== 'undefined' && Array.isArray(window.CARS_DATABASE)) {
+        catalogCar = window.CARS_DATABASE.find(c => c && (c.id === car.id || c.name === car.name));
+    }
+
+    // Определяем базовую обложку
+    let baseImg = car.baseImg || (catalogCar ? catalogCar.img : null) || car.img || defaultPlaceholder;
+    car.baseImg = baseImg;
+
+    let universalFallback = car.fallback || (catalogCar ? catalogCar.fallback : '') || defaultPlaceholder;
+
+    // 2. Если обложка уже была выбрана и закреплена — возвращаем её
+    if (car.assignedLotImg) {
+        return {
+            src: car.assignedLotImg,
+            baseFallback: baseImg,
+            fallback: universalFallback
+        };
+    }
+
+    // 3. Собираем пул картинок для разнообразия
+    let pool = [];
+
+    if (Array.isArray(car.images) && car.images.length > 0) {
+        pool = [...car.images];
+    } else if (catalogCar && Array.isArray(catalogCar.images) && catalogCar.images.length > 0) {
+        pool = [...catalogCar.images];
+    } else if (baseImg) {
+        pool.push(baseImg);
+        // Добавляем варианты вида model_1, model_2, если имя файла стандартное
+        const match = baseImg.match(/\.(jpg|jpeg|png|webp)$/i);
+        if (match) {
+            const ext = match[0];
+            const basePath = baseImg.slice(0, -ext.length);
+            for (let i = 1; i <= 3; i++) {
+                pool.push(`${basePath}_${i}${ext}`);
+            }
+        }
+    }
+
+    // 4. Выбираем случайную обложку и закрепляем её
+    let chosenImg = baseImg;
+    if (pool.length > 0) {
+        const randIdx = Math.floor(Math.random() * pool.length);
+        chosenImg = pool[randIdx];
+    }
+
+    // Закрепляем в объекте машины и лота
+    car.assignedLotImg = chosenImg;
+    car.img = chosenImg;
+    if (lot) lot.lockedImg = chosenImg;
+
+    return {
+        src: chosenImg,
+        baseFallback: baseImg,
+        fallback: universalFallback
+    };
+}
 
 // ========================================================
 // ХЕЛПЕРЫ СИНХРОНИЗАЦИИ M+ ДИАЛОГОВ С ЛОТАМИ
@@ -196,7 +282,6 @@ function cleanupOrphanedDialogs() {
 // ========================================================
 function initSalesLotTimer() {
     if (!_isStateReady()) {
-        // Не запускаем таймер, пока state не готов
         return;
     }
     if (salesLotTimerInterval) clearInterval(salesLotTimerInterval);
@@ -212,7 +297,6 @@ function _startSalesLotTimerWhenReady() {
         return;
     }
 
-    // Попытка 1: подписка на EventBus state:loaded
     if (typeof window.EventBus !== 'undefined' && typeof window.EventBus.on === 'function') {
         try {
             let _handled = false;
@@ -222,7 +306,6 @@ function _startSalesLotTimerWhenReady() {
                 initSalesLotTimer();
             };
             window.EventBus.on('state:loaded', handler);
-            // На случай, если state:loaded уже проходил до нас — проверим с задержкой
             setTimeout(() => {
                 if (!_handled && _isStateReady()) {
                     _handled = true;
@@ -235,14 +318,13 @@ function _startSalesLotTimerWhenReady() {
         }
     }
 
-    // Fallback: поллинг
     let attempts = 0;
     const check = setInterval(() => {
         attempts++;
         if (_isStateReady()) {
             clearInterval(check);
             initSalesLotTimer();
-        } else if (attempts > 100) { // ~10 секунд
+        } else if (attempts > 100) {
             clearInterval(check);
             console.warn('[SalesLot] state так и не загрузился за 10с — таймер не запущен');
         }
@@ -257,10 +339,8 @@ function renderSalesLot() {
 
     if (!state.salesLot) state.salesLot = [];
 
-    // Чистим мёртвые диалоги перед рендером
     cleanupOrphanedDialogs();
 
-    // ⭐ v2.7.0: фильтруем лоты без .car и без .name (страховка)
     const validLots = state.salesLot.filter(lot => lot && (lot.car || lot.name));
 
     const badge = document.getElementById('lotCountBadge');
@@ -317,11 +397,15 @@ function renderSalesLot() {
             lot.buyerGenerationPending = false;
         }
 
-        let rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
+        // ⭐ v2.9.0: Выбор и закрепление обложки + каскадный fallback
+        const imgInfo = getOrAssignLotCarImage(car, lot);
+        let rawImg = imgInfo.src;
+        let baseFallback = imgInfo.baseFallback;
+        let universalFallback = imgInfo.fallback;
 
         let carImgAttrs = (typeof buildCarImageAttrs === 'function')
             ? buildCarImageAttrs(rawImg, car)
-            : `src="${rawImg}" onerror="this.onerror=null; this.src='${car.fallback || 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80'}'"`;
+            : `src="${rawImg}" onerror="if(this.src!=='${baseFallback}' && '${baseFallback}'){this.src='${baseFallback}';}else{this.onerror=null;this.src='${universalFallback}';}"`;
 
         let statusBadgeHtml = "";
         let waitSectionHtml = "";
@@ -537,8 +621,6 @@ function generateRandomLotBuyer(car, askingPrice) {
 
 /**
  * ⭐ v2.7.0: syncBuyerToMNetwork теперь защищён от дублей
- * - Проверка по dialogId
- * - Проверка по carUid (если диалог уже существует для этой машины)
  */
 function syncBuyerToMNetwork(lot, idx) {
     if (!lot || !lot.buyer || lot.buyer.dealType !== 'chat') return;
@@ -558,10 +640,8 @@ function syncBuyerToMNetwork(lot, idx) {
     const safeCarName = String(car.name || 'car').replace(/[^a-zа-я0-9]/gi, '_');
     const dialogId = `dlg_buyer_slot_${idx}_${safeCarName}`;
 
-    // Проверка 1: диалог по id
     let exists = state.player.phoneMessages.find(m => m.id === dialogId);
 
-    // ⭐ v2.7.0: Проверка 2: диалог по carUid (защита от дублей)
     if (!exists && carUid) {
         exists = state.player.phoneMessages.find(m =>
             m && m.category === 'buyers' && m.carUid === carUid && m.carIndex === idx
@@ -632,11 +712,15 @@ function renderLotHoodHaggleModalContent() {
     const buyer = lot.buyer;
     const currentOffer = buyer.currentOffer || buyer.offeredPrice;
 
-    let rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
+    // ⭐ v2.9.0: Используем ту же закреплённую обложку в модалке торга
+    const imgInfo = getOrAssignLotCarImage(car, lot);
+    let rawImg = imgInfo.src;
+    let baseFallback = imgInfo.baseFallback;
+    let universalFallback = imgInfo.fallback;
 
     let carImgAttrs = (typeof buildCarImageAttrs === 'function')
         ? buildCarImageAttrs(rawImg, car)
-        : `src="${rawImg}" onerror="this.onerror=null; this.src='${car.fallback || 'assets/cars/economy/2101/vaz-2101.jpg'}'"`;
+        : `src="${rawImg}" onerror="if(this.src!=='${baseFallback}' && '${baseFallback}'){this.src='${baseFallback}';}else{this.onerror=null;this.src='${universalFallback}';}"`;
 
     let plateText = car.customPlate || car.plate || "ТРАНЗИТ";
 
@@ -755,7 +839,6 @@ function executeModalHaggleStep(percent, failRisk) {
     let lvl = state.player?.level || 1;
     actualRisk = Math.max(5, Math.min(95, actualRisk - (lvl * 0.3) - ((karma - 50) * 0.2)));
 
-    // Случайная проверка машины покупателем
     let inspectionTriggerRoll = Math.random();
     let inspectionMessage = "";
 
@@ -901,13 +984,9 @@ function finishSalesLotDeal(idx, price, profit) {
             }
         }
 
-        // Удаляем M+ диалог этого лота перед splice
         removeDialogByCarIndex(idx);
-
-        // ⭐ v2.7.0: корректируем activeSalesLotHaggleIndex ДО splice
         _adjustHaggleIndexAfterRemoval(idx);
 
-        // Если открыта модалка просмотра этой машины — закрываем
         if (window.previewCarIndex !== null && window.previewCarIndex !== undefined) {
             const previewCar = state.garage[window.previewCarIndex];
             if (previewCar && previewCar.uid === car.uid) {
@@ -916,10 +995,7 @@ function finishSalesLotDeal(idx, price, profit) {
             }
         }
 
-        // Удаляем лот
         state.salesLot.splice(idx, 1);
-
-        // Сдвигаем индексы у диалогов оставшихся лотов
         shiftDialogIndicesAfterRemoval(idx);
 
         saveState();
@@ -938,7 +1014,6 @@ function finishSalesLotDeal(idx, price, profit) {
             );
         }
     } finally {
-        // Явный сброс флага (на случай, если что-то выше упало)
         try { lot._finishing = false; } catch (e) {}
     }
 }
@@ -948,8 +1023,6 @@ function rejectLotBuyer(idx) {
     const lot = state.salesLot[idx];
     if (!lot) return;
 
-    // Лот НЕ удаляется — просто сбрасываем покупателя.
-    // Диалог удаляем по тому же индексу (лот остаётся на своём месте).
     removeDialogByCarIndex(idx);
 
     lot.currentBuyer = null;
@@ -959,7 +1032,6 @@ function rejectLotBuyer(idx) {
     lot.buyerGenerationPending = false;
     lot._buyerTimerActive = false;
 
-    // ⭐ v2.7.0: если открыта модалка именно этого лота — закрываем
     if (activeSalesLotHaggleIndex === idx) {
         activeSalesLotHaggleIndex = null;
         try { ModalManager.close('modalLotHoodDeal'); } catch (e) {}
@@ -1053,7 +1125,6 @@ function updateSalesLotTimers() {
                 needReRender = true;
             }
         } else {
-            // ⭐ v2.7.0: инициализируем buyerTimerLeft, если он undefined
             if (typeof lot.buyerTimerLeft !== 'number' || isNaN(lot.buyerTimerLeft)) {
                 lot.buyerTimerLeft = 120;
             }
@@ -1063,7 +1134,6 @@ function updateSalesLotTimers() {
                 const buyerTimeText = document.getElementById(`lot_buyer_timer_${idx}`);
                 if (buyerTimeText) buyerTimeText.innerText = `⏳ ${lot.buyerTimerLeft}с`;
 
-                // ⭐ v2.7.0: если открыта модалка этого лота — обновляем таймер
                 if (activeSalesLotHaggleIndex === idx) {
                     const modalTimerText = document.querySelector('#modalLotHoodDeal .sub-label .color-amber');
                     if (modalTimerText) modalTimerText.innerText = `⏳ ${lot.buyerTimerLeft}с`;
@@ -1078,7 +1148,6 @@ function updateSalesLotTimers() {
                 lot.buyerGenerationPending = false;
                 lot._buyerTimerActive = false;
 
-                // ⭐ v2.7.0: если открыта модалка именно этого лота — закрываем
                 if (activeSalesLotHaggleIndex === idx) {
                     activeSalesLotHaggleIndex = null;
                     try { ModalManager.close('modalLotHoodDeal'); } catch (e) {}
@@ -1133,7 +1202,6 @@ function speedUpLotSearch(idx, type) {
     showToast("Покупатель найден мгновенно!");
 }
 
-// ⭐ v2.7.0: защита от отсутствия lot + корректный сдвиг activeSalesLotHaggleIndex
 function reclaimCarFromLot(idx) {
     if (!_isStateReady()) return;
     const lot = state.salesLot[idx];
@@ -1158,8 +1226,6 @@ function reclaimCarFromLot(idx) {
     state.garage.push(car);
 
     removeDialogByCarIndex(idx);
-
-    // ⭐ v2.7.0: корректируем activeSalesLotHaggleIndex ДО splice
     _adjustHaggleIndexAfterRemoval(idx);
 
     state.salesLot.splice(idx, 1);
@@ -1175,6 +1241,7 @@ function reclaimCarFromLot(idx) {
 // ========================================================
 // ЭКСПОРТ ХЕЛПЕРОВ И ФУНКЦИЙ
 // ========================================================
+window.getOrAssignLotCarImage = getOrAssignLotCarImage;
 window.removeDialogByCarIndex = removeDialogByCarIndex;
 window.shiftDialogIndicesAfterRemoval = shiftDialogIndicesAfterRemoval;
 window.cleanupOrphanedDialogs = cleanupOrphanedDialogs;
@@ -1194,12 +1261,10 @@ window.finishSalesLotDeal = finishSalesLotDeal;
 window.rejectLotBuyer = rejectLotBuyer;
 window.openLotBuyerInNetworkM = openLotBuyerInNetworkM;
 
-// ⭐ v2.8.0: ГЛАВНЫЙ ФИКС — не запускаем таймер синхронно.
-// Ждём state:loaded через EventBus или поллим state.
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', _startSalesLotTimerWhenReady);
 } else {
     _startSalesLotTimerWhenReady();
 }
 
-console.log('[🏪 salesLot v2.8.0] ФИКС: таймер ждёт state:loaded + все state-обращения защищены ✓');
+console.log('[🏪 salesLot v2.9.0] Динамические обложки с фиксацией и защитой от 404 ✓');
