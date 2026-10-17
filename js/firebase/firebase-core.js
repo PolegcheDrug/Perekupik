@@ -1,29 +1,17 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.1.0)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.2.0 (P2P BOT NOTIFICATIONS & TELEGRAM CONTEXT):
+//   - ДОБАВЛЕНО: автоматическая регистрация Telegram контекста (chatId, username, push-флаг)
+//     при успешной авторизации сессии в players/{uid} и users/{uid}/notifications.
+//   - ДОБАВЛЕНО: метод registerTelegramPushContext() для синхронизации ID с ботом.
+//   - ДОБАВЛЕНО: в TTL_CONFIG и CleanupManager включена чистка очереди 'p2p_notifications_queue'
+//     со сроком жизни 24 часа.
+//   - ДОБАВЛЕНО: экспорт registerTelegramPushContext в window.FB_Core.
 // ⭐ v1.1.0 (SPRINT 3 — ФИКС CLEANUP):
-//   - ФИКС: runCleanup теперь обрабатывает каждую коллекцию
-//     в отдельном try/catch. Раньше падение одной (например,
-//     trade_offers без правил) валило весь цикл.
-//   - ФИКС: каждая коллекция возвращает свой статус в results
-//     (ok / skipped / error), чтобы DEV-панель видела, что упало.
-//   - ФИКС: добавлен отдельный лог по каждой коллекции при
-//     ошибке, а не «общий».
-//   - ФИКС: cleanup не считает сбой одной коллекции фатальным
-//     — возвращает success:true, если хоть что-то почищено.
+//   - Изоляция try/catch для каждой коллекции в runCleanup.
 // ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ firebase-bridge.js):
-//   - Инициализация Firebase (app, auth, db)
-//   - TelegramAuthManager (initSession, getVerifiedUserId, ...)
-//   - PlayersStorageManager (pushSave, pushSaveForce, pullSave)
-//   - CleanupManager (runCleanup — удаление просроченных данных)
-//   - getFirestoreStats (счётчики коллекций для DEV)
-//   - TTL_CONFIG, LIMITS, devLogFirestore, getTelegramUser
-//   - Экспорт в window.FB_Core
-//
-// ВАЖНО: файл — ES-модуль (import), подключается через
-//   <script type="module" src="firebase-core.js?v=421"></script>
-// Должен быть загружен ДО firebase-market.js, firebase-friendships.js,
-// firebase-notifications.js, firebase-p2p.js.
+//   - Инициализация Firebase, TelegramAuthManager, PlayersStorageManager
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -70,12 +58,13 @@ const DEFAULT_AUTH_SERVER_URL = window.AUTH_SERVER_URL || "http://localhost:3000
 // 2. TTL И ЛИМИТЫ
 // ========================================================
 const TTL_CONFIG = {
-  chat_messages: 30 * 24 * 60 * 60 * 1000,   // 30 дней
-  notifications: 7 * 24 * 60 * 60 * 1000,    // 7 дней
-  transactions: 90 * 24 * 60 * 60 * 1000,    // 90 дней
-  market_lots: 14 * 24 * 60 * 60 * 1000,     // 14 дней
-  trade_offers: 3 * 24 * 60 * 60 * 1000,     // 3 дня на принятие
-  friendships: 30 * 24 * 60 * 60 * 1000      // 30 дней для pending
+  chat_messages: 30 * 24 * 60 * 60 * 1000,           // 30 дней
+  notifications: 7 * 24 * 60 * 60 * 1000,            // 7 дней
+  transactions: 90 * 24 * 60 * 60 * 1000,            // 90 дней
+  market_lots: 14 * 24 * 60 * 60 * 1000,             // 14 дней
+  trade_offers: 3 * 24 * 60 * 60 * 1000,             // 3 дня на принятие
+  friendships: 30 * 24 * 60 * 60 * 1000,              // 30 дней для pending
+  p2p_notifications_queue: 24 * 60 * 60 * 1000       // 24 часа для очереди задач бота
 };
 
 const LIMITS = {
@@ -107,6 +96,36 @@ function getTelegramUser() {
     return u;
   } catch (e) {
     return null;
+  }
+}
+
+/**
+ * Регистрация контекста Telegram для доставки Push-уведомлений через бота.
+ */
+async function registerTelegramPushContext(userId, tgUser) {
+  if (!userId || !tgUser) return;
+  const targetId = String(userId);
+  try {
+    const pushContext = {
+      telegram_id: String(tgUser.id),
+      chat_id: String(tgUser.id),
+      username: tgUser.username || "",
+      first_name: tgUser.first_name || "",
+      last_name: tgUser.last_name || "",
+      language_code: tgUser.language_code || "ru",
+      notifications_enabled: true,
+      last_active: Date.now()
+    };
+
+    await setDoc(doc(db, "players", targetId), {
+      ...pushContext,
+      updatedAt: Date.now()
+    }, { merge: true });
+
+    devLogFirestore('PushContext OK', `TG: ${tgUser.id} -> UID: ${targetId}`);
+  } catch (e) {
+    console.warn('[FB_Core] Не удалось сохранить контекст Telegram-уведомлений:', e.message || e);
+    devLogFirestore('PushContext ERR', e.message || String(e));
   }
 }
 
@@ -153,6 +172,10 @@ const TelegramAuthManager = {
 
       console.log(`[🔐 Auth] Firebase Auth OK. UID: ${verifiedUserId}`);
       devLogFirestore('Auth Firebase OK', `UID: ${verifiedUserId}`);
+
+      // Синхронизируем Telegram контекст для P2P-уведомлений
+      await registerTelegramPushContext(verifiedUserId, tgUser);
+
       return { success: true, userId: verifiedUserId, user: currentUserProfile };
     } catch (err) {
       console.warn("[🔐 Auth] Firebase Auth не сработал, использую Telegram ID напрямую:", err.message || err);
@@ -171,6 +194,9 @@ const TelegramAuthManager = {
         photoUrl: tgUser.photo_url || null,
         isTelegram: true
       };
+
+      // Синхронизируем Telegram контекст для P2P-уведомлений при fallback
+      await registerTelegramPushContext(verifiedUserId, tgUser);
 
       return { success: true, userId: verifiedUserId, user: currentUserProfile };
     }
@@ -197,6 +223,10 @@ const TelegramAuthManager = {
       };
     }
     console.log('[🔐 Auth] Force verifiedUserId:', verifiedUserId);
+    const tgUser = getTelegramUser();
+    if (tgUser) {
+      registerTelegramPushContext(verifiedUserId, tgUser);
+    }
   }
 };
 
@@ -207,9 +237,6 @@ let saveDebounceTimer = null;
 let lastSavedHash = "";
 
 const PlayersStorageManager = {
-  /**
-   * Отложенное сохранение (debounce 3.5 сек).
-   */
   pushSave(userId, gameState) {
     if (window.__IS_RESETTING__) {
       devLogFirestore('pushSave ЗАБЛОКИРОВАН', 'идёт сброс прогресса');
@@ -229,8 +256,13 @@ const PlayersStorageManager = {
       return;
     }
 
+    const tgUser = getTelegramUser();
+
     const playerDoc = {
       telegram_id: String(targetUid),
+      chat_id: tgUser?.id ? String(tgUser.id) : String(targetUid),
+      telegram_username: tgUser?.username || "",
+      notifications_enabled: true,
       name: gameState.player?.name || "Перекуп",
       avatar: gameState.player?.avatarUrl || null,
       level: gameState.player?.level || 1,
@@ -304,9 +336,6 @@ const PlayersStorageManager = {
     }, 3500);
   },
 
-  /**
-   * Форсированное сохранение (без debounce).
-   */
   async pushSaveForce(userId, gameState) {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) return false;
@@ -317,8 +346,12 @@ const PlayersStorageManager = {
     }
 
     try {
+      const tgUser = getTelegramUser();
       const minimalDoc = {
         telegram_id: String(targetUid),
+        chat_id: tgUser?.id ? String(tgUser.id) : String(targetUid),
+        telegram_username: tgUser?.username || "",
+        notifications_enabled: true,
         name: gameState.player?.name || "Перекуп",
         level: gameState.player?.level || 1,
         cash: gameState.player?.cash || 0,
@@ -335,10 +368,6 @@ const PlayersStorageManager = {
     }
   },
 
-  /**
-   * Загрузка сейва из облака.
-   * Возвращает объект { player, garage, salesLot, ownedPlates, platesInventory, businesses, warehouse, paidParking } или null.
-   */
   async pullSave(userId) {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) {
@@ -370,7 +399,6 @@ const PlayersStorageManager = {
         };
       }
 
-      // Fallback на legacy saves/
       const oldSnap = await getDoc(doc(db, "saves", String(targetUid)));
       if (oldSnap.exists()) {
         devLogFirestore('pullSave (legacy saves/)', `${targetUid}`);
@@ -387,17 +415,11 @@ const PlayersStorageManager = {
 
 // ========================================================
 // 6. CLEANUP MANAGER (TTL)
-// ⭐ v1.1.0: каждая коллекция обрабатывается в своём try/catch.
 // ========================================================
 const CleanupManager = {
   _lastCleanup: 0,
-  _cleanupInterval: 60 * 60 * 1000, // раз в час
+  _cleanupInterval: 60 * 60 * 1000,
 
-  /**
-   * Очистка просроченных документов.
-   * @param {boolean} force — игнорировать интервал
-   * @returns {Promise<{success, results, total, skipped?}>}
-   */
   async runCleanup(force = false) {
     const now = Date.now();
     if (!force && now - this._lastCleanup < this._cleanupInterval) {
@@ -405,13 +427,13 @@ const CleanupManager = {
     }
     this._lastCleanup = now;
 
-    // ⭐ v1.1.0: результаты по каждой коллекции отдельно
     const results = {
       chat_messages: { ok: 0, error: null },
       notifications: { ok: 0, error: null },
       market_lots: { ok: 0, error: null },
       transactions: { ok: 0, error: null },
-      trade_offers: { ok: 0, error: null }
+      trade_offers: { ok: 0, error: null },
+      p2p_notifications_queue: { ok: 0, error: null }
     };
 
     const collectionsToClean = [
@@ -419,13 +441,13 @@ const CleanupManager = {
       'notifications',
       'market_lots',
       'transactions',
-      'trade_offers'
+      'trade_offers',
+      'p2p_notifications_queue'
     ];
 
     let totalDeleted = 0;
     let errorCount = 0;
 
-    // ⭐ v1.1.0: каждую коллекцию чистим изолированно
     for (const colName of collectionsToClean) {
       try {
         const q = query(
@@ -451,14 +473,12 @@ const CleanupManager = {
         results[colName].ok = deleted;
         totalDeleted += deleted;
       } catch (colErr) {
-        // ⭐ v1.1.0: не валим весь cleanup из-за одной коллекции
         const errMsg = colErr?.code || colErr?.message || String(colErr);
         results[colName].error = errMsg;
         errorCount++;
 
-        // Логируем детально, но не роняем цикл
         if (errMsg.includes('permission-denied')) {
-          console.warn(`[Cleanup] ${colName}: permission-denied (коллекция не открыта в Firestore Rules)`);
+          console.warn(`[Cleanup] ${colName}: permission-denied`);
         } else {
           console.warn(`[Cleanup] ${colName} error:`, errMsg);
         }
@@ -476,7 +496,6 @@ const CleanupManager = {
       );
     }
 
-    // ⭐ v1.1.0: успех, если хоть что-то почищено или не было ошибок
     return {
       success: errorCount === 0 || totalDeleted > 0,
       results,
@@ -502,7 +521,8 @@ async function getFirestoreStats() {
     trade_offers: 0,
     friendships: 0,
     street_events: 0,
-    storage_wars_lobbies: 0
+    storage_wars_lobbies: 0,
+    p2p_notifications_queue: 0
   };
 
   try {
@@ -543,19 +563,21 @@ window.FB_Core = {
   // Stats
   getStats: getFirestoreStats,
 
+  // Push Context
+  registerTelegramPushContext,
+
   // Хелперы
   getTelegramUser,
   devLogFirestore,
 
-  // Константы (для справки)
+  // Константы
   TTL_CONFIG,
   LIMITS
 };
 
-// Алиасы для совместимости со старым кодом
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Core v1.1.0] Ядро Firebase загружено. Auth, Players, Cleanup (isolated per-collection), Stats ✓");
+console.log("[☁️ FB_Core v1.2.0] Ядро Firebase загружено. P2P Telegram Context & Queue ready ✓");
 
 // ========================================================
 // 9. АВТОЗАПУСК CLEANUP

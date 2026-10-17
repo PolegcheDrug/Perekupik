@@ -1,33 +1,15 @@
 // ========================================================
-// js/firebase-notifications.js — УВЕДОМЛЕНИЯ, ЧАТ, СОБЫТИЯ (v1.1.0)
+// js/firebase-notifications.js — УВЕДОМЛЕНИЯ, ЧАТ, СОБЫТИЯ (v1.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.1.0 (SPRINT 3 — ФИКСЫ БЕЗ СОСТАВНЫХ ИНДЕКСОВ):
-//   - ФИКС: fetchMyNotifications — убран 3-way where + orderBy
-//     (требовал индекса). Теперь single-field where(toUser)
-//     + клиентская фильтрация по claimed/expireAt и сортировка.
-//   - ФИКС: subscribeToNotifications — то же самое.
-//   - ФИКС: fetchMessagesForDialog — убран orderBy, сортировка
-//     на клиенте. Требовал индекса dialogId+timestamp.
-//   - ФИКС: subscribeToDialog — то же самое.
-//   - ФИКС: fetchEvents / subscribeToEvents — orderBy убран,
-//     сортировка на клиенте (single-field auto-index уже есть,
-//     но избегаем любых сюрпризов с коллекциями).
-//   - ФИКС: sendMessage и pushEvent — защита от ошибок, возврат
-//     осмысленного сообщения при permission-denied.
-// ⭐ v1.0.0 (ВЫДЕЛЕНО ИЗ firebase-bridge.js):
-//   - NotificationsManager (fetchMyNotifications,
-//     subscribeToNotifications, claimNotificationPayout,
-//     unsubscribeAll)
-//   - ChatMessagesManager (sendMessage, fetchMessagesForDialog,
-//     subscribeToDialog)
-//   - EventsManager (fetchEvents, pushEvent, toggleReaction,
-//     subscribeToEvents)
-//   - CANNED_PHRASES (quick-chat фразы для M+)
-//   - Экспорт в window.FB_Notifications
-//
-// ВАЖНО: файл — ES-модуль (import), подключается через
-//   <script type="module" src="firebase-notifications.js?v=421"></script>
-// Должен быть загружен ПОСЛЕ firebase-core.js.
+// ⭐ v1.2.0 (P2P BOT NOTIFICATIONS & QUEUE DISPATCHER):
+//   - ДОБАВЛЕНО: P2PNotificationsManager для генерации и отправки
+//     push-задач целевому игроку в коллекцию 'p2p_notifications_queue'.
+//   - ДОБАВЛЕНО: автоматическое разрешение Telegram Chat ID адресата через players/{uid}.
+//   - ДОБАВЛЕНО: шаблонизация P2P-уведомлений (новое предложение, принятие сделки,
+//     отклонение предложения, отмена оффера инициатором).
+//   - ДОБАВЛЕНО: дублирование P2P-уведомления во внутриигровую коллекцию 'notifications',
+//     чтобы игрок видел статус и в игре, и через Telegram-бота вне игры.
+//   - СОХРАНЕНО: v1.1.0 клиентская фильтрация без составных индексов Firestore.
 // ========================================================
 
 import {
@@ -97,7 +79,6 @@ function getCurrentPlayerProfile() {
 
 // ========================================================
 // 3. ХЕЛПЕР: клиентская фильтрация + сортировка
-// (используется вместо составных индексов Firestore)
 // ========================================================
 function _filterAndSortDocs(items, opts = {}) {
   if (!Array.isArray(items)) return [];
@@ -105,14 +86,11 @@ function _filterAndSortDocs(items, opts = {}) {
 
   const result = items.filter(item => {
     if (!item) return false;
-    // Отсеиваем протухшие (если есть expireAt)
     if (item.expireAt && item.expireAt < now) return false;
-    // Фильтр по claimed (для уведомлений)
     if (opts.claimed !== undefined && item.claimed !== opts.claimed) return false;
     return true;
   });
 
-  // Сортировка по timestamp
   if (opts.sortBy) {
     const dir = opts.sortDir === 'asc' ? 1 : -1;
     result.sort((a, b) => {
@@ -161,15 +139,11 @@ const CANNED_PHRASES = {
 };
 
 // ========================================================
-// 5. NOTIFICATIONS MANAGER
+// 5. NOTIFICATIONS MANAGER (ВНУТРИИГРОВЫЕ)
 // ========================================================
 const NotificationsManager = {
   _listeners: new Map(),
 
-  /**
-   * Получить все непрочитанные уведомления игрока.
-   * ⭐ v1.1.0: single-field where(toUser) + клиентская фильтрация.
-   */
   async fetchMyNotifications(userId) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
     if (!targetUid) return [];
@@ -185,7 +159,6 @@ const NotificationsManager = {
       const raw = [];
       snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
 
-      // ⭐ Клиентская фильтрация: только claimed=false + сортировка timestamp desc
       const filtered = _filterAndSortDocs(raw, {
         claimed: false,
         sortBy: 'timestamp',
@@ -204,13 +177,6 @@ const NotificationsManager = {
     }
   },
 
-  /**
-   * Real-time подписка на уведомления.
-   * ⭐ v1.1.0: single-field where(toUser) + клиентский фильтр.
-   * @param {string} userId
-   * @param {Function} callback — вызывается с массивом уведомлений
-   * @returns {Function} unsubscribe
-   */
   subscribeToNotifications(userId, callback) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
     if (!targetUid || typeof callback !== 'function') return () => {};
@@ -250,9 +216,6 @@ const NotificationsManager = {
     }
   },
 
-  /**
-   * Отписаться от всех подписок.
-   */
   unsubscribeAll() {
     this._listeners.forEach((unsub) => {
       try { unsub(); } catch (e) {}
@@ -260,9 +223,6 @@ const NotificationsManager = {
     this._listeners.clear();
   },
 
-  /**
-   * Пометить уведомление как обработанное (claimed).
-   */
   async claimNotificationPayout(notifId) {
     try {
       await updateDoc(doc(db, "notifications", notifId), {
@@ -278,15 +238,180 @@ const NotificationsManager = {
 };
 
 // ========================================================
-// 6. CHAT MESSAGES MANAGER
+// 6. P2P NOTIFICATIONS MANAGER (ВНЕИГРОВЫЕ PUSH-УВЕДОМЛЕНИЯ БОТА)
+// ========================================================
+const P2PNotificationsManager = {
+  /**
+   * Получить chat_id адресата из Firestore (players/{uid}).
+   */
+  async resolveTargetChatId(targetUserId) {
+    if (!targetUserId) return null;
+    try {
+      const snap = await getDoc(doc(db, "players", String(targetUserId)));
+      if (snap.exists()) {
+        const data = snap.data();
+        return data.chat_id || data.telegram_id || String(targetUserId);
+      }
+    } catch (e) {
+      console.warn('[P2P_Push] Не удалось получить chat_id для игрока:', targetUserId);
+    }
+    return String(targetUserId);
+  },
+
+  /**
+   * Запланировать отправку P2P-уведомления ботом и внутри игры.
+   * @param {Object} opts
+   * @param {string} opts.targetUserId — UID получателя
+   * @param {string} opts.type — 'p2p_offer_received' | 'p2p_offer_accepted' | 'p2p_offer_declined' | 'p2p_offer_cancelled'
+   * @param {string} opts.title — Заголовок уведомления
+   * @param {string} opts.text — Основной текст для Telegram
+   * @param {Object} [opts.meta] — Дополнительные данные сделки (offerId, carName, cash, senderName)
+   */
+  async queueP2PNotification(opts) {
+    const { targetUserId, type, title, text, meta = {} } = opts;
+    if (!targetUserId || !text) return false;
+
+    const senderProfile = getCurrentPlayerProfile();
+    const targetChatId = await this.resolveTargetChatId(targetUserId);
+    const queueId = "p2p_push_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+    const now = Date.now();
+
+    // 1. Задача для внешнего Telegram-бота
+    const botTask = {
+      id: queueId,
+      targetUserId: String(targetUserId),
+      targetChatId: String(targetChatId),
+      type: type || 'p2p_deal',
+      title: title || 'P2P Сделка',
+      text: text,
+      meta: {
+        senderId: senderProfile?.id || null,
+        senderName: senderProfile?.name || 'Игрок',
+        ...meta
+      },
+      status: 'pending',
+      createdAt: now,
+      expireAt: now + (TTL_CONFIG.p2p_notifications_queue || 86400000)
+    };
+
+    // 2. Внутриигровое уведомление
+    const inGameNotification = {
+      id: "notif_" + queueId,
+      toUser: String(targetUserId),
+      fromUser: senderProfile?.id ? String(senderProfile.id) : null,
+      fromUserName: senderProfile?.name || "Игрок",
+      type: type || 'p2p_trade',
+      title: title || 'P2P Торговля',
+      message: text,
+      claimed: false,
+      read: false,
+      timestamp: now,
+      expireAt: now + TTL_CONFIG.notifications,
+      meta: meta
+    };
+
+    try {
+      await Promise.all([
+        setDoc(doc(db, "p2p_notifications_queue", queueId), botTask),
+        setDoc(doc(db, "notifications", inGameNotification.id), inGameNotification)
+      ]);
+
+      devLogFirestore('queueP2PNotification OK', `${type} -> ${targetUserId} (Chat: ${targetChatId})`);
+      return true;
+    } catch (e) {
+      const errMsg = e?.code || e?.message || String(e);
+      console.warn('[P2P_Push] Ошибка постановки в очередь:', errMsg);
+      devLogFirestore('queueP2PNotification ERR', errMsg);
+      return false;
+    }
+  },
+
+  /**
+   * Шаблон: Входящее предложение обмена/покупки.
+   */
+  async notifyOfferReceived(targetUserId, offerData) {
+    const carName = offerData.car?.name || offerData.car?.title || "Автомобиль";
+    const sender = offerData.senderName || "Другой перекуп";
+    const cashPart = offerData.cash ? ` и доплату $${Number(offerData.cash).toLocaleString()}` : '';
+
+    const text = `🤝 <b>Новое P2P-предложение!</b>\n` +
+                 `Перекуп <b>${sender}</b> предлагает сделку по <b>${carName}</b>${cashPart}.\n` +
+                 `Зайди в игру, чтобы рассмотреть или принять оффер!`;
+
+    return this.queueP2PNotification({
+      targetUserId,
+      type: 'p2p_offer_received',
+      title: 'Входящее P2P-предложение',
+      text,
+      meta: { offerId: offerData.id, carName }
+    });
+  },
+
+  /**
+   * Шаблон: Предложение принято, сделка закрыта.
+   */
+  async notifyOfferAccepted(targetUserId, dealData) {
+    const carName = dealData.carName || "Автомобиль";
+    const responder = dealData.responderName || "Покупатель";
+
+    const text = `🎉 <b>Сделка завершена!</b>\n` +
+                 `<b>${responder}</b> принял ваше предложение по авто <b>${carName}</b>.\n` +
+                 `Деньги и техника зачислены на баланс!`;
+
+    return this.queueP2PNotification({
+      targetUserId,
+      type: 'p2p_offer_accepted',
+      title: 'Сделка закрыта 🤝',
+      text,
+      meta: { carName }
+    });
+  },
+
+  /**
+   * Шаблон: Предложение отклонено.
+   */
+  async notifyOfferDeclined(targetUserId, dealData) {
+    const carName = dealData.carName || "Автомобиль";
+    const responder = dealData.responderName || "Владелец";
+
+    const text = `❌ <b>Предложение отклонено</b>\n` +
+                 `<b>${responder}</b> отклонил ваше предложение по лоту <b>${carName}</b>. Средства и авто возвращены.`;
+
+    return this.queueP2PNotification({
+      targetUserId,
+      type: 'p2p_offer_declined',
+      title: 'Оффер отклонён',
+      text,
+      meta: { carName }
+    });
+  },
+
+  /**
+   * Шаблон: Инициатор отменил предложение.
+   */
+  async notifyOfferCancelled(targetUserId, dealData) {
+    const carName = dealData.carName || "Автомобиль";
+    const sender = dealData.senderName || "Покупатель";
+
+    const text = `⚠️ <b>Оффер отозван</b>\n` +
+                 `Перекуп <b>${sender}</b> отменил предложение по авто <b>${carName}</b>.`;
+
+    return this.queueP2PNotification({
+      targetUserId,
+      type: 'p2p_offer_cancelled',
+      title: 'Оффер отозван',
+      text,
+      meta: { carName }
+    });
+  }
+};
+
+// ========================================================
+// 7. CHAT MESSAGES MANAGER
 // ========================================================
 const ChatMessagesManager = {
   _listeners: [],
 
-  /**
-   * Отправить сообщение в диалог.
-   * @param {Object} params — { receiverId?, clubId?, dialogId?, text, senderProfile? }
-   */
   async sendMessage(params) {
     const profile = params.senderProfile || getCurrentPlayerProfile();
     if (!profile?.id) return { success: false, error: "Нет профиля" };
@@ -318,10 +443,6 @@ const ChatMessagesManager = {
     }
   },
 
-  /**
-   * Получить сообщения диалога (одноразово).
-   * ⭐ v1.1.0: single-field where(dialogId) + клиентская сортировка.
-   */
   async fetchMessagesForDialog(dialogId) {
     if (!dialogId) return [];
     try {
@@ -335,7 +456,6 @@ const ChatMessagesManager = {
       const raw = [];
       snap.forEach(d => raw.push(d.data()));
 
-      // ⭐ Клиентская сортировка по timestamp asc
       const sorted = _filterAndSortDocs(raw, {
         sortBy: 'timestamp',
         sortDir: 'asc'
@@ -353,10 +473,6 @@ const ChatMessagesManager = {
     }
   },
 
-  /**
-   * Real-time подписка на сообщения диалога.
-   * ⭐ v1.1.0: single-field where(dialogId) + клиентская сортировка.
-   */
   subscribeToDialog(dialogId, callback) {
     if (!dialogId || typeof callback !== 'function') return () => {};
 
@@ -394,9 +510,6 @@ const ChatMessagesManager = {
     }
   },
 
-  /**
-   * Отписаться от всех подписок.
-   */
   unsubscribeAll() {
     this._listeners.forEach(unsub => {
       try { unsub(); } catch (e) {}
@@ -406,15 +519,11 @@ const ChatMessagesManager = {
 };
 
 // ========================================================
-// 7. EVENTS MANAGER (уличные события M+)
+// 8. EVENTS MANAGER (уличные события M+)
 // ========================================================
 const EventsManager = {
   _listeners: [],
 
-  /**
-   * Получить последние события.
-   * ⭐ v1.1.0: клиентская сортировка вместо orderBy.
-   */
   async fetchEvents(limitCount = 35) {
     try {
       const q = query(
@@ -426,7 +535,6 @@ const EventsManager = {
       const raw = [];
       snap.forEach(d => raw.push({ id: d.id, ...d.data() }));
 
-      // ⭐ Клиентская сортировка по timestamp desc
       const sorted = _filterAndSortDocs(raw, {
         sortBy: 'timestamp',
         sortDir: 'desc'
@@ -444,9 +552,6 @@ const EventsManager = {
     }
   },
 
-  /**
-   * Опубликовать новое событие.
-   */
   async pushEvent(eventData) {
     const profile = getCurrentPlayerProfile();
     if (!eventData || !profile?.id) return { success: false };
@@ -480,9 +585,6 @@ const EventsManager = {
     }
   },
 
-  /**
-   * Увеличить счётчик реакции.
-   */
   async toggleReaction(eventId, reactionType, userId) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
     if (!eventId || !reactionType || !targetUid) return false;
@@ -502,10 +604,6 @@ const EventsManager = {
     }
   },
 
-  /**
-   * Real-time подписка на ленту событий.
-   * ⭐ v1.1.0: клиентская сортировка.
-   */
   subscribeToEvents(callback, limitCount = 35) {
     if (typeof callback !== 'function') return () => {};
     try {
@@ -547,10 +645,11 @@ const EventsManager = {
 };
 
 // ========================================================
-// 8. ЭКСПОРТ В WINDOW
+// 9. ЭКСПОРТ В WINDOW
 // ========================================================
 window.FB_Notifications = {
   Notifications: NotificationsManager,
+  P2P: P2PNotificationsManager,
   ChatMessages: ChatMessagesManager,
   Events: EventsManager,
   CANNED_PHRASES
@@ -558,7 +657,8 @@ window.FB_Notifications = {
 
 // Алиасы для совместимости со старым кодом
 window.FB_NotificationsManager = NotificationsManager;
+window.FB_P2PNotificationsManager = P2PNotificationsManager;
 window.FB_ChatMessagesManager = ChatMessagesManager;
 window.FB_EventsManager = EventsManager;
 
-console.log('[🔔 FB_Notifications v1.1.0] Без составных индексов. Notifications, ChatMessages, Events, CANNED_PHRASES ✓');
+console.log('[🔔 FB_Notifications v1.2.0] Notifications, P2P Bot Queue, ChatMessages, Events, CANNED_PHRASES ✓');

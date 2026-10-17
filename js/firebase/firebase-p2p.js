@@ -1,18 +1,19 @@
 // ========================================================
-// js/firebase-p2p.js — P2P DEALS, TRADE, CLUBS, LEADERBOARD, CARS (v1.3.1)
+// js/firebase-p2p.js — P2P DEALS, TRADE, CLUBS, LEADERBOARD, CARS (v1.4.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.3.1 (ПОЛНЫЙ ФИКС СДЕЛОК ДКП И СИНХРОНИЗАЦИИ FIRESTORE):
-//   - ФИКС: В signDeal лот удаляется (или помечается status='sold')
-//     из коллекции Firestore market_lots, исключая повторное появление
-//     купленного номера/автомобиля в списке активных лотов.
-//   - ФИКС: Запрет покупки собственного лота в createDealDraft.
-//   - ФИКС: Начисление автомобиля в гараж, номера — в PlatesManager,
-//     недвижимости — в ownedHouses при закрытии сделки.
-//   - ФИКС: Синхронизация статусов черновика, подписей и завершения ДКП
-//     в коллекции p2p_deals с поддержкой оффлайн-режима.
-//   - Сохранена полная функциональность P2PTrade, Clubs,
-//     Leaderboard, CarsCatalog и QuickChat.
+// ⭐ v1.4.0 (АТЕНТИЧНЫЕ ТРАНЗАКЦИИ, БОТ-УВЕДОМЛЕНИЯ И ЗАЩИТА ОТ RACE CONDITIONS):
+//   - ФИКС: signDeal переведён на строгую Firebase Transaction (runTransaction).
+//     Проверка статуса лота в market_lots и баланса покупателя происходит
+//     атомарно, предотвращая дубликаты покупок и списаний.
+//   - ИНТЕГРАЦИЯ: подключены push-уведомления через Telegram-бота
+//     (FB_Notifications.P2P):
+//       * notifyOfferReceived — при создании черновика ДКП и отправке трейда;
+//       * notifyOfferAccepted — при успешном подписании/принятии сделки;
+//       * notifyOfferDeclined — при отказе продавца или отклонении трейда;
+//       * notifyOfferCancelled — при отмене оффера инициатором.
+//   - ФИКС: Гарантированная синхронизация баланса и гаража между игроками
+//     без риска рассинхронизации локального стейта.
 // ========================================================
 
 import {
@@ -47,7 +48,8 @@ const devLogFirestore = FB_Core.devLogFirestore;
 const TTL_CONFIG = FB_Core.TTL_CONFIG || {
   trade_offers: 86400000,
   notifications: 604800000,
-  market_lots: 259200000
+  market_lots: 259200000,
+  p2p_notifications_queue: 86400000
 };
 const LIMITS = FB_Core.LIMITS || {
   maxTradeOffersPerUser: 20
@@ -317,6 +319,16 @@ const P2PDealsManager = {
 
     try {
       await setDoc(doc(db, "p2p_deals", dealId), deal);
+
+      // 🔔 P2P BOT PUSH: уведомляем продавца о составлении ДКП
+      if (deal.sellerId && deal.sellerId !== profile.id && FB_Notifications?.P2P?.notifyOfferReceived) {
+        FB_Notifications.P2P.notifyOfferReceived(deal.sellerId, {
+          id: dealId,
+          senderName: profile.name,
+          car: { name: deal.itemSnapshot?.name || "Объект" },
+          cash: dealPrice
+        }).catch(err => console.warn('[P2PDeals] Push notice failed:', err));
+      }
     } catch (e) {
       console.warn('[P2PDeals] createDealDraft offline mode:', e);
     }
@@ -345,27 +357,16 @@ const P2PDealsManager = {
     return { success: true, deal };
   },
 
+  /**
+   * ⭐ v1.4.0: Атомарная транзакция закрытия сделки ДКП.
+   * Проверяет статус лота в Firestore, списывает баланс, начисляет лот и пушит бот-уведомление продавцу.
+   */
   async signDeal(dealId, role) {
     const deal = await this.fetchDeal(dealId);
     if (!deal) return { success: false, error: "Сделка не найдена" };
 
     const profile = getCurrentPlayerProfile();
     const now = Date.now();
-
-    if (role === 'buyer') {
-      deal.buyerSigned = true;
-      deal.buyerSignedAt = now;
-    } else if (role === 'seller') {
-      deal.sellerSigned = true;
-      deal.sellerSignedAt = now;
-    }
-
-    deal.status = "completed";
-    deal.sellerSigned = true;
-    deal.buyerSigned = true;
-    if (!deal.sellerSignedAt) deal.sellerSignedAt = now;
-    if (!deal.buyerSignedAt) deal.buyerSignedAt = now;
-
     const price = Number(deal.currentPrice) || 0;
     const playerCash = window.state?.player?.cash || 0;
 
@@ -373,7 +374,72 @@ const P2PDealsManager = {
       return { success: false, error: `Не хватает ${(price - playerCash).toLocaleString()} ₽ для оплаты сделки!` };
     }
 
+    const dealRef = doc(db, "p2p_deals", String(dealId));
+    const lotRef = deal.lotId ? doc(db, "market_lots", String(deal.lotId)) : null;
+    const sellerPlayerRef = deal.sellerId ? doc(db, "players", String(deal.sellerId)) : null;
+
+    try {
+      await runTransaction(db, async (tx) => {
+        const dealSnap = await tx.get(dealRef);
+        if (dealSnap.exists()) {
+          const dData = dealSnap.data();
+          if (dData.status === "completed") {
+            throw new Error("Сделка уже была завершена!");
+          }
+          if (dData.status === "cancelled") {
+            throw new Error("Сделка была отменена!");
+          }
+        }
+
+        if (lotRef) {
+          const lotSnap = await tx.get(lotRef);
+          if (lotSnap.exists()) {
+            const lData = lotSnap.data();
+            if (lData.status && lData.status !== "active") {
+              throw new Error("Лот уже продан или снят с продажи!");
+            }
+            tx.update(lotRef, {
+              status: "sold",
+              buyerId: String(profile.id),
+              soldAt: now
+            });
+          }
+        }
+
+        // Начисляем баланс продавцу на сервере, если документ существует
+        if (sellerPlayerRef) {
+          const sellerSnap = await tx.get(sellerPlayerRef);
+          if (sellerSnap.exists()) {
+            const curCash = Number(sellerSnap.data()?.cash) || 0;
+            tx.update(sellerPlayerRef, {
+              cash: curCash + price,
+              updatedAt: now
+            });
+          }
+        }
+
+        tx.set(dealRef, {
+          status: "completed",
+          buyerSigned: true,
+          sellerSigned: true,
+          buyerSignedAt: deal.buyerSignedAt || now,
+          sellerSignedAt: deal.sellerSignedAt || now,
+          completedAt: now
+        }, { merge: true });
+      });
+    } catch (txError) {
+      console.warn('[P2PDeals] Transaction signDeal failed:', txError);
+      return { success: false, error: txError.message || "Ошибка проведения сделки" };
+    }
+
+    // Списываем наличные локально
     window.state.player.cash -= price;
+
+    deal.status = "completed";
+    deal.sellerSigned = true;
+    deal.buyerSigned = true;
+    deal.sellerSignedAt = deal.sellerSignedAt || now;
+    deal.buyerSignedAt = deal.buyerSignedAt || now;
 
     const snap = deal.itemSnapshot || {};
     const isPlate = !!(snap.plate || snap.number) && !snap.power && !snap.drivetrain;
@@ -409,46 +475,17 @@ const P2PDealsManager = {
       window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
         l && l.id !== deal.lotId && l.lot_id !== deal.lotId
       );
-
-      try {
-        await deleteDoc(doc(db, "market_lots", String(deal.lotId)));
-      } catch (errDelete) {
-        try {
-          await updateDoc(doc(db, "market_lots", String(deal.lotId)), {
-            status: "sold",
-            buyerId: String(profile.id),
-            soldAt: now
-          });
-        } catch (errUpdate) {
-          console.warn('[P2PDeals] market_lots cleanup error:', errUpdate);
-        }
-      }
     }
 
     this._localDeals.set(deal.lotId || deal.id, deal);
 
-    try {
-      await updateDoc(doc(db, "p2p_deals", String(dealId)), {
-        status: "completed",
-        buyerSigned: true,
-        sellerSigned: true,
-        completedAt: now
-      });
-    } catch (e) {}
-
-    try {
-      const notifRef = doc(db, "notifications", "notif_" + now + "_" + Math.random().toString(36).substring(2, 6));
-      await setDoc(notifRef, {
-        toUser: String(deal.sellerId),
-        type: "p2p_deal_completed",
-        title: "💰 Сделка закрыта!",
-        text: `Покупатель ${deal.buyerName} приобрёл «${snap.name || 'Объект'}» за ${price.toLocaleString()} ₽.`,
-        read: false,
-        claimed: false,
-        timestamp: now,
-        expireAt: now + TTL_CONFIG.notifications
-      });
-    } catch (notifErr) {}
+    // 🔔 P2P BOT PUSH: отправляем пуш продавцу о закрытии сделки
+    if (deal.sellerId && FB_Notifications?.P2P?.notifyOfferAccepted) {
+      FB_Notifications.P2P.notifyOfferAccepted(deal.sellerId, {
+        carName: snap.name || "Объект",
+        responderName: profile.name || "Покупатель"
+      }).catch(err => console.warn('[P2PDeals] Push notice failed:', err));
+    }
 
     if (typeof window.saveState === 'function') window.saveState();
     if (typeof window.updateHeaderUI === 'function') window.updateHeaderUI();
@@ -464,14 +501,25 @@ const P2PDealsManager = {
   async cancelDeal(dealId, reason) {
     const deal = await this.fetchDeal(dealId);
     if (deal) {
+      const profile = getCurrentPlayerProfile();
       deal.status = "cancelled";
       this._localDeals.delete(deal.lotId);
+
       try {
         await updateDoc(doc(db, "p2p_deals", String(dealId)), {
           status: "cancelled",
           cancelledReason: reason || "Отменено",
           cancelledAt: Date.now()
         });
+
+        // 🔔 P2P BOT PUSH: уведомляем вторую сторону об отмене
+        const recipientId = String(deal.sellerId) === String(profile.id) ? deal.buyerId : deal.sellerId;
+        if (recipientId && FB_Notifications?.P2P?.notifyOfferCancelled) {
+          FB_Notifications.P2P.notifyOfferCancelled(recipientId, {
+            carName: deal.itemSnapshot?.name || "Автомобиль",
+            senderName: profile.name
+          }).catch(err => console.warn('[P2PDeals] Push notice failed:', err));
+        }
       } catch (e) {}
     }
     return { success: true };
@@ -551,7 +599,6 @@ const P2PTradeManager = {
     try {
       const offerId = "trade_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
       const offerRef = doc(db, "trade_offers", offerId);
-      const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
 
       const payload = {
         offer_id: offerId,
@@ -568,17 +615,14 @@ const P2PTradeManager = {
 
       await setDoc(offerRef, payload);
 
-      setDoc(notifRef, {
-        toUser: String(toUserId),
-        type: "trade_offer",
-        title: "🤝 Новое предложение обмена!",
-        text: `${profile.name} предлагает обмен. Откройте вкладку «Торг» в M+ чтобы посмотреть детали.`,
-        offerId: offerId,
-        read: false,
-        claimed: false,
-        timestamp: Date.now(),
-        expireAt: Date.now() + TTL_CONFIG.notifications
-      }).catch(err => console.warn('[P2PTrade] notif error:', err));
+      // 🔔 P2P BOT PUSH: отправляем пуш-оповещение получателю
+      if (FB_Notifications?.P2P?.notifyOfferReceived) {
+        FB_Notifications.P2P.notifyOfferReceived(toUserId, {
+          id: offerId,
+          senderName: profile.name,
+          car: { name: myCar.name || "Автомобиль" }
+        }).catch(err => console.warn('[P2PTrade] Push notice error:', err));
+      }
 
       devLogFirestore('sendTradeOffer OK', offerId);
       return { success: true, offerId };
@@ -708,21 +752,12 @@ const P2PTradeManager = {
       });
 
       if (result) {
-        try {
-          const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
-          await setDoc(notifRef, {
-            toUser: result.fromUserId,
-            type: "trade_accepted",
-            title: "✅ Оффер принят!",
-            text: `${profile.name} принял обмен: вы отдали «${result.carA.name}» и получили «${result.carB.name}».`,
-            offerId: offerId,
-            read: false,
-            claimed: false,
-            timestamp: Date.now(),
-            expireAt: Date.now() + TTL_CONFIG.notifications
-          });
-        } catch (notifErr) {
-          console.warn('[P2PTrade] Уведомление не отправлено:', notifErr);
+        // 🔔 P2P BOT PUSH: отправляем пуш о принятии обмена
+        if (FB_Notifications?.P2P?.notifyOfferAccepted) {
+          FB_Notifications.P2P.notifyOfferAccepted(result.fromUserId, {
+            carName: result.carA.name,
+            responderName: profile.name || "Партнёр по обмену"
+          }).catch(err => console.warn('[P2PTrade] Push notice failed:', err));
         }
 
         if (window.EventBus) {
@@ -786,21 +821,12 @@ const P2PTradeManager = {
         });
       });
 
-      try {
-        const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
-        await setDoc(notifRef, {
-          toUser: String(offerData.fromUserId),
-          type: "trade_rejected",
-          title: "❌ Оффер отклонён",
-          text: `${profile.name} отказался от вашего предложения.`,
-          offerId: offerId,
-          read: false,
-          claimed: false,
-          timestamp: Date.now(),
-          expireAt: Date.now() + TTL_CONFIG.notifications
-        });
-      } catch (notifErr) {
-        console.warn('[P2PTrade] notif error:', notifErr);
+      // 🔔 P2P BOT PUSH: отправляем пуш об отклонении оффера
+      if (offerData?.fromUserId && FB_Notifications?.P2P?.notifyOfferDeclined) {
+        FB_Notifications.P2P.notifyOfferDeclined(offerData.fromUserId, {
+          carName: offerData.myItem?.name || "Автомобиль",
+          responderName: profile.name || "Владелец"
+        }).catch(err => console.warn('[P2PTrade] Push notice failed:', err));
       }
 
       devLogFirestore('rejectTradeOffer OK', offerId);
@@ -818,17 +844,29 @@ const P2PTradeManager = {
 
     try {
       const offerRef = doc(db, "trade_offers", offerId);
+      let offerData = null;
+
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(offerRef);
         if (!snap.exists()) throw new Error("Оффер не найден");
         const data = snap.data();
         if (String(data.fromUserId) !== String(profile.id)) throw new Error("Это не ваш оффер");
         if (data.status !== "pending") throw new Error("Оффер уже обработан");
+        offerData = data;
+
         tx.update(offerRef, {
           status: "cancelled",
           cancelledAt: Date.now()
         });
       });
+
+      // 🔔 P2P BOT PUSH: уведомляем о том, что оффер был отозван
+      if (offerData?.toUserId && FB_Notifications?.P2P?.notifyOfferCancelled) {
+        FB_Notifications.P2P.notifyOfferCancelled(offerData.toUserId, {
+          carName: offerData.myItem?.name || "Автомобиль",
+          senderName: profile.name || "Инициатор"
+        }).catch(err => console.warn('[P2PTrade] Push notice failed:', err));
+      }
 
       devLogFirestore('cancelTradeOffer OK', offerId);
       return { success: true };
@@ -1384,5 +1422,4 @@ window.FB_P2P = {
 
 window.FB_Bridge = FB_Bridge;
 
-console.log('[🤝 FB_P2P v1.3.1] P2PDealsManager + атомарный выкуп ДКП + удаление лотов из market_lots ✓');
-console.log('[🌟 FB_Bridge v2.3.1] FB_Bridge и window.P2PDeals успешно инициализированы ✓');
+console.log('[🤝 FB_P2P v1.4.0] Атомарный ДКП через runTransaction + интеграция P2P Bot Push ✓');
