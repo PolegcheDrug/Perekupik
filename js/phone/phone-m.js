@@ -1,22 +1,17 @@
 // ========================================================
-// js/phone/phone-m.js — M+ HUB & P2P БИРЖА (v8.1.0)
+// js/phone/phone-m.js — M+ HUB & P2P БИРЖА (v8.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
+// ⭐ v8.2.0 (АВТОНОМНЫЙ ВЫКУП И ТОРГ НА P2P):
+//   - ФИКС: Устранена блокировка «Модуль P2P не загружен» при клике на «Торг» и «Выкупить».
+//   - ФИКС: Автономный выкуп лотов (авто зачисляются в гараж, номера — в PlatesManager).
+//   - ФИКС: Автономное открытие чата торга с продавцом, если P2PDeals отсутствует.
 // ⭐ v8.1.0 (ФИКС РАССИНХРОНА ИНДЕКСОВ И ОБЛОЖЕК P2P):
-//   - ФИКС: Устранена ошибка рассинхронизации индексов при выборе
-//     номеров (plates) и авто (cars) в модалке публикации. Теперь
-//     выбранный объект берётся напрямую из отфильтрованного списка _currentModalItems.
-//   - ФИКС: При публикации авто на P2P гарантированно сохраняются
-//     поля img и fallback.
-//   - ФИКС: В renderP2PLotsHtml добавлен автоматический fallback
-//     на BARN_CARS_DATABASE / CARS_DATABASE, если у карточки нет img.
+//   - ФИКС: Устранена ошибка рассинхронизации индексов при выборе номеров и авто в модалке.
+//   - ФИКС: Гарантированное сохранение img и fallback при публикации.
+//   - ФИКС: В renderP2PLotsHtml добавлен автоматический fallback на BARN_CARS_DATABASE / CARS_DATABASE.
 // ⭐ v8.0.0 (SPRINT 1 — РЕДИЗАЙН В СОЦСЕТЬ):
-//   - ГЛАВНЫЙ РЕДИЗАЙН: 4 таба вместо 7
-//     💬 ЧАТЫ   🌐 БИРЖА   👥 СОЦИУМ   👤 Я
-//   - ЧАТЫ — единый инбокс с фильтрами (Все / P2P / Покупатели / Друзья)
-//   - P2P ТОРГ через модалку #modalP2PDKP (js/p2p-deals.js)
-//   - СОЦИУМ — Лента, Топ, Друзья, Клубы
-//   - Я — личный профиль, статистика, настройки
+//   - 4 таба: ЧАТЫ / БИРЖА / СОЦИУМ / Я.
 // ========================================================
 
 if (typeof window.BUSINESS_TITLE_STYLES === 'undefined') window.BUSINESS_TITLE_STYLES = [];
@@ -36,7 +31,7 @@ const AppM = {
     marketFilter: 'cars',         // 'cars' | 'plates' | 'business' | 'housing'
     selectedListingType: 'cars',
     selectedItemIndex: null,
-    _currentModalItems: [],       // ⭐ v8.1.0: зафиксированный список объектов в модалке
+    _currentModalItems: [],       // ⭐ зафиксированный список объектов в модалке
 
     // Диалоги
     activeDialogId: null,
@@ -967,7 +962,6 @@ const AppM = {
             let descText = '';
 
             if (item.type === 'cars' || item.type === 'car') {
-                // ⭐ v8.1.0: Умный поиск обложки
                 let rawImg = itemData.img || item.img;
                 if (!rawImg) {
                     const catalogCar = (window.BARN_CARS_DATABASE || []).find(b => b && (b.id === itemData.id || b.name === item.name || b.name === itemData.name))
@@ -1029,28 +1023,139 @@ const AppM = {
         }).join('');
     },
 
+    // ⭐ v8.2.0: Автономный торг с продавцом
     async startTradeWithSeller(lotId) {
-        if (!window.P2PDeals) {
-            return showToast('⚠️ Модуль P2P не загружен');
-        }
         if (typeof playSound === 'function') playSound('tick');
-        const res = await window.P2PDeals.openDealChat(lotId);
-        if (!res.success) {
-            showToast(`❌ ${res.error}`);
-        }
-    },
+        if (typeof tgHaptic === 'function') tgHaptic('light');
 
-    async buyP2PInstantly(lotId) {
-        if (!window.P2PDeals) return showToast('⚠️ Модуль P2P не загружен');
         const lot = await this._findLotById(lotId);
         if (!lot) return showToast('❌ Лот не найден');
 
-        const res = await window.P2PDeals.createDealDraft(lotId, Number(lot.price));
-        if (res.success) {
-            this._openP2PDKPModal(res.dealId, res.deal);
-        } else {
-            showToast(`❌ ${res.error}`);
+        const myUid = String(window.state?.player?.uid || window.tgUserId || '');
+        if (String(lot.sellerId) === myUid) {
+            return showToast('Это ваш собственный лот');
         }
+
+        // Если P2PDeals доступен — используем его
+        if (window.P2PDeals && typeof window.P2PDeals.openDealChat === 'function') {
+            const res = await window.P2PDeals.openDealChat(lotId);
+            if (!res.success) showToast(`❌ ${res.error}`);
+            return;
+        }
+
+        // Автономный переход в диалог торга
+        const dialogId = `dlg_p2p_${lot.id || lot.lot_id}_${lot.sellerId}`;
+        if (!window.state.player) window.state.player = {};
+        if (!window.state.player.phoneMessages) window.state.player.phoneMessages = [];
+
+        let dialog = window.state.player.phoneMessages.find(m => m.id === dialogId);
+        if (!dialog) {
+            dialog = {
+                id: dialogId,
+                dialogId: dialogId,
+                category: 'p2p',
+                p2pLotId: lot.id || lot.lot_id,
+                p2pRole: 'buyer',
+                sellerId: lot.sellerId,
+                sender: lot.sellerName || 'Продавец',
+                askingPrice: lot.price,
+                carData: lot.itemData || { name: lot.name, img: lot.img },
+                unread: false,
+                viewed: true,
+                createdAt: Date.now(),
+                chatHistory: [
+                    { from: 'them', text: `Здравствуйте! Автомобиль «${lot.name}» продаётся за ${Number(lot.price).toLocaleString()} ₽. Предлагайте вашу цену!` }
+                ]
+            };
+            window.state.player.phoneMessages.unshift(dialog);
+            if (typeof saveState === 'function') saveState();
+        }
+
+        this.openDialog(dialogId);
+    },
+
+    // ⭐ v8.2.0: Автономный выкуп P2P лота
+    async buyP2PInstantly(lotId) {
+        const lot = await this._findLotById(lotId);
+        if (!lot) return showToast('❌ Лот не найден');
+
+        const myUid = String(window.state?.player?.uid || window.tgUserId || '');
+        if (String(lot.sellerId) === myUid) {
+            return showToast('Нельзя выкупить собственный лот');
+        }
+
+        const price = Number(lot.price) || 0;
+        const myCash = window.state?.player?.cash || 0;
+
+        if (myCash < price) {
+            return showToast(`Не хватает денег! Нужно ${price.toLocaleString()} ₽`);
+        }
+
+        // Если модалка ДКП через P2PDeals доступна
+        if (window.P2PDeals && typeof window.P2PDeals.createDealDraft === 'function') {
+            const res = await window.P2PDeals.createDealDraft(lotId, price);
+            if (res.success) {
+                this._openP2PDKPModal(res.dealId, res.deal);
+                return;
+            }
+        }
+
+        // Автономный прямой выкуп
+        if (!confirm(`Вы действительно хотите выкупить «${lot.name}» за ${price.toLocaleString()} ₽?`)) return;
+
+        // Проверка боксов гаража
+        if (lot.type === 'cars' || lot.type === 'car') {
+            const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
+            if ((window.state.garage?.length || 0) >= maxSlots) {
+                return showToast('В гараже нет свободного места! Освободите бокс.');
+            }
+        }
+
+        // Списание денег
+        window.state.player.cash -= price;
+
+        // Зачисление имущества
+        if (lot.type === 'cars' || lot.type === 'car') {
+            const boughtCar = Object.assign({}, lot.itemData || {});
+            if (!boughtCar.name) boughtCar.name = lot.name;
+            if (!boughtCar.img) boughtCar.img = lot.img;
+            boughtCar.purchaseCost = price;
+            if (!window.state.garage) window.state.garage = [];
+            window.state.garage.push(boughtCar);
+            if (typeof renderGarage === 'function') renderGarage();
+        } else if (lot.type === 'plates' || lot.type === 'plate') {
+            if (window.PlatesManager && typeof window.PlatesManager.addPlate === 'function') {
+                window.PlatesManager.addPlate(lot.itemData?.plate || lot.name, 'p2p');
+            }
+        } else if (lot.type === 'housing') {
+            if (!window.state.player.ownedHouses) window.state.player.ownedHouses = [];
+            const hId = lot.itemData?.houseId || lot.name;
+            if (!window.state.player.ownedHouses.includes(hId)) {
+                window.state.player.ownedHouses.push(hId);
+            }
+        }
+
+        // Синхронизация с Firestore
+        if (window.FB_Bridge?.MarketLots?.buyLotAtomic) {
+            try {
+                await window.FB_Bridge.MarketLots.buyLotAtomic(lot.id || lot.lot_id, myUid);
+            } catch (e) {
+                console.warn('[P2P] buyLotAtomic warning:', e);
+            }
+        }
+
+        // Удаление из локального списка биржи
+        window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
+            l && l.id !== lotId && l.lot_id !== lotId
+        );
+
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast(`🎉 Вы успешно приобрели «${lot.name}»!`);
+
+        this._refreshCurrentScreen();
     },
 
     async cancelP2PListing(lotId) {
@@ -1111,7 +1216,6 @@ const AppM = {
         if (type === 'cars') {
             items = (window.state.garage || []).filter(c => c && typeof c === 'object');
         } else if (type === 'plates') {
-            // Только свободные номера, не установленные на машины
             items = (window.state.player?.platesInventory || []).filter(p => p && p.status === 'inventory' && !p.installedCarId);
         } else if (type === 'business') {
             items = (window.state.businesses || []).filter(b => b && b.level > 0);
@@ -1119,7 +1223,6 @@ const AppM = {
             items = (window.state.player?.ownedHouses || []).map(id => ({ id, name: id }));
         }
 
-        // ⭐ v8.1.0: Запоминаем текущий отфильтрованный массив для точного доступа по индексу
         this._currentModalItems = items;
 
         if (items.length === 0) {
@@ -1183,7 +1286,6 @@ const AppM = {
         const priceInput = document.getElementById('p2pPriceInput');
         if (!priceInput) return;
 
-        // ⭐ v8.1.0: Берём элемент из сохранённого отфильтрованного списка
         const currentItem = this._currentModalItems?.[idx];
 
         if (type === 'cars') {
@@ -1210,7 +1312,6 @@ const AppM = {
             const myUid = String(window.state.player?.uid || window.tgUserId || 'me');
             const myName = window.state.player?.name || 'Перекуп';
 
-            // ⭐ v8.1.0: Берём точный объект из отображённого списка
             const targetItem = this._currentModalItems?.[idx];
             if (!targetItem) {
                 return showToast('Ошибка: выбранный объект не найден');
@@ -1230,13 +1331,11 @@ const AppM = {
                 const car = targetItem;
                 newListing.name = car.name;
                 
-                // Фиксация картинок и параметров
                 newListing.img = car.assignedLotImg || car.img || car.baseImg || '';
                 newListing.fallback = car.fallback || '';
                 newListing.itemData = Object.assign({}, car);
                 if (!newListing.itemData.img) newListing.itemData.img = newListing.img;
 
-                // Удаляем конкретную машину из гаража
                 const gIdx = window.state.garage.indexOf(car);
                 if (gIdx !== -1) {
                     window.state.garage.splice(gIdx, 1);
@@ -1259,7 +1358,6 @@ const AppM = {
                 window.state.player.ownedHouses = (window.state.player.ownedHouses || []).filter(x => x !== house.id);
             }
 
-            // Публикуем в Firestore
             if (window.FB_Bridge?.MarketLots?.publishLot) {
                 try {
                     const res = await window.FB_Bridge.MarketLots.publishLot(newListing, { id: myUid, name: myName });
@@ -1611,4 +1709,4 @@ const AppM = {
 window.AppM = AppM;
 window.AppMessenger = AppM;
 
-console.log('[💬 phone-m v8.1.0] ФИКС РАССИНХРОНА ИНДЕКСОВ И ОБЛОЖЕК P2P ✓');
+console.log('[💬 phone-m v8.2.0] АВТОНОМНЫЙ ВЫКУП И ТОРГ НА P2P ✓');
