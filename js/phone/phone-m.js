@@ -1,45 +1,29 @@
 // ========================================================
-// js/phone/phone-m.js — M+ HUB & P2P БИРЖА (v8.0.0)
+// js/phone/phone-m.js — M+ HUB & P2P БИРЖА (v8.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
+// ⭐ v8.1.0 (ФИКС РАССИНХРОНА ИНДЕКСОВ И ОБЛОЖЕК P2P):
+//   - ФИКС: Устранена ошибка рассинхронизации индексов при выборе
+//     номеров (plates) и авто (cars) в модалке публикации. Теперь
+//     выбранный объект берётся напрямую из отфильтрованного списка _currentModalItems.
+//   - ФИКС: При публикации авто на P2P гарантированно сохраняются
+//     поля img и fallback.
+//   - ФИКС: В renderP2PLotsHtml добавлен автоматический fallback
+//     на BARN_CARS_DATABASE / CARS_DATABASE, если у карточки нет img.
 // ⭐ v8.0.0 (SPRINT 1 — РЕДИЗАЙН В СОЦСЕТЬ):
 //   - ГЛАВНЫЙ РЕДИЗАЙН: 4 таба вместо 7
 //     💬 ЧАТЫ   🌐 БИРЖА   👥 СОЦИУМ   👤 Я
-//   - ЧАТЫ — единый инбокс с фильтрами:
-//       • Все
-//       • Торг P2P (мои офферы как покупатель + как продавец)
-//       • Покупатели (NPC с площадки продаж)
-//       • Друзья (личные переписки)
-//   - P2P ТОРГ УПРОЩЁН:
-//       • Убрана сложная машина состояний pending/countered/accepted
-//       • Обычный чат как с NPC-покупателем
-//       • Кнопка «💰 Оформить ДКП» → модалка #modalP2PDKP
-//       • Вся логика в js/p2p-deals.js
-//   - СОЦИУМ — объединённый хаб:
-//       • 📰 Лента (MEventsModule)
-//       • 🏆 Топ (MLeaderboardModule)
-//       • 👫 Друзья (встроенный список)
-//       • 🎭 Клубы (MClubsModule)
-//   - Я — личный профиль:
-//       • Карточка игрока (аватар, ник, титул, уровень)
-//       • Статистика (сделки, винрейт, автопарк)
-//       • Настройки (стиль, звук, язык)
-//       • Достижения
-//
-// ЗАВИСИМОСТИ:
-//   - window.P2PDeals (js/p2p-deals.js)
-//   - window.MEventsModule (js/m-hub/m-events.js)
-//   - window.MLeaderboardModule (js/m-hub/m-leaderboard.js)
-//   - window.MClubsModule (js/m-hub/m-clubs.js)
-//   - window.FB_Bridge (firebase-*)
-//   - window.ModalManager
+//   - ЧАТЫ — единый инбокс с фильтрами (Все / P2P / Покупатели / Друзья)
+//   - P2P ТОРГ через модалку #modalP2PDKP (js/p2p-deals.js)
+//   - СОЦИУМ — Лента, Топ, Друзья, Клубы
+//   - Я — личный профиль, статистика, настройки
 // ========================================================
 
 if (typeof window.BUSINESS_TITLE_STYLES === 'undefined') window.BUSINESS_TITLE_STYLES = [];
 if (typeof window.BUSINESS_CARD_ANIMATIONS === 'undefined') window.BUSINESS_CARD_ANIMATIONS = [];
 
 const AppM = {
-    // ⭐ v8.0.0: 4 главных таба
+    // 4 главных таба
     activeTab: 'chats',           // 'chats' | 'market' | 'social' | 'me'
 
     // Подтабы СОЦИУМА
@@ -52,6 +36,7 @@ const AppM = {
     marketFilter: 'cars',         // 'cars' | 'plates' | 'business' | 'housing'
     selectedListingType: 'cars',
     selectedItemIndex: null,
+    _currentModalItems: [],       // ⭐ v8.1.0: зафиксированный список объектов в модалке
 
     // Диалоги
     activeDialogId: null,
@@ -71,7 +56,6 @@ const AppM = {
     _bindEvents() {
         if (!window.EventBus) return;
 
-        // ⭐ v8.0.0: P2P сделки
         window.EventBus.on('p2p:deal_completed', () => {
             this._refreshCurrentScreen();
         });
@@ -82,12 +66,10 @@ const AppM = {
             this._refreshCurrentScreen();
         });
 
-        // P2P чат открыт
         window.EventBus.on('p2p:chat_opened', () => {
             this._updateBadge();
         });
 
-        // Обновление бейджа при любых нотификациях
         window.EventBus.on('notification:received', () => {
             this._updateBadge();
         });
@@ -126,7 +108,6 @@ const AppM = {
     render(container) {
         if (!container) return;
 
-        // Если открыт диалог — рендерим его
         if (this.activeDialogId) {
             this.renderConversationScreen(container);
             return;
@@ -209,7 +190,6 @@ const AppM = {
     },
 
     _getActiveDealsCount() {
-        // Считаем сообщения P2P с активными ДКП (для бейджа на СОЦИУМ)
         const messages = window.state?.player?.phoneMessages || [];
         return messages.filter(m => m && m.category === 'p2p' && m.unread).length;
     },
@@ -230,54 +210,50 @@ const AppM = {
     },
 
     // ========================================================
-// ⭐ v8.0.0: ЧАТЫ — ЕДИНЫЙ ИНБОКС С ФИЛЬТРАМИ
-// ========================================================
-renderChatsScreen(container) {
-    if (!container) return;
+    // ЧАТЫ — ЕДИНЫЙ ИНБОКС С ФИЛЬТРАМИ
+    // ========================================================
+    renderChatsScreen(container) {
+        if (!container) return;
 
-    this.syncSalesLotBuyersToMessages();
+        this.syncSalesLotBuyersToMessages();
 
-    if (typeof window.cleanupOrphanedDialogs === 'function') {
-        try { window.cleanupOrphanedDialogs(); } catch (e) {}
-    }
+        if (typeof window.cleanupOrphanedDialogs === 'function') {
+            try { window.cleanupOrphanedDialogs(); } catch (e) {}
+        }
 
-    // Фильтруем диалоги
-    const filtered = this._getFilteredDialogs();
+        const filtered = this._getFilteredDialogs();
 
-    // Счётчики для фильтров
-    const allMsgs = window.state?.player?.phoneMessages || [];
-    const counts = {
-        all: allMsgs.length,
-        p2p: allMsgs.filter(m => m && m.category === 'p2p').length,
-        buyers: allMsgs.filter(m => m && m.category === 'buyers').length,
-        friends: allMsgs.filter(m => m && m.category === 'friends').length
-    };
+        const allMsgs = window.state?.player?.phoneMessages || [];
+        const counts = {
+            all: allMsgs.length,
+            p2p: allMsgs.filter(m => m && m.category === 'p2p').length,
+            buyers: allMsgs.filter(m => m && m.category === 'buyers').length,
+            friends: allMsgs.filter(m => m && m.category === 'friends').length
+        };
 
-    const curFilter = this.chatFilter;
+        const curFilter = this.chatFilter;
 
-    container.innerHTML = `
-        <!-- ФИЛЬТР-ЧИПСЫ (это и есть "Все переписки" и т.д.) -->
-        <div class="mplus-nav-scroll-bar mb-2">
-            <button onclick="AppM.setChatFilter('all')" class="m-nav-pill ${curFilter === 'all' ? 'active' : ''}">
-                <i class="fa-solid fa-list-ul"></i> Все (${counts.all})
-            </button>
-            <button onclick="AppM.setChatFilter('p2p')" class="m-nav-pill ${curFilter === 'p2p' ? 'active' : ''}">
-                <i class="fa-solid fa-handshake"></i> Торг P2P (${counts.p2p})
-            </button>
-            <button onclick="AppM.setChatFilter('buyers')" class="m-nav-pill ${curFilter === 'buyers' ? 'active' : ''}">
-                <i class="fa-solid fa-user-tag"></i> Покупатели (${counts.buyers})
-            </button>
-            <button onclick="AppM.setChatFilter('friends')" class="m-nav-pill ${curFilter === 'friends' ? 'active' : ''}">
-                <i class="fa-solid fa-user-group"></i> Друзья (${counts.friends})
-            </button>
-        </div>
+        container.innerHTML = `
+            <div class="mplus-nav-scroll-bar mb-2">
+                <button onclick="AppM.setChatFilter('all')" class="m-nav-pill ${curFilter === 'all' ? 'active' : ''}">
+                    <i class="fa-solid fa-list-ul"></i> Все (${counts.all})
+                </button>
+                <button onclick="AppM.setChatFilter('p2p')" class="m-nav-pill ${curFilter === 'p2p' ? 'active' : ''}">
+                    <i class="fa-solid fa-handshake"></i> Торг P2P (${counts.p2p})
+                </button>
+                <button onclick="AppM.setChatFilter('buyers')" class="m-nav-pill ${curFilter === 'buyers' ? 'active' : ''}">
+                    <i class="fa-solid fa-user-tag"></i> Покупатели (${counts.buyers})
+                </button>
+                <button onclick="AppM.setChatFilter('friends')" class="m-nav-pill ${curFilter === 'friends' ? 'active' : ''}">
+                    <i class="fa-solid fa-user-group"></i> Друзья (${counts.friends})
+                </button>
+            </div>
 
-        <!-- СПИСОК ДИАЛОГОВ -->
-        <div id="mDialogsListContainer">
-            ${this._renderDialogsListHtml(filtered)}
-        </div>
-    `;
-},
+            <div id="mDialogsListContainer">
+                ${this._renderDialogsListHtml(filtered)}
+            </div>
+        `;
+    },
 
     setChatFilter(filter) {
         this.chatFilter = filter;
@@ -298,7 +274,6 @@ renderChatsScreen(container) {
             filtered = all.filter(m => m && m.category === 'friends');
         }
 
-        // Сортируем: непрочитанные сверху, потом по свежести
         return [...filtered].sort((a, b) => {
             if (!a || !b) return 0;
             const aUnread = a.unread ? 1 : 0;
@@ -337,13 +312,11 @@ renderChatsScreen(container) {
         const isUnread = !!m.unread;
         const category = m.category || 'unknown';
 
-        // Определяем превью-карточку
         const carData = m.carData || {};
         const rawImg = carData.img || "assets/cars/economy/2101/vaz-2101.jpg";
         const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(carData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
 
-        // Бейдж категории
         let categoryBadge = '';
         if (category === 'p2p') {
             const role = m.p2pRole === 'seller' ? 'ВЫ — ПРОДАВЕЦ' : 'ВЫ — ПОКУПАТЕЛЬ';
@@ -359,13 +332,11 @@ renderChatsScreen(container) {
             ? `<span class="tag-badge bg-tag-red" style="font-weight:900; font-size:7.5px;"><span class="led-dot led-red"></span> НОВОЕ</span>`
             : '';
 
-        // Цена
         let priceText = '';
         if (m.askingPrice) {
             priceText = `${Number(m.askingPrice).toLocaleString()} ₽`;
         }
 
-        // Для p2p показываем кнопку «💰 ДКП», если есть активный ДКП
         let dealActionBtn = '';
         if (category === 'p2p') {
             dealActionBtn = `
@@ -382,7 +353,6 @@ renderChatsScreen(container) {
                  class="glass-card mb-2 p-2 cursor-pointer ${isUnread ? 'card-glow-deal' : ''}" 
                  style="border-left: 3px solid ${isUnread ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}; background: #090e18;">
                 
-                <!-- ПРЕВЬЮ ОБЪЕКТА -->
                 <div class="car-img-wrap mb-2" style="height:100px; position:relative; border-radius:10px; overflow:hidden;">
                     <img src="${carImg}" 
                          class="car-img" 
@@ -394,7 +364,6 @@ renderChatsScreen(container) {
                     ${categoryBadge ? `<div class="badge-tag badge-tl" style="top:4px; left:4px;">${categoryBadge}</div>` : ''}
                 </div>
 
-                <!-- ИНФО -->
                 <div class="flex-between mb-1">
                     <div style="min-width:0; flex:1;">
                         <b class="text-xs color-cyan" style="font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
@@ -412,7 +381,6 @@ renderChatsScreen(container) {
                     ` : ''}
                 </div>
 
-                <!-- ПОСЛЕДНЕЕ СООБЩЕНИЕ -->
                 <div class="seller-dialog-bubble my-1" 
                      style="border-left: 3px solid var(--cyan); background: rgba(0, 242, 254, 0.04); padding: 5px 9px; border-radius: 6px;">
                     <span class="sub-label" 
@@ -421,7 +389,6 @@ renderChatsScreen(container) {
                     </span>
                 </div>
 
-                <!-- ДЕЙСТВИЯ -->
                 <div class="grid-2 mt-1" style="gap:4px;">
                     <button onclick="event.stopPropagation(); AppM.openDialog('${m.id}')" 
                             class="btn btn-cyan btn-sm" 
@@ -453,7 +420,7 @@ renderChatsScreen(container) {
     },
 
     // ========================================================
-    // ⭐ v8.0.0: ОТКРЫТЬ ДКП ПО ДИАЛОГУ
+    // ОТКРЫТЬ ДКП ПО ДИАЛОГУ
     // ========================================================
     async openDealForDialog(dialogId) {
         const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === dialogId);
@@ -466,23 +433,19 @@ renderChatsScreen(container) {
         const lotId = msg.p2pLotId;
         if (!lotId) return showToast('❌ Нет привязки к лоту');
 
-        // Ищем активный ДКП по лоту
         if (!window.P2PDeals) {
             return showToast('⚠️ Модуль P2P-сделок не загружен');
         }
 
         const existing = await window.P2PDeals.findActiveDealByLot(lotId);
         if (existing) {
-            // Открываем существующий
             this._openP2PDKPModal(existing.id, existing);
             return;
         }
 
-        // Создаём новый черновик — берём цену из лота
         const lot = await this._findLotById(lotId);
         if (!lot) return showToast('❌ Лот не найден');
 
-        const myProfile = window.P2PDeals.getMyRole ? null : null; // заглушка
         const price = Number(lot.price) || 100000;
 
         const res = await window.P2PDeals.createDealDraft(lotId, price);
@@ -512,7 +475,6 @@ renderChatsScreen(container) {
             return showToast('⚠️ Модалка ДКП не найдена в index.html');
         }
 
-        // Заполняем модалку
         if (window.P2PDKPModal && typeof window.P2PDKPModal.open === 'function') {
             window.P2PDKPModal.open(dealId, deal);
         } else {
@@ -521,7 +483,7 @@ renderChatsScreen(container) {
     },
 
     // ========================================================
-    // ⭐ v8.0.0: ЭКРАН ДИАЛОГА (ОБСУЖДЕНИЕ)
+    // ЭКРАН ДИАЛОГА (ОБСУЖДЕНИЕ)
     // ========================================================
     async openDialog(msgId) {
         const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === msgId);
@@ -563,16 +525,12 @@ renderChatsScreen(container) {
         }
     },
 
-    // --------------------------------------------------------
-    // P2P ДИАЛОГ — обычный чат + кнопка «Оформить ДКП»
-    // --------------------------------------------------------
     async _renderP2PConversation(container, msg) {
         const carData = msg.carData || {};
         const rawImg = carData.img || "assets/cars/economy/2101/vaz-2101.jpg";
         const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(carData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
 
-        // Проверяем активный ДКП
         let activeDeal = null;
         if (window.P2PDeals && msg.p2pLotId) {
             try {
@@ -580,7 +538,6 @@ renderChatsScreen(container) {
             } catch (e) {}
         }
 
-        // Собираем chatHistory
         const history = msg.chatHistory || [];
 
         container.innerHTML = `
@@ -596,7 +553,6 @@ renderChatsScreen(container) {
             </div>
 
             <div class="phone-app-body" style="display:flex; flex-direction:column; gap:8px; padding:6px;">
-                <!-- КАРТОЧКА ЛОТА -->
                 <div class="glass-card p-2" style="border: 1.5px solid var(--cyan); background: #060a14; margin-bottom: 0;">
                     <div class="deal-car-preview-card" style="height:56px; min-height:56px; padding:4px 8px;">
                         <img src="${carImg}" class="deal-car-thumb" 
@@ -620,7 +576,6 @@ renderChatsScreen(container) {
                     </div>
                 </div>
 
-                <!-- АКТИВНЫЙ ДКП БАННЕР -->
                 ${activeDeal ? `
                     <div class="p-2" style="background:rgba(255,179,0,0.1); border-radius:10px; border:1px solid rgba(255,179,0,0.4);">
                         <div class="flex-between mb-1">
@@ -639,7 +594,6 @@ renderChatsScreen(container) {
                     </div>
                 ` : ''}
 
-                <!-- ЧАТ -->
                 <div class="chat-thread-container" id="mChatScrollBox" 
                      style="flex:1; min-height:180px; max-height:340px; overflow-y:auto; padding:8px; background:#04070e; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
                     ${history.length === 0 ? `
@@ -653,7 +607,6 @@ renderChatsScreen(container) {
                     `).join('')}
                 </div>
 
-                <!-- КОМПОЗЕР -->
                 <div class="p2p-compact-composer">
                     <input type="text" 
                            id="mP2PChatInput" 
@@ -669,7 +622,6 @@ renderChatsScreen(container) {
                     </button>
                 </div>
 
-                <!-- КНОПКА ДКП -->
                 <div class="grid-2" style="gap:6px;">
                     ${activeDeal ? `
                         <button onclick="AppM.openActiveDeal()" class="btn btn-amber w-full" style="font-size:11px;">
@@ -712,7 +664,6 @@ renderChatsScreen(container) {
         msg.lastMessageAt = Date.now();
         msg.preview = text;
 
-        // Отправляем в Firestore
         if (window.FB_Bridge?.ChatMessages?.sendMessage && msg.dialogId) {
             try {
                 await window.FB_Bridge.ChatMessages.sendMessage({
@@ -728,7 +679,6 @@ renderChatsScreen(container) {
         if (typeof saveState === 'function') saveState();
         if (typeof playSound === 'function') playSound('tick');
 
-        // Мгновенно показываем в чате
         const box = document.getElementById('mChatScrollBox');
         if (box) {
             const div = document.createElement('div');
@@ -740,9 +690,6 @@ renderChatsScreen(container) {
         }
     },
 
-    // --------------------------------------------------------
-    // NPC ДИАЛОГ — обсуждение с покупателем с площадки
-    // --------------------------------------------------------
     _renderNPCDialog(container, msg) {
         const carData = msg.carData || {};
         const rawImg = carData.img || "assets/cars/economy/2101/vaz-2101.jpg";
@@ -836,7 +783,6 @@ renderChatsScreen(container) {
     },
 
     acceptNPCBuyer(dialogId) {
-        // Делегируем в salesLot.js / market-deal.js
         if (typeof finishSalesLotDeal === 'function') {
             const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === dialogId);
             if (msg && msg.carIndex !== undefined) {
@@ -864,9 +810,6 @@ renderChatsScreen(container) {
         }
     },
 
-    // --------------------------------------------------------
-    // ДРУЗЬЯ / ПРОЧЕЕ
-    // --------------------------------------------------------
     _renderGenericDialog(container, msg) {
         const history = msg.chatHistory || [];
 
@@ -929,7 +872,7 @@ renderChatsScreen(container) {
     },
 
     // ========================================================
-    // ⭐ v8.0.0: БИРЖА
+    // БИРЖА
     // ========================================================
     renderMarketScreen(container) {
         if (!container) return;
@@ -983,7 +926,6 @@ renderChatsScreen(container) {
     renderP2PLotsHtml(filter) {
         let lots = window.state.p2pMarketListings || [];
 
-        // Дедупликация
         const seen = new Set();
         const deduped = [];
         lots.forEach(l => {
@@ -1021,14 +963,22 @@ renderChatsScreen(container) {
             const isMine = String(item.sellerId) === myUid;
             const itemData = item.itemData || {};
 
-            // Превью
             let imgHtml = '';
             let descText = '';
 
             if (item.type === 'cars' || item.type === 'car') {
-                const rawImg = itemData.img || item.img || "assets/cars/economy/2101/vaz-2101.jpg";
+                // ⭐ v8.1.0: Умный поиск обложки
+                let rawImg = itemData.img || item.img;
+                if (!rawImg) {
+                    const catalogCar = (window.BARN_CARS_DATABASE || []).find(b => b && (b.id === itemData.id || b.name === item.name || b.name === itemData.name))
+                                    || (window.CARS_DATABASE || []).find(c => c && (c.id === itemData.id || c.name === item.name || c.name === itemData.name));
+                    if (catalogCar && catalogCar.img) rawImg = catalogCar.img;
+                }
+                if (!rawImg) rawImg = "assets/cars/economy/2101/vaz-2101.jpg";
+
                 const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
-                const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(itemData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
+                const fallbackImg = item.fallback || itemData.fallback || ((typeof getCategoryFallback === 'function') ? getCategoryFallback(itemData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg");
+                
                 imgHtml = `<div class="car-img-wrap mb-2" style="height:110px;"><img src="${carImg}" class="car-img" onerror="this.onerror=null; this.src='${fallbackImg}';"></div>`;
                 descText = `${itemData.power || 100} л.с. · Кузов ${itemData.condition || 85}%`;
             } else if (item.type === 'plates' || item.type === 'plate') {
@@ -1091,7 +1041,6 @@ renderChatsScreen(container) {
     },
 
     async buyP2PInstantly(lotId) {
-        // Быстрый выкуп через ДКП: открываем чат и сразу создаём черновик
         if (!window.P2PDeals) return showToast('⚠️ Модуль P2P не загружен');
         const lot = await this._findLotById(lotId);
         if (!lot) return showToast('❌ Лот не найден');
@@ -1118,6 +1067,13 @@ renderChatsScreen(container) {
         window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
             l && l.id !== lotId && l.lot_id !== lotId
         );
+
+        // Возвращаем номер в инвентарь при отмене
+        if (lot.type === 'plates' || lot.type === 'plate') {
+            const plateNum = lot.itemData?.plate;
+            const pObj = (window.state.player?.platesInventory || []).find(p => p && p.number === plateNum);
+            if (pObj) pObj.status = 'inventory';
+        }
 
         if (typeof saveState === 'function') saveState();
         if (typeof showToast === 'function') showToast('Лот снят');
@@ -1155,12 +1111,16 @@ renderChatsScreen(container) {
         if (type === 'cars') {
             items = (window.state.garage || []).filter(c => c && typeof c === 'object');
         } else if (type === 'plates') {
-            items = (window.state.player?.platesInventory || []).filter(p => p && p.status === 'inventory');
+            // Только свободные номера, не установленные на машины
+            items = (window.state.player?.platesInventory || []).filter(p => p && p.status === 'inventory' && !p.installedCarId);
         } else if (type === 'business') {
             items = (window.state.businesses || []).filter(b => b && b.level > 0);
         } else if (type === 'housing') {
             items = (window.state.player?.ownedHouses || []).map(id => ({ id, name: id }));
         }
+
+        // ⭐ v8.1.0: Запоминаем текущий отфильтрованный массив для точного доступа по индексу
+        this._currentModalItems = items;
 
         if (items.length === 0) {
             container.innerHTML = `<div class="glass-card p-3 text-center sub-label" style="background:#050914;">Нет объектов для продажи</div>`;
@@ -1171,7 +1131,7 @@ renderChatsScreen(container) {
             if (type === 'cars') {
                 const rawImg = item.img || "assets/cars/economy/2101/vaz-2101.jpg";
                 const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
-                const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(item.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
+                const fallbackImg = item.fallback || ((typeof getCategoryFallback === 'function') ? getCategoryFallback(item.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg");
                 html += `
                     <div onclick="AppM.pickP2PItemCard(${idx})" id="p2pCardItem_${idx}" 
                          class="glass-card p-2 cursor-pointer flex-gap" 
@@ -1223,9 +1183,11 @@ renderChatsScreen(container) {
         const priceInput = document.getElementById('p2pPriceInput');
         if (!priceInput) return;
 
+        // ⭐ v8.1.0: Берём элемент из сохранённого отфильтрованного списка
+        const currentItem = this._currentModalItems?.[idx];
+
         if (type === 'cars') {
-            const car = (window.state.garage || [])[idx];
-            if (car) priceInput.value = Math.round((car.marketValue || car.basePrice || 150000) * 1.1);
+            if (currentItem) priceInput.value = Math.round((currentItem.marketValue || currentItem.basePrice || 150000) * 1.1);
         } else if (type === 'plates') priceInput.value = 500000;
         else if (type === 'business') priceInput.value = 250000;
         else if (type === 'housing') priceInput.value = 1500000;
@@ -1248,6 +1210,12 @@ renderChatsScreen(container) {
             const myUid = String(window.state.player?.uid || window.tgUserId || 'me');
             const myName = window.state.player?.name || 'Перекуп';
 
+            // ⭐ v8.1.0: Берём точный объект из отображённого списка
+            const targetItem = this._currentModalItems?.[idx];
+            if (!targetItem) {
+                return showToast('Ошибка: выбранный объект не найден');
+            }
+
             let newListing = {
                 id: 'p2p_' + Date.now(),
                 sellerId: myUid,
@@ -1259,31 +1227,36 @@ renderChatsScreen(container) {
             };
 
             if (type === 'cars') {
-                const car = window.state.garage[idx];
-                if (!car) return showToast('Машина не найдена');
+                const car = targetItem;
                 newListing.name = car.name;
+                
+                // Фиксация картинок и параметров
+                newListing.img = car.assignedLotImg || car.img || car.baseImg || '';
+                newListing.fallback = car.fallback || '';
                 newListing.itemData = Object.assign({}, car);
-                window.state.garage.splice(idx, 1);
+                if (!newListing.itemData.img) newListing.itemData.img = newListing.img;
+
+                // Удаляем конкретную машину из гаража
+                const gIdx = window.state.garage.indexOf(car);
+                if (gIdx !== -1) {
+                    window.state.garage.splice(gIdx, 1);
+                }
                 if (typeof renderGarage === 'function') renderGarage();
             } else if (type === 'plates') {
-                const plateObj = window.state.player.platesInventory[idx];
-                if (!plateObj) return showToast('Номер не найден');
+                const plateObj = targetItem;
                 newListing.name = 'Номер ' + plateObj.number;
-                newListing.itemData = { plate: plateObj.number };
+                newListing.itemData = { plate: plateObj.number, region: plateObj.region || 77 };
                 plateObj.status = 'on_sale';
             } else if (type === 'business') {
-                const bizList = (window.state.businesses || []).filter(b => b && b.level > 0);
-                const biz = bizList[idx];
-                if (!biz) return showToast('Бизнес не найден');
+                const biz = targetItem;
                 newListing.name = biz.customName || biz.name;
                 newListing.itemData = { bizId: biz.id, level: biz.level };
                 biz.level = 0;
             } else if (type === 'housing') {
-                const hId = (window.state.player.ownedHouses || [])[idx];
-                if (!hId) return showToast('Объект не найден');
-                newListing.name = 'Объект ' + hId;
-                newListing.itemData = { houseId: hId };
-                window.state.player.ownedHouses = window.state.player.ownedHouses.filter(x => x !== hId);
+                const house = targetItem;
+                newListing.name = 'Объект ' + house.name;
+                newListing.itemData = { houseId: house.id };
+                window.state.player.ownedHouses = (window.state.player.ownedHouses || []).filter(x => x !== house.id);
             }
 
             // Публикуем в Firestore
@@ -1294,7 +1267,9 @@ renderChatsScreen(container) {
                         newListing.id = res.lotId;
                         newListing.lot_id = res.lotId;
                     }
-                } catch (e) {}
+                } catch (e) {
+                    console.warn('[AppM] Firestore publishLot error:', e);
+                }
             }
 
             if (!window.state.p2pMarketListings) window.state.p2pMarketListings = [];
@@ -1311,7 +1286,7 @@ renderChatsScreen(container) {
     },
 
     // ========================================================
-    // ⭐ v8.0.0: СОЦИУМ — объединённый хаб
+    // СОЦИУМ — объединённый хаб
     // ========================================================
     renderSocialHubScreen(container) {
         if (!container) return;
@@ -1396,9 +1371,6 @@ renderChatsScreen(container) {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // --------------------------------------------------------
-    // ДРУЗЬЯ (встроенный список — раньше был отдельный таб)
-    // --------------------------------------------------------
     _renderFriendsScreen(box) {
         const friendsList = window.state?.friendsList || [];
         const pendingReqs = window.state?.player?.pendingFriendRequests || [];
@@ -1414,8 +1386,7 @@ renderChatsScreen(container) {
 
             ${pendingReqs.length > 0 ? `
                 <div class="glass-card mb-2 p-2" style="border-color: var(--amber);">
-                    <b class="text-xs color-amber mb-2 block">📩 Входящие заявки (${pendingReqs.length})</b>
-                    ${pendingReqs.map(req => `
+                    <b class="text-xs color-amber mb-2 block">📩 Входящие заявки (${pendingReqs.length})</b>${pendingReqs.map(req => `
                         <div class="flex-between p-2 mb-1" style="background:#050914; border-radius:8px;">
                             <div>
                                 <b class="text-xs">${this._escapeHtml(req.name || 'Игрок')}</b>
@@ -1506,7 +1477,7 @@ renderChatsScreen(container) {
     },
 
     // ========================================================
-    // ⭐ v8.0.0: Я — ПРОФИЛЬ
+    // Я — ПРОФИЛЬ
     // ========================================================
     renderProfileScreen(container) {
         if (!container) return;
@@ -1514,7 +1485,6 @@ renderChatsScreen(container) {
         const p = window.state.player || {};
         const stats = p.stats || {};
         const garage = window.state.garage || [];
-        const lots = window.state.p2pMarketListings || [];
 
         let fleetValue = 0;
         garage.forEach(c => { if (c) fleetValue += (c.marketValue || c.basePrice || 100000); });
@@ -1641,4 +1611,4 @@ renderChatsScreen(container) {
 window.AppM = AppM;
 window.AppMessenger = AppM;
 
-console.log('[💬 phone-m v8.0.0] РЕДИЗАЙН В СОЦСЕТЬ: 4 таба (ЧАТЫ/БИРЖА/СОЦИУМ/Я) + P2P через P2PDeals ✓');
+console.log('[💬 phone-m v8.1.0] ФИКС РАССИНХРОНА ИНДЕКСОВ И ОБЛОЖЕК P2P ✓');
