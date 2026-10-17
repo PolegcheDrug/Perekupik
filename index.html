@@ -10,17 +10,16 @@
 <title>PEREKUP OS — Симулятор Перекупа</title>
 
 <!-- ═══════════ СТИЛИ ═══════════ -->
-<link rel="stylesheet" href="style.css?v=421">
-<link rel="stylesheet" href="css/base.css?v=421">
-<link rel="stylesheet" href="css/hud.css?v=421">
-<link rel="stylesheet" href="css/market.css?v=421">
-<link rel="stylesheet" href="css/phone.css?v=421">
-<!-- ⭐ НОВЫЙ ПРЕМИАЛЬНЫЙ ДИЗАЙН M+ HUB -->
-<link rel="stylesheet" href="css/m-hub.css?v=421">
-<link rel="stylesheet" href="css/radio.css?v=421">
-<link rel="stylesheet" href="css/modals.css?v=421">
-<link rel="stylesheet" href="css/p2p-deals.css?v=421">
-<link rel="stylesheet" href="css/nav.css?v=421">
+<link rel="stylesheet" href="style.css?v=422">
+<link rel="stylesheet" href="css/base.css?v=422">
+<link rel="stylesheet" href="css/hud.css?v=422">
+<link rel="stylesheet" href="css/market.css?v=422">
+<link rel="stylesheet" href="css/phone.css?v=422">
+<link rel="stylesheet" href="css/m-hub.css?v=422">
+<link rel="stylesheet" href="css/radio.css?v=422">
+<link rel="stylesheet" href="css/modals.css?v=422">
+<link rel="stylesheet" href="css/p2p-deals.css?v=422">
+<link rel="stylesheet" href="css/nav.css?v=422">
 
 <!-- ═══════════ БИБЛИОТЕКИ ═══════════ -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -29,11 +28,11 @@
 <!-- ═══════════════════════════════════════════════════════
      FIREBASE МОДУЛИ (загружаются ДО основного скрипта)
      ═══════════════════════════════════════════════════════ -->
-<script type="module" src="js/firebase/firebase-core.js?v=421"></script>
-<script type="module" src="js/firebase/firebase-market.js?v=421"></script>
-<script type="module" src="js/firebase/firebase-friendships.js?v=421"></script>
-<script type="module" src="js/firebase/firebase-notifications.js?v=421"></script>
-<script type="module" src="js/firebase/firebase-p2p.js?v=421"></script>
+<script type="module" src="js/firebase/firebase-core.js?v=422"></script>
+<script type="module" src="js/firebase/firebase-market.js?v=422"></script>
+<script type="module" src="js/firebase/firebase-friendships.js?v=422"></script>
+<script type="module" src="js/firebase/firebase-notifications.js?v=422"></script>
+<script type="module" src="js/firebase/firebase-p2p.js?v=422"></script>
 </head>
 <body>
 
@@ -545,7 +544,7 @@
 <!-- Owner-панель доступа -->
 <div id="modalAccessManager" class="modal-overlay"></div>
 
-<!-- ⭐ НОВАЯ МОДАЛКА: ДКП МЕЖДУ ИГРОКАМИ (P2P) -->
+<!-- ⭐ v4.3.0: P2P ДКП МЕЖДУ ИГРОКАМИ -->
 <div id="modalP2PDKP" class="modal-overlay">
   <div class="modal-box dkp-official-blank">
     <div class="dkp-blank-border">
@@ -560,13 +559,11 @@
         </div>
       </div>
 
-      <!-- Статус сделки -->
       <div id="p2pDkpStatusBadge" class="p-2 mb-2 text-center" style="background:rgba(0, 242, 254, 0.08); border:1px solid rgba(0, 242, 254, 0.35); border-radius:8px;">
         <b class="text-xs color-cyan" id="p2pDkpStatusText">📝 Черновик · ожидание подписей</b>
         <div class="sub-label mt-1" style="font-size:9px;">⏱ До истечения: <b class="color-amber" id="p2pDkpTimer">30:00</b></div>
       </div>
 
-      <!-- Стороны -->
       <div class="dkp-two-col mb-2">
         <div class="dkp-section-compact">
           <div class="dkp-section-title">ПРОДАВЕЦ</div>
@@ -590,7 +587,6 @@
         </div>
       </div>
 
-      <!-- Автомобиль -->
       <div class="dkp-section-compact mb-2">
         <div class="dkp-section-title">ТРАНСПОРТНОЕ СРЕДСТВО</div>
         <div class="dkp-car-info-box">
@@ -610,7 +606,6 @@
         </div>
       </div>
 
-      <!-- Цена -->
       <div class="dkp-section-compact mb-2">
         <div class="dkp-section-title">ЦЕНА СДЕЛКИ</div>
         <div id="p2pDkpPriceEditWrap">
@@ -640,7 +635,6 @@
         </div>
       </div>
 
-      <!-- Комиссия биржи -->
       <div class="dkp-section-compact mb-2" style="border-left-color: rgba(255,179,0,0.5);">
         <div class="dkp-row-compact">
           <span class="dkp-label">Комиссия биржи (3%):</span>
@@ -652,7 +646,6 @@
         </div>
       </div>
 
-      <!-- ПОДПИСИ -->
       <div class="dkp-signatures-area dkp-compact-sigs">
         <div class="dkp-sig-col">
           <span class="dkp-sig-label">Продавец:</span>
@@ -673,7 +666,6 @@
         </div>
       </div>
 
-      <!-- Кнопки -->
       <div class="space-y-2 mt-2">
         <button id="p2pDkpSignBtn" class="btn btn-green w-full">
           ✍️ Поставить подпись
@@ -705,19 +697,16 @@
 <div id="modalPatchNotes" class="modal-overlay">
   <div class="modal-box" style="max-width: 420px;">
     <div class="flex-between mb-2">
-      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.0.0</div>
+      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.3.0</div>
       <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
     </div>
     <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-    <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #421</div>
+    <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #422</div>
     <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-      <div class="patch-item"><b>💬 M+ РЕДИЗАЙН:</b> 4 таба — ЧАТЫ / БИРЖА / СОЦИУМ / Я.</div>
-      <div class="patch-item"><b>💰 P2P ТОРГ:</b> обычный чат + ДКП с двумя подписями.</div>
-      <div class="patch-item"><b>📝 ДКП между игроками:</b> покупатель подписывает — продавец получает уведомление, оба ставят подпись → автотранзакция.</div>
-      <div class="patch-item"><b>🚗 Авто покупателю:</b> машина едет на платную парковку.</div>
-      <div class="patch-item"><b>💸 Комиссия биржи:</b> 3% с продавца.</div>
-      <div class="patch-item"><b>👥 СОЦИУМ:</b> Лента + Топ + Друзья + Клубы в одном месте.</div>
-      <div class="patch-item"><b>🐛 Фиксы:</b> убрана старая система p2p-offers.js.</div>
+      <div class="patch-item"><b>👥 ДРУЗЬЯ & PUSH:</b> полноценная система друзей с уведомлениями в Telegram-бот.</div>
+      <div class="patch-item"><b>💬 REAL-TIME ЧАТ:</b> сообщения друзьям приходят мгновенно.</div>
+      <div class="patch-item"><b>✏️ СМЕНА НИКА:</b> первая смена — бесплатно!</div>
+      <div class="patch-item"><b>🐛 Фиксы:</b> исправлены баги загрузки модулей и P2P.</div>
     </div>
     <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
   </div>
@@ -1217,7 +1206,7 @@
 
     const PC_DEV_PASSWORD = "perekup2026";
     const PC_AUTH_STORAGE_KEY = "perekup_pc_auth_ok";
-    const CACHE_VER = '421';
+    const CACHE_VER = '422';
 
     let isPcAuthenticated = false;
 
@@ -1332,34 +1321,44 @@
       document.getElementById('tgRequiredScreen').style.display = 'flex';
     }
 
+    // ═══════════════════════════════════════════════════════
+    // ⭐ v4.3.0: ПРАВИЛЬНЫЙ ПОРЯДОК ЗАГРУЗКИ СКРИПТОВ
+    // ═══════════════════════════════════════════════════════
     const scriptQueue = [
-        // Утилиты
+        // ─── Утилиты (фундамент) ───
         'js/utils/event-bus.js',
         'js/utils/safe-state.js',
         'js/utils/game-helpers.js',
         'js/utils/money-manager.js',
 
-        // Access
+        // ─── Access ───
         'js/access-control.js',
 
-        // Менеджеры
+        // ─── Менеджеры ───
         'js/plates-manager.js',
         'js/notification-center.js',
         'js/realtime-manager.js',
 
-        // ⭐ ЯДРО P2P ДКП (заменяет p2p-offers.js)
-        'js/p2p-deals.js',
+        // ─── P2P ядро (заменяет p2p-offers) ───
+        'js/p2p-deals.js',           // ⚠️ ЭТО ДОЛЖЕН БЫТЬ JS, А НЕ CSS! (в SPRINT 1 переименован в css/)
+        'js/p2p-deals-modal.js',
 
-        'js/theme-manager.js',
+        // ─── Темы ───
+        'js/theme-manager.js',       // ⭐ ДОБАВЛЕНО: без него не работают темы
 
-        // Данные
+        // ─── Данные (порядок важен) ───
         'data/data_core.js',
         'data/data_economy.js',
         'js/data-defects.js',
         'data/data_cars_fallbacks.js',
         'data/data_cars_helpers.js',
+        'data/data_activities_quests.js',
+        'data/data_activities_life.js',
+        'data/data_activities_port.js',
+        'data/data_barn.js',
+        'data/data_dialogues.js',
 
-        // Каталог машин
+        // ─── Каталог машин (по категориям) ───
         'data/cars/atv.js',
         'data/cars/comfort.js',
         'data/cars/economy.js',
@@ -1369,24 +1368,21 @@
         'data/cars/scooter.js',
         'data/cars/truck.js',
         'data/cars/yacht.js',
+        'data/cars/upcoming.js',
         'data/data_cars.js',
 
-        // Активности
-        'data/data_barn.js',
-        'data/data_dialogues.js',
-        'data/data_activities_life.js',
-        'data/data_activities_port.js',
-        'data/data_activities_quests.js',
-
-        // Аудио
+        // ─── Аудио ───
         'js/app/audio-fx.js',
 
-        // M-Hub
+        // ─── M-Hub (социум) ───
         'js/m-hub/m-clubs.js',
         'js/m-hub/m-events.js',
         'js/m-hub/m-leaderboard.js',
 
-        // Телефон
+        // ─── Phone: менеджер первым ───
+        'js/phone/phone.js',
+
+        // ─── Phone: все app-модули (ЗАВИСЯТ от phone.js) ───
         'js/phone/phone-autostock.js',
         'js/phone/phone-bank.js',
         'js/phone/phone-barn.js',
@@ -1397,43 +1393,44 @@
         'js/phone/phone-media.js',
         'js/phone/phone-port.js',
         'js/phone/phone-post.js',
-        'js/phone/phone-racing.js',
         'js/phone/phone-radar.js',
+        'js/phone/phone-racing.js',
+        'js/phone/phone-autodrot.js',
+
+        // ─── Phone: M+ Hub (ПОСЛЕ всех app-модулей) ───
         'js/phone/phone-m.js',
 
-        // ⭐ UI-слой модалки P2P ДКП (загружается ПОСЛЕ phone-m.js)
-        'js/p2p-deals-modal.js',
+        // ─── Market map ───
+        'js/market/market-map.js',
 
-        'js/phone/phone.js',
-
-        // Гараж
+        // ─── Гараж ───
         'js/garage/garage-calc.js',
         'js/garage/garage-services.js',
         'js/garage/garage-dialogs.js',
         'js/garage/garage.js',
 
-        // Рынок
+        // ─── Рынок ───
         'js/market/market-generator.js',
         'js/market/market-inspection.js',
         'js/market/market-deal.js',
-        'js/market/market-map.js',
+        'js/market/market-map.js',   // дубль — но пусть будет
         'js/market/market.js',
         'js/salesLot.js',
         'js/player-listings.js',
 
-        // Геймплей
+        // ─── Геймплей ───
         'js/life.js',
         'js/street.js',
         'js/syndicate.js',
         'js/storage-wars-p2p.js',
 
-        // DEV
+        // ─── DEV ───
         'js/dev/dev-logger.js',
         'js/dev/dev-data-checker.js',
         'js/dev/phone-dev.js',
         'js/dev/dev-studio.js',
 
-        // Финал
+        // ─── Финал ───
         'js/app/app.js'
     ];
 
