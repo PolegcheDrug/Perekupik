@@ -1,7 +1,11 @@
 // ========================================================
-// js/app/app-loader.js — ЗАГРУЗЧИК, АВТОРИЗАЦИЯ, HUD (v4.3.0)
+// js/app/app-loader.js — ЗАГРУЗЧИК, АВТОРИЗАЦИЯ, HUD (v4.3.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ Часть 3 из 3 (разгрузка app.js)
+// ⭐ v4.3.1 (ФИКС ДУБЛИРОВАНИЯ ЗАГРУЗЧИКА):
+//   - УДАЛЕНЫ дублирующие scriptQueue, loadScript, initAllModules,
+//     startGame. Теперь очередью скриптов управляет ТОЛЬКО index.html.
+//   - initApp вызывается из index.html после загрузки всех скриптов.
+//   - Добавлена защита от отсутствия state.player при рендере.
 // ========================================================
 
 let _notificationUnsubscribe = null;
@@ -159,12 +163,12 @@ function showAccessDeniedScreen() {
 }
 
 function showTelegramRequiredScreen() {
-    if (window.isPcDevMode()) {
+    if (window.isPcDevMode && window.isPcDevMode()) {
         console.log('[App] DEV-режим активен, экран Telegram НЕ показывается');
         return;
     }
-    if (tgUserId && !String(tgUserId).startsWith('guest_')) {
-        console.log('[App] UID уже установлен:', tgUserId);
+    if (window.tgUserId && !String(window.tgUserId).startsWith('guest_')) {
+        console.log('[App] UID уже установлен:', window.tgUserId);
         return;
     }
 
@@ -189,7 +193,7 @@ function createOwnerPanelButton() {
     const existing = document.getElementById('ownerPanelBtn');
     if (existing) existing.remove();
 
-    if (!_isOwner()) return;
+    if (!window.isOwnerUser || !window.isOwnerUser()) return;
 
     const btn = document.createElement('button');
     btn.id = 'ownerPanelBtn';
@@ -244,9 +248,10 @@ function setupOnlineListeners() {
 // 6. ОНБОРДИНГ
 // ========================================================
 function checkPlayerOnboarding(onComplete) {
-    if (!state.player) state.player = {};
+    if (!window.state) window.state = {};
+    if (!window.state.player) window.state.player = {};
 
-    const validUid = tgUserId || window.tgUserId;
+    const validUid = window.tgUserId || window.state.player.uid;
     if (!validUid) {
         console.error('[Onboarding] Нет UID — блокируем');
         showTelegramRequiredScreen();
@@ -259,26 +264,26 @@ function checkPlayerOnboarding(onComplete) {
         return;
     }
 
-    state.player.uid = String(validUid);
+    window.state.player.uid = String(validUid);
 
-    if (state.player.onboardingDone === true) {
+    if (window.state.player.onboardingDone === true) {
         if (typeof onComplete === 'function') onComplete();
         return;
     }
 
-    if (_isOwner()) {
+    if (window.isOwnerUser && window.isOwnerUser()) {
         console.log('[Onboarding] Owner — автоматический пропуск');
-        state.player.onboardingDone = true;
-        state.player.name = state.player.name || "Owner";
-        saveState();
+        window.state.player.onboardingDone = true;
+        window.state.player.name = window.state.player.name || "Owner";
+        if (typeof saveState === 'function') saveState();
         if (typeof onComplete === 'function') onComplete();
         return;
     }
 
-    if (isPcDevSession) {
-        state.player.onboardingDone = true;
-        state.player.name = state.player.name || "DEV_Перекуп";
-        saveState();
+    if (window.isPcDevMode && window.isPcDevMode()) {
+        window.state.player.onboardingDone = true;
+        window.state.player.name = window.state.player.name || "DEV_Перекуп";
+        if (typeof saveState === 'function') saveState();
         if (typeof onComplete === 'function') onComplete();
         return;
     }
@@ -302,7 +307,7 @@ function checkPlayerOnboarding(onComplete) {
 
             <div class="glass-card p-2 mb-3 text-left" style="background:#090e18;">
                 <span class="sub-label" style="font-size:9px;">Ваш ID:</span>
-                <div class="font-bold color-green" style="font-size:12px; font-family:monospace;">${state.player.uid}</div>
+                <div class="font-bold color-green" style="font-size:12px; font-family:monospace;">${window.state.player.uid}</div>
             </div>
 
             <div class="mb-3 text-left">
@@ -327,21 +332,21 @@ function submitPlayerOnboarding() {
         return;
     }
 
-    const validUid = tgUserId || window.tgUserId;
+    const validUid = window.tgUserId || window.state.player.uid;
     if (!validUid) {
         showToast("Ошибка: нет ID", 'error');
         return;
     }
 
-    state.player.uid = String(validUid);
-    state.player.name = val;
-    state.player.onboardingDone = true;
+    window.state.player.uid = String(validUid);
+    window.state.player.name = val;
+    window.state.player.onboardingDone = true;
 
-    saveState();
-    updateHeaderUI();
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
 
-    if (window.FB_Bridge?.Players?.pushSaveForce && !isPcDevSession) {
-        window.FB_Bridge.Players.pushSaveForce(String(validUid), state)
+    if (window.FB_Bridge?.Players?.pushSaveForce && !window.isPcDevMode()) {
+        window.FB_Bridge.Players.pushSaveForce(String(validUid), window.state)
             .then(ok => console.log('[Onboarding] pushSaveForce →', ok ? 'OK' : 'FAIL'))
             .catch(e => console.warn('[Onboarding] pushSaveForce error:', e));
     }
@@ -419,9 +424,9 @@ async function initTelegramAuthAndStorage(callback) {
 
             tgUser = tg.initDataUnsafe?.user || null;
             if (tgUser && tgUser.id) {
-                tgUserData = tgUser;
-                tgUserId = String(tgUser.id);
-                console.log('[Auth] Telegram ID установлен:', tgUserId);
+                window.tgUserData = tgUser;
+                window.tgUserId = String(tgUser.id);
+                console.log('[Auth] Telegram ID установлен:', window.tgUserId);
             }
         }
     } catch (e) {
@@ -431,10 +436,9 @@ async function initTelegramAuthAndStorage(callback) {
     if (!tgUser || !tgUser.id) {
         if (window.tgUserId && String(window.tgUserId).startsWith('pc_dev_')) {
             console.log('[Auth] DEV-режим обнаружен, UID:', window.tgUserId);
-            tgUserId = String(window.tgUserId);
-            isPcDevSession = true;
-            tgUserData = {
-                id: tgUserId,
+            window.isPcDevSession = true;
+            window.tgUserData = {
+                id: window.tgUserId,
                 first_name: 'DEV',
                 last_name: 'Player',
                 username: 'dev_player'
@@ -446,7 +450,7 @@ async function initTelegramAuthAndStorage(callback) {
             return;
         }
     } else {
-        tgUserId = String(tgUser.id);
+        window.tgUserId = String(tgUser.id);
     }
 
     // ─── ЭТАП 2: Deep-link инвайт-код ───
@@ -463,7 +467,7 @@ async function initTelegramAuthAndStorage(callback) {
     try {
         if (window.AccessControl && typeof window.AccessControl.checkAccess === 'function') {
             console.log('[App] 🔐 Проверка доступа через AccessControl...');
-            const accessRes = await window.AccessControl.checkAccess(tgUserId);
+            const accessRes = await window.AccessControl.checkAccess(window.tgUserId);
 
             if (!accessRes || accessRes.success !== true) {
                 console.warn('[App] ❌ Доступ запрещён:', accessRes?.reason || 'unknown');
@@ -503,16 +507,16 @@ async function initTelegramAuthAndStorage(callback) {
     }
 
     if (window.FB_Bridge?.Auth?._forceVerifiedUserId) {
-        window.FB_Bridge.Auth._forceVerifiedUserId(tgUserId);
+        window.FB_Bridge.Auth._forceVerifiedUserId(window.tgUserId);
     }
 
     // ─── ЭТАП 5: Сейв ───
-    const hadLocalSave = loadFromLocalStorage();
+    const hadLocalSave = typeof loadFromLocalStorage === 'function' ? loadFromLocalStorage() : false;
 
-    if (!hadLocalSave && !isPcDevSession && window.FB_Bridge?.Players?.pullSave) {
+    if (!hadLocalSave && !window.isPcDevMode() && window.FB_Bridge?.Players?.pullSave) {
         try {
-            const cloudSave = await window.FB_Bridge.Players.pullSave(tgUserId);
-            if (cloudSave) {
+            const cloudSave = await window.FB_Bridge.Players.pullSave(window.tgUserId);
+            if (cloudSave && typeof applyLoadedState === 'function') {
                 applyLoadedState(cloudSave);
                 console.log("[Cloud] Прогресс восстановлен из Firestore");
                 showToast("☁️ Прогресс синхронизирован из облака!", 'success');
@@ -523,41 +527,43 @@ async function initTelegramAuthAndStorage(callback) {
     }
 
     // ─── ЭТАП 6: Имя и аватар ───
-    if (tgUser && state.player) {
+    if (tgUser && window.state && window.state.player) {
         let names = [];
         if (tgUser.first_name) names.push(tgUser.first_name);
         if (tgUser.last_name) names.push(tgUser.last_name);
         const fullName = names.join(' ').trim();
 
-        const currentName = state.player.name || "";
+        const currentName = window.state.player.name || "";
         const isDefaultName = !currentName || currentName === "Перекуп #777" || currentName.startsWith("Гость");
 
-        if (isDefaultName && fullName) state.player.name = fullName;
-        if (tgUser.photo_url) state.player.avatarUrl = tgUser.photo_url;
+        if (isDefaultName && fullName) window.state.player.name = fullName;
+        if (tgUser.photo_url) window.state.player.avatarUrl = tgUser.photo_url;
     }
 
-    if (isPcDevSession && state.player) {
-        if (!state.player.name || state.player.name === "Перекуп #777") {
-            state.player.name = "DEV_Перекуп";
+    if (window.isPcDevMode && window.isPcDevMode() && window.state && window.state.player) {
+        if (!window.state.player.name || window.state.player.name === "Перекуп #777") {
+            window.state.player.name = "DEV_Перекуп";
         }
     }
 
-    state.player.uid = String(tgUserId);
+    if (window.state && window.state.player) {
+        window.state.player.uid = String(window.tgUserId);
+    }
 
     // ─── ЭТАП 7: Owner — все приложения ───
-    if (_isOwner() && state.player) {
-        if (!Array.isArray(state.player.unlockedApps)) state.player.unlockedApps = [];
+    if (window.isOwnerUser && window.isOwnerUser() && window.state && window.state.player) {
+        if (!Array.isArray(window.state.player.unlockedApps)) window.state.player.unlockedApps = [];
         const allApps = ['barn', 'containers', 'autopodbor_order', 'street', 'darknet'];
         allApps.forEach(app => {
-            if (!state.player.unlockedApps.includes(app)) {
-                state.player.unlockedApps.push(app);
+            if (!window.state.player.unlockedApps.includes(app)) {
+                window.state.player.unlockedApps.push(app);
             }
         });
         console.log('[App] 👑 Owner получил все приложения:', allApps);
     }
 
     // ─── ЭТАП 8: Каталог машин из Firestore ───
-    if (window.FB_Bridge?.CarsCatalog && !isPcDevSession) {
+    if (window.FB_Bridge?.CarsCatalog && !window.isPcDevMode()) {
         try { await window.FB_Bridge.CarsCatalog.seedDefaultCarsCatalog(); } catch (e) {}
     }
 
@@ -569,8 +575,8 @@ async function initTelegramAuthAndStorage(callback) {
 // 9. СТАРТ
 // ========================================================
 function initApp() {
-    if (window.isPcDevMode()) {
-        console.log('[App] DEV-режим активен. UID:', tgUserId || window.tgUserId);
+    if (window.isPcDevMode && window.isPcDevMode()) {
+        console.log('[App] DEV-режим активен. UID:', window.tgUserId);
     }
 
     setupOnlineListeners();
@@ -581,7 +587,7 @@ function initApp() {
     }
 
     initTelegramAuthAndStorage(async () => {
-        if (!tgUserId) {
+        if (!window.tgUserId) {
             console.error('[App] Критическая ошибка: UID не установлен');
             showTelegramRequiredScreen();
             return;
@@ -597,19 +603,19 @@ function initApp() {
             if (tgScreen) tgScreen.style.display = 'none';
             if (denied) denied.style.display = 'none';
 
-            _syncStarRateToBank();
+            if (typeof _syncStarRateToBank === 'function') _syncStarRateToBank();
 
-            updateHeaderUI();
-            updateLevelGatesUI();
-            applyLanguageToDOM();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (typeof updateLevelGatesUI === 'function') updateLevelGatesUI();
+            if (typeof applyLanguageToDOM === 'function') applyLanguageToDOM();
             if (window.ThemeManager) window.ThemeManager.init();
-            checkRealTimeDayChange();
+            if (typeof checkRealTimeDayChange === 'function') checkRealTimeDayChange();
 
             _cloneStatsRow();
 
             createOwnerPanelButton();
 
-            if (window.FB_Bridge?.CarsCatalog && !isPcDevSession) {
+            if (window.FB_Bridge?.CarsCatalog && !window.isPcDevMode()) {
                 try { await window.FB_Bridge.CarsCatalog.fetchCloudCars(); } catch(e) {}
             }
 
@@ -619,7 +625,7 @@ function initApp() {
                         PhoneBusiness.ensureState();
                         if (window.state.businesses && window.state.businesses.length > 0) {
                             console.log('[App] ✅ Бизнесы инициализированы:', window.state.businesses.length);
-                            saveState();
+                            if (typeof saveState === 'function') saveState();
                         } else {
                             console.warn('[App] ❌ BUSINESS_DATA не загружен или пустой');
                         }
@@ -641,11 +647,11 @@ function initApp() {
                     );
 
                     if (hasCars) {
-                        if (typeof populateMarketFeed === 'function' && (!state.marketFeed || state.marketFeed.length === 0)) {
+                        if (typeof populateMarketFeed === 'function' && (!window.state.marketFeed || window.state.marketFeed.length === 0)) {
                             console.log('[App] ⚡ Принудительный populateMarketFeed');
                             populateMarketFeed();
-                        } else if (state.marketFeed && state.marketFeed.length > 0) {
-                            console.log('[App] ✅ Лента рынка уже заполнена:', state.marketFeed.length, 'лотов');
+                        } else if (window.state.marketFeed && window.state.marketFeed.length > 0) {
+                            console.log('[App] ✅ Лента рынка уже заполнена:', window.state.marketFeed.length, 'лотов');
                         }
                     } else {
                         console.error('[App] ❌ CAR_DATABASE пустой! Проверьте пути data/cars/*.js');
@@ -663,7 +669,7 @@ function initApp() {
                 PhoneManager.init();
             }
 
-            if (window.NotificationCenter && !isPcDevSession) {
+            if (window.NotificationCenter && !window.isPcDevMode()) {
                 try {
                     await window.NotificationCenter.processStartupNotifications();
 
@@ -677,12 +683,12 @@ function initApp() {
                 }
             }
 
-            switchTab('tabMarket');
+            if (typeof switchTab === 'function') switchTab('tabMarket');
 
             try {
                 const lastSeen = localStorage.getItem('perekup_last_seen_version');
                 if (lastSeen !== window.CURRENT_GAME_VERSION) {
-                    setTimeout(() => openPatchNotesModal(), 2000);
+                    setTimeout(() => { if (typeof openPatchNotesModal === 'function') openPatchNotesModal(); }, 2000);
                 }
             } catch(e) {}
         });
@@ -690,130 +696,12 @@ function initApp() {
 }
 
 // ========================================================
-// 10. ЗАГРУЗЧИК СКРИПТОВ
-// ========================================================
-const CACHE_VER = '422';
-
-const scriptQueue = [
-    'js/utils/event-bus.js',
-    'js/utils/safe-state.js',
-    'js/utils/game-helpers.js',
-    'js/utils/money-manager.js',
-    'js/access-control.js',
-    'js/plates-manager.js',
-    'js/notification-center.js',
-    'js/realtime-manager.js',
-    'js/p2p-deals.js',
-    'js/p2p-deals-modal.js',
-    'js/theme-manager.js',
-    'data/data_core.js',
-    'data/data_economy.js',
-    'js/data-defects.js',
-    'data/data_cars_fallbacks.js',
-    'data/data_cars_helpers.js',
-    'data/data_activities_quests.js',
-    'data/data_activities_life.js',
-    'data/data_activities_port.js',
-    'data/data_barn.js',
-    'data/data_dialogues.js',
-    'data/cars/atv.js',
-    'data/cars/comfort.js',
-    'data/cars/economy.js',
-    'data/cars/hyper.js',
-    'data/cars/moto.js',
-    'data/cars/premium.js',
-    'data/cars/scooter.js',
-    'data/cars/truck.js',
-    'data/cars/yacht.js',
-    'data/cars/upcoming.js',
-    'data/data_cars.js',
-    'js/app/audio-fx.js',
-    'js/m-hub/m-clubs.js',
-    'js/m-hub/m-events.js',
-    'js/m-hub/m-leaderboard.js',
-    'js/phone/phone.js',
-    'js/phone/phone-autostock.js',
-    'js/phone/phone-bank.js',
-    'js/phone/phone-barn.js',
-    'js/phone/phone-business.js',
-    'js/phone/phone-darknet.js',
-    'js/phone/phone-gosuslugi.js',
-    'js/phone/phone-housing.js',
-    'js/phone/phone-media.js',
-    'js/phone/phone-port.js',
-    'js/phone/phone-post.js',
-    'js/phone/phone-radar.js',
-    'js/phone/phone-racing.js',
-    'js/phone/phone-autodrot.js',
-    'js/phone/phone-m.js',
-    'js/market/market-map.js',
-    'js/garage/garage-calc.js',
-    'js/garage/garage-services.js',
-    'js/garage/garage-dialogs.js',
-    'js/garage/garage.js',
-    'js/market/market-generator.js',
-    'js/market/market-inspection.js',
-    'js/market/market-deal.js',
-    'js/market/market.js',
-    'js/salesLot.js',
-    'js/player-listings.js',
-    'js/life.js',
-    'js/street.js',
-    'js/syndicate.js',
-    'js/storage-wars-p2p.js',
-    'js/dev/dev-logger.js',
-    'js/dev/dev-data-checker.js',
-    'js/dev/phone-dev.js',
-    'js/dev/dev-studio.js'
-];
-
-function loadScript(path) {
-    return new Promise((resolve) => {
-        const s = document.createElement('script');
-        s.src = path + '?v=' + CACHE_VER;
-        s.onload = () => resolve(true);
-        s.onerror = () => {
-            console.warn('[Loader] Ошибка загрузки скрипта: ' + path);
-            resolve(false);
-        };
-        document.body.appendChild(s);
-    });
-}
-
-async function initAllModules() {
-    for (const scriptPath of scriptQueue) {
-        await loadScript(scriptPath);
-    }
-    if (typeof initApp === 'function') {
-        initApp();
-    }
-}
-
-function startGame() {
-    if (window.Telegram?.WebApp) {
-        try {
-            window.Telegram.WebApp.ready();
-            window.Telegram.WebApp.expand();
-        } catch (e) {}
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initAllModules);
-    } else {
-        initAllModules();
-    }
-}
-
-window.startGame = startGame;
-
-// ========================================================
-// 11. ЭКСПОРТ
+// 10. ЭКСПОРТ
 // ========================================================
 window.initApp = initApp;
-window.switchTab = switchTab;
 window._cloneStatsRow = _cloneStatsRow;
 window._processStartParam = _processStartParam;
 window.showAccessDeniedScreen = showAccessDeniedScreen;
 window.createOwnerPanelButton = createOwnerPanelButton;
 
-console.log('[💠 app-loader.js v4.3.0] Загрузчик + Авторизация + AccessControl + HUD ✓');
+console.log('[💠 app-loader.js v4.3.1] Загрузчик + Авторизация + AccessControl + HUD ✓ (без дублирования scriptQueue)');

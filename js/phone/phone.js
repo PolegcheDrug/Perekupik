@@ -1,6 +1,12 @@
 // ========================================================
-// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.9.0)
+// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.9.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v1.9.1 (ФИКС DEV И СТАБИЛЬНОСТЬ):
+//   - ВСЕ вызовы внешних приложений обёрнуты в try/catch.
+//   - Для 'dev' добавлена проверка на window.AppDev и fallback.
+//   - Добавлены проверки window.state.player в критических местах.
+//   - Исправлен вызов PhoneBusiness.collectAllCash.
 //
 // ⭐ v1.9.0 (СПРИНТ 4 — ДЕНЬГИ ЧЕРЕЗ MONEYMANAGER):
 //   - ФИКС: AppShop.buyToolAction использует MoneyManager.trySpendMulti
@@ -229,9 +235,6 @@ const PhoneManager = {
         if (typeof playSound === 'function') playSound('tick');
     },
 
-    /**
-     * ⭐ v1.9.0: ФИКС — используем MoneyManager.trySpendMulti
-     */
     confirmUnlockAppAction(appId, configKey) {
         const config = (window.APP_ACCESS_CONFIG && window.APP_ACCESS_CONFIG[configKey])
             ? window.APP_ACCESS_CONFIG[configKey]
@@ -246,7 +249,7 @@ const PhoneManager = {
         const costTickets = Number(config.costTickets) || 0;
 
         // ⭐ Проверка + списание через MoneyManager
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.trySpendMulti === 'function') {
             const spendRes = window.MoneyManager.trySpendMulti({
                 cash: costCash,
                 stars: costStars,
@@ -343,7 +346,12 @@ const PhoneManager = {
             // 1. СЕТЬ M+ & P2P БИРЖА (AppM)
             if (appId === 'm' || appId === 'm-hub' || appId === 'messages') {
                 if (window.AppM && typeof window.AppM.render === 'function') {
-                    window.AppM.render(appContainer);
+                    try {
+                        window.AppM.render(appContainer);
+                    } catch (e) {
+                        console.error('[Phone] AppM.render error:', e);
+                        this.renderGenericFallback(appId, appContainer);
+                    }
                 } else {
                     this.renderGenericFallback(appId, appContainer);
                 }
@@ -353,7 +361,12 @@ const PhoneManager = {
             // 2. ПОЧТА / СКЛАД
             if (appId === 'post' || appId === 'mailbox' || appId === 'warehouse') {
                 if (window.AppPost && typeof window.AppPost.render === 'function') {
-                    window.AppPost.render(appContainer);
+                    try {
+                        window.AppPost.render(appContainer);
+                    } catch (e) {
+                        console.error('[Phone] AppPost.render error:', e);
+                        this.renderGenericFallback(appId, appContainer);
+                    }
                     return;
                 }
                 this.renderGenericFallback(appId, appContainer);
@@ -363,7 +376,12 @@ const PhoneManager = {
             // 3. АВТО-МАРКЕТ
             if (appId === 'shop') {
                 if (window.AppShop && typeof window.AppShop.render === 'function') {
-                    window.AppShop.render(appContainer);
+                    try {
+                        window.AppShop.render(appContainer);
+                    } catch (e) {
+                        console.error('[Phone] AppShop.render error:', e);
+                        this.renderGenericFallback(appId, appContainer);
+                    }
                     return;
                 }
                 this.renderGenericFallback(appId, appContainer);
@@ -373,7 +391,12 @@ const PhoneManager = {
             // 4. САРАИ
             if (appId === 'barn') {
                 if (window.AppBarn && typeof window.AppBarn.render === 'function') {
-                    window.AppBarn.render(appContainer);
+                    try {
+                        window.AppBarn.render(appContainer);
+                    } catch (e) {
+                        console.error('[Phone] AppBarn.render error:', e);
+                        this.renderGenericFallback(appId, appContainer);
+                    }
                     return;
                 }
                 this.renderGenericFallback(appId, appContainer);
@@ -383,7 +406,12 @@ const PhoneManager = {
             // 5. БЛОКНОТ
             if (appId === 'notepad') {
                 if (window.AppNotepad && typeof window.AppNotepad.render === 'function') {
-                    window.AppNotepad.render(appContainer);
+                    try {
+                        window.AppNotepad.render(appContainer);
+                    } catch (e) {
+                        console.error('[Phone] AppNotepad.render error:', e);
+                        this.renderGenericFallback(appId, appContainer);
+                    }
                     return;
                 }
                 this.renderGenericFallback(appId, appContainer);
@@ -394,7 +422,12 @@ const PhoneManager = {
             switch (appId) {
                 case 'dev':
                     if (window.AppDev && typeof window.AppDev.render === 'function') {
-                        window.AppDev.render(appContainer);
+                        try {
+                            window.AppDev.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] AppDev.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -402,7 +435,12 @@ const PhoneManager = {
 
                 case 'fortune':
                     if (window.PhoneMedia && typeof window.PhoneMedia.renderFortuneApp === 'function') {
-                        window.PhoneMedia.renderFortuneApp(appContainer);
+                        try {
+                            window.PhoneMedia.renderFortuneApp(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] renderFortuneApp error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -410,7 +448,12 @@ const PhoneManager = {
 
                 case 'reshala':
                     if (window.AppDarknet && typeof window.AppDarknet.render === 'function') {
-                        window.AppDarknet.render(appContainer);
+                        try {
+                            window.AppDarknet.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] AppDarknet.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -418,7 +461,12 @@ const PhoneManager = {
 
                 case 'street':
                     if (window.PhoneRacing && typeof window.PhoneRacing.renderStreetApp === 'function') {
-                        window.PhoneRacing.renderStreetApp(appContainer);
+                        try {
+                            window.PhoneRacing.renderStreetApp(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] PhoneRacing.renderStreetApp error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -426,7 +474,12 @@ const PhoneManager = {
 
                 case 'radio':
                     if (window.PhoneMedia && typeof window.PhoneMedia.renderRadioApp === 'function') {
-                        window.PhoneMedia.renderRadioApp(appContainer);
+                        try {
+                            window.PhoneMedia.renderRadioApp(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] renderRadioApp error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -434,7 +487,12 @@ const PhoneManager = {
 
                 case 'bank':
                     if (window.AppBank && typeof window.AppBank.render === 'function') {
-                        window.AppBank.render(appContainer);
+                        try {
+                            window.AppBank.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] AppBank.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -442,7 +500,12 @@ const PhoneManager = {
 
                 case 'business':
                     if (window.PhoneBusiness && typeof window.PhoneBusiness.render === 'function') {
-                        window.PhoneBusiness.render(appContainer);
+                        try {
+                            window.PhoneBusiness.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] PhoneBusiness.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -450,9 +513,19 @@ const PhoneManager = {
 
                 case 'housing':
                     if (window.PhoneHousing && typeof window.PhoneHousing.render === 'function') {
-                        window.PhoneHousing.render(appContainer);
+                        try {
+                            window.PhoneHousing.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] PhoneHousing.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else if (window.AppHousing && typeof window.AppHousing.render === 'function') {
-                        window.AppHousing.render(appContainer);
+                        try {
+                            window.AppHousing.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] AppHousing.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -460,7 +533,12 @@ const PhoneManager = {
 
                 case 'syndicate':
                     if (window.AppSyndicate && typeof window.AppSyndicate.render === 'function') {
-                        window.AppSyndicate.render(appContainer);
+                        try {
+                            window.AppSyndicate.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] AppSyndicate.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -469,7 +547,12 @@ const PhoneManager = {
                 case 'containers':
                 case 'storage_wars':
                     if (window.AppPort && typeof window.AppPort.render === 'function') {
-                        window.AppPort.render(appContainer);
+                        try {
+                            window.AppPort.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] AppPort.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -477,7 +560,12 @@ const PhoneManager = {
 
                 case 'radar':
                     if (window.AppRadar && typeof window.AppRadar.render === 'function') {
-                        window.AppRadar.render(appContainer);
+                        try {
+                            window.AppRadar.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] AppRadar.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -485,7 +573,12 @@ const PhoneManager = {
 
                 case 'gosuslugi':
                     if (window.AppGosuslugi && typeof window.AppGosuslugi.render === 'function') {
-                        window.AppGosuslugi.render(appContainer);
+                        try {
+                            window.AppGosuslugi.render(appContainer);
+                        } catch (e) {
+                            console.error('[Phone] AppGosuslugi.render error:', e);
+                            this.renderGenericFallback(appId, appContainer);
+                        }
                     } else {
                         this.renderGenericFallback(appId, appContainer);
                     }
@@ -644,7 +737,7 @@ const PhoneManager = {
             q.done = true;
 
             // ⭐ v1.9.0: через MoneyManager
-            if (window.MoneyManager) {
+            if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
                 window.MoneyManager.earn(q.reward || 0, `Квест: ${q.text}`, { silent: true });
             } else {
                 p.cash = (p.cash || 0) + (q.reward || 0);
@@ -671,7 +764,12 @@ const PhoneManager = {
         const box = document.getElementById('phoneBizWidgetContainer');
         if (!box) return;
 
-        const businesses = window.state?.businesses || [];
+        if (!window.state || !window.state.businesses) {
+            box.style.display = 'none';
+            return;
+        }
+
+        const businesses = window.state.businesses || [];
         const ownedBusinesses = businesses.filter(b => b && b.level > 0);
 
         if (ownedBusinesses.length === 0) {
@@ -732,7 +830,11 @@ const PhoneManager = {
 
     collectAllBusinessCash() {
         if (window.PhoneBusiness && typeof window.PhoneBusiness.collectAllCash === 'function') {
-            window.PhoneBusiness.collectAllCash();
+            try {
+                window.PhoneBusiness.collectAllCash();
+            } catch (e) {
+                console.error('[Phone] collectAllBusinessCash error:', e);
+            }
             return;
         }
 
@@ -747,7 +849,7 @@ const PhoneManager = {
         if (total <= 0) return;
 
         // ⭐ v1.9.0: через MoneyManager
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
             window.MoneyManager.earn(total, 'Сбор кассы бизнес-сети');
         } else {
             window.state.player.cash = (window.state.player.cash || 0) + total;
@@ -960,15 +1062,12 @@ const AppShop = {
         box.innerHTML = html;
     },
 
-    /**
-     * ⭐ v1.9.0: Покупка прибора через MoneyManager
-     */
     buyToolAction(toolId, cost, reqStars) {
         const p = window.state?.player;
         if (!p) return showToast("❌ Профиль недоступен");
 
         // Проверка + списание через MoneyManager
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.trySpendMulti === 'function') {
             const spendRes = window.MoneyManager.trySpendMulti({
                 cash: cost,
                 stars: reqStars || 0
@@ -1007,7 +1106,7 @@ const AppShop = {
         if (!p) return;
 
         // ⭐ v1.9.0: через MoneyManager
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
             const ok = window.MoneyManager.spend(cost, `Калибровка прибора`);
             if (!ok) return showToast("Не хватает денег на калибровку и зарядку!");
         } else {
@@ -1033,7 +1132,7 @@ const AppShop = {
         if (!p) return;
 
         // ⭐ v1.9.0: через MoneyManager
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.trySpendMulti === 'function') {
             const spendRes = window.MoneyManager.trySpendMulti({
                 cash: cost,
                 stars: reqStars || 0
@@ -1076,7 +1175,7 @@ const AppShop = {
         if (!p) return;
 
         // ⭐ v1.9.0: через MoneyManager
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.trySpendMulti === 'function') {
             const spendRes = window.MoneyManager.trySpendMulti({
                 cash: cost,
                 stars: reqStars || 0
@@ -1124,7 +1223,7 @@ const AppShop = {
         if (!p) return;
 
         // ⭐ v1.9.0: через MoneyManager
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.trySpendMulti === 'function') {
             const spendRes = window.MoneyManager.trySpendMulti({
                 cash: cost,
                 stars: reqStars || 0
@@ -1246,4 +1345,4 @@ if (document.readyState === 'loading') {
     PhoneManager.init();
 }
 
-console.log('[📱 phone.js v1.9.0] MoneyManager во всех покупках AppShop + PhoneManager.confirmUnlockAppAction ✓');
+console.log('[📱 phone.js v1.9.1] Усиленная защита при открытии приложений (включая DEV) + MoneyManager ✓');

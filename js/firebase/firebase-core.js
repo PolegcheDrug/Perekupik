@@ -1,6 +1,12 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.2.0)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.3.0 (ФИКС DEV-ПАНЕЛИ):
+//   - ДОБАВЛЕН объект Admin с методами:
+//       • wipeMarketAndP2P() — очистка лотов, ДКП, чатов и офферов
+//       • wipeAllGlobal() — полная очистка БД (включая игроков)
+//   - Очистка выполняется пакетами (writeBatch) с защитой от зависаний.
+//   - Экспортируется в window.FB_Core.Admin для phone-dev.js.
 // ⭐ v1.2.0 (P2P BOT NOTIFICATIONS & TELEGRAM CONTEXT):
 //   - ДОБАВЛЕНО: автоматическая регистрация Telegram контекста (chatId, username, push-флаг)
 //     при успешной авторизации сессии в players/{uid} и users/{uid}/notifications.
@@ -506,6 +512,128 @@ const CleanupManager = {
 };
 
 // ========================================================
+// ⭐ v1.3.0: ADMIN MANAGER (ДЛЯ DEV-ПАНЕЛИ)
+// ========================================================
+const AdminManager = {
+    /**
+     * Вспомогательная функция для безопасного удаления коллекции пачками.
+     * Защищена от бесконечного цикла (max 50 итераций).
+     */
+    async _wipeCollection(colName) {
+        let totalDeleted = 0;
+        let iterations = 0;
+        const maxIterations = 50; // Защита от бесконечного цикла (максимум 50 * 200 = 10 000 док-тов за раз)
+
+        try {
+            while (iterations < maxIterations) {
+                iterations++;
+                const q = query(collection(db, colName), limit(200));
+                const snap = await getDocs(q);
+
+                if (snap.empty) break;
+
+                const batch = writeBatch(db);
+                snap.forEach(d => batch.delete(d.ref));
+                await batch.commit();
+                totalDeleted += snap.size;
+            }
+            return totalDeleted;
+        } catch (e) {
+            console.warn(`[Admin] Ошибка очистки ${colName}:`, e);
+            throw e;
+        }
+    },
+
+    /**
+     * Очистка рынка, P2P сделок, чатов и офферов.
+     * Сохраняет аккаунты игроков и их гаражи.
+     */
+    async wipeMarketAndP2P() {
+        console.warn('[Admin] Запуск очистки Рынка и P2P...');
+        const colsToWipe = [
+            'market_lots',
+            'p2p_deals',
+            'trade_offers',
+            'p2p_offers',
+            'p2p_notifications_queue',
+            'chat_messages',
+            'notifications',
+            'transactions'
+        ];
+
+        let total = 0;
+        try {
+            for (const col of colsToWipe) {
+                const count = await this._wipeCollection(col);
+                total += count;
+                console.log(`[Admin] ${col}: удалено ${count} док-тов`);
+            }
+            devLogFirestore('Admin.wipeMarketAndP2P OK', `Удалено всего: ${total}`);
+            return { success: true, total };
+        } catch (e) {
+            devLogFirestore('Admin.wipeMarketAndP2P ERROR', e.message);
+            return { success: false, error: e.message };
+        }
+    },
+
+    /**
+     * Полная очистка ВСЕЙ базы данных.
+     * ВНИМАНИЕ: Удаляет игроков, гаражи, бизнесы и т.д.
+     */
+    async wipeAllGlobal() {
+        console.warn('[Admin] ⚠️ ЗАПУСК ПОЛНОГО ВАЙПА БАЗЫ ДАННЫХ!');
+        const allCollections = [
+            // Игровые данные
+            'players',
+            'garages',
+            'saves',
+            'leaderboard',
+            'clubs',
+            'friendships',
+            'access_whitelist',
+            'access_invites',
+            'access_requests',
+            'access_settings',
+            // Рынок и сделки
+            'market_lots',
+            'p2p_deals',
+            'trade_offers',
+            'p2p_offers',
+            'p2p_notifications_queue',
+            'chat_messages',
+            'notifications',
+            'transactions',
+            // Контент и события
+            'cars_catalog',
+            'registered_plates',
+            'street_events',
+            'storage_wars_lobbies'
+        ];
+
+        let total = 0;
+        const errors = [];
+
+        try {
+            for (const col of allCollections) {
+                try {
+                    const count = await this._wipeCollection(col);
+                    total += count;
+                    console.log(`[Admin] ${col}: удалено ${count} док-тов`);
+                } catch (e) {
+                    // Если коллекции нет или нет прав (например, на access_whitelist) — игнорируем, идем дальше
+                    errors.push(`${col}: ${e.message}`);
+                }
+            }
+            devLogFirestore('Admin.wipeAllGlobal OK', `Удалено всего: ${total}. Ошибок: ${errors.length}`);
+            return { success: true, total, errors };
+        } catch (e) {
+            devLogFirestore('Admin.wipeAllGlobal FATAL', e.message);
+            return { success: false, error: e.message, partialTotal: total };
+        }
+    }
+};
+
+// ========================================================
 // 7. FIRESTORE STATS (для DEV)
 // ========================================================
 async function getFirestoreStats() {
@@ -560,6 +688,9 @@ window.FB_Core = {
   // Cleanup
   Cleanup: CleanupManager,
 
+  // ⭐ v1.3.0: Admin для DEV-панели
+  Admin: AdminManager,
+
   // Stats
   getStats: getFirestoreStats,
 
@@ -577,7 +708,7 @@ window.FB_Core = {
 
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Core v1.2.0] Ядро Firebase загружено. P2P Telegram Context & Queue ready ✓");
+console.log("[☁️ FB_Core v1.3.0] Ядро Firebase + AdminManager для DEV ✓");
 
 // ========================================================
 // 9. АВТОЗАПУСК CLEANUP

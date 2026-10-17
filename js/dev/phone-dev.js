@@ -1,6 +1,11 @@
 // ========================================================
-// js/dev/phone-dev.js — ПРИЛОЖЕНИЕ «DEV TERMINAL» (v2.1.0)
+// js/dev/phone-dev.js — ПРИЛОЖЕНИЕ «DEV TERMINAL» (v2.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.2.0 (СТАБИЛЬНОСТЬ И ЗАЩИТА ОТ ПАДЕНИЙ):
+//   - Все вкладки обернуты в try/catch.
+//   - Добавлена проверка на window.AccessControl и window.FB_Core.Admin.
+//   - Добавлена защита от отсутствия window.state.player.
+//   - Исправлены мелкие ошибки в renderAccessTab и renderOverviewTab.
 // ⭐ v2.1.0 (ГЛОБАЛЬНЫЙ СБРОС И ВАЙП БД):
 //   - ДОБАВЛЕНО: Два режима сброса во вкладку FIRESTORE и OVERVIEW:
 //       1. 🧹 СБРОС СЕТИ / РЫНКА (с сохранением игроков, гаражей и клубов).
@@ -52,7 +57,7 @@ const AppDev = {
                 this.renderDashboard(container);
             }
         } catch (e) {
-            console.error('[AppDev] Ошибка рендера:', e);
+            console.error('[AppDev] Критическая ошибка рендера:', e);
             container.innerHTML = `
                 <div class="phone-app-header">
                     <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
@@ -61,7 +66,7 @@ const AppDev = {
                 </div>
                 <div class="phone-app-body">
                     <div class="glass-card p-3" style="border-color: var(--red);">
-                        <b class="color-red text-xs">Ошибка DEV-приложения</b>
+                        <b class="color-red text-xs">Критическая ошибка DEV-приложения</b>
                         <div class="sub-label mt-1" style="font-size:9.5px;">${String(e.message || e).substring(0, 200)}</div>
                         <button onclick="AppDev.isAuthenticated=false; PhoneManager.openApp('dev')" class="btn btn-dark btn-sm mt-2">Сбросить и зайти снова</button>
                     </div>
@@ -314,6 +319,7 @@ const AppDev = {
                 <div class="glass-card p-3" style="border-color: var(--red);">
                     <b class="color-red text-xs">Ошибка вкладки «${sub}»</b>
                     <div class="sub-label mt-1" style="font-size:9px;">${String(e.message || e).substring(0, 200)}</div>
+                    <button onclick="AppDev.render(document.getElementById('phoneAppContainer'))" class="btn btn-dark btn-sm mt-2">Обновить</button>
                 </div>
             `;
         }
@@ -353,6 +359,8 @@ const AppDev = {
         }
 
         try {
+            if (!window.AccessControl) throw new Error("AccessControl не загружен");
+
             const [invitesRes, playersRes] = await Promise.all([
                 window.AccessControl.listInvites(),
                 window.AccessControl.listWhitelist()
@@ -825,6 +833,7 @@ const AppDev = {
     },
 
     quickCash(amount) {
+        if (!window.state || !window.state.player) return showToast("State не загружен");
         if (window.MoneyManager) {
             if (amount > 0) window.MoneyManager.earn(amount, 'DEV: читерство');
             else window.MoneyManager.spend(-amount, 'DEV: читерство', { force: true });
@@ -836,6 +845,7 @@ const AppDev = {
     },
 
     quickStars(amount) {
+        if (!window.state || !window.state.player) return;
         if (window.MoneyManager) {
             if (amount > 0) window.MoneyManager.earn(amount, 'DEV: читерство', { currency: 'stars', silent: true });
             else window.MoneyManager.spend(-amount, 'DEV: читерство', { currency: 'stars', silent: true, force: true });
@@ -847,6 +857,7 @@ const AppDev = {
     },
 
     quickLevel(amount) {
+        if (!window.state || !window.state.player) return;
         window.state.player.level = Math.max(1, Math.min(100, (window.state.player.level || 1) + amount));
         if (typeof updateLevelGatesUI === 'function') updateLevelGatesUI();
         this.refreshHeader();
@@ -854,12 +865,14 @@ const AppDev = {
     },
 
     quickConn(amount) {
+        if (!window.state || !window.state.player) return;
         window.state.player.connections = Math.max(0, (window.state.player.connections || 0) + amount);
         this.refreshHeader();
         showToast('+' + amount + ' 🤝');
     },
 
     quickTickets(amount) {
+        if (!window.state || !window.state.player) return;
         const max = window.state.player.maxExpressTickets || 25;
         window.state.player.expressTickets = Math.min(max, (window.state.player.expressTickets || 0) + amount);
         this.refreshHeader();
@@ -867,6 +880,7 @@ const AppDev = {
     },
 
     quickSuperSpinTickets(amount) {
+        if (!window.state || !window.state.player) return;
         window.state.player.superSpinTickets = (window.state.player.superSpinTickets || 0) + amount;
         this.refreshHeader();
         showToast('+' + amount + ' 🎫');
@@ -1008,7 +1022,7 @@ const AppDev = {
     },
 
     simulateBuyOwnLot() {
-        const myUid = window.TelegramAuthManager?.getVerifiedUserId() || window.state.player?.uid;
+        const myUid = window.TelegramAuthManager?.getVerifiedUserId() || window.state?.player?.uid;
         const myLots = (window.state.p2pMarketListings || []).filter(l => String(l.sellerId) === String(myUid));
 
         if (myLots.length === 0) {
@@ -1037,7 +1051,7 @@ const AppDev = {
     },
 
     clearP2PLots() {
-        const myUid = window.TelegramAuthManager?.getVerifiedUserId() || window.state.player?.uid;
+        const myUid = window.TelegramAuthManager?.getVerifiedUserId() || window.state?.player?.uid;
         const before = (window.state.p2pMarketListings || []).length;
         window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l => String(l.sellerId) !== String(myUid));
         const after = window.state.p2pMarketListings.length;
@@ -1464,7 +1478,7 @@ const AppDev = {
                     ${summary.map(row => `
                         <div class="flex-between">
                             <span class="sub-label">${row.label}</span>
-                            <b class="${row.color \vert{}\vert{} ''}">${row.value}</b>
+                            <b class="${row.color || ''}">${row.value}</b>
                         </div>
                     `).join('')}
                 </div>
@@ -1788,7 +1802,7 @@ const AppDev = {
             if (res.success) {
                 if (typeof playSound === 'function') playSound('win');
                 if (typeof tgHaptic === 'function') tgHaptic('success');
-                showToast("✅ Рынок и P2P очищены! Прогресс игроков сохранён.");
+                showToast(`✅ Рынок и P2P очищены! Удалено: ${res.total} док-тов.`);
                 this.refreshFirestoreStats();
             } else {
                 showToast("❌ Ошибка сброса: " + res.error);
@@ -2030,7 +2044,13 @@ const AppDev = {
 
         const checkModule = (mod) => {
             try {
-                return !!eval(mod.path);
+                const parts = mod.path.split('.');
+                let cur = window;
+                for (const p of parts) {
+                    if (cur === undefined || cur === null) return false;
+                    cur = cur[p];
+                }
+                return !!cur;
             } catch (e) {
                 return false;
             }
@@ -2076,4 +2096,4 @@ const AppDev = {
 
 window.AppDev = AppDev;
 
-console.log('[🔧 phone-dev v2.1.0] Добавлены глобальные сбросы (Сброс рынка / Полный вайп БД) ✓');
+console.log('[🔧 phone-dev v2.2.0] Стабильность + защита от падений + Admin интеграция ✓');

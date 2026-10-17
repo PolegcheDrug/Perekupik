@@ -1,10 +1,14 @@
 // ========================================================
-// js/app/app-core.js — ЯДРО: STATE, SAVE, MIGRATE (v4.3.0)
+// js/app/app-core.js — ЯДРО: STATE, SAVE, MIGRATE (v4.3.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v4.3.1 (ФИКС ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ):
+//   - Все глобальные переменные (tgUserId, tgUserData, isPcDevSession)
+//     теперь синхронизируются с window.* для совместимости с app-loader.js
+//   - window.isPcDevMode() читает из window.isPcDevSession
 // ⭐ Часть 1 из 3 (разгрузка app.js)
 // ========================================================
 
-window.CURRENT_GAME_VERSION = "v4.3.0";
+window.CURRENT_GAME_VERSION = "v4.3.1";
 
 const SAVE_VERSION = 14;
 let SAVE_KEY_PREFIX = "perekup_v14_";
@@ -14,14 +18,13 @@ const STAR_RATE_MIN = 22000;
 const STAR_RATE_MAX = 28000;
 const STAR_RATE_DEFAULT = 25000;
 
-// Глобальные переменные, которые заполняются в app-loader.js
-// (объявлены здесь для доступа из app-core и app-game)
-let tgUserId = null;
-let tgUserData = null;
-let isPcDevSession = false;
+// Глобальные переменные — выносим в window для доступа из всех модулей
+window.tgUserId = window.tgUserId || null;
+window.tgUserData = window.tgUserData || null;
+window.isPcDevSession = window.isPcDevSession || false;
 
 window.isPcDevMode = function() {
-    return isPcDevSession === true || String(tgUserId || '').startsWith('pc_dev_');
+    return window.isPcDevSession === true || String(window.tgUserId || '').startsWith('pc_dev_');
 };
 
 function _fmtMoney(val) {
@@ -44,7 +47,7 @@ function _isOwner() {
         return window.GameHelpers.isOwnerUser();
     }
     if (window.AccessControl && typeof window.AccessControl.isOwner === 'function') {
-        return window.AccessControl.isOwner(tgUserId);
+        return window.AccessControl.isOwner(window.tgUserId);
     }
     return false;
 }
@@ -264,79 +267,81 @@ function migrateSave(parsed) {
 // 3. SANITIZE STATE
 // ========================================================
 function sanitizeState() {
-    if (!state.player) state.player = JSON.parse(JSON.stringify(DEFAULT_STATE.player));
-    if (!state.player.baseSlots || state.player.baseSlots < 2) state.player.baseSlots = 2;
-    if (!state.player.maxExpressTickets) state.player.maxExpressTickets = 25;
-    if (typeof state.player.expressTickets !== 'number') state.player.expressTickets = state.player.maxExpressTickets;
-    if (typeof state.player.cash !== 'number' || state.player.cash < 0) state.player.cash = 150000;
-    if (typeof state.player.stars !== 'number' || state.player.stars < 0) state.player.stars = 15;
-    if (!state.player.hudColorId) state.player.hudColorId = 'cyber_neon';
-    if (!state.player.soundProfile) state.player.soundProfile = 'cyber';
-    if (!state.player.traderTitle) state.player.traderTitle = "Быстрый выкуп за кэш 💸";
-    if (!Array.isArray(state.player.mailbox)) state.player.mailbox = [];
-    if (!Array.isArray(state.player.unlockedApps)) state.player.unlockedApps = [];
-    if (!Array.isArray(state.player.businessAchievements)) state.player.businessAchievements = [];
-    if (!Array.isArray(state.player.ownedBizSkins)) state.player.ownedBizSkins = [];
-    if (!Array.isArray(state.player.ownedBizStickers)) state.player.ownedBizStickers = [];
-    if (typeof state.player.businessSalesCount !== 'number') state.player.businessSalesCount = 0;
-    if (!state.player.warehouse) state.player.warehouse = { maxCars: 6, maxItems: 12, cars: [], items: [] };
-    if (!Array.isArray(state.player.warehouse.cars)) state.player.warehouse.cars = [];
-    if (!Array.isArray(state.player.warehouse.items)) state.player.warehouse.items = [];
-    if (!state.player.dailyQuests || state.player.dailyQuests.length === 0) refreshDailyQuestsList();
-    if (!state.player.mEventReactions || typeof state.player.mEventReactions !== 'object') state.player.mEventReactions = {};
+    if (!window.state.player) window.state.player = JSON.parse(JSON.stringify(DEFAULT_STATE.player));
+    if (!window.state.player.baseSlots || window.state.player.baseSlots < 2) window.state.player.baseSlots = 2;
+    if (!window.state.player.maxExpressTickets) window.state.player.maxExpressTickets = 25;
+    if (typeof window.state.player.expressTickets !== 'number') window.state.player.expressTickets = window.state.player.maxExpressTickets;
+    if (typeof window.state.player.cash !== 'number' || window.state.player.cash < 0) window.state.player.cash = 150000;
+    if (typeof window.state.player.stars !== 'number' || window.state.player.stars < 0) window.state.player.stars = 15;
+    if (!window.state.player.hudColorId) window.state.player.hudColorId = 'cyber_neon';
+    if (!window.state.player.soundProfile) window.state.player.soundProfile = 'cyber';
+    if (!window.state.player.traderTitle) window.state.player.traderTitle = "Быстрый выкуп за кэш 💸";
+    if (!Array.isArray(window.state.player.mailbox)) window.state.player.mailbox = [];
+    if (!Array.isArray(window.state.player.unlockedApps)) window.state.player.unlockedApps = [];
+    if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
+    if (!Array.isArray(window.state.player.ownedBizSkins)) window.state.player.ownedBizSkins = [];
+    if (!Array.isArray(window.state.player.ownedBizStickers)) window.state.player.ownedBizStickers = [];
+    if (typeof window.state.player.businessSalesCount !== 'number') window.state.player.businessSalesCount = 0;
+    if (!window.state.player.warehouse) window.state.player.warehouse = { maxCars: 6, maxItems: 12, cars: [], items: [] };
+    if (!Array.isArray(window.state.player.warehouse.cars)) window.state.player.warehouse.cars = [];
+    if (!Array.isArray(window.state.player.warehouse.items)) window.state.player.warehouse.items = [];
+    if (!window.state.player.dailyQuests || window.state.player.dailyQuests.length === 0) {
+        if (typeof refreshDailyQuestsList === 'function') refreshDailyQuestsList();
+    }
+    if (!window.state.player.mEventReactions || typeof window.state.player.mEventReactions !== 'object') window.state.player.mEventReactions = {};
 
-    if (!Array.isArray(state.player._processedNotifIds)) state.player._processedNotifIds = [];
-    if (!Array.isArray(state.player.pendingFriendRequests)) state.player.pendingFriendRequests = [];
-    if (!Array.isArray(state.player.incomingTradeOffers)) state.player.incomingTradeOffers = [];
-    if (!Array.isArray(state.player.platesInventory)) state.player.platesInventory = [];
+    if (!Array.isArray(window.state.player._processedNotifIds)) window.state.player._processedNotifIds = [];
+    if (!Array.isArray(window.state.player.pendingFriendRequests)) window.state.player.pendingFriendRequests = [];
+    if (!Array.isArray(window.state.player.incomingTradeOffers)) window.state.player.incomingTradeOffers = [];
+    if (!Array.isArray(window.state.player.platesInventory)) window.state.player.platesInventory = [];
 
-    if (!state.player.interior || typeof state.player.interior !== 'object') state.player.interior = {};
-    if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
-    if (typeof state.player.housingRentDue !== 'number') state.player.housingRentDue = 0;
-    if (state.player.mortgage === undefined) state.player.mortgage = null;
-    if (!state.player.housingId) state.player.housingId = 'trailer';
-    if (!state.player.housingType) state.player.housingType = 'own';
+    if (!window.state.player.interior || typeof window.state.player.interior !== 'object') window.state.player.interior = {};
+    if (!Array.isArray(window.state.player.ownedHouses)) window.state.player.ownedHouses = [];
+    if (typeof window.state.player.housingRentDue !== 'number') window.state.player.housingRentDue = 0;
+    if (window.state.player.mortgage === undefined) window.state.player.mortgage = null;
+    if (!window.state.player.housingId) window.state.player.housingId = 'trailer';
+    if (!window.state.player.housingType) window.state.player.housingType = 'own';
 
-    if (!Array.isArray(state.player.ownedThemes)) {
-        state.player.ownedThemes = ['cyber_neon'];
-        if (state.player.hudColorId && state.player.hudColorId !== 'cyber_neon') {
-            state.player.ownedThemes.push(state.player.hudColorId);
+    if (!Array.isArray(window.state.player.ownedThemes)) {
+        window.state.player.ownedThemes = ['cyber_neon'];
+        if (window.state.player.hudColorId && window.state.player.hudColorId !== 'cyber_neon') {
+            window.state.player.ownedThemes.push(window.state.player.hudColorId);
         }
-        if (state.player.themePresetId === 'cyber_black_neo') {
-            state.player.ownedThemes.push('cyber_black_neo');
+        if (window.state.player.themePresetId === 'cyber_black_neo') {
+            window.state.player.ownedThemes.push('cyber_black_neo');
         }
     }
-    if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
-    if (!Array.isArray(state.player.ownedAvatarEffects)) state.player.ownedAvatarEffects = ['none'];
-    if (!Array.isArray(state.player.ownedTitles)) state.player.ownedTitles = ['cash_buyer'];
+    if (!Array.isArray(window.state.player.ownedNickEffects)) window.state.player.ownedNickEffects = ['none'];
+    if (!Array.isArray(window.state.player.ownedAvatarEffects)) window.state.player.ownedAvatarEffects = ['none'];
+    if (!Array.isArray(window.state.player.ownedTitles)) window.state.player.ownedTitles = ['cash_buyer'];
 
-    if (typeof state.player.streakDay !== 'number' || state.player.streakDay < 0) {
-        state.player.streakDay = 1;
+    if (typeof window.state.player.streakDay !== 'number' || window.state.player.streakDay < 0) {
+        window.state.player.streakDay = 1;
     }
 
-    if (typeof state.player.dynamicStarRate !== 'number') {
-        state.player.dynamicStarRate = STAR_RATE_DEFAULT;
+    if (typeof window.state.player.dynamicStarRate !== 'number') {
+        window.state.player.dynamicStarRate = STAR_RATE_DEFAULT;
     }
-    if (!Array.isArray(state.player.dynamicStarRateHistory)) {
-        state.player.dynamicStarRateHistory = [];
+    if (!Array.isArray(window.state.player.dynamicStarRateHistory)) {
+        window.state.player.dynamicStarRateHistory = [];
     }
 
-    if (!state.player.paidParking || typeof state.player.paidParking !== 'object') {
-        state.player.paidParking = { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 };
+    if (!window.state.player.paidParking || typeof window.state.player.paidParking !== 'object') {
+        window.state.player.paidParking = { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 };
     } else {
-        if (!Array.isArray(state.player.paidParking.cars)) state.player.paidParking.cars = [];
-        if (typeof state.player.paidParking.maxCars !== 'number') state.player.paidParking.maxCars = 3;
-        if (typeof state.player.paidParking.dailyRate !== 'number') state.player.paidParking.dailyRate = 200;
-        if (typeof state.player.paidParking.lastChargeDay !== 'number') state.player.paidParking.lastChargeDay = 0;
+        if (!Array.isArray(window.state.player.paidParking.cars)) window.state.player.paidParking.cars = [];
+        if (typeof window.state.player.paidParking.maxCars !== 'number') window.state.player.paidParking.maxCars = 3;
+        if (typeof window.state.player.paidParking.dailyRate !== 'number') window.state.player.paidParking.dailyRate = 200;
+        if (typeof window.state.player.paidParking.lastChargeDay !== 'number') window.state.player.paidParking.lastChargeDay = 0;
     }
 
-    if (!state.businessWorkshop) state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
-    if (!state.businessStaff) state.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
-    if (!Array.isArray(state.businessFleet)) state.businessFleet = [];
+    if (!window.state.businessWorkshop) window.state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
+    if (!window.state.businessStaff) window.state.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
+    if (!Array.isArray(window.state.businessFleet)) window.state.businessFleet = [];
 
-    state.__saveVersion = SAVE_VERSION;
-    if (!Array.isArray(state.mEventsFeed)) state.mEventsFeed = [];
-    if (typeof state.marketFeedVersion !== 'number') state.marketFeedVersion = 0;
+    window.state.__saveVersion = SAVE_VERSION;
+    if (!Array.isArray(window.state.mEventsFeed)) window.state.mEventsFeed = [];
+    if (typeof window.state.marketFeedVersion !== 'number') window.state.marketFeedVersion = 0;
 }
 
 // ========================================================
@@ -346,92 +351,92 @@ function applyLoadedState(parsed) {
     if (!parsed) parsed = {};
     parsed = migrateSave(parsed);
 
-    if (parsed.lang) state.lang = parsed.lang;
+    if (parsed.lang) window.state.lang = parsed.lang;
 
-    if (typeof parsed.marketFeedVersion === 'number') state.marketFeedVersion = parsed.marketFeedVersion;
-    else state.marketFeedVersion = 0;
+    if (typeof parsed.marketFeedVersion === 'number') window.state.marketFeedVersion = parsed.marketFeedVersion;
+    else window.state.marketFeedVersion = 0;
 
-    if (Array.isArray(parsed.mEventsFeed)) state.mEventsFeed = parsed.mEventsFeed;
-    else state.mEventsFeed = [];
+    if (Array.isArray(parsed.mEventsFeed)) window.state.mEventsFeed = parsed.mEventsFeed;
+    else window.state.mEventsFeed = [];
 
     if (parsed.player) {
-        state.player = { ...DEFAULT_STATE.player, ...parsed.player };
-        if (parsed.player.stats) state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
-        if (parsed.player.tools) state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
-        if (parsed.player.toolsWear) state.player.toolsWear = { ...DEFAULT_STATE.player.toolsWear, ...parsed.player.toolsWear };
-        if (parsed.player.crypto) state.player.crypto = { ...DEFAULT_STATE.player.crypto, ...parsed.player.crypto };
-        if (parsed.player.bankReputation) state.player.bankReputation = { ...DEFAULT_STATE.player.bankReputation, ...parsed.player.bankReputation };
-        if (parsed.player.phoneWidgetsCollapsed) state.player.phoneWidgetsCollapsed = { ...DEFAULT_STATE.player.phoneWidgetsCollapsed, ...parsed.player.phoneWidgetsCollapsed };
-        if (parsed.player.club) state.player.club = parsed.player.club;
+        window.state.player = { ...DEFAULT_STATE.player, ...parsed.player };
+        if (parsed.player.stats) window.state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
+        if (parsed.player.tools) window.state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
+        if (parsed.player.toolsWear) window.state.player.toolsWear = { ...DEFAULT_STATE.player.toolsWear, ...parsed.player.toolsWear };
+        if (parsed.player.crypto) window.state.player.crypto = { ...DEFAULT_STATE.player.crypto, ...parsed.player.crypto };
+        if (parsed.player.bankReputation) window.state.player.bankReputation = { ...DEFAULT_STATE.player.bankReputation, ...parsed.player.bankReputation };
+        if (parsed.player.phoneWidgetsCollapsed) window.state.player.phoneWidgetsCollapsed = { ...DEFAULT_STATE.player.phoneWidgetsCollapsed, ...parsed.player.phoneWidgetsCollapsed };
+        if (parsed.player.club) window.state.player.club = parsed.player.club;
 
-        if (!state.player.interior || typeof state.player.interior !== 'object') state.player.interior = {};
-        if (!Array.isArray(state.player.ownedHouses)) state.player.ownedHouses = [];
-        if (typeof state.player.housingRentDue !== 'number') state.player.housingRentDue = 0;
-        if (state.player.mortgage === undefined) state.player.mortgage = null;
+        if (!window.state.player.interior || typeof window.state.player.interior !== 'object') window.state.player.interior = {};
+        if (!Array.isArray(window.state.player.ownedHouses)) window.state.player.ownedHouses = [];
+        if (typeof window.state.player.housingRentDue !== 'number') window.state.player.housingRentDue = 0;
+        if (window.state.player.mortgage === undefined) window.state.player.mortgage = null;
 
-        if (!Array.isArray(state.player.ownedThemes)) state.player.ownedThemes = ['cyber_neon'];
-        if (!Array.isArray(state.player.ownedNickEffects)) state.player.ownedNickEffects = ['none'];
-        if (!Array.isArray(state.player.ownedAvatarEffects)) state.player.ownedAvatarEffects = ['none'];
-        if (!Array.isArray(state.player.ownedTitles)) state.player.ownedTitles = ['cash_buyer'];
+        if (!Array.isArray(window.state.player.ownedThemes)) window.state.player.ownedThemes = ['cyber_neon'];
+        if (!Array.isArray(window.state.player.ownedNickEffects)) window.state.player.ownedNickEffects = ['none'];
+        if (!Array.isArray(window.state.player.ownedAvatarEffects)) window.state.player.ownedAvatarEffects = ['none'];
+        if (!Array.isArray(window.state.player.ownedTitles)) window.state.player.ownedTitles = ['cash_buyer'];
 
-        if (!Array.isArray(state.player.phoneMessages)) state.player.phoneMessages = [];
-        if (!Array.isArray(state.player.dailyQuests)) state.player.dailyQuests = [];
-        if (!Array.isArray(state.player.bankHistory)) state.player.bankHistory = [];
-        if (!Array.isArray(state.player.bankDeposits)) state.player.bankDeposits = [];
-        if (!Array.isArray(state.player.mailbox)) state.player.mailbox = [];
-        if (!Array.isArray(state.player.unlockedApps)) state.player.unlockedApps = [];
-        if (!Array.isArray(state.player.businessAchievements)) state.player.businessAchievements = [];
-        if (!Array.isArray(state.player.ownedBizSkins)) state.player.ownedBizSkins = [];
-        if (!Array.isArray(state.player.ownedBizStickers)) state.player.ownedBizStickers = [];
-        if (!state.player.mEventReactions || typeof state.player.mEventReactions !== 'object') state.player.mEventReactions = {};
+        if (!Array.isArray(window.state.player.phoneMessages)) window.state.player.phoneMessages = [];
+        if (!Array.isArray(window.state.player.dailyQuests)) window.state.player.dailyQuests = [];
+        if (!Array.isArray(window.state.player.bankHistory)) window.state.player.bankHistory = [];
+        if (!Array.isArray(window.state.player.bankDeposits)) window.state.player.bankDeposits = [];
+        if (!Array.isArray(window.state.player.mailbox)) window.state.player.mailbox = [];
+        if (!Array.isArray(window.state.player.unlockedApps)) window.state.player.unlockedApps = [];
+        if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
+        if (!Array.isArray(window.state.player.ownedBizSkins)) window.state.player.ownedBizSkins = [];
+        if (!Array.isArray(window.state.player.ownedBizStickers)) window.state.player.ownedBizStickers = [];
+        if (!window.state.player.mEventReactions || typeof window.state.player.mEventReactions !== 'object') window.state.player.mEventReactions = {};
 
-        if (!Array.isArray(state.player._processedNotifIds)) state.player._processedNotifIds = [];
-        if (!Array.isArray(state.player.pendingFriendRequests)) state.player.pendingFriendRequests = [];
-        if (!Array.isArray(state.player.incomingTradeOffers)) state.player.incomingTradeOffers = [];
-        if (!Array.isArray(state.player.platesInventory)) state.player.platesInventory = [];
+        if (!Array.isArray(window.state.player._processedNotifIds)) window.state.player._processedNotifIds = [];
+        if (!Array.isArray(window.state.player.pendingFriendRequests)) window.state.player.pendingFriendRequests = [];
+        if (!Array.isArray(window.state.player.incomingTradeOffers)) window.state.player.incomingTradeOffers = [];
+        if (!Array.isArray(window.state.player.platesInventory)) window.state.player.platesInventory = [];
 
-        if (typeof state.player.dynamicStarRate !== 'number') {
-            state.player.dynamicStarRate = STAR_RATE_DEFAULT;
+        if (typeof window.state.player.dynamicStarRate !== 'number') {
+            window.state.player.dynamicStarRate = STAR_RATE_DEFAULT;
         }
-        if (!Array.isArray(state.player.dynamicStarRateHistory)) {
-            state.player.dynamicStarRateHistory = [];
+        if (!Array.isArray(window.state.player.dynamicStarRateHistory)) {
+            window.state.player.dynamicStarRateHistory = [];
         }
 
         if (parsed.player.warehouse && typeof parsed.player.warehouse === 'object') {
-            state.player.warehouse = { ...DEFAULT_STATE.player.warehouse, ...parsed.player.warehouse };
-            if (!Array.isArray(state.player.warehouse.cars)) state.player.warehouse.cars = [];
-            if (!Array.isArray(state.player.warehouse.items)) state.player.warehouse.items = [];
+            window.state.player.warehouse = { ...DEFAULT_STATE.player.warehouse, ...parsed.player.warehouse };
+            if (!Array.isArray(window.state.player.warehouse.cars)) window.state.player.warehouse.cars = [];
+            if (!Array.isArray(window.state.player.warehouse.items)) window.state.player.warehouse.items = [];
         }
 
         if (parsed.player.paidParking && typeof parsed.player.paidParking === 'object') {
-            state.player.paidParking = { ...DEFAULT_STATE.player.paidParking, ...parsed.player.paidParking };
-            if (!Array.isArray(state.player.paidParking.cars)) state.player.paidParking.cars = [];
+            window.state.player.paidParking = { ...DEFAULT_STATE.player.paidParking, ...parsed.player.paidParking };
+            if (!Array.isArray(window.state.player.paidParking.cars)) window.state.player.paidParking.cars = [];
         }
     }
 
-    if (Array.isArray(parsed.garage)) state.garage = parsed.garage;
-    if (Array.isArray(parsed.salesLot)) state.salesLot = parsed.salesLot;
-    if (Array.isArray(parsed.contracts)) state.contracts = parsed.contracts;
-    if (Array.isArray(parsed.ownedPlates)) state.ownedPlates = parsed.ownedPlates;
-    if (Array.isArray(parsed.registeredPlates)) state.registeredPlates = parsed.registeredPlates;
-    if (Array.isArray(parsed.businesses)) state.businesses = parsed.businesses;
-    if (parsed.marketModifiers) state.marketModifiers = parsed.marketModifiers;
-    if (Array.isArray(parsed.myP2PListings)) state.myP2PListings = parsed.myP2PListings;
-    if (Array.isArray(parsed.p2pMarketListings)) state.p2pMarketListings = parsed.p2pMarketListings;
-    if (parsed.confiscatedLot) state.confiscatedLot = parsed.confiscatedLot;
-    if (Array.isArray(parsed.marketFeed)) state.marketFeed = parsed.marketFeed;
-    if (Array.isArray(parsed.blackMarketPlates)) state.blackMarketPlates = parsed.blackMarketPlates;
-    if (Array.isArray(parsed.officialPlateAuction)) state.officialPlateAuction = parsed.officialPlateAuction;
-    if (Array.isArray(parsed.lifeChatMessages)) state.lifeChatMessages = parsed.lifeChatMessages;
-    if (Array.isArray(parsed.friendsList)) state.friendsList = parsed.friendsList;
+    if (Array.isArray(parsed.garage)) window.state.garage = parsed.garage;
+    if (Array.isArray(parsed.salesLot)) window.state.salesLot = parsed.salesLot;
+    if (Array.isArray(parsed.contracts)) window.state.contracts = parsed.contracts;
+    if (Array.isArray(parsed.ownedPlates)) window.state.ownedPlates = parsed.ownedPlates;
+    if (Array.isArray(parsed.registeredPlates)) window.state.registeredPlates = parsed.registeredPlates;
+    if (Array.isArray(parsed.businesses)) window.state.businesses = parsed.businesses;
+    if (parsed.marketModifiers) window.state.marketModifiers = parsed.marketModifiers;
+    if (Array.isArray(parsed.myP2PListings)) window.state.myP2PListings = parsed.myP2PListings;
+    if (Array.isArray(parsed.p2pMarketListings)) window.state.p2pMarketListings = parsed.p2pMarketListings;
+    if (parsed.confiscatedLot) window.state.confiscatedLot = parsed.confiscatedLot;
+    if (Array.isArray(parsed.marketFeed)) window.state.marketFeed = parsed.marketFeed;
+    if (Array.isArray(parsed.blackMarketPlates)) window.state.blackMarketPlates = parsed.blackMarketPlates;
+    if (Array.isArray(parsed.officialPlateAuction)) window.state.officialPlateAuction = parsed.officialPlateAuction;
+    if (Array.isArray(parsed.lifeChatMessages)) window.state.lifeChatMessages = parsed.lifeChatMessages;
+    if (Array.isArray(parsed.friendsList)) window.state.friendsList = parsed.friendsList;
 
     if (parsed.businessWorkshop && typeof parsed.businessWorkshop === 'object') {
-        state.businessWorkshop = { ...DEFAULT_STATE.businessWorkshop, ...parsed.businessWorkshop };
+        window.state.businessWorkshop = { ...DEFAULT_STATE.businessWorkshop, ...parsed.businessWorkshop };
     }
     if (parsed.businessStaff && typeof parsed.businessStaff === 'object') {
-        state.businessStaff = { ...DEFAULT_STATE.businessStaff, ...parsed.businessStaff };
+        window.state.businessStaff = { ...DEFAULT_STATE.businessStaff, ...parsed.businessStaff };
     }
-    if (Array.isArray(parsed.businessFleet)) state.businessFleet = parsed.businessFleet;
+    if (Array.isArray(parsed.businessFleet)) window.state.businessFleet = parsed.businessFleet;
 
     sanitizeState();
 
@@ -452,13 +457,13 @@ function applyLoadedState(parsed) {
 }
 
 function loadFromLocalStorage() {
-    if (!tgUserId) return false;
+    if (!window.tgUserId) return false;
     try {
-        let saved = localStorage.getItem("perekup_save_" + tgUserId);
-        if (!saved) saved = localStorage.getItem("perekup_v13_" + tgUserId);
-        if (!saved) saved = localStorage.getItem("perekup_v12_" + tgUserId);
-        if (!saved) saved = localStorage.getItem("perekup_v11_" + tgUserId);
-        if (!saved) saved = localStorage.getItem(SAVE_KEY_PREFIX + tgUserId);
+        let saved = localStorage.getItem("perekup_save_" + window.tgUserId);
+        if (!saved) saved = localStorage.getItem("perekup_v13_" + window.tgUserId);
+        if (!saved) saved = localStorage.getItem("perekup_v12_" + window.tgUserId);
+        if (!saved) saved = localStorage.getItem("perekup_v11_" + window.tgUserId);
+        if (!saved) saved = localStorage.getItem(SAVE_KEY_PREFIX + window.tgUserId);
 
         if (saved) {
             const parsed = JSON.parse(saved);
@@ -482,16 +487,16 @@ let isCloudStorageAvailable = false;
 const CHUNK_SIZE = 2048;
 
 function prepareStateForCloud() {
-    return JSON.stringify(state);
+    return JSON.stringify(window.state);
 }
 
 function saveToTelegramCloud(jsonString, callback) {
     if (!window.Telegram?.WebApp?.CloudStorage) return;
-    if (!tgUserId || tgUserId === "guest_777") return;
+    if (!window.tgUserId || window.tgUserId === "guest_777") return;
     const tgCloud = window.Telegram.WebApp.CloudStorage;
     const totalChunks = Math.ceil(jsonString.length / CHUNK_SIZE);
 
-    tgCloud.setItem(SAVE_KEY_PREFIX + tgUserId + "_meta", String(totalChunks), (err) => {
+    tgCloud.setItem(SAVE_KEY_PREFIX + window.tgUserId + "_meta", String(totalChunks), (err) => {
         if (err) {
             if (callback) callback(false);
             return;
@@ -499,7 +504,7 @@ function saveToTelegramCloud(jsonString, callback) {
         let completed = 0;
         for (let i = 0; i < totalChunks; i++) {
             const chunk = jsonString.substr(i * CHUNK_SIZE, CHUNK_SIZE);
-            tgCloud.setItem(SAVE_KEY_PREFIX + tgUserId + "_c" + i, chunk, (cErr) => {
+            tgCloud.setItem(SAVE_KEY_PREFIX + window.tgUserId + "_c" + i, chunk, (cErr) => {
                 if (!cErr) completed++;
                 if (completed === totalChunks && callback) {
                     callback(true);
@@ -510,13 +515,13 @@ function saveToTelegramCloud(jsonString, callback) {
 }
 
 function saveState() {
-    if (!tgUserId) {
+    if (!window.tgUserId) {
         console.warn('[Save] saveState заблокирован: нет UID');
         return;
     }
 
-    if (String(tgUserId).startsWith('guest_') || String(tgUserId).startsWith('p_')) {
-        console.warn('[Save] saveState заблокирован: некорректный UID:', tgUserId);
+    if (String(window.tgUserId).startsWith('guest_') || String(window.tgUserId).startsWith('p_')) {
+        console.warn('[Save] saveState заблокирован: некорректный UID:', window.tgUserId);
         return;
     }
 
@@ -526,20 +531,20 @@ function saveState() {
     }
 
     try {
-        state.__saveVersion = SAVE_VERSION;
+        window.state.__saveVersion = SAVE_VERSION;
 
-        const fullJson = JSON.stringify(state);
-        localStorage.setItem("perekup_save_" + tgUserId, fullJson);
-        localStorage.setItem(SAVE_KEY_PREFIX + tgUserId, fullJson);
+        const fullJson = JSON.stringify(window.state);
+        localStorage.setItem("perekup_save_" + window.tgUserId, fullJson);
+        localStorage.setItem(SAVE_KEY_PREFIX + window.tgUserId, fullJson);
 
-        if (isPcDevSession) {
+        if (window.isPcDevMode && window.isPcDevMode()) {
             console.log('[Save] DEV-режим: сохранено локально');
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
             return;
         }
 
         if (window.FB_Bridge && window.FB_Bridge.CloudSave) {
-            window.FB_Bridge.CloudSave.pushSave(tgUserId, state);
+            window.FB_Bridge.CloudSave.pushSave(window.tgUserId, window.state);
         }
 
         if (isCloudStorageAvailable) {
@@ -583,12 +588,12 @@ function resetGameData() {
     try {
         const keysToRemove = new Set();
 
-        keysToRemove.add("perekup_save_" + tgUserId);
-        keysToRemove.add("perekup_v10_" + tgUserId);
-        keysToRemove.add("perekup_v11_" + tgUserId);
-        keysToRemove.add("perekup_v12_" + tgUserId);
-        keysToRemove.add("perekup_v13_" + tgUserId);
-        keysToRemove.add(SAVE_KEY_PREFIX + tgUserId);
+        keysToRemove.add("perekup_save_" + window.tgUserId);
+        keysToRemove.add("perekup_v10_" + window.tgUserId);
+        keysToRemove.add("perekup_v11_" + window.tgUserId);
+        keysToRemove.add("perekup_v12_" + window.tgUserId);
+        keysToRemove.add("perekup_v13_" + window.tgUserId);
+        keysToRemove.add(SAVE_KEY_PREFIX + window.tgUserId);
         keysToRemove.add("perekup_save_guest_777");
         keysToRemove.add("perekup_save_777");
         keysToRemove.add("perekup_save_undefined");
@@ -622,11 +627,11 @@ function resetGameData() {
             }
         } catch (e) {}
 
-        if (!isPcDevSession) {
+        if (!window.isPcDevMode || !window.isPcDevMode()) {
             (async () => {
                 try {
-                    if (window.FB_Bridge?.db && tgUserId) {
-                        const uid = String(tgUserId);
+                    if (window.FB_Bridge?.db && window.tgUserId) {
+                        const uid = String(window.tgUserId);
                         const mod = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
                         const { doc, deleteDoc } = mod;
                         const collectionsToWipe = ['players', 'garages', 'leaderboard'];
@@ -645,10 +650,9 @@ function resetGameData() {
 
         try {
             const cleanState = JSON.parse(JSON.stringify(DEFAULT_STATE));
-            Object.keys(state).forEach(k => { delete state[k]; });
-            Object.assign(state, cleanState);
-            state.__saveVersion = SAVE_VERSION;
-            window.state = state;
+            Object.keys(window.state).forEach(k => { delete window.state[k]; });
+            Object.assign(window.state, cleanState);
+            window.state.__saveVersion = SAVE_VERSION;
         } catch (e) {}
 
         try {
@@ -700,7 +704,7 @@ function ensureCarIdentity(car) {
 // ========================================================
 // 8. ЭКСПОРТ
 // ========================================================
-window.state = state;
+window.state = window.state;
 window.migrateSave = migrateSave;
 window.applyLoadedState = applyLoadedState;
 window.loadFromLocalStorage = loadFromLocalStorage;
@@ -711,4 +715,4 @@ window.ensureCarIdentity = ensureCarIdentity;
 window.isOwnerUser = _isOwner;
 window.SAVE_VERSION = SAVE_VERSION;
 
-console.log('[💠 app-core.js v4.3.0] State + Save + Migrate + Утилиты ✓');
+console.log('[💠 app-core.js v4.3.1] State + Save + Migrate + window.tgUserId синхронизирован ✓');

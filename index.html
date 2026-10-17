@@ -10,29 +10,29 @@
 <title>PEREKUP OS — Симулятор Перекупа</title>
 
 <!-- ═══════════ СТИЛИ ═══════════ -->
-<link rel="stylesheet" href="style.css?v=422">
-<link rel="stylesheet" href="css/base.css?v=422">
-<link rel="stylesheet" href="css/hud.css?v=422">
-<link rel="stylesheet" href="css/market.css?v=422">
-<link rel="stylesheet" href="css/phone.css?v=422">
-<link rel="stylesheet" href="css/m-hub.css?v=422">
-<link rel="stylesheet" href="css/radio.css?v=422">
-<link rel="stylesheet" href="css/modals.css?v=422">
-<link rel="stylesheet" href="css/p2p-deals.css?v=422">
-<link rel="stylesheet" href="css/nav.css?v=422">
+<link rel="stylesheet" href="style.css?v=423">
+<link rel="stylesheet" href="css/base.css?v=423">
+<link rel="stylesheet" href="css/hud.css?v=423">
+<link rel="stylesheet" href="css/market.css?v=423">
+<link rel="stylesheet" href="css/phone.css?v=423">
+<link rel="stylesheet" href="css/m-hub.css?v=423">
+<link rel="stylesheet" href="css/radio.css?v=423">
+<link rel="stylesheet" href="css/modals.css?v=423">
+<link rel="stylesheet" href="css/p2p-deals.css?v=423">
+<link rel="stylesheet" href="css/nav.css?v=423">
 
 <!-- ═══════════ БИБЛИОТЕКИ ═══════════ -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <!-- ═══════════════════════════════════════════════════════
-     FIREBASE МОДУЛИ (загружаются ДО основного скрипта)
+     FIREBASE МОДУЛИ (ES-модули загружаются асинхронно)
      ═══════════════════════════════════════════════════════ -->
-<script type="module" src="js/firebase/firebase-core.js?v=422"></script>
-<script type="module" src="js/firebase/firebase-market.js?v=422"></script>
-<script type="module" src="js/firebase/firebase-friendships.js?v=422"></script>
-<script type="module" src="js/firebase/firebase-notifications.js?v=422"></script>
-<script type="module" src="js/firebase/firebase-p2p.js?v=422"></script>
+<script type="module" src="js/firebase/firebase-core.js?v=423"></script>
+<script type="module" src="js/firebase/firebase-market.js?v=423"></script>
+<script type="module" src="js/firebase/firebase-friendships.js?v=423"></script>
+<script type="module" src="js/firebase/firebase-notifications.js?v=423"></script>
+<script type="module" src="js/firebase/firebase-p2p.js?v=423"></script>
 </head>
 <body>
 
@@ -60,7 +60,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Если вы играете через Telegram — просто откройте бота заново.</div>
-      <div class="pc-auth-version">v4.0.0 // BUILD 421</div>
+      <div class="pc-auth-version">v4.3.1 // BUILD 423</div>
     </div>
   </div>
 </div>
@@ -88,7 +88,7 @@
     </button>
 
     <div class="pc-auth-footer">
-      <div class="pc-auth-version">v4.0.0 // BUILD 421</div>
+      <div class="pc-auth-version">v4.3.1 // BUILD 423</div>
     </div>
   </div>
 </div>
@@ -123,7 +123,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Инвайт-код выдаёт владелец игры в личном сообщении.</div>
-      <div class="pc-auth-version">v4.0.0 // BUILD 421</div>
+      <div class="pc-auth-version">v4.3.1 // BUILD 423</div>
     </div>
   </div>
 </div>
@@ -697,16 +697,15 @@
 <div id="modalPatchNotes" class="modal-overlay">
   <div class="modal-box" style="max-width: 420px;">
     <div class="flex-between mb-2">
-      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.3.0</div>
+      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.3.1</div>
       <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
     </div>
     <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-    <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #422</div>
+    <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #423</div>
     <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-      <div class="patch-item"><b>👥 ДРУЗЬЯ & PUSH:</b> полноценная система друзей с уведомлениями в Telegram-бот.</div>
-      <div class="patch-item"><b>💬 REAL-TIME ЧАТ:</b> сообщения друзьям приходят мгновенно.</div>
-      <div class="patch-item"><b>✏️ СМЕНА НИКА:</b> первая смена — бесплатно!</div>
-      <div class="patch-item"><b>🐛 Фиксы:</b> исправлены баги загрузки модулей и P2P.</div>
+      <div class="patch-item"><b>🛠 ФИКС ЗАГРУЗКИ:</b> Устранено дублирование загрузчика, игра запускается стабильно.</div>
+      <div class="patch-item"><b>👑 DEV-ПАНЕЛЬ:</b> Добавлены кнопки глобального сброса БД.</div>
+      <div class="patch-item"><b>🐛 Фиксы:</b> исправлены баги с AccessControl и инициализацией.</div>
     </div>
     <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
   </div>
@@ -1206,7 +1205,7 @@
 
     const PC_DEV_PASSWORD = "perekup2026";
     const PC_AUTH_STORAGE_KEY = "perekup_pc_auth_ok";
-    const CACHE_VER = '422';
+    const CACHE_VER = '423';
 
     let isPcAuthenticated = false;
 
@@ -1322,7 +1321,7 @@
     }
 
     // ═══════════════════════════════════════════════════════
-    // ⭐ v4.3.0: ПРАВИЛЬНЫЙ ПОРЯДОК ЗАГРУЗКИ СКРИПТОВ
+    // ⭐ ПОЛНЫЙ СПИСОК СКРИПТОВ (единственный загрузчик)
     // ═══════════════════════════════════════════════════════
     const scriptQueue = [
         // ─── Утилиты (фундамент) ───
@@ -1339,16 +1338,17 @@
         'js/notification-center.js',
         'js/realtime-manager.js',
 
-        // ─── P2P ядро (заменяет p2p-offers) ───
-        'js/p2p-deals.js',           // ⚠️ ЭТО ДОЛЖЕН БЫТЬ JS, А НЕ CSS! (в SPRINT 1 переименован в css/)
+        // ─── P2P модули ───
+        'js/p2p-offers.js',
         'js/p2p-deals-modal.js',
 
         // ─── Темы ───
-        'js/theme-manager.js',       // ⭐ ДОБАВЛЕНО: без него не работают темы
+        'js/theme-manager.js',
 
-        // ─── Данные (порядок важен) ───
+        // ─── Данные ───
         'data/data_core.js',
         'data/data_economy.js',
+        'data/data_profile.js',
         'js/data-defects.js',
         'data/data_cars_fallbacks.js',
         'data/data_cars_helpers.js',
@@ -1358,7 +1358,7 @@
         'data/data_barn.js',
         'data/data_dialogues.js',
 
-        // ─── Каталог машин (по категориям) ───
+        // ─── Каталог машин ───
         'data/cars/atv.js',
         'data/cars/comfort.js',
         'data/cars/economy.js',
@@ -1368,7 +1368,7 @@
         'data/cars/scooter.js',
         'data/cars/truck.js',
         'data/cars/yacht.js',
-        'data/cars/upcoming.js',
+        'data/cars/upcoming_cars_data.js',
         'data/data_cars.js',
 
         // ─── Аудио ───
@@ -1379,10 +1379,10 @@
         'js/m-hub/m-events.js',
         'js/m-hub/m-leaderboard.js',
 
-        // ─── Phone: менеджер первым ───
+        // ─── Phone: ядро ───
         'js/phone/phone.js',
 
-        // ─── Phone: все app-модули (ЗАВИСЯТ от phone.js) ───
+        // ─── Phone: приложения ───
         'js/phone/phone-autostock.js',
         'js/phone/phone-bank.js',
         'js/phone/phone-barn.js',
@@ -1397,11 +1397,10 @@
         'js/phone/phone-racing.js',
         'js/phone/phone-autodrot.js',
 
-        // ─── Phone: M+ Hub (ПОСЛЕ всех app-модулей) ───
-        'js/phone/phone-m.js',
-
-        // ─── Market map ───
-        'js/market/market-map.js',
+        // ─── Phone: Сеть «М» ───
+        'js/phone/phone-m-core.js',
+        'js/phone/phone-m-market.js',
+        'js/phone/phone-m-social.js',
 
         // ─── Гараж ───
         'js/garage/garage-calc.js',
@@ -1413,7 +1412,7 @@
         'js/market/market-generator.js',
         'js/market/market-inspection.js',
         'js/market/market-deal.js',
-        'js/market/market-map.js',   // дубль — но пусть будет
+        'js/market/market-map.js',
         'js/market/market.js',
         'js/salesLot.js',
         'js/player-listings.js',
@@ -1430,8 +1429,10 @@
         'js/dev/phone-dev.js',
         'js/dev/dev-studio.js',
 
-        // ─── Финал ───
-        'js/app/app.js'
+        // ─── Финальные ядра приложения ───
+        'js/app/app-core.js',
+        'js/app/app-game.js',
+        'js/app/app-loader.js'
     ];
 
     function loadScript(path) {

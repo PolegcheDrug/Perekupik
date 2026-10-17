@@ -1,6 +1,10 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v4.3.0)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v4.3.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v4.3.1 (СТАБИЛЬНОСТЬ):
+//   - Усилена защита try/catch в executeDayCycleMidnight
+//   - Добавлены проверки на существование элементов в updateHeaderUI
+//   - window.state используется для доступа к стейту
 // ⭐ Часть 2 из 3 (разгрузка app.js)
 // ========================================================
 
@@ -96,13 +100,13 @@ function showToast(msg, type = 'default') {
 }
 
 function logBankTransaction(title, amount, isIncome) {
-    if (!state.player) state.player = {};
-    if (!Array.isArray(state.player.bankHistory)) state.player.bankHistory = [];
+    if (!window.state.player) window.state.player = {};
+    if (!Array.isArray(window.state.player.bankHistory)) window.state.player.bankHistory = [];
 
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-    state.player.bankHistory.unshift({
+    window.state.player.bankHistory.unshift({
         id: "tx_" + Date.now() + "_" + Math.random().toString(36).substring(2, 5),
         title: title || "Банковская операция",
         amount: Math.round(Number(amount) || 0),
@@ -110,8 +114,8 @@ function logBankTransaction(title, amount, isIncome) {
         time: timeStr
     });
 
-    if (state.player.bankHistory.length > 35) {
-        state.player.bankHistory = state.player.bankHistory.slice(0, 35);
+    if (window.state.player.bankHistory.length > 35) {
+        window.state.player.bankHistory = window.state.player.bankHistory.slice(0, 35);
     }
 }
 
@@ -196,9 +200,9 @@ function openLevelGateModal(appName, reqLevel, customDesc = null) {
         window.AudioFx.haptic('warning');
     }
 
-    let curLvl = state.player?.level || 1;
-    let curXp = state.player?.xp || 0;
-    let maxXp = state.player?.maxXp || 120;
+    let curLvl = window.state.player?.level || 1;
+    let curXp = window.state.player?.xp || 0;
+    let maxXp = window.state.player?.maxXp || 120;
     let xpPercent = Math.min(100, Math.round((curXp / maxXp) * 100));
 
     let modal = document.getElementById('modalLevelGate');
@@ -329,13 +333,13 @@ function dismissPatchNotesModal() {
 // 3. ЯЗЫК
 // ========================================================
 function toggleGameLanguage() {
-    setGameLanguage(state.lang === 'ru' ? 'en' : 'ru');
+    setGameLanguage(window.state.lang === 'ru' ? 'en' : 'ru');
 }
 
 function setGameLanguage(lang) {
-    state.lang = lang;
+    window.state.lang = lang;
     applyLanguageToDOM();
-    saveState();
+    if (typeof saveState === 'function') saveState();
     if (window.AudioFx) {
         window.AudioFx.play('tick');
         window.AudioFx.haptic('light');
@@ -344,7 +348,7 @@ function setGameLanguage(lang) {
 }
 
 function applyLanguageToDOM() {
-    const lang = state.lang || 'ru';
+    const lang = window.state.lang || 'ru';
     const dict = (typeof I18N_TRANSLATIONS !== 'undefined' && I18N_TRANSLATIONS[lang]) ? I18N_TRANSLATIONS[lang] : {};
 
     document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -364,10 +368,10 @@ function applyLanguageToDOM() {
 // 4. ЗАДАНИЯ И ВЕХИ
 // ========================================================
 function trackQuestProgress(actionType, count = 1) {
-    if (!state.player || !Array.isArray(state.player.dailyQuests)) return;
+    if (!window.state.player || !Array.isArray(window.state.player.dailyQuests)) return;
     let questsUpdated = false;
 
-    state.player.dailyQuests.forEach(q => {
+    window.state.player.dailyQuests.forEach(q => {
         if (!q.done && (q.actionType === actionType || q.id === actionType)) {
             q.cur = Math.min(q.max || q.target || 1, (q.cur || 0) + count);
             questsUpdated = true;
@@ -379,7 +383,7 @@ function trackQuestProgress(actionType, count = 1) {
     });
 
     if (questsUpdated) {
-        saveState();
+        if (typeof saveState === 'function') saveState();
         if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.renderDailyQuestsWidget === 'function') {
             PhoneManager.renderDailyQuestsWidget();
         }
@@ -389,26 +393,26 @@ function trackQuestProgress(actionType, count = 1) {
 }
 
 function checkNotepadMilestones() {
-    const s = state.player?.stats || {};
+    const s = window.state.player?.stats || {};
     const netProfit = s.totalNetProfit || 0;
     const sold = s.sold || 0;
 
-    if (netProfit >= 1000000 && !state.player.milestoneMilClaimed) {
-        state.player.milestoneMilClaimed = true;
+    if (netProfit >= 1000000 && !window.state.player.milestoneMilClaimed) {
+        window.state.player.milestoneMilClaimed = true;
         showToast("🏆 Веха: Первый 1,000,000 ₽ чистой прибыли!", 'success');
         if (window.AudioFx) window.AudioFx.play('win');
     }
-    if (sold >= 10 && !state.player.milestoneSalesClaimed) {
-        state.player.milestoneSalesClaimed = true;
+    if (sold >= 10 && !window.state.player.milestoneSalesClaimed) {
+        window.state.player.milestoneSalesClaimed = true;
         showToast("🏆 Веха: Закрыто 10 успешных продаж!", 'success');
         if (window.AudioFx) window.AudioFx.play('win');
     }
 }
 
 function refreshDailyQuestsList() {
-    state.player.dailyQuestsSuperClaimed = false;
+    window.state.player.dailyQuestsSuperClaimed = false;
     if (typeof DAILY_QUESTS_POOL === 'undefined' || !Array.isArray(DAILY_QUESTS_POOL)) {
-        state.player.dailyQuests = [
+        window.state.player.dailyQuests = [
             { id: "q_inspect", text: "Осмотреть толщиномером 2 авто", cur: 0, max: 2, actionType: "gauge_check", reward: 40000, rewardXp: 40, done: false },
             { id: "q_race", text: "Выиграть заезд 402м", cur: 0, max: 1, actionType: "win_drag", reward: 60000, rewardXp: 45, done: false },
             { id: "q_biz", text: "Собрать кассу с предприятий", cur: 0, max: 1, actionType: "collect_biz", reward: 30000, rewardXp: 30, done: false }
@@ -417,7 +421,7 @@ function refreshDailyQuestsList() {
     }
 
     const shuffled = [...DAILY_QUESTS_POOL].sort(() => 0.5 - Math.random());
-    state.player.dailyQuests = shuffled.slice(0, 3).map(q => ({
+    window.state.player.dailyQuests = shuffled.slice(0, 3).map(q => ({
         id: q.id, text: q.text, cur: 0, max: q.target || 1,
         actionType: q.actionType, reward: q.reward, rewardXp: q.rewardXp || 35, done: false
     }));
@@ -427,27 +431,27 @@ function refreshDailyQuestsList() {
 // 5. СЛОТЫ ГАРАЖА
 // ========================================================
 function getMarketRefreshCost() {
-    let lvl = state.player?.level || 1;
+    let lvl = window.state.player?.level || 1;
     return 250 + (lvl * 450);
 }
 
 function getGarageSlotCost() {
-    let bs = state.player?.baseSlots || 2;
+    let bs = window.state.player?.baseSlots || 2;
     let extraSlots = Math.max(0, bs - 2);
     return Math.round(300000 * Math.pow(1.65, extraSlots));
 }
 
 function getExpressTicketUpgradeCost() {
-    let m = state.player?.maxExpressTickets || 25;
+    let m = window.state.player?.maxExpressTickets || 25;
     let extra = Math.max(0, m - 25);
     const steps = Math.floor(extra / 25);
     return Math.round(75000 * Math.pow(1.5, steps));
 }
 
 function getTotalGarageSlots() {
-    let slots = state.player?.baseSlots || 2;
+    let slots = window.state.player?.baseSlots || 2;
     if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST)) {
-        const activeHousingId = state.player?.housingId;
+        const activeHousingId = window.state.player?.housingId;
         if (activeHousingId) {
             const activeHouse = HOUSING_LIST.find(h => h.id === activeHousingId);
             if (activeHouse && typeof activeHouse.slots === 'number') {
@@ -462,31 +466,31 @@ function getTotalGarageSlots() {
 // 6. КУРС STARS (динамический)
 // ========================================================
 function _updateDynamicStarRate() {
-    if (!state.player) return;
+    if (!window.state.player) return;
 
-    const prev = state.player.dynamicStarRate || STAR_RATE_DEFAULT;
+    const prev = window.state.player.dynamicStarRate || STAR_RATE_DEFAULT;
     const drift = (Math.random() - 0.5) * 0.01;
     let next = Math.round(prev * (1 + drift));
 
     next = Math.max(STAR_RATE_MIN, Math.min(STAR_RATE_MAX, next));
     next = Math.round(next / 100) * 100;
 
-    state.player.dynamicStarRate = next;
+    window.state.player.dynamicStarRate = next;
 
-    if (!Array.isArray(state.player.dynamicStarRateHistory)) {
-        state.player.dynamicStarRateHistory = [];
+    if (!Array.isArray(window.state.player.dynamicStarRateHistory)) {
+        window.state.player.dynamicStarRateHistory = [];
     }
-    state.player.dynamicStarRateHistory.push(next);
-    if (state.player.dynamicStarRateHistory.length > 30) {
-        state.player.dynamicStarRateHistory = state.player.dynamicStarRateHistory.slice(-30);
+    window.state.player.dynamicStarRateHistory.push(next);
+    if (window.state.player.dynamicStarRateHistory.length > 30) {
+        window.state.player.dynamicStarRateHistory = window.state.player.dynamicStarRateHistory.slice(-30);
     }
 
     console.log(`[Stars] Динамический курс: ${next.toLocaleString()} ₽ (было ${prev.toLocaleString()})`);
 }
 
 function _syncStarRateToBank() {
-    if (!state.player) return;
-    const rate = state.player.dynamicStarRate || STAR_RATE_DEFAULT;
+    if (!window.state.player) return;
+    const rate = window.state.player.dynamicStarRate || STAR_RATE_DEFAULT;
     if (window.BANK_EXCHANGE_RATES && window.BANK_EXCHANGE_RATES.stars) {
         window.BANK_EXCHANGE_RATES.stars.buyRub = rate;
         window.BANK_EXCHANGE_RATES.stars.sellRub = Math.round(rate * 0.96);
@@ -498,7 +502,7 @@ function _syncStarRateToBank() {
 // ========================================================
 function checkRealTimeDayChange() {
     const now = new Date();
-    const lastDate = new Date(state.player.lastRealDayTimestamp || Date.now());
+    const lastDate = new Date(window.state.player.lastRealDayTimestamp || Date.now());
 
     const isDifferentDay = (
         now.getFullYear() !== lastDate.getFullYear() ||
@@ -510,232 +514,241 @@ function checkRealTimeDayChange() {
 }
 
 function executeDayCycleMidnight(currentDateObj) {
-    state.player.day = (state.player.day || 1) + 1;
-    state.player.lastRealDayTimestamp = currentDateObj.getTime();
-    state.player.expressTickets = state.player.maxExpressTickets || 25;
-    state.player.consecutiveRaces = 0;
-
-    _updateDynamicStarRate();
-    _syncStarRateToBank();
-
-    state.player.streakDay = (state.player.streakDay || 0) + 1;
-    if (state.player.streakDay >= 7) {
-        state.player.streakDay = 0;
-        state.player.superSpinTickets = (state.player.superSpinTickets || 0) + 1;
-        if (typeof showToast === 'function') {
-            setTimeout(() => showToast("🎟️ 7-дневный стрик! +1 билет СуперВилспина", 'success'), 3200);
-        }
-        if (typeof logBankTransaction === 'function') {
-            logBankTransaction("Бонус за 7-дневный стрик: +1 билет", 0, true);
-        }
-    }
-
-    if (state.player.loanDebt > 0) state.player.loanDebt = Math.round(state.player.loanDebt * 1.02);
-
-    if (Array.isArray(state.player.bankDeposits)) {
-        state.player.bankDeposits.forEach(dep => {
-            dep.daysPassed = (dep.daysPassed || 0) + 1;
-            let dailyRate = (dep.dailyPercent || 0.3) / 100;
-            let gain = Math.round(dep.currentAmount * dailyRate);
-            if (dep.autoCompound) dep.currentAmount += gain;
-            else dep.accumulatedProfit = (dep.accumulatedProfit || 0) + gain;
-        });
-    }
-
-    state.player.hunger = Math.max(10, (state.player.hunger || 80) - 25);
-    state.player.mood = Math.max(10, (state.player.mood || 85) - 15);
-
     try {
-        if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST) && state.player?.housingId) {
-            const activeHouse = HOUSING_LIST.find(h => h.id === state.player.housingId);
-            if (activeHouse && typeof activeHouse.moodBonus === 'number' && activeHouse.moodBonus !== 0) {
-                state.player.mood = Math.max(0, Math.min(100, (state.player.mood || 0) + activeHouse.moodBonus));
-                console.log(`[Housing] Ежедневный mood-бонус: ${activeHouse.moodBonus >= 0 ? '+' : ''}${activeHouse.moodBonus} от «${activeHouse.name}»`);
+        window.state.player.day = (window.state.player.day || 1) + 1;
+        window.state.player.lastRealDayTimestamp = currentDateObj.getTime();
+        window.state.player.expressTickets = window.state.player.maxExpressTickets || 25;
+        window.state.player.consecutiveRaces = 0;
 
-                if (typeof showToast === 'function') {
-                    setTimeout(() => {
-                        showToast(`🏠 «${activeHouse.name}»: ${activeHouse.moodBonus >= 0 ? '+' : ''}${activeHouse.moodBonus}% к куражу`, 'info');
-                    }, 2200);
-                }
+        _updateDynamicStarRate();
+        _syncStarRateToBank();
+
+        window.state.player.streakDay = (window.state.player.streakDay || 0) + 1;
+        if (window.state.player.streakDay >= 7) {
+            window.state.player.streakDay = 0;
+            window.state.player.superSpinTickets = (window.state.player.superSpinTickets || 0) + 1;
+            if (typeof showToast === 'function') {
+                setTimeout(() => showToast("🎟️ 7-дневный стрик! +1 билет СуперВилспина", 'success'), 3200);
+            }
+            if (typeof logBankTransaction === 'function') {
+                logBankTransaction("Бонус за 7-дневный стрик: +1 билет", 0, true);
             }
         }
-    } catch (e) {
-        console.warn('[Housing] Ошибка применения mood-бонуса:', e);
-    }
 
-    if (typeof refreshDailyQuestsList === 'function') refreshDailyQuestsList();
+        if (window.state.player.loanDebt > 0) window.state.player.loanDebt = Math.round(window.state.player.loanDebt * 1.02);
 
-    try {
-        if (window.PhoneBusiness && typeof window.PhoneBusiness.onNewDay === 'function') {
-            window.PhoneBusiness.onNewDay();
-            if (typeof window.PhoneBusiness.checkAchievements === 'function') {
-                window.PhoneBusiness.checkAchievements();
-            }
-        }
-    } catch (e) {
-        console.error('[DayCycle] Ошибка бизнеса:', e);
-    }
-
-    try {
-        if (Array.isArray(state.garage)) {
-            state.garage.forEach((car, idx) => {
-                if (!car || !car._backfireDay || car._backfireResolved) return;
-                const curDay = state.player.day || 1;
-                if (curDay >= car._backfireDay) {
-                    car._backfireResolved = true;
-                    setTimeout(() => {
-                        if (typeof _triggerBuyerBackfire === 'function') _triggerBuyerBackfire(car, idx);
-                    }, 800 + Math.random() * 1500);
-                }
+        if (Array.isArray(window.state.player.bankDeposits)) {
+            window.state.player.bankDeposits.forEach(dep => {
+                dep.daysPassed = (dep.daysPassed || 0) + 1;
+                let dailyRate = (dep.dailyPercent || 0.3) / 100;
+                let gain = Math.round(dep.currentAmount * dailyRate);
+                if (dep.autoCompound) dep.currentAmount += gain;
+                else dep.accumulatedProfit = (dep.accumulatedProfit || 0) + gain;
             });
         }
-    } catch (e) {}
 
-    try {
-        if (window.PhoneBusiness && typeof window.PhoneBusiness._syncActiveBonus === 'function') {
-            window.PhoneBusiness._syncActiveBonus();
-        } else if (state.player.businessAdBonus) {
-            const curDay = state.player.day || 1;
-            if (state.player.businessAdBonus.expiresDay < curDay) {
-                state.player.businessAdBonus = null;
-                if (window.PhoneBusiness) window.PhoneBusiness._activeBonus = null;
+        window.state.player.hunger = Math.max(10, (window.state.player.hunger || 80) - 25);
+        window.state.player.mood = Math.max(10, (window.state.player.mood || 85) - 15);
+
+        try {
+            if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST) && window.state.player?.housingId) {
+                const activeHouse = HOUSING_LIST.find(h => h.id === window.state.player.housingId);
+                if (activeHouse && typeof activeHouse.moodBonus === 'number' && activeHouse.moodBonus !== 0) {
+                    window.state.player.mood = Math.max(0, Math.min(100, (window.state.player.mood || 0) + activeHouse.moodBonus));
+                    console.log(`[Housing] Ежедневный mood-бонус: ${activeHouse.moodBonus >= 0 ? '+' : ''}${activeHouse.moodBonus} от «${activeHouse.name}»`);
+
+                    if (typeof showToast === 'function') {
+                        setTimeout(() => {
+                            showToast(`🏠 «${activeHouse.name}»: ${activeHouse.moodBonus >= 0 ? '+' : ''}${activeHouse.moodBonus}% к куражу`, 'info');
+                        }, 2200);
+                    }
+                }
             }
+        } catch (e) {
+            console.warn('[Housing] Ошибка применения mood-бонуса:', e);
         }
-    } catch (e) {}
 
-    try {
-        if (state.player.housingType === 'rent' && state.player.housingRentDue > 0) {
-            const curDay = state.player.day || 1;
-            if (curDay >= state.player.housingRentDue) {
-                const db = (typeof HOUSING_LIST !== 'undefined') ? HOUSING_LIST : [];
-                const activeHouse = db.find(h => h.id === state.player.housingId);
-                if (activeHouse) {
-                    const rent = activeHouse.rent || 0;
-                    if ((state.player.cash || 0) >= rent) {
-                        state.player.cash -= rent;
-                        state.player.housingRentDue = curDay + 1;
-                        if (typeof logBankTransaction === 'function') {
-                            logBankTransaction(`Аренда жилья: ${activeHouse.name}`, rent, false);
-                        }
-                        if (typeof showToast === 'function') {
-                            setTimeout(() => showToast(`🏠 Списана аренда жилья: -${rent.toLocaleString()} ₽`, 'info'), 2800);
-                        }
-                    } else {
-                        state.player.housingId = 'trailer';
-                        state.player.housingType = 'own';
-                        if (typeof showToast === 'function') {
-                            setTimeout(() => showToast("⚠️ Не хватило денег на аренду! Вы переехали в бытовку.", 'warning'), 2800);
+        if (typeof refreshDailyQuestsList === 'function') refreshDailyQuestsList();
+
+        try {
+            if (window.PhoneBusiness && typeof window.PhoneBusiness.onNewDay === 'function') {
+                window.PhoneBusiness.onNewDay();
+                if (typeof window.PhoneBusiness.checkAchievements === 'function') {
+                    window.PhoneBusiness.checkAchievements();
+                }
+            }
+        } catch (e) {
+            console.error('[DayCycle] Ошибка бизнеса:', e);
+        }
+
+        try {
+            if (Array.isArray(window.state.garage)) {
+                window.state.garage.forEach((car, idx) => {
+                    if (!car || !car._backfireDay || car._backfireResolved) return;
+                    const curDay = window.state.player.day || 1;
+                    if (curDay >= car._backfireDay) {
+                        car._backfireResolved = true;
+                        setTimeout(() => {
+                            if (typeof _triggerBuyerBackfire === 'function') _triggerBuyerBackfire(car, idx);
+                        }, 800 + Math.random() * 1500);
+                    }
+                });
+            }
+        } catch (e) {}
+
+        try {
+            if (window.PhoneBusiness && typeof window.PhoneBusiness._syncActiveBonus === 'function') {
+                window.PhoneBusiness._syncActiveBonus();
+            } else if (window.state.player.businessAdBonus) {
+                const curDay = window.state.player.day || 1;
+                if (window.state.player.businessAdBonus.expiresDay < curDay) {
+                    window.state.player.businessAdBonus = null;
+                    if (window.PhoneBusiness) window.PhoneBusiness._activeBonus = null;
+                }
+            }
+        } catch (e) {}
+
+        try {
+            if (window.state.player.housingType === 'rent' && window.state.player.housingRentDue > 0) {
+                const curDay = window.state.player.day || 1;
+                if (curDay >= window.state.player.housingRentDue) {
+                    const db = (typeof HOUSING_LIST !== 'undefined') ? HOUSING_LIST : [];
+                    const activeHouse = db.find(h => h.id === window.state.player.housingId);
+                    if (activeHouse) {
+                        const rent = activeHouse.rent || 0;
+                        if ((window.state.player.cash || 0) >= rent) {
+                            window.state.player.cash -= rent;
+                            window.state.player.housingRentDue = curDay + 1;
+                            if (typeof logBankTransaction === 'function') {
+                                logBankTransaction(`Аренда жилья: ${activeHouse.name}`, rent, false);
+                            }
+                            if (typeof showToast === 'function') {
+                                setTimeout(() => showToast(`🏠 Списана аренда жилья: -${rent.toLocaleString()} ₽`, 'info'), 2800);
+                            }
+                        } else {
+                            window.state.player.housingId = 'trailer';
+                            window.state.player.housingType = 'own';
+                            if (typeof showToast === 'function') {
+                                setTimeout(() => showToast("⚠️ Не хватило денег на аренду! Вы переехали в бытовку.", 'warning'), 2800);
+                            }
                         }
                     }
                 }
             }
+        } catch (e) {
+            console.warn('[Housing] Ошибка списания аренды:', e);
         }
-    } catch (e) {
-        console.warn('[Housing] Ошибка списания аренды:', e);
-    }
 
-    try {
-        if (window.AppPost && typeof window.AppPost.chargeDailyParking === 'function') {
-            const parkingResult = window.AppPost.chargeDailyParking();
-            if (parkingResult.charged > 0) {
-                setTimeout(() => {
-                    showToast(`🅿️ Списано за парковку: -${parkingResult.charged.toLocaleString()} ₽`, 'info');
-                }, 3500);
+        try {
+            if (window.AppPost && typeof window.AppPost.chargeDailyParking === 'function') {
+                const parkingResult = window.AppPost.chargeDailyParking();
+                if (parkingResult.charged > 0) {
+                    setTimeout(() => {
+                        showToast(`🅿️ Списано за парковку: -${parkingResult.charged.toLocaleString()} ₽`, 'info');
+                    }, 3500);
+                }
+                if (parkingResult.lostCars > 0) {
+                    setTimeout(() => {
+                        if (typeof openVerdictModal === 'function') {
+                            openVerdictModal(
+                                "ЭВАКУАЦИЯ С ПАРКОВКИ ⚠️",
+                                `Не хватило денег на оплату парковки! ${parkingResult.lostCars} авто отправлены в утиль.`,
+                                false
+                            );
+                        } else {
+                            showToast(`⚠️ ${parkingResult.lostCars} авто утилизированы с парковки!`, 'error');
+                        }
+                    }, 4200);
+                }
             }
-            if (parkingResult.lostCars > 0) {
-                setTimeout(() => {
-                    if (typeof openVerdictModal === 'function') {
-                        openVerdictModal(
-                            "ЭВАКУАЦИЯ С ПАРКОВКИ ⚠️",
-                            `Не хватило денег на оплату парковки! ${parkingResult.lostCars} авто отправлены в утиль.`,
-                            false
-                        );
-                    } else {
-                        showToast(`⚠️ ${parkingResult.lostCars} авто утилизированы с парковки!`, 'error');
-                    }
-                }, 4200);
-            }
+        } catch (e) {
+            console.warn('[Parking] Ошибка ежедневного списания:', e);
         }
-    } catch (e) {
-        console.warn('[Parking] Ошибка ежедневного списания:', e);
+
+        if (typeof saveState === 'function') saveState();
+        updateHeaderUI();
+
+        if (typeof showToast === 'function') showToast("🌙 Наступил новый день!", 'info');
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+    } catch (err) {
+        console.error('[DayCycle] Критическая ошибка:', err);
+        if (typeof showToast === 'function') showToast("⚠️ Ошибка смены дня. Проверьте консоль.", 'error');
     }
-
-    saveState();
-    updateHeaderUI();
-
-    if (typeof showToast === 'function') showToast("🌙 Наступил новый день!", 'info');
-    if (typeof playSound === 'function') playSound('win');
-    if (typeof tgHaptic === 'function') tgHaptic('success');
 }
 
 // ========================================================
 // 8. HUD
 // ========================================================
 function updateHeaderUI() {
-    let targetCash = state.player?.cash || 0;
-    let targetStars = state.player?.stars || 0;
-    let targetSuperSpinTickets = state.player?.superSpinTickets || 0;
-    let fuel = state.player?.fuel !== undefined ? state.player.fuel : 100;
-    let tck = state.player?.expressTickets || 0;
-    let mTck = state.player?.maxExpressTickets || 25;
-    let pName = state.player?.name || "Перекуп #777";
-    let lvl = state.player?.level || 1;
-    let conn = state.player?.connections || 0;
-    let karma = Math.max(0, Math.min(100, state.player?.karma !== undefined ? state.player.karma : 50));
+    try {
+        let targetCash = window.state.player?.cash || 0;
+        let targetStars = window.state.player?.stars || 0;
+        let targetSuperSpinTickets = window.state.player?.superSpinTickets || 0;
+        let fuel = window.state.player?.fuel !== undefined ? window.state.player.fuel : 100;
+        let tck = window.state.player?.expressTickets || 0;
+        let mTck = window.state.player?.maxExpressTickets || 25;
+        let pName = window.state.player?.name || "Перекуп #777";
+        let lvl = window.state.player?.level || 1;
+        let conn = window.state.player?.connections || 0;
+        let karma = Math.max(0, Math.min(100, window.state.player?.karma !== undefined ? window.state.player.karma : 50));
 
-    animateNumberRoll('cashAmount', displayedCashValue, targetCash, 450, true);
-    displayedCashValue = targetCash;
+        animateNumberRoll('cashAmount', displayedCashValue, targetCash, 450, true);
+        displayedCashValue = targetCash;
 
-    animateNumberRoll('starsAmount', displayedStarsValue, targetStars, 350, false);
-    displayedStarsValue = targetStars;
+        animateNumberRoll('starsAmount', displayedStarsValue, targetStars, 350, false);
+        displayedStarsValue = targetStars;
 
-    setTxt('superSpinTicketsAmount', targetSuperSpinTickets);
-    setTxt('fuelAmount', fuel);
-    setTxt('ticketsAmount', tck + "/" + mTck);
-    setTxt('playerName', pName);
-    setTxt('playerLvl', "Ур. " + lvl);
-    setTxt('connectionsText', conn);
-    setTxt('karmaText', karma);
+        setTxt('superSpinTicketsAmount', targetSuperSpinTickets);
+        setTxt('fuelAmount', fuel);
+        setTxt('ticketsAmount', tck + "/" + mTck);
+        setTxt('playerName', pName);
+        setTxt('playerLvl', "Ур. " + lvl);
+        setTxt('connectionsText', conn);
+        setTxt('karmaText', karma);
 
-    const hunger = state.player?.hunger !== undefined ? state.player.hunger : 80;
-    const mood = state.player?.mood !== undefined ? state.player.mood : 85;
-    const hungerFill = document.getElementById('hungerFill');
-    const moodFill = document.getElementById('moodFill');
-    const hungerText = document.getElementById('hungerText');
-    const moodText = document.getElementById('moodText');
-    if (hungerFill) hungerFill.style.width = hunger + '%';
-    if (moodFill) moodFill.style.width = mood + '%';
-    if (hungerText) hungerText.innerText = hunger + '%';
-    if (moodText) moodText.innerText = mood + '%';
+        const hunger = window.state.player?.hunger !== undefined ? window.state.player.hunger : 80;
+        const mood = window.state.player?.mood !== undefined ? window.state.player.mood : 85;
+        const hungerFill = document.getElementById('hungerFill');
+        const moodFill = document.getElementById('moodFill');
+        const hungerText = document.getElementById('hungerText');
+        const moodText = document.getElementById('moodText');
+        if (hungerFill) hungerFill.style.width = hunger + '%';
+        if (moodFill) moodFill.style.width = mood + '%';
+        if (hungerText) hungerText.innerText = hunger + '%';
+        if (moodText) moodText.innerText = mood + '%';
 
-    const pPhoto = document.getElementById('playerTgPhoto');
-    const dIcon = document.getElementById('defaultAvatarIcon');
-    if (state.player?.avatarUrl) {
-        if (pPhoto) { pPhoto.src = state.player.avatarUrl; pPhoto.style.display = 'block'; }
-        if (dIcon) dIcon.style.display = 'none';
-    } else {
-        if (pPhoto) pPhoto.style.display = 'none';
-        if (dIcon) dIcon.style.display = 'block';
+        const pPhoto = document.getElementById('playerTgPhoto');
+        const dIcon = document.getElementById('defaultAvatarIcon');
+        if (window.state.player?.avatarUrl) {
+            if (pPhoto) { pPhoto.src = window.state.player.avatarUrl; pPhoto.style.display = 'block'; }
+            if (dIcon) dIcon.style.display = 'none';
+        } else {
+            if (pPhoto) pPhoto.style.display = 'none';
+            if (dIcon) dIcon.style.display = 'block';
+        }
+
+        const fill = document.getElementById('xpBar');
+        if (fill) {
+            let xp = window.state.player?.xp || 0;
+            let maxXp = window.state.player?.maxXp || 120;
+            fill.style.width = Math.min(100, (xp / maxXp) * 100) + "%";
+        }
+
+        let gLen = window.state.garage ? window.state.garage.length : 0;
+        let totalSlots = getTotalGarageSlots();
+        let hasWorkshop = typeof checkPlayerCapability === 'function' ? checkPlayerCapability('tune') : false;
+        setTxt('garageHeaderSlots', hasWorkshop ? `${gLen}/${totalSlots}` : `${gLen}/${totalSlots} ⛺`);
+
+        if (window.ThemeManager) window.ThemeManager.applyTheme();
+        if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.updateUnreadBadge === 'function') PhoneManager.updateUnreadBadge();
+    } catch (e) {
+        console.warn('[HUD] Ошибка обновления:', e);
     }
-
-    const fill = document.getElementById('xpBar');
-    if (fill) {
-        let xp = state.player?.xp || 0;
-        let maxXp = state.player?.maxXp || 120;
-        fill.style.width = Math.min(100, (xp / maxXp) * 100) + "%";
-    }
-
-    let gLen = state.garage ? state.garage.length : 0;
-    let totalSlots = getTotalGarageSlots();
-    let hasWorkshop = typeof checkPlayerCapability === 'function' ? checkPlayerCapability('tune') : false;
-    setTxt('garageHeaderSlots', hasWorkshop ? `${gLen}/${totalSlots}` : `${gLen}/${totalSlots} ⛺`);
-
-    if (window.ThemeManager) window.ThemeManager.applyTheme();
-    if (typeof PhoneManager !== 'undefined') PhoneManager.updateUnreadBadge();
 }
 
 function updateLevelGatesUI() {
-    let lvl = state.player?.level || 1;
+    let lvl = window.state.player?.level || 1;
     const gates = [
         { id: 'moto', lockId: 'lock-moto', minLvl: 5 },
         { id: 'atv', lockId: 'lock-atv', minLvl: 8 },
@@ -763,178 +776,188 @@ function updateLevelGatesUI() {
 }
 
 function addXp(amount) {
-    state.player.xp += amount;
-    if (state.player.xp >= state.player.maxXp) {
-        state.player.xp -= state.player.maxXp;
-        state.player.level += 1;
-        state.player.maxXp = Math.round(state.player.maxXp * 1.35);
-        openVerdictModal("Новый уровень!", "Вы достигли " + state.player.level + " уровня авторитета!", true);
+    window.state.player.xp += amount;
+    if (window.state.player.xp >= window.state.player.maxXp) {
+        window.state.player.xp -= window.state.player.maxXp;
+        window.state.player.level += 1;
+        window.state.player.maxXp = Math.round(window.state.player.maxXp * 1.35);
+        openVerdictModal("Новый уровень!", "Вы достигли " + window.state.player.level + " уровня авторитета!", true);
     }
     updateLevelGatesUI();
-    saveState();
+    if (typeof saveState === 'function') saveState();
 }
 
 function adjustResource(type, delta) {
-    if (!state.player) return;
+    if (!window.state.player) return;
     if (type === 'cash') {
-        state.player.cash = Math.max(0, (state.player.cash || 0) + delta);
+        window.state.player.cash = Math.max(0, (window.state.player.cash || 0) + delta);
         showToast((delta > 0 ? "+" : "") + delta.toLocaleString() + " ₽", delta > 0 ? 'success' : 'warning');
     } else if (type === 'level') {
-        state.player.level = Math.max(1, Math.min(100, (state.player.level || 1) + delta));
+        window.state.player.level = Math.max(1, Math.min(100, (window.state.player.level || 1) + delta));
         updateLevelGatesUI();
         showToast((delta > 0 ? "+" : "") + delta + " Ур", 'info');
     } else if (type === 'stars') {
-        state.player.stars = Math.max(0, (state.player.stars || 0) + delta);
+        window.state.player.stars = Math.max(0, (window.state.player.stars || 0) + delta);
         showToast((delta > 0 ? "+" : "") + delta + " 💵 Банкнот", delta > 0 ? 'success' : 'warning');
     } else if (type === 'tickets') {
-        let max = state.player.maxExpressTickets || 25;
-        state.player.expressTickets = Math.max(0, Math.min(max, (state.player.expressTickets || 0) + delta));
+        let max = window.state.player.maxExpressTickets || 25;
+        window.state.player.expressTickets = Math.max(0, Math.min(max, (window.state.player.expressTickets || 0) + delta));
         showToast((delta > 0 ? "+" : "") + delta + " Талонов 🎟️", 'info');
     } else if (type === 'connections') {
-        state.player.connections = Math.max(0, (state.player.connections || 0) + delta);
+        window.state.player.connections = Math.max(0, (window.state.player.connections || 0) + delta);
         showToast((delta > 0 ? "+" : "") + delta + " Связей 🤝", 'info');
     }
-    saveState();
+    if (typeof saveState === 'function') saveState();
     updateHeaderUI();
-    renderProfileAnalytics();
+    if (typeof renderProfileAnalytics === 'function') renderProfileAnalytics();
 }
 
 function renderProfileAnalytics() {
     const container = document.getElementById('profileDashboardContainer');
     if (!container) return;
 
-    let p = state.player || {};
-    let s = p.stats || { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
-    let lvl = p.level || 1;
+    try {
+        let p = window.state.player || {};
+        let s = p.stats || { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 };
+        let lvl = p.level || 1;
 
-    let totalCash = p.cash || 0;
-    let safeCash = p.safeDeposit || 0;
-    let depositsTotal = 0;
-    if (Array.isArray(p.bankDeposits)) {
-        p.bankDeposits.forEach(d => { depositsTotal += (d.currentAmount || d.principal || 0); });
-    }
+        let totalCash = p.cash || 0;
+        let safeCash = p.safeDeposit || 0;
+        let depositsTotal = 0;
+        if (Array.isArray(p.bankDeposits)) {
+            p.bankDeposits.forEach(d => { depositsTotal += (d.currentAmount || d.principal || 0); });
+        }
 
-    let fleetValuation = 0;
-    if (Array.isArray(state.garage)) {
-        state.garage.forEach(c => { if (c) fleetValuation += (c.marketValue || c.basePrice || 100000); });
-    }
+        let fleetValuation = 0;
+        if (Array.isArray(window.state.garage)) {
+            window.state.garage.forEach(c => { if (c) fleetValuation += (c.marketValue || c.basePrice || 100000); });
+        }
 
-    let realEstateValuation = 0;
-    if (Array.isArray(p.ownedHouses) && typeof HOUSING_LIST !== 'undefined') {
-        p.ownedHouses.forEach(hId => {
-            let h = HOUSING_LIST.find(x => x.id === hId);
-            if (h) realEstateValuation += (h.buyPrice || 0);
-        });
-    }
+        let realEstateValuation = 0;
+        if (Array.isArray(p.ownedHouses) && typeof HOUSING_LIST !== 'undefined') {
+            p.ownedHouses.forEach(hId => {
+                let h = HOUSING_LIST.find(x => x.id === hId);
+                if (h) realEstateValuation += (h.buyPrice || 0);
+            });
+        }
 
-    let totalNetWorth = Math.round(totalCash + safeCash + depositsTotal + fleetValuation + realEstateValuation);
-    let totalSales = (s.profitableSales || 0) + (s.lossSales || 0);
-    let winrate = totalSales > 0 ? Math.round(((s.profitableSales || 0) / totalSales) * 100) : 0;
-    let rankTitle = p.traderTitle || "Быстрый выкуп за кэш 💸";
+        let totalNetWorth = Math.round(totalCash + safeCash + depositsTotal + fleetValuation + realEstateValuation);
+        let totalSales = (s.profitableSales || 0) + (s.lossSales || 0);
+        let winrate = totalSales > 0 ? Math.round(((s.profitableSales || 0) / totalSales) * 100) : 0;
+        let rankTitle = p.traderTitle || "Быстрый выкуп за кэш 💸";
 
-    const isDev = window.isPcDevMode ? window.isPcDevMode() : false;
-    const isOwner = _isOwner();
-    let modeBadge = '';
-    if (isOwner) {
-        modeBadge = `<span class="owner-badge" style="font-size:8px; margin-left:4px;">👑 OWNER</span>`;
-    } else if (isDev) {
-        modeBadge = `<span class="tag-badge bg-tag-purple" style="font-size:8px; margin-left:4px;">DEV MODE</span>`;
-    }
+        const isDev = window.isPcDevMode ? window.isPcDevMode() : false;
+        const isOwner = typeof _isOwner === 'function' ? _isOwner() : false;
+        let modeBadge = '';
+        if (isOwner) {
+            modeBadge = `<span class="owner-badge" style="font-size:8px; margin-left:4px;">👑 OWNER</span>`;
+        } else if (isDev) {
+            modeBadge = `<span class="tag-badge bg-tag-purple" style="font-size:8px; margin-left:4px;">DEV MODE</span>`;
+        }
 
-    const ownerPanelButton = isOwner ? `
-        <div class="glass-card mb-3 p-2" style="background:linear-gradient(135deg, rgba(255,215,0,0.08), rgba(9,14,24,0.95)); border-color:rgba(255,215,0,0.5);">
-            <button onclick="AccessControl.openOwnerPanel()" class="btn btn-amber w-full font-bold" style="font-size:11px;">
-                👑 Открыть Owner-панель управления доступом
-            </button>
-            <div class="sub-label text-center mt-1" style="font-size:9px; color:#ffd700;">
-                Инвайт-коды, список игроков, баны
-            </div>
-        </div>
-    ` : '';
-
-    container.innerHTML = `
-        <div class="glass-card mb-3 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.18), #090e18); border-color: var(--cyan);">
-            <div class="avatar-ring mb-2" style="margin: 0 auto; width: 62px; height: 62px;">
-                <div class="avatar-glow"></div>
-                <div class="avatar-fx-glow"></div>
-                <div class="avatar" style="width: 54px; height: 54px; font-size: 22px;">
-                    <i class="fa-solid fa-user-ninja"></i>
-                </div>
-            </div>
-            <h3 class="font-bold text-xs" style="font-size:16px;">${p.name || 'Перекуп #777'}${modeBadge}</h3>
-            <div class="sub-label mt-1 font-bold color-cyan">${rankTitle} (Уровень ${lvl})</div>
-            <div class="sub-label mt-1 font-mono" style="font-size:9px; color:#64748b;">UID: ${p.uid || '—'}</div>
-
-            <div class="flex-between mt-3 pt-2" style="border-top: 1px dashed rgba(255,255,255,0.08);">
-                <button onclick="ThemeManager.openCustomizer()" class="btn btn-purple btn-sm btn-auto" style="font-size:10px;">
-                    🎨 Скин & Эффекты
+        const ownerPanelButton = isOwner ? `
+            <div class="glass-card mb-3 p-2" style="background:linear-gradient(135deg, rgba(255,215,0,0.08), rgba(9,14,24,0.95)); border-color:rgba(255,215,0,0.5);">
+                <button onclick="AccessControl.openOwnerPanel()" class="btn btn-amber w-full font-bold" style="font-size:11px;">
+                    👑 Открыть Owner-панель управления доступом
                 </button>
-                <button onclick="openPatchNotesModal()" class="btn btn-dark btn-sm btn-auto" style="font-size:10px;">
-                    <i class="fa-solid fa-bolt color-amber"></i> Патчноут ${window.CURRENT_GAME_VERSION}
+                <div class="sub-label text-center mt-1" style="font-size:9px; color:#ffd700;">
+                    Инвайт-коды, список игроков, баны
+                </div>
+            </div>
+        ` : '';
+
+        container.innerHTML = `
+            <div class="glass-card mb-3 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.18), #090e18); border-color: var(--cyan);">
+                <div class="avatar-ring mb-2" style="margin: 0 auto; width: 62px; height: 62px;">
+                    <div class="avatar-glow"></div>
+                    <div class="avatar-fx-glow"></div>
+                    <div class="avatar" style="width: 54px; height: 54px; font-size: 22px;">
+                        <i class="fa-solid fa-user-ninja"></i>
+                    </div>
+                </div>
+                <h3 class="font-bold text-xs" style="font-size:16px;">${p.name || 'Перекуп #777'}${modeBadge}</h3>
+                <div class="sub-label mt-1 font-bold color-cyan">${rankTitle} (Уровень ${lvl})</div>
+                <div class="sub-label mt-1 font-mono" style="font-size:9px; color:#64748b;">UID: ${p.uid || '—'}</div>
+
+                <div class="flex-between mt-3 pt-2" style="border-top: 1px dashed rgba(255,255,255,0.08);">
+                    <button onclick="ThemeManager.openCustomizer()" class="btn btn-purple btn-sm btn-auto" style="font-size:10px;">
+                        🎨 Скин & Эффекты
+                    </button>
+                    <button onclick="openPatchNotesModal()" class="btn btn-dark btn-sm btn-auto" style="font-size:10px;">
+                        <i class="fa-solid fa-bolt color-amber"></i> Патчноут ${window.CURRENT_GAME_VERSION}
+                    </button>
+                </div>
+            </div>
+
+            ${ownerPanelButton}
+
+            <div class="glass-card mb-3 p-3" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.14), #090e18); border-color: var(--green);">
+                <div class="flex-between mb-1">
+                    <div>
+                        <span class="sub-label" style="font-size:9.5px;">Капитализация активов:</span>
+                        <div class="price-val color-green" style="font-size:22px;">${totalNetWorth.toLocaleString()} ₽</div>
+                    </div>
+                    <span class="tag-badge bg-tag-green">NET WORTH</span>
+                </div>
+                <div class="grid-2 my-2 text-xs" style="gap:6px;">
+                    <div class="p-2" style="background:#090e18; border-radius:8px;">
+                        <span class="sub-label" style="font-size:9px;">Кэш & Банк:</span>
+                        <div class="font-bold color-cyan mt-1">${(totalCash + safeCash + depositsTotal).toLocaleString()} ₽</div>
+                    </div>
+                    <div class="p-2" style="background:#090e18; border-radius:8px;">
+                        <span class="sub-label" style="font-size:9px;">Автопарк:</span>
+                        <div class="font-bold color-amber mt-1">${fleetValuation.toLocaleString()} ₽</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card mb-3 p-3">
+                <b class="text-xs color-cyan block mb-2"><i class="fa-solid fa-chart-pie mr-1"></i> Бизнес-KPI:</b>
+                <div class="grid-2 mb-2">
+                    <div class="stat-box">
+                        <div class="sub-label" style="font-size:9px;">Чистый профит:</div>
+                        <div class="stat-value color-green">${(s.totalNetProfit || 0).toLocaleString()} ₽</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="sub-label" style="font-size:9px;">Винрейт сделок:</div>
+                        <div class="stat-value color-amber">${winrate}%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card p-3" style="background:#090e18; border-color:var(--border-glass);">
+                <div class="grid-2 mb-2">
+                    <button onclick="syncCloudStorageManual()" class="btn btn-cyan btn-sm" ${isDev ? 'disabled title="Недоступно в DEV"' : ''}>
+                        <i class="fa-solid fa-rotate"></i> Синхронизация
+                    </button>
+                    <button onclick="openSaveManagerModal()" class="btn btn-dark btn-sm">
+                        <i class="fa-solid fa-file-export"></i> Экспорт кода
+                    </button>
+                </div>
+                <button id="btnHardReset" onclick="resetGameData()" class="btn btn-danger btn-sm w-full">
+                    <i class="fa-solid fa-trash-can mr-1"></i> Сбросить прогресс
                 </button>
             </div>
-        </div>
-
-        ${ownerPanelButton}
-
-        <div class="glass-card mb-3 p-3" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.14), #090e18); border-color: var(--green);">
-            <div class="flex-between mb-1">
-                <div>
-                    <span class="sub-label" style="font-size:9.5px;">Капитализация активов:</span>
-                    <div class="price-val color-green" style="font-size:22px;">${totalNetWorth.toLocaleString()} ₽</div>
-                </div>
-                <span class="tag-badge bg-tag-green">NET WORTH</span>
+        `;
+    } catch (e) {
+        console.warn('[Profile] Ошибка рендера:', e);
+        container.innerHTML = `
+            <div class="glass-card p-3 text-center" style="border-color: var(--red);">
+                <b class="color-red text-xs">Ошибка загрузки профиля</b>
+                <div class="sub-label mt-1" style="font-size:9.5px;">${String(e.message || e).substring(0, 100)}</div>
             </div>
-            <div class="grid-2 my-2 text-xs" style="gap:6px;">
-                <div class="p-2" style="background:#090e18; border-radius:8px;">
-                    <span class="sub-label" style="font-size:9px;">Кэш & Банк:</span>
-                    <div class="font-bold color-cyan mt-1">${(totalCash + safeCash + depositsTotal).toLocaleString()} ₽</div>
-                </div>
-                <div class="p-2" style="background:#090e18; border-radius:8px;">
-                    <span class="sub-label" style="font-size:9px;">Автопарк:</span>
-                    <div class="font-bold color-amber mt-1">${fleetValuation.toLocaleString()} ₽</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="glass-card mb-3 p-3">
-            <b class="text-xs color-cyan block mb-2"><i class="fa-solid fa-chart-pie mr-1"></i> Бизнес-KPI:</b>
-            <div class="grid-2 mb-2">
-                <div class="stat-box">
-                    <div class="sub-label" style="font-size:9px;">Чистый профит:</div>
-                    <div class="stat-value color-green">${(s.totalNetProfit || 0).toLocaleString()} ₽</div>
-                </div>
-                <div class="stat-box">
-                    <div class="sub-label" style="font-size:9px;">Винрейт сделок:</div>
-                    <div class="stat-value color-amber">${winrate}%</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="glass-card p-3" style="background:#090e18; border-color:var(--border-glass);">
-            <div class="grid-2 mb-2">
-                <button onclick="syncCloudStorageManual()" class="btn btn-cyan btn-sm" ${isDev ? 'disabled title="Недоступно в DEV"' : ''}>
-                    <i class="fa-solid fa-rotate"></i> Синхронизация
-                </button>
-                <button onclick="openSaveManagerModal()" class="btn btn-dark btn-sm">
-                    <i class="fa-solid fa-file-export"></i> Экспорт кода
-                </button>
-            </div>
-            <button id="btnHardReset" onclick="resetGameData()" class="btn btn-danger btn-sm w-full">
-                <i class="fa-solid fa-trash-can mr-1"></i> Сбросить прогресс
-            </button>
-        </div>
-    `;
+        `;
+    }
 }
 
 // ========================================================
 // 9. CLOUD / SAVE MANAGER
 // ========================================================
 function syncCloudStorageManual() {
-    if (isPcDevSession) {
+    if (window.isPcDevMode && window.isPcDevMode()) {
         return showToast("DEV-режим: сохранение только локально", 'info');
     }
-    saveState();
+    if (typeof saveState === 'function') saveState();
     showToast("Синхронизация с облаком Firestore запущена ✓", 'success');
     if (window.AudioFx) {
         window.AudioFx.play('win');
@@ -945,8 +968,8 @@ function syncCloudStorageManual() {
 function openSaveManagerModal() {
     const area = document.getElementById('saveExportArea');
     if (area) {
-        try { area.value = btoa(unescape(encodeURIComponent(JSON.stringify(state)))); }
-        catch(e) { area.value = JSON.stringify(state); }
+        try { area.value = btoa(unescape(encodeURIComponent(JSON.stringify(window.state)))); }
+        catch(e) { area.value = JSON.stringify(window.state); }
     }
     ModalManager.open('modalSaveManager');
     if (window.AudioFx) window.AudioFx.play('tick');
@@ -979,8 +1002,8 @@ function importSaveCodeAction() {
 
         const parsed = JSON.parse(jsonStr);
         if (!parsed.player) throw new Error();
-        applyLoadedState(parsed);
-        saveState();
+        if (typeof applyLoadedState === 'function') applyLoadedState(parsed);
+        if (typeof saveState === 'function') saveState();
         ModalManager.close('modalSaveManager');
         location.reload();
     } catch(err) {
@@ -1069,4 +1092,4 @@ window._updateDynamicStarRate = _updateDynamicStarRate;
 window._syncStarRateToBank = _syncStarRateToBank;
 window.logBankTransaction = logBankTransaction;
 
-console.log('[💠 app-game.js v4.3.0] Циклы + Квесты + XP + Профиль + Роллеры ✓');
+console.log('[💠 app-game.js v4.3.1] Циклы + Квесты + XP + Профиль + Роллеры ✓');

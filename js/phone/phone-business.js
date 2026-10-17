@@ -1,27 +1,21 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v5.2.1)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v5.2.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v5.2.2 (ФИКС СТАБИЛЬНОСТИ ensureState):
+//   - ensureState теперь защищён от отсутствия window.state или state.player
+//   - Все обращения к state внутри ensureState обёрнуты в проверки
+//   - Добавлена защита от повторного вызова ensureState
 // ⭐ v5.2.1 (SPRINT 2 — ФИКСЫ D1, D2):
 //   - ФИКС D1: разделены _collectPending на два независимых флага
-//     • _collectAllPending — для кнопки «Собрать всё» в шапке
-//     • _collectPointPending — для кнопки «Собрать» в конкретной точке
-//     Раньше клик по одной кнопке блокировал другую.
-//   - ФИКС D2: drawSparkline вызывается через requestAnimationFrame —
-//     canvas гарантированно в DOM перед отрисовкой.
-//     Плюс проверка canvas.isConnected в самом drawSparkline.
-// ⭐ v5.2.0 (ПОЛНЫЙ РЕДИЗАЙН КАРТОЧЕК В СТИЛЕ АВТО):
-//   - Новый Hero-баннер со статусом и стикерами
-//   - Виджет дохода/цены в правом углу с трендом
-//   - Сетка из 3 плашек параметров (Касса, Сырьё, ДНК)
-//   - Блок-цитата текущего статуса и перка
-//   - Анимированная полоса сырья и прогноз окупаемости
-//   - Синхронизация табов под обновленный phone.css
+//   - ФИКС D2: drawSparkline вызывается через requestAnimationFrame
+// ⭐ v5.2.0 (ПОЛНЫЙ РЕДИЗАЙН КАРТОЧЕК В СТИЛЕ АВТО)
 // ========================================================
 
 const PhoneBusiness = {
     currentTab: 'points',
     _tickInterval: null,
     _activeBonus: null,
+    _ensureStateInProgress: false,
 
     // ⭐ v5.2.1 (ФИКС D1): разделены на два независимых флага
     _collectAllPending: false,     // для кнопки «Собрать всё» в шапке
@@ -158,113 +152,147 @@ const PhoneBusiness = {
 
     // ========================================================
     // ИНИЦИАЛИЗАЦИЯ
+    // ⭐ v5.2.2: УСИЛЕННАЯ ЗАЩИТА
     // ========================================================
     ensureState() {
-        if (!window.state) return;
-        if (!window.state.player) window.state.player = {};
-        if (!Array.isArray(window.state.businesses)) window.state.businesses = [];
+        // ⭐ Защита от повторного вызова
+        if (this._ensureStateInProgress) {
+            console.log('[PhoneBusiness] ensureState уже выполняется, пропускаем повтор');
+            return;
+        }
+        this._ensureStateInProgress = true;
 
-        const baseData = (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA)) ? BUSINESS_DATA : [];
-
-        if (baseData.length === 0) {
-            if (!this._ensureStateRetries) this._ensureStateRetries = 0;
-            this._ensureStateRetries++;
-
-            if (this._ensureStateRetries <= 6) {
-                console.warn(`[PhoneBusiness] BUSINESS_DATA не загружен, retry ${this._ensureStateRetries}/6 через 500ms`);
-                setTimeout(() => this.ensureState(), 500);
-                return;
-            } else {
-                console.error('[PhoneBusiness] ❌ BUSINESS_DATA так и не загрузился после 6 попыток!');
-                return;
+        try {
+            // ⭐ Проверка window.state
+            if (!window.state) {
+                console.warn('[PhoneBusiness] window.state не существует, создаём заглушку');
+                window.state = {};
             }
+
+            if (!window.state.player) {
+                console.warn('[PhoneBusiness] window.state.player не существует, создаём заглушку');
+                window.state.player = {};
+            }
+
+            if (!Array.isArray(window.state.businesses)) {
+                console.warn('[PhoneBusiness] window.state.businesses не массив, сбрасываем');
+                window.state.businesses = [];
+            }
+
+            const baseData = (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA)) ? BUSINESS_DATA : [];
+
+            if (baseData.length === 0) {
+                if (!this._ensureStateRetries) this._ensureStateRetries = 0;
+                this._ensureStateRetries++;
+
+                if (this._ensureStateRetries <= 6) {
+                    console.warn(`[PhoneBusiness] BUSINESS_DATA не загружен, retry ${this._ensureStateRetries}/6 через 500ms`);
+                    setTimeout(() => {
+                        this._ensureStateInProgress = false;
+                        this.ensureState();
+                    }, 500);
+                    return;
+                } else {
+                    console.error('[PhoneBusiness] ❌ BUSINESS_DATA так и не загрузился после 6 попыток!');
+                    this._ensureStateInProgress = false;
+                    return;
+                }
+            }
+
+            this._ensureStateRetries = 0;
+
+            const existingIds = new Set(
+                window.state.businesses
+                    .filter(b => b && b.id)
+                    .map(b => b.id)
+            );
+            const missing = baseData.filter(b => b && b.id && !existingIds.has(b.id));
+
+            if (missing.length > 0) {
+                console.log('[PhoneBusiness] Добавляем отсутствующие бизнесы:', missing.length);
+                const newBusinesses = missing.map(b => ({
+                    id: b.id,
+                    name: b.name,
+                    customName: b.name,
+                    slogan: '',
+                    icon: b.icon || this._iconForBiz(b.id),
+                    level: 0,
+                    cost: b.cost,
+                    reqStars: b.reqStars || 0,
+                    income: b.income,
+                    minLevel: b.minLevel || 1,
+                    perk: b.perk || '',
+                    desc: b.desc || '',
+                    img: b.img || '',
+                    fallback: b.fallback || '',
+                    stored: 0,
+                    stock: 100,
+                    maxStock: 100,
+                    incomeHistory: [],
+                    lastIncomeDay: 0,
+                    lastStockDay: 0,
+                    dna: null,
+                    coverSkin: 'classic',
+                    ownerSticker: 'none',
+                    activeBuffs: [],
+                    activeDebuffs: [],
+                    reputation: 0,
+                    totalEarned: 0,
+                    createdAt: 0
+                }));
+
+                window.state.businesses = [...window.state.businesses, ...newBusinesses]
+                    .sort((a, b) => (a.minLevel || 1) - (b.minLevel || 1));
+
+                if (typeof saveState === 'function') saveState();
+            }
+
+            window.state.businesses.forEach(b => {
+                if (!b) return;
+                if (typeof b.stored !== 'number') b.stored = 0;
+                if (typeof b.stock !== 'number') b.stock = 100;
+                if (typeof b.maxStock !== 'number') b.maxStock = 100;
+                if (!Array.isArray(b.incomeHistory)) b.incomeHistory = [];
+                if (typeof b.lastIncomeDay !== 'number') b.lastIncomeDay = 0;
+                if (typeof b.lastStockDay !== 'number') b.lastStockDay = 0;
+                if (!b.icon) b.icon = this._iconForBiz(b.id);
+                if (!b.customName) b.customName = b.name;
+                if (typeof b.slogan !== 'string') b.slogan = '';
+                if (!b.coverSkin) b.coverSkin = 'classic';
+                if (!b.ownerSticker) b.ownerSticker = 'none';
+                if (!Array.isArray(b.activeBuffs)) b.activeBuffs = [];
+                if (!Array.isArray(b.activeDebuffs)) b.activeDebuffs = [];
+                if (typeof b.reputation !== 'number') b.reputation = 0;
+                if (typeof b.totalEarned !== 'number') b.totalEarned = 0;
+                if (typeof b.createdAt !== 'number') b.createdAt = 0;
+                if (b.level > 0 && !b.dna) b.dna = this._generateDNA(b.id);
+            });
+
+            if (!window.state.businessWorkshop) window.state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
+            if (!window.state.businessStaff) window.state.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
+            if (!Array.isArray(window.state.businessFleet)) window.state.businessFleet = [];
+            if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
+            if (!window.state.player.businessAdBonus) window.state.player.businessAdBonus = null;
+
+            if (!window.state.player.economicCycle) {
+                window.state.player.economicCycle = this._generateEconomicCycle();
+            }
+
+            if (!Array.isArray(window.state.player.dailyBizChallenges) || window.state.player.dailyBizChallenges.length === 0) {
+                this._generateDailyBizChallenges();
+            }
+
+            this._checkOfflineCapitalization();
+            this._syncActiveBonus();
+
+        } catch (e) {
+            console.error('[PhoneBusiness] КРИТИЧЕСКАЯ ОШИБКА в ensureState:', e);
+            if (typeof showToast === 'function') {
+                showToast('⚠️ Ошибка инициализации бизнеса. Проверьте консоль.', 'error');
+            }
+        } finally {
+            this._ensureStateInProgress = false;
         }
-
-        this._ensureStateRetries = 0;
-
-        const existingIds = new Set(
-            window.state.businesses
-                .filter(b => b && b.id)
-                .map(b => b.id)
-        );
-        const missing = baseData.filter(b => b && b.id && !existingIds.has(b.id));
-
-        if (missing.length > 0) {
-            console.log('[PhoneBusiness] Добавляем отсутствующие бизнесы:', missing.length);
-            const newBusinesses = missing.map(b => ({
-                id: b.id,
-                name: b.name,
-                customName: b.name,
-                slogan: '',
-                icon: b.icon || this._iconForBiz(b.id),
-                level: 0,
-                cost: b.cost,
-                reqStars: b.reqStars || 0,
-                income: b.income,
-                minLevel: b.minLevel || 1,
-                perk: b.perk || '',
-                desc: b.desc || '',
-                img: b.img || '',
-                fallback: b.fallback || '',
-                stored: 0,
-                stock: 100,
-                maxStock: 100,
-                incomeHistory: [],
-                lastIncomeDay: 0,
-                lastStockDay: 0,
-                dna: null,
-                coverSkin: 'classic',
-                ownerSticker: 'none',
-                activeBuffs: [],
-                activeDebuffs: [],
-                reputation: 0,
-                totalEarned: 0,
-                createdAt: 0
-            }));
-
-            window.state.businesses = [...window.state.businesses, ...newBusinesses]
-                .sort((a, b) => (a.minLevel || 1) - (b.minLevel || 1));
-
-            if (typeof saveState === 'function') saveState();
-        }
-
-        window.state.businesses.forEach(b => {
-            if (!b) return;
-            if (typeof b.stored !== 'number') b.stored = 0;
-            if (typeof b.stock !== 'number') b.stock = 100;
-            if (typeof b.maxStock !== 'number') b.maxStock = 100;
-            if (!Array.isArray(b.incomeHistory)) b.incomeHistory = [];
-            if (typeof b.lastIncomeDay !== 'number') b.lastIncomeDay = 0;
-            if (typeof b.lastStockDay !== 'number') b.lastStockDay = 0;
-            if (!b.icon) b.icon = this._iconForBiz(b.id);
-            if (!b.customName) b.customName = b.name;
-            if (typeof b.slogan !== 'string') b.slogan = '';
-            if (!b.coverSkin) b.coverSkin = 'classic';
-            if (!b.ownerSticker) b.ownerSticker = 'none';
-            if (!Array.isArray(b.activeBuffs)) b.activeBuffs = [];
-            if (!Array.isArray(b.activeDebuffs)) b.activeDebuffs = [];
-            if (typeof b.reputation !== 'number') b.reputation = 0;
-            if (typeof b.totalEarned !== 'number') b.totalEarned = 0;
-            if (typeof b.createdAt !== 'number') b.createdAt = 0;
-            if (b.level > 0 && !b.dna) b.dna = this._generateDNA(b.id);
-        });
-
-        if (!window.state.businessWorkshop) window.state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
-        if (!window.state.businessStaff) window.state.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
-        if (!Array.isArray(window.state.businessFleet)) window.state.businessFleet = [];
-        if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
-        if (!window.state.player.businessAdBonus) window.state.player.businessAdBonus = null;
-
-        if (!window.state.player.economicCycle) {
-            window.state.player.economicCycle = this._generateEconomicCycle();
-        }
-
-        if (!Array.isArray(window.state.player.dailyBizChallenges) || window.state.player.dailyBizChallenges.length === 0) {
-            this._generateDailyBizChallenges();
-        }
-
-        this._checkOfflineCapitalization();
-        this._syncActiveBonus();
     },
 
     // ========================================================
@@ -340,7 +368,7 @@ const PhoneBusiness = {
 
                 if (ch.cur >= ch.max) {
                     ch.done = true;
-                    if (window.MoneyManager) {
+                    if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
                         window.MoneyManager.earn(ch.reward, `Бизнес-челлендж: ${ch.text}`, { silent: true });
                     } else {
                         window.state.player.cash = (window.state.player.cash || 0) + ch.reward;
@@ -364,13 +392,14 @@ const PhoneBusiness = {
     // ОФФЛАЙН-КАПИТАЛИЗАЦИЯ
     // ========================================================
     _checkOfflineCapitalization() {
-        const lastVisit = window.state.player?.lastBizVisitDay || 0;
-        const curDay = window.state.player?.day || 1;
+        if (!window.state || !window.state.player) return;
+        const lastVisit = window.state.player.lastBizVisitDay || 0;
+        const curDay = window.state.player.day || 1;
         const daysAway = curDay - lastVisit;
 
         if (daysAway >= 3 && lastVisit > 0) {
             let bonus = 0;
-            window.state.businesses.forEach(b => {
+            (window.state.businesses || []).forEach(b => {
                 if (b && b.level > 0 && b.stored > 0) {
                     const bns = Math.round(b.stored * 0.05 * Math.min(daysAway, 7));
                     b.stored += bns;
@@ -622,7 +651,10 @@ const PhoneBusiness = {
     // ГЛАВНЫЙ РЕНДЕР
     // ========================================================
     render(container) {
-        if (!container) { console.warn('[PhoneBusiness] нет контейнера'); return; }
+        if (!container) {
+            console.warn('[PhoneBusiness] нет контейнера');
+            return;
+        }
         this.ensureState();
 
         const tab = this.currentTab;
@@ -844,8 +876,7 @@ const PhoneBusiness = {
 
         container.innerHTML = html;
 
-        // ⭐ v5.2.1 (ФИКС D2): отрисовка графиков через requestAnimationFrame,
-        // чтобы canvas гарантированно был в DOM
+        // ⭐ v5.2.1 (ФИКС D2): отрисовка графиков через requestAnimationFrame
         requestAnimationFrame(() => {
             window.state.businesses.forEach(b => {
                 if (b && b.level > 0) {
@@ -1196,7 +1227,7 @@ const PhoneBusiness = {
                     window.state.player.businessAchievements.push(a.id);
 
                     if (a.reward.cash) {
-                        if (window.MoneyManager) {
+                        if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
                             window.MoneyManager.earn(a.reward.cash, `Достижение бизнеса: ${a.title}`, { silent: true });
                         } else {
                             window.state.player.cash = (window.state.player.cash || 0) + a.reward.cash;
@@ -1440,7 +1471,7 @@ const PhoneBusiness = {
                 return;
             }
 
-            if (window.MoneyManager) {
+            if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
                 window.MoneyManager.earn(total, 'Сбор кассы бизнес-сети');
             } else {
                 window.state.player.cash = (window.state.player.cash || 0) + total;
@@ -1481,7 +1512,7 @@ const PhoneBusiness = {
             b.stored = 0;
             b.totalEarned = (b.totalEarned || 0) + amount;
 
-            if (window.MoneyManager) {
+            if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
                 window.MoneyManager.earn(amount, `Сбор кассы: ${b.customName || b.name}`);
             } else {
                 window.state.player.cash = (window.state.player.cash || 0) + amount;
@@ -1515,7 +1546,7 @@ const PhoneBusiness = {
         let cost = 15000;
         if (window.state.businessFleet.includes('gazelle')) cost = Math.round(cost * 0.7);
 
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
             const ok = window.MoneyManager.spend(cost, `Сырьё: ${b.customName || b.name}`);
             if (!ok) {
                 if (typeof showToast === 'function') showToast(`Не хватает ${cost.toLocaleString()} ₽!`);
@@ -1563,7 +1594,7 @@ const PhoneBusiness = {
 
         this._upgradePending = true;
         try {
-            if (window.MoneyManager) {
+            if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
                 const ok = window.MoneyManager.spend(cost, isNew ? `Покупка бизнеса: ${b.name}` : `Апгрейд бизнеса: ${b.name}`);
                 if (!ok) {
                     if (typeof showToast === 'function') showToast(`Не хватает ${cost.toLocaleString()} ₽!`);
@@ -1617,7 +1648,7 @@ const PhoneBusiness = {
         if (curLvl >= u.maxLevel) return;
         const cost = Math.round(u.baseCost * Math.pow(u.costMul, curLvl));
 
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
             const ok = window.MoneyManager.spend(cost, `Апгрейд цеха: ${u.name}`);
             if (!ok) {
                 if (typeof showToast === 'function') showToast(`Нужно ${cost.toLocaleString()} ₽!`);
@@ -1655,7 +1686,7 @@ const PhoneBusiness = {
         const hired = window.state.businessStaff[staffId] || 0;
         if (hired >= s.maxHired) return;
 
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
             const ok = window.MoneyManager.spend(s.salary, `Найм: ${s.name}`);
             if (!ok) {
                 if (typeof showToast === 'function') showToast(`Нужно ${s.salary.toLocaleString()} ₽!`);
@@ -1690,7 +1721,7 @@ const PhoneBusiness = {
         if (!v) return;
         if (window.state.businessFleet.includes(vehId)) return;
 
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
             const ok = window.MoneyManager.spend(v.cost, `Транспорт: ${v.name}`);
             if (!ok) {
                 if (typeof showToast === 'function') showToast(`Нужно ${v.cost.toLocaleString()} ₽!`);
@@ -1832,7 +1863,7 @@ const PhoneBusiness = {
         const isOwned = window.state.player.ownedBizSkins.includes(skinId) || skin.cost === 0;
 
         if (!isOwned) {
-            if (window.MoneyManager) {
+            if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
                 const ok = window.MoneyManager.spend(skin.cost, `Скин бизнеса: ${skin.name}`);
                 if (!ok) {
                     if (typeof showToast === 'function') showToast(`Нужно ${skin.cost.toLocaleString()} ₽!`);
@@ -1865,7 +1896,7 @@ const PhoneBusiness = {
         const isOwned = window.state.player.ownedBizStickers.includes(stickerId) || sticker.cost === 0;
 
         if (!isOwned) {
-            if (window.MoneyManager) {
+            if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
                 const ok = window.MoneyManager.spend(sticker.cost, `Стикер: ${sticker.name}`);
                 if (!ok) {
                     if (typeof showToast === 'function') showToast(`Нужно ${sticker.cost.toLocaleString()} ₽!`);
@@ -1967,7 +1998,7 @@ const PhoneBusiness = {
         if (!b || b.level <= 0) return;
         if (!confirm(`Продать «${b.customName || b.name}» боту за ${price.toLocaleString()} ₽?`)) return;
 
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
             window.MoneyManager.earn(price, `Продажа бизнеса: ${b.customName || b.name}`);
         } else {
             window.state.player.cash = (window.state.player.cash || 0) + price;
@@ -2066,7 +2097,7 @@ const PhoneBusiness = {
         const curDay = window.state.player?.day || 1;
 
         if (action === 'bribe' && ev.bribeCost > 0) {
-            if (window.MoneyManager) {
+            if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
                 const ok = window.MoneyManager.spend(ev.bribeCost, `Взятка: ${ev.name}`);
                 if (!ok) {
                     if (typeof showToast === 'function') showToast(`Нужно ${ev.bribeCost.toLocaleString()} ₽!`);
@@ -2087,7 +2118,7 @@ const PhoneBusiness = {
                 b.stored = 0;
                 if (typeof showToast === 'function') showToast(`🔥 Касса «${b.customName || b.name}» сгорела!`);
             } else if (typeof ev.penalty === 'number' && ev.penalty > 0) {
-                if (window.MoneyManager) {
+                if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
                     window.MoneyManager.spend(ev.penalty, `Штраф: ${ev.name}`, { force: true });
                 } else {
                     window.state.player.cash = Math.max(0, (window.state.player.cash || 0) - ev.penalty);
@@ -2173,7 +2204,7 @@ const PhoneBusiness = {
             return;
         }
 
-        if (window.MoneyManager) {
+        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
             const ok = window.MoneyManager.spend(cost, 'Рекламная кампания');
             if (!ok) {
                 if (typeof showToast === 'function') showToast(`Нужно ${cost.toLocaleString()} ₽!`);
@@ -2262,7 +2293,7 @@ const PhoneBusiness = {
                 }
             });
             if (autoCollected > 0) {
-                if (window.MoneyManager) {
+                if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
                     window.MoneyManager.earn(autoCollected, 'Автосбор кассы (Управляющий)');
                 } else {
                     window.state.player.cash = (window.state.player.cash || 0) + autoCollected;
@@ -2315,4 +2346,4 @@ if (typeof document !== 'undefined') {
     });
 }
 
-console.log('[💼 phone-business v5.2.1] ФИКС D1 (независимые флаги сбора) + D2 (drawSparkline через rAF) ✓');
+console.log('[💼 phone-business v5.2.2] Усиленная защита ensureState + ФИКС D1/D2 ✓');
