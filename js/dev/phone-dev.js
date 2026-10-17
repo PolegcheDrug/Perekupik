@@ -1,20 +1,17 @@
 // ========================================================
-// js/dev/phone-dev.js — ПРИЛОЖЕНИЕ «DEV TERMINAL» (v2.0.0)
+// js/dev/phone-dev.js — ПРИЛОЖЕНИЕ «DEV TERMINAL» (v2.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.1.0 (ГЛОБАЛЬНЫЙ СБРОС И ВАЙП БД):
+//   - ДОБАВЛЕНО: Два режима сброса во вкладку FIRESTORE и OVERVIEW:
+//       1. 🧹 СБРОС СЕТИ / РЫНКА (с сохранением игроков, гаражей и клубов).
+//       2. 💣 ПОЛНЫЙ ГЛОБАЛЬНЫЙ ВАЙП БД (удаляет вообще все коллекции).
+//   - ДОБАВЛЕНО: Двойное подтверждение через prompt с вводом ключевых слов
+//     ("СБРОС" и "ВАЙП"), исключающее случайное нажатие.
+//   - ДОБАВЛЕНО: Индикатор выполнения очистки и вывод результатов по коллекциям.
 // ⭐ v2.0.0 (ВКЛАДКА ДОСТУП):
-//   - НОВАЯ ВКЛАДКА «ДОСТУП» — управление инвайтами и игроками
-//   - Видна ТОЛЬКО владельцу (проверка AccessControl.isOwner)
-//   - Быстрое создание кодов, список игроков, баны
-//   - Управление системой доступа (вкл/выкл)
-//   - Плавающая кнопка .owner-panel-btn убрана
+//   - Вкладка «ДОСТУП» — управление инвайтами и игроками (для владельца)
 // ⭐ v1.0.0:
-//   - ИСПРАВЛЕНА синтаксическая ошибка DEV_PIN
-//   - try/catch во всех вкладках
-//   - Защита от отсутствия зависимостей
-//   - НОВЫЕ ВКЛАДКИ: «События» (EventBus) и «Деньги» (MoneyManager)
-//   - Кнопка «Показать индексы Firestore» (список для консоли)
-//   - Кнопка «Экспорт логов в файл»
-//   - Кнопка «Проверить модули» — что загружено, что нет
+//   - Обзор, Студия, Ресурсы, Дебаг, Данные, Логи, События, Деньги, State, Модули
 // ========================================================
 
 const AppDev = {
@@ -86,7 +83,6 @@ const AppDev = {
                 return window.AccessControl.isOwner(uid);
             }
 
-            // Fallback
             const OWNER_ID = '1944392183';
             return String(uid) === OWNER_ID;
         } catch (e) {
@@ -227,7 +223,7 @@ const AppDev = {
     },
 
     // ========================================================
-    // 2. ГЛАВНАЯ ПАНЕЛЬ (со ВКЛАДКОЙ ДОСТУП для владельца)
+    // 2. ГЛАВНАЯ ПАНЕЛЬ
     // ========================================================
     renderDashboard(container) {
         const sub = this.activeSubTab;
@@ -280,7 +276,7 @@ const AppDev = {
                     </button>
                 </div>
 
-                <!-- НИЖНИЙ РЯД: МОДУЛИ + ДОСТУП (только для owner) -->
+                <!-- НИЖНИЙ РЯД: МОДУЛИ + ДОСТУП -->
                 <div class="mb-2" style="display:grid; grid-template-columns: ${isOwner ? '2fr 1fr' : '1fr'}; gap: 4px;">
                     <button onclick="AppDev.switchTab('modules')" class="btn ${sub === 'modules' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:6px 2px; font-size:8.5px;">
                         <i class="fa-solid fa-puzzle-piece"></i> ПРОВЕРИТЬ МОДУЛИ
@@ -322,12 +318,10 @@ const AppDev = {
             `;
         }
 
-        // Автозагрузка статистики Firestore
         if (sub === 'firestore') {
             setTimeout(() => this.refreshFirestoreStats(), 50);
         }
 
-        // Автозагрузка данных доступа
         if (sub === 'access' && isOwner) {
             setTimeout(() => this.loadAccessData(), 50);
         }
@@ -341,7 +335,7 @@ const AppDev = {
     },
 
     // ========================================================
-    // ⭐ v2.0.0: ВКЛАДКА ДОСТУП (OWNER-PANEL)
+    // ⭐ v2.0.0: ВКЛАДКА ДОСТУП
     // ========================================================
     async loadAccessData() {
         if (!this._isOwner()) return;
@@ -403,7 +397,6 @@ const AppDev = {
         const systemEnabled = window.AccessControl?.isAccessControlEnabled?.() ?? true;
 
         container.innerHTML = `
-            <!-- Статистика -->
             <div class="grid-3 mb-2" style="gap:5px;">
                 <div class="dev-access-stat-tile tile-players">
                     <div class="dev-access-stat-value color-green">${totalPlayers}</div>
@@ -419,7 +412,6 @@ const AppDev = {
                 </div>
             </div>
 
-            <!-- Быстрое создание -->
             <div class="glass-card p-2 mb-2" style="border-color:rgba(255,215,0,0.4); background:linear-gradient(135deg, rgba(255,215,0,0.06), #090e18);">
                 <b class="text-xs color-amber mb-2 block"><i class="fa-solid fa-bolt mr-1"></i> Быстрое создание кода</b>
                 <div class="grid-3 mb-1" style="gap:4px;">
@@ -438,7 +430,6 @@ const AppDev = {
                 </div>
             </div>
 
-            <!-- Инвайты -->
             <div class="glass-card p-2 mb-2">
                 <div class="flex-between mb-2">
                     <b class="text-xs color-cyan"><i class="fa-solid fa-ticket mr-1"></i> Инвайт-коды (${invites.length})</b>
@@ -481,7 +472,6 @@ const AppDev = {
                 </div>
             </div>
 
-            <!-- Игроки -->
             <div class="glass-card p-2 mb-2">
                 <b class="text-xs color-green mb-2 block"><i class="fa-solid fa-users mr-1"></i> Whitelist игроков (${players.length})</b>
                 <div style="max-height:320px; overflow-y:auto;">
@@ -509,7 +499,6 @@ const AppDev = {
                 </div>
             </div>
 
-            <!-- Управление системой -->
             <div class="glass-card p-2" style="border-color:rgba(255,179,0,0.3);">
                 <b class="text-xs color-amber mb-1 block"><i class="fa-solid fa-cog mr-1"></i> Система доступа</b>
                 <div class="sub-label mb-2" style="font-size:9px;">
@@ -528,7 +517,6 @@ const AppDev = {
         `;
     },
 
-    // Действия вкладки ДОСТУП
     async quickCreate(maxUses, ttlDays) {
         if (!window.AccessControl) return showToast("AccessControl не загружен");
         const res = await window.AccessControl.createInviteCode({ maxUses, ttlDays });
@@ -1476,7 +1464,7 @@ const AppDev = {
                     ${summary.map(row => `
                         <div class="flex-between">
                             <span class="sub-label">${row.label}</span>
-                            <b class="${row.color || ''}">${row.value}</b>
+                            <b class="${row.color \vert{}\vert{} ''}">${row.value}</b>
                         </div>
                     `).join('')}
                 </div>
@@ -1682,7 +1670,7 @@ const AppDev = {
     },
 
     // ========================================================
-    // 12. ВКЛАДКА: FIRESTORE
+    // 12. ВКЛАДКА: FIRESTORE (С ДВУМЯ КНОПКАМИ СБРОСА)
     // ========================================================
     renderFirestoreTab(container) {
         if (!container) return;
@@ -1690,9 +1678,10 @@ const AppDev = {
         const stats = this.firestoreStats || {};
         const isTesting = this.firestoreTesting;
 
-        const collections = ['market_lots', 'chat_messages', 'notifications', 'clubs', 'transactions',
-                             'registered_plates', 'cars_catalog', 'leaderboard', 'trade_offers', 'friendships',
-                             'street_events', 'storage_wars_lobbies'];
+        const collections = ['market_lots', 'p2p_deals', 'trade_offers', 'p2p_notifications_queue',
+                             'chat_messages', 'notifications', 'clubs', 'transactions',
+                             'registered_plates', 'cars_catalog', 'leaderboard', 'street_events',
+                             'players', 'garages'];
 
         container.innerHTML = `
             <div class="glass-card p-2 mb-2" style="background: radial-gradient(circle at 50% 0%, rgba(192,132,252,0.18), #090e18); border-color: var(--purple);">
@@ -1702,7 +1691,30 @@ const AppDev = {
                         <i class="fa-solid fa-rotate"></i> Обновить
                     </button>
                 </div>
-                <div class="sub-label" style="font-size:9px;">Проверка коллекций и ручная очистка мусора</div>
+                <div class="sub-label" style="font-size:9px;">Проверка коллекций и глобальное управление БД</div>
+            </div>
+
+            <!-- ⭐ v2.1.0: СЕКЦИЯ ГЛОБАЛЬНЫХ СБРОСОВ -->
+            <div class="glass-card p-2 mb-2" style="border:1.5px solid rgba(255,51,102,0.4); background: linear-gradient(135deg, rgba(255,51,102,0.08), #090e18);">
+                <div class="flex-between mb-1">
+                    <b class="text-xs color-red"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Глобальные сбросы (DEV)</b>
+                    <span class="tag-badge bg-tag-red">DANGER</span>
+                </div>
+                <div class="sub-label mb-2" style="font-size:8.5px; color:#cbd5e1;">
+                    Используйте для очистки тестовых данных, зависших сделок и лотов на сервере.
+                </div>
+
+                <div class="space-y-2">
+                    <!-- Кнопка 1: Сброс рынка и P2P с СОХРАНЕНИЕМ ИГРОКОВ -->
+                    <button onclick="AppDev.triggerWipeMarketAndP2P()" class="btn btn-amber btn-sm w-full font-bold" style="font-size:9px; padding:7px 4px; border:1px solid rgba(255,179,0,0.5);">
+                        <i class="fa-solid fa-broom mr-1"></i> СБРОС СЕТИ / РЫНКА (сохранить игроков)
+                    </button>
+
+                    <!-- Кнопка 2: Полный глобальный вайп всей базы данных -->
+                    <button onclick="AppDev.triggerWipeAllGlobal()" class="btn btn-red btn-sm w-full font-bold" style="font-size:9px; padding:7px 4px; box-shadow: 0 0 12px rgba(255,51,102,0.35);">
+                        <i class="fa-solid fa-skull-crossbones mr-1"></i> ПОЛНЫЙ ГЛОБАЛЬНЫЙ ВАЙП БД
+                    </button>
+                </div>
             </div>
 
             <div class="glass-card p-2 mb-2">
@@ -1723,7 +1735,7 @@ const AppDev = {
                 <b class="text-xs color-green block mb-2">⚙️ Действия:</b>
                 <div class="space-y-1">
                     <button onclick="AppDev.runCleanupManual()" class="btn btn-green btn-sm w-full" style="font-size:9px;" ${isTesting ? 'disabled' : ''}>
-                        <i class="fa-solid fa-broom mr-1"></i> ${isTesting ? 'Очистка...' : 'Запустить Cleanup'}
+                        <i class="fa-solid fa-broom mr-1"></i> ${isTesting ? 'Очистка...' : 'Запустить Cleanup (TTL)'}
                     </button>
                     <button onclick="AppDev.showFirestoreIndexes()" class="btn btn-cyan btn-sm w-full" style="font-size:9px;">
                         <i class="fa-solid fa-list mr-1"></i> Показать нужные индексы
@@ -1743,6 +1755,92 @@ const AppDev = {
                 </div>
             </div>
         `;
+    },
+
+    // ========================================================
+    // ⭐ v2.1.0: ЛОГИКА ДВУХ КНОПОК СБРОСА
+    // ========================================================
+
+    /**
+     * КНОПКА 1: Вайп рынка, лотов, сделок ДКП, офферов и чатов (прогресс игроков сохраняется)
+     */
+    async triggerWipeMarketAndP2P() {
+        const confirm1 = confirm("⚠️ ВНИМАНИЕ: Будут удалены все объявления на рынке, P2P сделки, офферы и чаты!\n\nПрогресс игроков (деньги, уровни, гаражи) СОХРАНИТСЯ.\n\nПродолжить?");
+        if (!confirm1) return;
+
+        const code = prompt("Для подтверждения введите слово «СБРОС» большими буквами:");
+        if (code !== "СБРОС") {
+            showToast("❌ Отменено: неверный код подтверждения");
+            return;
+        }
+
+        const admin = window.FB_Core?.Admin;
+        if (!admin?.wipeMarketAndP2P) {
+            showToast("❌ FB_Core.Admin.wipeMarketAndP2P недоступен!");
+            return;
+        }
+
+        showToast("🧹 Очистка рынка и P2P... Подождите.");
+        if (window.DevLogger) window.DevLogger.add('firestore', 'Запущен сброс рынка (с сохранением игроков)');
+
+        try {
+            const res = await admin.wipeMarketAndP2P();
+            if (res.success) {
+                if (typeof playSound === 'function') playSound('win');
+                if (typeof tgHaptic === 'function') tgHaptic('success');
+                showToast("✅ Рынок и P2P очищены! Прогресс игроков сохранён.");
+                this.refreshFirestoreStats();
+            } else {
+                showToast("❌ Ошибка сброса: " + res.error);
+            }
+        } catch (e) {
+            console.error('[AppDev] Ошибка wipeMarketAndP2P:', e);
+            showToast("❌ Сбой: " + (e.message || e));
+        }
+    },
+
+    /**
+     * КНОПКА 2: Полный глобальный вайп всей БД (включая аккаунты всех игроков)
+     */
+    async triggerWipeAllGlobal() {
+        const confirm1 = confirm("🚨 КРИТИЧЕСКОЕ ДЕЙСТВИЕ!\n\nБудет полностью уничтожена ВСЯ база данных Firebase: аккаунты игроков, гаражи, деньги, лоты, чаты и статистика.\n\nВы АБСОЛЮТНО уверены?");
+        if (!confirm1) return;
+
+        const code = prompt("Для подтверждения ПОЛНОГО ВАЙПА введите слово «ВАЙП» большими буквами:");
+        if (code !== "ВАЙП") {
+            showToast("❌ Отменено: подтверждение не пройдено");
+            return;
+        }
+
+        const admin = window.FB_Core?.Admin;
+        if (!admin?.wipeAllGlobal) {
+            showToast("❌ FB_Core.Admin.wipeAllGlobal недоступен!");
+            return;
+        }
+
+        showToast("💣 Идёт полный вайп базы данных... Не закрывайте игру!");
+        if (window.DevLogger) window.DevLogger.add('warn', 'ВНИМАНИЕ: Запущен полный вайп базы данных');
+
+        try {
+            const res = await admin.wipeAllGlobal();
+            if (res.success) {
+                // Блокируем фоновые сохранения и очищаем локальный стейт
+                window.__IS_RESETTING__ = true;
+                try { localStorage.clear(); } catch (e) {}
+                try { sessionStorage.clear(); } catch (e) {}
+
+                if (typeof playSound === 'function') playSound('win');
+                showToast("🔥 База данных полностью очищена! Перезагрузка...");
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showToast("❌ Ошибка вайпа: " + res.error);
+            }
+        } catch (e) {
+            console.error('[AppDev] Ошибка wipeAllGlobal:', e);
+            showToast("❌ Сбой: " + (e.message || e));
+        }
     },
 
     FIRESTORE_INDEXES: [
@@ -1976,7 +2074,6 @@ const AppDev = {
     }
 };
 
-// Экспорт
 window.AppDev = AppDev;
 
-console.log('[🔧 phone-dev v2.0.0] ВКЛАДКА ДОСТУП для владельца + 11 вкладок + EventBus/MoneyManager ✓');
+console.log('[🔧 phone-dev v2.1.0] Добавлены глобальные сбросы (Сброс рынка / Полный вайп БД) ✓');
