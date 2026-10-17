@@ -1,600 +1,415 @@
-/**
- * market-map.js
- * Интерактивная карта авторынка с радиусом поиска, районами и точками объявлений.
- */
+// ========================================================
+// js/market/market-map.js — ИНТЕРАКТИВНАЯ НЕОНОВАЯ GPS-КАРТА АВТОРЫНКА (v2.0.0)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ========================================================
 
 const MarketMap = {
-    canvas: null,
-    ctx: null,
-    container: null,
-    isActive: false,
+    modalId: 'modalMarketMapContainer',
+    selectedCarId: null,
 
-    // Центр города / база игрока (в процентах от 0 до 100)
-    playerBase: {
-        x: 50,
-        y: 50,
-        name: "Мой Гараж / Офис"
-    },
-
-    // Настройки радиуса поиска (в виртуальных километрах)
-    currentRadiusKm: 15, // Стартовый радиус
-    maxRadiusKm: 60,
-    radiusLevels: [
-        { level: 1, radiusKm: 15, cost: 0, title: "Пеший перекуп (Свой район)" },
-        { level: 2, radiusKm: 30, cost: 35000, title: "Городской подбор (Весь город)" },
-        { level: 3, radiusKm: 45, cost: 90000, title: "Областной радар (Пригород + Гаражи)" },
-        { level: 4, radiusKm: 60, cost: 200000, title: "Федеральная сеть (Вся область)" }
-    ],
-    currentRadiusLevel: 1,
-
-    // Районы города
-    districts: [
-        { id: 'center', name: 'Центральный р-н', x: 50, y: 50, radius: 12, priceMod: 1.15, desc: 'Премиум и ухоженные авто' },
-        { id: 'sleep', name: 'Спальные микрорайоны', x: 28, y: 35, radius: 16, priceMod: 1.0, desc: 'Эконом и семейные авто' },
-        { id: 'industrial', name: 'Промзона / Авторынок', x: 75, y: 30, radius: 15, priceMod: 0.92, desc: 'Срочный выкуп, битые авто' },
-        { id: 'garages', name: 'Гаражный массив "Север"', x: 35, y: 80, radius: 14, priceMod: 0.85, desc: 'Капсулы времени, авто под проект' },
-        { id: 'suburb', name: 'Пригород / Посёлок', x: 80, y: 78, radius: 18, priceMod: 0.88, desc: 'Рабочие лошадки, внедорожники' }
+    // Районы города и их координаты на координатной сетке (0-100%)
+    DISTRICTS: [
+        { id: 'center', name: 'Центральный р-н', x: 50, y: 50, dist: 0 },
+        { id: 'spalny', name: 'Спальные микрорайоны', x: 25, y: 28, dist: 18 },
+        { id: 'promzona', name: 'Промзона / Авторынок', x: 74, y: 22, dist: 22 },
+        { id: 'garages', name: 'Гаражный массив "Север"', x: 30, y: 76, dist: 20 },
+        { id: 'suburb', name: 'Пригород / Посёлок', x: 78, y: 72, dist: 26 }
     ],
 
-    // Кэш пинов объявлений на карте
-    pins: [],
-    selectedPin: null,
-    animationFrameId: null,
-    radarPulseAngle: 0,
-
-    /**
-     * Инициализация карты
-     */
-    init() {
-        this.createMapDOM();
-        this.bindEvents();
+    getRadarRadius() {
+        if (window.state?.player?.radarRadius) return window.state.player.radarRadius;
+        if (window.state?.radarLevel) return 10 + window.state.radarLevel * 5;
+        return 15; // Базовый радиус 15 км
     },
 
-    /**
-     * Создание разметки контейнера карты
-     */
-    createMapDOM() {
-        if (document.getElementById('market-map-overlay')) return;
+    show(feed) {
+        const cars = feed || window.state?.marketFeed || [];
+        this.selectedCarId = null;
 
-        const overlay = document.createElement('div');
-        overlay.id = 'market-map-overlay';
-        overlay.className = 'market-map-overlay hidden';
-
-        overlay.innerHTML = `
-            <div class="market-map-modal">
-                <div class="market-map-header">
-                    <div class="market-map-title">
-                        <span class="map-icon">🗺️</span>
-                        <div>
-                            <h3>Карта авторынка</h3>
-                            <p class="map-subtitle">Поиск объявлений по районам</p>
-                        </div>
-                    </div>
-                    <div class="market-map-controls">
-                        <div class="radar-status-badge">
-                            Радиус: <span id="map-current-radius-val">${this.currentRadiusKm} км</span>
-                        </div>
-                        <button class="map-btn-upgrade-radar" id="map-btn-upgrade" title="Расширить радиус поиска">
-                            📡 Улучшить радар
-                        </button>
-                        <button class="map-btn-close" id="map-btn-close" title="Закрыть карту">✕</button>
-                    </div>
-                </div>
-
-                <div class="market-map-body" id="market-map-body">
-                    <canvas id="market-map-canvas"></canvas>
-                    <div class="market-map-legend">
-                        <div class="legend-item"><span class="legend-dot dot-player"></span> База перекупа</div>
-                        <div class="legend-item"><span class="legend-dot dot-active"></span> Доступные авто</div>
-                        <div class="legend-item"><span class="legend-dot dot-disabled"></span> Вне зоны радара</div>
-                    </div>
-
-                    <!-- Карточка предпросмотра при тапе на пин -->
-                    <div class="map-pin-preview hidden" id="map-pin-preview"></div>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(overlay);
-
-        this.container = overlay;
-        this.canvas = document.getElementById('market-map-canvas');
-        this.ctx = this.canvas.getContext('2d');
-    },
-
-    /**
-     * Привязка обработчиков событий
-     */
-    bindEvents() {
-        const closeBtn = document.getElementById('map-btn-close');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.hide());
+        let modalEl = document.getElementById(this.modalId);
+        if (!modalEl) {
+            modalEl = document.createElement('div');
+            modalEl.id = this.modalId;
+            modalEl.className = 'market-map-overlay';
+            document.body.appendChild(modalEl);
         }
 
-        const upgradeBtn = document.getElementById('map-btn-upgrade');
-        if (upgradeBtn) {
-            upgradeBtn.addEventListener('click', () => this.promptRadarUpgrade());
-        }
+        modalEl.innerHTML = this.renderMapHtml(cars);
+        modalEl.style.display = 'flex';
 
-        if (this.canvas) {
-            this.canvas.addEventListener('click', (e) => this.handleCanvasClick(e));
-            this.canvas.addEventListener('mousemove', (e) => this.handleCanvasHover(e));
-        }
-
-        window.addEventListener('resize', () => {
-            if (this.isActive) {
-                this.resizeCanvas();
-            }
-        });
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('medium');
     },
 
-    /**
-     * Подгонка размеров canvas под контейнер
-     */
-    resizeCanvas() {
-        const body = document.getElementById('market-map-body');
-        if (!body || !this.canvas) return;
-
-        const rect = body.getBoundingClientRect();
-        this.canvas.width = rect.width;
-        this.canvas.height = rect.height;
+    close() {
+        const modalEl = document.getElementById(this.modalId);
+        if (modalEl) modalEl.style.display = 'none';
+        this.selectedCarId = null;
+        if (typeof playSound === 'function') playSound('tick');
     },
 
-    /**
-     * Открытие карты
-     * @param {Array} marketCars - Массив машин сгенерированного рынка
-     */
-    show(marketCars = []) {
-        if (!this.container) this.init();
+    upgradeRadarPrompt() {
+        const currentRadius = this.getRadarRadius();
+        const cost = currentRadius * 8000;
 
-        this.container.classList.remove('hidden');
-        this.isActive = true;
-        this.resizeCanvas();
-        this.generatePinsForCars(marketCars);
-        this.startRenderLoop();
-    },
-
-    /**
-     * Закрытие карты
-     */
-    hide() {
-        if (!this.container) return;
-        this.container.classList.add('hidden');
-        this.isActive = false;
-        this.selectedPin = null;
-
-        const preview = document.getElementById('map-pin-preview');
-        if (preview) preview.classList.add('hidden');
-
-        if (this.animationFrameId) {
-            cancelAnimationFrame(this.animationFrameId);
-            this.animationFrameId = null;
-        }
-    },
-
-    /**
-     * Привязка координат и районов к автомобилям рынка
-     */
-    generatePinsForCars(cars) {
-        this.pins = [];
-
-        cars.forEach((car, index) => {
-            // Если у машины еще нет назначенных координат - генерируем в одном из районов
-            if (typeof car.mapX !== 'number' || typeof car.mapY !== 'number') {
-                const district = this.districts[Math.floor(Math.random() * this.districts.length)];
-                
-                // Случайное смещение внутри круга района
-                const angle = Math.random() * Math.PI * 2;
-                const r = Math.random() * district.radius;
-
-                car.mapX = Math.min(95, Math.max(5, district.x + Math.cos(angle) * r));
-                car.mapY = Math.min(95, Math.max(5, district.y + Math.sin(angle) * r));
-                car.districtName = district.name;
-                car.address = `${district.name}, сектор ${Math.floor(Math.random() * 8) + 1}`;
-            }
-
-            // Вычисляем расстояние от базы перекупа в км (1% карты ≈ 0.8 км)
-            const dx = (car.mapX - this.playerBase.x) * 0.8;
-            const dy = (car.mapY - this.playerBase.y) * 0.8;
-            const distanceKm = Math.round(Math.sqrt(dx * dx + dy * dy));
-
-            this.pins.push({
-                carIndex: index,
-                car: car,
-                x: car.mapX,
-                y: car.mapY,
-                distanceKm: distanceKm,
-                isAvailable: distanceKm <= this.currentRadiusKm
-            });
-        });
-    },
-
-    /**
-     * Основной цикл отрисовки
-     */
-    startRenderLoop() {
-        const render = () => {
-            if (!this.isActive) return;
-
-            this.radarPulseAngle += 0.03;
-            if (this.radarPulseAngle > Math.PI * 2) {
-                this.radarPulseAngle = 0;
-            }
-
-            this.draw();
-            this.animationFrameId = requestAnimationFrame(render);
-        };
-
-        if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
-        this.animationFrameId = requestAnimationFrame(render);
-    },
-
-    /**
-     * Отрисовка всех слоев карты
-     */
-    draw() {
-        const ctx = this.ctx;
-        const width = this.canvas.width;
-        const height = this.canvas.height;
-
-        ctx.clearRect(0, 0, width, height);
-
-        // 1. Фон карты (темная стилизованная сетка кибер-города)
-        this.drawBackgroundGrid(ctx, width, height);
-
-        // 2. Районы города
-        this.drawDistricts(ctx, width, height);
-
-        // 3. Зона покрытия радара (круг поиска)
-        this.drawRadarZone(ctx, width, height);
-
-        // 4. Линии дорог к доступным объявлениям
-        this.drawRoadLines(ctx, width, height);
-
-        // 5. База игрока
-        this.drawPlayerBase(ctx, width, height);
-
-        // 6. Пины автомобилей
-        this.drawPins(ctx, width, height);
-    },
-
-    drawBackgroundGrid(ctx, w, h) {
-        ctx.fillStyle = '#0a0e17';
-        ctx.fillRect(0, 0, w, h);
-
-        ctx.strokeStyle = 'rgba(0, 240, 255, 0.04)';
-        ctx.lineWidth = 1;
-        const step = 30;
-
-        for (let x = 0; x < w; x += step) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, h);
-            ctx.stroke();
-        }
-        for (let y = 0; y < h; y += step) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(w, y);
-            ctx.stroke();
-        }
-    },
-
-    drawDistricts(ctx, w, h) {
-        this.districts.forEach(d => {
-            const cx = (d.x / 100) * w;
-            const cy = (d.y / 100) * h;
-            const radius = (d.radius / 100) * Math.min(w, h);
-
-            // Ореол района
-            const grad = ctx.createRadialGradient(cx, cy, radius * 0.2, cx, cy, radius);
-            grad.addColorStop(0, 'rgba(0, 255, 170, 0.08)');
-            grad.addColorStop(1, 'rgba(0, 255, 170, 0)');
-
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Текст района
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-            ctx.font = '10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(d.name, cx, cy - radius - 4);
-        });
-    },
-
-    drawRadarZone(ctx, w, h) {
-        const cx = (this.playerBase.x / 100) * w;
-        const cy = (this.playerBase.y / 100) * h;
-
-        // Перевод радиуса поиска в пиксели
-        const radiusPx = (this.currentRadiusKm / 0.8 / 100) * Math.min(w, h);
-
-        // Граница зоны поиска
-        ctx.strokeStyle = '#00f0ff';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 6]);
-        ctx.beginPath();
-        ctx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Пульсирующий луч радара
-        const pulseR = radiusPx * (0.3 + 0.7 * Math.sin(this.radarPulseAngle));
-        ctx.strokeStyle = 'rgba(0, 240, 255, 0.15)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(cx, cy, pulseR, 0, Math.PI * 2);
-        ctx.stroke();
-    },
-
-    drawRoadLines(ctx, w, h) {
-        const bx = (this.playerBase.x / 100) * w;
-        const by = (this.playerBase.y / 100) * h;
-
-        this.pins.forEach(pin => {
-            if (!pin.isAvailable) return;
-
-            const px = (pin.x / 100) * w;
-            const py = (pin.y / 100) * h;
-
-            ctx.strokeStyle = 'rgba(0, 240, 255, 0.08)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(bx, by);
-            ctx.lineTo(px, py);
-            ctx.stroke();
-        });
-    },
-
-    drawPlayerBase(ctx, w, h) {
-        const cx = (this.playerBase.x / 100) * w;
-        const cy = (this.playerBase.y / 100) * h;
-
-        // Неоновое свечение базы
-        ctx.shadowColor = '#00ffaa';
-        ctx.shadowBlur = 15;
-
-        ctx.fillStyle = '#00ffaa';
-        ctx.beginPath();
-        ctx.arc(cx, cy, 7, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.shadowBlur = 0; // Сброс теней
-
-        ctx.fillStyle = '#00ffaa';
-        ctx.font = 'bold 11px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('ГАРАЖ', cx, cy + 18);
-    },
-
-    drawPins(ctx, w, h) {
-        this.pins.forEach(pin => {
-            const px = (pin.x / 100) * w;
-            const py = (pin.y / 100) * h;
-            const isSelected = this.selectedPin === pin;
-
-            if (pin.isAvailable) {
-                // Доступное авто (неоновый желто-бирюзовый)
-                ctx.shadowColor = isSelected ? '#ffdd00' : '#00f0ff';
-                ctx.shadowBlur = isSelected ? 16 : 8;
-
-                ctx.fillStyle = isSelected ? '#ffdd00' : '#00f0ff';
-                ctx.beginPath();
-                ctx.arc(px, py, isSelected ? 8 : 5.5, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1.5;
-                ctx.stroke();
-
-                ctx.shadowBlur = 0;
-
-                // Ценник над машинкой
-                ctx.fillStyle = '#ffffff';
-                ctx.font = '9px monospace';
-                ctx.textAlign = 'center';
-                const priceShort = (pin.car.price / 1000).toFixed(0) + 'k';
-                ctx.fillText(priceShort, px, py - 9);
-            } else {
-                // Недоступное авто (вне радиуса)
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-                ctx.beginPath();
-                ctx.arc(px, py, 4, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-                ctx.lineWidth = 1;
-                ctx.stroke();
-            }
-        });
-    },
-
-    /**
-     * Обработка клика по canvas для выбора машины
-     */
-    handleCanvasClick(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
-
-        const w = this.canvas.width;
-        const h = this.canvas.height;
-
-        let clickedPin = null;
-
-        // Поиск ближайшего пина в радиусе клика (14px)
-        for (let i = this.pins.length - 1; i >= 0; i--) {
-            const pin = this.pins[i];
-            const px = (pin.x / 100) * w;
-            const py = (pin.y / 100) * h;
-
-            const dist = Math.hypot(clickX - px, clickY - py);
-            if (dist <= 14) {
-                clickedPin = pin;
-                break;
-            }
-        }
-
-        if (clickedPin) {
-            this.selectedPin = clickedPin;
-            this.showPinPreview(clickedPin, clickX, clickY);
-        } else {
-            this.selectedPin = null;
-            const preview = document.getElementById('map-pin-preview');
-            if (preview) preview.classList.add('hidden');
-        }
-    },
-
-    /**
-     * Отображение всплывающей карточки осмотра авто с карты
-     */
-    showPinPreview(pin, mouseX, mouseY) {
-        const preview = document.getElementById('map-pin-preview');
-        if (!preview) return;
-
-        const car = pin.car;
-        const travelCost = pin.distanceKm * 35; // 35 ₽ за 1 км бензина
-
-        let actionBtnHtml = '';
-        if (pin.isAvailable) {
-            actionBtnHtml = `
-                <button class="map-preview-btn-inspect" onclick="MarketMap.inspectCarFromMap(${pin.carIndex})">
-                    🔍 Выехать на осмотр (${travelCost.toLocaleString()} ₽)
-                </button>
-            `;
-        } else {
-            actionBtnHtml = `
-                <div class="map-preview-locked-warning">
-                    ⚠️ Слишком далеко (${pin.distanceKm} км). Увеличьте радиус радара.
-                </div>
-            `;
-        }
-
-        preview.innerHTML = `
-            <div class="map-preview-card">
-                <div class="map-preview-header">
-                    <h4>${car.brand || ''} ${car.model || 'Автомобиль'} (${car.year || '2010'})</h4>
-                    <span class="map-preview-price">${Number(car.price || 0).toLocaleString()} ₽</span>
-                </div>
-                <div class="map-preview-info-row">
-                    <span>📍 Локация:</span>
-                    <strong>${car.address || pin.distanceKm + ' км от базы'}</strong>
-                </div>
-                <div class="map-preview-info-row">
-                    <span>⚡ Дистанция:</span>
-                    <strong>${pin.distanceKm} км</strong>
-                </div>
-                <div class="map-preview-info-row">
-                    <span>🛠 Состояние кузова:</span>
-                    <strong>${car.bodyCondition || car.condition || 'Неизвестно'}</strong>
-                </div>
-                <div class="map-preview-actions">
-                    ${actionBtnHtml}
-                </div>
-            </div>
-        `;
-
-        preview.classList.remove('hidden');
-    },
-
-    /**
-     * Переход к осмотру автомобиля через стандартный обработчик рынка
-     */
-    inspectCarFromMap(carIndex) {
-        const pin = this.pins.find(p => p.carIndex === carIndex);
-        if (!pin) return;
-
-        const travelCost = pin.distanceKm * 35;
-
-        // Проверяем баланс игрока на оплату выезда/бензина (ФИКС: state.player.cash)
-        if (typeof state !== 'undefined' && state.player) {
-            if (state.player.cash < travelCost) {
-                alert(`Недостаточно денег на бензин для выезда! Требуется: ${travelCost} ₽`);
+        if (confirm(`📡 Улучшить радар до ${currentRadius + 8} км?\nСтоимость апгрейда: ${cost.toLocaleString()} ₽`)) {
+            if ((window.state?.player?.cash || 0) < cost) {
+                if (typeof showToast === 'function') showToast(`Не хватает денег! Нужно ${cost.toLocaleString()} ₽`);
                 return;
             }
-            // Списываем плату за дорогу
-            state.player.cash -= travelCost;
-            if (typeof updateHUD === 'function') updateHUD();
-        }
 
-        this.hide();
+            window.state.player.cash -= cost;
+            window.state.player.radarRadius = currentRadius + 8;
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (typeof showToast === 'function') showToast(`📡 Радар расширен до ${currentRadius + 8} км!`);
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
 
-        // Вызываем функцию осмотра авто из существующего рынка (ФИКС: openMarketDeal)
-        if (typeof openMarketDeal === 'function') {
-            openMarketDeal(carIndex);
-        } else if (typeof Market !== 'undefined' && typeof Market.inspectCar === 'function') {
-            Market.inspectCar(carIndex);
+            this.show(window.state.marketFeed || []);
         }
     },
 
-    /**
-     * Диалог улучшения радиуса радара
-     */
-    promptRadarUpgrade() {
-        const nextLevel = this.radiusLevels.find(l => l.level === this.currentRadiusLevel + 1);
+    selectCar(carId) {
+        this.selectedCarId = carId;
+        const feed = window.state?.marketFeed || [];
+        const car = feed.find(c => c && c.id === carId);
+        const cardBox = document.getElementById('mapSelectedCarCardBox');
 
-        if (!nextLevel) {
-            alert('Радар уже прокачан на максимум (60 км)!');
+        if (!cardBox) return;
+
+        if (!car) {
+            cardBox.innerHTML = '';
+            cardBox.style.display = 'none';
             return;
         }
 
-        const confirmUpgrade = confirm(
-            `Улучшить радар до "${nextLevel.title}"?\n` +
-            `Новый радиус: ${nextLevel.radiusKm} км\n` +
-            `Стоимость: ${nextLevel.cost.toLocaleString()} ₽`
-        );
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
 
-        if (!confirmUpgrade) return;
+        const fallbackUrl = car.fallback || 'assets/cars/economy/2101/vaz-2101.jpg';
+        const rawImg = car.img || car.image || fallbackUrl;
+        const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
+        const estProfit = (car.marketValue || 0) - (car.price || 0);
 
-        // ФИКС: state.player.cash вместо GameState.player.balance
-        if (typeof state !== 'undefined' && state.player) {
-            if (state.player.cash < nextLevel.cost) {
-                alert('Недостаточно средств для улучшения радара!');
-                return;
-            }
-            state.player.cash -= nextLevel.cost;
-            if (typeof updateHUD === 'function') updateHUD();
-        }
-
-        this.currentRadiusLevel = nextLevel.level;
-        this.currentRadiusKm = nextLevel.radiusKm;
-
-        const label = document.getElementById('map-current-radius-val');
-        if (label) label.textContent = `${this.currentRadiusKm} км`;
-
-        // Обновляем доступность пинов
-        this.pins.forEach(pin => {
-            pin.isAvailable = pin.distanceKm <= this.currentRadiusKm;
-        });
-
-        alert(`Радар успешно улучшен до ${this.currentRadiusKm} км! Теперь доступно больше объявлений.`);
+        cardBox.style.display = 'block';
+        cardBox.innerHTML = `
+            <div class="map-hud-car-card">
+                <button onclick="MarketMap.selectCar(null)" class="map-hud-close-btn">✕</button>
+                <div class="map-hud-car-body">
+                    <img src="${carImg}" class="map-hud-car-thumb" onerror="this.onerror=null; this.src='${fallbackUrl}';">
+                    <div style="flex:1; min-width:0;">
+                        <div class="map-hud-title">${car.name}</div>
+                        <div class="map-hud-subtitle">
+                            <span><i class="fa-solid fa-road"></i> ${(car.mileage || 85000).toLocaleString()} км</span>
+                            <span><i class="fa-solid fa-shield"></i> ${car.condition || 80}%</span>
+                        </div>
+                        <div class="map-hud-price-row">
+                            <span class="map-hud-price">${(car.price || 100000).toLocaleString()} ₽</span>
+                            <span class="map-hud-profit ${estProfit >= 0 ? 'color-green' : 'color-red'}">
+                                ${estProfit >= 0 ? '▲ +' : '▼ '}${estProfit.toLocaleString()} ₽
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="map-hud-actions">
+                    <button onclick="MarketMap.actionCheckAutoteka('${car.id}')" class="btn btn-dark btn-sm">
+                        <i class="fa-solid fa-file-waveform color-green"></i> Автотека
+                    </button>
+                    <button onclick="MarketMap.actionCallSeller('${car.id}')" class="btn btn-cyan btn-sm font-bold">
+                        <i class="fa-solid fa-phone"></i> Позвонить
+                    </button>
+                </div>
+            </div>
+        `;
     },
 
-    handleCanvasHover(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        const hx = e.clientX - rect.left;
-        const hy = e.clientY - rect.top;
-
-        const w = this.canvas.width;
-        const h = this.canvas.height;
-
-        let hovered = false;
-        for (let pin of this.pins) {
-            const px = (pin.x / 100) * w;
-            const py = (pin.y / 100) * h;
-            if (Math.hypot(hx - px, hy - py) <= 12) {
-                hovered = true;
-                break;
-            }
+    actionCallSeller(carId) {
+        this.close();
+        if (typeof initiateBuyMarketCar === 'function') {
+            initiateBuyMarketCar(carId);
+        } else {
+            const cardEl = document.getElementById(`card_${carId}`);
+            if (cardEl) cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-        this.canvas.style.cursor = hovered ? 'pointer' : 'default';
+    },
+
+    actionCheckAutoteka(carId) {
+        if (typeof openAutotekaModal === 'function') {
+            openAutotekaModal(carId);
+        }
+    },
+
+    renderMapHtml(cars) {
+        const radiusKm = this.getRadarRadius();
+        const radiusPct = Math.min(48, Math.max(16, radiusKm * 1.5));
+
+        // Распределяем машины по координатам районов с небольшим разбросом
+        const mappedCars = (cars || []).map((car, idx) => {
+            const district = this.DISTRICTS[idx % this.DISTRICTS.length];
+            // Псевдослучайное смещение внутри района
+            const seed = (car.id ? String(car.id).charCodeAt(0) : idx) * 11;
+            const offsetX = ((seed % 14) - 7);
+            const offsetY = (((seed * 7) % 14) - 7);
+
+            const posX = Math.max(8, Math.min(92, district.x + offsetX));
+            const posY = Math.max(8, Math.min(92, district.y + offsetY));
+
+            // Расстояние от центра (50, 50)
+            const dx = posX - 50;
+            const dy = posY - 50;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const inRange = distance <= radiusPct;
+
+            return { car, posX, posY, inRange };
+        });
+
+        // Генерация пинов машин
+        const pinsHtml = mappedCars.map(({ car, posX, posY, inRange }) => {
+            if (inRange) {
+                return `
+                    <div class="map-car-pin pin-active" 
+                         style="left: ${posX}%; top: ${posY}%;" 
+                         onclick="MarketMap.selectCar('${car.id}')"
+                         title="${car.name}">
+                        <div class="pin-marker">
+                            <i class="fa-solid fa-car-side"></i>
+                        </div>
+                        <div class="pin-label">${(car.price / 1000).toFixed(0)}k</div>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="map-car-pin pin-fog" 
+                         style="left: ${posX}%; top: ${posY}%;" 
+                         onclick="MarketMap.upgradeRadarPrompt()"
+                         title="Вне зоны сканирования радара">
+                        <div class="pin-marker-fog">❓</div>
+                    </div>
+                `;
+            }
+        }).join('');
+
+        return `
+            <style>
+                .market-map-overlay {
+                    position: fixed; inset: 0; z-index: 9999;
+                    background: rgba(3, 7, 18, 0.88); backdrop-filter: blur(10px);
+                    display: flex; align-items: center; justify-content: center; padding: 12px;
+                }
+                .market-map-box {
+                    width: 100%; max-width: 440px; background: #070d18;
+                    border: 1.5px solid rgba(0, 242, 254, 0.4); border-radius: 16px;
+                    box-shadow: 0 0 35px rgba(0, 242, 254, 0.15), inset 0 0 20px rgba(0, 0, 0, 0.8);
+                    overflow: hidden; display: flex; flex-direction: column; position: relative;
+                }
+                .map-header {
+                    padding: 10px 14px; display: flex; align-items: center; justify-content: space-between;
+                    background: rgba(10, 18, 32, 0.85); border-bottom: 1px solid rgba(0, 242, 254, 0.2);
+                }
+                .map-canvas-area {
+                    position: relative; width: 100%; height: 420px;
+                    background: radial-gradient(circle at center, #0a1324 0%, #040812 100%);
+                    overflow: hidden;
+                }
+                /* Сетка и дороги города */
+                .map-roads-svg {
+                    position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
+                }
+                /* Анимированный радар */
+                .radar-pulse-ring {
+                    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                    border-radius: 50%; border: 2px dashed rgba(0, 242, 254, 0.6);
+                    background: radial-gradient(circle, rgba(0, 242, 254, 0.08) 0%, transparent 70%);
+                    box-shadow: 0 0 20px rgba(0, 242, 254, 0.25), inset 0 0 15px rgba(0, 242, 254, 0.1);
+                    pointer-events: none;
+                }
+                .radar-sweep-cone {
+                    position: absolute; top: 50%; left: 50%; width: 100%; height: 100%;
+                    transform-origin: 0 0;
+                    background: conic-gradient(from 0deg, rgba(0, 242, 254, 0.25) 0deg, transparent 60deg);
+                    animation: radarSweep 4s linear infinite; pointer-events: none;
+                }
+                @keyframes radarSweep {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                /* База перекупа */
+                .player-base-pin {
+                    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                    width: 28px; height: 28px; border-radius: 50%;
+                    background: #00e676; border: 3px solid #fff;
+                    box-shadow: 0 0 16px #00e676; display: flex; align-items: center; justify-content: center;
+                    font-size: 13px; z-index: 10;
+                }
+                /* Пины авто */
+                .map-car-pin {
+                    position: absolute; transform: translate(-50%, -50%);
+                    cursor: pointer; display: flex; flex-direction: column; align-items: center;
+                    z-index: 20; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                }
+                .map-car-pin:hover, .map-car-pin:active {
+                    transform: translate(-50%, -50%) scale(1.25); z-index: 30;
+                }
+                .pin-marker {
+                    width: 26px; height: 26px; border-radius: 50%;
+                    background: linear-gradient(135deg, #00f2fe, #4facfe);
+                    border: 2px solid #fff; box-shadow: 0 0 12px rgba(0, 242, 254, 0.8);
+                    color: #000; display: flex; align-items: center; justify-content: center; font-size: 11px;
+                }
+                .pin-label {
+                    background: rgba(5, 10, 20, 0.85); border: 1px solid rgba(0, 242, 254, 0.5);
+                    border-radius: 4px; padding: 1px 4px; font-size: 8px; font-weight: 800;
+                    color: #00f2fe; margin-top: 2px; white-space: nowrap;
+                }
+                .pin-marker-fog {
+                    width: 22px; height: 22px; border-radius: 50%;
+                    background: rgba(100, 116, 139, 0.4); border: 1.5px solid #64748b;
+                    color: #cbd5e1; display: flex; align-items: center; justify-content: center;
+                    font-size: 10px; font-weight: bold;
+                }
+                /* Районы */
+                .district-label {
+                    position: absolute; font-size: 8.5px; font-weight: 800; color: rgba(148, 163, 184, 0.45);
+                    text-transform: uppercase; letter-spacing: 0.8px; pointer-events: none;
+                    transform: translate(-50%, -50%); white-space: nowrap;
+                }
+                /* Карточка авто внизу */
+                .map-hud-car-card {
+                    position: absolute; bottom: 8px; left: 8px; right: 8px;
+                    background: rgba(8, 14, 26, 0.95); backdrop-filter: blur(8px);
+                    border: 1.5px solid var(--cyan); border-radius: 12px;
+                    padding: 8px 10px; box-shadow: 0 0 25px rgba(0, 0, 0, 0.9);
+                    z-index: 50; animation: hudCardIn 0.25s ease-out;
+                }
+                @keyframes hudCardIn {
+                    0% { transform: translateY(20px); opacity: 0; }
+                    100% { transform: translateY(0); opacity: 1; }
+                }
+                .map-hud-close-btn {
+                    position: absolute; top: 4px; right: 8px; background: none; border: none;
+                    color: #64748b; font-size: 14px; cursor: pointer;
+                }
+                .map-hud-car-body {
+                    display: flex; gap: 8px; align-items: center; margin-bottom: 6px;
+                }
+                .map-hud-car-thumb {
+                    width: 72px; height: 48px; border-radius: 6px; object-fit: cover;
+                    border: 1px solid rgba(255, 255, 255, 0.15);
+                }
+                .map-hud-title {
+                    font-size: 12px; font-weight: bold; color: #fff;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                }
+                .map-hud-subtitle {
+                    font-size: 9px; color: #94a3b8; display: flex; gap: 8px; margin: 2px 0;
+                }
+                .map-hud-price-row {
+                    display: flex; align-items: baseline; gap: 6px;
+                }
+                .map-hud-price {
+                    font-size: 13px; font-weight: 900; color: var(--green);
+                }
+                .map-hud-profit {
+                    font-size: 9px; font-weight: bold;
+                }
+                .map-hud-actions {
+                    display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+                }
+                /* Легенда */
+                .map-footer-legend {
+                    padding: 8px 12px; background: rgba(5, 10, 20, 0.9);
+                    border-top: 1px solid rgba(255, 255, 255, 0.08);
+                    display: flex; justify-content: space-around; font-size: 9px; color: #94a3b8;
+                }
+            </style>
+
+            <div class="market-map-box">
+                <!-- ШАПКА -->
+                <div class="map-header">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:22px;">🗺️</span>
+                        <div>
+                            <b class="text-xs color-cyan" style="font-size:13px; display:block;">Карта авторынка</b>
+                            <span class="sub-label" style="font-size:8.5px;">Поиск объявлений по районам</span>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span class="tag-badge bg-tag-cyan" style="font-size:9.5px; padding:3px 7px;">
+                            Радиус: ${radiusKm} км
+                        </span>
+                        <button onclick="MarketMap.upgradeRadarPrompt()" class="btn btn-amber btn-sm" style="font-size:9.5px; padding:4px 8px; font-weight:bold;">
+                            📡 Радар +
+                        </button>
+                        <button onclick="MarketMap.close()" class="btn btn-dark btn-sm btn-auto" style="padding:4px 8px;">✕</button>
+                    </div>
+                </div>
+
+                <!-- ХОЛСТ КАРТЫ -->
+                <div class="map-canvas-area" onclick="if(event.target===this) MarketMap.selectCar(null);">
+                    <!-- ВЕКТОРНЫЙ ГОРОД (SVG) -->
+                    <svg class="map-roads-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <!-- Сетка кварталов -->
+                        <defs>
+                            <pattern id="gridPattern" width="10" height="10" patternUnits="userSpaceOnUse">
+                                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(0, 242, 254, 0.05)" stroke-width="0.5"/>
+                            </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#gridPattern)" />
+
+                        <!-- Река -->
+                        <path d="M 0,40 Q 25,60 55,45 T 100,65" fill="none" stroke="rgba(0, 150, 255, 0.18)" stroke-width="6" stroke-linecap="round"/>
+                        <path d="M 0,40 Q 25,60 55,45 T 100,65" fill="none" stroke="rgba(0, 242, 254, 0.3)" stroke-width="1" stroke-dasharray="2,2"/>
+
+                        <!-- Главные магистрали -->
+                        <line x1="50" y1="0" x2="50" y2="100" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1.8"/>
+                        <line x1="0" y1="50" x2="100" y2="50" stroke="rgba(255, 255, 255, 0.12)" stroke-width="1.8"/>
+
+                        <!-- Кольцевая дорога (МКАД) -->
+                        <circle cx="50" cy="50" r="38" fill="none" stroke="rgba(0, 242, 254, 0.22)" stroke-width="1.2" stroke-dasharray="4,2"/>
+                        <!-- Малое кольцо -->
+                        <circle cx="50" cy="50" r="20" fill="none" stroke="rgba(255, 255, 255, 0.15)" stroke-width="1"/>
+
+                        <!-- Диагональные развязки -->
+                        <line x1="15" y1="15" x2="85" y2="85" stroke="rgba(255, 255, 255, 0.06)" stroke-width="1"/>
+                        <line x1="85" y1="15" x2="15" y2="85" stroke="rgba(255, 255, 255, 0.06)" stroke-width="1"/>
+                    </svg>
+
+                    <!-- НАЗВАНИЯ РАЙОНОВ -->
+                    <div class="district-label" style="top: 15%; left: 74%;">Промзона / Авторынок</div>
+                    <div class="district-label" style="top: 20%; left: 25%;">Спальные микрорайоны</div>
+                    <div class="district-label" style="top: 42%; left: 50%; color:rgba(0,242,254,0.7);">Центральный р-н</div>
+                    <div class="district-label" style="top: 85%; left: 30%;">Гаражный массив "Север"</div>
+                    <div class="district-label" style="top: 80%; left: 78%;">Пригород / Посёлок</div>
+
+                    <!-- ЗОНА СКАНИРОВАНИЯ РАДАРА -->
+                    <div class="radar-pulse-ring" style="width: ${radiusPct * 2}%; height: ${radiusPct * 2}%;">
+                        <div class="radar-sweep-cone"></div>
+                    </div>
+
+                    <!-- БАЗА ПЕРЕКУПА (ИГРОК) -->
+                    <div class="player-base-pin" title="Ваша база">
+                        🏠
+                    </div>
+
+                    <!-- АВТОМОБИЛИ -->
+                    ${pinsHtml}
+
+                    <!-- КАРТОЧКА ВЫБРАННОГО АВТО ПРИ КЛИКЕ -->
+                    <div id="mapSelectedCarCardBox" style="display:none;"></div>
+                </div>
+
+                <!-- ЛЕГЕНДА -->
+                <div class="map-footer-legend">
+                    <span>🟢 База перекупа</span>
+                    <span class="color-cyan">🔵 Доступные авто (${mappedCars.filter(m => m.inRange).length})</span>
+                    <span style="color:#64748b;">❓ Вне зоны радара (${mappedCars.filter(m => !m.inRange).length})</span>
+                </div>
+            </div>
+        `;
     }
 };
 
 window.MarketMap = MarketMap;
+console.log('[🗺️ market-map v2.0.0] Интерактивная неоновая GPS-карта авторынка загружена ✓');
