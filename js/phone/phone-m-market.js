@@ -1,13 +1,12 @@
 // ========================================================
-// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.0)
+// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.2)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.1.0 (UI/UX UPDATE):
-//   - ДОБАВЛЕНА вкладка "Мои лоты" (фильтр my_lots).
-//   - Улучшены пустые состояния (анимированный радар).
-//   - Красивые карточки: бейдж "Ваш лот", анимация свежих лотов.
-//   - Кнопка "ПРОДАТЬ" в шапке теперь вызывает openCreateListingModal.
-//   - Исправлена ошибка с отсутствием метода _refreshCurrentScreen.
+// ⭐ v9.1.2 (ФИКС ОТОБРАЖЕНИЯ СПИСКА P2P):
+//   - ДОБАВЛЕН setTimeout в openCreateListingModal, чтобы DOM 
+//     успевал прогрузиться перед вызовом selectP2PListingType.
+//   - Добавлены защитные проверки (try/catch) и логи в консоль.
+//   - Кнопки-табы переключаются корректно.
 // ========================================================
 
 (function() {
@@ -124,19 +123,7 @@
         if (!container) return;
 
         const f = this.marketFilter || 'cars';
-        const pLvl = window.state.player?.level || 1;
         
-        const seasonEvent = window.state.globalEvent || null;
-        let seasonBannerHtml = '';
-        if (seasonEvent && seasonEvent.isActive) {
-            seasonBannerHtml = `
-                <div class="glass-card mb-2 p-2 text-center" style="background: linear-gradient(90deg, rgba(192,132,252,0.2), rgba(0,242,254,0.2)); border-color: var(--purple);">
-                    <b class="text-xs color-purple"><i class="fa-solid fa-star mr-1"></i> ${seasonEvent.name}</b>
-                    <div class="sub-label" style="font-size:9px;">Множитель цен: x${seasonEvent.multiplier} | Осталось: ${seasonEvent.daysLeft} дн.</div>
-                </div>
-            `;
-        }
-
         container.innerHTML = `
             <style>
                 @keyframes radarSpin {
@@ -156,8 +143,6 @@
                     <div class="sub-label" style="font-size:8.5px;">Авто · Номера · Бизнес · Жильё</div>
                 </div>
             </div>
-
-            ${seasonBannerHtml}
 
             <!-- ФИЛЬТРЫ -->
             <div class="mplus-nav-scroll-bar mb-2">
@@ -529,7 +514,7 @@
     };
 
     // ========================================================
-    // 8. СОЗДАНИЕ ЛОТА
+    // 8. СОЗДАНИЕ ЛОТА (МОДАЛКА)
     // ========================================================
     AppM.openCreateListingModal = function() {
         this._currentModalItems = [];
@@ -538,7 +523,145 @@
         const modal = document.getElementById('modalCreateP2P');
         if (modal && typeof ModalManager !== 'undefined') {
             ModalManager.open('modalCreateP2P');
+            // ⭐ v9.1.2: Небольшая задержка, чтобы DOM точно обновился
+            setTimeout(() => {
+                this.selectP2PListingType('cars');
+            }, 50);
         }
+    };
+
+    // ⭐ v9.1.2: ПЕРЕКЛЮЧЕНИЕ ТИПОВ ОБЪЕКТОВ В МОДАЛКЕ
+    AppM.selectP2PListingType = function(type) {
+        try {
+            console.log('[P2P Market] selectP2PListingType:', type);
+            this.selectedListingType = type;
+            this.selectedItemIndex = null;
+
+            const btnCar = document.getElementById('btnP2PTypeCar');
+            const btnPlate = document.getElementById('btnP2PTypePlate');
+            const btnBiz = document.getElementById('btnP2PTypeBiz');
+            const btnHouse = document.getElementById('btnP2PTypeHouse');
+
+            if (btnCar) btnCar.className = type === 'cars' ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
+            if (btnPlate) btnPlate.className = type === 'plates' ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
+            if (btnBiz) btnBiz.className = type === 'business' ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
+            if (btnHouse) btnHouse.className = type === 'housing' ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
+
+            const container = document.getElementById('p2pCardsListContainer');
+            if (!container) {
+                console.warn('[P2P Market] p2pCardsListContainer not found!');
+                return;
+            }
+
+            let html = '';
+            this._currentModalItems = [];
+
+            if (type === 'cars') {
+                const garageArr = window.state?.garage;
+                const garage = Array.isArray(garageArr) ? garageArr.filter(c => c && !c.isPersonal) : [];
+                
+                if (garage.length === 0) {
+                    html = '<div class="sub-label text-center py-4" style="font-size:10px; color:#64748b;">В гараже нет доступных машин</div>';
+                } else {
+                    garage.forEach((car, i) => {
+                        this._currentModalItems.push(car);
+                        const isSelected = this.selectedItemIndex === i;
+                        const img = car.img || 'assets/cars/economy/2101/vaz-2101.jpg';
+                        html += `
+                            <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'var(--border-glass)'}; background:${isSelected ? 'rgba(0,230,118,0.1)' : '#090e18'};">
+                                <div class="flex-gap" style="align-items:center;">
+                                    <img src="${img}" style="width:40px; height:30px; object-fit:cover; border-radius:4px;">
+                                    <div>
+                                        <b class="text-xs color-cyan">${car.name}</b>
+                                        <div class="sub-label" style="font-size:9px;">${car.power || 100} л.с. | ${car.condition || 80}%</div>
+                                    </div>
+                                </div>
+                                ${isSelected ? '<i class="fa-solid fa-circle-check color-green"></i>' : ''}
+                            </div>
+                        `;
+                    });
+                }
+            } else if (type === 'plates') {
+                const plates = (window.PlatesManager && typeof window.PlatesManager.getFreePlates === 'function') ? window.PlatesManager.getFreePlates() : [];
+                if (plates.length === 0) html = '<div class="sub-label text-center py-4" style="font-size:10px; color:#64748b;">Нет свободных номеров в инвентаре</div>';
+                plates.forEach((p, i) => {
+                    this._currentModalItems.push(p);
+                    const isSelected = this.selectedItemIndex === i;
+                    html += `
+                        <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'var(--border-glass)'}; background:${isSelected ? 'rgba(0,230,118,0.1)' : '#090e18'};">
+                            <div>
+                                <b class="text-xs font-mono color-cyan">${p.number}</b>
+                                <div class="sub-label" style="font-size:9px;">Регион: ${p.region || 77}</div>
+                            </div>
+                            ${isSelected ? '<i class="fa-solid fa-circle-check color-green"></i>' : ''}
+                        </div>
+                    `;
+                });
+            } else if (type === 'business') {
+                const bizArr = window.state?.businesses;
+                const biz = Array.isArray(bizArr) ? bizArr.filter(b => b && b.level > 0) : [];
+                if (biz.length === 0) html = '<div class="sub-label text-center py-4" style="font-size:10px; color:#64748b;">Нет купленных бизнесов</div>';
+                biz.forEach((b, i) => {
+                    this._currentModalItems.push(b);
+                    const isSelected = this.selectedItemIndex === i;
+                    html += `
+                        <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'var(--border-glass)'}; background:${isSelected ? 'rgba(0,230,118,0.1)' : '#090e18'};">
+                            <div>
+                                <b class="text-xs color-cyan">${b.name}</b>
+                                <div class="sub-label" style="font-size:9px;">Уровень ${b.level}</div>
+                            </div>
+                            ${isSelected ? '<i class="fa-solid fa-circle-check color-green"></i>' : ''}
+                        </div>
+                    `;
+                });
+            } else if (type === 'housing') {
+                const houses = window.state?.player?.ownedHouses || [];
+                if (houses.length === 0) html = '<div class="sub-label text-center py-4" style="font-size:10px; color:#64748b;">Нет недвижимости в собственности</div>';
+                houses.forEach((hId, i) => {
+                    this._currentModalItems.push(hId);
+                    const isSelected = this.selectedItemIndex === i;
+                    const houseObj = (window.HOUSING_LIST || []).find(h => h.id === hId);
+                    const hName = houseObj ? houseObj.name : hId;
+                    html += `
+                        <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'var(--border-glass)'}; background:${isSelected ? 'rgba(0,230,118,0.1)' : '#090e18'};">
+                            <div>
+                                <b class="text-xs color-cyan">${hName}</b>
+                                <div class="sub-label" style="font-size:9px;">Жильё / Бокс</div>
+                            </div>
+                            ${isSelected ? '<i class="fa-solid fa-circle-check color-green"></i>' : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            if (html === '') {
+                html = '<div class="sub-label text-center py-4" style="font-size:10px; color:#64748b;">Нет доступных объектов</div>';
+            }
+            
+            container.innerHTML = html;
+        } catch (e) {
+            console.error('[P2P Market] Error in selectP2PListingType:', e);
+            const container = document.getElementById('p2pCardsListContainer');
+            if (container) container.innerHTML = `<div class="sub-label color-red text-center py-2" style="font-size:10px;">Ошибка: ${e.message}</div>`;
+        }
+    };
+
+    // ⭐ v9.1.2: ВЫБОР КОНКРЕТНОГО ОБЪЕКТА ИЗ СПИСКА
+    AppM.selectP2PItemToSell = function(index) {
+        this.selectedItemIndex = index;
+        this.selectP2PListingType(this.selectedListingType);
+
+        const item = this._currentModalItems[index];
+        const priceInput = document.getElementById('p2pPriceInput');
+        
+        if (priceInput && item) {
+            if (this.selectedListingType === 'cars') priceInput.value = item.marketValue || item.price || 150000;
+            else if (this.selectedListingType === 'plates') priceInput.value = 150000;
+            else if (this.selectedListingType === 'business') priceInput.value = 250000;
+            else if (this.selectedListingType === 'housing') priceInput.value = 1500000;
+        }
+        
+        if (window.AudioFx) window.AudioFx.play('tick');
     };
 
     // ========================================================
@@ -554,7 +677,7 @@
             const idx = this.selectedItemIndex;
 
             if (idx === null || isNaN(price) || price <= 1000) {
-                if (typeof showToast === 'function') showToast('Укажите корректную цену');
+                if (typeof showToast === 'function') showToast('Выберите объект и укажите корректную цену (>1000 ₽)');
                 return;
             }
 
@@ -595,17 +718,22 @@
                 const plateObj = targetItem;
                 newListing.name = 'Номер ' + plateObj.number;
                 newListing.itemData = { plate: plateObj.number, region: plateObj.region || 77 };
-                plateObj.status = 'on_sale';
+                if (window.PlatesManager && typeof window.PlatesManager.removePlate === 'function') {
+                    window.PlatesManager.removePlate(plateObj.number, { silent: true });
+                } else {
+                    plateObj.status = 'on_sale';
+                }
             } else if (type === 'business') {
                 const biz = targetItem;
                 newListing.name = biz.customName || biz.name;
                 newListing.itemData = { bizId: biz.id, level: biz.level };
                 biz.level = 0;
             } else if (type === 'housing') {
-                const house = targetItem;
-                newListing.name = 'Объект ' + house.name;
-                newListing.itemData = { houseId: house.id };
-                window.state.player.ownedHouses = (window.state.player.ownedHouses || []).filter(x => x !== house.id);
+                const houseId = targetItem;
+                const houseObj = (window.HOUSING_LIST || []).find(h => h.id === houseId);
+                newListing.name = 'Объект ' + (houseObj ? houseObj.name : houseId);
+                newListing.itemData = { houseId: houseId };
+                window.state.player.ownedHouses = (window.state.player.ownedHouses || []).filter(x => x !== houseId);
             }
 
             if (!window.state.p2pMarketListings) window.state.p2pMarketListings = [];
@@ -640,5 +768,5 @@
         }
     };
 
-    console.log('[💱 phone-m-market v9.1.0] Добавлена вкладка "Мои лоты", анимированные заглушки и премиум-карточки ✓');
+    console.log('[💱 phone-m-market v9.1.2] ФИКС: добавлен setTimeout перед рендером списка P2P и защитный try/catch ✓');
 })();
