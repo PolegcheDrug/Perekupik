@@ -1,45 +1,26 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.2.0)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.2.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v1.2.1:
+//   - Добавлен signInAnonymously как резервный вариант авторизации.
+//     Теперь request.auth != null всегда выполняется даже без внешнего auth-сервера.
+//   - Корректная обработка запуска вне Telegram (браузер / GitHub Pages).
 //
 // ⭐ v1.2.0 (SPRINT 5 — ФИКС «НЕТ СВЯЗИ С СЕРВЕРОМ БИРЖИ»):
 //   - Firestore инициализируется через initializeFirestore()
 //     с experimentalForceLongPolling: true.
-//     Это критически важно для Telegram WebView и мобильных сетей,
-//     где WebSocket-соединения блокируются или нестабильны.
-//   - Добавлен enableNetwork(db) при событии 'online' —
-//     Firestore принудительно переподключается при возврате сети.
-//   - Логирование offline/online в консоль и DevLogger.
-//
-// ⭐ v1.1.0 (SPRINT 3 — ФИКС CLEANUP):
-//   - runCleanup обрабатывает каждую коллекцию в отдельном try/catch.
-//   - Каждая коллекция возвращает свой статус (ok/error).
-//   - Сбой одной коллекции не валит весь цикл.
-//
-// ⭐ v1.0.0:
-//   - Инициализация Firebase (app, auth, db)
-//   - TelegramAuthManager (initSession, getVerifiedUserId, ...)
-//   - PlayersStorageManager (pushSave, pushSaveForce, pullSave)
-//   - CleanupManager (runCleanup — удаление просроченных данных)
-//   - getFirestoreStats (счётчики коллекций для DEV)
-//   - TTL_CONFIG, LIMITS, devLogFirestore, getTelegramUser
-//   - Экспорт в window.FB_Core
-//
-// ВАЖНО: файл — ES-модуль (import), подключается через
-//   <script type="module" src="firebase-core.js?v=421"></script>
-// Должен быть загружен ДО firebase-market.js, firebase-friendships.js,
-// firebase-notifications.js, firebase-p2p.js.
+//   - Добавлен enableNetwork(db) при событии 'online'.
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
   getAuth,
-  signInWithCustomToken
+  signInWithCustomToken,
+  signInAnonymously
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  // ⭐ v1.2.0: initializeFirestore вместо getFirestore
   initializeFirestore,
-  // ⭐ v1.2.0: enableNetwork для восстановления связи
   enableNetwork,
   doc,
   getDoc,
@@ -71,34 +52,24 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// ========================================================
-// ⭐ v1.2.0: FIRESTORE С ПРИНУДИТЕЛЬНЫМ LONG POLLING
-// ========================================================
-// experimentalForceLongPolling: true — переключает транспорт с WebSocket
-// на HTTP Long Polling. Это критически важно для:
-//   - Telegram WebView (iOS / Android) — WebSocket часто блокируется
-//   - Мобильные сети за NAT — WebSocket рвётся
-//   - Корпоративные сети / прокси — WebSocket запрещён
-// Без этого флага Firestore уходит в offline-режим и пишет
-// «Failed to get document because the client is offline».
 const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
 });
 
 console.log('[🔥 Firebase Core] Firestore инициализирован с experimentalForceLongPolling: true');
 
-const DEFAULT_AUTH_SERVER_URL = window.AUTH_SERVER_URL || "http://localhost:3000";
+const DEFAULT_AUTH_SERVER_URL = window.AUTH_SERVER_URL || null;
 
 // ========================================================
 // 2. TTL И ЛИМИТЫ
 // ========================================================
 const TTL_CONFIG = {
-  chat_messages: 30 * 24 * 60 * 60 * 1000,   // 30 дней
-  notifications: 7 * 24 * 60 * 60 * 1000,    // 7 дней
-  transactions: 90 * 24 * 60 * 60 * 1000,    // 90 дней
-  market_lots: 14 * 24 * 60 * 60 * 1000,     // 14 дней
-  trade_offers: 3 * 24 * 60 * 60 * 1000,     // 3 дня на принятие
-  friendships: 30 * 24 * 60 * 60 * 1000      // 30 дней для pending
+  chat_messages: 30 * 24 * 60 * 60 * 1000,
+  notifications: 7 * 24 * 60 * 60 * 1000,
+  transactions: 90 * 24 * 60 * 60 * 1000,
+  market_lots: 14 * 24 * 60 * 60 * 1000,
+  trade_offers: 3 * 24 * 60 * 60 * 1000,
+  friendships: 30 * 24 * 60 * 60 * 1000
 };
 
 const LIMITS = {
@@ -142,14 +113,6 @@ let currentUserProfile = null;
 const TelegramAuthManager = {
   async initSession(customServerUrl = null) {
     const tgUser = getTelegramUser();
-    if (!tgUser) {
-      console.warn('[🔐 Auth] Нет Telegram-пользователя. Игра недоступна без Telegram.');
-      devLogFirestore('Auth BLOCKED', 'нет Telegram-пользователя');
-      verifiedUserId = null;
-      currentUserProfile = null;
-      return { success: false, userId: null, user: null, reason: 'no_telegram' };
-    }
-
     const url = customServerUrl || DEFAULT_AUTH_SERVER_URL;
     let initData = "";
     try {
@@ -158,44 +121,75 @@ const TelegramAuthManager = {
       }
     } catch (e) {}
 
+    // Попытка 1: Авторизация через внешний сервер токенов (если URL задан)
+    if (url && initData) {
+      try {
+        const response = await fetch(`${url}/api/auth/telegram`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ initData })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.customToken) {
+            const userCredential = await signInWithCustomToken(auth, data.customToken);
+            verifiedUserId = userCredential.user.uid;
+            currentUserProfile = data.user;
+            console.log(`[🔐 Auth] Firebase Auth (Custom Token) OK. UID: ${verifiedUserId}`);
+            devLogFirestore('Auth Firebase OK', `UID: ${verifiedUserId}`);
+            return { success: true, userId: verifiedUserId, user: currentUserProfile };
+          }
+        }
+      } catch (err) {
+        console.warn("[🔐 Auth] Сервер кастомных токенов недоступен:", err.message || err);
+      }
+    }
+
+    // Попытка 2: Резервная авторизация через signInAnonymously (чтобы request.auth != null работал)
     try {
-      const response = await fetch(`${url}/api/auth/telegram`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ initData })
-      });
+      let anonCredential;
+      if (!auth.currentUser) {
+        anonCredential = await signInAnonymously(auth);
+      } else {
+        anonCredential = { user: auth.currentUser };
+      }
 
-      if (!response.ok) throw new Error(`HTTP: ${response.status}`);
+      // Если мы внутри Telegram — используем Telegram ID как целевой идентификатор в игре
+      if (tgUser) {
+        verifiedUserId = String(tgUser.id);
+        const names = [];
+        if (tgUser.first_name) names.push(tgUser.first_name);
+        if (tgUser.last_name) names.push(tgUser.last_name);
 
-      const data = await response.json();
-      if (!data.customToken) throw new Error("Токен не получен");
+        currentUserProfile = {
+          id: String(tgUser.id),
+          name: names.join(" ").trim() || (tgUser.username ? "@" + tgUser.username : "Перекуп #" + tgUser.id),
+          username: tgUser.username || "",
+          photoUrl: tgUser.photo_url || null,
+          isTelegram: true,
+          authUid: anonCredential.user.uid
+        };
+      } else {
+        // Игра запущена в обычном браузере (тест/демо)
+        verifiedUserId = anonCredential.user.uid;
+        currentUserProfile = {
+          id: verifiedUserId,
+          name: window.state?.player?.name || "Игрок (Web)",
+          username: "",
+          photoUrl: null,
+          isTelegram: false,
+          authUid: verifiedUserId
+        };
+      }
 
-      const userCredential = await signInWithCustomToken(auth, data.customToken);
-      verifiedUserId = userCredential.user.uid;
-      currentUserProfile = data.user;
-
-      console.log(`[🔐 Auth] Firebase Auth OK. UID: ${verifiedUserId}`);
-      devLogFirestore('Auth Firebase OK', `UID: ${verifiedUserId}`);
+      console.log(`[🔐 Auth] Резервный Firebase Auth OK. UID игрока: ${verifiedUserId}, Auth UID: ${anonCredential.user.uid}`);
+      devLogFirestore('Auth Fallback OK', `UID: ${verifiedUserId}`);
       return { success: true, userId: verifiedUserId, user: currentUserProfile };
-    } catch (err) {
-      console.warn("[🔐 Auth] Firebase Auth не сработал, использую Telegram ID напрямую:", err.message || err);
-      devLogFirestore('Auth fallback → TG ID', `tgUserId: ${tgUser.id}`);
-
-      verifiedUserId = String(tgUser.id);
-
-      const names = [];
-      if (tgUser.first_name) names.push(tgUser.first_name);
-      if (tgUser.last_name) names.push(tgUser.last_name);
-
-      currentUserProfile = {
-        id: String(tgUser.id),
-        name: names.join(" ").trim() || (tgUser.username ? "@" + tgUser.username : "Перекуп #" + tgUser.id),
-        username: tgUser.username || "",
-        photoUrl: tgUser.photo_url || null,
-        isTelegram: true
-      };
-
-      return { success: true, userId: verifiedUserId, user: currentUserProfile };
+    } catch (authErr) {
+      console.error("[🔐 Auth] Критическая ошибка авторизации Firebase:", authErr);
+      devLogFirestore('Auth CRITICAL ERROR', authErr.message || String(authErr));
+      return { success: false, userId: null, user: null, reason: authErr.message };
     }
   },
 
@@ -230,9 +224,6 @@ let saveDebounceTimer = null;
 let lastSavedHash = "";
 
 const PlayersStorageManager = {
-  /**
-   * Отложенное сохранение (debounce 3.5 сек).
-   */
   pushSave(userId, gameState) {
     if (window.__IS_RESETTING__) {
       devLogFirestore('pushSave ЗАБЛОКИРОВАН', 'идёт сброс прогресса');
@@ -242,13 +233,6 @@ const PlayersStorageManager = {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) {
       devLogFirestore('pushSave BLOCKED', 'нет userId');
-      return;
-    }
-
-    if (typeof targetUid === 'string' &&
-        (targetUid === 'guest_777' || targetUid.startsWith('guest_') || targetUid.startsWith('dev_') || targetUid.startsWith('p_'))) {
-      devLogFirestore('pushSave BLOCKED', `подозрительный UID: ${targetUid}`);
-      console.warn('[FB_Core] pushSave: заблокирован некорректный UID', targetUid);
       return;
     }
 
@@ -327,17 +311,9 @@ const PlayersStorageManager = {
     }, 3500);
   },
 
-  /**
-   * Форсированное сохранение (без debounce).
-   */
   async pushSaveForce(userId, gameState) {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) return false;
-    if (typeof targetUid === 'string' &&
-        (targetUid.startsWith('guest_') || targetUid.startsWith('dev_') || targetUid.startsWith('p_'))) {
-      console.warn('[FB_Core] pushSaveForce: некорректный UID', targetUid);
-      return false;
-    }
 
     try {
       const minimalDoc = {
@@ -358,10 +334,6 @@ const PlayersStorageManager = {
     }
   },
 
-  /**
-   * Загрузка сейва из облака.
-   * Возвращает объект { player, garage, salesLot, ownedPlates, platesInventory, businesses, warehouse, paidParking } или null.
-   */
   async pullSave(userId) {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) {
@@ -393,7 +365,6 @@ const PlayersStorageManager = {
         };
       }
 
-      // Fallback на legacy saves/
       const oldSnap = await getDoc(doc(db, "saves", String(targetUid)));
       if (oldSnap.exists()) {
         devLogFirestore('pullSave (legacy saves/)', `${targetUid}`);
@@ -410,17 +381,11 @@ const PlayersStorageManager = {
 
 // ========================================================
 // 6. CLEANUP MANAGER (TTL)
-// ⭐ v1.1.0: каждая коллекция обрабатывается в своём try/catch.
 // ========================================================
 const CleanupManager = {
   _lastCleanup: 0,
-  _cleanupInterval: 60 * 60 * 1000, // раз в час
+  _cleanupInterval: 60 * 60 * 1000,
 
-  /**
-   * Очистка просроченных документов.
-   * @param {boolean} force — игнорировать интервал
-   * @returns {Promise<{success, results, total, errors, skipped?}>}
-   */
   async runCleanup(force = false) {
     const now = Date.now();
     if (!force && now - this._lastCleanup < this._cleanupInterval) {
@@ -475,12 +440,6 @@ const CleanupManager = {
         const errMsg = colErr?.code || colErr?.message || String(colErr);
         results[colName].error = errMsg;
         errorCount++;
-
-        if (errMsg.includes('permission-denied')) {
-          console.warn(`[Cleanup] ${colName}: permission-denied (коллекция не открыта в Firestore Rules)`);
-        } else {
-          console.warn(`[Cleanup] ${colName} error:`, errMsg);
-        }
       }
     }
 
@@ -505,7 +464,7 @@ const CleanupManager = {
 };
 
 // ========================================================
-// 7. FIRESTORE STATS (для DEV)
+// 7. FIRESTORE STATS
 // ========================================================
 async function getFirestoreStats() {
   const stats = {
@@ -541,10 +500,8 @@ async function getFirestoreStats() {
 }
 
 // ========================================================
-// ⭐ v1.2.0: 8. ВОССТАНОВЛЕНИЕ СЕТИ ПРИ ОНЛАЙНЕ
+// 8. ВОССТАНОВЛЕНИЕ СЕТИ
 // ========================================================
-// Если Firestore ушёл в offline (потеря сети, блокировка WebSocket),
-// при возврате онлайна принудительно включаем сеть.
 if (typeof window !== 'undefined') {
   window.addEventListener('online', async () => {
     console.log('[🔥 Firebase Core] Онлайн восстановлен — enableNetwork()');
@@ -570,36 +527,20 @@ window.FB_Core = {
   auth,
   db,
   enabled: true,
-
-  // Auth
   Auth: TelegramAuthManager,
-
-  // Storage
   Players: PlayersStorageManager,
-
-  // Cleanup
   Cleanup: CleanupManager,
-
-  // Stats
   getStats: getFirestoreStats,
-
-  // Хелперы
   getTelegramUser,
   devLogFirestore,
-
-  // Константы (для справки)
   TTL_CONFIG,
   LIMITS
 };
 
-// Алиасы для совместимости со старым кодом
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Core v1.2.0] Ядро Firebase загружено. Long Polling + Auth + Players + Cleanup ✓");
+console.log("[☁️ FB_Core v1.2.1] Ядро Firebase загружено. Fallback Auth + Long Polling ✓");
 
-// ========================================================
-// 10. АВТОЗАПУСК CLEANUP
-// ========================================================
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
