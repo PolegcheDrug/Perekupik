@@ -3,10 +3,10 @@
  * Воркер рассылки P2P push-уведомлений и автоликвидации зависших лотов (> 24ч).
  * Запуск: node tools/bot-p2p-notifier.js
  *
- * ⭐ v2.1.0 (P2P BOT AUTO-BUYOUT & INCIDENTS):
- *   - Встроен периодический сканер зависших лотов (дольше 24 часов).
- *   - 5 вариативных сценариев (мошенники, дисконт 25-50%, ДТП, угон, эвакуация).
- *   - Атомарное начисление выплаты через notifications и транзакции.
+ * ⭐ v2.2.0 (P2P BOT AUTO-BUYOUT & INCIDENTS SYNC):
+ *   - Периодический сканер зависших лотов (дольше 24 часов).
+ *   - 5 вариативных сценариев (мошенники, дисконт 25-50%, ДТП, угон 0 ₽, эвакуация).
+ *   - Атомарное начисление выплаты через notifications и transactions.
  *   - Push-уведомление в Telegram с описанием инцидента.
  */
 
@@ -160,54 +160,56 @@ async function validateBotToken() {
 // ПУЛ ВАРИАТИВНЫХ СОБЫТИЙ ДЛЯ ЗАВИСШИХ ЛОТОВ
 // ========================================================
 function getRandomStaleEvent(lotName, askingPrice) {
+    const randomPercent = (min, max) => Math.floor(min + Math.random() * (max - min + 1));
+
     const events = [
         {
-            type: 'aggregator_buyout',
-            title: '🏢 Срочный выкуп каршерингом / агрегатором',
-            discountPct: Math.floor(25 + Math.random() * 10), // 25-35% дисконт
-            getStory: (disc, payout) =>
+            type: 'urgent_tradein',
+            title: '🏢 Срочный автовыкуп салоном',
+            discountPct: randomPercent(25, 35),
+            getStory: (disc, payout, lost) =>
                 `Ваш лот <b>«${lotName}»</b> простоял на бирже более суток без спроса. ` +
-                `Сетевой автосалон забрал его оптом со скидкой <b>${disc}%</b>.\n` +
+                `Сетевой автосалон выкупил его оптом со скидкой <b>${disc}%</b>.\n` +
                 `💰 Начислено: <b>+${payout.toLocaleString()} ₽</b>.`,
-            pushEmoji: '🤝'
+            pushEmoji: '🏢'
         },
         {
-            type: 'fraud_scheme',
+            type: 'scam_buyer',
             title: '⚠️ Нарвались на серых перекупов!',
-            discountPct: Math.floor(38 + Math.random() * 12), // 38-50% дисконт
-            getStory: (disc, payout) =>
-                `При ночной продаже <b>«${lotName}»</b> покупатели начали агрессивно сбивать цену у капота, найдя скрытые дефекты. ` +
-                `Вы уступили <b>${disc}%</b> стоимости.\n` +
-                `💸 Вам переведено: <b>+${payout.toLocaleString()} ₽</b>.`,
+            discountPct: randomPercent(35, 50),
+            getStory: (disc, payout, lost) =>
+                `При ночной продаже <b>«${lotName}»</b> покупатели агрессивно сбили цену у капота, найдя мнимые дефекты. ` +
+                `Пришлось уступить <b>${disc}%</b> стоимости.\n` +
+                `💸 Вам переведено: <b>+${payout.toLocaleString()} ₽</b> (потери: -${lost.toLocaleString()} ₽).`,
             pushEmoji: '🕵️‍♂️'
         },
         {
             type: 'parking_crash',
             title: '💥 ДТП на открытой стоянке авторынка!',
-            discountPct: 70, // выплата 30% от страховой
-            getStory: (disc, payout) =>
-                `Ночью на парковке в ваш <b>«${lotName}»</b> на скорости влетела другая машина. Виновник скрылся. ` +
-                `Страховая компания возместила ущерб по остаточной стоимости (-70%).\n` +
-                `🛡️ Выплата по страховому случаю: <b>+${payout.toLocaleString()} ₽</b>.`,
-            pushEmoji: '🚨'
+            discountPct: randomPercent(50, 70),
+            getStory: (disc, payout, lost) =>
+                `Ночью на парковке в ваш <b>«${lotName}»</b> на скорости влетел автомобиль, виновник скрылся. ` +
+                `Разбитую машину забрали перекупы по остаточной стоимости (-${disc}%).\n` +
+                `🛡️ Выплата: <b>+${payout.toLocaleString()} ₽</b> (ущерб: -${lost.toLocaleString()} ₽).`,
+            pushEmoji: '💥'
         },
         {
             type: 'car_theft',
-            title: '🏴‍☠️ Автомобиль угнали со стоянки!',
-            discountPct: 100, // 0 руб
-            getStory: () =>
-                `Пока <b>«${lotName}»</b> стоял более 24 часов на неохраняемой парковке, его вскрыли кодграббером и отогнали в теневой отстойник.\n` +
-                `❌ Машина утеряна. Полиция завела уголовное дело, компенсация: <b>0 ₽</b>.`,
+            title: '🚨 Автомобиль угнали прямо со стоянки!',
+            discountPct: 100,
+            getStory: (disc, payout, lost) =>
+                `Пока <b>«${lotName}»</b> стоял более 24 часов на неохраняемой парковке, его вскрыли и отогнали в теневой отстойник.\n` +
+                `❌ Машина утеряна. Полиция возбудила уголовное дело, компенсация: <b>0 ₽</b> (убыток: -${lost.toLocaleString()} ₽).`,
             pushEmoji: '🚨'
         },
         {
-            type: 'impound_evacuation',
-            title: '🚔 Эвакуация на штрафстоянку за нарушение разметки',
-            discountPct: 60, // выплата 40%
-            getStory: (disc, payout) =>
-                `Администрация авторынка признала стоянку <b>«${lotName}»</b> нарушением и принудительно реализовала лот с аукциона для покрытия штрафов.\n` +
-                `💰 Остаток средств после штрафов переведён вам: <b>+${payout.toLocaleString()} ₽</b>.`,
-            pushEmoji: '🪪'
+            type: 'impound_lot',
+            title: '🚔 Эвакуация на штрафстоянку за нарушение',
+            discountPct: randomPercent(40, 55),
+            getStory: (disc, payout, lost) =>
+                `Администрация авторынка признала суточный простой <b>«${lotName}»</b> нарушением разметки и принудительно продала лот для покрытия штрафов.\n` +
+                `💰 Остаток средств переведён вам: <b>+${payout.toLocaleString()} ₽</b>.`,
+            pushEmoji: '🚔'
         }
     ];
 
@@ -215,12 +217,14 @@ function getRandomStaleEvent(lotName, askingPrice) {
     const selected = events[idx];
     const discount = selected.discountPct;
     const payout = Math.max(0, Math.round(askingPrice * (1 - discount / 100)));
+    const lost = askingPrice - payout;
 
     return {
         ...selected,
         discountPct: discount,
         payoutAmount: payout,
-        description: selected.getStory(discount, payout)
+        lostAmount: lost,
+        description: selected.getStory(discount, payout, lost)
     };
 }
 
@@ -247,7 +251,6 @@ async function checkStaleMarketLots() {
 
             const ageMs = now - createdAt;
 
-            // Если лот активен дольше 24 часов
             if (ageMs >= LOT_EXPIRE_MS) {
                 const askingPrice = Number(lot.price) || 100000;
                 const lotName = lot.name || 'Автомобиль';
@@ -264,10 +267,11 @@ async function checkStaleMarketLots() {
                     liquidationType: event.type,
                     liquidationDiscount: event.discountPct,
                     soldAt: now,
-                    finalPrice: event.payoutAmount
+                    finalPrice: event.payoutAmount,
+                    originalPrice: askingPrice
                 });
 
-                // 2. Создаем уведомление с выплатой продавцу (если выплата > 0)
+                // 2. Создаем уведомление с выплатой продавцу (даже при 0 ₽ для отображения инцидента)
                 const notifId = 'notif_liq_' + now + '_' + Math.random().toString(36).substring(2, 6);
                 await setDoc(doc(db, "notifications", notifId), {
                     toUser: sellerId,
@@ -289,10 +293,10 @@ async function checkStaleMarketLots() {
                     lot_id: lotId,
                     sellerId: sellerId,
                     buyerId: 'bot_liquidator',
-                    buyerName: 'Система ликвидации',
+                    buyerName: 'Автоликвидация',
                     item: lotName,
-                    price: askingPrice,
-                    payout: event.payoutAmount,
+                    price: event.payoutAmount,
+                    originalPrice: askingPrice,
                     discountPct: event.discountPct,
                     reason: event.type,
                     timestamp: now
@@ -304,14 +308,16 @@ async function checkStaleMarketLots() {
                     const pushMsg =
                         `${event.pushEmoji} <b>P2P БИРЖА: ${event.title}</b>\n\n` +
                         event.description + `\n\n` +
-                        `<i>Заберите деньги во вкладке «Уведомления» в игре.</i>`;
+                        (event.payoutAmount > 0 
+                            ? `<i>Заберите деньги во вкладке «Уведомления» в игре.</i>` 
+                            : `<i>Подробности доступны во вкладке «Уведомления».</i>`);
 
                     sendTelegramPush(sellerId, pushMsg).catch(e => {
                         logWarn(`Не удалось отправить пуш ликвидации на ${sellerId}:`, e.message);
                     });
                 }
 
-                logInfo(`✓ Лот ${lotId} ликвидирован по сценарию [${event.type}], выплата: ${event.payoutAmount} ₽`);
+                logInfo(`✓ Лот ${lotId} ликвидирован [${event.type}], выплата: ${event.payoutAmount} ₽`);
             }
         }
     } catch (err) {
@@ -385,9 +391,8 @@ function startListener() {
         }, 5000);
     });
 
-    // Запуск таймера проверки 24-часовых зависших лотов
     _staleCheckerInterval = setInterval(checkStaleMarketLots, CHECK_STALE_INTERVAL_MS);
-    checkStaleMarketLots(); // первый запуск при старте
+    checkStaleMarketLots();
 
     logInfo(`Слушатель очереди и сканер 24ч лотов активны.`);
 }

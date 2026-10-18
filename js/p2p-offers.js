@@ -1,11 +1,12 @@
 // ========================================================
-// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.5.5 CHAT-SYNC)
+// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.5.7 NPC-TRADE-FIX)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.5.5 (SYNC OFFERS TO PHONE MESSAGES):
-//   - При отправке оффера диалог моментально добавляется в phoneMessages.
-//   - Вкладка «ЧАТЫ / Торг P2P» сразу отображает активную сделку.
-//   - Сохранена полная атомарная транзакция ДКП и поддержка DEV-режима.
+// ⭐ v1.5.7 (NPC-TRADE-FIX):
+//   - ФИКС: _findLot теперь ищет лоты не только в p2pMarketListings,
+//     но и в marketFeed. Это позволяет открывать модалку офферов
+//     для NPC-лотов (если её вызовут напрямую).
+//   - ФИКС: Для NPC-лотов создаётся адаптированный объект с sellerId.
 // ========================================================
 
 (function() {
@@ -211,9 +212,36 @@
         return result;
     }
 
+    // ⭐ v1.5.7: УЛУЧШЕННЫЙ _findLot — ищет и в P2P-лотах, и в marketFeed
     function _findLot(lotId) {
-        const listings = window.state?.p2pMarketListings || [];
-        return listings.find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
+        if (!lotId) return null;
+
+        // 1. Сначала ищем в P2P-лотах (для торговли между игроками)
+        const p2pListings = window.state?.p2pMarketListings || [];
+        const p2pLot = p2pListings.find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
+        if (p2pLot) return p2pLot;
+
+        // 2. Если не нашли — ищем в ленте рынка (для торговли с NPC)
+        const marketFeed = window.state?.marketFeed || [];
+        const npcLot = marketFeed.find(l => l && String(l.id) === String(lotId));
+        if (npcLot) {
+            // Адаптируем NPC-лот под формат, который ожидает модалка
+            return {
+                id: npcLot.id,
+                lot_id: npcLot.id,
+                sellerId: 'npc_seller',
+                sellerName: npcLot.sellerMoodIcon ? `${npcLot.sellerMoodIcon} Продавец` : 'Продавец',
+                sellerAvatar: npcLot.sellerMoodIcon || '🧔',
+                name: npcLot.name || 'Автомобиль',
+                price: Number(npcLot.price) || 100000,
+                itemData: npcLot.itemData || { name: npcLot.name, img: npcLot.img },
+                img: npcLot.img || '',
+                type: npcLot.type || 'cars',
+                isNpcLot: true // Флаг, чтобы понимать, что это NPC-лот
+            };
+        }
+
+        return null;
     }
 
     // ========================================================
@@ -447,6 +475,7 @@
                     return { success: false, error: 'Некорректная финальная цена' };
                 }
 
+                // ⭐ v1.5.6: проверяем баланс покупателя перед завершением
                 if (isBuyer) {
                     const myCash = Number(window.state?.player?.cash) || 0;
                     if (myCash < fpNum) {
@@ -1336,5 +1365,5 @@
         }
     }
 
-    console.log('[🤝 p2p-offers v1.5.5] Синхронизация офферов в раздел ЧАТЫ подключена ✓');
+    console.log('[🤝 p2p-offers v1.5.7] NPC-лоты теперь доступны для торга через P2P-модалку (адаптация в _findLot) ✓');
 })();

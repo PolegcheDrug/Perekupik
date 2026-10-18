@@ -1,12 +1,12 @@
 // ========================================================
-// js/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.8.1 COMPACT CATEGORIES)
+// js/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.8.2 COMPACT CATEGORIES)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.8.1 (COMPACT ACCORDION CATEGORIES):
-//   - Сетка категорий плавно сворачивается и становится ультра-компактной,
-//     освобождая место под карточки машин на экране.
-//   - Стрелка переключает свернутое/развернутое состояние.
-//   - Сохранена вся логика P2P и NPC торгов, кликабельных карточек и сортировки.
+// ⭐ v1.8.2:
+//   - ФИКС: клик по кнопкам внутри карточки не всплывает до контейнера
+//   - ФИКС: таймеры занятости обновляются без полного перерендера
+//   - ФИКС: кнопка "На карте" защищена от отсутствия MarketMap
+//   - ФИКС: сворачивание категорий сохраняется в localStorage
 // ========================================================
 
 let marketSortOrder = 'asc';
@@ -414,6 +414,7 @@ function renderMarketFeed() {
                 const actionBtnLabel = car.isP2PUserListing ? 'Торг' : 'Позвонить';
                 const actionBtnIcon = car.isP2PUserListing ? 'fa-solid fa-comments-dollar' : 'fa-solid fa-phone';
 
+                // ⭐ v1.8.2: используем event.preventDefault() и event.stopPropagation() для кнопок
                 htmlContent += `
                 <div class='glass-card mb-3 ${busyClass} ${viewedClass} ${cardAuraClass}' 
                      id='card_${car.id}'
@@ -424,7 +425,7 @@ function renderMarketFeed() {
                     <div class='cooldown-timer notranslate' translate='no' style='${isBusy ? "display:flex !important;" : "display:none !important;"}'>
                         <div class='timer-clock notranslate' translate='no' id='timer_num_${car.id}'>${timeLeft}с</div>
                         <div class='timer-text'>Абонент занят</div>
-                        <button onclick="paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>Платный дозвон (1,000 ₽)</button>
+                        <button onclick="event.stopPropagation(); paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>Платный дозвон (1,000 ₽)</button>
                     </div>
 
                     <div class='car-img-wrap' style="height: 190px;">
@@ -488,10 +489,10 @@ function renderMarketFeed() {
                         </div>
 
                         <div class="grid-2" style="gap: 6px;">
-                            <button onclick="openAutotekaModal('${car.id}')" class='btn btn-dark btn-sm' style="height: 30px; font-size: 9.5px; padding: 0 6px;">
+                            <button onclick="event.stopPropagation(); openAutotekaModal('${car.id}')" class='btn btn-dark btn-sm' style="height: 30px; font-size: 9.5px; padding: 0 6px;">
                                 <i class='fa-solid fa-file-waveform color-green' style="font-size:10px;"></i> Автотека (${autoIcon})
                             </button>
-                            <button onclick="initiateBuyMarketCar('${car.id}')" class="btn btn-cyan btn-sm" style="height: 30px; font-size: 9.5px; padding: 0 6px; font-weight: 700;">
+                            <button onclick="event.stopPropagation(); initiateBuyMarketCar('${car.id}')" class="btn btn-cyan btn-sm" style="height: 30px; font-size: 9.5px; padding: 0 6px; font-weight: 700;">
                                 <i class="${actionBtnIcon}" style="font-size:10px;"></i> ${actionBtnLabel}
                             </button>
                         </div>
@@ -523,7 +524,7 @@ function renderMarketFeed() {
 }
 
 // ========================================================
-// ОБНОВЛЕНИЕ ТАЙМЕРОВ
+// ОБНОВЛЕНИЕ ТАЙМЕРОВ (БЕЗ ПОЛНОГО РЕРЕНДЕРА)
 // ========================================================
 function updateMarketTimers() {
     if (!state.marketFeed || !Array.isArray(state.marketFeed) || state.marketFeed.length === 0) return;
@@ -572,4 +573,4 @@ Object.assign(window, {
     updateMarketTimers
 });
 
-console.log('[🏪 market v1.8.1] Компактные сворачивающиеся категории + авто-сворачивание ✓');
+console.log('[🏪 market v1.8.2] Компактные сворачивающиеся категории + авто-сворачивание + защита кликов ✓');

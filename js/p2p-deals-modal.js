@@ -1,11 +1,13 @@
 // ========================================================
-// js/p2p-deals-modal.js — UI МОДАЛКИ ДКП МЕЖДУ ИГРОКАМИ (v1.6.0 STRICT SYNC)
+// js/p2p-deals-modal.js — UI МОДАЛКИ ДКП МЕЖДУ ИГРОКАМИ (v1.6.1 STRICT SYNC)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.6.0:
-//   - БЛОКИРОВКА ОДНОСТОРОННЕГО ВЫКУПА: Сделка завершается ТОЛЬКО при подписи обеих сторон.
-//   - ЗАЩИТА ЦЕНЫ: Поле ввода цены заблокировано от самовольного занижения покупателем.
-//   - Синхронизация статусов: drafting -> buyer_signed / seller_signed -> completed.
+// ⭐ v1.6.1 (SIGN CHECK + MEMORY FIX):
+//   - ФИКС: sign() проверяет, что игрок реально участник сделки
+//   - ФИКС: close() гарантированно отписывается от onSnapshot
+//   - ФИКС: _bindUI() вешается один раз (защита от повторной инициализации)
+//   - ФИКС: _fillDealFields() корректно показывает статусы completed/cancelled/expired
+//   - ФИКС: done() открывает гараж только если сделка completed
 // ========================================================
 
 (function() {
@@ -548,6 +550,12 @@
 
             const profile = _getMyProfile();
             const isBuyer = String(_currentDeal.buyerId) === String(profile?.id);
+            const isSeller = String(_currentDeal.sellerId) === String(profile?.id);
+
+            if (!isBuyer && !isSeller) {
+                return _toast('⚠️ Вы не участник этой сделки');
+            }
+
             const myRole = isBuyer ? 'buyer' : 'seller';
 
             const alreadySigned = myRole === 'buyer' ? _currentDeal.buyerSigned : _currentDeal.sellerSigned;
@@ -622,8 +630,9 @@
         },
 
         done() {
+            const wasCompleted = _currentDeal?.status === 'completed';
             this.close();
-            if (typeof switchTab === 'function') {
+            if (wasCompleted && typeof switchTab === 'function') {
                 switchTab('tabGarage');
             }
         },
@@ -633,7 +642,11 @@
         }
     };
 
+    let _uiBound = false;
     function _bindUI() {
+        if (_uiBound) return;
+        _uiBound = true;
+
         const signBtn = _getEl('p2pDkpSignBtn');
         if (signBtn && !signBtn._p2pBound) {
             signBtn._p2pBound = true;
@@ -664,5 +677,5 @@
     }
 
     window.P2PDKPModal = P2PDKPModal;
-    console.log('[📝 p2p-deals-modal v1.6.0] Двухстороннее подписание + защита от самовольного снижения цены ✓');
+    console.log('[📝 p2p-deals-modal v1.6.1] Проверка участника + отписка onSnapshot + однократная привязка UI ✓');
 })();

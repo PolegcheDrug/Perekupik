@@ -1,6 +1,12 @@
 // ========================================================
-// js/garage-dialogs.js — OBD2, ШТРАФСТОЯНКА, НОМЕРА И ИВЕНТЫ (v2.0.0)
+// js/garage-dialogs.js — OBD2, ШТРАФСТОЯНКА, НОМЕРА И ИТОГИ СДЕЛКИ (v2.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.1.0 (ИНТЕРАКТИВНЫЕ ИТОГИ ПРОДАЖИ):
+//   - ДОБАВЛЕНО: openCarSoldSuccessModal — раздельный двухцветный рендер
+//     выручки (неоновый циан) и чистой маржи (золотой янтарь / красный убыток).
+//   - Устранено дублирование одинаковых плашек «ДЕНЕЖНЫЕ СРЕДСТВА».
+//   - Отображение точного ROI (%) окупаемости вложений.
+//   - Перехватчик openVerdictModal для экранов продажи автомобилей.
 // ⭐ v2.0.0 (ЕДИНЫЙ PLATESMANAGER v2.0.0):
 //   - applyPlateToCar → PlatesManager.attachPlateToCar (полностью)
 //   - removePlateFromCar → PlatesManager.detachPlateFromCar
@@ -455,7 +461,6 @@ function resolveImpoundOfficialPay() {
     }
 }
 
-// ⭐ v2.0.0: через PlatesManager (архив номера)
 async function resolveImpoundScrap(reward) {
     if (activeImpoundCarIndex === null || _impoundActionPending) return;
     const car = safeGetCar(activeImpoundCarIndex);
@@ -463,7 +468,6 @@ async function resolveImpoundScrap(reward) {
 
     if (!confirm(`Сдать «${car.name}» в утиль? Автомобиль будет списан из гаража.`)) return;
 
-    // ⭐ Снимаем номер через PlatesManager (уходит в архив)
     if (window.PlatesManager && (car.customPlate || car.plate)) {
         try {
             window.PlatesManager.detachPlateFromCar(car, { silent: true, archive: true, skipFirestore: true });
@@ -509,13 +513,7 @@ async function resolveImpoundScrap(reward) {
 
 // ========================================================
 // --- НОМЕРНЫЕ ЗНАКИ (через PlatesManager v2.0.0) ---
-// ⭐ v2.0.0: Единый источник — PlatesManager.platesInventory
 // ========================================================
-
-/**
- * Открыть модалку смены номера.
- * ⭐ v2.0.0: использует PlatesManager.getFreePlates() — массив объектов.
- */
 function openChangePlateModal() {
     if (window.previewCarIndex === null || window.previewCarIndex === undefined) {
         return safeShowToast("Сначала выберите автомобиль в инспекции.");
@@ -530,9 +528,7 @@ function openChangePlateModal() {
     ModalManager.close('modalPreview');
     const modal = ensureModal('modalChangePlate');
 
-    // ⭐ v2.0.0: только свободные номера (status === 'inventory')
     const plates = window.PlatesManager.getFreePlates();
-
     let platesListHtml = "";
 
     if (plates.length === 0) {
@@ -582,10 +578,6 @@ function closeChangePlateModal() {
     }
 }
 
-/**
- * ⭐ v2.0.0: Установить номер на авто через PlatesManager.
- * Убрана вся логика с state.ownedPlates.
- */
 async function applyPlateToCar(plateStr) {
     if (window.previewCarIndex === null || window.previewCarIndex === undefined) return;
     const car = safeGetCar(window.previewCarIndex);
@@ -596,8 +588,6 @@ async function applyPlateToCar(plateStr) {
     }
 
     const oldVal = car.marketValue || car.basePrice || 100000;
-
-    // Единый менеджер — установка
     const result = window.PlatesManager.attachPlateToCar(car, plateStr, { silent: true });
 
     if (!result.success) {
@@ -630,9 +620,6 @@ async function applyPlateToCar(plateStr) {
     }
 }
 
-/**
- * ⭐ v2.0.0: Снять номер с авто через PlatesManager.
- */
 async function removePlateFromCar() {
     if (window.previewCarIndex === null || window.previewCarIndex === undefined) return;
     const car = safeGetCar(window.previewCarIndex);
@@ -651,12 +638,10 @@ async function removePlateFromCar() {
     state.player.cash -= 2000;
 
     const oldVal = car.marketValue || car.basePrice || 100000;
-
-    // Единый менеджер — снятие (статус → inventory)
     const result = window.PlatesManager.detachPlateFromCar(car, { silent: true, archive: false });
 
     if (!result.success) {
-        state.player.cash += 2000; // Возврат денег
+        state.player.cash += 2000;
         return safeShowToast(`Ошибка снятия: ${result.error}`);
     }
 
@@ -804,6 +789,99 @@ function closeGarageEventModal() {
 }
 
 // ========================================================
+// --- ИНТЕРАКТИВНОЕ МОДАЛЬНОЕ ОКНО ИТОГОВ СДЕЛКИ (ВЫРУЧКА + МАРЖА) ---
+// ========================================================
+function openCarSoldSuccessModal(carName, salePrice, profit, costPrice = 0) {
+    const modal = ensureModal('modalCarSoldSuccess');
+    const isProfitPositive = profit >= 0;
+    const baseCost = costPrice > 0 ? costPrice : Math.max(1000, salePrice - profit);
+    const roi = Math.round((profit / baseCost) * 100);
+
+    modal.innerHTML = `
+        <div class="modal-box text-center" style="max-width: 400px; border-color: rgba(0, 242, 254, 0.4);">
+            <div class="radar-spinner-ring mb-2" style="border-top-color: #00f2fe; border-right-color: #ffb800; width: 60px; height: 60px; margin: 0 auto;">
+                <div class="radar-spinner-center" style="font-size: 26px;">🎉</div>
+            </div>
+
+            <div class="modal-glow-badge mb-1" style="color: #00f2fe; border-color: rgba(0, 242, 254, 0.4);">
+                ИТОГИ ПРОДАЖИ
+            </div>
+
+            <h3 class="font-bold mb-1 color-cyan" style="font-size: 18px;">АВТОМОБИЛЬ ПРОДАН! 🤝</h3>
+            <div class="sub-label mb-3" style="font-size: 11px;">
+                Машина «<b>${escapeHtml(carName)}</b>» успешно передана новому владельцу!
+            </div>
+
+            <!-- КАРТОЧКА 1: ОБЩАЯ ВЫРУЧКА (НЕОНОВЫЙ ЦИАН) -->
+            <div class="deal-reward-card reward-revenue" style="display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:10px; border-radius:12px; background:#0b1320; border:1px solid rgba(0,242,254,0.4); text-align:left;">
+                <div style="width:40px; height:40px; border-radius:10px; background:rgba(0,242,254,0.12); color:#00f2fe; display:flex; align-items:center; justify-content:center; font-size:20px; border:1px solid rgba(0,242,254,0.3);">
+                    <i class="fa-solid fa-sack-dollar"></i>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">ВЫРУЧКА С ПРОДАЖИ</div>
+                    <div style="font-size:18px; font-weight:800; color:#00f2fe; text-shadow:0 0 10px rgba(0,242,254,0.4);">+${Number(salePrice).toLocaleString()} ₽</div>
+                    <div style="font-size:10.5px; color:#64748b;">Зачислено на баланс игрока</div>
+                </div>
+            </div>
+
+            <!-- КАРТОЧКА 2: ЧИСТАЯ МАРЖА (ЗОЛОТОЙ ЯНТАРЬ / КРАСНЫЙ) -->
+            <div class="deal-reward-card reward-profit" style="display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:14px; border-radius:12px; background:#0b1320; border:1px solid ${isProfitPositive ? 'rgba(255,184,0,0.45)' : 'rgba(255,75,75,0.45)'}; text-align:left;">
+                <div style="width:40px; height:40px; border-radius:10px; background:${isProfitPositive ? 'rgba(255,184,0,0.12)' : 'rgba(255,75,75,0.12)'}; color:${isProfitPositive ? '#ffb800' : '#ff4b4b'}; display:flex; align-items:center; justify-content:center; font-size:20px; border:1px solid ${isProfitPositive ? 'rgba(255,184,0,0.3)' : 'rgba(255,75,75,0.3)'};">
+                    <i class="fa-solid ${isProfitPositive ? 'fa-chart-line-up' : 'fa-chart-line-down'}"></i>
+                </div>
+                <div style="flex:1;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:10px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">
+                            ${isProfitPositive ? 'ЧИСТАЯ ПРИБЫЛЬ' : 'ФИКСИРОВАННЫЙ УБЫТОК'}
+                        </span>
+                        <span class="tag-badge" style="background:${isProfitPositive ? 'rgba(255,184,0,0.15)' : 'rgba(255,75,75,0.15)'}; color:${isProfitPositive ? '#ffb800' : '#ff4b4b'}; border:1px solid ${isProfitPositive ? 'rgba(255,184,0,0.3)' : 'rgba(255,75,75,0.3)'}; font-size:9.5px; padding:1px 5px; border-radius:4px;">
+                            ${isProfitPositive ? '+' : ''}${roi}% ROI
+                        </span>
+                    </div>
+                    <div style="font-size:18px; font-weight:800; color:${isProfitPositive ? '#ffb800' : '#ff4b4b'}; text-shadow:0 0 10px ${isProfitPositive ? 'rgba(255,184,0,0.4)' : 'rgba(255,75,75,0.4)'};">
+                        ${isProfitPositive ? '+' : ''}${Number(profit).toLocaleString()} ₽
+                    </div>
+                    <div style="font-size:10.5px; color:#64748b;">
+                        ${isProfitPositive ? 'Маржа с учётом расходов на покупку' : 'Продажа ниже себестоимости'}
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="ModalManager.close('modalCarSoldSuccess')" class="btn btn-green w-full" style="font-weight:700; padding:12px; font-size:14px; border-radius:10px;">
+                ЗАБРАТЬ ✓
+            </button>
+        </div>
+    `;
+
+    ModalManager.open('modalCarSoldSuccess');
+    safePlaySound('win');
+    safeTgHaptic('success');
+}
+
+// --------------------------------------------------------
+// ПЕРЕХВАТЧИК СТАРОГО openVerdictModal (ДЛЯ ИСКЛЮЧЕНИЯ ДУБЛИРОВАНИЯ СУММ)
+// --------------------------------------------------------
+if (typeof window !== 'undefined') {
+    const originalOpenVerdictModal = window.openVerdictModal;
+    window.openVerdictModal = function(title, desc, isGood, reward = null) {
+        // Если это окно продажи автомобиля с двумя суммами в тексте или наградах
+        if (title && (title.includes('ПРОДАН') || title.includes('СДЕЛКА')) && desc && desc.includes('успешно передана')) {
+            const matches = desc.match(/\d[\d\s]*\d/g);
+            if (matches && matches.length >= 2) {
+                const salePrice = parseInt(matches[0].replace(/\s/g, ''), 10) || 0;
+                const profit = parseInt(matches[1].replace(/\s/g, ''), 10) || 0;
+                const carNameMatch = desc.match(/«([^»]+)»/);
+                const carName = carNameMatch ? carNameMatch[1] : 'Автомобиль';
+                return openCarSoldSuccessModal(carName, salePrice, profit);
+            }
+        }
+        if (typeof originalOpenVerdictModal === 'function') {
+            return originalOpenVerdictModal.apply(this, arguments);
+        }
+    };
+}
+
+// ========================================================
 // ЭКСПОРТ В WINDOW
 // ========================================================
 Object.assign(window, {
@@ -825,7 +903,8 @@ Object.assign(window, {
     removePlateFromCar,
     triggerGarageRandomEvent,
     resolveGarageEvent,
-    closeGarageEventModal
+    closeGarageEventModal,
+    openCarSoldSuccessModal
 });
 
-console.log('[🏠 garage-dialogs v2.0.0] PlatesManager v2.0.0 интегрирован — нет прямых записей в state.ownedPlates ✓');
+console.log('[🏠 garage-dialogs v2.1.0] Интерактивные итоги сделки (Выручка + Маржа ROI) и PlatesManager v2.0.0 ✓');

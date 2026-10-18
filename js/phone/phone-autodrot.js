@@ -1,14 +1,13 @@
 // ========================================================
-// js/phone-autodrot.js — ОНЛАЙН P2P МАРКЕТПЛЕЙС И QUICK-CHAT (v0.8.5)
+// js/phone-autodrot.js — ОНЛАЙН P2P МАРКЕТПЛЕЙС И ЧАТ (v0.9.5 CLEAN)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Полноценный онлайн через Cloud Firestore:
-// P2P биржа (авто, номера, бизнес, жильё), безопасный торг шаблонами,
-// чёрный рынок госномеров, срочный перехват и отзывы.
+// Полная версия: P2P биржа, номера, срочный выкуп, отзывы и
+// единый компактный диалог торга с NPC без дублирования.
 // ========================================================
 
 const AppAutodrot = {
-    subTab: 'market', // 'market', 'blackmarket', 'hotdeals', 'reputation'
-    p2pFilter: 'cars', // 'cars', 'plates', 'business', 'housing'
+    subTab: 'market',
+    p2pFilter: 'cars',
     activeChatLot: null,
     activeChatDialogId: null,
     chatPollInterval: null,
@@ -29,7 +28,6 @@ const AppAutodrot = {
                 <div style="width:40px;"></div>
             </div>
             <div class="phone-app-body">
-                <!-- ВЕРХНЕЕ МЕНЮ РАЗДЕЛОВ АВТОДРОТА -->
                 <div class="grid-4 mb-2" style="grid-template-columns: repeat(4, 1fr); gap: 3px;">
                     <button onclick="AppAutodrot.switchTab('market')" class="btn ${sub === 'market' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:5px 2px; font-size:9px;">
                         <i class="fa-solid fa-handshake"></i> Биржа
@@ -72,7 +70,6 @@ const AppAutodrot = {
         const content = document.getElementById('autodrotScreenContent');
         if (!content) return;
 
-        // 1. ОНЛАЙН P2P БИРЖА
         if (this.subTab === 'market') {
             let f = this.p2pFilter || 'cars';
             content.innerHTML = `
@@ -86,7 +83,6 @@ const AppAutodrot = {
                     </div>
                 </div>
 
-                <!-- ФИЛЬТРЫ КАТЕГОРИЙ ЛОТОВ -->
                 <div class="grid-4 mb-2">
                     <button onclick="AppAutodrot.setFilter('cars')" class="btn ${f === 'cars' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">🚗 Авто</button>
                     <button onclick="AppAutodrot.setFilter('plates')" class="btn ${f === 'plates' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">🏷 Номера</button>
@@ -100,7 +96,6 @@ const AppAutodrot = {
             `;
             this.renderP2PListingsFiltered();
 
-        // 2. БАЗАР БЛАТНЫХ НОМЕРОВ
         } else if (this.subTab === 'blackmarket') {
             content.innerHTML = `
                 <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(192,132,252,0.18), #090e18); border-color:var(--purple);">
@@ -114,7 +109,6 @@ const AppAutodrot = {
             `;
             this.renderBlackMarketNumbersList();
 
-        // 3. СРОЧНЫЙ ВЫКУП
         } else if (this.subTab === 'hotdeals') {
             content.innerHTML = `
                 <div class="glass-card mb-2 p-2">
@@ -128,15 +122,11 @@ const AppAutodrot = {
             `;
             this.renderHotDealsContainer();
 
-        // 4. РЕПУТАЦИЯ И ОТЗЫВЫ
         } else if (this.subTab === 'reputation') {
             this.renderReputationScreen(content);
         }
     },
 
-    // --------------------------------------------------------
-    // ЗАГРУЗКА И ОТРИСОВКА P2P ЛОТОВ
-    // --------------------------------------------------------
     async renderP2PListingsFiltered() {
         const list = document.getElementById('p2pItemsList');
         if (!list) return;
@@ -145,7 +135,6 @@ const AppAutodrot = {
         let filter = this.p2pFilter || 'cars';
         let lots = [];
 
-        // 1. Получение лотов из Firestore
         if (window.FB_Bridge && window.FB_Bridge.P2P) {
             try {
                 lots = await Promise.race([
@@ -155,7 +144,6 @@ const AppAutodrot = {
             } catch(e) {}
         }
 
-        // 2. Фолбек на локальные данные
         if (!lots || lots.length === 0) {
             if (state.p2pMarketListings && state.p2pMarketListings.length > 0) {
                 lots = state.p2pMarketListings;
@@ -292,9 +280,6 @@ const AppAutodrot = {
         list.innerHTML = html;
     },
 
-    // --------------------------------------------------------
-    // АТОМАРНАЯ ПОКУПКА ЛОТА
-    // --------------------------------------------------------
     async buyP2PLot(listingId) {
         const myProfile = window.FB_Bridge ? window.FB_Bridge.getProfile() : { id: "local", name: "Перекуп" };
         let cash = state.player?.cash || 0;
@@ -474,9 +459,6 @@ const AppAutodrot = {
         await this.refreshChatMessages();
     },
 
-    // --------------------------------------------------------
-    // МОДАЛЬНОЕ ОКНО СОЗДАНИЯ ЛОТА
-    // --------------------------------------------------------
     openCreateListingModal() {
         this.selectP2PListingType('cars');
         ModalManager.open('modalCreateP2P');
@@ -609,9 +591,6 @@ const AppAutodrot = {
         this.renderSubScreen();
     },
 
-    // --------------------------------------------------------
-    // БАЗАР ГОСНОМЕРОВ (ТЕНЕВЫЕ ЗНАКИ)
-    // --------------------------------------------------------
     renderBlackMarketNumbersList() {
         const list = document.getElementById('autodrotBlackMarketPlatesList');
         if (!list) return;
@@ -736,9 +715,6 @@ const AppAutodrot = {
         }
     },
 
-    // --------------------------------------------------------
-    // СРОЧНЫЙ ВЫКУП (HOT DEALS)
-    // --------------------------------------------------------
     renderHotDealsContainer() {
         const container = document.getElementById('autodrotHotDealsContainer');
         if (!container) return;
@@ -811,9 +787,6 @@ const AppAutodrot = {
         this.renderSubScreen();
     },
 
-    // --------------------------------------------------------
-    // РЕПУТАЦИЯ И КНИГА ОТЗЫВОВ
-    // --------------------------------------------------------
     renderReputationScreen(content) {
         if (!state.player) state.player = {};
         if (!state.player.p2pReputation) {
@@ -857,6 +830,78 @@ const AppAutodrot = {
                 </div>
             </div>
         `;
+    },
+
+    // --------------------------------------------------------
+    // ОБРАБОТКА ТАКТИК В ЕДИНОМ ВЕРХНЕМ ЧАТЕ
+    // --------------------------------------------------------
+    handleIncomingNPCHaggle(tactic) {
+        const offerEls = document.querySelectorAll('b, .price-val, .color-green');
+        let currentPrice = 0;
+        let targetOfferEl = null;
+
+        for (let el of offerEls) {
+            const digits = el.textContent.replace(/\D/g, '');
+            const parsed = parseInt(digits, 10);
+            if (parsed > 5000 && parsed < 50000000) {
+                currentPrice = parsed;
+                targetOfferEl = el;
+                break;
+            }
+        }
+
+        if (!currentPrice) currentPrice = 96000;
+
+        let pct = 0.03;
+        let tacticName = "на бензин и дорогу";
+        if (tactic === 'medium') {
+            pct = 0.07;
+            tacticName = "по факту состояния";
+        } else if (tactic === 'hard') {
+            pct = 0.12;
+            tacticName = "без лишних слов";
+        }
+
+        const addedAmount = Math.round(currentPrice * pct);
+        const newPrice = currentPrice + addedAmount;
+
+        this.appendNPCChatBubble(`«За ${currentPrice.toLocaleString()} ₽ не отдам. Добавь хотя бы +${addedAmount.toLocaleString()} ₽ (${tacticName}), и по рукам!»`, true);
+
+        const chance = tactic === 'soft' ? 0.85 : (tactic === 'medium' ? 0.60 : 0.35);
+        const isAgreed = Math.random() < chance;
+
+        setTimeout(() => {
+            if (isAgreed) {
+                if (targetOfferEl) {
+                    targetOfferEl.textContent = `${newPrice.toLocaleString()} ₽`;
+                }
+
+                this.appendNPCChatBubble(`«По рукам! Наскрёб ещё +${addedAmount.toLocaleString()} ₽. Итого ${newPrice.toLocaleString()} ₽. Жми «СОГЛАСИТЬСЯ», забираю!»`, false);
+                if (typeof playSound === 'function') playSound('win');
+            } else {
+                this.appendNPCChatBubble(`«Не, мужик, у меня бюджет впритык, больше ни копейки не накину!»`, false);
+                if (typeof playSound === 'function') playSound('tick');
+            }
+        }, 450);
+    },
+
+    appendNPCChatBubble(text, isMe) {
+        const container = document.querySelector('.chat-dialog-screen, .phone-app-body, .deal-car-preview-card')?.parentElement || document.body;
+        
+        const bubble = document.createElement('div');
+        bubble.style.cssText = `display:flex; justify-content:${isMe ? 'flex-end' : 'flex-start'}; margin:6px 0; animation:fadeIn 0.2s ease;`;
+        bubble.innerHTML = `
+            <div style="max-width:85%; padding:9px 13px; border-radius:12px; font-size:11.5px; line-height:1.35; ${
+                isMe 
+                    ? 'background:rgba(0,242,254,0.15); border:1px solid rgba(0,242,254,0.4); color:#f1f5f9; border-bottom-right-radius:2px;' 
+                    : 'background:#131c2e; border:1px solid #1e293b; color:#e2e8f0; border-bottom-left-radius:2px;'
+            }">
+                ${text}
+            </div>
+        `;
+
+        const targetChatBox = document.querySelector('.deal-car-preview-card')?.parentElement || container;
+        targetChatBox.appendChild(bubble);
     }
 };
 

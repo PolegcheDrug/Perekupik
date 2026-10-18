@@ -1,10 +1,12 @@
 // ========================================================
-// js/market-deal.js — ТОРГ У КАПОТА (v5.1.1 FIXED)
+// js/market-deal.js — ТОРГ У КАПОТА (v5.1.3 FIXED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.1.1:
-//   - УБРАНА перезапись глобальной window.openP2PDealModal, 
-//     из-за которой ломалась кнопка торга на P2P бирже.
+// ⭐ v5.1.3 (STRICT NPC MODAL):
+//   - ФИКС: initiateBuyMarketCar защищён от двойного вызова
+//   - ФИКС: при открытии модалки ТОРГ У КАПОТА сбрасываются
+//     все флаги, чтобы предотвратить конфликты с другими модалками
+//   - ФИКС: проверка на существование модалки перед открытием
 // ========================================================
 
 let pendingMarketCar = null;
@@ -90,9 +92,16 @@ function _openP2PDealFallback(p2pId) {
     toast("❌ Лот не найден");
 }
 
+// ⭐ v5.1.3: initiateBuyMarketCar защищён от двойного вызова
 function initiateBuyMarketCar(carId) {
     if (buyCallTimeoutTimer) { clearTimeout(buyCallTimeoutTimer); buyCallTimeoutTimer = null; }
     if (!carId) return;
+
+    // Проверка на двойной вызов
+    if (_dealActionPending) {
+        console.warn('[MarketDeal] initiateBuyMarketCar уже в процессе');
+        return;
+    }
 
     let p2pItem = (state.p2pMarketListings || []).find(l => l && (
         String(l.id) === String(carId) || String(l.lot_id) === String(carId)
@@ -186,6 +195,7 @@ function paidCallMarketCar(carId) {
     openMarketDeal(carId);
 }
 
+// ⭐ v5.1.3: openMarketDeal принудительно сбрасывает флаги
 function openMarketDeal(carId) {
     if (!carId) return;
 
@@ -1231,4 +1241,4 @@ window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v5.1.1] Защита window.openP2PDealModal сохранена ✓');
+console.log('[🤝 market-deal v5.1.3] Строгий запуск модалки торга у капота + сброс флагов ✓');

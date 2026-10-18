@@ -1,6 +1,11 @@
 // ========================================================
-// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.6 P2P TRADE READY)
+// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.7 NPC-TRADE-FIX)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v9.1.7 (NPC-TRADE-FIX):
+//   - ФИКС: startTradeWithSeller теперь различает P2P-лоты игроков
+//     и NPC-лоты. Для P2P-лотов открывает P2P-модалку офферов,
+//     для NPC-лотов — старую модалку торга у капота (initiateBuyMarketCar).
 // ========================================================
 
 (function() {
@@ -317,53 +322,70 @@
     };
 
     // ========================================================
-    // 4. ТОРГ С ПРОДАВЦОМ (МОДАЛКА ИЛИ ДИАЛОГ)
+    // 4. ⭐ v9.1.7: ТОРГ — РАЗДЕЛЕНИЕ P2P И NPC
     // ========================================================
     AppM.startTradeWithSeller = function(lotId) {
         if (!lotId) return;
 
-        const lot = (window.state?.p2pMarketListings || []).find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
-        const targetId = lot ? (lot.id || lot.lot_id) : lotId;
+        // 1. Проверяем, является ли лот P2P-лотом игрока
+        const isP2PLot = (window.state?.p2pMarketListings || []).some(l => 
+            l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId))
+        );
 
-        // Если доступна модалка офферов
-        if (typeof window.openP2PDealModal === 'function') {
-            try {
-                window.openP2PDealModal(targetId);
-                return;
-            } catch (e) {
-                console.warn('[AppM] openP2PDealModal error:', e);
-            }
-        }
-
-        // Альтернативный переход в чат
-        if (lot) {
-            let dialogId = 'dlg_p2p_' + targetId;
-            let msg = (window.state.player.phoneMessages || []).find(m => m.id === dialogId);
-
-            if (!msg) {
-                if (!window.state.player.phoneMessages) window.state.player.phoneMessages = [];
-                msg = {
-                    id: dialogId,
-                    sender: lot.sellerName || 'Продавец',
-                    sellerId: lot.sellerId,
-                    category: 'p2p',
-                    p2pLotId: targetId,
-                    p2pRole: 'buyer',
-                    askingPrice: lot.price,
-                    carData: lot.itemData || { name: lot.name, img: lot.img },
-                    chatHistory: [
-                        { from: 'them', text: `Здравствуйте! Торгуюсь по ${lot.name}. Какое у вас предложение?` }
-                    ],
-                    unread: false,
-                    lastMessageAt: Date.now()
-                };
-                window.state.player.phoneMessages.unshift(msg);
-                if (typeof saveState === 'function') saveState();
+        if (isP2PLot) {
+            // ⭐ Для P2P-лотов используем модалку офферов
+            if (typeof window.openP2PDealModal === 'function') {
+                try {
+                    window.openP2PDealModal(lotId);
+                    return;
+                } catch (e) {
+                    console.warn('[AppM] openP2PDealModal error:', e);
+                }
             }
 
-            this.openDialog(dialogId);
+            // Fallback на старый чат
+            const lot = (window.state.p2pMarketListings || []).find(l => 
+                l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId))
+            );
+            if (lot) {
+                let dialogId = 'dlg_p2p_' + lotId;
+                let msg = (window.state.player.phoneMessages || []).find(m => m.id === dialogId);
+
+                if (!msg) {
+                    if (!window.state.player.phoneMessages) window.state.player.phoneMessages = [];
+                    msg = {
+                        id: dialogId,
+                        sender: lot.sellerName || 'Продавец',
+                        sellerId: lot.sellerId,
+                        category: 'p2p',
+                        p2pLotId: lotId,
+                        p2pRole: 'buyer',
+                        askingPrice: lot.price,
+                        carData: lot.itemData || { name: lot.name, img: lot.img },
+                        chatHistory: [
+                            { from: 'them', text: `Здравствуйте! Торгуюсь по ${lot.name}. Какое у вас предложение?` }
+                        ],
+                        unread: false,
+                        lastMessageAt: Date.now()
+                    };
+                    window.state.player.phoneMessages.unshift(msg);
+                    if (typeof saveState === 'function') saveState();
+                }
+                this.openDialog(dialogId);
+            }
         } else {
-            if (typeof showToast === 'function') showToast('❌ Лот не найден');
+            // ⭐ Для NPC-лотов используем старую модалку торга у капота
+            if (typeof window.initiateBuyMarketCar === 'function') {
+                // initiateBuyMarketCar ищет лот в state.marketFeed по id
+                const npcLot = (window.state?.marketFeed || []).find(l => l && String(l.id) === String(lotId));
+                if (npcLot) {
+                    window.initiateBuyMarketCar(npcLot.id);
+                } else {
+                    if (typeof showToast === 'function') showToast('❌ Лот не найден в ленте рынка');
+                }
+            } else {
+                if (typeof showToast === 'function') showToast('❌ Функция торга с NPC недоступна');
+            }
         }
     };
 
@@ -921,5 +943,5 @@
         }
     };
 
-    console.log('[💱 phone-m-market v9.1.6] Прямой торг + переход в чат сделки готов ✓');
+    console.log('[💱 phone-m-market v9.1.7] Разделение торга: P2P-лоты → модалка офферов, NPC-лоты → торг у капота ✓');
 })();
