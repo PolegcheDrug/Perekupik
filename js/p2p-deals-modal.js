@@ -1,106 +1,114 @@
 // ========================================================
-// js/p2p-deals-modal.js — UI МОДАЛКИ ДКП МЕЖДУ ИГРОКАМИ (v1.1.1)
+// js/p2p-deals-modal.js — UI МОДАЛКИ ДКП МЕЖДУ ИГРОКАМИ (v1.5.1 FIXED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.1.1 (FIXED P2P LIFECYCLE & SYNC):
-//   - ФИКС: Безопасное подключение к window.P2PDeals без затирания модулей.
-//   - ФИКС: Поиск лотов по id и lot_id.
-//   - ФИКС: Сброс состояний кнопок и защита от зависания модалки при ошибках.
+// ⭐ v1.5.1 (P2P DKP LIFECYCLE & MULTI-USER SYNC):
+//   - Устранен конфликт с firebase-p2p.js: приоритет всегда отдается облачному P2PDeals.
+//   - Корректная обработка ролей Покупатель/Продавец при подписании ДКП.
+//   - Возврат лота в гараж продавца при отмене договора.
+//   - Поддержка поиска лотов по id и lot_id.
+//   - Защита от двойного клика, зависаний и debounce ввода цены.
 // ========================================================
 
 (function() {
     'use strict';
 
     // ========================================================
-    // 0. БЕЗОПАСНЫЙ FALLBACK (ЕСЛИ МОДУЛЬ ЕЩЕ НЕ ПОДГРУЗИЛСЯ)
+    // 0. БЕЗОПАСНЫЙ FALLBACK (ТОЛЬКО ЕСЛИ ОБЛАЧНЫЙ МОДУЛЬ НЕ ЗАГРУЖЕН)
     // ========================================================
-    if (!window.P2PDeals) {
-        window.P2PDeals = {
-            _activeDeals: new Map(),
+    function getP2PEngine() {
+        if (window.P2PDeals && typeof window.P2PDeals.createDealDraft === 'function') {
+            return window.P2PDeals;
+        }
+        if (window.FB_Bridge?.P2PDeals) {
+            return window.FB_Bridge.P2PDeals;
+        }
+        return _localFallbackEngine;
+    }
 
-            formatTimeLeft(sec) {
-                const s = Math.max(0, Math.floor(sec || 0));
-                const mm = String(Math.floor(s / 60)).padStart(2, '0');
-                const ss = String(s % 60).padStart(2, '0');
-                return `${mm}:${ss}`;
-            },
+    const _localFallbackEngine = {
+        _activeDeals: new Map(),
 
-            getStatusLabel(status) {
-                switch (status) {
-                    case 'drafting': return '📝 Черновик';
-                    case 'buyer_signed': return '✍️ Подписано покупателем';
-                    case 'seller_signed': return '✍️ Подписано продавцом';
-                    case 'completed': return '✅ Сделка закрыта';
-                    case 'cancelled': return '⛔ Отменено';
-                    case 'expired': return '⌛ Срок истёк';
-                    default: return 'Договор ДКП';
-                }
-            },
+        formatTimeLeft(sec) {
+            const s = Math.max(0, Math.floor(sec || 0));
+            const mm = String(Math.floor(s / 60)).padStart(2, '0');
+            const ss = String(s % 60).padStart(2, '0');
+            return `${mm}:${ss}`;
+        },
 
-            async findActiveDealByLot(lotId) {
-                return this._activeDeals.get(String(lotId)) || null;
-            },
+        getStatusLabel(status) {
+            switch (status) {
+                case 'drafting': return '📝 Черновик';
+                case 'buyer_signed': return '✍️ Подписано покупателем';
+                case 'seller_signed': return '✍️ Подписано продавцом';
+                case 'completed': return '✅ Сделка закрыта';
+                case 'cancelled': return '⛔ Отменено';
+                case 'expired': return '⌛ Срок истёк';
+                default: return 'Договор ДКП';
+            }
+        },
 
-            async fetchDeal(dealId) {
-                for (let d of this._activeDeals.values()) {
-                    if (d && (String(d.id) === String(dealId) || String(d.dealId) === String(dealId))) return d;
-                }
-                return null;
-            },
+        async findActiveDealByLot(lotId) {
+            return this._activeDeals.get(String(lotId)) || null;
+        },
 
-            async createDealDraft(lotId, price) {
-                const myUid = String(window.state?.player?.uid || window.tgUserId || 'me');
-                const myName = window.state?.player?.name || 'Перекуп #777';
+        async fetchDeal(dealId) {
+            for (let d of this._activeDeals.values()) {
+                if (d && (String(d.id) === String(dealId) || String(d.dealId) === String(dealId))) return d;
+            }
+            return null;
+        },
 
-                const lot = (window.state?.p2pMarketListings || []).find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
-                const carData = lot?.itemData || { name: lot?.name || 'Автомобиль', plate: 'ТРАНЗИТ' };
+        async createDealDraft(lotId, price) {
+            const myUid = String(window.state?.player?.uid || window.tgUserId || 'me');
+            const myName = window.state?.player?.name || 'Перекуп';
 
-                const deal = {
-                    id: 'deal_' + Date.now(),
-                    dealId: 'deal_' + Date.now(),
-                    lotId: String(lotId),
-                    sellerId: String(lot ? lot.sellerId : 'seller_npc'),
-                    sellerName: lot ? lot.sellerName : 'Продавец',
-                    buyerId: myUid,
-                    buyerName: myName,
-                    itemSnapshot: carData,
-                    originalPrice: price || lot?.price || 100000,
-                    currentPrice: price || lot?.price || 100000,
-                    status: 'drafting',
-                    createdAt: Date.now(),
-                    expiresAt: Date.now() + 1800000,
-                    buyerSigned: false,
-                    sellerSigned: false,
-                    buyerSignedAt: null,
-                    sellerSignedAt: null
-                };
+            const lot = (window.state?.p2pMarketListings || []).find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
+            const carData = lot?.itemData || { name: lot?.name || 'Автомобиль', plate: 'ТРАНЗИТ' };
 
-                this._activeDeals.set(String(lotId), deal);
-                return { success: true, dealId: deal.id, deal: deal };
-            },
+            const deal = {
+                id: 'deal_' + Date.now(),
+                dealId: 'deal_' + Date.now(),
+                lotId: String(lotId),
+                sellerId: String(lot ? lot.sellerId : 'seller_player'),
+                sellerName: lot ? lot.sellerName : 'Продавец',
+                buyerId: myUid,
+                buyerName: myName,
+                itemSnapshot: carData,
+                originalPrice: Number(price) || Number(lot?.price) || 100000,
+                currentPrice: Number(price) || Number(lot?.price) || 100000,
+                status: 'drafting',
+                createdAt: Date.now(),
+                expiresAt: Date.now() + 1800000,
+                buyerSigned: false,
+                sellerSigned: false,
+                buyerSignedAt: null,
+                sellerSignedAt: null
+            };
 
-            async updateDealPrice(dealId, newPrice) {
-                const deal = await this.fetchDeal(dealId);
-                if (!deal) return { success: false, error: 'Сделка не найдена' };
-                deal.currentPrice = Number(newPrice);
-                return { success: true, deal };
-            },
+            this._activeDeals.set(String(lotId), deal);
+            return { success: true, dealId: deal.id, deal: deal };
+        },
 
-            async signDeal(dealId, role) {
-                const deal = await this.fetchDeal(dealId);
-                if (!deal) return { success: false, error: 'Сделка не найдена' };
+        async updateDealPrice(dealId, newPrice) {
+            const deal = await this.fetchDeal(dealId);
+            if (!deal) return { success: false, error: 'Сделка не найдена' };
+            deal.currentPrice = Number(newPrice);
+            return { success: true, deal };
+        },
 
-                deal.status = 'completed';
-                deal.sellerSigned = true;
-                deal.buyerSigned = true;
-                deal.sellerSignedAt = Date.now();
-                deal.buyerSignedAt = Date.now();
+        async signDeal(dealId, role) {
+            const deal = await this.fetchDeal(dealId);
+            if (!deal) return { success: false, error: 'Сделка не найдена' };
 
-                const price = Number(deal.currentPrice) || 0;
+            const myProfile = _getMyProfile();
+            const isBuyer = String(deal.buyerId) === String(myProfile?.id);
+            const price = Number(deal.currentPrice) || 0;
+
+            if (isBuyer) {
                 if ((window.state?.player?.cash || 0) < price) {
                     return { success: false, error: 'Недостаточно денег на балансе!' };
                 }
-
                 window.state.player.cash -= price;
 
                 const car = Object.assign({}, deal.itemSnapshot || {});
@@ -109,42 +117,53 @@
 
                 if (!window.state.garage) window.state.garage = [];
                 window.state.garage.push(car);
-
-                if (deal.lotId) {
-                    window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
-                        l && String(l.id) !== String(deal.lotId) && String(l.lot_id) !== String(deal.lotId)
-                    );
-                }
-
-                if (typeof window.saveState === 'function') window.saveState();
-                if (typeof window.updateHeaderUI === 'function') window.updateHeaderUI();
-                if (typeof window.renderGarage === 'function') window.renderGarage();
-
-                if (window.EventBus) {
-                    window.EventBus.emit('p2p:deal_completed', { dealId: deal.id, deal });
-                }
-
-                return { success: true, completed: true, deal };
-            },
-
-            async cancelDeal(dealId) {
-                const deal = await this.fetchDeal(dealId);
-                if (deal) {
-                    deal.status = 'cancelled';
-                    this._activeDeals.delete(String(deal.lotId));
-                }
-                return { success: true };
-            },
-
-            subscribeToDeal(dealId, callback) {
-                const interval = setInterval(async () => {
-                    const deal = await this.fetchDeal(dealId);
-                    if (callback) callback(deal);
-                }, 1500);
-
-                return () => clearInterval(interval);
             }
-        };
+
+            deal.status = 'completed';
+            deal.sellerSigned = true;
+            deal.buyerSigned = true;
+            deal.sellerSignedAt = deal.sellerSignedAt || Date.now();
+            deal.buyerSignedAt = deal.buyerSignedAt || Date.now();
+
+            if (deal.lotId) {
+                window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
+                    l && String(l.id) !== String(deal.lotId) && String(l.lot_id) !== String(deal.lotId)
+                );
+            }
+
+            if (typeof window.saveState === 'function') window.saveState();
+            if (typeof window.updateHeaderUI === 'function') window.updateHeaderUI();
+            if (typeof window.renderGarage === 'function') window.renderGarage();
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:deal_completed', { dealId: deal.id, deal });
+            }
+
+            return { success: true, completed: true, deal };
+        },
+
+        async cancelDeal(dealId) {
+            const deal = await this.fetchDeal(dealId);
+            if (deal) {
+                deal.status = 'cancelled';
+                this._activeDeals.delete(String(deal.lotId));
+            }
+            return { success: true };
+        },
+
+        subscribeToDeal(dealId, callback) {
+            const interval = setInterval(async () => {
+                const deal = await this.fetchDeal(dealId);
+                if (callback) callback(deal);
+            }, 1500);
+
+            return () => clearInterval(interval);
+        }
+    };
+
+    // Если глобальный объект отсутствует — инициализируем фоллбеком
+    if (!window.P2PDeals) {
+        window.P2PDeals = _localFallbackEngine;
     }
 
     // ========================================================
@@ -191,12 +210,16 @@
     function _playSound(snd) {
         if (typeof window.playSound === 'function') {
             try { window.playSound(snd); } catch (e) {}
+        } else if (window.AudioFx?.play) {
+            try { window.AudioFx.play(snd); } catch (e) {}
         }
     }
 
     function _haptic(type) {
         if (typeof window.tgHaptic === 'function') {
             try { window.tgHaptic(type); } catch (e) {}
+        } else if (window.AudioFx?.haptic) {
+            try { window.AudioFx.haptic(type); } catch (e) {}
         }
     }
 
@@ -288,7 +311,7 @@
 
         const snap = deal.itemSnapshot || {};
         const carNameEl = _getEl('p2pDkpCarName');
-        if (carNameEl) carNameEl.innerText = snap.name || 'Автомобиль';
+        if (carNameEl) carNameEl.innerText = snap.name || deal.name || 'Автомобиль';
         const carPowerEl = _getEl('p2pDkpCarPower');
         if (carPowerEl) carPowerEl.innerText = (snap.power || 100) + ' л.с.';
         const carMileageEl = _getEl('p2pDkpCarMileage');
@@ -418,7 +441,7 @@
                 signBtn.style.display = 'block';
                 signBtn.disabled = _signPending;
                 signBtn.innerText = _signPending ? '⏳ Подписание...' : '✍️ Поставить подпись';
-                signBtn.className = 'btn btn-green w-full';
+                signBtn.className = 'btn btn-green w-full font-bold';
             }
             if (cancelBtn) cancelBtn.style.display = 'block';
             if (closeBtn) closeBtn.style.display = 'none';
@@ -451,8 +474,9 @@
             }
 
             const sec = Math.max(0, Math.ceil(((Number(_currentDeal.expiresAt) || 0) - Date.now()) / 1000));
-            timerEl.innerText = window.P2PDeals?.formatTimeLeft
-                ? window.P2PDeals.formatTimeLeft(sec)
+            const engine = getP2PEngine();
+            timerEl.innerText = engine?.formatTimeLeft
+                ? engine.formatTimeLeft(sec)
                 : `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
 
             if (sec <= 0) {
@@ -480,9 +504,11 @@
             _currentDealId = String(dealId);
             _currentDeal = dealSnapshot || null;
 
-            if (!_currentDeal && window.P2PDeals?.fetchDeal) {
+            const engine = getP2PEngine();
+
+            if (!_currentDeal && engine?.fetchDeal) {
                 try {
-                    _currentDeal = await window.P2PDeals.fetchDeal(_currentDealId);
+                    _currentDeal = await engine.fetchDeal(_currentDealId);
                 } catch (e) {
                     console.warn('[P2PDKPModal] fetchDeal error:', e);
                 }
@@ -494,7 +520,7 @@
 
             const modal = _getEl('modalP2PDKP');
             if (!modal) {
-                return _toast('⚠️ Модалка #modalP2PDKP не найдена');
+                return _toast('⚠️ Модалка #modalP2PDKP не найдена в DOM');
             }
 
             _fillDealFields(_currentDeal);
@@ -509,15 +535,16 @@
             this._subscribe();
             _startTimer();
 
-            if (typeof playSound === 'function') playSound('tick');
+            _playSound('tick');
         },
 
         _subscribe() {
             this._unsubscribe();
 
-            if (!window.P2PDeals?.subscribeToDeal || !_currentDealId) return;
+            const engine = getP2PEngine();
+            if (!engine?.subscribeToDeal || !_currentDealId) return;
 
-            _unsubscribe = window.P2PDeals.subscribeToDeal(_currentDealId, (deal) => {
+            _unsubscribe = engine.subscribeToDeal(_currentDealId, (deal) => {
                 if (!deal) {
                     this.close();
                     return;
@@ -552,7 +579,7 @@
                 }
             }
 
-            if (typeof playSound === 'function') playSound('tick');
+            _playSound('tick');
         },
 
         async sign() {
@@ -572,7 +599,8 @@
             _fillDealFields(_currentDeal);
 
             try {
-                const res = await window.P2PDeals.signDeal(_currentDealId, myRole);
+                const engine = getP2PEngine();
+                const res = await engine.signDeal(_currentDealId, myRole);
 
                 if (!res.success) {
                     _toast(`❌ ${res.error || 'Ошибка подписи'}`);
@@ -613,7 +641,8 @@
             _cancelPending = true;
 
             try {
-                const res = await window.P2PDeals.cancelDeal(_currentDealId, 'Отменено пользователем');
+                const engine = getP2PEngine();
+                const res = await engine.cancelDeal(_currentDealId, 'Отменено пользователем');
                 if (!res.success) {
                     _toast(`❌ ${res.error}`);
                     return;
@@ -655,7 +684,10 @@
 
             _priceUpdatePending = true;
             try {
-                await window.P2PDeals.updateDealPrice(_currentDealId, clamped);
+                const engine = getP2PEngine();
+                if (engine?.updateDealPrice) {
+                    await engine.updateDealPrice(_currentDealId, clamped);
+                }
             } catch (e) {
                 console.warn('[P2PDKPModal] price update error:', e);
             } finally {
@@ -719,5 +751,5 @@
     }
 
     window.P2PDKPModal = P2PDKPModal;
-    console.log('[📝 p2p-deals-modal v1.1.1] UI модалки ДКП синхронизирован ✓');
+    console.log('[📝 p2p-deals-modal v1.5.1] UI модалки ДКП синхронизирован с облачным P2PDeals ✓');
 })();
