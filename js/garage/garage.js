@@ -1,5 +1,5 @@
 // ========================================================
-// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.7.3)
+// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.7.4)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ========================================================
 
@@ -588,6 +588,10 @@ function buyGarageSlot() {
     safeShowToast("Гараж расширен!");
 }
 
+// ========================================================
+// ОБНОВЛЕННАЯ МОДАЛКА ВЫСТАВЛЕНИЯ НА ПРОДАЖУ
+// ========================================================
+
 function openPutOnLotModal(idx) {
     const car = safeGetCar(idx);
     if (!car) return safeShowToast("❌ Машина не найдена");
@@ -596,7 +600,162 @@ function openPutOnLotModal(idx) {
 
     window.currentLotPutIndex = idx;
     window.currentLotPutUid = car.uid || car.id || null;
-    if (typeof ModalManager !== 'undefined') ModalManager.open('modalPutOnLot');
+
+    const modal = ensureModal('modalPutOnLot');
+    const marketValue = car.marketValue || car.basePrice || 100000;
+    const cName = escapeHtml(car.name || "Автомобиль");
+    const cPlate = escapeHtml(car.customPlate || car.plate || "ТРАНЗИТ");
+
+    modal.innerHTML = `
+        <div class="modal-box text-left" style="max-width: 400px;">
+            <div class="flex-between mb-2 pb-2" style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                <div class="modal-glow-badge"><i class="fa-solid fa-store"></i> ВЫСТАВЛЕНИЕ НА ПЛОЩАДКУ</div>
+                <button onclick="ModalManager.close('modalPutOnLot')" class="btn btn-dark btn-auto btn-sm">✕</button>
+            </div>
+
+            <div class="p-3 mb-3" style="background: #090e18; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+                <div class="font-bold text-sm color-cyan mb-1 text-center">${cName}</div>
+                <div class="text-xs sub-label mb-2 text-center">Госномер: <span class="license-plate" style="font-size: 10px; padding: 2px 6px;">${cPlate}</span></div>
+                <div class="flex-between text-xs px-2 py-1" style="background: rgba(0, 230, 118, 0.1); border-radius: 6px;">
+                    <span class="sub-label">Оценка рынка:</span>
+                    <b class="color-green">${marketValue.toLocaleString()} ₽</b>
+                </div>
+            </div>
+
+            <div class="sub-label text-xs mb-1.5 font-bold">Быстрый выбор цены:</div>
+            <div class="grid-4 mb-2" style="gap: 4px;">
+                <button onclick="setLotPrice(${marketValue * 0.85})" class="btn btn-dark btn-sm" style="padding: 6px 2px; font-size: 9.5px; display: flex; flex-direction: column; align-items: center; line-height:1.2;">
+                    <span class="color-red font-bold">-15%</span>
+                    <span style="font-size:8px; color:var(--amber);">${Math.round(marketValue * 0.85).toLocaleString()} ₽</span>
+                </button>
+                <button onclick="setLotPrice(${marketValue * 0.9})" class="btn btn-dark btn-sm" style="padding: 6px 2px; font-size: 9.5px; display: flex; flex-direction: column; align-items: center; line-height:1.2;">
+                    <span class="color-amber font-bold">-10%</span>
+                    <span style="font-size:8px; color:var(--amber);">${Math.round(marketValue * 0.9).toLocaleString()} ₽</span>
+                </button>
+                <button onclick="setLotPrice(${marketValue * 0.95})" class="btn btn-dark btn-sm" style="padding: 6px 2px; font-size: 9.5px; display: flex; flex-direction: column; align-items: center; line-height:1.2;">
+                    <span class="color-amber font-bold">-5%</span>
+                    <span style="font-size:8px; color:var(--amber);">${Math.round(marketValue * 0.95).toLocaleString()} ₽</span>
+                </button>
+                <button onclick="setLotPrice(${marketValue})" class="btn btn-cyan btn-sm" style="padding: 6px 2px; font-size: 9.5px; display: flex; flex-direction: column; align-items: center; line-height:1.2;">
+                    <span class="font-bold">Рынок</span>
+                    <span style="font-size:8px;">${Math.round(marketValue).toLocaleString()} ₽</span>
+                </button>
+            </div>
+            <div class="grid-3 mb-3" style="gap: 4px;">
+                <button onclick="setLotPrice(${marketValue * 1.05})" class="btn btn-dark btn-sm" style="padding: 6px 2px; font-size: 9.5px; display: flex; flex-direction: column; align-items: center; line-height:1.2;">
+                    <span class="color-amber font-bold">+5%</span>
+                    <span style="font-size:8px; color:var(--amber);">${Math.round(marketValue * 1.05).toLocaleString()} ₽</span>
+                </button>
+                <button onclick="setLotPrice(${marketValue * 1.1})" class="btn btn-dark btn-sm" style="padding: 6px 2px; font-size: 9.5px; display: flex; flex-direction: column; align-items: center; line-height:1.2;">
+                    <span class="color-amber font-bold">+10%</span>
+                    <span style="font-size:8px; color:var(--amber);">${Math.round(marketValue * 1.1).toLocaleString()} ₽</span>
+                </button>
+                <button onclick="setLotPrice(${marketValue * 1.15})" class="btn btn-dark btn-sm" style="padding: 6px 2px; font-size: 9.5px; display: flex; flex-direction: column; align-items: center; line-height:1.2;">
+                    <span class="color-green font-bold">+15%</span>
+                    <span style="font-size:8px; color:var(--amber);">${Math.round(marketValue * 1.15).toLocaleString()} ₽</span>
+                </button>
+            </div>
+
+            <div class="sub-label text-xs mb-1 font-bold">Ваша цена (₽):</div>
+            <input type="number" id="lotAskingPriceInput" value="${marketValue}" oninput="updateLotPricePreview()" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:16px; margin-bottom:12px; text-align:center; font-weight:bold; color:var(--cyan);" min="1">
+
+            <div id="lotPricePreview" class="p-2 mb-3 text-xs" style="background: rgba(0, 242, 254, 0.05); border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.2);">
+                <!-- Заполняется через updateLotPricePreview() -->
+            </div>
+
+            <div class="grid-2">
+                <button onclick="confirmPutOnLot()" class="btn btn-green">Выставить</button>
+                <button onclick="ModalManager.close('modalPutOnLot')" class="btn btn-dark">Отмена</button>
+            </div>
+        </div>
+    `;
+
+    // Первичное заполнение превью
+    setTimeout(() => {
+        if (typeof updateLotPricePreview === 'function') updateLotPricePreview();
+    }, 10);
+
+    if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
+        ModalManager.open('modalPutOnLot');
+    } else {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
+}
+
+function setLotPrice(price) {
+    const input = document.getElementById('lotAskingPriceInput');
+    if (input) {
+        input.value = Math.round(price);
+        updateLotPricePreview();
+        safePlaySound('tick');
+        safeTgHaptic('light');
+    }
+}
+
+function updateLotPricePreview() {
+    const input = document.getElementById('lotAskingPriceInput');
+    const preview = document.getElementById('lotPricePreview');
+    if (!input || !preview) return;
+
+    const price = parseInt(input.value, 10) || 0;
+    const car = safeGetCar(window.currentLotPutIndex);
+    if (!car) return;
+
+    const marketValue = car.marketValue || car.basePrice || 100000;
+    const diff = price - marketValue;
+    const percent = ((price / marketValue) * 100 - 100).toFixed(1);
+    
+    let color = 'color-cyan';
+    let hint = 'Цена соответствует рынку.';
+    let speed = 'Средний спрос (ожидание ~30 сек)';
+    let speedColor = 'color-cyan';
+
+    if (price < marketValue * 0.85) {
+        color = 'color-red';
+        hint = 'Слишком низкая цена! Вы теряете потенциальную выгоду.';
+        speed = 'Мгновенная продажа (ожидание ~10 сек)';
+        speedColor = 'color-green';
+    } else if (price < marketValue * 0.95) {
+        color = 'color-green';
+        hint = 'Выгодное предложение для покупателя.';
+        speed = 'Быстрая продажа (ожидание ~20 сек)';
+        speedColor = 'color-green';
+    } else if (price > marketValue * 1.15) {
+        color = 'color-red';
+        hint = 'Завышенная цена. Покупатели пройдут мимо.';
+        speed = 'Очень долгая продажа (ожидание 2+ мин)';
+        speedColor = 'color-red';
+    } else if (price > marketValue * 1.05) {
+        color = 'color-amber';
+        hint = 'Цена выше рынка. Придется ждать своего покупателя.';
+        speed = 'Затяжная продажа (ожидание ~90 сек)';
+        speedColor = 'color-amber';
+    }
+
+    preview.innerHTML = `
+        <div class="flex-between mb-1">
+            <span class="sub-label">Отклонение от рынка:</span>
+            <b class="${color}">${diff > 0 ? '+' : ''}${percent}%</b>
+        </div>
+        <div class="flex-between mb-1">
+            <span class="sub-label">Ожидаемый спрос:</span>
+            <b class="${speedColor}" style="font-size: 10px;">${speed}</b>
+        </div>
+        <div class="text-center mt-2 font-bold" style="font-size: 9.5px; color: #94a3b8;">${hint}</div>
+    `;
+
+    // Блокировка кнопки при некорректной цене
+    const btn = document.querySelector('#modalPutOnLot .btn-green');
+    if (btn) {
+        if (price <= 0) {
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+        } else {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+    }
 }
 
 function confirmPutOnLot() {
@@ -626,7 +785,7 @@ Object.assign(window, {
     renderGarage, openCarPreviewModal, openGaugeModalFromPreview, openOBD2ModalFromPreview,
     openTuningFromPreview, togglePersonalCar, selectCarForStreetDirect, buyGarageSlot,
     openPutOnLotModal, confirmPutOnLot, _sortGarageCars, _getFixedCarImage,
-    setGarageFilter, unassignCarFromGarage
+    setGarageFilter, unassignCarFromGarage, setLotPrice, updateLotPricePreview
 });
 
-console.log('[🏠 garage v1.7.3] Стабильный рендер гаража ✓');
+console.log('[🏠 garage v1.7.4] Интерактивная модалка продажи ✓');
