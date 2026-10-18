@@ -29,7 +29,8 @@
 #modalStorageWars,
 #modalLevelGate,
 #modalAppUnlockPrompt,
-#modalCarSoldSuccess {
+#modalCarSoldSuccess,
+#modalPutOnLot {
   z-index: 5500 !important;
 }
 
@@ -1204,8 +1205,9 @@
     transform: translateY(0);
   }
 }
+
 /* ========================================================
-   ⭐ ИНТЕРАКТИВНОЕ ОКНО ПРОДАЖИ НА ПЛОЩАДКЕ (LOT)
+   ⭐ v4.3.4: ИНТЕРАКТИВНОЕ ОКНО ПРОДАЖИ НА ПЛОЩАДКЕ (LOT)
    ======================================================== */
 
 /* Рамка и свечение самой модалки */
@@ -1215,17 +1217,17 @@
 }
 
 /* Сетка кнопок быстрой цены */
-#modalPutOnLot .grid-4, 
+#modalPutOnLot .grid-4,
 #modalPutOnLot .grid-3 {
-  gap: 6px !important;
-  margin-bottom: 12px !important;
+  gap: var(--space-xs) !important;
+  margin-bottom: var(--space-md) !important;
 }
 
 /* Стилизация кнопок быстрой цены */
 #modalPutOnLot .btn-dark {
   background: rgba(14, 22, 38, 0.85) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 10px !important;
+  border: 1px solid var(--border-glass) !important;
+  border-radius: var(--radius-sm) !important;
   padding: 8px 4px !important;
   display: flex !important;
   flex-direction: column !important;
@@ -1234,14 +1236,14 @@
   gap: 3px !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   cursor: pointer;
+  text-transform: none !important; /* Разрешаем красивый шрифт без капса */
 }
 
-/* Эффект наведения на кнопки */
 #modalPutOnLot .btn-dark:hover {
   background: rgba(0, 242, 254, 0.1) !important;
   border-color: var(--cyan) !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2) !important;
+  box-shadow: 0 4px 15px var(--cyan-glow) !important;
 }
 
 #modalPutOnLot .btn-dark:active {
@@ -1252,7 +1254,7 @@
 #modalPutOnLot .btn-cyan {
   background: rgba(0, 242, 254, 0.15) !important;
   border: 1.5px solid var(--cyan) !important;
-  border-radius: 10px !important;
+  border-radius: var(--radius-sm) !important;
   padding: 8px 4px !important;
   display: flex !important;
   flex-direction: column !important;
@@ -1261,6 +1263,7 @@
   gap: 3px !important;
   transition: all 0.2s ease !important;
   box-shadow: inset 0 0 10px rgba(0, 242, 254, 0.1) !important;
+  text-transform: none !important;
 }
 
 #modalPutOnLot .btn-cyan:hover {
@@ -1271,15 +1274,15 @@
 /* Поле ввода цены (как терминал) */
 #lotAskingPriceInput {
   width: 100% !important;
-  background: #05080f !important;
+  background: var(--bg-body) !important;
   border: 2px solid rgba(0, 242, 254, 0.3) !important;
-  border-radius: 12px !important;
+  border-radius: var(--radius-md) !important;
   padding: 12px !important;
   color: var(--cyan) !important;
-  font-size: 20px !important;
+  font-size: var(--font-xl) !important;
   font-weight: 900 !important;
   text-align: center !important;
-  margin-bottom: 14px !important;
+  margin-bottom: var(--space-md) !important;
   transition: all 0.25s ease !important;
   font-family: 'Courier New', Courier, monospace !important;
   box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8) !important;
@@ -1295,17 +1298,17 @@
 #lotPricePreview {
   background: rgba(0, 242, 254, 0.03) !important;
   border: 1px solid rgba(0, 242, 254, 0.2) !important;
-  border-radius: 12px !important;
-  padding: 12px !important;
-  margin-bottom: 16px !important;
+  border-radius: var(--radius-md) !important;
+  padding: var(--space-md) !important;
+  margin-bottom: var(--space-lg) !important;
   transition: all 0.3s ease !important;
   box-shadow: inset 0 0 20px rgba(0,0,0,0.4) !important;
   animation: fadeInPreview 0.3s ease-out !important;
 }
 
 #lotPricePreview .flex-between {
-  margin-bottom: 6px !important;
-  padding-bottom: 6px !important;
+  margin-bottom: var(--space-sm) !important;
+  padding-bottom: var(--space-sm) !important;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.1) !important;
 }
 
@@ -1315,7 +1318,6 @@
   padding-bottom: 0 !important;
 }
 
-/* Анимация появления превью */
 @keyframes fadeInPreview {
   from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
