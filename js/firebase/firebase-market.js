@@ -1,14 +1,12 @@
 // ========================================================
-// js/firebase/firebase-market.js — P2P БИРЖА + REGISTERED PLATES (v1.4.1)
+// js/firebase/firebase-market.js — P2P БИРЖА + REGISTERED PLATES (v1.5.0 FIXED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.4.1 (КРИТИЧЕСКИЙ ФИКС ВЫКУПА P2P ЛОТОВ):
-//   - ФИКС: buyLotAtomic теперь атомарно убирает проданный автомобиль
-//     из документа garages/{sellerId} продавца в Firestore.
-//   - ФИКС: добавлена глобальная функция window.buyP2PLotDirect(lotId),
-//     которая корректно обрабатывает кнопку «Выкупить» для P2P-лотов.
-//   - ФИКС: реактивное удаление проданного лота из state.p2pMarketListings
-//     и обновление UI через renderMarketFeed().
+// ⭐ v1.5.0 (P2P TRADING & DEV MODE REPAIR):
+//   - ФИКС: Снято искусственное ограничение на публикацию лотов в DEV/локальном режиме.
+//   - ФИКС: Безопасный fetchLots без падения из-за отсутствия составных индексов.
+//   - ФИКС: Подписка subscribeToLots обновляет активный экран P2P-биржи в телефоне (AppM).
+//   - Сохранены все аукционы номеров, Registered Plates и атомарный выкуп.
 // ========================================================
 
 import {
@@ -39,8 +37,14 @@ if (!FB_Core) {
 
 const db = FB_Core.db;
 const devLogFirestore = FB_Core.devLogFirestore;
-const TTL_CONFIG = FB_Core.TTL_CONFIG;
-const LIMITS = FB_Core.LIMITS;
+const TTL_CONFIG = FB_Core.TTL_CONFIG || {
+  market_lots: 259200000,
+  notifications: 604800000,
+  transactions: 7776000000
+};
+const LIMITS = FB_Core.LIMITS || {
+  maxLotsPerFetch: 100
+};
 
 // ========================================================
 // 2. КОНСТАНТЫ
@@ -86,12 +90,23 @@ function getCurrentPlayerProfile() {
       id: String(window.state.player.uid),
       name: window.state.player.name || "Перекуп",
       username: "",
+      photoUrl: window.state.player?.avatarUrl || null,
+      isTelegram: false
+    };
+  }
+
+  const tgUid = window.TelegramAuthManager?.getVerifiedUserId() || window.tgUserId;
+  if (tgUid) {
+    return {
+      id: String(tgUid),
+      name: window.state?.player?.name || "Перекуп",
+      username: "",
       photoUrl: null,
       isTelegram: false
     };
   }
 
-  return null;
+  return { id: "player_local", name: "Перекуп", username: "", photoUrl: null, isTelegram: false };
 }
 
 // ========================================================
@@ -99,7 +114,11 @@ function getCurrentPlayerProfile() {
 // ========================================================
 function _sortByTimestampDesc(items) {
   if (!Array.isArray(items)) return [];
-  return [...items].sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+  return [...items].sort((a, b) => {
+    const ta = Number(b.createdAt || b.timestamp || 0);
+    const tb = Number(a.createdAt || a.timestamp || 0);
+    return ta - tb;
+  });
 }
 
 // ========================================================
@@ -118,7 +137,7 @@ const RegisteredPlatesManager = {
     }
     const docId = cleanPlate.replace(/\s+/g, "_");
     const plateRef = doc(db, "registered_plates", docId);
-    const targetUid = ownerId || FB_Core.Auth.getVerifiedUserId();
+    const targetUid = ownerId || FB_Core.Auth?.getVerifiedUserId?.();
     if (!targetUid) return { success: false, error: "Нет владельца" };
 
     try {
@@ -151,7 +170,7 @@ const RegisteredPlatesManager = {
     if (!cleanPlate || cleanPlate.includes("ТРАНЗИТ")) return true;
     const docId = cleanPlate.replace(/\s+/g, "_");
     const plateRef = doc(db, "registered_plates", docId);
-    const targetUid = ownerId || FB_Core.Auth.getVerifiedUserId();
+    const targetUid = ownerId || FB_Core.Auth?.getVerifiedUserId?.();
     if (!targetUid) return false;
     try {
       await runTransaction(db, async (tx) => {
@@ -199,13 +218,11 @@ const MarketLotsManager = {
     if (!lotData || !profile?.id) return { success: false, error: "Нет данных" };
 
     const uidStr = String(profile.id);
-    if (uidStr === 'guest_777' || uidStr.startsWith('dev_')) {
-      return { success: false, error: "P2P доступен только через Telegram" };
-    }
 
     try {
-      const lotId = "lot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+      const lotId = String(lotData.id || lotData.lot_id || ("lot_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6)));
       const rawPrice = Math.max(1000, parseInt(lotData.price) || 50000);
+      const now = Date.now();
 
       if (lotData.itemData && (lotData.type === 'car' || lotData.type === 'cars')) {
         if (typeof window.ensureCarIdentity === 'function') {
@@ -220,13 +237,16 @@ const MarketLotsManager = {
         sellerId: uidStr,
         sellerName: profile.name || "Перекуп",
         sellerAvatar: profile.avatar || profile.photoUrl || '🧔',
-        type: lotData.type,
-        name: lotData.name,
+        type: lotData.type || 'cars',
+        name: lotData.name || 'Объект',
         price: rawPrice,
+        img: lotData.img || '',
+        fallback: lotData.fallback || '',
         itemData: lotData.itemData || {},
         status: "active",
-        timestamp: Date.now(),
-        expireAt: Date.now() + TTL_CONFIG.market_lots
+        createdAt: now,
+        timestamp: now,
+        expireAt: now + (TTL_CONFIG.market_lots || 259200000)
       };
 
       if (lotData.type === "plate" || lotData.type === "plates") {
@@ -238,15 +258,15 @@ const MarketLotsManager = {
             plate: clean,
             ownerId: uidStr,
             status: "on_sale",
-            updatedAt: Date.now()
+            updatedAt: now
           }, { merge: true });
         }
       }
 
-      await setDoc(doc(db, "market_lots", lotId), payload);
+      await setDoc(doc(db, "market_lots", lotId), payload, { merge: true });
 
       devLogFirestore('publishLot OK', lotId);
-      return { success: true, lotId };
+      return { success: true, lotId, lot: payload };
     } catch (e) {
       devLogFirestore('publishLot ERROR', e.message || String(e));
       return { success: false, error: e.message };
@@ -259,7 +279,7 @@ const MarketLotsManager = {
       const q = query(
         collection(db, "market_lots"),
         where("status", "==", "active"),
-        limit(LIMITS.maxLotsPerFetch)
+        limit(LIMITS.maxLotsPerFetch || 100)
       );
       const snap = await getDocs(q);
       const lots = [];
@@ -267,14 +287,29 @@ const MarketLotsManager = {
         const item = d.data();
         if (!item) return;
         if (item.expireAt && item.expireAt < now) return;
-        lots.push(item);
+        lots.push({ id: d.id, ...item });
       });
       const sorted = _sortByTimestampDesc(lots);
       devLogFirestore('fetchLots OK', `${sorted.length} лотов`);
       return sorted;
     } catch (e) {
-      devLogFirestore('fetchLots ERROR', e.message || String(e));
-      return [];
+      console.warn('[FB_Market] fetchLots filter query fallback:', e);
+      try {
+        const fallbackSnap = await getDocs(collection(db, "market_lots"));
+        const fallbackLots = [];
+        fallbackSnap.forEach(d => {
+          const item = d.data();
+          if (item && (item.status === 'active' || !item.status)) {
+            fallbackLots.push({ id: d.id, ...item });
+          }
+        });
+        const sorted = _sortByTimestampDesc(fallbackLots);
+        devLogFirestore('fetchLots Fallback OK', `${sorted.length} лотов`);
+        return sorted;
+      } catch (err) {
+        devLogFirestore('fetchLots ERROR', err.message || String(err));
+        return [];
+      }
     }
   },
 
@@ -284,7 +319,7 @@ const MarketLotsManager = {
       const q = query(
         collection(db, "market_lots"),
         where("status", "==", "active"),
-        limit(LIMITS.maxLotsPerFetch)
+        limit(LIMITS.maxLotsPerFetch || 100)
       );
 
       const unsubscribe = onSnapshot(q, (snap) => {
@@ -294,7 +329,7 @@ const MarketLotsManager = {
           const item = d.data();
           if (!item) return;
           if (item.expireAt && item.expireAt < now) return;
-          lots.push(item);
+          lots.push({ id: d.id, ...item });
         });
         const sorted = _sortByTimestampDesc(lots);
         try { callback(sorted); } catch (e) { console.warn('[MarketLots] callback error:', e); }
@@ -376,7 +411,6 @@ const MarketLotsManager = {
         const nowTs = Date.now();
 
         // 3. ЗАТЕМ ВСЕ WRITES
-        // Обновляем статус лота на "sold"
         tx.update(lotRef, {
           status: "sold",
           buyerId: String(profile.id),
@@ -386,7 +420,6 @@ const MarketLotsManager = {
           originalPrice: Number(lot.price) || 0
         });
 
-        // Удаляем проданный автомобиль из облачного гаража продавца
         if (sellerGarageSnap.exists() && (lot.type === 'car' || lot.type === 'cars')) {
           const sGarageData = sellerGarageSnap.data();
           const targetCarUid = lot.itemData?.uid;
@@ -401,7 +434,6 @@ const MarketLotsManager = {
           });
         }
 
-        // Фиксируем транзакцию
         tx.set(txRef, {
           tx_id: txId,
           lot_id: String(lotId),
@@ -410,7 +442,7 @@ const MarketLotsManager = {
           sellerId: String(lot.sellerId),
           sellerName: lot.sellerName || "Продавец",
           item: lot.name,
-          type: lot.type,
+          type: lot.type || 'cars',
           price: finalPrice,
           originalPrice: Number(lot.price) || 0,
           wasNegotiated: overridePrice !== null && overridePrice !== undefined && finalPrice !== Number(lot.price),
@@ -418,10 +450,9 @@ const MarketLotsManager = {
           payout: sellerPayout,
           offerId: offerId || null,
           timestamp: nowTs,
-          expireAt: nowTs + TTL_CONFIG.transactions
+          expireAt: nowTs + (TTL_CONFIG.transactions || 7776000000)
         });
 
-        // Шлём продавцу уведомление о выплате средств
         const isNegotiated = overridePrice !== null && overridePrice !== undefined && finalPrice !== Number(lot.price);
         const notifText = isNegotiated
           ? `Покупатель ${profile.name} приобрёл «${lot.name}» после торга за ${finalPrice.toLocaleString()} ₽ (начислено: +${sellerPayout.toLocaleString()} ₽).`
@@ -437,7 +468,7 @@ const MarketLotsManager = {
           read: false,
           claimed: false,
           timestamp: nowTs,
-          expireAt: nowTs + TTL_CONFIG.notifications
+          expireAt: nowTs + (TTL_CONFIG.notifications || 604800000)
         });
 
         if (lot.type === "plate" || lot.type === "plates") {
@@ -480,7 +511,7 @@ const MarketLotsManager = {
   },
 
   async cancelLot(lotId, sellerId) {
-    const targetUid = sellerId || FB_Core.Auth.getVerifiedUserId();
+    const targetUid = sellerId || FB_Core.Auth?.getVerifiedUserId?.();
     if (!targetUid) return false;
     try {
       const lotRef = doc(db, "market_lots", String(lotId));
@@ -743,7 +774,7 @@ const PlatesAuctionManager = {
                         read: false,
                         claimed: false,
                         timestamp: now,
-                        expireAt: now + TTL_CONFIG.notifications
+                        expireAt: now + (TTL_CONFIG.notifications || 604800000)
                     });
 
                     const sellerNotifRef = doc(db, "notifications", "notif_" + now + "_" + Math.random().toString(36).substring(2, 6));
@@ -757,7 +788,7 @@ const PlatesAuctionManager = {
                         read: false,
                         claimed: false,
                         timestamp: now,
-                        expireAt: now + TTL_CONFIG.notifications
+                        expireAt: now + (TTL_CONFIG.notifications || 604800000)
                     });
 
                     tx.update(auctionRef, {
@@ -864,10 +895,8 @@ window.buyP2PLotDirect = async function(lotId) {
     const boughtLot = res.lot;
     const finalPrice = res.finalPrice;
 
-    // Списываем средства локально
     window.state.player.cash -= finalPrice;
 
-    // Добавляем машину в гараж
     if (boughtLot.type === 'car' || boughtLot.type === 'cars') {
       const carData = Object.assign({}, boughtLot.itemData || {});
       carData.name = boughtLot.name;
@@ -878,7 +907,6 @@ window.buyP2PLotDirect = async function(lotId) {
       window.state.garage.push(carData);
     }
 
-    // Удаляем из локальных списков рынка
     if (Array.isArray(window.state.p2pMarketListings)) {
       window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l =>
         l && String(l.id || l.lot_id) !== String(lotId)
@@ -894,6 +922,11 @@ window.buyP2PLotDirect = async function(lotId) {
     if (typeof updateHeaderUI === 'function') updateHeaderUI();
     if (typeof renderMarketFeed === 'function') renderMarketFeed();
     if (typeof renderGarage === 'function') renderGarage();
+
+    const area = document.getElementById('p2pLotsArea');
+    if (area && window.AppM?.renderP2PLotsHtml) {
+      area.innerHTML = window.AppM.renderP2PLotsHtml(window.AppM.marketFilter || 'cars');
+    }
 
     if (window.AudioFx) {
       window.AudioFx.play('win');
@@ -917,6 +950,10 @@ if (typeof window !== 'undefined') {
       window.state.p2pMarketListings = activeLots;
       if (typeof renderMarketFeed === 'function') {
         renderMarketFeed();
+      }
+      const area = document.getElementById('p2pLotsArea');
+      if (area && window.AppM?.renderP2PLotsHtml) {
+        area.innerHTML = window.AppM.renderP2PLotsHtml(window.AppM.marketFilter || 'cars');
       }
     }
   });
@@ -945,4 +982,9 @@ window.FB_MarketLots = MarketLotsManager;
 window.FB_RegisteredPlates = RegisteredPlatesManager;
 window.FB_PlatesAuction = PlatesAuctionManager;
 
-console.log('[💱 FB_Market v1.4.1] Атомарный выкуп с удалением авто из чужого гаража + Realtime подписка ✓');
+if (window.FB_Bridge) {
+  window.FB_Bridge.MarketLots = MarketLotsManager;
+  window.FB_Bridge.Plates = RegisteredPlatesManager;
+}
+
+console.log('[💱 FB_Market v1.5.0] Полная версия: Атомарный выкуп, Аукционы, Гаражи и подписка AppM ✓');
