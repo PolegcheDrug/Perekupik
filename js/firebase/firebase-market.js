@@ -1,8 +1,13 @@
 // ========================================================
-// js/firebase/firebase-market.js — P2P БИРЖА + REGISTERED PLATES (v1.5.0 FIXED)
+// js/firebase/firebase-market.js — P2P БИРЖА + REGISTERED PLATES + AUTO-LIQUIDATION (v1.6.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.5.0 (P2P TRADING & DEV MODE REPAIR):
+// ⭐ v1.6.0 (STALE LOTS AUTO-BUYOUT & INCIDENTS):
+//   - Встроен автовыкуп зависших лотов (> 24 часов):
+//       • При открытии биржи или запуске сессии проверяются устаревшие лоты игрока.
+//       • Если лот провисел более 24 часов, он атомарно выкупается ботом с дисконтом 25–50%
+//         либо списывается в рамках одного из 5 сценариев (мошенники, ДТП на стоянке, угон, эвакуация, перекупы).
+//       • Создается системное уведомление в notifications с детальным описанием и выплатой.
 //   - ФИКС: Снято искусственное ограничение на публикацию лотов в DEV/локальном режиме.
 //   - ФИКС: Безопасный fetchLots без падения из-за отсутствия составных индексов.
 //   - ФИКС: Подписка subscribeToLots обновляет активный экран P2P-биржи в телефоне (AppM).
@@ -53,6 +58,8 @@ const MARKET_FEE_PERCENT = 0.03;
 const AUCTION_FEE_PERCENT = 0.05;
 const OVERRIDE_PRICE_MIN_RATIO = 0.10;
 const OVERRIDE_PRICE_MAX_RATIO = 2.00;
+
+const LOT_STALE_TIMEOUT_MS = 24 * 60 * 60 * 1000; // 24 часа
 
 const AUCTION_CONFIG = {
     minBidStep: 5000,
@@ -122,7 +129,93 @@ function _sortByTimestampDesc(items) {
 }
 
 // ========================================================
-// 5. REGISTERED PLATES MANAGER
+// 5. ГЕНЕРАТОР ИНЦИДЕНТОВ ДЛЯ ЗАВИСШИХ ЛОТОВ
+// ========================================================
+function generateStaleLotIncident(lotName, askingPrice) {
+  const randomPercent = (min, max) => Math.floor(min + Math.random() * (max - min + 1));
+
+  const scenarios = [
+    {
+      type: "scam_buyer",
+      title: "🕵️‍♂️ Нарвались на мошенников!",
+      generate: () => {
+        const disc = randomPercent(30, 50);
+        const payout = Math.max(0, Math.round(askingPrice * (1 - disc / 100)));
+        return {
+          disc,
+          payout,
+          text: `Лот «${lotName}» провисел более 24 часов. На сделку приехали мутные типы: запудрили мозги поддельными дефектами и навязали кабальную расписку с дисконтом ${disc}%. Получено: ${payout.toLocaleString()} ₽ (потери: -${(askingPrice - payout).toLocaleString()} ₽).`
+        };
+      }
+    },
+    {
+      type: "urgent_bot_buyout",
+      title: "🏢 Срочный автовыкуп салоном",
+      generate: () => {
+        const disc = randomPercent(25, 40);
+        const payout = Math.max(0, Math.round(askingPrice * (1 - disc / 100)));
+        return {
+          disc,
+          payout,
+          text: `Поскольку покупатели не нашлись за сутки, бот-агрегатор выкупил «${lotName}» по программе экспресс-трейд-ин со скидкой ${disc}%. Выручено: ${payout.toLocaleString()} ₽.`
+        };
+      }
+    },
+    {
+      type: "parking_crash",
+      title: "💥 ДТП на стоянке продажи!",
+      generate: () => {
+        const disc = randomPercent(45, 60);
+        const payout = Math.max(0, Math.round(askingPrice * (1 - disc / 100)));
+        return {
+          disc,
+          payout,
+          text: `Пока «${lotName}» стоял на авторынке, в него сдал задом грузовик! Виновник скрылся, а разбитый кузов пришлось экстренно отдать перекупам на разборку за ${payout.toLocaleString()} ₽ (уценка: -${disc}%).`
+        };
+      }
+    },
+    {
+      type: "car_theft",
+      title: "🚨 Автомобиль угнали с парковки!",
+      generate: () => {
+        const disc = 100;
+        const payout = 0;
+        return {
+          disc,
+          payout,
+          text: `Спустя сутки простоя на неохраняемой площадке «${lotName}» был угнан неизвестными! Полиция разводит руками, автомобиль объявлен в розыск. Потери составили всю стоимость: ${askingPrice.toLocaleString()} ₽.`
+        };
+      }
+    },
+    {
+      type: "impound_evacuation",
+      title: "🚔 Эвакуация и штрафстоянка",
+      generate: () => {
+        const disc = randomPercent(35, 50);
+        const payout = Math.max(0, Math.round(askingPrice * (1 - disc / 100)));
+        return {
+          disc,
+          payout,
+          text: `Место показа «${lotName}» оказалось зоной платной стоянки. Машину эвакуировали, а накопившийся штраф съел ${disc}% её стоимости. Чистый остаток после покрытия расходов: ${payout.toLocaleString()} ₽.`
+        };
+      }
+    }
+  ];
+
+  const chosen = scenarios[Math.floor(Math.random() * scenarios.length)];
+  const details = chosen.generate();
+
+  return {
+    type: chosen.type,
+    title: chosen.title,
+    discountPct: details.disc,
+    payout: details.payout,
+    text: details.text
+  };
+}
+
+// ========================================================
+// 6. REGISTERED PLATES MANAGER
 // ========================================================
 const RegisteredPlatesManager = {
   cleanPlateString(plateStr) {
@@ -208,10 +301,98 @@ const RegisteredPlatesManager = {
 };
 
 // ========================================================
-// 6. MARKET LOTS MANAGER
+// 7. MARKET LOTS MANAGER
 // ========================================================
 const MarketLotsManager = {
   _listeners: [],
+
+  async checkAndLiquidateStaleLots(userId = null) {
+    try {
+      const targetUser = userId || getCurrentPlayerProfile()?.id;
+      if (!targetUser) return 0;
+
+      const now = Date.now();
+      const q = query(
+        collection(db, "market_lots"),
+        where("sellerId", "==", String(targetUser)),
+        where("status", "==", "active")
+      );
+
+      const snap = await getDocs(q);
+      if (snap.empty) return 0;
+
+      let liquidatedCount = 0;
+
+      for (const d of snap.docs) {
+        const lot = d.data();
+        const lotId = d.id;
+        const createdAt = Number(lot.createdAt || lot.timestamp || 0);
+
+        if (createdAt && (now - createdAt >= LOT_STALE_TIMEOUT_MS)) {
+          const askingPrice = Number(lot.price) || 50000;
+          const lotName = lot.name || 'Транспорт';
+          const incident = generateStaleLotIncident(lotName, askingPrice);
+
+          const lotRef = doc(db, "market_lots", lotId);
+          const notifId = "notif_liq_" + now + "_" + Math.random().toString(36).substring(2, 6);
+          const notifRef = doc(db, "notifications", notifId);
+          const txId = "tx_liq_" + now + "_" + Math.random().toString(36).substring(2, 6);
+          const txRef = doc(db, "transactions", txId);
+
+          await runTransaction(db, async (tx) => {
+            const currentLotSnap = await tx.get(lotRef);
+            if (!currentLotSnap.exists() || currentLotSnap.data().status !== "active") return;
+
+            tx.update(lotRef, {
+              status: "sold",
+              buyerId: "bot_liquidator",
+              buyerName: "Служба утилизации/рынок",
+              soldAt: now,
+              finalPrice: incident.payout,
+              originalPrice: askingPrice,
+              liquidationType: incident.type,
+              liquidationDiscount: incident.discountPct
+            });
+
+            tx.set(notifRef, {
+              toUser: String(targetUser),
+              type: "deal_payout",
+              title: incident.title,
+              text: incident.text,
+              amount: incident.payout,
+              lotId: lotId,
+              read: false,
+              claimed: false,
+              timestamp: now,
+              expireAt: now + (TTL_CONFIG.notifications || 604800000)
+            });
+
+            tx.set(txRef, {
+              tx_id: txId,
+              lot_id: lotId,
+              sellerId: String(targetUser),
+              buyerId: "bot_liquidator",
+              buyerName: "Автоликвидация",
+              item: lotName,
+              price: incident.payout,
+              originalPrice: askingPrice,
+              fee: 0,
+              payout: incident.payout,
+              timestamp: now
+            });
+          });
+
+          liquidatedCount++;
+          devLogFirestore('Stale lot liquidated', `${lotId} → ${incident.title} (${incident.payout} ₽)`);
+        }
+      }
+
+      return liquidatedCount;
+    } catch (e) {
+      console.warn('[FB_Market] checkAndLiquidateStaleLots error:', e);
+      return 0;
+    }
+  },
 
   async publishLot(lotData, sellerProfile) {
     const profile = sellerProfile || getCurrentPlayerProfile();
@@ -275,6 +456,8 @@ const MarketLotsManager = {
 
   async fetchLots(force = false) {
     try {
+      this.checkAndLiquidateStaleLots().catch(() => {});
+
       const now = Date.now();
       const q = query(
         collection(db, "market_lots"),
@@ -582,7 +765,7 @@ const MarketLotsManager = {
 };
 
 // ========================================================
-// 7. PLATES AUCTION MANAGER
+// 8. PLATES AUCTION MANAGER
 // ========================================================
 const PlatesAuctionManager = {
     _listeners: [],
@@ -873,7 +1056,7 @@ const PlatesAuctionManager = {
 };
 
 // ========================================================
-// 8. ПРЯМОЙ ВЫКУП P2P ЛОТА (КНОПКА «ВЫКУПИТЬ»)
+// 9. ПРЯМОЙ ВЫКУП P2P ЛОТА (КНОПКА «ВЫКУПИТЬ»)
 // ========================================================
 window.buyP2PLotDirect = async function(lotId) {
   const toast = (m) => { if (typeof showToast === 'function') showToast(m); };
@@ -942,7 +1125,7 @@ window.buyP2PLotDirect = async function(lotId) {
 };
 
 // ========================================================
-// 9. АВТОПОДПИСКА НА ОБНОВЛЕНИЯ БИРЖИ В РЕАЛЬНОМ ВРЕМЕНИ
+// 10. АВТОПОДПИСКА НА ОБНОВЛЕНИЯ БИРЖИ В РЕАЛЬНОМ ВРЕМЕНИ
 // ========================================================
 if (typeof window !== 'undefined') {
   MarketLotsManager.subscribeToLots((activeLots) => {
@@ -957,10 +1140,15 @@ if (typeof window !== 'undefined') {
       }
     }
   });
+
+  // Запуск проверки зависших лотов при старте скрипта
+  setTimeout(() => {
+    MarketLotsManager.checkAndLiquidateStaleLots().catch(() => {});
+  }, 3500);
 }
 
 // ========================================================
-// 10. ЭКСПОРТ
+// 11. ЭКСПОРТ
 // ========================================================
 window.FB_Market = {
   MARKET_FEE_PERCENT,
@@ -968,6 +1156,7 @@ window.FB_Market = {
   AUCTION_CONFIG,
   OVERRIDE_PRICE_MIN_RATIO,
   OVERRIDE_PRICE_MAX_RATIO,
+  LOT_STALE_TIMEOUT_MS,
   MarketLots: MarketLotsManager,
   Plates: RegisteredPlatesManager,
   PlatesAuction: PlatesAuctionManager,
@@ -975,7 +1164,8 @@ window.FB_Market = {
     buyLot: (lotId, buyerProfile, buyerCash, overridePrice = null, offerId = null) =>
       MarketLotsManager.buyLotAtomic(lotId, buyerProfile, buyerCash, overridePrice, offerId)
   },
-  getCurrentPlayerProfile
+  getCurrentPlayerProfile,
+  generateStaleLotIncident
 };
 
 window.FB_MarketLots = MarketLotsManager;
@@ -987,4 +1177,4 @@ if (window.FB_Bridge) {
   window.FB_Bridge.Plates = RegisteredPlatesManager;
 }
 
-console.log('[💱 FB_Market v1.5.0] Полная версия: Атомарный выкуп, Аукционы, Гаражи и подписка AppM ✓');
+console.log('[💱 FB_Market v1.6.0] Полная версия: Автовыкуп >24ч, Атомарный выкуп, Аукционы, Гаражи и подписка AppM ✓');

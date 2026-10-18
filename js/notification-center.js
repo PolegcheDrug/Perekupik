@@ -1,12 +1,17 @@
 // ========================================================
-// js/notification-center.js — ЕДИНЫЙ ЦЕНТР УВЕДОМЛЕНИЙ (v2.1.1)
+// js/notification-center.js — ЕДИНЫЙ ЦЕНТР УВЕДОМЛЕНИЙ (v2.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v2.2.0 (STALE LOTS & INCIDENT MODALS):
+//   - ДОБАВЛЕНО: Обработка инцидентов автоликвидации зависших лотов (>24ч):
+//       • Мошенники, автовыкуп с дисконтом, ДТП на стоянке, угон (0 ₽), штрафстоянка.
+//       • Полноценный вывод всплывающего модального окна вердикта (openVerdictModal),
+//         даже если выплата 0 ₽ (при угоне).
+//       • Корректное зачисление в почтовый ящик/баланс и очистка проданных лотов из стейта.
 //
 // ⭐ v2.1.1 (P2P CAR DELIVERY DEBIT):
 //   - ФИКС: _handleP2PDealCarDelivered теперь дебетует cash
 //     покупателя и добавляет авто в гараж из meta.carData.
-//     Раньше показывал только тост — покупатель получал
-//     уведомление «авто ваше», но в гараже ничего не появлялось.
 //     Срабатывает при сценарии «продавец принял оффер, покупатель
 //     был оффлайн» — при следующем заходе покупателя в игру
 //     processStartupNotifications подхватывает уведомление и
@@ -22,23 +27,9 @@
 //       • p2p_offer_cancelled — отменён
 //       • p2p_offer_expired   — истёк
 //     Каждый показывает тост + эмитит EventBus.
-//
-//   - ДОБАВЛЕНО: _showIncomingOfferModal — минимальная модалка
-//     ответа на оффер (Принять / Встречное / Отклонить) через
-//     P2POffersManager.
-//
-//   - ФИКС: _handleNewMessage читает message || text и
-//     dialogId || meta.dialogId. Раньше читал только text и
-//     dialogId на верхнем уровне — а queueP2PNotification пишет
-//     message в text, а dialogId в meta.dialogId.
-//
-//   - ФИКС: _handleDealPayout корректно начисляет деньги
-//     напрямую в state.player.cash, если pushToMailbox недоступна.
-//
-//   - УДАЛЕНО: _handleLegacyP2POffer (больше не нужна).
-//
-// ⭐ v2.0.0 (SPRINT 1 — РЕДИЗАЙН P2P):
-//   - Типы p2p_deal_* и интеграция с P2PDKPModal.
+//   - ДОБАВЛЕНО: _showIncomingOfferModal — модалка ответа на оффер.
+//   - ФИКС: _handleNewMessage читает message || text и dialogId || meta.dialogId.
+//   - ФИКС: _handleDealPayout корректно начисляет деньги напрямую в state.player.cash.
 //
 // ВАЖНО: загружается ПОСЛЕ firebase-*, p2p-deals.js и p2p-deals-modal.js
 // ========================================================
@@ -70,7 +61,7 @@
 
             try {
                 switch (notif.type) {
-                    // === ЭКОНОМИКА ===
+                    // === ЭКОНОМИКА И ИНЦИДЕНТЫ ===
                     case 'deal_payout':
                         handled = this._handleDealPayout(notif);
                         break;
@@ -81,7 +72,7 @@
                         handled = this._handleLotSold(notif);
                         break;
 
-                    // === P2P ОФФЕРЫ (v2.1.0) ===
+                    // === P2P ОФФЕРЫ ===
                     case 'p2p_offer_received':
                         handled = this._handleP2POfferReceived(notif);
                         break;
@@ -134,7 +125,7 @@
                         handled = this._handleNewMessage(notif);
                         break;
 
-                    // === TRADE OFFERS (старые, обмен авто) ===
+                    // === TRADE OFFERS ===
                     case 'trade_offer':
                         handled = this._handleTradeOffer(notif);
                         break;
@@ -231,12 +222,6 @@
 
         // ====================================================
         // P2P ОФФЕРЫ — ОБРАБОТЧИКИ
-        //
-        // Данные приходят из P2PNotificationsManager.queueP2PNotification:
-        //   notif.message  — текст
-        //   notif.fromUser — ID отправителя
-        //   notif.fromUserName
-        //   notif.meta.offerId / lotId / carName / counterPrice
         // ====================================================
 
         _handleP2POfferReceived(notif) {
@@ -550,7 +535,7 @@
         },
 
         // ====================================================
-        // P2P ДКП — обработчики (типы p2p_deal_*)
+        // P2P ДКП — ОБРАБОТЧИКИ (типы p2p_deal_*)
         // ====================================================
 
         _handleP2PDealCreated(notif) {
@@ -690,19 +675,6 @@
             return true;
         },
 
-        /**
-         * ⭐ v2.1.1: Авто доставлено покупателю — списываем cash,
-         * добавляем авто из meta.carData в гараж.
-         *
-         * Срабатывает при сценарии «продавец принял оффер,
-         * покупатель был оффлайн» — при следующем заходе покупателя
-         * в игру processStartupNotifications подхватывает уведомление
-         * и локально завершает сделку.
-         *
-         * Если покупатель был онлайн и сам принял counter-offer —
-         * p2p-offers.js v1.4.0 уже применил _applyBuyerSideCompletion,
-         * и эта функция не вызывается (skipBuyerNotif: true).
-         */
         _handleP2PDealCarDelivered(notif) {
             const meta = notif.meta || {};
             const carData = meta.carData;
@@ -778,12 +750,49 @@
         },
 
         // ====================================================
-        // ЭКОНОМИКА
+        // ЭКОНОМИКА И ИНЦИДЕНТЫ ЗАВИСШИХ ЛОТОВ
         // ====================================================
 
         _handleDealPayout(notif) {
             const amount = Number(notif.amount) || 0;
-            if (amount <= 0) return false;
+            const title = String(notif.title || '');
+            const text = String(notif.text || notif.message || '');
+
+            const isIncident = title.includes("мошенник") || 
+                              title.includes("угнали") || 
+                              title.includes("ДТП") || 
+                              title.includes("штрафстоян") ||
+                              title.includes("выкуп салоном") ||
+                              title.includes("экспресс-трейд-ин");
+
+            // Если лот угнан (компенсация 0) или случился инцидент — выводим модальное окно
+            if (isIncident) {
+                if (typeof openVerdictModal === 'function') {
+                    openVerdictModal(
+                        title,
+                        `${text}\n\n${amount > 0 ? `💰 Компенсация / выплата: +${amount.toLocaleString()} ₽` : '❌ Машина утеряна. Компенсация: 0 ₽'}`,
+                        amount > 0
+                    );
+                } else if (typeof showToast === 'function') {
+                    showToast(`${title}: ${amount > 0 ? `+${amount.toLocaleString()} ₽` : 'потери 100%'}`);
+                }
+
+                if (window.AudioFx) {
+                    if (amount > 0) {
+                        window.AudioFx.play('cash');
+                        window.AudioFx.haptic('success');
+                    } else {
+                        window.AudioFx.play('error');
+                        window.AudioFx.haptic('error');
+                    }
+                }
+            }
+
+            if (amount <= 0) {
+                // Если сумма 0 (угон), удаляем лот из локального списка и выходим
+                this._cleanLocalMarketLot(notif.lotId || notif.offerId);
+                return isIncident;
+            }
 
             let usedMailbox = false;
             try {
@@ -791,10 +800,10 @@
                     window.pushToMailbox({
                         type: "cash",
                         amount: amount,
-                        title: `Продажа P2P: ${notif.title || 'Лот'}`,
-                        sender: "P2P Биржа M+",
-                        desc: `Покупатель приобрёл ваш лот! Сумма: ${amount.toLocaleString()} ₽.`,
-                        badge: "P2P ВЫПЛАТА"
+                        title: notif.title || 'Выплата за лот',
+                        sender: isIncident ? "Служба урегулирования M+" : "P2P Биржа M+",
+                        desc: text || `Сумма: ${amount.toLocaleString()} ₽.`,
+                        badge: isIncident ? "ИНЦИДЕНТ" : "P2P ВЫПЛАТА"
                     });
                     usedMailbox = true;
                 }
@@ -807,29 +816,18 @@
                 if (typeof spawnFloatingReward === 'function') spawnFloatingReward(`+${amount.toLocaleString()} ₽`);
             }
 
-            if (typeof showToast === 'function') {
+            if (!isIncident && typeof showToast === 'function') {
                 showToast(`💰 Продажа P2P! +${amount.toLocaleString()} ₽`);
             }
-            if (window.AudioFx) {
+            if (!isIncident && window.AudioFx) {
                 window.AudioFx.play('win');
                 window.AudioFx.haptic('success');
             }
             if (typeof logBankTransaction === 'function') {
-                logBankTransaction(`P2P продажа: ${notif.title || 'Лот'}`, amount, true);
+                logBankTransaction(isIncident ? `Инцидент лота: ${title}` : `P2P продажа: ${title || 'Лот'}`, amount, true);
             }
 
-            try {
-                if (Array.isArray(window.state.p2pMarketListings)) {
-                    const lotId = notif.lotId || notif.offerId;
-                    window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l => {
-                        if (!l) return false;
-                        const lid = l.id || l.lot_id;
-                        if (lotId && String(lid) === String(lotId)) return false;
-                        if (notif.title && l.name === notif.title) return false;
-                        return true;
-                    });
-                }
-            } catch (e) {}
+            this._cleanLocalMarketLot(notif.lotId || notif.offerId, notif.title);
 
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
 
@@ -840,19 +838,32 @@
             return true;
         },
 
+        _cleanLocalMarketLot(lotId, title = null) {
+            try {
+                if (Array.isArray(window.state?.p2pMarketListings)) {
+                    window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l => {
+                        if (!l) return false;
+                        const lid = l.id || l.lot_id;
+                        if (lotId && String(lid) === String(lotId)) return false;
+                        if (title && l.name === title) return false;
+                        return true;
+                    });
+                }
+                if (Array.isArray(window.state?.marketFeed)) {
+                    window.state.marketFeed = window.state.marketFeed.filter(l => {
+                        if (!l) return false;
+                        const lid = l.id || l.lot_id;
+                        return !lotId || String(lid) !== String(lotId);
+                    });
+                }
+            } catch (e) {}
+        },
+
         _handleLotBought(notif) {
             const amount = Number(notif.amount) || 0;
             if (amount <= 0) return false;
 
-            try {
-                if (Array.isArray(window.state.p2pMarketListings)) {
-                    const lotId = notif.lotId || notif.offerId;
-                    window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l => {
-                        if (!l) return false;
-                        return String(l.id || l.lot_id) !== String(lotId);
-                    });
-                }
-            } catch (e) {}
+            this._cleanLocalMarketLot(notif.lotId || notif.offerId);
 
             if (typeof showToast === 'function') {
                 showToast(`🔔 Лот продан: ${notif.title || ''}`);
@@ -985,7 +996,7 @@
         },
 
         // ====================================================
-        // ЧАТ (читаем message || text, dialogId || meta.dialogId)
+        // ЧАТ
         // ====================================================
 
         _handleNewMessage(notif) {
@@ -1100,7 +1111,6 @@
 
     window.NotificationCenter = NotificationCenter;
 
-    console.log('[🔔 NotificationCenter v2.1.1] ФИКС: _handleP2PDealCarDelivered дебетует cash + добавляет авто ✓');
-    console.log('[🔔 NotificationCenter] p2p_offer_* реальные обработчики + _showIncomingOfferModal ✓');
+    console.log('[🔔 NotificationCenter v2.2.0] Модалки инцидентов зависших лотов, выкуп с дисконтом и угон (0 ₽) ✓');
 
 })();
