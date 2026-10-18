@@ -1,22 +1,18 @@
 // ========================================================
-// js/p2p-deals-modal.js — UI МОДАЛКИ ДКП МЕЖДУ ИГРОКАМИ (v1.1.0)
+// js/p2p-deals-modal.js — UI МОДАЛКИ ДКП МЕЖДУ ИГРОКАМИ (v1.1.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.1.0 (АВТОНОМНЫЙ P2P-МОДУЛЬ & ПОЛНЫЙ ФИКС ДКП):
-//   - ФИКС: Автоматическая инициализация window.P2PDeals при его отсутствии
-//     (предотвращает ошибку "Модуль P2P не загружен").
-//   - ФИКС: Автономное подписание и проведение сделки купли-продажи
-//     с зачислением авто/номеров в гараж и инвентарь игрока.
-//   - Управляет модалкой #modalP2PDKP из index.html.
-//   - Кнопка «Подписать» → P2PDeals.signDeal(dealId, role).
-//   - Кнопка «Отменить» → P2PDeals.cancelDeal(dealId).
+// ⭐ v1.1.1 (FIXED P2P LIFECYCLE & SYNC):
+//   - ФИКС: Безопасное подключение к window.P2PDeals без затирания модулей.
+//   - ФИКС: Поиск лотов по id и lot_id.
+//   - ФИКС: Сброс состояний кнопок и защита от зависания модалки при ошибках.
 // ========================================================
 
 (function() {
     'use strict';
 
     // ========================================================
-    // 0. АВТОНОМНЫЙ FALLBACK ДЛЯ P2PDeals (ЕСЛИ МОДУЛЬ НЕ ЗАГРУЖЕН)
+    // 0. БЕЗОПАСНЫЙ FALLBACK (ЕСЛИ МОДУЛЬ ЕЩЕ НЕ ПОДГРУЗИЛСЯ)
     // ========================================================
     if (!window.P2PDeals) {
         window.P2PDeals = {
@@ -42,15 +38,12 @@
             },
 
             async findActiveDealByLot(lotId) {
-                if (this._activeDeals.has(lotId)) {
-                    return this._activeDeals.get(lotId);
-                }
-                return null;
+                return this._activeDeals.get(String(lotId)) || null;
             },
 
             async fetchDeal(dealId) {
                 for (let d of this._activeDeals.values()) {
-                    if (d && (d.id === dealId || d.dealId === dealId)) return d;
+                    if (d && (String(d.id) === String(dealId) || String(d.dealId) === String(dealId))) return d;
                 }
                 return null;
             },
@@ -59,14 +52,14 @@
                 const myUid = String(window.state?.player?.uid || window.tgUserId || 'me');
                 const myName = window.state?.player?.name || 'Перекуп #777';
 
-                const lot = (window.state?.p2pMarketListings || []).find(l => l && (l.id === lotId || l.lot_id === lotId));
+                const lot = (window.state?.p2pMarketListings || []).find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
                 const carData = lot?.itemData || { name: lot?.name || 'Автомобиль', plate: 'ТРАНЗИТ' };
 
                 const deal = {
                     id: 'deal_' + Date.now(),
                     dealId: 'deal_' + Date.now(),
-                    lotId: lotId,
-                    sellerId: lot ? lot.sellerId : 'seller_npc',
+                    lotId: String(lotId),
+                    sellerId: String(lot ? lot.sellerId : 'seller_npc'),
                     sellerName: lot ? lot.sellerName : 'Продавец',
                     buyerId: myUid,
                     buyerName: myName,
@@ -75,21 +68,21 @@
                     currentPrice: price || lot?.price || 100000,
                     status: 'drafting',
                     createdAt: Date.now(),
-                    expiresAt: Date.now() + 1800000, // 30 минут
+                    expiresAt: Date.now() + 1800000,
                     buyerSigned: false,
                     sellerSigned: false,
                     buyerSignedAt: null,
                     sellerSignedAt: null
                 };
 
-                this._activeDeals.set(lotId, deal);
+                this._activeDeals.set(String(lotId), deal);
                 return { success: true, dealId: deal.id, deal: deal };
             },
 
             async updateDealPrice(dealId, newPrice) {
                 const deal = await this.fetchDeal(dealId);
                 if (!deal) return { success: false, error: 'Сделка не найдена' };
-                deal.currentPrice = newPrice;
+                deal.currentPrice = Number(newPrice);
                 return { success: true, deal };
             },
 
@@ -97,22 +90,12 @@
                 const deal = await this.fetchDeal(dealId);
                 if (!deal) return { success: false, error: 'Сделка не найдена' };
 
-                if (role === 'buyer') {
-                    deal.buyerSigned = true;
-                    deal.buyerSignedAt = Date.now();
-                } else if (role === 'seller') {
-                    deal.sellerSigned = true;
-                    deal.sellerSignedAt = Date.now();
-                }
-
-                // В одиночном режиме/тестах — если одна сторона подписала, завершаем сделку
                 deal.status = 'completed';
                 deal.sellerSigned = true;
                 deal.buyerSigned = true;
-                if (!deal.sellerSignedAt) deal.sellerSignedAt = Date.now();
-                if (!deal.buyerSignedAt) deal.buyerSignedAt = Date.now();
+                deal.sellerSignedAt = Date.now();
+                deal.buyerSignedAt = Date.now();
 
-                // Финансовая проводка
                 const price = Number(deal.currentPrice) || 0;
                 if ((window.state?.player?.cash || 0) < price) {
                     return { success: false, error: 'Недостаточно денег на балансе!' };
@@ -120,7 +103,6 @@
 
                 window.state.player.cash -= price;
 
-                // Зачисление купленного авто в гараж
                 const car = Object.assign({}, deal.itemSnapshot || {});
                 if (!car.name) car.name = 'Приобретённый автомобиль';
                 car.purchaseCost = price;
@@ -128,16 +110,15 @@
                 if (!window.state.garage) window.state.garage = [];
                 window.state.garage.push(car);
 
-                // Удаление лота с биржи
                 if (deal.lotId) {
                     window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
-                        l && l.id !== deal.lotId && l.lot_id !== deal.lotId
+                        l && String(l.id) !== String(deal.lotId) && String(l.lot_id) !== String(deal.lotId)
                     );
                 }
 
-                if (typeof saveState === 'function') saveState();
-                if (typeof updateHeaderUI === 'function') updateHeaderUI();
-                if (typeof renderGarage === 'function') renderGarage();
+                if (typeof window.saveState === 'function') window.saveState();
+                if (typeof window.updateHeaderUI === 'function') window.updateHeaderUI();
+                if (typeof window.renderGarage === 'function') window.renderGarage();
 
                 if (window.EventBus) {
                     window.EventBus.emit('p2p:deal_completed', { dealId: deal.id, deal });
@@ -146,11 +127,11 @@
                 return { success: true, completed: true, deal };
             },
 
-            async cancelDeal(dealId, reason) {
+            async cancelDeal(dealId) {
                 const deal = await this.fetchDeal(dealId);
                 if (deal) {
                     deal.status = 'cancelled';
-                    this._activeDeals.delete(deal.lotId);
+                    this._activeDeals.delete(String(deal.lotId));
                 }
                 return { success: true };
             },
@@ -236,9 +217,6 @@
         return `${hh}:${mm}`;
     }
 
-    // ========================================================
-    // 3. ФОРМАТИРОВАНИЕ СТАТУСА
-    // ========================================================
     function _getStatusText(deal) {
         if (!deal) return '—';
         switch (deal.status) {
@@ -272,13 +250,25 @@
         }
     }
 
+    function _hexToRgb(hex) {
+        if (!hex || hex.indexOf('var(') === 0) {
+            if (hex === 'var(--cyan)')   return '0, 242, 254';
+            if (hex === 'var(--amber)')  return '255, 179, 0';
+            if (hex === 'var(--green)')  return '0, 230, 118';
+            if (hex === 'var(--red)')    return '255, 51, 102';
+            return '0, 242, 254';
+        }
+        const c = hex.replace('#', '');
+        const num = parseInt(c, 16);
+        return `${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}`;
+    }
+
     // ========================================================
-    // 4. ЗАПОЛНЕНИЕ UI
+    // 3. ЗАПОЛНЕНИЕ UI
     // ========================================================
     function _fillDealFields(deal) {
         if (!deal) return;
 
-        // Header
         const dealIdEl = _getEl('p2pDkpDealId');
         if (dealIdEl) {
             const shortId = String(deal.dealId || deal.id || '').slice(-8).toUpperCase();
@@ -287,7 +277,6 @@
         const dateEl = _getEl('p2pDkpDate');
         if (dateEl) dateEl.innerText = _fmtDate(deal.createdAt || Date.now());
 
-        // Стороны
         const sellerName = _getEl('p2pDkpSellerName');
         if (sellerName) sellerName.innerText = deal.sellerName || '—';
         const sellerIdEl = _getEl('p2pDkpSellerId');
@@ -297,7 +286,6 @@
         const buyerIdEl = _getEl('p2pDkpBuyerId');
         if (buyerIdEl) buyerIdEl.innerText = deal.buyerId || '—';
 
-        // Авто
         const snap = deal.itemSnapshot || {};
         const carNameEl = _getEl('p2pDkpCarName');
         if (carNameEl) carNameEl.innerText = snap.name || 'Автомобиль';
@@ -306,9 +294,8 @@
         const carMileageEl = _getEl('p2pDkpCarMileage');
         if (carMileageEl) carMileageEl.innerText = ((snap.mileage || 0).toLocaleString()) + ' км';
         const carPlateEl = _getEl('p2pDkpCarPlate');
-        if (carPlateEl) carPlateEl.innerText = snap.plate || 'ТРАНЗИТ';
+        if (carPlateEl) carPlateEl.innerText = snap.plate || snap.number || 'ТРАНЗИТ';
 
-        // Цена
         const currentPrice = Number(deal.currentPrice) || 0;
         const originalPrice = Number(deal.originalPrice) || currentPrice;
         const minAllowed = Math.round(originalPrice * 0.10);
@@ -344,7 +331,6 @@
             }
         }
 
-        // Комиссия и payout
         const fee = Math.round(currentPrice * 0.03);
         const payout = currentPrice - fee;
         const feeEl = _getEl('p2pDkpFee');
@@ -352,7 +338,6 @@
         const payoutEl = _getEl('p2pDkpPayout');
         if (payoutEl) payoutEl.innerText = _fmtMoney(payout);
 
-        // Подписи
         const sellerSig = _getEl('p2pDkpSellerSig');
         const sellerSigDate = _getEl('p2pDkpSellerSigDate');
         if (sellerSig) {
@@ -383,7 +368,6 @@
             buyerSigDate.innerText = deal.buyerSignedAt ? _fmtTime(deal.buyerSignedAt) : '';
         }
 
-        // Статус-баннер
         const statusText = _getEl('p2pDkpStatusText');
         if (statusText) {
             statusText.innerText = _getStatusText(deal);
@@ -396,7 +380,6 @@
             statusBadge.style.borderColor = _getStatusColor(deal);
         }
 
-        // Печать
         const stamp = _getEl('p2pDkpStamp');
         if (stamp) {
             if (deal.status === 'completed') {
@@ -406,7 +389,6 @@
             }
         }
 
-        // Кнопки
         const signBtn = _getEl('p2pDkpSignBtn');
         const cancelBtn = _getEl('p2pDkpCancelBtn');
         const closeBtn = _getEl('p2pDkpCloseBtn');
@@ -414,16 +396,11 @@
         const profile = _getMyProfile();
         const isBuyer = profile && String(deal.buyerId) === String(profile.id);
         const isSeller = profile && String(deal.sellerId) === String(profile.id);
-        const isParticipant = isBuyer || isSeller;
 
         const myRole = isBuyer ? 'buyer' : (isSeller ? 'seller' : 'buyer');
         const mySigned = myRole === 'buyer' ? deal.buyerSigned : deal.sellerSigned;
 
-        if (deal.status === 'completed') {
-            if (signBtn) signBtn.style.display = 'none';
-            if (cancelBtn) cancelBtn.style.display = 'none';
-            if (closeBtn) closeBtn.style.display = 'block';
-        } else if (deal.status === 'cancelled' || deal.status === 'expired') {
+        if (deal.status === 'completed' || deal.status === 'cancelled' || deal.status === 'expired') {
             if (signBtn) signBtn.style.display = 'none';
             if (cancelBtn) cancelBtn.style.display = 'none';
             if (closeBtn) closeBtn.style.display = 'block';
@@ -448,21 +425,8 @@
         }
     }
 
-    function _hexToRgb(hex) {
-        if (!hex || hex.indexOf('var(') === 0) {
-            if (hex === 'var(--cyan)')   return '0, 242, 254';
-            if (hex === 'var(--amber)')  return '255, 179, 0';
-            if (hex === 'var(--green)')  return '0, 230, 118';
-            if (hex === 'var(--red)')    return '255, 51, 102';
-            return '0, 242, 254';
-        }
-        const c = hex.replace('#', '');
-        const num = parseInt(c, 16);
-        return `${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}`;
-    }
-
     // ========================================================
-    // 5. ТАЙМЕР
+    // 4. ТАЙМЕР
     // ========================================================
     function _startTimer() {
         if (_timerInterval) clearInterval(_timerInterval);
@@ -505,7 +469,7 @@
     }
 
     // ========================================================
-    // 6. ГЛАВНОЕ API
+    // 5. ОСНОВНОЙ КОНТРОЛЛЕР МОДАЛКИ
     // ========================================================
     const P2PDKPModal = {
         async open(dealId, dealSnapshot) {
@@ -513,12 +477,12 @@
                 return _toast('❌ Нет ID сделки');
             }
 
-            _currentDealId = dealId;
+            _currentDealId = String(dealId);
             _currentDeal = dealSnapshot || null;
 
             if (!_currentDeal && window.P2PDeals?.fetchDeal) {
                 try {
-                    _currentDeal = await window.P2PDeals.fetchDeal(dealId);
+                    _currentDeal = await window.P2PDeals.fetchDeal(_currentDealId);
                 } catch (e) {
                     console.warn('[P2PDKPModal] fetchDeal error:', e);
                 }
@@ -575,6 +539,8 @@
             this._unsubscribe();
             _currentDealId = null;
             _currentDeal = null;
+            _signPending = false;
+            _cancelPending = false;
 
             if (window.ModalManager && typeof window.ModalManager.close === 'function') {
                 window.ModalManager.close('modalP2PDKP');
@@ -634,7 +600,7 @@
                 _signPending = false;
                 _fillDealFields(_currentDeal);
             } finally {
-                setTimeout(() => { _signPending = false; }, 1200);
+                setTimeout(() => { _signPending = false; }, 800);
             }
         },
 
@@ -658,7 +624,6 @@
                 _haptic('warning');
 
                 this.close();
-
             } catch (e) {
                 _toast(`❌ ${e.message}`);
             } finally {
@@ -704,7 +669,7 @@
     };
 
     // ========================================================
-    // 7. ПРИВЯЗКА ОБРАБОТЧИКОВ UI
+    // 6. ИНИЦИАЛИЗАЦИЯ СЛУШАТЕЛЕЙ UI
     // ========================================================
     function _bindUI() {
         const signBtn = _getEl('p2pDkpSignBtn');
@@ -734,7 +699,7 @@
                 const val = e.target.value;
                 debounceTimer = setTimeout(() => {
                     P2PDKPModal.onPriceInputChange(val);
-                }, 800);
+                }, 600);
             });
             priceInput.addEventListener('blur', (e) => {
                 clearTimeout(debounceTimer);
@@ -746,17 +711,13 @@
     if (typeof document !== 'undefined') {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
-                setTimeout(_bindUI, 500);
+                setTimeout(_bindUI, 300);
             });
         } else {
-            setTimeout(_bindUI, 500);
+            setTimeout(_bindUI, 300);
         }
     }
 
-    // ========================================================
-    // 8. ЭКСПОРТ
-    // ========================================================
     window.P2PDKPModal = P2PDKPModal;
-
-    console.log('[📝 p2p-deals-modal v1.1.0] Автономный P2P-контроллер и UI модалки ДКП загружен ✓');
+    console.log('[📝 p2p-deals-modal v1.1.1] UI модалки ДКП синхронизирован ✓');
 })();

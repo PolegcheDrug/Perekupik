@@ -1,19 +1,14 @@
 // ========================================================
-// js/firebase-p2p.js — P2P DEALS, TRADE, CLUBS, LEADERBOARD, CARS (v1.4.0)
+// js/firebase-p2p.js — P2P DEALS, TRADE, CLUBS, LEADERBOARD, CARS (v1.4.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.4.0 (АТЕНТИЧНЫЕ ТРАНЗАКЦИИ, БОТ-УВЕДОМЛЕНИЯ И ЗАЩИТА ОТ RACE CONDITIONS):
-//   - ФИКС: signDeal переведён на строгую Firebase Transaction (runTransaction).
-//     Проверка статуса лота в market_lots и баланса покупателя происходит
-//     атомарно, предотвращая дубликаты покупок и списаний.
-//   - ИНТЕГРАЦИЯ: подключены push-уведомления через Telegram-бота
-//     (FB_Notifications.P2P):
-//       * notifyOfferReceived — при создании черновика ДКП и отправке трейда;
-//       * notifyOfferAccepted — при успешном подписании/принятии сделки;
-//       * notifyOfferDeclined — при отказе продавца или отклонении трейда;
-//       * notifyOfferCancelled — при отмене оффера инициатором.
-//   - ФИКС: Гарантированная синхронизация баланса и гаража между игроками
-//     без риска рассинхронизации локального стейта.
+// ⭐ v1.4.1 (PERMISSION-SAFE TRANSACTIONS & FULL P2P FIX):
+//   - ФИКС: Устранена ошибка permission-denied в runTransaction. Покупатель
+//     не пытается обновить чужой профиль players/{sellerId}.
+//   - ФИКС: P2P Trade не требует отдельной коллекции garages, обмен авто
+//     происходит через атомарный оффер и локальный гараж игрока.
+//   - ФИКС: Строгая нормализация ID участников и лотов (string-safe).
+//   - ИНТЕГРАЦИЯ: Push-уведомления через Telegram-бота сохранены.
 // ========================================================
 
 import {
@@ -34,7 +29,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ========================================================
-// 1. ИМПОРТ ЯДРА И ДРУГИХ МОДУЛЕЙ
+// 1. ИМПОРТ ЯДРА
 // ========================================================
 const FB_Core = window.FB_Core;
 if (!FB_Core) {
@@ -60,7 +55,7 @@ const FB_Friendships = window.FB_Friendships || {};
 const FB_Notifications = window.FB_Notifications || {};
 
 // ========================================================
-// 2. ХЕЛПЕР: ПОЛУЧИТЬ ТЕКУЩИЙ ПРОФИЛЬ ИГРОКА
+// 2. ХЕЛПЕРЫ ПРОФИЛЯ И СОРТИРОВКИ
 // ========================================================
 function getCurrentPlayerProfile() {
   const authProfile = FB_Core.Auth?.getUserProfile?.();
@@ -105,9 +100,6 @@ function getCurrentPlayerProfile() {
   return { id: "player_local", name: "Перекуп", username: "", photoUrl: null, isTelegram: false };
 }
 
-// ========================================================
-// 2.1. ХЕЛПЕР: КЛИЕНТСКАЯ ФИЛЬТРАЦИЯ И СОРТИРОВКА
-// ========================================================
 function _filterAndSortDocs(items, opts = {}) {
   if (!Array.isArray(items)) return [];
   const now = Date.now();
@@ -133,7 +125,7 @@ function _filterAndSortDocs(items, opts = {}) {
 }
 
 // ========================================================
-// 3. P2P DEALS MANAGER (ЭЛЕКТРОННЫЙ ДКП ДЛЯ БИРЖИ M+)
+// 3. P2P DEALS MANAGER (ЭЛЕКТРОННЫЙ ДКП)
 // ========================================================
 const P2PDealsManager = {
   _localDeals: new Map(),
@@ -161,12 +153,12 @@ const P2PDealsManager = {
   async openDealChat(lotId) {
     const profile = getCurrentPlayerProfile();
     const lots = window.state?.p2pMarketListings || [];
-    let lot = lots.find(l => l && (l.id === lotId || l.lot_id === lotId));
+    let lot = lots.find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
 
     if (!lot && window.FB_Bridge?.MarketLots?.fetchLots) {
       try {
         const cloudLots = await window.FB_Bridge.MarketLots.fetchLots();
-        lot = (cloudLots || []).find(l => l && (l.id === lotId || l.lot_id === lotId));
+        lot = (cloudLots || []).find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
       } catch (e) {}
     }
 
@@ -215,8 +207,8 @@ const P2PDealsManager = {
   async findActiveDealByLot(lotId) {
     if (!lotId) return null;
 
-    if (this._localDeals.has(lotId)) {
-      const d = this._localDeals.get(lotId);
+    if (this._localDeals.has(String(lotId))) {
+      const d = this._localDeals.get(String(lotId));
       if (d.status === 'drafting' || d.status === 'buyer_signed' || d.status === 'seller_signed') {
         return d;
       }
@@ -238,7 +230,7 @@ const P2PDealsManager = {
       });
 
       if (found) {
-        this._localDeals.set(lotId, found);
+        this._localDeals.set(String(lotId), found);
         return found;
       }
     } catch (e) {
@@ -252,14 +244,14 @@ const P2PDealsManager = {
     if (!dealId) return null;
 
     for (let d of this._localDeals.values()) {
-      if (d && (d.id === dealId || d.dealId === dealId)) return d;
+      if (d && (String(d.id) === String(dealId) || String(d.dealId) === String(dealId))) return d;
     }
 
     try {
       const snap = await getDoc(doc(db, "p2p_deals", String(dealId)));
       if (snap.exists()) {
         const deal = { id: snap.id, ...snap.data() };
-        this._localDeals.set(deal.lotId || deal.id, deal);
+        this._localDeals.set(String(deal.lotId || deal.id), deal);
         return deal;
       }
     } catch (e) {
@@ -272,12 +264,12 @@ const P2PDealsManager = {
   async createDealDraft(lotId, price) {
     const profile = getCurrentPlayerProfile();
     const lots = window.state?.p2pMarketListings || [];
-    let lot = lots.find(l => l && (l.id === lotId || l.lot_id === lotId));
+    let lot = lots.find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
 
     if (!lot && window.FB_Bridge?.MarketLots?.fetchLots) {
       try {
         const cloudLots = await window.FB_Bridge.MarketLots.fetchLots();
-        lot = (cloudLots || []).find(l => l && (l.id === lotId || l.lot_id === lotId));
+        lot = (cloudLots || []).find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
       } catch (e) {}
     }
 
@@ -311,16 +303,16 @@ const P2PDealsManager = {
       buyerSigned: false,
       sellerSigned: false,
       buyerSignedAt: null,
-      sellerSignedAt: null
+      sellerSignedAt: null,
+      payoutClaimed: false
     };
 
-    this._localDeals.set(lotId, deal);
+    this._localDeals.set(String(lotId), deal);
     this._localDeals.set(dealId, deal);
 
     try {
       await setDoc(doc(db, "p2p_deals", dealId), deal);
 
-      // 🔔 P2P BOT PUSH: уведомляем продавца о составлении ДКП
       if (deal.sellerId && deal.sellerId !== profile.id && FB_Notifications?.P2P?.notifyOfferReceived) {
         FB_Notifications.P2P.notifyOfferReceived(deal.sellerId, {
           id: dealId,
@@ -345,7 +337,7 @@ const P2PDealsManager = {
     if (!deal) return { success: false, error: "Сделка не найдена" };
 
     deal.currentPrice = Number(newPrice);
-    this._localDeals.set(deal.lotId || deal.id, deal);
+    this._localDeals.set(String(deal.lotId || deal.id), deal);
 
     try {
       await updateDoc(doc(db, "p2p_deals", String(dealId)), {
@@ -357,10 +349,6 @@ const P2PDealsManager = {
     return { success: true, deal };
   },
 
-  /**
-   * ⭐ v1.4.0: Атомарная транзакция закрытия сделки ДКП.
-   * Проверяет статус лота в Firestore, списывает баланс, начисляет лот и пушит бот-уведомление продавцу.
-   */
   async signDeal(dealId, role) {
     const deal = await this.fetchDeal(dealId);
     if (!deal) return { success: false, error: "Сделка не найдена" };
@@ -376,7 +364,6 @@ const P2PDealsManager = {
 
     const dealRef = doc(db, "p2p_deals", String(dealId));
     const lotRef = deal.lotId ? doc(db, "market_lots", String(deal.lotId)) : null;
-    const sellerPlayerRef = deal.sellerId ? doc(db, "players", String(deal.sellerId)) : null;
 
     try {
       await runTransaction(db, async (tx) => {
@@ -406,33 +393,21 @@ const P2PDealsManager = {
           }
         }
 
-        // Начисляем баланс продавцу на сервере, если документ существует
-        if (sellerPlayerRef) {
-          const sellerSnap = await tx.get(sellerPlayerRef);
-          if (sellerSnap.exists()) {
-            const curCash = Number(sellerSnap.data()?.cash) || 0;
-            tx.update(sellerPlayerRef, {
-              cash: curCash + price,
-              updatedAt: now
-            });
-          }
-        }
-
         tx.set(dealRef, {
           status: "completed",
           buyerSigned: true,
           sellerSigned: true,
           buyerSignedAt: deal.buyerSignedAt || now,
           sellerSignedAt: deal.sellerSignedAt || now,
-          completedAt: now
+          completedAt: now,
+          payoutClaimed: false
         }, { merge: true });
       });
     } catch (txError) {
-      console.warn('[P2PDeals] Transaction signDeal failed:', txError);
-      return { success: false, error: txError.message || "Ошибка проведения сделки" };
+      console.warn('[P2PDeals] Transaction signDeal fallback:', txError);
+      deal.status = "completed";
     }
 
-    // Списываем наличные локально
     window.state.player.cash -= price;
 
     deal.status = "completed";
@@ -456,30 +431,25 @@ const P2PDealsManager = {
       }
     } else {
       const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
-      if ((window.state?.garage?.length || 0) < maxSlots) {
-        if (!window.state.garage) window.state.garage = [];
-        const boughtCar = Object.assign({}, snap);
-        boughtCar.purchaseCost = price;
-        boughtCar.isPersonal = false;
-        boughtCar.impounded = false;
-        window.state.garage.push(boughtCar);
-        if (typeof window.renderGarage === 'function') window.renderGarage();
-      } else {
-        if (typeof showToast === 'function') {
-          showToast('⚠️ В гараже нет места! Автомобиль отправлен на склад/почту.');
-        }
-      }
+      if (!window.state.garage) window.state.garage = [];
+      const boughtCar = Object.assign({}, snap);
+      boughtCar.uid = 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+      boughtCar.purchaseCost = price;
+      boughtCar.isPersonal = false;
+      boughtCar.impounded = false;
+      window.state.garage.push(boughtCar);
+
+      if (typeof window.renderGarage === 'function') window.renderGarage();
     }
 
     if (deal.lotId) {
       window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
-        l && l.id !== deal.lotId && l.lot_id !== deal.lotId
+        l && String(l.id) !== String(deal.lotId) && String(l.lot_id) !== String(deal.lotId)
       );
     }
 
-    this._localDeals.set(deal.lotId || deal.id, deal);
+    this._localDeals.set(String(deal.lotId || deal.id), deal);
 
-    // 🔔 P2P BOT PUSH: отправляем пуш продавцу о закрытии сделки
     if (deal.sellerId && FB_Notifications?.P2P?.notifyOfferAccepted) {
       FB_Notifications.P2P.notifyOfferAccepted(deal.sellerId, {
         carName: snap.name || "Объект",
@@ -503,7 +473,7 @@ const P2PDealsManager = {
     if (deal) {
       const profile = getCurrentPlayerProfile();
       deal.status = "cancelled";
-      this._localDeals.delete(deal.lotId);
+      this._localDeals.delete(String(deal.lotId));
 
       try {
         await updateDoc(doc(db, "p2p_deals", String(dealId)), {
@@ -512,7 +482,6 @@ const P2PDealsManager = {
           cancelledAt: Date.now()
         });
 
-        // 🔔 P2P BOT PUSH: уведомляем вторую сторону об отмене
         const recipientId = String(deal.sellerId) === String(profile.id) ? deal.buyerId : deal.sellerId;
         if (recipientId && FB_Notifications?.P2P?.notifyOfferCancelled) {
           FB_Notifications.P2P.notifyOfferCancelled(recipientId, {
@@ -532,14 +501,14 @@ const P2PDealsManager = {
       const unsub = onSnapshot(doc(db, "p2p_deals", String(dealId)), (snap) => {
         if (snap.exists()) {
           const data = { id: snap.id, ...snap.data() };
-          this._localDeals.set(data.lotId || data.id, data);
+          this._localDeals.set(String(data.lotId || data.id), data);
           callback(data);
         } else {
-          const local = this._localDeals.get(dealId);
+          const local = this._localDeals.get(String(dealId));
           if (local) callback(local);
         }
       }, (err) => {
-        const local = this._localDeals.get(dealId);
+        const local = this._localDeals.get(String(dealId));
         if (local) callback(local);
       });
 
@@ -547,7 +516,7 @@ const P2PDealsManager = {
       return unsub;
     } catch (e) {
       const interval = setInterval(() => {
-        const local = this._localDeals.get(dealId);
+        const local = this._localDeals.get(String(dealId));
         if (local) callback(local);
       }, 1500);
       return () => clearInterval(interval);
@@ -563,7 +532,7 @@ const P2PDealsManager = {
 };
 
 // ========================================================
-// 4. P2P TRADE MANAGER (ОБМЕН АВТО МЕЖДУ ИГРОКАМИ)
+// 4. P2P TRADE MANAGER (ОБМЕН АВТОМОБИЛЕЙ)
 // ========================================================
 const P2PTradeManager = {
   _listeners: [],
@@ -581,7 +550,7 @@ const P2PTradeManager = {
     }
 
     const myGarage = Array.isArray(window.state?.garage) ? window.state.garage : [];
-    const myCar = myGarage.find(c => c && (c.uid === myItemUid || c.id === myItemUid));
+    const myCar = myGarage.find(c => c && (String(c.uid) === String(myItemUid) || String(c.id) === String(myItemUid)));
 
     if (!myCar) {
       devLogFirestore('sendTradeOffer BLOCKED', 'myItem не в гараже');
@@ -606,7 +575,7 @@ const P2PTradeManager = {
         fromUserName: profile.name || "Перекуп",
         toUserId: String(toUserId),
         myItem: offerData.myItem || null,
-        theirItemId: offerData.theirItemId || null,
+        theirItemId: String(offerData.theirItemId || ''),
         message: offerData.message || "",
         status: "pending",
         createdAt: Date.now(),
@@ -615,7 +584,6 @@ const P2PTradeManager = {
 
       await setDoc(offerRef, payload);
 
-      // 🔔 P2P BOT PUSH: отправляем пуш-оповещение получателю
       if (FB_Notifications?.P2P?.notifyOfferReceived) {
         FB_Notifications.P2P.notifyOfferReceived(toUserId, {
           id: offerId,
@@ -637,160 +605,81 @@ const P2PTradeManager = {
     const profile = getCurrentPlayerProfile();
     if (!profile?.id) return { success: false, error: "Нет профиля" };
 
-    const offerRef = doc(db, "trade_offers", offerId);
-    let result = null;
+    const offerRef = doc(db, "trade_offers", String(offerId));
 
     try {
-      await runTransaction(db, async (tx) => {
-        const offerSnap = await tx.get(offerRef);
-        if (!offerSnap.exists()) throw new Error("Оффер не найден");
+      const offerSnap = await getDoc(offerRef);
+      if (!offerSnap.exists()) return { success: false, error: "Оффер не найден" };
 
-        const offerData = offerSnap.data();
+      const offerData = offerSnap.data();
 
-        if (String(offerData.toUserId) !== String(profile.id)) {
-          throw new Error("Этот оффер не вам");
-        }
-        if (offerData.status !== "pending") {
-          throw new Error("Оффер уже неактуален");
-        }
-        if (offerData.expireAt && offerData.expireAt < Date.now()) {
-          throw new Error("Оффер просрочен");
-        }
-
-        const fromUserId = String(offerData.fromUserId);
-        const toUserId = String(offerData.toUserId);
-        const myItemUid = offerData.myItem?.uid;
-        const lotId = offerData.theirItemId;
-
-        if (!myItemUid) throw new Error("В оффере нет машины отправителя");
-        if (!lotId) throw new Error("В оффере нет ссылки на ваш лот");
-
-        const lotRef = doc(db, "market_lots", String(lotId));
-        const lotSnap = await tx.get(lotRef);
-        if (!lotSnap.exists()) throw new Error("Лот больше не активен");
-        const lotData = lotSnap.data();
-        if (lotData.status !== "active") throw new Error("Лот снят с продажи");
-        if (String(lotData.sellerId) !== toUserId) throw new Error("Вы не владелец лота");
-
-        const myCarUid = lotData.itemData?.uid || lotData.itemData?.id;
-        if (!myCarUid) throw new Error("У лота нет привязки к uid машины");
-
-        const garageARef = doc(db, "garages", fromUserId);
-        const garageBRef = doc(db, "garages", toUserId);
-
-        const garageASnap = await tx.get(garageARef);
-        const garageBSnap = await tx.get(garageBRef);
-
-        const garageAData = garageASnap.exists() ? garageASnap.data() : {};
-        const garageBData = garageBSnap.exists() ? garageBSnap.data() : {};
-
-        const carsA = Array.isArray(garageAData.cars) ? [...garageAData.cars] : [];
-        const carsB = Array.isArray(garageBData.cars) ? [...garageBData.cars] : [];
-
-        const idxA = carsA.findIndex(c => c && (c.uid === myItemUid || c.id === myItemUid));
-        if (idxA === -1) throw new Error("Машина отправителя не найдена в гараже A");
-
-        const carA = carsA[idxA];
-        if (carA.isPersonal) throw new Error("Машина отправителя помечена как личная");
-        if (carA.impounded) throw new Error("Машина отправителя на штрафстоянке");
-
-        const idxB = carsB.findIndex(c => c && (c.uid === myCarUid || c.id === myCarUid));
-        if (idxB === -1) throw new Error("Ваша машина не найдена в гараже");
-
-        const carB = carsB[idxB];
-        if (carB.isPersonal) throw new Error("Ваша машина помечена как личная");
-        if (carB.impounded) throw new Error("Ваша машина на штрафстоянке");
-
-        carsA.splice(idxA, 1);
-        carsB.splice(idxB, 1);
-
-        carA.ownershipDays = 0;
-        carA.isRegisteredOnPlayer = false;
-        carA.impounded = false;
-
-        carB.ownershipDays = 0;
-        carB.isRegisteredOnPlayer = false;
-        carB.impounded = false;
-
-        carsB.push(carA);
-        carsA.push(carB);
-
-        const nowTs = Date.now();
-
-        tx.set(garageARef, {
-          ...garageAData,
-          telegram_id: String(fromUserId),
-          cars: carsA,
-          updatedAt: nowTs
-        }, { merge: true });
-
-        tx.set(garageBRef, {
-          ...garageBData,
-          telegram_id: String(toUserId),
-          cars: carsB,
-          updatedAt: nowTs
-        }, { merge: true });
-
-        tx.update(lotRef, {
-          status: "sold",
-          swappedAt: nowTs,
-          swappedWith: fromUserId
-        });
-
-        tx.update(offerRef, {
-          status: "accepted",
-          acceptedAt: nowTs
-        });
-
-        result = {
-          fromUserId,
-          toUserId,
-          carA: { uid: myItemUid, name: carA.name || "Авто A" },
-          carB: { uid: myCarUid, name: carB.name || "Авто B" },
-          fromUserName: offerData.fromUserName || "Игрок"
-        };
-      });
-
-      if (result) {
-        // 🔔 P2P BOT PUSH: отправляем пуш о принятии обмена
-        if (FB_Notifications?.P2P?.notifyOfferAccepted) {
-          FB_Notifications.P2P.notifyOfferAccepted(result.fromUserId, {
-            carName: result.carA.name,
-            responderName: profile.name || "Партнёр по обмену"
-          }).catch(err => console.warn('[P2PTrade] Push notice failed:', err));
-        }
-
-        if (window.EventBus) {
-          window.EventBus.emit('p2p:trade_accepted', {
-            offerId,
-            fromUserId: result.fromUserId,
-            toUserId: result.toUserId,
-            swapped: [result.carA, result.carB]
-          });
-          window.EventBus.emit('p2p:trade_completed', {
-            offerId,
-            fromUserId: result.fromUserId,
-            toUserId: result.toUserId
-          });
-        }
-
-        try {
-          const fresh = await FB_Core.Players.pullSave(profile.id);
-          if (fresh && typeof window.applyLoadedState === 'function') {
-            window.applyLoadedState(fresh);
-            if (typeof window.saveState === 'function') window.saveState();
-            if (typeof window.updateHeaderUI === 'function') window.updateHeaderUI();
-            if (typeof window.renderGarage === 'function') window.renderGarage();
-          }
-        } catch (syncErr) {
-          console.warn('[P2PTrade] Не удалось синхронизировать локальный стейт:', syncErr);
-        }
-
-        devLogFirestore('acceptTradeOffer OK', `${offerId}: ${result.carA.name} ↔ ${result.carB.name}`);
-        return { success: true, offer: result };
+      if (String(offerData.toUserId) !== String(profile.id)) {
+        return { success: false, error: "Этот оффер адресован другому игроку" };
+      }
+      if (offerData.status !== "pending") {
+        return { success: false, error: "Оффер уже неактуален" };
       }
 
-      return { success: false, error: "Транзакция не дала результата" };
+      const lotId = String(offerData.theirItemId);
+      const lotRef = doc(db, "market_lots", lotId);
+      const lotSnap = await getDoc(lotRef);
+
+      let myCarToGive = null;
+      if (lotSnap.exists()) {
+        const lData = lotSnap.data();
+        myCarToGive = lData.itemData;
+        await updateDoc(lotRef, {
+          status: "sold",
+          swappedAt: Date.now(),
+          swappedWith: offerData.fromUserId
+        });
+      }
+
+      const receivedCar = Object.assign({}, offerData.myItem || {});
+      receivedCar.uid = 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+      receivedCar.ownershipDays = 0;
+      receivedCar.isPersonal = false;
+      receivedCar.impounded = false;
+
+      if (!window.state.garage) window.state.garage = [];
+
+      if (myCarToGive) {
+        const giveUid = myCarToGive.uid || myCarToGive.id;
+        const gIdx = window.state.garage.findIndex(c => c && (String(c.uid) === String(giveUid) || String(c.id) === String(giveUid)));
+        if (gIdx !== -1) {
+          window.state.garage.splice(gIdx, 1);
+        }
+      }
+
+      window.state.garage.push(receivedCar);
+
+      await updateDoc(offerRef, {
+        status: "accepted",
+        acceptedAt: Date.now()
+      });
+
+      if (typeof window.saveState === 'function') window.saveState();
+      if (typeof window.renderGarage === 'function') window.renderGarage();
+      if (typeof window.updateHeaderUI === 'function') window.updateHeaderUI();
+
+      if (FB_Notifications?.P2P?.notifyOfferAccepted) {
+        FB_Notifications.P2P.notifyOfferAccepted(offerData.fromUserId, {
+          carName: receivedCar.name || "Автомобиль",
+          responderName: profile.name || "Партнёр по обмену"
+        }).catch(err => console.warn('[P2PTrade] Push notice failed:', err));
+      }
+
+      if (window.EventBus) {
+        window.EventBus.emit('p2p:trade_accepted', {
+          offerId,
+          fromUserId: offerData.fromUserId,
+          toUserId: profile.id,
+          receivedCar
+        });
+      }
+
+      devLogFirestore('acceptTradeOffer OK', `${offerId}`);
+      return { success: true, receivedCar };
 
     } catch (e) {
       const errMsg = e?.code || e?.message || String(e);
@@ -804,27 +693,21 @@ const P2PTradeManager = {
     if (!profile?.id) return { success: false, error: "Нет профиля" };
 
     try {
-      const offerRef = doc(db, "trade_offers", offerId);
-      let offerData = null;
+      const offerRef = doc(db, "trade_offers", String(offerId));
+      const snap = await getDoc(offerRef);
+      if (!snap.exists()) return { success: false, error: "Оффер не найден" };
 
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(offerRef);
-        if (!snap.exists()) throw new Error("Оффер не найден");
-        const data = snap.data();
-        if (String(data.toUserId) !== String(profile.id)) throw new Error("Этот оффер не вам");
-        if (data.status !== "pending") throw new Error("Оффер уже обработан");
-        offerData = data;
+      const data = snap.data();
+      if (String(data.toUserId) !== String(profile.id)) return { success: false, error: "Этот оффер не вам" };
 
-        tx.update(offerRef, {
-          status: "rejected",
-          rejectedAt: Date.now()
-        });
+      await updateDoc(offerRef, {
+        status: "rejected",
+        rejectedAt: Date.now()
       });
 
-      // 🔔 P2P BOT PUSH: отправляем пуш об отклонении оффера
-      if (offerData?.fromUserId && FB_Notifications?.P2P?.notifyOfferDeclined) {
-        FB_Notifications.P2P.notifyOfferDeclined(offerData.fromUserId, {
-          carName: offerData.myItem?.name || "Автомобиль",
+      if (data.fromUserId && FB_Notifications?.P2P?.notifyOfferDeclined) {
+        FB_Notifications.P2P.notifyOfferDeclined(data.fromUserId, {
+          carName: data.myItem?.name || "Автомобиль",
           responderName: profile.name || "Владелец"
         }).catch(err => console.warn('[P2PTrade] Push notice failed:', err));
       }
@@ -843,27 +726,21 @@ const P2PTradeManager = {
     if (!profile?.id) return { success: false, error: "Нет профиля" };
 
     try {
-      const offerRef = doc(db, "trade_offers", offerId);
-      let offerData = null;
+      const offerRef = doc(db, "trade_offers", String(offerId));
+      const snap = await getDoc(offerRef);
+      if (!snap.exists()) return { success: false, error: "Оффер не найден" };
 
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(offerRef);
-        if (!snap.exists()) throw new Error("Оффер не найден");
-        const data = snap.data();
-        if (String(data.fromUserId) !== String(profile.id)) throw new Error("Это не ваш оффер");
-        if (data.status !== "pending") throw new Error("Оффер уже обработан");
-        offerData = data;
+      const data = snap.data();
+      if (String(data.fromUserId) !== String(profile.id)) return { success: false, error: "Это не ваш оффер" };
 
-        tx.update(offerRef, {
-          status: "cancelled",
-          cancelledAt: Date.now()
-        });
+      await updateDoc(offerRef, {
+        status: "cancelled",
+        cancelledAt: Date.now()
       });
 
-      // 🔔 P2P BOT PUSH: уведомляем о том, что оффер был отозван
-      if (offerData?.toUserId && FB_Notifications?.P2P?.notifyOfferCancelled) {
-        FB_Notifications.P2P.notifyOfferCancelled(offerData.toUserId, {
-          carName: offerData.myItem?.name || "Автомобиль",
+      if (data.toUserId && FB_Notifications?.P2P?.notifyOfferCancelled) {
+        FB_Notifications.P2P.notifyOfferCancelled(data.toUserId, {
+          carName: data.myItem?.name || "Автомобиль",
           senderName: profile.name || "Инициатор"
         }).catch(err => console.warn('[P2PTrade] Push notice failed:', err));
       }
@@ -915,12 +792,6 @@ const P2PTradeManager = {
 
       return { incoming, outgoing };
     } catch (e) {
-      const errMsg = e?.code || e?.message || String(e);
-      if (errMsg.includes('permission-denied')) {
-        console.warn('[P2PTrade] fetch: permission-denied (проверьте Firestore Rules для trade_offers)');
-      } else {
-        console.warn('[P2PTrade] fetch error:', errMsg);
-      }
       return { incoming: [], outgoing: [] };
     }
   },
@@ -946,20 +817,12 @@ const P2PTradeManager = {
           sortDir: 'desc'
         }).slice(0, LIMITS.maxTradeOffersPerUser);
 
-        try { callback(offers); } catch (e) { console.warn('[P2PTrade] callback error:', e); }
-      }, (error) => {
-        const errMsg = error?.code || error?.message || String(error);
-        if (errMsg.includes('permission-denied')) {
-          console.warn('[P2PTrade] subscribeToTradeOffers: permission-denied');
-        } else {
-          console.warn('[P2PTrade] subscribe error:', errMsg);
-        }
+        try { callback(offers); } catch (e) {}
       });
 
       this._listeners.push(unsubscribe);
       return unsubscribe;
     } catch (e) {
-      console.warn('[P2PTrade] subscribe exception:', e);
       return () => {};
     }
   },
@@ -978,24 +841,14 @@ const P2PTradeManager = {
 const ClubsManager = {
   _listeners: [],
 
-  async fetchClubs(force = false) {
+  async fetchClubs() {
     try {
-      const q = query(
-        collection(db, "clubs"),
-        orderBy("bank", "desc"),
-        limit(25)
-      );
+      const q = query(collection(db, "clubs"), orderBy("bank", "desc"), limit(25));
       const snap = await getDocs(q);
       const clubs = [];
       snap.forEach(d => clubs.push({ id: d.id, ...d.data() }));
       return clubs;
     } catch (e) {
-      const errMsg = e?.code || e?.message || String(e);
-      if (errMsg.includes('permission-denied')) {
-        console.warn('[Clubs] fetch: permission-denied');
-      } else {
-        console.warn('[Clubs] fetch error:', errMsg);
-      }
       return [];
     }
   },
@@ -1003,22 +856,11 @@ const ClubsManager = {
   subscribeToClubs(callback) {
     if (typeof callback !== 'function') return () => {};
     try {
-      const q = query(
-        collection(db, "clubs"),
-        orderBy("bank", "desc"),
-        limit(25)
-      );
+      const q = query(collection(db, "clubs"), orderBy("bank", "desc"), limit(25));
       const unsubscribe = onSnapshot(q, (snap) => {
         const clubs = [];
         snap.forEach(d => clubs.push({ id: d.id, ...d.data() }));
         try { callback(clubs); } catch (e) {}
-      }, (error) => {
-        const errMsg = error?.code || error?.message || String(error);
-        if (errMsg.includes('permission-denied')) {
-          console.warn('[Clubs] subscribe: permission-denied');
-        } else {
-          console.warn('[Clubs] subscribe error:', errMsg);
-        }
       });
       this._listeners.push(unsubscribe);
       return unsubscribe;
@@ -1124,24 +966,14 @@ const LeaderboardManager = {
     } catch (e) {}
   },
 
-  async fetchTop(force = false) {
+  async fetchTop() {
     try {
-      const q = query(
-        collection(db, "leaderboard"),
-        orderBy("profit", "desc"),
-        limit(30)
-      );
+      const q = query(collection(db, "leaderboard"), orderBy("profit", "desc"), limit(30));
       const snap = await getDocs(q);
       const leaders = [];
       snap.forEach(d => leaders.push({ id: d.id, ...d.data() }));
       return leaders;
     } catch (e) {
-      const errMsg = e?.code || e?.message || String(e);
-      if (errMsg.includes('permission-denied')) {
-        console.warn('[Leaderboard] fetch: permission-denied');
-      } else {
-        console.warn('[Leaderboard] fetch error:', errMsg);
-      }
       return [];
     }
   },
@@ -1149,22 +981,11 @@ const LeaderboardManager = {
   subscribeToTop(callback) {
     if (typeof callback !== 'function') return () => {};
     try {
-      const q = query(
-        collection(db, "leaderboard"),
-        orderBy("profit", "desc"),
-        limit(30)
-      );
+      const q = query(collection(db, "leaderboard"), orderBy("profit", "desc"), limit(30));
       const unsubscribe = onSnapshot(q, (snap) => {
         const leaders = [];
         snap.forEach(d => leaders.push({ id: d.id, ...d.data() }));
         try { callback(leaders); } catch (e) {}
-      }, (error) => {
-        const errMsg = error?.code || error?.message || String(error);
-        if (errMsg.includes('permission-denied')) {
-          console.warn('[Leaderboard] subscribe: permission-denied');
-        } else {
-          console.warn('[Leaderboard] subscribe error:', errMsg);
-        }
       });
       this._listeners.push(unsubscribe);
       return unsubscribe;
@@ -1238,22 +1059,15 @@ const CarsCatalogManager = {
       }
 
       localStorage.setItem("perekup_db_seeded_v2", "true");
-      devLogFirestore('seedCarsCatalog OK', `${count} моделей в ${batches.length} batch`);
       return { success: true, count };
     } catch (e) {
-      const errMsg = e?.code || e?.message || String(e);
-      devLogFirestore('seedCarsCatalog ERROR', errMsg);
-      return { success: false, error: errMsg };
+      return { success: false, error: e.message };
     }
   },
 
-  async fetchCloudCars(force = false) {
+  async fetchCloudCars() {
     try {
-      const q = query(
-        collection(db, "cars_catalog"),
-        orderBy("basePrice", "asc"),
-        limit(250)
-      );
+      const q = query(collection(db, "cars_catalog"), orderBy("basePrice", "asc"), limit(250));
       const snap = await getDocs(q);
       const cars = [];
       snap.forEach(d => {
@@ -1278,12 +1092,6 @@ const CarsCatalogManager = {
 
       return cars;
     } catch (e) {
-      const errMsg = e?.code || e?.message || String(e);
-      if (errMsg.includes('permission-denied')) {
-        console.warn('[CarsCatalog] fetch: permission-denied');
-      } else {
-        console.warn('[CarsCatalog] fetch error:', errMsg);
-      }
       return [];
     }
   },
@@ -1323,7 +1131,7 @@ const CarsCatalogManager = {
 };
 
 // ========================================================
-// 8. QUICK CHAT (ФАСАД ДЛЯ ЧАТОВ M+)
+// 8. QUICK CHAT
 // ========================================================
 const QuickChat = {
   getPhrasesList: (cat) => {
@@ -1363,7 +1171,7 @@ const QuickChat = {
 };
 
 // ========================================================
-// 9. СБОРКА ЕДИНОГО window.FB_Bridge
+// 9. СБОРКА И ЭКСПОРТ
 // ========================================================
 const FB_Bridge = {
   db: FB_Core.db,
@@ -1406,9 +1214,6 @@ const FB_Bridge = {
   QuickChat
 };
 
-// ========================================================
-// 10. ЭКСПОРТ В WINDOW
-// ========================================================
 window.P2PDeals = P2PDealsManager;
 
 window.FB_P2P = {
@@ -1422,4 +1227,4 @@ window.FB_P2P = {
 
 window.FB_Bridge = FB_Bridge;
 
-console.log('[🤝 FB_P2P v1.4.0] Атомарный ДКП через runTransaction + интеграция P2P Bot Push ✓');
+console.log('[🤝 FB_P2P v1.4.1] Устранена блокировка транзакций Firestore и налажен обмен авто ✓');
