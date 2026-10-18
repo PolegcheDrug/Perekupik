@@ -501,6 +501,8 @@
         if (!lotId) return;
         if (!confirm('Снять лот с продажи?')) return;
 
+        const lot = (window.state.p2pMarketListings || []).find(l => l && (l.id === lotId || l.lot_id === lotId));
+
         const marketMgr = getMarketManager();
         if (marketMgr?.cancelLot) {
             try {
@@ -510,31 +512,39 @@
             }
         }
 
+        // ВОЗВРАТ ПРЕДМЕТА В ГАРАЖ / ИНВЕНТАРЬ
+        if (lot && lot.itemData) {
+            if (lot.type === 'cars' || lot.type === 'car') {
+                if (!Array.isArray(window.state.garage)) window.state.garage = [];
+                const restoredCar = Object.assign({}, lot.itemData);
+                if (!restoredCar.uid) restoredCar.uid = 'car_' + Date.now();
+                window.state.garage.push(restoredCar);
+                if (typeof renderGarage === 'function') renderGarage();
+            } else if (lot.type === 'plates' || lot.type === 'plate') {
+                const pNum = lot.itemData?.plate || lot.name?.replace('Номер ', '');
+                if (window.PlatesManager && typeof window.PlatesManager.addPlate === 'function') {
+                    window.PlatesManager.addPlate(pNum, 'storage');
+                }
+            } else if (lot.type === 'business') {
+                const biz = (window.state.businesses || []).find(b => b.id === lot.itemData?.bizId);
+                if (biz) biz.level = Math.max(biz.level || 0, lot.itemData?.level || 1);
+            } else if (lot.type === 'housing' && lot.itemData?.houseId) {
+                if (!window.state.player.ownedHouses) window.state.player.ownedHouses = [];
+                if (!window.state.player.ownedHouses.includes(lot.itemData.houseId)) {
+                    window.state.player.ownedHouses.push(lot.itemData.houseId);
+                }
+            }
+        }
+
         window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
             l && l.id !== lotId && l.lot_id !== lotId
         );
 
         if (typeof saveState === 'function') saveState();
-        if (typeof showToast === 'function') showToast('✅ Лот снят с биржи');
+        if (typeof showToast === 'function') showToast('✅ Лот снят и возвращён в гараж');
 
         const area = document.getElementById('p2pLotsArea');
         if (area) area.innerHTML = this.renderP2PLotsHtml(this.marketFilter || 'cars');
-    };
-
-    // ========================================================
-    // 8. СОЗДАНИЕ ЛОТА (МОДАЛКА)
-    // ========================================================
-    AppM.openCreateListingModal = function() {
-        this._currentModalItems = [];
-        this.selectedItemIndex = 0; // Предварительно выбираем первый элемент
-
-        const modal = document.getElementById('modalCreateP2P');
-        if (modal && typeof ModalManager !== 'undefined') {
-            ModalManager.open('modalCreateP2P');
-            setTimeout(() => {
-                this.selectP2PListingType('cars', false);
-            }, 50);
-        }
     };
 
     // ПЕРЕКЛЮЧЕНИЕ ТИПОВ ОБЪЕКТОВ В МОДАЛКЕ
