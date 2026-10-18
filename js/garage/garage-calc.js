@@ -1,15 +1,12 @@
 // ========================================================
-// js/garage-calc.js — РАСЧЁТЫ, КОНФИГУРАЦИИ И БЕЙДЖИ ГАРАЖА (v1.2.0)
+// js/garage/garage-calc.js — РАСЧЁТЫ, КОНФИГУРАЦИИ И БЕЙДЖИ ГАРАЖА (v1.3.0 BALANCED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.2.0:
-//   - Учёт новых дефектов в recalculateCarMarketValue
-//   - Бонус за отсутствие юридических проблем
-//   - Улучшенная логика износа (engine, transmission, tires)
-//   - Точный бонус за тюнинг
-//   - Штраф за скрытые дефекты
-//   - DEV-режим работает
-//   - Новые бейджи модов
-//   - getCarConditionGrade() — рейтинг A/B/C/D/F
+// ⭐ v1.3.0 (РЕБАЛАНС МАРЖИНАЛЬНОСТИ И ОЦЕНКИ РЫНКА):
+//   - Исправлен обвал цены авто до 15k ₽ при наличии шпатлёвки и дефектов
+//   - Гарантированный пол рыночной оценки авто (не ниже 72% от базы)
+//   - Процентный учёт дефектов с мягким капом (до 18% макс. снижения)
+//   - Высокая маржинальность: выкуп битого авто у капота приносит честный профит
+//   - Сохранены все капабилити жилья, тюнинг и бейджи конфигурации
 // ========================================================
 
 const INSURANCE_CONFIG = {
@@ -125,7 +122,7 @@ function playerHasGarageOrWorkshop() {
 }
 
 // ========================================================
-// ⭐ v1.2.0: РЕЙТИНГ СОСТОЯНИЯ АВТО (A/B/C/D/F)
+// РЕЙТИНГ СОСТОЯНИЯ АВТО (A/B/C/D/F)
 // ========================================================
 function getCarConditionGrade(car) {
     if (!car) return { grade: '?', color: 'color-muted', label: 'Неизвестно' };
@@ -146,17 +143,84 @@ function getCarConditionGrade(car) {
 }
 
 // ========================================================
-// ⭐ v1.2.0: ГЛАВНЫЙ РАСЧЁТ ЦЕНЫ (учёт дефектов + бонусов)
+// ⭐ v1.3.0: СБАЛАНСИРОВАННЫЙ РАСЧЁТ РЫНОЧНОЙ СТОИМОСТИ
 // ========================================================
 function recalculateCarMarketValue(car) {
     if (!car) return 0;
 
-    const base = Number(car.baseMarketValue || car.basePrice || 100000);
-    const cond = (car.condition !== undefined) ? Number(car.condition) : 80;
+    // Базовая цена модели на вторичном рынке
+    let base = Number(car.baseMarketValue || car.basePrice || car.marketValue || 120000);
+    if (base < 50000) base = 120000;
+
+    const cond = (car.condition !== undefined) ? Math.max(10, Math.min(100, Number(car.condition))) : 80;
     
-    // Базовая цена от состояния кузова
-    const condMultiplier = 0.68 + (cond / 100) * 0.46;
+    // Мягкий коэффициент кузова: даже при 40% кузова машина теряет не более 15% базовой цены
+    const condMultiplier = 0.82 + (cond / 100) * 0.28;
     let currentVal = Math.round(base * condMultiplier);
+
+    // Гарантированный порог пола: машина на ходу не может упасть ниже 72% от базы
+    const guaranteedFloor = Math.round(base * 0.72);
+
+    // ==================== ИЗНОС АГРЕГАТОВ ====================
+    const engWear = car.wear?.engine !== undefined ? Number(car.wear.engine) : 85;
+    const transWear = car.wear?.transmission !== undefined ? Number(car.wear.transmission) : 85;
+    
+    if (engWear < 40) currentVal = Math.round(currentVal * 0.94);
+    else if (engWear < 65) currentVal = Math.round(currentVal * 0.97);
+
+    if (transWear < 40) currentVal = Math.round(currentVal * 0.95);
+    else if (transWear < 65) currentVal = Math.round(currentVal * 0.98);
+
+    const tires = car.tireWear !== undefined ? Number(car.tireWear) : 100;
+    if (tires < 30) currentVal -= 4000;
+
+    // ==================== ДЕФЕКТЫ (ПРОЦЕНТНЫЙ ШТРАФ С КАПОМ) ====================
+    const revealedDefects = car._revealedDefects || [];
+    const mechDefects = car.mechanicalDefects || [];
+    let defectPenaltyPct = 0;
+
+    mechDefects.forEach(d => {
+        if (revealedDefects.includes(d.id)) {
+            // Штраф считается от процента дефекта, а не от рублей ремонта!
+            const pPct = Number(d.pricePenaltyPct) || 3;
+            defectPenaltyPct += Math.min(6, pPct * 0.5);
+        }
+    });
+
+    // Ограничиваем суммарное влияние дефектов: максимум -16%
+    defectPenaltyPct = Math.min(16, defectPenaltyPct);
+    if (defectPenaltyPct > 0) {
+        currentVal = Math.round(currentVal * (1 - defectPenaltyPct / 100));
+    }
+
+    // Скрытый дефект (если не замаскирован присадкой)
+    if (car.hiddenDefect && !car.hasAdditive) {
+        currentVal = Math.round(currentVal * 0.96);
+    }
+
+    // Юридический статус
+    if (car.legalDefect && !car._legalResolved) {
+        currentVal = Math.round(currentVal * 0.88);
+    } else if (!car.legalDefect) {
+        // Бонус за чистую историю
+        currentVal = Math.round(currentVal * 1.04);
+    }
+
+    if (car.isStolen) {
+        currentVal = Math.round(currentVal * 0.65);
+    }
+
+    // Защита пола рыночной стоимости перед добавлением бонусов
+    currentVal = Math.max(guaranteedFloor, currentVal);
+
+    // ==================== ПРЕДПРОДАЖНАЯ ПОДГОТОВКА И БОНУСЫ ====================
+    if (car.isPolished) currentVal = Math.round(currentVal * 1.12);
+    if (car.isRepainted) currentVal += 35000;
+    if (car.cleanInterior) currentVal += 20000;
+    if (car.hasAdditive) currentVal += 8000;
+
+    if (car.isMuseumStock) currentVal = Math.round(currentVal * 1.25);
+    if (car.isTunedSpec && car.tuning && car.tuning.chip >= 2) currentVal = Math.round(currentVal * 1.10);
 
     // ==================== ТЮНИНГ ====================
     const t = car.tuning || {};
@@ -175,91 +239,28 @@ function recalculateCarMarketValue(car) {
         if (t[key]) currentVal += tuningBonusMap[key];
     });
 
-    // ==================== ПРЕДПРОДАЖНАЯ ПОДГОТОВКА ====================
-    if (car.isPolished) currentVal = Math.round(currentVal * 1.12);
-    if (car.isRepainted) currentVal += 45000;
-    if (car.cleanInterior) currentVal += 25000;
-
-    // ==================== ИЗНОС АГРЕГАТОВ ====================
-    const engWear = car.wear?.engine !== undefined ? Number(car.wear.engine) : 85;
-    const transWear = car.wear?.transmission !== undefined ? Number(car.wear.transmission) : 85;
-    if (engWear < 40) currentVal = Math.round(currentVal * 0.86);
-    else if (engWear < 60) currentVal = Math.round(currentVal * 0.94);
-    if (transWear < 40) currentVal = Math.round(currentVal * 0.90);
-    else if (transWear < 60) currentVal = Math.round(currentVal * 0.96);
-    
-    const tires = car.tireWear !== undefined ? Number(car.tireWear) : 100;
-    if (tires < 25) currentVal = Math.max(10000, currentVal - 15000);
-    else if (tires < 40) currentVal = Math.max(10000, currentVal - 7000);
-
-    // ==================== ⭐ v1.2.0: УЧЁТ ДЕФЕКТОВ ====================
-    // Механические дефекты: известные (открытые) снижают цену
-    const revealedDefects = car._revealedDefects || [];
-    const mechDefects = car.mechanicalDefects || [];
-    let defectPenalty = 0;
-    mechDefects.forEach(d => {
-        if (revealedDefects.includes(d.id)) {
-            defectPenalty += Math.round((d.cost || 0) * 0.85);
-        }
-    });
-    if (defectPenalty > 0) {
-        currentVal = Math.max(10000, currentVal - defectPenalty);
-    }
-
-    // ⭐ v1.2.0: штраф за скрытые дефекты (если они не выявлены)
-    if (car.hiddenDefect && !car.hasAdditive) {
-        currentVal = Math.max(10000, currentVal - Math.round((car.hiddenDefect.cost || 15000) * 0.85));
-    }
-
-    // ⭐ v1.2.0: штраф за юридические проблемы
-    if (car.legalDefect && !car._legalResolved) {
-        const legalPenaltyPct = car.legalDefect.pricePenaltyPct || 15;
-        currentVal = Math.round(currentVal * (1 - legalPenaltyPct / 100));
-    } else if (!car.legalDefect) {
-        // ⭐ v1.2.0: БОНУС за чистую юридическую историю
-        currentVal = Math.round(currentVal * 1.05);
-    }
-
-    // ⭐ v1.2.0: штраф за статус «в розыске»
-    if (car.isStolen) {
-        currentVal = Math.round(currentVal * 0.55);
-    }
-
-    // ⭐ v1.2.0: бонус за «капсулу времени»
-    if (car.isMuseumStock) {
-        currentVal = Math.round(currentVal * 1.25);
-    }
-
-    // ⭐ v1.2.0: надбавка за тюнинг-спек
-    if (car.isTunedSpec && car.tuning && car.tuning.chip >= 2) {
-        currentVal = Math.round(currentVal * 1.10);
-    }
-
     // ==================== ГОСНОМЕР ====================
     const plateStr = car.customPlate || car.plate || "ТРАНЗИТ";
     if (typeof calculatePlateValue === 'function') {
         currentVal += calculatePlateValue(plateStr);
     }
 
-    // ==================== ФИНАЛЬНАЯ ЦЕНА ====================
     car.marketValue = Math.round(currentVal);
     return car.marketValue;
 }
 
 // ========================================================
-// ⭐ v1.2.0: РЕНДЕР БЕЙДЖЕЙ МОДОВ (с новыми иконками)
+// РЕНДЕР БЕЙДЖЕЙ МОДОВ
 // ========================================================
 function renderCarModsBadges(car) {
     if (!car) return "";
     const t = car.tuning || {};
     const badges = [];
 
-    // Chip / Stage
     if (t.chip === 1) badges.push(`<span class="mod-pill color-cyan" title="Stage 1 Чип"><i class="fa-solid fa-bolt"></i> St1</span>`);
     else if (t.chip === 2) badges.push(`<span class="mod-pill color-amber" title="Stage 2 + Выхлоп"><i class="fa-solid fa-fire"></i> St2</span>`);
     else if (t.chip >= 3) badges.push(`<span class="mod-pill color-red" title="Stage 3 Big Turbo"><i class="fa-solid fa-rocket"></i> St3</span>`);
 
-    // Остальные моды
     const simpleModsMap = [
         { key: 'coldIntake', cls: 'color-cyan', icon: 'fa-wind', label: 'Впуск', desc: 'Холодный впуск' },
         { key: 'intercooler', cls: 'color-cyan', icon: 'fa-snowflake', label: 'Кулер', desc: 'Спортивный кулер' },
@@ -282,17 +283,12 @@ function renderCarModsBadges(car) {
         }
     });
 
-    // ⭐ v1.2.0: дополнительные статусы
     if (car.isPolished) badges.push(`<span class="mod-pill color-cyan" title="Полировка кузова"><i class="fa-solid fa-sparkles"></i> Блеск</span>`);
     if (car.cleanInterior) badges.push(`<span class="mod-pill color-green" title="Химчистка салона"><i class="fa-solid fa-spray-can"></i> Химчистка</span>`);
     if (car.isRepainted) badges.push(`<span class="mod-pill color-green" title="Свежий облив"><i class="fa-solid fa-paint-roller"></i> Облив</span>`);
     if (car.hasAdditive) badges.push(`<span class="mod-pill color-amber" title="Присадка в моторе"><i class="fa-solid fa-flask"></i> Присадка</span>`);
     if (car.rolledOdometer) badges.push(`<span class="mod-pill color-red" title="Скрученный одометр"><i class="fa-solid fa-clock-rotate-left"></i> Скручен</span>`);
-
-    // ⭐ v1.2.0: бейдж за капсулу времени
     if (car.isMuseumStock) badges.push(`<span class="mod-pill color-amber" title="Капсула времени"><i class="fa-solid fa-crown"></i> Капсула</span>`);
-
-    // ⭐ v1.2.0: бейдж за тюнинг-спек
     if (car.isTunedSpec) badges.push(`<span class="mod-pill color-purple" title="Тюнинг-спек"><i class="fa-solid fa-fire-flame-curved"></i> Корч</span>`);
 
     return badges.length > 0 ? badges.join(' ') : `<span class="stock-badge-pill"><i class="fa-solid fa-car"></i> Заводской сток</span>`;
@@ -307,9 +303,9 @@ Object.assign(window, {
     getPlayerHousingCapabilities,
     checkPlayerCapability,
     playerHasGarageOrWorkshop,
-    getCarConditionGrade,       // ⭐ v1.2.0
+    getCarConditionGrade,
     recalculateCarMarketValue,
     renderCarModsBadges
 });
 
-console.log('[🏠 garage-calc v1.2.0] Учёт дефектов + бонусы + рейтинг A/B/C/D/F ✓');
+console.log('[🏠 garage-calc v1.3.0] Сбалансированная экономика: защита маржи перекупа ✓');
