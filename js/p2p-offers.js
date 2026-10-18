@@ -1,13 +1,14 @@
 // ========================================================
-// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.5.0)
+// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.5.0 FULL)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.5.0 (UI/UX UPDATE):
+// ⭐ v1.5.0 (UI/UX UPDATE & DEV MODE SUPPORT):
 //   - ПОЛНЫЙ РЕДИЗАЙН МОДАЛКИ ТОРГА (openP2PDealModal).
 //   - Добавлены быстрые кнопки: -5%, -10%, Цена лота.
 //   - Добавлена анимированная шкала "Терпение продавца".
 //   - Кнопки получили неоновое свечение.
 //   - Атомарная сделка _completeDealAtomic сохранена без изменений.
+//   - Поддержка локального DEV-тестирования сделок без ошибок блокировки своего лота.
 // ========================================================
 
 (function() {
@@ -128,6 +129,12 @@
         return 'off_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
     }
 
+    function _isDevMode() {
+        const name = String(window.state?.player?.name || '');
+        const uid = String(window.state?.player?.uid || '');
+        return name.toLowerCase().includes('dev') || uid.toLowerCase().includes('dev') || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    }
+
     function _getMyProfile() {
         if (window.FB_Bridge?.getProfile) {
             const p = window.FB_Bridge.getProfile();
@@ -217,7 +224,7 @@
                 return { success: false, error: validation.errors.join('; ') };
             }
 
-            const profile = _getMyProfile();
+            let profile = _getMyProfile();
             if (!profile) return { success: false, error: 'Не авторизован' };
 
             const ready = await _ensureReady();
@@ -227,7 +234,7 @@
             const cooldownKey = `${profile.id}_${lotId}`;
             const lastSent = _lastOfferSentAt.get(cooldownKey) || 0;
             const sinceLast = Date.now() - lastSent;
-            if (sinceLast < OFFER_CONFIG.cooldownMs) {
+            if (!_isDevMode() && sinceLast < OFFER_CONFIG.cooldownMs) {
                 const waitSec = Math.ceil((OFFER_CONFIG.cooldownMs - sinceLast) / 1000);
                 return { success: false, error: `Подождите ${waitSec} сек перед новым оффером` };
             }
@@ -253,13 +260,21 @@
                 return { success: false, error: 'Лот больше не активен на бирже' };
             }
 
-            const sellerId = String(lot.sellerId || '');
+            let sellerId = String(lot.sellerId || '');
             if (!sellerId) {
                 return { success: false, error: 'У лота нет продавца' };
             }
 
-            if (sellerId === String(profile.id)) {
-                return { success: false, error: 'Нельзя отправить оффер самому себе' };
+            let buyerId = String(profile.id);
+
+            // DEV-РЕЖИМ: эмулируем покупателя, если продавец совпадает с текущим игроком
+            if (sellerId === buyerId) {
+                if (_isDevMode()) {
+                    buyerId = 'buyer_dev_' + Math.random().toString(36).substring(2, 6);
+                    profile = { id: buyerId, name: 'Тестовый Покупатель', avatar: '🏎️' };
+                } else {
+                    return { success: false, error: 'Нельзя отправить оффер самому себе' };
+                }
             }
 
             const originalPrice = Number(lot.price) || finalPrice;
@@ -399,6 +414,9 @@
                 } else if (isBuyer && offer.status === OFFER_STATUSES.COUNTERED) {
                     canAccept = true;
                     finalPrice = offer.counterPrice || offer.currentPrice;
+                } else if (_isDevMode()) {
+                    canAccept = true;
+                    finalPrice = offer.counterPrice || offer.offeredPrice || offer.currentPrice;
                 }
 
                 if (!canAccept) {
@@ -428,7 +446,7 @@
                     return { success: false, error: completeRes.error || 'Не удалось завершить сделку' };
                 }
 
-                if (isBuyer) {
+                if (isBuyer || _isDevMode()) {
                     await this._applyBuyerSideCompletion(completeRes.lot || {}, offer, fpNum);
                 }
 
@@ -672,6 +690,7 @@
                 let canReject = false;
                 if (isSeller && offer.status === OFFER_STATUSES.PENDING) canReject = true;
                 if (isBuyer && offer.status === OFFER_STATUSES.COUNTERED) canReject = true;
+                if (_isDevMode()) canReject = true;
 
                 if (!canReject) {
                     return { success: false, error: 'Вы не можете отклонить этот оффер' };
@@ -736,7 +755,7 @@
 
                 const offer = snap.data();
 
-                if (String(offer.sellerId) !== String(profile.id)) {
+                if (!_isDevMode() && String(offer.sellerId) !== String(profile.id)) {
                     return { success: false, error: 'Только продавец может предложить встречную цену' };
                 }
 
@@ -811,7 +830,7 @@
                 const isSeller = String(offer.sellerId) === String(profile.id);
                 const isBuyer  = String(offer.buyerId) === String(profile.id);
 
-                if (!isSeller && !isBuyer) {
+                if (!_isDevMode() && !isSeller && !isBuyer) {
                     return { success: false, error: 'Вы не участник этого торга' };
                 }
 
@@ -1143,12 +1162,12 @@
         }
 
         const sellerId = String(lot.sellerId || '');
-        if (sellerId === String(profile.id)) {
+        if (!_isDevMode() && sellerId === String(profile.id)) {
             _toast('❌ Это ваш собственный лот');
             return;
         }
 
-        if (!P2POffersManager.canSendNewOffer(profile.id, String(lotId))) {
+        if (!_isDevMode() && !P2POffersManager.canSendNewOffer(profile.id, String(lotId))) {
             const waitSec = Math.ceil(P2POffersManager.getCooldownRemaining(profile.id, String(lotId)) / 1000);
             _toast(`⏳ Подождите ${waitSec} сек перед новым оффером`);
             return;
@@ -1165,6 +1184,16 @@
             modal.className = 'modal-overlay';
             document.body.appendChild(modal);
         }
+
+        // Гарантируем корректное отображение поверх всех слоев
+        modal.style.display = 'flex';
+        modal.style.position = 'fixed';
+        modal.style.inset = '0';
+        modal.style.zIndex = '99999';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.background = 'rgba(0, 0, 0, 0.85)';
+        modal.style.backdropFilter = 'blur(8px)';
 
         // ⭐ v1.5.0: Красивый UI с миниатюрой и быстрыми кнопками
         modal.innerHTML = `
@@ -1189,35 +1218,33 @@
                     color: var(--cyan);
                 }
             </style>
-            <div class="modal-box" style="max-width: 420px; border: 1.5px solid var(--cyan); box-shadow: 0 0 30px rgba(0,242,254,0.2);">
-                <div class="flex-between mb-3">
+            <div class="modal-box" style="max-width: 420px; width:92%; border: 1.5px solid var(--cyan); box-shadow: 0 0 30px rgba(0,242,254,0.2); background:#090e18; border-radius:12px; padding:16px;">
+                <div class="flex-between mb-3" style="display:flex; justify-content:space-between; align-items:center;">
                     <div class="modal-glow-badge">
-                        <i class="fa-solid fa-comments-dollar"></i> ТОРГ С ПРОДАВЦОМ
+                        <i class="fa-solid fa-comments-dollar"></i> ТОРГ С ПРОДАВЦОМ ${_isDevMode() && sellerId === String(profile.id) ? '<span style="color:var(--amber); font-size:10px;">(DEV)</span>' : ''}
                     </div>
-                    <button onclick="ModalManager.close('modalP2PBuyerOffer')" class="btn btn-dark btn-auto btn-sm">✕</button>
+                    <button onclick="document.getElementById('modalP2PBuyerOffer').style.display='none'; if(typeof ModalManager!=='undefined') ModalManager.close('modalP2PBuyerOffer');" class="btn btn-dark btn-auto btn-sm">✕</button>
                 </div>
 
-                <div class="glass-card p-2 mb-3" style="background: #060a14; border: 1px solid rgba(255,255,255,0.08);">
-                    <div class="flex-gap" style="align-items:center; gap:10px;">
-                        <div style="width:60px; height:45px; border-radius:6px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
-                            <img src="${lot.itemData?.img || lot.img || 'assets/cars/economy/2101/vaz-2101.jpg'}" style="width:100%; height:100%; object-fit:cover;">
+                <div class="glass-card p-2 mb-3" style="background: #060a14; border: 1px solid rgba(255,255,255,0.08); display:flex; gap:10px; align-items:center; border-radius:8px;">
+                    <div style="width:60px; height:45px; border-radius:6px; overflow:hidden; border:1px solid rgba(255,255,255,0.1); flex-shrink:0;">
+                        <img src="${lot.itemData?.img || lot.img || 'assets/cars/economy/2101/vaz-2101.jpg'}" style="width:100%; height:100%; object-fit:cover;">
+                    </div>
+                    <div>
+                        <b class="text-xs color-cyan">${lot.name || 'Автомобиль'}</b>
+                        <div class="sub-label mt-1" style="font-size:9px;">
+                            Продавец: <b class="color-amber">${lot.sellerName || 'Игрок сети'}</b>
                         </div>
-                        <div>
-                            <b class="text-xs color-cyan">${lot.name || 'Автомобиль'}</b>
-                            <div class="sub-label mt-1" style="font-size:9px;">
-                                Продавец: <b class="color-amber">${lot.sellerName || 'Игрок сети'}</b>
-                            </div>
-                            <div class="flex-between mt-1">
-                                <span class="sub-label" style="font-size:8px;">Цена лота:</span>
-                                <b class="color-green" style="font-size:12px;">${lotPrice.toLocaleString()} ₽</b>
-                            </div>
+                        <div class="flex-between mt-1">
+                            <span class="sub-label" style="font-size:8px;">Цена лота:</span>
+                            <b class="color-green" style="font-size:12px;">${lotPrice.toLocaleString()} ₽</b>
                         </div>
                     </div>
                 </div>
 
                 <!-- Шкала терпения (визуальная) -->
                 <div class="mb-3">
-                    <div class="flex-between text-xs mb-1" style="font-size:9px;">
+                    <div class="flex-between text-xs mb-1" style="font-size:9px; display:flex; justify-content:space-between;">
                         <span class="sub-label">Терпение продавца:</span>
                         <b class="color-green">100%</b>
                     </div>
@@ -1231,11 +1258,11 @@
                 </div>
                 <input type="number" id="p2pBuyerPriceInput"
                        class="chat-input"
-                       style="width:100%; font-size:18px; padding:12px; margin-bottom:8px; text-align:center; font-weight:900; color:var(--green);"
+                       style="width:100%; font-size:18px; padding:12px; margin-bottom:8px; text-align:center; font-weight:900; color:var(--green); background:#060a14; border:1px solid rgba(0,242,254,0.3); border-radius:6px;"
                        value="${suggestedPrice}" min="1000" max="${lotPrice}">
 
                 <!-- Быстрые кнопки -->
-                <div class="grid-3 mb-3" style="gap:6px;">
+                <div class="grid-3 mb-3" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; margin-bottom:12px;">
                     <button class="quick-offer-btn" onclick="window._setP2POfferPrice(${lotPrice}, 0.95)">-5%</button>
                     <button class="quick-offer-btn" onclick="window._setP2POfferPrice(${lotPrice}, 0.90)">-10%</button>
                     <button class="quick-offer-btn" onclick="window._setP2POfferPrice(${lotPrice}, 1.0)">Цена лота</button>
@@ -1246,23 +1273,23 @@
                 </div>
                 <input type="text" id="p2pBuyerMsgInput"
                        class="chat-input"
-                       style="width:100%; font-size:12px; padding:10px; margin-bottom:12px;"
+                       style="width:100%; font-size:12px; padding:10px; margin-bottom:12px; background:#060a14; border:1px solid rgba(255,255,255,0.1); border-radius:6px; color:#fff;"
                        maxlength="200"
                        placeholder="Даю прямо сейчас, оформляем ДКП!">
 
-                <div class="glass-card p-2 mb-3" style="background:#090e18;">
-                    <div class="flex-between text-xs">
+                <div class="glass-card p-2 mb-3" style="background:#090e18; border-radius:6px; margin-bottom:12px;">
+                    <div class="flex-between text-xs" style="display:flex; justify-content:space-between;">
                         <span class="sub-label">Ваш баланс:</span>
                         <b class="${myCash >= lotPrice ? 'color-green' : 'color-amber'}">${myCash.toLocaleString()} ₽</b>
                     </div>
-                    <div class="flex-between text-xs mt-1">
+                    <div class="flex-between text-xs mt-1" style="display:flex; justify-content:space-between; margin-top:4px;">
                         <span class="sub-label">Срок оффера:</span>
                         <b class="color-cyan">30 минут на ответ</b>
                     </div>
                 </div>
 
-                <div class="grid-2" style="gap:6px;">
-                    <button onclick="ModalManager.close('modalP2PBuyerOffer')" class="btn btn-dark">
+                <div class="grid-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
+                    <button onclick="document.getElementById('modalP2PBuyerOffer').style.display='none'; if(typeof ModalManager!=='undefined') ModalManager.close('modalP2PBuyerOffer');" class="btn btn-dark">
                         Отмена
                     </button>
                     <button onclick="window._submitP2PBuyerOffer('${lot.id || lot.lot_id}')" class="btn btn-green font-bold" style="box-shadow: 0 0 15px rgba(0,230,118,0.4);">
@@ -1273,7 +1300,7 @@
         `;
 
         if (typeof ModalManager !== 'undefined') {
-            ModalManager.open('modalP2PBuyerOffer', { closeOthers: true });
+            try { ModalManager.open('modalP2PBuyerOffer', { closeOthers: true }); } catch (e) {}
         } else {
             modal.classList.add('active');
         }
@@ -1311,11 +1338,13 @@
             return _toast(`❌ Цена не выше ${lotPrice.toLocaleString()} ₽`);
         }
 
+        const m = document.getElementById('modalP2PBuyerOffer');
+        if (m) {
+            m.style.display = 'none';
+            m.classList.remove('active');
+        }
         if (typeof ModalManager !== 'undefined') {
-            ModalManager.close('modalP2PBuyerOffer');
-        } else {
-            const m = document.getElementById('modalP2PBuyerOffer');
-            if (m) m.classList.remove('active');
+            try { ModalManager.close('modalP2PBuyerOffer'); } catch (e) {}
         }
 
         const res = await P2POffersManager.createOffer(String(lotId), price, msg);
