@@ -1,935 +1,609 @@
 // ========================================================
-// js/phone/phone-m-core.js — M+ HUB: ЯДРО И ЧАТЫ (v9.0.2)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.0.2 (ФИНАЛИЗАЦИЯ КНОПКИ ОБНОВЛЕНИЯ):
-//   - Кнопка "+ Продать" в шапке M+ заменена на "🔄 Обновить".
-//   - Теперь она вызывает AppM.refreshMarketFeed() для подгрузки актуальных лотов.
-//   - Метод refreshMarketFeed финализирован в phone-m-market.js.
-//   - Добавлена защита от повторных кликов _refreshPending.
-//   - Бейджи непрочитанных сообщений обновляются корректно.
+// ⭐ v1.2.0 (SPRINT 5 — ФИКС «НЕТ СВЯЗИ С СЕРВЕРОМ БИРЖИ»):
+//   - Firestore инициализируется через initializeFirestore()
+//     с experimentalForceLongPolling: true.
+//     Это критически важно для Telegram WebView и мобильных сетей,
+//     где WebSocket-соединения блокируются или нестабильны.
+//   - Добавлен enableNetwork(db) при событии 'online' —
+//     Firestore принудительно переподключается при возврате сети.
+//   - Логирование offline/online в консоль и DevLogger.
+//
+// ⭐ v1.1.0 (SPRINT 3 — ФИКС CLEANUP):
+//   - runCleanup обрабатывает каждую коллекцию в отдельном try/catch.
+//   - Каждая коллекция возвращает свой статус (ok/error).
+//   - Сбой одной коллекции не валит весь цикл.
+//
+// ⭐ v1.0.0:
+//   - Инициализация Firebase (app, auth, db)
+//   - TelegramAuthManager (initSession, getVerifiedUserId, ...)
+//   - PlayersStorageManager (pushSave, pushSaveForce, pullSave)
+//   - CleanupManager (runCleanup — удаление просроченных данных)
+//   - getFirestoreStats (счётчики коллекций для DEV)
+//   - TTL_CONFIG, LIMITS, devLogFirestore, getTelegramUser
+//   - Экспорт в window.FB_Core
+//
+// ВАЖНО: файл — ES-модуль (import), подключается через
+//   <script type="module" src="firebase-core.js?v=421"></script>
+// Должен быть загружен ДО firebase-market.js, firebase-friendships.js,
+// firebase-notifications.js, firebase-p2p.js.
 // ========================================================
 
-if (typeof window.BUSINESS_TITLE_STYLES === 'undefined') window.BUSINESS_TITLE_STYLES = [];
-if (typeof window.BUSINESS_CARD_ANIMATIONS === 'undefined') window.BUSINESS_CARD_ANIMATIONS = [];
-
-// ⭐ Единый объект AppM — используется всеми 3 частями
-const AppM = {
-    // 4 главных таба
-    activeTab: 'chats',           // 'chats' | 'market' | 'social' | 'me'
-
-    // Подтабы СОЦИУМА
-    socialSubTab: 'feed',         // 'feed' | 'top' | 'friends' | 'clubs'
-
-    // Подтабы ЧАТОВ (фильтры)
-    chatFilter: 'all',            // 'all' | 'p2p' | 'buyers' | 'friends'
-
-    // Биржа
-    marketFilter: 'cars',         // 'cars' | 'plates' | 'business' | 'housing' | 'black_market'
-    selectedListingType: 'cars',
-    selectedItemIndex: null,
-    _currentModalItems: [],
-
-    // Диалоги
-    activeDialogId: null,
-
-    // Флаги
-    _buyPending: false,
-    _publishPending: false,
-    _refreshPending: false,
-
-    // Real-time подписка на чат друга
-    _friendChatUnsubscribe: null,
-
-    // ========================================================
-    // ИНИЦИАЛИЗАЦИЯ
-    // ========================================================
-    init() {
-        this.syncSalesLotBuyersToMessages();
-        this._bindEvents();
-    },
-
-    _bindEvents() {
-        if (!window.EventBus) return;
-
-        window.EventBus.on('p2p:deal_completed', () => {
-            this._refreshCurrentScreen();
-        });
-        window.EventBus.on('p2p:deal_signed', () => {
-            this._refreshCurrentScreen();
-        });
-        window.EventBus.on('p2p:deal_created', () => {
-            this._refreshCurrentScreen();
-        });
-
-        window.EventBus.on('p2p:chat_opened', () => {
-            this._updateBadge();
-        });
-
-        window.EventBus.on('notification:received', () => {
-            this._updateBadge();
-        });
-    },
-
-    _refreshCurrentScreen() {
-        const container = document.getElementById('phoneAppContainer');
-        if (container && window.PhoneManager?.currentApp === 'm') {
-            this.render(container);
-        }
-        this._updateBadge();
-    },
-
-    _updateBadge() {
-        try {
-            const badge = document.getElementById('phoneAppSmsBadge');
-            if (badge) {
-                const unreadCount = (window.state?.player?.phoneMessages || []).filter(m => m && m.unread).length;
-                badge.style.display = unreadCount > 0 ? 'block' : 'none';
-                badge.innerText = unreadCount;
-            }
-            const navBadge = document.getElementById('phoneNavBadge');
-            if (navBadge) {
-                const unreadCount = (window.state?.player?.phoneMessages || []).filter(m => m && m.unread).length;
-                const unreadMail = (window.state?.player?.mailbox || []).filter(m => m && !m.claimed).length;
-                const total = unreadCount + unreadMail;
-                navBadge.style.display = total > 0 ? 'inline-block' : 'none';
-                navBadge.innerText = total;
-            }
-        } catch (e) {}
-    },
-
-    // ========================================================
-    // ГЛАВНЫЙ РЕНДЕР
-    // ========================================================
-    render(container) {
-        if (!container) return;
-
-        if (this.activeDialogId) {
-            this.renderConversationScreen(container);
-            return;
-        }
-
-        const curTab = this.activeTab;
-        const unreadCount = this._getUnreadCount();
-        const activeDeals = this._getActiveDealsCount();
-
-        // ⭐ v9.0.2: Кнопка "Обновить" вместо "Продать" (только на вкладке market)
-        const headerActionBtn = curTab === 'market' ? `
-            <button onclick="AppM.refreshMarketFeed()" class="btn btn-cyan btn-auto btn-sm" style="font-size:9.5px; padding:4px 9px; font-weight:900;">
-                <i class="fa-solid fa-arrows-rotate mr-1"></i> Обновить
-            </button>
-        ` : `<div style="width:40px;"></div>`;
-
-        container.innerHTML = `
-            <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.4); padding: 6px 10px;">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn">
-                    <i class="fa-solid fa-chevron-left"></i> Меню
-                </button>
-                <div class="phone-app-title color-cyan" style="display:flex; align-items:center; gap:6px;">
-                    <span class="m-network-logo" style="background: linear-gradient(135deg, #00f2fe, #7928ca); padding: 2px 7px; border-radius: 6px; font-weight: 900; color: #000; font-size: 11px;">M+</span>
-                    <span style="font-size:12px; font-weight:900; letter-spacing:0.4px;">PRO HUB</span>
-                </div>
-                ${headerActionBtn}
-            </div>
-
-            <div class="phone-app-body" style="padding: 6px 8px;">
-                <div class="mplus-nav-scroll-bar mb-2">
-                    <button onclick="AppM.switchMainTab('chats')" class="m-nav-pill ${curTab === 'chats' ? 'active' : ''}">
-                        <i class="fa-solid fa-comments"></i> ЧАТЫ ${unreadCount > 0 ? `<span class="m-pill-badge">${unreadCount}</span>` : ''}
-                    </button>
-                    <button onclick="AppM.switchMainTab('market')" class="m-nav-pill ${curTab === 'market' ? 'active' : ''}">
-                        <i class="fa-solid fa-globe"></i> БИРЖА
-                    </button>
-                    <button onclick="AppM.switchMainTab('social')" class="m-nav-pill ${curTab === 'social' ? 'active' : ''}">
-                        <i class="fa-solid fa-users"></i> СОЦИУМ ${activeDeals > 0 ? `<span class="m-pill-badge">${activeDeals}</span>` : ''}
-                    </button>
-                    <button onclick="AppM.switchMainTab('me')" class="m-nav-pill ${curTab === 'me' ? 'active' : ''}">
-                        <i class="fa-solid fa-user"></i> Я
-                    </button>
-                </div>
-
-                <div id="mHubSubContentBox" style="min-height: 300px;"></div>
-            </div>
-        `;
-
-        const subBox = document.getElementById('mHubSubContentBox');
-        if (!subBox) return;
-
-        try {
-            if (curTab === 'chats')       this.renderChatsScreen(subBox);
-            else if (curTab === 'market') this.renderMarketScreen(subBox);
-            else if (curTab === 'social') this.renderSocialHubScreen(subBox);
-            else if (curTab === 'me')     this.renderProfileScreen(subBox);
-        } catch (e) {
-            console.error('[AppM] Ошибка рендера таба', curTab, e);
-            subBox.innerHTML = `
-                <div class="glass-card p-3 text-center" style="border-color: var(--red);">
-                    <b class="color-red text-xs">Ошибка рендера</b>
-                    <div class="sub-label mt-1" style="font-size:9.5px;">${String(e.message || e).substring(0, 150)}</div>
-                </div>
-            `;
-        }
-    },
-
-    switchMainTab(tab) {
-        this.activeTab = tab;
-        this.activeDialogId = null;
-        if (typeof playSound === 'function') playSound('tick');
-        if (typeof tgHaptic === 'function') tgHaptic('light');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    // ========================================================
-    // ХЕЛПЕРЫ
-    // ========================================================
-    _getUnreadCount() {
-        return (window.state?.player?.phoneMessages || []).filter(m => m && m.unread).length;
-    },
-
-    _getActiveDealsCount() {
-        const messages = window.state?.player?.phoneMessages || [];
-        return messages.filter(m => m && m.category === 'p2p' && m.unread).length;
-    },
-
-    _escapeHtml(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    },
-
-    _escapeAttr(str) {
-        if (!str) return '';
-        return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    },
-
-    // ========================================================
-    // ЧАТЫ — ЕДИНЫЙ ИНБОКС С ФИЛЬТРАМИ
-    // ========================================================
-    renderChatsScreen(container) {
-        if (!container) return;
-
-        this.syncSalesLotBuyersToMessages();
-
-        if (typeof window.cleanupOrphanedDialogs === 'function') {
-            try { window.cleanupOrphanedDialogs(); } catch (e) {}
-        }
-
-        const filtered = this._getFilteredDialogs();
-
-        const allMsgs = window.state?.player?.phoneMessages || [];
-        const counts = {
-            all: allMsgs.length,
-            p2p: allMsgs.filter(m => m && m.category === 'p2p').length,
-            buyers: allMsgs.filter(m => m && m.category === 'buyers').length,
-            friends: allMsgs.filter(m => m && m.category === 'friends').length
-        };
-
-        const curFilter = this.chatFilter;
-
-        container.innerHTML = `
-            <div class="mplus-nav-scroll-bar mb-2">
-                <button onclick="AppM.setChatFilter('all')" class="m-nav-pill ${curFilter === 'all' ? 'active' : ''}">
-                    <i class="fa-solid fa-list-ul"></i> Все (${counts.all})
-                </button>
-                <button onclick="AppM.setChatFilter('p2p')" class="m-nav-pill ${curFilter === 'p2p' ? 'active' : ''}">
-                    <i class="fa-solid fa-handshake"></i> Торг P2P (${counts.p2p})
-                </button>
-                <button onclick="AppM.setChatFilter('buyers')" class="m-nav-pill ${curFilter === 'buyers' ? 'active' : ''}">
-                    <i class="fa-solid fa-user-tag"></i> Покупатели (${counts.buyers})
-                </button>
-                <button onclick="AppM.setChatFilter('friends')" class="m-nav-pill ${curFilter === 'friends' ? 'active' : ''}">
-                    <i class="fa-solid fa-user-group"></i> Друзья (${counts.friends})
-                </button>
-            </div>
-
-            <div id="mDialogsListContainer">
-                ${this._renderDialogsListHtml(filtered)}
-            </div>
-        `;
-    },
-
-    setChatFilter(filter) {
-        this.chatFilter = filter;
-        if (typeof playSound === 'function') playSound('tick');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    _getFilteredDialogs() {
-        const all = window.state?.player?.phoneMessages || [];
-        const f = this.chatFilter;
-
-        let filtered = all;
-        if (f === 'p2p') {
-            filtered = all.filter(m => m && m.category === 'p2p');
-        } else if (f === 'buyers') {
-            filtered = all.filter(m => m && m.category === 'buyers');
-        } else if (f === 'friends') {
-            filtered = all.filter(m => m && m.category === 'friends');
-        }
-
-        return [...filtered].sort((a, b) => {
-            if (!a || !b) return 0;
-            const aUnread = a.unread ? 1 : 0;
-            const bUnread = b.unread ? 1 : 0;
-            if (aUnread !== bUnread) return bUnread - aUnread;
-            const aTs = a.lastMessageAt || a.createdAt || 0;
-            const bTs = b.lastMessageAt || b.createdAt || 0;
-            return bTs - aTs;
-        });
-    },
-
-    _renderDialogsListHtml(dialogs) {
-        if (!dialogs || dialogs.length === 0) {
-            return `
-                <div class="glass-card text-center sub-label py-6" style="background:#090e18;">
-                    <i class="fa-solid fa-comment-slash color-cyan mb-2" style="font-size:26px;"></i>
-                    <div>Здесь пока пусто</div>
-                    <div class="text-xs mt-1" style="font-size:9px;">
-                        ${this.chatFilter === 'p2p' ? 'Откройте Биржу и напишите продавцу' : 
-                          this.chatFilter === 'buyers' ? 'Выставьте авто на площадку продаж' :
-                          this.chatFilter === 'friends' ? 'Найдите друзей в разделе Социум' :
-                          'Начните переписку — биржа, площадка или друзья'}
-                    </div>
-                </div>
-            `;
-        }
-
-        return dialogs.map(m => this._buildDialogCard(m)).join('');
-    },
-
-    _buildDialogCard(m) {
-        if (!m) return '';
-
-        const history = m.chatHistory || [];
-        const lastMsg = history.length > 0 ? history[history.length - 1].text : (m.preview || '');
-        const isUnread = !!m.unread;
-        const category = m.category || 'unknown';
-
-        const carData = m.carData || {};
-        const rawImg = carData.img || "assets/cars/economy/2101/vaz-2101.jpg";
-        const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
-        const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(carData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
-
-        let categoryBadge = '';
-        if (category === 'p2p') {
-            const role = m.p2pRole === 'seller' ? 'ВЫ — ПРОДАВЕЦ' : 'ВЫ — ПОКУПАТЕЛЬ';
-            const roleColor = m.p2pRole === 'seller' ? 'var(--amber)' : 'var(--cyan)';
-            categoryBadge = `<span class="tag-badge" style="background:rgba(${m.p2pRole === 'seller' ? '255,179,0' : '0,242,254'},0.15); color:${roleColor}; font-size:7.5px;">${role}</span>`;
-        } else if (category === 'buyers') {
-            categoryBadge = `<span class="tag-badge bg-tag-green" style="font-size:7.5px;">ПОКУПАТЕЛЬ NPC</span>`;
-        } else if (category === 'friends') {
-            categoryBadge = `<span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">ДРУГ</span>`;
-        }
-
-        const unreadBadge = isUnread
-            ? `<span class="tag-badge bg-tag-red" style="font-weight:900; font-size:7.5px;"><span class="led-dot led-red"></span> НОВОЕ</span>`
-            : '';
-
-        let priceText = '';
-        if (m.askingPrice) {
-            priceText = `${Number(m.askingPrice).toLocaleString()} ₽`;
-        }
-
-        let dealActionBtn = '';
-        if (category === 'p2p') {
-            dealActionBtn = `
-                <button onclick="event.stopPropagation(); AppM.openDealForDialog('${m.id}')" 
-                        class="btn btn-amber btn-sm btn-auto" 
-                        style="font-size:9px; padding:3px 8px;">
-                    <i class="fa-solid fa-file-signature"></i> ДКП
-                </button>
-            `;
-        }
-
-        return `
-            <div onclick="AppM.openDialog('${m.id}')" 
-                 class="glass-card mb-2 p-2 cursor-pointer ${isUnread ? 'card-glow-deal' : ''}" 
-                 style="border-left: 3px solid ${isUnread ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}; background: #090e18;">
-                
-                <div class="car-img-wrap mb-2" style="height:100px; position:relative; border-radius:10px; overflow:hidden;">
-                    <img src="${carImg}" 
-                         class="car-img" 
-                         style="width:100%; height:100%; object-fit:cover;" 
-                         onerror="this.onerror=null; this.src='${fallbackImg}';">
-                    <div class="badge-tag badge-br" style="bottom:4px; right:4px;">
-                        ${unreadBadge}
-                    </div>
-                    ${categoryBadge ? `<div class="badge-tag badge-tl" style="top:4px; left:4px;">${categoryBadge}</div>` : ''}
-                </div>
-
-                <div class="flex-between mb-1">
-                    <div style="min-width:0; flex:1;">
-                        <b class="text-xs color-cyan" style="font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
-                            ${this._escapeHtml(carData.name || 'Диалог')}
-                        </b>
-                        <div class="sub-label" style="font-size:8.5px;">
-                            ${this._escapeHtml(m.sender || 'Собеседник')}
-                        </div>
-                    </div>
-                    ${priceText ? `
-                        <div class="text-right" style="flex-shrink:0;">
-                            <span class="sub-label" style="font-size:7.5px;">${category === 'p2p' ? 'ЦЕНА' : 'ПРЕДЛОЖЕНИЕ'}</span>
-                            <div class="price-val text-xs color-green" style="font-size:12px;">${priceText}</div>
-                        </div>
-                    ` : ''}
-                </div>
-
-                <div class="seller-dialog-bubble my-1" 
-                     style="border-left: 3px solid var(--cyan); background: rgba(0, 242, 254, 0.04); padding: 5px 9px; border-radius: 6px;">
-                    <span class="sub-label" 
-                          style="font-size:9px; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
-                        ${this._escapeHtml(lastMsg) || 'Начните переписку...'}
-                    </span>
-                </div>
-
-                <div class="grid-2 mt-1" style="gap:4px;">
-                    <button onclick="event.stopPropagation(); AppM.openDialog('${m.id}')" 
-                            class="btn btn-cyan btn-sm" 
-                            style="font-size:9px; padding:5px 0;">
-                        <i class="fa-solid fa-comments mr-1"></i> ОТКРЫТЬ
-                    </button>
-                    ${dealActionBtn || `
-                        <button onclick="event.stopPropagation(); AppM.deleteDialog('${m.id}')" 
-                                class="btn btn-dark btn-sm" 
-                                style="font-size:9px; padding:5px 0;">
-                            <i class="fa-solid fa-trash"></i> УДАЛИТЬ
-                        </button>
-                    `}
-                </div>
-            </div>
-        `;
-    },
-
-    deleteDialog(dialogId) {
-        if (!confirm('Удалить диалог?')) return;
-        if (!window.state?.player?.phoneMessages) return;
-
-        window.state.player.phoneMessages = window.state.player.phoneMessages.filter(m => m.id !== dialogId);
-        if (typeof saveState === 'function') saveState();
-        if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.updateUnreadBadge === 'function') {
-            PhoneManager.updateUnreadBadge();
-        }
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    // ========================================================
-    // ОТКРЫТЬ ДКП ПО ДИАЛОГУ
-    // ========================================================
-    async openDealForDialog(dialogId) {
-        const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === dialogId);
-        if (!msg) return;
-
-        if (msg.category !== 'p2p') {
-            return showToast('⚠️ ДКП доступен только для P2P-диалогов');
-        }
-
-        const lotId = msg.p2pLotId;
-        if (!lotId) return showToast('❌ Нет привязки к лоту');
-
-        if (!window.P2PDeals) {
-            return showToast('⚠️ Модуль P2P-сделок не загружен');
-        }
-
-        const existing = await window.P2PDeals.findActiveDealByLot(lotId);
-        if (existing) {
-            this._openP2PDKPModal(existing.id, existing);
-            return;
-        }
-
-        const lot = await this._findLotById(lotId);
-        if (!lot) return showToast('❌ Лот не найден');
-
-        const price = Number(lot.price) || 100000;
-
-        const res = await window.P2PDeals.createDealDraft(lotId, price);
-        if (res.success) {
-            this._openP2PDKPModal(res.dealId, res.deal);
-        } else {
-            showToast(`❌ ${res.error}`);
-        }
-    },
-
-    async _findLotById(lotId) {
-        if (!lotId) return null;
-        const local = (window.state?.p2pMarketListings || []).find(l => l && (l.id === lotId || l.lot_id === lotId));
-        if (local) return local;
-        if (window.FB_Bridge?.MarketLots?.fetchLots) {
-            try {
-                const lots = await window.FB_Bridge.MarketLots.fetchLots();
-                return (lots || []).find(l => l && (l.id === lotId || l.lot_id === lotId)) || null;
-            } catch (e) {}
-        }
-        return null;
-    },
-
-    _openP2PDKPModal(dealId, deal) {
-        const modal = document.getElementById('modalP2PDKP');
-        if (!modal) {
-            return showToast('⚠️ Модалка ДКП не найдена в index.html');
-        }
-
-        if (window.P2PDKPModal && typeof window.P2PDKPModal.open === 'function') {
-            window.P2PDKPModal.open(dealId, deal);
-        } else {
-            showToast('⚠️ Обработчик P2PDKPModal не загружен');
-        }
-    },
-
-    // ========================================================
-    // ЭКРАН ДИАЛОГА (ОБСУЖДЕНИЕ)
-    // ========================================================
-    async openDialog(msgId) {
-        const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === msgId);
-        if (!msg) return;
-
-        this.activeDialogId = msgId;
-        msg.unread = false;
-        msg.viewed = true;
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.updateUnreadBadge === 'function') {
-            PhoneManager.updateUnreadBadge();
-        }
-
-        if (typeof playSound === 'function') playSound('tick');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    closeDialog() {
-        this.activeDialogId = null;
-
-        // Отписка от real-time чата друга
-        if (this._friendChatUnsubscribe) {
-            try { this._friendChatUnsubscribe(); } catch (e) {}
-            this._friendChatUnsubscribe = null;
-        }
-
-        if (typeof playSound === 'function') playSound('tick');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    renderConversationScreen(container) {
-        const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
-        if (!msg) {
-            this.activeDialogId = null;
-            this.render(container);
-            return;
-        }
-
-        if (msg.category === 'p2p') {
-            this._renderP2PConversation(container, msg);
-        } else if (msg.category === 'buyers') {
-            this._renderNPCDialog(container, msg);
-        } else {
-            this._renderGenericDialog(container, msg);
-        }
-    },
-
-    async _renderP2PConversation(container, msg) {
-        const carData = msg.carData || {};
-        const rawImg = carData.img || "assets/cars/economy/2101/vaz-2101.jpg";
-        const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
-        const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(carData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
-
-        let activeDeal = null;
-        if (window.P2PDeals && msg.p2pLotId) {
-            try {
-                activeDeal = await window.P2PDeals.findActiveDealByLot(msg.p2pLotId);
-            } catch (e) {}
-        }
-
-        const history = msg.chatHistory || [];
-
-        container.innerHTML = `
-            <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.4); flex-shrink: 0;">
-                <button onclick="AppM.closeDialog()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div style="text-align:center; min-width:0; flex:1;">
-                    <div class="phone-app-title text-xs font-bold" style="font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                        ${this._escapeHtml(msg.sender || 'Продавец')}
-                    </div>
-                    <div class="sub-label color-green" style="font-size:8px;">● P2P Биржа</div>
-                </div>
-                <div style="width:40px;"></div>
-            </div>
-
-            <div class="phone-app-body" style="display:flex; flex-direction:column; gap:8px; padding:6px;">
-                <div class="glass-card p-2" style="border: 1.5px solid var(--cyan); background: #060a14; margin-bottom: 0;">
-                    <div class="deal-car-preview-card" style="height:56px; min-height:56px; padding:4px 8px;">
-                        <img src="${carImg}" class="deal-car-thumb" 
-                             style="width:68px; height:46px; min-width:68px; object-fit:cover;" 
-                             onerror="this.onerror=null; this.src='${fallbackImg}';">
-                        <div style="flex:1; min-width:0;">
-                            <div class="flex-between">
-                                <b class="text-xs color-cyan block" style="font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    ${this._escapeHtml(carData.name || 'Автомобиль')}
-                                </b>
-                                <span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">P2P ЛОТ</span>
-                            </div>
-                            <div class="sub-label mt-1" style="font-size:8.5px;">
-                                Продавец: <b class="color-amber">${this._escapeHtml(msg.sender || '—')}</b>
-                            </div>
-                            <div class="flex-between mt-1">
-                                <span class="sub-label" style="font-size:8px;">Цена продавца:</span>
-                                <b class="color-green text-xs" style="font-size:12px;">${Number(msg.askingPrice || 0).toLocaleString()} ₽</b>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                ${activeDeal ? `
-                    <div class="p-2" style="background:rgba(255,179,0,0.1); border-radius:10px; border:1px solid rgba(255,179,0,0.4);">
-                        <div class="flex-between mb-1">
-                            <b class="text-xs color-amber" style="font-size:10px;">
-                                <i class="fa-solid fa-file-signature mr-1"></i> ${window.P2PDeals?.getStatusLabel(activeDeal.status) || 'ДКП активен'}
-                            </b>
-                            <button onclick="event.stopPropagation(); AppM.openActiveDeal()" 
-                                    class="btn btn-amber btn-sm btn-auto" 
-                                    style="font-size:9px; padding:3px 8px;">
-                                ОТКРЫТЬ
-                            </button>
-                        </div>
-                        <div class="sub-label" style="font-size:9px;">
-                            Цена: <b class="color-green">${Number(activeDeal.currentPrice).toLocaleString()} ₽</b>
-                        </div>
-                    </div>
-                ` : ''}
-
-                <div class="chat-thread-container" id="mChatScrollBox" 
-                     style="flex:1; min-height:180px; max-height:340px; overflow-y:auto; padding:8px; background:#04070e; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
-                    ${history.length === 0 ? `
-                        <div class="sub-label text-center py-4" style="font-size:9.5px;">
-                            Начните переписку — обсудите цену и состояние
-                        </div>
-                    ` : history.map(item => `
-                        <div class="chat-msg ${item.from === 'me' ? 'msg-player' : 'msg-seller'}" style="margin-bottom:6px;">
-                            ${this._escapeHtml(item.text)}
-                        </div>
-                    `).join('')}
-                </div>
-
-                <div class="p2p-compact-composer">
-                    <input type="text" 
-                           id="mP2PChatInput" 
-                           class="chat-input p2p-compact-input" 
-                           placeholder="Написать сообщение..." 
-                           maxlength="200"
-                           autocomplete="off"
-                           onkeydown="if(event.key==='Enter'){AppM.sendP2PMessage('${msg.id}');}">
-                    <button onclick="AppM.sendP2PMessage('${msg.id}')" 
-                            class="p2p-compact-btn p2p-compact-btn-send" 
-                            title="Отправить сообщение">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </button>
-                </div>
-
-                <div class="grid-2" style="gap:6px;">
-                    ${activeDeal ? `
-                        <button onclick="AppM.openActiveDeal()" class="btn btn-amber w-full" style="font-size:11px;">
-                            <i class="fa-solid fa-file-signature mr-1"></i> ОТКРЫТЬ ДКП
-                        </button>
-                    ` : `
-                        <button onclick="AppM.openDealForDialog('${msg.id}')" class="btn btn-green w-full" style="font-size:11px;">
-                            <i class="fa-solid fa-file-signature mr-1"></i> 💰 ОФОРМИТЬ ДКП
-                        </button>
-                    `}
-                    <button onclick="AppM.closeDialog()" class="btn btn-dark w-full" style="font-size:11px;">
-                        <i class="fa-solid fa-arrow-left mr-1"></i> К бирже
-                    </button>
-                </div>
-            </div>
-        `;
-
-        const box = document.getElementById('mChatScrollBox');
-        if (box) box.scrollTop = box.scrollHeight;
-    },
-
-    openActiveDeal() {
-        const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === this.activeDialogId);
-        if (!msg || !msg.p2pLotId) return;
-        this.openDealForDialog(this.activeDialogId);
-    },
-
-    async sendP2PMessage(dialogId) {
-        const input = document.getElementById('mP2PChatInput');
-        if (!input || !input.value.trim()) return;
-
-        const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === dialogId);
-        if (!msg) return;
-
-        const text = input.value.trim();
-        input.value = '';
-
-        if (!Array.isArray(msg.chatHistory)) msg.chatHistory = [];
-        msg.chatHistory.push({ from: 'me', text: text });
-        msg.lastMessageAt = Date.now();
-        msg.preview = text;
-
-        if (window.FB_Bridge?.ChatMessages?.sendMessage && msg.dialogId) {
-            try {
-                await window.FB_Bridge.ChatMessages.sendMessage({
-                    dialogId: msg.dialogId,
-                    text: text,
-                    receiverId: msg.sellerId || null
-                });
-            } catch (e) {
-                console.warn('[AppM] sendP2PMessage firestore error:', e);
-            }
-        }
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof playSound === 'function') playSound('tick');
-
-        const box = document.getElementById('mChatScrollBox');
-        if (box) {
-            const div = document.createElement('div');
-            div.className = 'chat-msg msg-player';
-            div.style.marginBottom = '6px';
-            div.innerText = text;
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-        }
-    },
-
-    _renderNPCDialog(container, msg) {
-        const carData = msg.carData || {};
-        const rawImg = carData.img || "assets/cars/economy/2101/vaz-2101.jpg";
-        const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
-        const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(carData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
-
-        const history = msg.chatHistory || [];
-
-        container.innerHTML = `
-            <div class="phone-app-header" style="border-bottom-color: rgba(0, 230, 118, 0.4); flex-shrink: 0;">
-                <button onclick="AppM.closeDialog()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div style="text-align:center;">
-                    <div class="phone-app-title text-xs font-bold">${this._escapeHtml(msg.sender || 'Покупатель')}</div>
-                    <div class="sub-label color-green" style="font-size:8px;">● Покупатель с площадки</div>
-                </div>
-                <div style="width:40px;"></div>
-            </div>
-
-            <div class="phone-app-body" style="padding:6px;">
-                <div class="glass-card p-2 mb-2" style="border: 1.5px solid var(--green); background: #060a14;">
-                    <div class="deal-car-preview-card" style="padding:4px 8px;">
-                        <img src="${carImg}" class="deal-car-thumb" 
-                             style="width:68px; height:46px; object-fit:cover;" 
-                             onerror="this.onerror=null; this.src='${fallbackImg}';">
-                        <div style="flex:1; min-width:0;">
-                            <b class="text-xs color-cyan" style="font-size:11.5px;">${this._escapeHtml(carData.name || 'Автомобиль')}</b>
-                            <div class="sub-label mt-1" style="font-size:8.5px;">
-                                Предложение: <b class="color-green">${Number(msg.offerPrice || 0).toLocaleString()} ₽</b>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="chat-thread-container" id="mChatScrollBox" 
-                     style="min-height:200px; max-height:340px; overflow-y:auto; padding:8px; background:#04070e; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
-                    ${history.map(item => `
-                        <div class="chat-msg ${item.from === 'me' ? 'msg-player' : 'msg-seller'}" style="margin-bottom:6px;">
-                            ${this._escapeHtml(item.text)}
-                        </div>
-                    `).join('')}
-                </div>
-
-                <div class="p2p-compact-composer mt-2">
-                    <input type="text" 
-                           id="mP2PChatInput" 
-                           class="chat-input p2p-compact-input" 
-                           placeholder="Сообщение покупателю..." 
-                           maxlength="200"
-                           onkeydown="if(event.key==='Enter'){AppM.sendNPCMessage('${msg.id}');}">
-                    <button onclick="AppM.sendNPCMessage('${msg.id}')" 
-                            class="p2p-compact-btn p2p-compact-btn-send">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </button>
-                </div>
-
-                <div class="grid-2 mt-2" style="gap:6px;">
-                    <button onclick="AppM.acceptNPCBuyer('${msg.id}')" class="btn btn-green" style="font-size:11px;">
-                        🤝 Согласиться
-                    </button>
-                    <button onclick="AppM.rejectNPCBuyer('${msg.id}')" class="btn btn-dark" style="font-size:11px;">
-                        ❌ Отказать
-                    </button>
-                </div>
-            </div>
-        `;
-
-        const box = document.getElementById('mChatScrollBox');
-        if (box) box.scrollTop = box.scrollHeight;
-    },
-
-    sendNPCMessage(dialogId) {
-        const input = document.getElementById('mP2PChatInput');
-        if (!input || !input.value.trim()) return;
-        const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === dialogId);
-        if (!msg) return;
-        const text = input.value.trim();
-        input.value = '';
-        if (!Array.isArray(msg.chatHistory)) msg.chatHistory = [];
-        msg.chatHistory.push({ from: 'me', text });
-        if (typeof saveState === 'function') saveState();
-        if (typeof playSound === 'function') playSound('tick');
-        const box = document.getElementById('mChatScrollBox');
-        if (box) {
-            const div = document.createElement('div');
-            div.className = 'chat-msg msg-player';
-            div.style.marginBottom = '6px';
-            div.innerText = text;
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-        }
-    },
-
-    acceptNPCBuyer(dialogId) {
-        if (typeof finishSalesLotDeal === 'function') {
-            const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === dialogId);
-            if (msg && msg.carIndex !== undefined) {
-                const slot = window.state.salesLot?.[msg.carIndex];
-                if (slot) {
-                    const finalPrice = msg.offerPrice || 100000;
-                    const purchaseCost = (slot.car?.purchaseCost) || Math.round(finalPrice * 0.75);
-                    const profit = finalPrice - purchaseCost;
-                    this.closeDialog();
-                    finishSalesLotDeal(msg.carIndex, finalPrice, profit);
-                    return;
-                }
-            }
-        }
-        showToast('⚠️ Действие недоступно');
-    },
-
-    rejectNPCBuyer(dialogId) {
-        const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === dialogId);
-        if (msg && msg.carIndex !== undefined && typeof rejectLotBuyer === 'function') {
-            this.closeDialog();
-            rejectLotBuyer(msg.carIndex);
-        } else {
-            this.closeDialog();
-        }
-    },
-
-    /**
-     * Универсальный диалог (друзья и т.д.)
-     * С real-time подпиской для дружеских чатов + отправка в Firestore.
-     */
-    _renderGenericDialog(container, msg) {
-        const history = msg.chatHistory || [];
-
-        // Real-time подписка для друзей
-        if (msg.category === 'friends' && msg.dialogId && window.FB_Bridge?.ChatMessages?.subscribeToDialog) {
-            if (this._friendChatUnsubscribe) {
-                try { this._friendChatUnsubscribe(); } catch (e) {}
-            }
-            const myUid = String(window.state?.player?.uid || window.tgUserId || '');
-            const currentMsgId = msg.id;
-
-            this._friendChatUnsubscribe = window.FB_Bridge.ChatMessages.subscribeToDialog(
-                msg.dialogId,
-                (messages) => {
-                    if (!Array.isArray(messages)) return;
-                    msg.chatHistory = messages.map(m => ({
-                        from: String(m.senderId) === String(myUid) ? 'me' : 'them',
-                        text: m.text
-                    }));
-                    if (typeof saveState === 'function') saveState();
-                    if (this.activeDialogId === currentMsgId) {
-                        this._renderGenericDialog(container, msg);
-                    }
-                }
-            );
-        }
-
-        container.innerHTML = `
-            <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.4); flex-shrink: 0;">
-                <button onclick="AppM.closeDialog()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
-                <div class="phone-app-title text-xs font-bold">${this._escapeHtml(msg.sender || 'Диалог')}</div>
-                <div style="width:40px;"></div>
-            </div>
-
-            <div class="phone-app-body" style="padding:6px;">
-                <div class="chat-thread-container" id="mChatScrollBox" 
-                     style="min-height:200px; max-height:400px; overflow-y:auto; padding:8px; background:#04070e; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
-                    ${history.length === 0 ? `
-                        <div class="sub-label text-center py-4" style="font-size:9.5px;">
-                            Начните переписку с другом
-                        </div>
-                    ` : history.map(item => `
-                        <div class="chat-msg ${item.from === 'me' ? 'msg-player' : 'msg-seller'}" style="margin-bottom:6px;">
-                            ${this._escapeHtml(item.text)}
-                        </div>
-                    `).join('')}
-                </div>
-
-                <div class="p2p-compact-composer mt-2">
-                    <input type="text" 
-                           id="mP2PChatInput" 
-                           class="chat-input p2p-compact-input" 
-                           placeholder="Сообщение..." 
-                           maxlength="200"
-                           onkeydown="if(event.key==='Enter'){AppM.sendGenericMessage('${msg.id}');}">
-                    <button onclick="AppM.sendGenericMessage('${msg.id}')" 
-                            class="p2p-compact-btn p2p-compact-btn-send">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-
-        const box = document.getElementById('mChatScrollBox');
-        if (box) box.scrollTop = box.scrollHeight;
-    },
-
-    /**
-     * Отправка сообщения другу в Firestore + push в бот.
-     */
-    async sendGenericMessage(dialogId) {
-        const input = document.getElementById('mP2PChatInput');
-        if (!input || !input.value.trim()) return;
-        const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === dialogId);
-        if (!msg) return;
-        const text = input.value.trim();
-        input.value = '';
-
-        if (!Array.isArray(msg.chatHistory)) msg.chatHistory = [];
-        msg.chatHistory.push({ from: 'me', text });
-        msg.lastMessageAt = Date.now();
-        msg.preview = text;
-
-        // Отправка в Firestore (для друзей)
-        if (msg.category === 'friends' && msg.friendUserId && window.FB_Bridge?.ChatMessages?.sendMessage) {
-            try {
-                await window.FB_Bridge.ChatMessages.sendMessage({
-                    dialogId: msg.dialogId || dialogId,
-                    receiverId: msg.friendUserId,
-                    text: text
-                });
-            } catch (e) {
-                console.warn('[AppM] sendGenericMessage → Firestore error:', e);
-            }
-        }
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof playSound === 'function') playSound('tick');
-        const box = document.getElementById('mChatScrollBox');
-        if (box) {
-            const div = document.createElement('div');
-            div.className = 'chat-msg msg-player';
-            div.style.marginBottom = '6px';
-            div.innerText = text;
-            box.appendChild(div);
-            box.scrollTop = box.scrollHeight;
-        }
-    }
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getAuth,
+  signInWithCustomToken
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  // ⭐ v1.2.0: initializeFirestore вместо getFirestore
+  initializeFirestore,
+  // ⭐ v1.2.0: enableNetwork для восстановления связи
+  enableNetwork,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+  limit,
+  writeBatch,
+  Timestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ========================================================
+// 1. КОНФИГ FIREBASE
+// ========================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAV-FUWKge9c6sO-diK7wGqN3p1UbuW7Xc",
+  authDomain: "perekupik-e2979.firebaseapp.com",
+  projectId: "perekupik-e2979",
+  storageBucket: "perekupik-e2979.firebasestorage.app",
+  messagingSenderId: "242959354626",
+  appId: "1:242959354626:web:f03ff4725763c86d33501b",
+  measurementId: "G-CDCFWLQE2C"
 };
 
-// Экспорт в window
-window.AppM = AppM;
-window.AppMessenger = AppM;
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 
-console.log('[💬 phone-m-core v9.0.2] Кнопка обновления ленты на бирже M+ финализирована ✓');
+// ========================================================
+// ⭐ v1.2.0: FIRESTORE С ПРИНУДИТЕЛЬНЫМ LONG POLLING
+// ========================================================
+// experimentalForceLongPolling: true — переключает транспорт с WebSocket
+// на HTTP Long Polling. Это критически важно для:
+//   - Telegram WebView (iOS / Android) — WebSocket часто блокируется
+//   - Мобильные сети за NAT — WebSocket рвётся
+//   - Корпоративные сети / прокси — WebSocket запрещён
+// Без этого флага Firestore уходит в offline-режим и пишет
+// «Failed to get document because the client is offline».
+const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true
+});
+
+console.log('[🔥 Firebase Core] Firestore инициализирован с experimentalForceLongPolling: true');
+
+const DEFAULT_AUTH_SERVER_URL = window.AUTH_SERVER_URL || "http://localhost:3000";
+
+// ========================================================
+// 2. TTL И ЛИМИТЫ
+// ========================================================
+const TTL_CONFIG = {
+  chat_messages: 30 * 24 * 60 * 60 * 1000,   // 30 дней
+  notifications: 7 * 24 * 60 * 60 * 1000,    // 7 дней
+  transactions: 90 * 24 * 60 * 60 * 1000,    // 90 дней
+  market_lots: 14 * 24 * 60 * 60 * 1000,     // 14 дней
+  trade_offers: 3 * 24 * 60 * 60 * 1000,     // 3 дня на принятие
+  friendships: 30 * 24 * 60 * 60 * 1000      // 30 дней для pending
+};
+
+const LIMITS = {
+  maxLotsPerFetch: 40,
+  maxMessagesPerDialog: 100,
+  maxNotificationsPerUser: 50,
+  maxChatMessagesTotal: 500,
+  maxFriendshipsPerUser: 200,
+  maxTradeOffersPerUser: 30
+};
+
+// ========================================================
+// 3. ХЕЛПЕРЫ
+// ========================================================
+function devLogFirestore(action, details) {
+  if (window.DevLogger) {
+    try {
+      window.DevLogger.add('firestore', action + (details ? ' — ' + details : ''));
+    } catch (e) {}
+  }
+}
+
+function getTelegramUser() {
+  try {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return null;
+    const u = tg.initDataUnsafe?.user;
+    if (!u || !u.id) return null;
+    return u;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ========================================================
+// 4. TELEGRAM AUTH MANAGER
+// ========================================================
+let verifiedUserId = null;
+let currentUserProfile = null;
+
+const TelegramAuthManager = {
+  async initSession(customServerUrl = null) {
+    const tgUser = getTelegramUser();
+    if (!tgUser) {
+      console.warn('[🔐 Auth] Нет Telegram-пользователя. Игра недоступна без Telegram.');
+      devLogFirestore('Auth BLOCKED', 'нет Telegram-пользователя');
+      verifiedUserId = null;
+      currentUserProfile = null;
+      return { success: false, userId: null, user: null, reason: 'no_telegram' };
+    }
+
+    const url = customServerUrl || DEFAULT_AUTH_SERVER_URL;
+    let initData = "";
+    try {
+      if (window.Telegram?.WebApp?.initData) {
+        initData = window.Telegram.WebApp.initData;
+      }
+    } catch (e) {}
+
+    try {
+      const response = await fetch(`${url}/api/auth/telegram`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ initData })
+      });
+
+      if (!response.ok) throw new Error(`HTTP: ${response.status}`);
+
+      const data = await response.json();
+      if (!data.customToken) throw new Error("Токен не получен");
+
+      const userCredential = await signInWithCustomToken(auth, data.customToken);
+      verifiedUserId = userCredential.user.uid;
+      currentUserProfile = data.user;
+
+      console.log(`[🔐 Auth] Firebase Auth OK. UID: ${verifiedUserId}`);
+      devLogFirestore('Auth Firebase OK', `UID: ${verifiedUserId}`);
+      return { success: true, userId: verifiedUserId, user: currentUserProfile };
+    } catch (err) {
+      console.warn("[🔐 Auth] Firebase Auth не сработал, использую Telegram ID напрямую:", err.message || err);
+      devLogFirestore('Auth fallback → TG ID', `tgUserId: ${tgUser.id}`);
+
+      verifiedUserId = String(tgUser.id);
+
+      const names = [];
+      if (tgUser.first_name) names.push(tgUser.first_name);
+      if (tgUser.last_name) names.push(tgUser.last_name);
+
+      currentUserProfile = {
+        id: String(tgUser.id),
+        name: names.join(" ").trim() || (tgUser.username ? "@" + tgUser.username : "Перекуп #" + tgUser.id),
+        username: tgUser.username || "",
+        photoUrl: tgUser.photo_url || null,
+        isTelegram: true
+      };
+
+      return { success: true, userId: verifiedUserId, user: currentUserProfile };
+    }
+  },
+
+  getVerifiedUserId() {
+    return verifiedUserId;
+  },
+
+  getUserProfile() {
+    return currentUserProfile;
+  },
+
+  _forceVerifiedUserId(uid) {
+    if (!uid) return;
+    verifiedUserId = String(uid);
+    if (!currentUserProfile) {
+      currentUserProfile = {
+        id: String(uid),
+        name: window.state?.player?.name || "Перекуп",
+        username: "",
+        photoUrl: null,
+        isTelegram: true
+      };
+    }
+    console.log('[🔐 Auth] Force verifiedUserId:', verifiedUserId);
+  }
+};
+
+// ========================================================
+// 5. PLAYERS STORAGE MANAGER
+// ========================================================
+let saveDebounceTimer = null;
+let lastSavedHash = "";
+
+const PlayersStorageManager = {
+  /**
+   * Отложенное сохранение (debounce 3.5 сек).
+   */
+  pushSave(userId, gameState) {
+    if (window.__IS_RESETTING__) {
+      devLogFirestore('pushSave ЗАБЛОКИРОВАН', 'идёт сброс прогресса');
+      return;
+    }
+
+    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
+    if (!targetUid) {
+      devLogFirestore('pushSave BLOCKED', 'нет userId');
+      return;
+    }
+
+    if (typeof targetUid === 'string' &&
+        (targetUid === 'guest_777' || targetUid.startsWith('guest_') || targetUid.startsWith('dev_') || targetUid.startsWith('p_'))) {
+      devLogFirestore('pushSave BLOCKED', `подозрительный UID: ${targetUid}`);
+      console.warn('[FB_Core] pushSave: заблокирован некорректный UID', targetUid);
+      return;
+    }
+
+    const playerDoc = {
+      telegram_id: String(targetUid),
+      name: gameState.player?.name || "Перекуп",
+      avatar: gameState.player?.avatarUrl || null,
+      level: gameState.player?.level || 1,
+      xp: gameState.player?.xp || 0,
+      maxXp: gameState.player?.maxXp || 120,
+      cash: gameState.player?.cash || 0,
+      stars: gameState.player?.stars || 0,
+      fuel: gameState.player?.fuel || 100,
+      tickets: gameState.player?.expressTickets || 25,
+      maxTickets: gameState.player?.maxExpressTickets || 25,
+      karma: gameState.player?.karma || 50,
+      streetCred: gameState.player?.streetCred || 100,
+      connections: gameState.player?.connections || 1,
+      safeDeposit: gameState.player?.safeDeposit || 0,
+      loanDebt: gameState.player?.loanDebt || 0,
+      taxDebt: gameState.player?.taxDebt || 0,
+      hunger: gameState.player?.hunger || 80,
+      mood: gameState.player?.mood || 85,
+      day: gameState.player?.day || 1,
+      club: gameState.player?.club || null,
+      hudColorId: gameState.player?.hudColorId || 'lightning',
+      nickEffect: gameState.player?.nickEffect || 'none',
+      avatarEffect: gameState.player?.avatarEffect || 'none',
+      tools: gameState.player?.tools || {},
+      toolsWear: gameState.player?.toolsWear || {},
+      crypto: gameState.player?.crypto || {},
+      bankDeposits: gameState.player?.bankDeposits || [],
+      ownedHouses: gameState.player?.ownedHouses || [],
+      housingId: gameState.player?.housingId || 'trailer',
+      stats: gameState.player?.stats || {},
+      onboardingDone: gameState.player?.onboardingDone === true,
+      updatedAt: Date.now()
+    };
+
+    const garageDoc = {
+      telegram_id: String(targetUid),
+      cars: (gameState.garage || []).slice(0, 35),
+      salesLot: (gameState.salesLot || []).slice(0, 10),
+      ownedPlates: (gameState.ownedPlates || []).slice(0, 50),
+      platesInventory: (gameState.player?.platesInventory || []).slice(0, 100),
+      businesses: (gameState.businesses || []).slice(0, 15),
+      warehouse: gameState.player?.warehouse || { maxCars: 6, maxItems: 12, cars: [], items: [] },
+      paidParking: gameState.player?.paidParking || { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 },
+      updatedAt: Date.now()
+    };
+
+    const currentHash = `${playerDoc.cash}_${playerDoc.level}_${garageDoc.cars.length}_${playerDoc.club?.id || 'none'}_${playerDoc.onboardingDone}_${garageDoc.warehouse.cars.length}_${garageDoc.paidParking.cars.length}_${garageDoc.platesInventory.length}`;
+    if (currentHash === lastSavedHash) return;
+
+    clearTimeout(saveDebounceTimer);
+    saveDebounceTimer = setTimeout(async () => {
+      try {
+        if (window.__IS_RESETTING__) {
+          devLogFirestore('pushSave ОТМЕНЁН', 'сброс начался во время дебаунса');
+          return;
+        }
+
+        const t0 = performance.now();
+        await Promise.all([
+          setDoc(doc(db, "players", String(targetUid)), playerDoc, { merge: true }),
+          setDoc(doc(db, "garages", String(targetUid)), garageDoc, { merge: true })
+        ]);
+        const dt = Math.round(performance.now() - t0);
+        lastSavedHash = currentHash;
+        console.log(`[☁️ Firestore] Синхронизировано: ${targetUid}`);
+        devLogFirestore('pushSave OK', `players/garages → ${targetUid} (${dt}ms)`);
+      } catch (e) {
+        console.warn("[☁️ Firestore] Ошибка записи:", e);
+        devLogFirestore('pushSave ERROR', e.message || String(e));
+      }
+    }, 3500);
+  },
+
+  /**
+   * Форсированное сохранение (без debounce).
+   */
+  async pushSaveForce(userId, gameState) {
+    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
+    if (!targetUid) return false;
+    if (typeof targetUid === 'string' &&
+        (targetUid.startsWith('guest_') || targetUid.startsWith('dev_') || targetUid.startsWith('p_'))) {
+      console.warn('[FB_Core] pushSaveForce: некорректный UID', targetUid);
+      return false;
+    }
+
+    try {
+      const minimalDoc = {
+        telegram_id: String(targetUid),
+        name: gameState.player?.name || "Перекуп",
+        level: gameState.player?.level || 1,
+        cash: gameState.player?.cash || 0,
+        onboardingDone: gameState.player?.onboardingDone === true,
+        uid: gameState.player?.uid || String(targetUid),
+        updatedAt: Date.now()
+      };
+      await setDoc(doc(db, "players", String(targetUid)), minimalDoc, { merge: true });
+      devLogFirestore('pushSaveForce OK', `players/${targetUid}`);
+      return true;
+    } catch (e) {
+      devLogFirestore('pushSaveForce ERROR', e.message || String(e));
+      return false;
+    }
+  },
+
+  /**
+   * Загрузка сейва из облака.
+   * Возвращает объект { player, garage, salesLot, ownedPlates, platesInventory, businesses, warehouse, paidParking } или null.
+   */
+  async pullSave(userId) {
+    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
+    if (!targetUid) {
+      devLogFirestore('pullSave BLOCKED', 'нет userId');
+      return null;
+    }
+
+    try {
+      const t0 = performance.now();
+      const [playerSnap, garageSnap] = await Promise.all([
+        getDoc(doc(db, "players", String(targetUid))),
+        getDoc(doc(db, "garages", String(targetUid)))
+      ]);
+      const dt = Math.round(performance.now() - t0);
+
+      if (playerSnap.exists() || garageSnap.exists()) {
+        const pData = playerSnap.exists() ? playerSnap.data() : {};
+        const gData = garageSnap.exists() ? garageSnap.data() : {};
+        devLogFirestore('pullSave OK', `${targetUid} (${dt}ms, ${(gData.cars || []).length} авто)`);
+        return {
+          player: { ...pData },
+          garage: gData.cars || [],
+          salesLot: gData.salesLot || [],
+          ownedPlates: gData.ownedPlates || [],
+          platesInventory: gData.platesInventory || [],
+          businesses: gData.businesses || [],
+          warehouse: gData.warehouse || { maxCars: 6, maxItems: 12, cars: [], items: [] },
+          paidParking: gData.paidParking || { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 }
+        };
+      }
+
+      // Fallback на legacy saves/
+      const oldSnap = await getDoc(doc(db, "saves", String(targetUid)));
+      if (oldSnap.exists()) {
+        devLogFirestore('pullSave (legacy saves/)', `${targetUid}`);
+        return oldSnap.data();
+      }
+      devLogFirestore('pullSave MISS', `${targetUid} — документов нет`);
+    } catch (e) {
+      console.warn("[☁️ Firestore] Ошибка загрузки:", e);
+      devLogFirestore('pullSave ERROR', e.message || String(e));
+    }
+    return null;
+  }
+};
+
+// ========================================================
+// 6. CLEANUP MANAGER (TTL)
+// ⭐ v1.1.0: каждая коллекция обрабатывается в своём try/catch.
+// ========================================================
+const CleanupManager = {
+  _lastCleanup: 0,
+  _cleanupInterval: 60 * 60 * 1000, // раз в час
+
+  /**
+   * Очистка просроченных документов.
+   * @param {boolean} force — игнорировать интервал
+   * @returns {Promise<{success, results, total, errors, skipped?}>}
+   */
+  async runCleanup(force = false) {
+    const now = Date.now();
+    if (!force && now - this._lastCleanup < this._cleanupInterval) {
+      return { success: true, skipped: true, results: {}, total: 0, errors: 0 };
+    }
+    this._lastCleanup = now;
+
+    const results = {
+      chat_messages: { ok: 0, error: null },
+      notifications: { ok: 0, error: null },
+      market_lots: { ok: 0, error: null },
+      transactions: { ok: 0, error: null },
+      trade_offers: { ok: 0, error: null }
+    };
+
+    const collectionsToClean = [
+      'chat_messages',
+      'notifications',
+      'market_lots',
+      'transactions',
+      'trade_offers'
+    ];
+
+    let totalDeleted = 0;
+    let errorCount = 0;
+
+    for (const colName of collectionsToClean) {
+      try {
+        const q = query(
+          collection(db, colName),
+          where("expireAt", "<=", now),
+          limit(100)
+        );
+        const snap = await getDocs(q);
+
+        if (snap.empty) {
+          results[colName].ok = 0;
+          continue;
+        }
+
+        const batch = writeBatch(db);
+        let deleted = 0;
+        snap.forEach(d => {
+          batch.delete(d.ref);
+          deleted++;
+        });
+
+        await batch.commit();
+        results[colName].ok = deleted;
+        totalDeleted += deleted;
+      } catch (colErr) {
+        const errMsg = colErr?.code || colErr?.message || String(colErr);
+        results[colName].error = errMsg;
+        errorCount++;
+
+        if (errMsg.includes('permission-denied')) {
+          console.warn(`[Cleanup] ${colName}: permission-denied (коллекция не открыта в Firestore Rules)`);
+        } else {
+          console.warn(`[Cleanup] ${colName} error:`, errMsg);
+        }
+      }
+    }
+
+    const summary = Object.entries(results)
+      .map(([k, v]) => v.error ? `${k}:ERR` : `${k}:${v.ok}`)
+      .join(', ');
+
+    if (totalDeleted > 0 || errorCount > 0) {
+      devLogFirestore(
+        'cleanupExpiredData',
+        `${summary} | total=${totalDeleted}, errors=${errorCount}`
+      );
+    }
+
+    return {
+      success: errorCount === 0 || totalDeleted > 0,
+      results,
+      total: totalDeleted,
+      errors: errorCount
+    };
+  }
+};
+
+// ========================================================
+// 7. FIRESTORE STATS (для DEV)
+// ========================================================
+async function getFirestoreStats() {
+  const stats = {
+    market_lots: 0,
+    chat_messages: 0,
+    notifications: 0,
+    clubs: 0,
+    transactions: 0,
+    registered_plates: 0,
+    cars_catalog: 0,
+    leaderboard: 0,
+    trade_offers: 0,
+    friendships: 0,
+    street_events: 0,
+    storage_wars_lobbies: 0
+  };
+
+  try {
+    for (const colName in stats) {
+      try {
+        const q = query(collection(db, colName), limit(1));
+        const snap = await getDocs(q);
+        stats[colName] = snap.empty ? 0 : "есть данные";
+      } catch (e) {
+        stats[colName] = "ошибка";
+      }
+    }
+  } catch (e) {
+    console.warn('[Stats] Ошибка:', e);
+  }
+
+  return stats;
+}
+
+// ========================================================
+// ⭐ v1.2.0: 8. ВОССТАНОВЛЕНИЕ СЕТИ ПРИ ОНЛАЙНЕ
+// ========================================================
+// Если Firestore ушёл в offline (потеря сети, блокировка WebSocket),
+// при возврате онлайна принудительно включаем сеть.
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', async () => {
+    console.log('[🔥 Firebase Core] Онлайн восстановлен — enableNetwork()');
+    try {
+      await enableNetwork(db);
+      devLogFirestore('enableNetwork OK', 'сеть восстановлена');
+    } catch (e) {
+      console.warn('[🔥 Firebase Core] enableNetwork error:', e);
+    }
+  });
+
+  window.addEventListener('offline', () => {
+    console.log('[🔥 Firebase Core] Сеть потеряна — Firestore переходит в offline');
+    devLogFirestore('offline', 'сеть потеряна');
+  });
+}
+
+// ========================================================
+// 9. ЭКСПОРТ В WINDOW
+// ========================================================
+window.FB_Core = {
+  app,
+  auth,
+  db,
+  enabled: true,
+
+  // Auth
+  Auth: TelegramAuthManager,
+
+  // Storage
+  Players: PlayersStorageManager,
+
+  // Cleanup
+  Cleanup: CleanupManager,
+
+  // Stats
+  getStats: getFirestoreStats,
+
+  // Хелперы
+  getTelegramUser,
+  devLogFirestore,
+
+  // Константы (для справки)
+  TTL_CONFIG,
+  LIMITS
+};
+
+// Алиасы для совместимости со старым кодом
+window.TelegramAuthManager = TelegramAuthManager;
+
+console.log("[☁️ FB_Core v1.2.0] Ядро Firebase загружено. Long Polling + Auth + Players + Cleanup ✓");
+
+// ========================================================
+// 10. АВТОЗАПУСК CLEANUP
+// ========================================================
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      CleanupManager.runCleanup().catch(e => console.warn('[Cleanup] Автозапуск ошибка:', e));
+    }, 5000);
+  });
+}
