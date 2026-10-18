@@ -1,6 +1,11 @@
 // ========================================================
-// js/market/market-inspection.js — СИСТЕМА ПРОВЕРОК (v2.3.1)
+// js/market/market-inspection.js — СИСТЕМА ПРОВЕРОК (v2.4.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.4.1:
+//   - Замеры толщиномером и сканером OBD2 влияют на торг и аргументы скидки
+//   - Диалоги покупателя и продавца в чате сделки по итогам проверок
+//   - При закрытии толщиномера возврат происходит обратно в окно торга у капота
+//   - Строгий гейт инструментов (OBD и толщиномер недоступны без покупки в магазине)
 // ========================================================
 
 let activeInspectCarId = null;
@@ -9,26 +14,49 @@ let isInspectionInProgress = false;
 let _inspectionPending = false;
 
 // --------------------------------------------------------
-// ВСПОМОГАТЕЛЬНЫЕ ГЕТТЕРЫ
+// ВСПОМОГАТЕЛЬНЫЕ ГЕТТЕРЫ И ПРОВЕРКИ ИНСТРУМЕНТОВ
 // --------------------------------------------------------
 function _getInspectCar() {
-    if (!activeInspectCarId || !state.marketFeed) return null;
-    return state.marketFeed.find(c => c && c.id === activeInspectCarId) || null;
+    if (!activeInspectCarId) {
+        if (window.pendingMarketCar?.car) return window.pendingMarketCar.car;
+        return null;
+    }
+    if (state.marketFeed) {
+        const found = state.marketFeed.find(c => c && (String(c.id) === String(activeInspectCarId) || c.id == activeInspectCarId));
+        if (found) return found;
+    }
+    if (state.garage) {
+        const found = state.garage.find(c => c && (String(c.id) === String(activeInspectCarId) || c.id == activeInspectCarId));
+        if (found) return found;
+    }
+    return null;
 }
 
 function _hasTool(toolId) {
-    if (!state.player?.tools) return false;
-    return !!state.player.tools[toolId];
+    const p = state?.player;
+    if (!p) return false;
+
+    if (p.tools && Boolean(p.tools[toolId])) return true;
+    if (Array.isArray(p.inventory) && p.inventory.includes(toolId)) return true;
+
+    if (toolId === 'gauge' && (p.hasGauge || p.tools?.gauge_pro || p.hasGaugePro)) return true;
+    if (toolId === 'gauge_pro' && (p.tools?.gauge_pro || p.hasGaugePro)) return true;
+    if (toolId === 'obd' && (p.hasOBD || p.tools?.obd_launch || p.hasLaunchOBD)) return true;
+    if (toolId === 'obd_launch' && (p.tools?.obd_launch || p.hasLaunchOBD)) return true;
+
+    return false;
 }
 
 function _getToolWear(toolId) {
-    if (!state.player?.toolsWear) return 0;
-    return state.player.toolsWear[toolId] || 0;
+    if (!state.player?.toolsWear) return 100;
+    return state.player.toolsWear[toolId] !== undefined ? state.player.toolsWear[toolId] : 100;
 }
 
 function _consumeToolWear(toolId) {
-    if (!state.player?.toolsWear) return;
-    state.player.toolsWear[toolId] = Math.max(0, (state.player.toolsWear[toolId] || 0) - 1);
+    if (!state.player) return;
+    if (!state.player.toolsWear) state.player.toolsWear = {};
+    const cur = state.player.toolsWear[toolId] !== undefined ? state.player.toolsWear[toolId] : 100;
+    state.player.toolsWear[toolId] = Math.max(0, cur - 1);
     if (typeof saveState === 'function') saveState();
 }
 
@@ -37,88 +65,371 @@ function _getInspectionTiers() {
         return INSPECTION_TIERS;
     }
     return [
-        { id: 'quick',    name: 'Экспресс',    cost: 0,     desc: 'Визуально у капота',      icon: '👁', detects: ['visual'] },
-        { id: 'standard', name: 'Стандарт',    cost: 5000,  desc: '+ Толщиномер + OBD2',      icon: '🔍', detects: ['visual', 'gauge', 'obd'] },
-        { id: 'expert',   name: 'Экспертиза',  cost: 25000, desc: '+ Эндоскоп + компрессометр', icon: '🔬', detects: ['visual', 'gauge', 'obd', 'endoscope', 'compression'] },
-        { id: 'full',     name: 'Полная',      cost: 60000, desc: 'Всё + Автотека + подъёмник', icon: '🏛', detects: ['visual', 'gauge', 'obd', 'endoscope', 'compression', 'autoteka', 'expert'] },
-        { id: 'vin_report', name: 'VIN-отчёт', cost: 15000, desc: 'Только Автотека Pro',     icon: '📜', detects: ['autoteka', 'autoteka_pro'] }
+        { id: 'quick',      name: 'Экспресс',    cost: 0,     desc: 'Визуально у капота',        icon: '👁', detects: ['visual'] },
+        { id: 'standard',   name: 'Стандарт',    cost: 5000,  desc: '+ Толщиномер + OBD2',        icon: '🔍', detects: ['visual', 'gauge', 'obd'] },
+        { id: 'expert',     name: 'Экспертиза',  cost: 25000, desc: '+ Эндоскоп + компрессометр',   icon: '🔬', detects: ['visual', 'gauge', 'obd', 'endoscope', 'compression'] },
+        { id: 'full',       name: 'Полная',      cost: 60000, desc: 'Всё + Автотека + подъёмник',   icon: '🏛', detects: ['visual', 'gauge', 'obd', 'endoscope', 'compression', 'autoteka', 'expert'] },
+        { id: 'vin_report', name: 'VIN-отчёт',   cost: 15000, desc: 'Только Автотека Pro',       icon: '📜', detects: ['autoteka', 'autoteka_pro'] }
     ];
 }
 
 // --------------------------------------------------------
-// 1. ТОЛЩИНОМЕР ЛКП
+// 1. ИНТЕРАКТИВНЫЙ ТОЛЩИНОМЕР ЛКП
 // --------------------------------------------------------
+const BODY_SECTIONS = [
+    { id: 'hood',          name: 'Капот',             side: 'Перед' },
+    { id: 'roof',          name: 'Крыша',             side: 'Верх' },
+    { id: 'trunk',         name: 'Крышка багажника',  side: 'Зад' },
+    { id: 'front_bumper',  name: 'Передний бампер',   side: 'Перед' },
+    { id: 'rear_bumper',   name: 'Задний бампер',     side: 'Зад' },
+    { id: 'wing_fl',       name: 'Крыло переднее L',  side: 'Левый борт' },
+    { id: 'wing_fr',       name: 'Крыло переднее R',  side: 'Правый борт' },
+    { id: 'door_fl',       name: 'Дверь передняя L',  side: 'Левый борт' },
+    { id: 'door_fr',       name: 'Дверь передняя R',  side: 'Правый борт' },
+    { id: 'door_rl',       name: 'Дверь задняя L',    side: 'Левый борт' },
+    { id: 'door_rr',       name: 'Дверь задняя R',    side: 'Правый борт' },
+    { id: 'wing_rl',       name: 'Крыло заднее L',    side: 'Левый борт' },
+    { id: 'wing_rr',       name: 'Крыло заднее R',    side: 'Правый борт' },
+    { id: 'sill_l',        name: 'Порог и стойка L',  side: 'Проёмы L' },
+    { id: 'sill_r',        name: 'Порог и стойка R',  side: 'Проёмы R' }
+];
+
 function openGaugeModal(carId) {
     activeInspectCarId = carId;
     const car = _getInspectCar();
     if (!car) return;
 
-    let hasGauge = _hasTool('gauge') || _hasTool('gauge_pro');
+    // 🔒 СТРОГИЙ ГЕЙТ: НАЛИЧИЕ ТОЛЩИНОМЕРА
+    const hasGauge = _hasTool('gauge') || _hasTool('gauge_pro');
     if (!hasGauge) {
         if (typeof playSound === 'function') playSound('error');
         if (typeof tgHaptic === 'function') tgHaptic('warning');
-        return showToast("⚠️ У вас нет толщиномера! Купите в Авто-Маркете.");
+        if (typeof showToast === 'function') {
+            showToast("🔒 Требуется толщиномер ЛКП! Купите прибор в Авто-Маркете.");
+        }
+        return;
     }
 
-    let toolKey = _hasTool('gauge_pro') ? 'gauge_pro' : 'gauge';
-    let wear = _getToolWear(toolKey);
+    const toolKey = _hasTool('gauge_pro') ? 'gauge_pro' : 'gauge';
+    const wear = _getToolWear(toolKey);
     if (wear <= 0) {
         if (typeof playSound === 'function') playSound('error');
-        return showToast("⚠️ Батарея толщиномера села! Откалибруйте в Авто-Маркете.");
+        return showToast("⚠️ Батарея толщиномера села! Замените питание в Маркете.");
     }
 
     _consumeToolWear(toolKey);
     car.gaugeChecked = true;
-    if (car.inspectionStatus) car.inspectionStatus.gauge = true;
+    if (!car.inspectionStatus) car.inspectionStatus = {};
+    car.inspectionStatus.gauge = true;
 
-    ['hood', 'roof', 'doors', 'wings'].forEach(part => {
-        const el = document.getElementById("part-" + part);
-        if (el) el.innerHTML = "Замерить";
-    });
+    if (!car.bodyThicknessMap) {
+        car.bodyThicknessMap = {};
+        const base = car.isRepainted ? 190 : 110;
+        BODY_SECTIONS.forEach(sec => {
+            let variance = Math.floor((Math.random() * 30) - 15);
+            let val = base + variance;
 
+            if (car.bodyThickness && car.bodyThickness[sec.id] !== undefined) {
+                val = car.bodyThickness[sec.id];
+            } else if (car.condition < 70 && (sec.id.includes('wing') || sec.id.includes('door'))) {
+                if (Math.random() < 0.35) val = Math.floor(350 + Math.random() * 650);
+                else if (Math.random() < 0.4) val = Math.floor(180 + Math.random() * 80);
+            }
+            car.bodyThicknessMap[sec.id] = {
+                val: Math.max(75, val),
+                checked: false
+            };
+        });
+    }
+
+    _renderGaugeInspectionModal(car);
     if (typeof trackQuestProgress === 'function') trackQuestProgress('gauge_check', 1);
     if (typeof saveState === 'function') saveState();
-    ModalManager.open("modalGauge");
 }
 
-function checkBodyPart(part) {
+function _renderGaugeInspectionModal(car) {
+    let modal = document.getElementById("modalGauge");
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalGauge';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    const map = car.bodyThicknessMap || {};
+    let cardsHtml = '';
+
+    const groups = {};
+    BODY_SECTIONS.forEach(sec => {
+        if (!groups[sec.side]) groups[sec.side] = [];
+        groups[sec.side].push(sec);
+    });
+
+    Object.keys(groups).forEach(sideName => {
+        const items = groups[sideName];
+        let itemsHtml = items.map(item => {
+            const data = map[item.id] || { val: 110, checked: false };
+            let statusBadge = `<button onclick="checkBodyPartInteractive('${item.id}')" class="btn btn-dark btn-sm" style="font-size:8.5px; padding:3px 8px;">Замерить</button>`;
+
+            if (data.checked) {
+                const val = data.val;
+                if (val > 260) {
+                    statusBadge = `<b class="color-red" style="font-size:10px;">${val} мкм <span class="tag-badge bg-tag-red" style="font-size:7px; padding:1px 4px;">Шпакля</span></b>`;
+                } else if (val > 155) {
+                    statusBadge = `<b class="color-amber" style="font-size:10px;">${val} мкм <span class="tag-badge bg-tag-amber" style="font-size:7px; padding:1px 4px;">Второй слой</span></b>`;
+                } else {
+                    statusBadge = `<b class="color-green" style="font-size:10px;">${val} мкм <span class="tag-badge bg-tag-green" style="font-size:7px; padding:1px 4px;">Завод</span></b>`;
+                }
+            }
+
+            return `
+                <div class="flex-between p-2 mb-1" style="background:#050914; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                    <div style="font-size:9.5px; color:#f1f5f9; display:flex; align-items:center; gap:5px;">
+                        <i class="fa-solid fa-car-side color-cyan" style="font-size:8.5px;"></i>
+                        <span>${item.name}</span>
+                    </div>
+                    <div>${statusBadge}</div>
+                </div>
+            `;
+        }).join('');
+
+        cardsHtml += `
+            <div class="mb-2 p-2" style="background:#090e18; border-radius:10px; border:1px solid rgba(0,242,254,0.15);">
+                <div class="flex-between mb-1" style="border-bottom:1px solid rgba(255,255,255,0.06); padding-bottom:3px;">
+                    <b class="text-xs color-cyan" style="font-size:9.5px;"><i class="fa-solid fa-layer-group mr-1"></i> ${sideName}</b>
+                    <span class="sub-label" style="font-size:8px;">${items.length} зон</span>
+                </div>
+                ${itemsHtml}
+            </div>
+        `;
+    });
+
+    modal.innerHTML = `
+        <div class="modal-box text-left" style="max-width:440px; max-height:88vh; display:flex; flex-direction:column;">
+            <div class="flex-between mb-2">
+                <div class="modal-glow-badge" style="color:var(--cyan); border-color:var(--cyan);">
+                    <i class="fa-solid fa-microchip"></i> ТОЛЩИНОМЕР ЛКП
+                </div>
+                <button onclick="closeGaugeModal()" class="btn btn-dark btn-auto btn-sm" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center;">✕</button>
+            </div>
+
+            <div class="p-2 mb-2" style="background:#050914; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+                <div class="flex-between">
+                    <div>
+                        <b class="text-xs color-cyan">${car.name}</b>
+                        <div class="sub-label" style="font-size:8.5px;">Заводской норматив: 90–140 мкм</div>
+                    </div>
+                    <button onclick="checkAllBodyParts()" class="btn btn-cyan btn-sm btn-auto" style="font-size:9px; padding:4px 8px;">
+                        Замерить всё в круг
+                    </button>
+                </div>
+            </div>
+
+            <div style="flex:1; overflow-y:auto; overflow-x:hidden; padding-right:2px; margin-bottom:10px;">
+                ${cardsHtml}
+            </div>
+
+            <button onclick="closeGaugeModal()" class="btn btn-cyan w-full font-bold">
+                Готово — к капоту ✓
+            </button>
+        </div>
+    `;
+
+    if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
+        ModalManager.open("modalGauge", { closeOthers: true });
+    } else {
+        modal.classList.add("active");
+        modal.style.display = "flex";
+    }
+}
+
+function checkBodyPartInteractive(partId) {
     const car = _getInspectCar();
-    if (!car || !car.bodyThickness) return;
+    if (!car || !car.bodyThicknessMap) return;
 
     if (typeof playSound === 'function') playSound('tick');
     if (typeof tgHaptic === 'function') tgHaptic('light');
 
-    let val = car.bodyThickness[part] || 110;
-    const el = document.getElementById("part-" + part);
-    if (el) {
-        if (val > 200) el.innerHTML = `<span class='color-red'>${val} мкм (Шпакля)</span>`;
-        else el.innerHTML = `<span class='color-green'>${val} мкм (Завод)</span>`;
+    if (car.bodyThicknessMap[partId]) {
+        car.bodyThicknessMap[partId].checked = true;
     }
+
+    _renderGaugeInspectionModal(car);
+    if (typeof saveState === 'function') saveState();
+}
+
+function checkAllBodyParts() {
+    const car = _getInspectCar();
+    if (!car || !car.bodyThicknessMap) return;
+
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('medium');
+
+    BODY_SECTIONS.forEach(sec => {
+        if (car.bodyThicknessMap[sec.id]) {
+            car.bodyThicknessMap[sec.id].checked = true;
+        }
+    });
+
+    _renderGaugeInspectionModal(car);
+    if (typeof saveState === 'function') saveState();
+    if (typeof showToast === 'function') showToast("✅ Замер всех сторон кузова завершён!");
+}
+
+function checkBodyPart(part) {
+    checkBodyPartInteractive(part);
+}
+
+// --------------------------------------------------------
+// ПРИМЕНЕНИЕ РЕЗУЛЬТАТОВ ТОЛЩИНОМЕРА К ТОРГУ
+// --------------------------------------------------------
+function _applyGaugeResultsToDeal(car) {
+    if (!car || !car.bodyThicknessMap) return;
+
+    let puttyCount = 0;
+    let secondLayerCount = 0;
+    let maxVal = 0;
+
+    Object.keys(car.bodyThicknessMap).forEach(key => {
+        const item = car.bodyThicknessMap[key];
+        if (item && item.checked) {
+            if (item.val > maxVal) maxVal = item.val;
+            if (item.val > 260) {
+                puttyCount++;
+            } else if (item.val > 155) {
+                secondLayerCount++;
+            }
+        }
+    });
+
+    if (!car.mechanicalDefects) car.mechanicalDefects = [];
+    if (!car._revealedDefects) car._revealedDefects = [];
+
+    if (puttyCount > 0) {
+        const defectId = 'body_putty_' + puttyCount;
+        car.mechanicalDefects = car.mechanicalDefects.filter(d => !d.id.startsWith('body_putty'));
+        car._revealedDefects = car._revealedDefects.filter(id => !id.startsWith('body_putty'));
+
+        const discountPct = Math.min(25, Math.max(5, puttyCount * 4));
+        car.mechanicalDefects.push({
+            id: defectId,
+            name: `Шпатлёвка кузова (${puttyCount} зон)`,
+            desc: `Зафиксирован слой шпатлёвки до ${maxVal} мкм на ${puttyCount} деталях.`,
+            severity: puttyCount >= 3 ? 'Критическая' : 'Высокая',
+            cost: puttyCount * 18000,
+            pricePenaltyPct: discountPct,
+            detectMethod: 'gauge'
+        });
+        car._revealedDefects.push(defectId);
+    } else if (secondLayerCount > 0) {
+        const defectId = 'body_second_layer_' + secondLayerCount;
+        car.mechanicalDefects = car.mechanicalDefects.filter(d => !d.id.startsWith('body_second_layer'));
+        car._revealedDefects = car._revealedDefects.filter(id => !id.startsWith('body_second_layer'));
+
+        const discountPct = Math.min(15, Math.max(3, secondLayerCount * 2));
+        car.mechanicalDefects.push({
+            id: defectId,
+            name: `Вторичный окрас (${secondLayerCount} зон)`,
+            desc: `Кузов перекрашивался вторичным слоем (160–250 мкм).`,
+            severity: 'Средняя',
+            cost: secondLayerCount * 7000,
+            pricePenaltyPct: discountPct,
+            detectMethod: 'gauge'
+        });
+        car._revealedDefects.push(defectId);
+    }
+
+    const thread = document.getElementById("dealChatThread");
+    if (thread && !car._gaugeChatNotified) {
+        const anyChecked = Object.values(car.bodyThicknessMap).some(x => x.checked);
+        if (anyChecked) {
+            car._gaugeChatNotified = true;
+            if (puttyCount > 0) {
+                thread.innerHTML += `
+                    <div class="chat-msg msg-player">«Я прошёлся толщиномером: на кузове шпатлёвка в ${puttyCount} зонах (до ${maxVal} мкм)! Скрываешь кузовной ремонт?»</div>
+                    <div class="chat-msg msg-seller" style="border-left-color: var(--amber);">
+                        <b>🔍 Замер ЛКП:</b><br>
+                        «Ладно, скрывать бессмысленно... Были притёртости. Готов подвинуться в цене у капота!»
+                    </div>
+                `;
+            } else if (secondLayerCount > 0) {
+                thread.innerHTML += `
+                    <div class="chat-msg msg-player">«Толщиномер показал вторичный окрас на ${secondLayerCount} деталях. Машина крашеная.»</div>
+                    <div class="chat-msg msg-seller" style="border-left-color: var(--cyan);">
+                        <b>🔍 Замер ЛКП:</b><br>
+                        «Красили от сколов, криминала нет! Но скидку сделаю.»
+                    </div>
+                `;
+            } else {
+                thread.innerHTML += `
+                    <div class="chat-msg msg-player">«Замерил кузов толщиномером: все детали в заводских 100–140 мкм.»</div>
+                    <div class="chat-msg msg-seller" style="border-left-color: var(--green);">
+                        <b>🔍 Замер ЛКП:</b><br>
+                        «А я говорил! Кузов полностью в родной краске!»
+                    </div>
+                `;
+            }
+            thread.scrollTop = thread.scrollHeight;
+        }
+    }
+
+    if (typeof saveState === 'function') saveState();
 }
 
 function closeGaugeModal() {
-    ModalManager.close("modalGauge");
+    const car = _getInspectCar() || window.pendingMarketCar?.car;
+
+    if (typeof ModalManager !== 'undefined' && typeof ModalManager.close === 'function') {
+        ModalManager.close("modalGauge");
+    } else {
+        const m = document.getElementById("modalGauge");
+        if (m) { m.classList.remove('active'); m.style.display = 'none'; }
+    }
+
+    if (car) {
+        _applyGaugeResultsToDeal(car);
+    }
+
     activeInspectCarId = null;
     if (typeof playSound === 'function') playSound('tick');
+
+    // ⭐ ВОЗВРАТ ОБРАТНО В ОКНО ТОРГА
+    const dealModal = document.getElementById("modalMarketDeal");
+    if (dealModal && (window.pendingMarketCar?.car || car)) {
+        if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
+            ModalManager.open("modalMarketDeal");
+        } else {
+            dealModal.classList.add("active");
+            dealModal.style.display = "flex";
+        }
+    }
+
     if (typeof renderMarketHaggleControls === 'function') renderMarketHaggleControls();
 }
 
 // --------------------------------------------------------
-// 2. LAUNCH OBD2
+// 2. ДИАГНОСТИЧЕСКИЙ СКАНЕР LAUNCH OBD2
 // --------------------------------------------------------
 function quickOBDScanMarketCar(carId) {
     if (isOBDScanningInProgress) return;
-    const car = state.marketFeed?.find(c => c && c.id === carId);
+    const car = state.marketFeed?.find(c => c && (String(c.id) === String(carId) || c.id == carId))
+        || state.garage?.find(c => c && (String(c.id) === String(carId) || c.id == carId))
+        || window.pendingMarketCar?.car;
     if (!car) return;
 
-    let hasScanner = _hasTool('obd') || _hasTool('obd_launch');
+    // 🔒 СТРОГИЙ ГЕЙТ: НАЛИЧИЕ СКАНЕРА
+    const hasScanner = _hasTool('obd') || _hasTool('obd_launch');
     if (!hasScanner) {
         if (typeof playSound === 'function') playSound('error');
-        return showToast("⚠️ У вас нет сканера OBD2! Купите ELM327 или Launch.");
+        if (typeof tgHaptic === 'function') tgHaptic('warning');
+        if (typeof showToast === 'function') {
+            showToast("🔒 Сканер OBD2 не найден! Купите ELM327 или Launch в Авто-Маркете.");
+        }
+        return;
     }
 
-    let toolKey = _hasTool('obd_launch') ? 'obd_launch' : 'obd';
-    let wear = _getToolWear(toolKey);
+    const toolKey = _hasTool('obd_launch') ? 'obd_launch' : 'obd';
+    const wear = _getToolWear(toolKey);
     if (wear <= 0) {
         if (typeof playSound === 'function') playSound('error');
         return showToast("⚠️ Сканер разряжен! Откалибруйте его в Авто-Маркете.");
@@ -126,36 +437,66 @@ function quickOBDScanMarketCar(carId) {
 
     _consumeToolWear(toolKey);
     car.stoChecked = true;
-    if (car.inspectionStatus) car.inspectionStatus.obd = true;
+    if (!car.inspectionStatus) car.inspectionStatus = {};
+    car.inspectionStatus.obd = true;
     isOBDScanningInProgress = true;
     if (typeof saveState === 'function') saveState();
 
+    let modal = document.getElementById("modalOBD2");
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalOBD2';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="modal-box text-left" style="max-width:420px;">
+            <div class="flex-between mb-2">
+                <div class="modal-glow-badge" style="color:var(--cyan); border-color:var(--cyan);">
+                    <i class="fa-solid fa-tablet-screen-button"></i> ДИАГНОСТИКА OBD2
+                </div>
+                <button onclick="closeOBD2Modal()" class="btn btn-dark btn-auto btn-sm" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center;">✕</button>
+            </div>
+            <div class="p-2 mb-2" style="background:#050914; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+                <b class="text-xs color-cyan" id="obd2CarTitle">Launch — ${car.name}</b>
+            </div>
+            <div id="obd2ResultBox"></div>
+            <div id="obd2ActionBox" class="mt-2"></div>
+        </div>
+    `;
+
     const resBox = document.getElementById('obd2ResultBox');
     const actBox = document.getElementById('obd2ActionBox');
-    if (typeof setTxt === 'function') setTxt('obd2CarTitle', `Launch — ${car.name}`);
 
-    ModalManager.open("modalOBD2");
+    if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
+        ModalManager.open("modalOBD2", { closeOthers: true });
+    } else {
+        modal.classList.add("active");
+        modal.style.display = "flex";
+    }
+
     if (typeof playSound === 'function') playSound('tick');
     if (typeof tgHaptic === 'function') tgHaptic('medium');
 
     if (resBox) {
         resBox.innerHTML = `
-            <div class="obd-cyber-display">
+            <div class="obd-cyber-display" style="background:#060a12; border:1px solid rgba(0,242,254,0.3); border-radius:10px; padding:10px;">
                 <div class="flex-between text-xs mb-2">
-                    <span class="color-cyan font-bold"><i class="fa-solid fa-satellite-dish"></i> ПОДКЛЮЧЕНИЕ К OBD2...</span>
-                    <span class="sub-label">ISO 15765-4</span>
+                    <span class="color-cyan font-bold"><i class="fa-solid fa-satellite-dish"></i> ПОДКЛЮЧЕНИЕ К ЭБУ...</span>
+                    <span class="sub-label">ISO 15765-4 CAN</span>
                 </div>
-                <div class="obd-progress-track">
-                    <div class="obd-progress-bar" id="obdScanProgressFill"></div>
+                <div class="obd-progress-track" style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; margin-bottom:8px;">
+                    <div class="obd-progress-bar" id="obdScanProgressFill" style="height:100%; width:0%; background:var(--cyan); transition:width 0.3s ease;"></div>
                 </div>
-                <div class="obd-scan-matrix-screen" id="obdTerminalLines">
-                    <div class="obd-terminal-line">> Инициализация протокола...</div>
+                <div class="obd-scan-matrix-screen" id="obdTerminalLines" style="height:110px; overflow-y:auto; font-family:monospace; font-size:9px; color:#a5f3fc; line-height:1.4;">
+                    <div class="obd-terminal-line">> Инициализация Launch X431 Pro...</div>
                 </div>
             </div>
         `;
     }
     if (actBox) {
-        actBox.innerHTML = `<button class="btn btn-dark w-full opacity-50" disabled><i class="fa-solid fa-spinner fa-spin"></i> СКАНИРОВАНИЕ...</button>`;
+        actBox.innerHTML = `<button class="btn btn-dark w-full opacity-50 btn-sm" disabled><i class="fa-solid fa-spinner fa-spin"></i> СКАНИРОВАНИЕ БЛОКОВ...</button>`;
     }
 
     const terminalEl = document.getElementById('obdTerminalLines');
@@ -166,10 +507,10 @@ function quickOBDScanMarketCar(carId) {
     const hasEngineIssue = engineDefects.length > 0;
 
     const scanSteps = [
-        { pct: 25, msg: "> Опрос ЭБУ ДВС (DME/ECU)... Связь 100%", type: "success" },
-        { pct: 50, msg: "> Диагностика АКПП / соленоидов...", type: "" },
-        { pct: 75, msg: "> Сканирование ABS/ESP/SRS...", type: "" },
-        { pct: 100, msg: "> Чтение ошибок в памяти DTC...", type: hasEngineIssue ? "error" : "success" }
+        { pct: 25, msg: "> Опрос DME/ECU двигателя... Связь 100%", type: "color-cyan" },
+        { pct: 50, msg: "> Сканирование АКПП/сцепления (TCM)...", type: "" },
+        { pct: 75, msg: "> Опрос блоков тормозов и безопасности (ABS/ESP/SRS)...", type: "" },
+        { pct: 100, msg: "> Чтение памяти кодов DTC...", type: hasEngineIssue ? "color-red font-bold" : "color-green font-bold" }
     ];
 
     let step = 0;
@@ -189,45 +530,53 @@ function quickOBDScanMarketCar(carId) {
             if (typeof trackQuestProgress === 'function') trackQuestProgress('obd_scan', 1);
             _renderNewOBDResults(car, resBox, actBox, engineDefects);
         }
-    }, 450);
+    }, 400);
 }
 
 function _renderNewOBDResults(car, resBox, actBox, engineDefects) {
     const engWear = car.wear?.engine ? Math.round(car.wear.engine) : 90;
     const transWear = car.wear?.transmission ? Math.round(car.wear.transmission) : 90;
 
+    if (!car._revealedDefects) car._revealedDefects = [];
+    engineDefects.forEach(d => {
+        if (!car._revealedDefects.includes(d.id)) {
+            car._revealedDefects.push(d.id);
+        }
+    });
+    if (typeof saveState === 'function') saveState();
+
     if (engineDefects.length > 0) {
         if (typeof playSound === 'function') playSound('error');
         if (typeof tgHaptic === 'function') tgHaptic('error');
 
         const defectsHtml = engineDefects.map(d => `
-            <div class="obd-terminal-line error" style="margin-bottom:4px;">
-                <b>❌ ${d.name}</b>
-                <div style="font-size:9.5px; color:#fca5a5; margin-top:2px;">${d.desc}</div>
-                <div style="font-size:8.5px; color:#ffb300; margin-top:2px;">
+            <div style="background:rgba(220,38,38,0.1); border-left:3px solid var(--red); padding:6px; border-radius:4px; margin-bottom:4px;">
+                <b class="color-red" style="font-size:10px;">❌ DTC: ${d.name}</b>
+                <div style="font-size:8.5px; color:#fca5a5; margin-top:1px;">${d.desc}</div>
+                <div style="font-size:8px; color:#ffb300; margin-top:2px;">
                     Серьёзность: <b>${d.severity}</b> | Ремонт: <b>~${(d.cost || 0).toLocaleString()} ₽</b>
                 </div>
             </div>
         `).join('');
 
         resBox.innerHTML = `
-            <div class="obd-cyber-display" style="border-color: var(--red);">
+            <div style="background:#090e18; border:1px solid var(--red); border-radius:10px; padding:10px;">
                 <div class="flex-between text-xs mb-2">
-                    <span class="color-red font-bold"><i class="fa-solid fa-triangle-exclamation"></i> НАЙДЕНО ДЕФЕКТОВ: ${engineDefects.length}</span>
-                    <span class="tag-badge bg-tag-red">ОШИБКИ</span>
+                    <span class="color-red font-bold"><i class="fa-solid fa-triangle-exclamation"></i> НАЙДЕНЫ ОШИБКИ: ${engineDefects.length}</span>
+                    <span class="tag-badge bg-tag-red">DTC FAULT</span>
                 </div>
-                <div class="obd-scan-matrix-screen mb-2" style="border-color: rgba(255, 51, 102, 0.4);">
+                <div style="max-height:140px; overflow-y:auto; margin-bottom:8px;">
                     ${defectsHtml}
                 </div>
-                <div class="flex-between text-xs p-2" style="background: rgba(0,0,0,0.6); border-radius: 8px;">
+                <div class="flex-between text-xs p-2" style="background:rgba(0,0,0,0.6); border-radius:8px;">
                     <span>Ресурс ДВС: <b class="${engWear < 50 ? 'color-red' : 'color-amber'}">${engWear}%</b></span>
                     <span>Ресурс КПП: <b class="${transWear < 50 ? 'color-red' : 'color-amber'}">${transWear}%</b></span>
                 </div>
             </div>
         `;
         actBox.innerHTML = `
-            <button onclick="closeOBD2Modal(); if(typeof renderMarketHaggleControls==='function') renderMarketHaggleControls();" class="btn btn-cyan w-full mt-2">
-                Понятно — использовать при торге!
+            <button onclick="closeOBD2Modal(); if(typeof renderMarketHaggleControls==='function') renderMarketHaggleControls();" class="btn btn-cyan w-full font-bold btn-sm">
+                Понятно — сбить цену у капота!
             </button>
         `;
     } else {
@@ -235,32 +584,102 @@ function _renderNewOBDResults(car, resBox, actBox, engineDefects) {
         if (typeof tgHaptic === 'function') tgHaptic('success');
 
         resBox.innerHTML = `
-            <div class="obd-cyber-display" style="border-color: var(--green);">
+            <div style="background:#090e18; border:1px solid var(--green); border-radius:10px; padding:10px;">
                 <div class="flex-between text-xs mb-2">
                     <span class="color-green font-bold"><i class="fa-solid fa-circle-check"></i> ОШИБОК DTC НЕ НАЙДЕНО</span>
                     <span class="tag-badge bg-tag-green">CAN: OK</span>
                 </div>
-                <div class="obd-scan-matrix-screen mb-2" style="border-color: rgba(0, 230, 118, 0.4);">
-                    <div class="obd-terminal-line success">> Блоки DME / EGS / ABS / SRS: Ошибки отсутствуют.</div>
-                    <div class="obd-terminal-line">> Топливные коррекции в норме.</div>
-                    <div class="obd-terminal-line">> Пропусков зажигания не зафиксировано.</div>
+                <div class="p-2 mb-2" style="background:rgba(0,230,118,0.06); border-radius:6px; font-family:monospace; font-size:8.5px; line-height:1.4;">
+                    <div class="color-green">> Блоки DME / EGS / ABS / SRS: Ошибок нет.</div>
+                    <div>> Топливные коррекции в допуске.</div>
+                    <div>> Пропусков зажигания не зафиксировано.</div>
                 </div>
-                <div class="flex-between text-xs p-2" style="background: rgba(0,0,0,0.6); border-radius: 8px;">
+                <div class="flex-between text-xs p-2" style="background:rgba(0,0,0,0.6); border-radius:8px;">
                     <span>Ресурс ДВС: <b class="color-green">${engWear}%</b></span>
                     <span>Ресурс КПП: <b class="color-green">${transWear}%</b></span>
                 </div>
             </div>
         `;
         actBox.innerHTML = `
-            <button onclick="closeOBD2Modal(); if(typeof renderMarketHaggleControls==='function') renderMarketHaggleControls();" class="btn btn-green w-full mt-2">
+            <button onclick="closeOBD2Modal(); if(typeof renderMarketHaggleControls==='function') renderMarketHaggleControls();" class="btn btn-green w-full font-bold btn-sm">
                 Завершить диагностику ✓
             </button>
         `;
     }
 }
 
+// --------------------------------------------------------
+// ПРИМЕНЕНИЕ РЕЗУЛЬТАТОВ OBD2 К ТОРГУ
+// --------------------------------------------------------
+function _applyOBDResultsToDeal(car) {
+    if (!car) return;
+
+    const mechDefects = car.mechanicalDefects || [];
+    const engineDefects = mechDefects.filter(d => d.category === 'ENGINE' || d.category === 'TRANSMISSION');
+
+    if (!car._revealedDefects) car._revealedDefects = [];
+    engineDefects.forEach(d => {
+        if (!car._revealedDefects.includes(d.id)) {
+            car._revealedDefects.push(d.id);
+        }
+    });
+
+    const thread = document.getElementById("dealChatThread");
+    if (thread && !car._obdChatNotified) {
+        car._obdChatNotified = true;
+        if (engineDefects.length > 0) {
+            const listNames = engineDefects.map(d => d.name).join(', ');
+            thread.innerHTML += `
+                <div class="chat-msg msg-player">«Подключил Launch OBD2. Сканер выявил ошибки DTC: ${listNames}! ДВС/трансмиссия требуют внимания.»</div>
+                <div class="chat-msg msg-seller" style="border-left-color: var(--red);">
+                    <b>💻 Диагностика OBD2:</b><br>
+                    «Чёрт... Не думал, что ошибки прочитаются. Готов скинуть на сервис!»
+                </div>
+            `;
+        } else {
+            thread.innerHTML += `
+                <div class="chat-msg msg-player">«Подключил сканер к OBD2: блок ЭБУ чистый, критических кодов DTC нет.»</div>
+                <div class="chat-msg msg-seller" style="border-left-color: var(--green);">
+                    <b>💻 Диагностика OBD2:</b><br>
+                    «Я же говорил, мотор и коробка работают идеально!»
+                </div>
+            `;
+        }
+        thread.scrollTop = thread.scrollHeight;
+    }
+
+    if (typeof saveState === 'function') saveState();
+}
+
 function closeOBD2Modal() {
-    ModalManager.close("modalOBD2");
+    const car = _getInspectCar() || window.pendingMarketCar?.car;
+
+    if (typeof ModalManager !== 'undefined' && typeof ModalManager.close === 'function') {
+        ModalManager.close("modalOBD2");
+    } else {
+        const m = document.getElementById("modalOBD2");
+        if (m) { m.classList.remove('active'); m.style.display = 'none'; }
+    }
+    isOBDScanningInProgress = false;
+
+    if (car) {
+        _applyOBDResultsToDeal(car);
+    }
+
+    if (typeof playSound === 'function') playSound('tick');
+
+    // ⭐ ВОЗВРАТ ОБРАТНО В ОКНО ТОРГА
+    const dealModal = document.getElementById("modalMarketDeal");
+    if (dealModal && (window.pendingMarketCar?.car || car)) {
+        if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
+            ModalManager.open("modalMarketDeal");
+        } else {
+            dealModal.classList.add("active");
+            dealModal.style.display = "flex";
+        }
+    }
+
+    if (typeof renderMarketHaggleControls === 'function') renderMarketHaggleControls();
 }
 
 // --------------------------------------------------------
@@ -365,10 +784,10 @@ function runInspection(tierId) {
 
     const detects = tier.detects || [];
     if (detects.includes('gauge') && !(_hasTool('gauge') || _hasTool('gauge_pro'))) {
-        return showToast("⚠️ Нужен толщиномер ЛКП!");
+        return showToast("⚠️ Нужен толщиномер ЛКП! Купите в Авто-Маркете.");
     }
     if (detects.includes('obd') && !(_hasTool('obd') || _hasTool('obd_launch'))) {
-        return showToast("⚠️ Нужен сканер OBD2!");
+        return showToast("⚠️ Нужен сканер OBD2! Купите в Авто-Маркете.");
     }
     if (detects.includes('endoscope') && !_hasTool('endoscope')) {
         return showToast("⚠️ Нужен видеоэндоскоп!");
@@ -414,8 +833,8 @@ function runInspection(tierId) {
                 <b class="text-xs color-cyan">${tier.name}</b>
                 <div class="sub-label mt-2" style="font-size:10px;">${tier.desc}</div>
                 <div class="p-2 mt-3" style="background:#050914; border-radius:8px;">
-                    <div class="obd-progress-track">
-                        <div class="obd-progress-bar" id="inspectionProgressBar" style="width:0%;"></div>
+                    <div class="obd-progress-track" style="height:6px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                        <div class="obd-progress-bar" id="inspectionProgressBar" style="width:0%; height:100%; background:var(--cyan); transition:width 0.25s ease;"></div>
                     </div>
                 </div>
             </div>
@@ -566,7 +985,7 @@ function _showInspectionResults(car, tier) {
                     </div>
                 ` : ''}
 
-                <div class="grid-2">
+                <div class="grid-2" style="gap:6px;">
                     <button onclick="closeInspectionResults()" class="btn btn-cyan w-full">К машине</button>
                     <button onclick="ModalManager.close('modalInspectionChoice'); if(typeof renderMarketHaggleControls==='function') renderMarketHaggleControls();" class="btn btn-green w-full">К торгу</button>
                 </div>
@@ -588,11 +1007,11 @@ function closeInspectionResults() {
 }
 
 // --------------------------------------------------------
-// 6. ИНТЕРАКТИВНАЯ АВТОТЕКА + СТРОГИЙ АНАЛИЗ БИЗНЕСА
+// 6. ИНТЕРАКТИВНАЯ АВТОТЕКА
 // --------------------------------------------------------
 function openAutotekaModal(carId) {
     if (!state.marketFeed) return;
-    const car = state.marketFeed.find(c => c && c.id === carId);
+    const car = state.marketFeed.find(c => c && (String(c.id) === String(carId) || c.id == carId));
     if (!car) return;
     car.viewed = true;
 
@@ -646,31 +1065,23 @@ function openAutotekaModal(carId) {
         if (legal.id === 'legal_pts_duplicate') ptsTypeStatus = "⚠️ Дубликат ПТС";
     }
 
-    // ⭐ АНАЛИЗ СОВМЕСТИМОСТИ ТОЛЬКО С РЕАЛЬНО КУПЛЕННЫМИ БИЗНЕСАМИ (level > 0)
     const ownedBizIds = (state.businesses || [])
-        .filter(b => b && b.level > 0)
+        .filter(b => b && (b.level > 0 || b.purchased || b.owned))
         .map(b => b.id);
 
     let bizSuitabilityHtml = '';
-    if (window.FLEET_CALCULATOR && ownedBizIds.length > 0) {
-        const suitability = window.FLEET_CALCULATOR.checkSuitability(car, ownedBizIds);
-        car.businessTag = suitability;
-
-        if (suitability && suitability.suitable && Array.isArray(suitability.matches) && suitability.matches.length > 0) {
-            const items = suitability.matches.map(m => {
-                const estIncome = window.FLEET_CALCULATOR.calculateCarDailyIncome(
-                    car, m.bizId, state.player?.legalEntity?.type || 'ip', true
-                );
-                return `
-                    <div class="p-1 mb-1 flex-between" style="background:#090e18; border-radius:6px; border-left:3px solid ${m.badgeColor};">
-                        <span style="font-size:9px;">
-                            <i class="fa-solid ${m.icon}" style="color:${m.badgeColor};"></i>
-                            <b>${m.name}</b> <span class="color-green font-bold">[Ваш бизнес]</span>
-                        </span>
-                        <b class="color-green" style="font-size:9.5px;">+${estIncome.netIncome.toLocaleString()} ₽/д</b>
-                    </div>
-                `;
-            }).join('');
+    if (typeof window.getCarBusinessSuitability === 'function') {
+        const matches = window.getCarBusinessSuitability(car, ownedBizIds);
+        if (matches.length > 0) {
+            const items = matches.map(m => `
+                <div class="p-1 mb-1 flex-between" style="background:#090e18; border-radius:6px; border-left:3px solid ${m.badgeColor || '#00e676'};">
+                    <span style="font-size:9px;">
+                        <i class="fa-solid ${m.icon || 'fa-briefcase'}" style="color:${m.badgeColor || '#00e676'};"></i>
+                        <b>${m.name}</b>
+                    </span>
+                    <span class="tag-badge bg-tag-green" style="font-size:7.5px;">Совместимо</span>
+                </div>
+            `).join('');
 
             bizSuitabilityHtml = `
                 <div class="autoteka-section-compact" style="border:1px solid rgba(0,230,118,0.3); background:rgba(0,230,118,0.03);">
@@ -680,12 +1091,9 @@ function openAutotekaModal(carId) {
                     </div>
                     <div class="sub-label mb-1" style="font-size:8.5px;">Автомобиль можно поставить на баланс через МРЭО:</div>
                     ${items}
-                    ${legal ? '<div class="sub-label color-red font-bold mt-1" style="font-size:8px;">⚠️ Внимание: регистрация в МРЭО возможна только после снятия арестов/залогов!</div>' : ''}
                 </div>
             `;
         }
-    } else {
-        car.businessTag = { suitable: false, matches: [] };
     }
 
     let overallScore = 10;
@@ -718,7 +1126,6 @@ function openAutotekaModal(carId) {
             <div class="autoteka-watermark autoteka-watermark-2">ГИБДД</div>
 
             <div class="autoteka-blank-border">
-                <!-- ШАПКА -->
                 <div class="autoteka-header text-center mb-2">
                     <div class="autoteka-logo-row mb-1">
                         <span class="autoteka-logo-icon">📋</span>
@@ -728,7 +1135,6 @@ function openAutotekaModal(carId) {
                     <div class="autoteka-report-num">Отчёт № <b>${reportNum}</b> от <b>${reportDate}</b></div>
                 </div>
 
-                <!-- 1. ТС -->
                 <div class="autoteka-section-compact">
                     <div class="autoteka-section-title">
                         <span>1. ТРАНСПОРТНОЕ СРЕДСТВО</span>
@@ -748,7 +1154,6 @@ function openAutotekaModal(carId) {
                     </div>
                 </div>
 
-                <!-- 2. ВЛАДЕЛЕЦ -->
                 <div class="autoteka-section-compact">
                     <div class="autoteka-section-title"><span>2. ВЛАДЕЛЕЦ</span></div>
                     <div class="autoteka-row-compact">
@@ -769,7 +1174,6 @@ function openAutotekaModal(carId) {
                     </div>
                 </div>
 
-                <!-- 3. ПРОБЕГ И РЕСУРС -->
                 <div class="autoteka-section-compact">
                     <div class="autoteka-section-title"><span>3. ПРОБЕГ И РЕСУРС</span></div>
                     <div class="autoteka-row-compact">
@@ -789,7 +1193,6 @@ function openAutotekaModal(carId) {
                     </div>
                 </div>
 
-                <!-- 4. ЮРИДИЧЕСКАЯ ПРОВЕРКА -->
                 <div class="autoteka-section-compact">
                     <div class="autoteka-section-title"><span>4. ЮРИДИЧЕСКАЯ ПРОВЕРКА</span></div>
                     <div class="autoteka-row-compact">
@@ -809,31 +1212,26 @@ function openAutotekaModal(carId) {
                 ${bizSuitabilityHtml}
 
                 ${legal ? `
-                    <div class="autoteka-legal-warning">
+                    <div class="autoteka-legal-warning" style="background:rgba(220,38,38,0.12); border:1px solid var(--red); border-radius:8px; padding:8px; margin-top:8px;">
                         <div class="flex-between mb-1">
                             <b class="text-xs color-red">⚠️ ОБНАРУЖЕНА ПРОБЛЕМА</b>
                             <span class="tag-badge bg-tag-red">${legal.severity}</span>
                         </div>
-                        <div class="sub-label mb-1" style="font-size:9px;">
-                            <b>${legal.name}</b> —${legal.desc}
-                        </div>
-                        <div class="sub-label color-red font-bold" style="font-size:8.5px;">
-                            Последствие: ${legal.consequence}
-                        </div>
+                        <div class="sub-label mb-1" style="font-size:9px;"><b>${legal.name}</b> —${legal.desc}</div>
+                        <div class="sub-label color-red font-bold" style="font-size:8.5px;">Последствие: ${legal.consequence}</div>
                     </div>
                 ` : ''}
 
-                <!-- ИТОГОВЫЙ РЕЙТИНГ -->
-                <div class="autoteka-score-block">
+                <div class="autoteka-score-block mt-2">
                     <div class="flex-between mb-1">
                         <b class="text-xs color-cyan">ИТОГОВЫЙ РЕЙТИНГ:</b>
                         <span class="tag-badge ${overallScore >= 8 ? 'bg-tag-green' : (overallScore >= 5 ? 'bg-tag-amber' : 'bg-tag-red')}" style="font-size:8px;">${scoreLabel}</span>
                     </div>
                     <div class="flex-between">
-                        <div class="autoteka-score-bar">
-                            <div class="autoteka-score-fill ${overallScore >= 8 ? 'score-good' : (overallScore >= 5 ? 'score-mid' : 'score-bad')}" style="width:${overallScore * 10}%;"></div>
+                        <div class="autoteka-score-bar" style="flex:1; height:8px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;">
+                            <div class="autoteka-score-fill" style="width:${overallScore * 10}%; height:100%; background:${overallScore >= 8 ? 'var(--green)' : (overallScore >= 5 ? 'var(--amber)' : 'var(--red)')};"></div>
                         </div>
-                        <b class="${scoreColor}" style="font-size:20px; margin-left:10px;">${overallScore}/10</b>
+                        <b class="${scoreColor}" style="font-size:18px; margin-left:10px;">${overallScore}/10</b>
                     </div>
                 </div>
             </div>
@@ -853,6 +1251,8 @@ window.PhoneMarketInspection = {
     runInspection,
     openGaugeModal,
     checkBodyPart,
+    checkBodyPartInteractive,
+    checkAllBodyParts,
     closeGaugeModal,
     quickOBDScanMarketCar,
     closeOBD2Modal,
@@ -862,6 +1262,8 @@ window.PhoneMarketInspection = {
 Object.assign(window, {
     openGaugeModal,
     checkBodyPart,
+    checkBodyPartInteractive,
+    checkAllBodyParts,
     closeGaugeModal,
     quickOBDScanMarketCar,
     closeOBD2Modal,
@@ -872,4 +1274,4 @@ Object.assign(window, {
     _showInspectionResults
 });
 
-console.log('[🔬 market-inspection v2.3.1] Автотека со строгой фильтрацией бизнесов игрока ✓');
+console.log('[🔬 market-inspection v2.4.1] Интерактивный возврат в торг + влияние проверок на чат и скидку ✓');
