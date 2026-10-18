@@ -1,22 +1,12 @@
 // ========================================================
-// js/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.8.0)
+// js/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.8.1 COMPACT CATEGORIES)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.8.0 (CARD CLICK → OPEN DEAL):
-//   - ДОБАВЛЕН onclick на карточку лота (кроме кнопок).
-//     Клик по картинке/названию/цене/характеристикам открывает
-//     процесс покупки: для P2P — offer modal (p2p-offers.js),
-//     для NPC — звонок + торг у капота.
-//   - Кнопка «Позвонить» для P2P-лотов переименована в «Торг»
-//     с иконкой 💬 — честнее отражает поведение.
-//   - cursor: pointer на кликабельной карточке.
-//   - Внутри карточки клик по любой кнопке НЕ дублирует card-click
-//     (проверка event.target.closest('button')).
-//
-// ⭐ v1.7.0 (АВТО-СВОРАЧИВАНИЕ КАТЕГОРИЙ И ГЛОБАЛЬНЫЕ ИВЕНТЫ):
-//   - Сетка категорий автоматически сворачивается при выборе.
-//   - Сетка разворачивается при переходе на вкладку "Рынок".
-//   - Добавлен баннер сезонных событий.
+// ⭐ v1.8.1 (COMPACT ACCORDION CATEGORIES):
+//   - Сетка категорий плавно сворачивается и становится ультра-компактной,
+//     освобождая место под карточки машин на экране.
+//   - Стрелка переключает свернутое/развернутое состояние.
+//   - Сохранена вся логика P2P и NPC торгов, кликабельных карточек и сортировки.
 // ========================================================
 
 let marketSortOrder = 'asc';
@@ -29,20 +19,23 @@ if (typeof window.__marketRenderToken !== 'number') window.__marketRenderToken =
 // Защита от двойного клика по категориям
 if (typeof window._setCategoryPending !== 'boolean') window._setCategoryPending = false;
 
-function toggleMarketCategories() {
+function toggleMarketCategories(forceCollapse = null) {
     const grid = document.getElementById('marketCatListContainer');
-    const btnIcon = document.querySelector('#btnToggleMarketGrid i');
+    const btnIcon = document.querySelector('#btnToggleMarketGrid i') || document.querySelector('.categories-toggle-btn i');
     if (!grid) return;
     
-    grid.classList.toggle('collapsed');
-    
-    if (btnIcon) {
-        if (grid.classList.contains('collapsed')) {
-            btnIcon.className = "fa-solid fa-chevron-down";
-        } else {
-            btnIcon.className = "fa-solid fa-chevron-up";
-        }
+    const shouldCollapse = forceCollapse !== null ? forceCollapse : !grid.classList.contains('collapsed');
+
+    if (shouldCollapse) {
+        grid.classList.add('collapsed');
+        if (btnIcon) btnIcon.className = "fa-solid fa-chevron-down";
+        localStorage.setItem('market_cat_collapsed', 'true');
+    } else {
+        grid.classList.remove('collapsed');
+        if (btnIcon) btnIcon.className = "fa-solid fa-chevron-up";
+        localStorage.setItem('market_cat_collapsed', 'false');
     }
+
     if (typeof playSound === 'function') playSound('tick');
 }
 
@@ -81,7 +74,7 @@ function sortCurrentMarketFeed() {
 }
 
 // ========================================================
-// setCategory с авто-сворачиванием и полной защитой
+// setCategory с авто-сворачиванием в компактный режим
 // ========================================================
 async function setCategory(cat) {
     console.log('[Market] setCategory → ' + cat + ' (START)');
@@ -115,12 +108,8 @@ async function setCategory(cat) {
         const btn = document.getElementById("catBtn-" + cat);
         if (btn) btn.classList.add('active');
 
-        const grid = document.getElementById('marketCatListContainer');
-        const btnIcon = document.querySelector('#btnToggleMarketGrid i');
-        if (grid && !grid.classList.contains('collapsed')) {
-            grid.classList.add('collapsed');
-            if (btnIcon) btnIcon.className = "fa-solid fa-chevron-down";
-        }
+        // Автоматически аккуратно сворачиваем блок после клика
+        toggleMarketCategories(true);
 
         const meta = (typeof CATEGORY_META !== 'undefined' && CATEGORY_META[cat]) ? CATEGORY_META[cat] : { name: 'Рынок', title: 'Общий рынок', capital: '—', desc: '' };
         if (typeof setTxt === 'function') {
@@ -157,16 +146,13 @@ async function setCategory(cat) {
             populateResult = 'MISSING';
         }
 
-        console.log('[Market] setCategory → populate result: ' + populateResult);
-
         if (window.__marketRefreshToken !== myToken) {
-            console.warn('[Market] setCategory → старый вызов отменён новым токеном');
             window._setCategoryPending = false;
             return;
         }
 
         if (populateResult === 'TIMEOUT') {
-            if (typeof showToast === 'function') showToast("⏱ Превышено время генерации. Попробуйте ещё раз.");
+            if (typeof showToast === 'function') showToast("⏱ Превышено время генерации. Повторите попытку.");
             if (container) {
                 container.innerHTML = `
                     <div class="glass-card text-center py-6" style="background:#090e18;">
@@ -186,11 +172,9 @@ async function setCategory(cat) {
             console.error('[Market] Ошибка renderMarketFeed:', e);
         }
 
-        console.log('[Market] setCategory → ' + cat + ' (END, ' + (state.marketFeed?.length || 0) + ' lots)');
-
     } catch (e) {
         console.error('[Market] КРИТИЧЕСКАЯ ОШИБКА в setCategory:', e);
-        if (typeof showToast === 'function') showToast("❌ Ошибка при смене категории. Смотрите консоль.");
+        if (typeof showToast === 'function') showToast("❌ Ошибка при смене категории.");
     } finally {
         window._setCategoryPending = false;
     }
@@ -200,12 +184,7 @@ async function setCategory(cat) {
 // ОБНОВЛЕНИЕ ЛЕНТЫ (ручное)
 // ========================================================
 async function refreshMarketFeedManual() {
-    console.log('[Market] refreshMarketFeedManual → START');
-
-    if (window._setCategoryPending) {
-        console.warn('[Market] refresh проигнорирован — обновление уже идёт');
-        return;
-    }
+    if (window._setCategoryPending) return;
     window._setCategoryPending = true;
 
     try {
@@ -227,12 +206,8 @@ async function refreshMarketFeedManual() {
         state.player.cash -= cost;
         state.player.fuel -= 5;
 
-        const grid = document.getElementById('marketCatListContainer');
-        const btnIcon = document.querySelector('#btnToggleMarketGrid i');
-        if (grid && !grid.classList.contains('collapsed')) {
-            grid.classList.add('collapsed');
-            if (btnIcon) btnIcon.className = "fa-solid fa-chevron-down";
-        }
+        // Сворачиваем блок категорий при обновлении ленты
+        toggleMarketCategories(true);
 
         if (typeof saveState === 'function') saveState();
 
@@ -289,7 +264,7 @@ function promptHiddenPlateAutotekaHint(event) {
 }
 
 // ========================================================
-// ⭐ v1.8.0: РЕНДЕР ЛЕНТЫ С КЛИКАБЕЛЬНОЙ КАРТОЧКОЙ
+// РЕНДЕР ЛЕНТЫ С КЛИКАБЕЛЬНОЙ КАРТОЧКОЙ
 // ========================================================
 function renderMarketFeed() {
     const container = document.getElementById('marketCardContainer');
@@ -436,7 +411,6 @@ function renderMarketFeed() {
                     ? `<span class="color-red font-bold ml-1" style="font-size:8px;">[скручен]</span>`
                     : "";
 
-                // ⭐ v1.8.0: P2P-лоты → кнопка «Торг», NPC → «Позвонить»
                 const actionBtnLabel = car.isP2PUserListing ? 'Торг' : 'Позвонить';
                 const actionBtnIcon = car.isP2PUserListing ? 'fa-solid fa-comments-dollar' : 'fa-solid fa-phone';
 
@@ -530,7 +504,6 @@ function renderMarketFeed() {
         });
 
         if (window.__marketRenderToken !== myRenderToken) {
-            console.warn('[Market] Устаревший рендер отменён');
             return;
         }
 
@@ -585,24 +558,6 @@ function updateMarketTimers() {
 }
 
 // ========================================================
-// АВТО-РАЗВОРАЧИВАНИЕ ПРИ ОТКРЫТИИ ВКЛАДКИ «РЫНОК»
-// ========================================================
-if (window.EventBus) {
-    window.EventBus.on('ui:tab_changed', (data) => {
-        if (data && data.tabId === 'tabMarket') {
-            setTimeout(() => {
-                const grid = document.getElementById('marketCatListContainer');
-                const btnIcon = document.querySelector('#btnToggleMarketGrid i');
-                if (grid && grid.classList.contains('collapsed')) {
-                    grid.classList.remove('collapsed');
-                    if (btnIcon) btnIcon.className = "fa-solid fa-chevron-up";
-                }
-            }, 50);
-        }
-    });
-}
-
-// ========================================================
 // ЭКСПОРТ
 // ========================================================
 Object.assign(window, {
@@ -617,4 +572,4 @@ Object.assign(window, {
     updateMarketTimers
 });
 
-console.log('[🏪 market v1.8.0] Кликабельная карточка → открывает покупку/торг. P2P: «Торг» 💬, NPC: «Позвонить» 📞 ✓');
+console.log('[🏪 market v1.8.1] Компактные сворачивающиеся категории + авто-сворачивание ✓');

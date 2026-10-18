@@ -16,27 +16,27 @@
 </script>
 
 <!-- ═══════════ СТИЛИ ═══════════ -->
-<link rel="stylesheet" href="style.css?v=425">
-<link rel="stylesheet" href="css/base.css?v=425">
-<link rel="stylesheet" href="css/hud.css?v=425">
-<link rel="stylesheet" href="css/market.css?v=425">
-<link rel="stylesheet" href="css/phone.css?v=425">
-<link rel="stylesheet" href="css/m-hub.css?v=425">
-<link rel="stylesheet" href="css/radio.css?v=425">
-<link rel="stylesheet" href="css/modals.css?v=425">
-<link rel="stylesheet" href="css/p2p-deals.css?v=425">
-<link rel="stylesheet" href="css/nav.css?v=425">
+<link rel="stylesheet" href="style.css?v=426">
+<link rel="stylesheet" href="css/base.css?v=426">
+<link rel="stylesheet" href="css/hud.css?v=426">
+<link rel="stylesheet" href="css/market.css?v=426">
+<link rel="stylesheet" href="css/phone.css?v=426">
+<link rel="stylesheet" href="css/m-hub.css?v=426">
+<link rel="stylesheet" href="css/radio.css?v=426">
+<link rel="stylesheet" href="css/modals.css?v=426">
+<link rel="stylesheet" href="css/p2p-deals.css?v=426">
+<link rel="stylesheet" href="css/nav.css?v=426">
 
 <!-- ═══════════ БИБЛИОТЕКИ ═══════════ -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <!-- ═══════════ FIREBASE МОДУЛИ ═══════════ -->
-<script type="module" src="js/firebase/firebase-core.js?v=425"></script>
-<script type="module" src="js/firebase/firebase-market.js?v=425"></script>
-<script type="module" src="js/firebase/firebase-friendships.js?v=425"></script>
-<script type="module" src="js/firebase/firebase-notifications.js?v=425"></script>
-<script type="module" src="js/firebase/firebase-p2p.js?v=425"></script>
+<script type="module" src="js/firebase/firebase-core.js?v=426"></script>
+<script type="module" src="js/firebase/firebase-market.js?v=426"></script>
+<script type="module" src="js/firebase/firebase-friendships.js?v=426"></script>
+<script type="module" src="js/firebase/firebase-notifications.js?v=426"></script>
+<script type="module" src="js/firebase/firebase-p2p.js?v=426"></script>
 </head>
 <body>
 
@@ -240,7 +240,7 @@
               <span class="tag-badge bg-tag-cyan" id="currentCatBadge">ЭКОНОМ</span>
             </div>
           </div>
-          <button onclick="toggleMarketCategories()" class="btn btn-dark btn-sm btn-auto" id="btnToggleMarketGrid" title="Свернуть/Развернуть">
+          <button onclick="toggleMarketCategories()" class="btn btn-dark btn-sm btn-auto categories-toggle-btn" id="btnToggleMarketGrid" title="Свернуть/Развернуть">
             <i class="fa-solid fa-chevron-up"></i>
           </button>
         </div>
@@ -499,6 +499,10 @@
     </div>
   </nav>
 </div>
+
+<!-- ═══════════ МОДАЛКА P2P ТОРГА С ПРОДАВЦОМ ═══════════ -->
+<div id="modalP2PBuyerOffer" class="modal-overlay" style="display:none;"></div>
+<div id="modalP2POffersList" class="modal-overlay" style="display:none;"></div>
 
 <div id="modalDevStudio" class="modal-overlay">
   <div class="modal-box" style="max-width: 440px; max-height: calc(100dvh - 20px);">
@@ -1154,7 +1158,7 @@
 
     const PC_DEV_PASSWORD = "perekup2026";
     const PC_AUTH_STORAGE_KEY = "perekup_pc_auth_ok";
-    const CACHE_VER = '425'; // ⭐ Обновлено до 425
+    const CACHE_VER = '426';
     const FIREBASE_READY_TIMEOUT_MS = 8000;
 
     let isPcAuthenticated = false;
@@ -1285,8 +1289,6 @@
         'js/plates-manager.js',
         'js/notification-center.js',
         'js/realtime-manager.js',
-        'js/p2p-offers.js',
-        'js/p2p-deals-modal.js',
         'js/theme-manager.js',
         'data/data_core.js',
         'data/data_economy.js',
@@ -1310,6 +1312,8 @@
         'data/cars/yacht.js',
         'data/cars/upcoming_cars_data.js',
         'data/data_cars.js',
+        'js/p2p-offers.js',
+        'js/p2p-deals-modal.js',
         'js/app/audio-fx.js',
         'js/m-hub/m-clubs.js',
         'js/m-hub/m-events.js',

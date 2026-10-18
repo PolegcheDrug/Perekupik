@@ -1,19 +1,13 @@
 // ========================================================
-// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.5 BULLETPROOF)
+// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.6 P2P TRADE READY)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-//
-// ⭐ v9.1.5 (MODAL AUTO-INJECT & GUARANTEED DISPLAY):
-//   - АВТО-СОЗДАНИЕ #modalCreateP2P в DOM: если окна нет в index.html,
-//     оно генерируется на лету и открывается поверх экрана телефона.
-//   - Принудительные стили z-index: 999999 и display: flex.
-//   - Полная синхронизация карточек, автовыбор и возврат в гараж при отмене.
 // ========================================================
 
 (function() {
     'use strict';
 
     if (!window.AppM) {
-        console.error('[💬 phone-m-market] AppM не загружен! Проверьте порядок скриптов: phone-m-core.js должен быть ДО phone-m-market.js');
+        console.error('[💬 phone-m-market] AppM не загружен!');
         return;
     }
 
@@ -47,7 +41,7 @@
     }
 
     // ========================================================
-    // 1. ОБНОВЛЕНИЕ ЛЕНТЫ (ЗАГРУЗКА С СЕРВЕРА)
+    // 1. ОБНОВЛЕНИЕ ЛЕНТЫ
     // ========================================================
     AppM.refreshMarketFeed = async function() {
         if (this._refreshPending) return;
@@ -69,7 +63,7 @@
                     
                     if (typeof saveState === 'function') saveState();
                     if (typeof showToast === 'function') {
-                        showToast(`🔄 Лента обновлена. Лотов: ${window.state.p2pMarketListings.length}`, 'success');
+                        showToast(`🔄 Загружено лотов: ${window.state.p2pMarketListings.length}`, 'success');
                     }
                     if (window.AudioFx) window.AudioFx.play('win');
                 }
@@ -92,7 +86,7 @@
     };
 
     // ========================================================
-    // 2. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ ЧЕРНОГО РЫНКА
+    // 2. ЧЕРНЫЙ РЫНОК
     // ========================================================
     AppM._generateBlackMarketListings = function() {
         if (!window.state.blackMarketCars || window.state.blackMarketCars.length === 0) {
@@ -323,14 +317,53 @@
     };
 
     // ========================================================
-    // 4. ТОРГ С ПРОДАВЦОМ
+    // 4. ТОРГ С ПРОДАВЦОМ (МОДАЛКА ИЛИ ДИАЛОГ)
     // ========================================================
     AppM.startTradeWithSeller = function(lotId) {
         if (!lotId) return;
+
+        const lot = (window.state?.p2pMarketListings || []).find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
+        const targetId = lot ? (lot.id || lot.lot_id) : lotId;
+
+        // Если доступна модалка офферов
         if (typeof window.openP2PDealModal === 'function') {
-            window.openP2PDealModal(lotId);
+            try {
+                window.openP2PDealModal(targetId);
+                return;
+            } catch (e) {
+                console.warn('[AppM] openP2PDealModal error:', e);
+            }
+        }
+
+        // Альтернативный переход в чат
+        if (lot) {
+            let dialogId = 'dlg_p2p_' + targetId;
+            let msg = (window.state.player.phoneMessages || []).find(m => m.id === dialogId);
+
+            if (!msg) {
+                if (!window.state.player.phoneMessages) window.state.player.phoneMessages = [];
+                msg = {
+                    id: dialogId,
+                    sender: lot.sellerName || 'Продавец',
+                    sellerId: lot.sellerId,
+                    category: 'p2p',
+                    p2pLotId: targetId,
+                    p2pRole: 'buyer',
+                    askingPrice: lot.price,
+                    carData: lot.itemData || { name: lot.name, img: lot.img },
+                    chatHistory: [
+                        { from: 'them', text: `Здравствуйте! Торгуюсь по ${lot.name}. Какое у вас предложение?` }
+                    ],
+                    unread: false,
+                    lastMessageAt: Date.now()
+                };
+                window.state.player.phoneMessages.unshift(msg);
+                if (typeof saveState === 'function') saveState();
+            }
+
+            this.openDialog(dialogId);
         } else {
-            if (typeof showToast === 'function') showToast('⚠️ Модуль P2P-торга не загружен');
+            if (typeof showToast === 'function') showToast('❌ Лот не найден');
         }
     };
 
@@ -441,7 +474,7 @@
     };
 
     // ========================================================
-    // 6. ВЫКУП С ЧЁРНОГО РЫНКА
+    // 6. ЧЁРНЫЙ РЫНОК
     // ========================================================
     AppM._buyBlackMarketCar = function(carId) {
         const bmCars = this._generateBlackMarketListings();
@@ -510,7 +543,6 @@
             }
         }
 
-        // ВОЗВРАТ ПРЕДМЕТА В ГАРАЖ / ИНВЕНТАРЬ
         if (lot && lot.itemData) {
             if (lot.type === 'cars' || lot.type === 'car') {
                 if (!Array.isArray(window.state.garage)) window.state.garage = [];
@@ -546,7 +578,7 @@
     };
 
     // ========================================================
-    // 8. СОЗДАНИЕ ЛОТА (МОДАЛКА С АВТО-ИНЖЕКТОМ В DOM)
+    // 8. СОЗДАНИЕ ЛОТА
     // ========================================================
     AppM._ensureCreateModalExists = function() {
         let modal = document.getElementById('modalCreateP2P');
@@ -632,7 +664,6 @@
         }
     };
 
-    // ПЕРЕКЛЮЧЕНИЕ ТИПОВ ОБЪЕКТОВ В МОДАЛКЕ
     AppM.selectP2PListingType = function(type, resetSelection = true) {
         try {
             this.selectedListingType = type;
@@ -767,7 +798,6 @@
         }
     };
 
-    // ВЫБОР КОНКРЕТНОГО ОБЪЕКТА ИЗ СПИСКА
     AppM.selectP2PItemToSell = function(index) {
         this.selectedItemIndex = index;
         this.selectP2PListingType(this.selectedListingType, false);
@@ -785,9 +815,6 @@
         if (window.AudioFx) window.AudioFx.play('tick');
     };
 
-    // ========================================================
-    // 9. ПОДТВЕРЖДЕНИЕ ПУБЛИКАЦИИ
-    // ========================================================
     AppM.confirmCreateP2PListing = async function() {
         if (this._publishPending) return;
         this._publishPending = true;
@@ -894,5 +921,5 @@
         }
     };
 
-    console.log('[💱 phone-m-market v9.1.5] Авто-создание #modalCreateP2P в DOM и гарантированный показ ✓');
+    console.log('[💱 phone-m-market v9.1.6] Прямой торг + переход в чат сделки готов ✓');
 })();

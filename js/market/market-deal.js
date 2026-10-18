@@ -1,23 +1,10 @@
 // ========================================================
-// js/market-deal.js — ТОРГ У КАПОТА (v5.1.0)
+// js/market-deal.js — ТОРГ У КАПОТА (v5.1.1 FIXED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.1.0 (КРИТИЧЕСКИЙ ФИКС P2P — FAKE CHAT):
-//   - УБРАНА фейковая openP2PDealModal, которая создавала
-//     локальный чат в phoneMessages и НЕ создавала оффер.
-//   - Все вызовы openP2PDealModal → window.openP2PDealModal
-//     (реальная модалка из p2p-offers.js, которая пишет
-//     p2p_offers + notifyOfferReceived + бот push).
-//   - Fallback _openP2PDealFallback через P2POffersManager.createOffer
-//     с prompt() если реальная модалка недоступна.
-//   - Object.assign больше не затирает реальную модалку.
-//   - Условная регистрация fallback: не перезаписываем реальную
-//     функцию при любом порядке загрузки.
-//
-// ⭐ v5.0.0 (РЕПУТАЦИЯ БРЕНДА + ДАРКНЕТ):
-//   - Учёт репутации бренда при торге.
-//   - Кнопка «Слить в Даркнет» для проблемных авто.
-// ⭐ v4.8.0: восстановлена initiateBuyMarketCar (кнопка «Позвонить»).
+// ⭐ v5.1.1:
+//   - УБРАНА перезапись глобальной window.openP2PDealModal, 
+//     из-за которой ломалась кнопка торга на P2P бирже.
 // ========================================================
 
 let pendingMarketCar = null;
@@ -45,9 +32,6 @@ window.__resetDKPFlags = function() {
     console.log('[DKP] Все флаги сброшены:', window.__getDKPState());
 };
 
-// ========================================================
-// ⭐ v5.1.0: FALLBACK P2P МОДАЛКА (замена фейкового чата)
-// ========================================================
 function _openP2PDealFallback(p2pId) {
     if (!p2pId) return;
     const toast = (m) => { if (typeof showToast === 'function') showToast(m); };
@@ -57,16 +41,10 @@ function _openP2PDealFallback(p2pId) {
     }
 
     const profile = (typeof getCurrentPlayerProfile === 'function') ? getCurrentPlayerProfile() : null;
-    const myUid = String(
-        profile?.id ||
-        state.player?.uid ||
-        window.tgUserId ||
-        ''
-    );
+    const myUid = String(profile?.id || state.player?.uid || window.tgUserId || '');
 
     const findLot = (lots) => (lots || []).find(l => l && (
-        String(l.id) === String(p2pId) ||
-        String(l.lot_id) === String(p2pId)
+        String(l.id) === String(p2pId) || String(l.lot_id) === String(p2pId)
     ));
 
     const doOffer = (lot) => {
@@ -75,7 +53,7 @@ function _openP2PDealFallback(p2pId) {
 
         const askingPrice = Number(lot.price) || 100000;
         const raw = prompt(
-            `Ваше предложение по «${lot.name}»?\n\nЦена продавца: ${askingPrice.toLocaleString()} ₽\nВведите сумму (не менее 1 000 ₽):`,
+            `Ваше предложение по «${lot.name}»?\n\nЦена продавца: ${askingPrice.toLocaleString()} ₽\nВведите сумму:`,
             String(askingPrice)
         );
         if (raw === null) return;
@@ -112,15 +90,10 @@ function _openP2PDealFallback(p2pId) {
     toast("❌ Лот не найден");
 }
 
-// ========================================================
-// ЗВОНОК ПРОДАВЦУ (NPC + роутинг P2P → window.openP2PDealModal)
-// ========================================================
 function initiateBuyMarketCar(carId) {
     if (buyCallTimeoutTimer) { clearTimeout(buyCallTimeoutTimer); buyCallTimeoutTimer = null; }
     if (!carId) return;
 
-    // ⭐ v5.1.0: Для P2P-лота делегируем реальной модалке торга
-    // (той, что в p2p-offers.js, а не фейковому чату)
     let p2pItem = (state.p2pMarketListings || []).find(l => l && (
         String(l.id) === String(carId) || String(l.lot_id) === String(carId)
     ));
@@ -195,21 +168,6 @@ function initiateBuyMarketCar(carId) {
     }, 700);
 }
 
-// ========================================================
-// P2P: делегирование window.openP2PDealModal
-// ========================================================
-function openP2PDealModal(p2pId) {
-    // Внутренние вызовы попадают сюда только если p2p-offers.js НЕ загружен.
-    // Иначе используется window.openP2PDealModal (реальная модалка).
-    if (typeof window.openP2PDealModal === 'function' && window.openP2PDealModal !== _openP2PDealFallback) {
-        return window.openP2PDealModal(p2pId);
-    }
-    return _openP2PDealFallback(p2pId);
-}
-
-// ========================================================
-// ПЛАТНЫЙ ДОЗВОН
-// ========================================================
 function paidCallMarketCar(carId) {
     if (!carId) return;
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -228,16 +186,12 @@ function paidCallMarketCar(carId) {
     openMarketDeal(carId);
 }
 
-// ========================================================
-// ВСТРЕЧА У КАПОТА (NPC + P2P роутинг)
-// ========================================================
 function openMarketDeal(carId) {
     if (!carId) return;
 
     const car = (state.marketFeed || []).find(c => c && c.id === carId);
     if (!car) return showToast("Автомобиль недоступен!");
 
-    // ⭐ v5.1.0: P2P → реальная модалка торга
     if (car.isP2PUserListing) {
         const p2pItem = (state.p2pMarketListings || []).find(l => l && (
             String(l.id) === String(carId) || String(l.lot_id) === String(carId)
@@ -302,9 +256,6 @@ function openMarketDeal(carId) {
     if (typeof playSound === 'function') playSound('tick');
 }
 
-// ========================================================
-// ТЕСТ-ДРАЙВ
-// ========================================================
 function startMarketTestDrive(carId) {
     if (!pendingMarketCar || !pendingMarketCar.car) return;
     const car = pendingMarketCar.car;
@@ -340,9 +291,6 @@ function startMarketTestDrive(carId) {
     if (typeof saveState === 'function') saveState();
 }
 
-// ========================================================
-// ПАНЕЛЬ ТОРГА NPC (с репутацией бренда)
-// ========================================================
 function renderMarketHaggleControls() {
     const haggleArea = document.getElementById("dealHaggleArea");
     if (!haggleArea || !pendingMarketCar || !pendingMarketCar.car) return;
@@ -467,7 +415,7 @@ function renderMarketHaggleControls() {
                 <div class="sub-label mb-2" style="font-size:9px;">Найденные дефекты, которые можно предъявить продавцу:</div>
                 ${mechDefects.slice(0, 3).map(d => `
                     <div class="sub-label mb-1" style="font-size:9px; color:#f1f5f9;">
-                        • <b>${d.name}</b> (-${d.pricePenaltyPct}\% / ~${(d.cost || 0).toLocaleString()} ₽)
+                        • <b>${d.name}</b> (-${d.pricePenaltyPct}% / ~${(d.cost || 0).toLocaleString()} ₽)
                     </div>
                 `).join('')}
                 ${mechDefects.length > 3 ? `<div class="sub-label" style="font-size:8.5px; color:#94a3b8;">... и ещё ${mechDefects.length - 3}</div>` : ''}
@@ -583,195 +531,6 @@ function renderMarketHaggleControls() {
         </div>`;
 }
 
-// ========================================================
-// АРГУМЕНТЫ ПО НАЙДЕННЫМ ДЕФЕКТАМ
-// ========================================================
-function argueKnownDefects(carId) {
-    if (!pendingMarketCar || !pendingMarketCar.car) return;
-    const car = pendingMarketCar.car;
-    const thread = document.getElementById("dealChatThread");
-
-    const revealed = car._revealedDefects || [];
-    const revealedLegal = car._revealedLegal || null;
-    const mechDefects = (car.mechanicalDefects || []).filter(d => revealed.includes(d.id));
-
-    if (mechDefects.length === 0 && !revealedLegal) {
-        return showToast("Нет обнаруженных дефектов для предъявления!");
-    }
-
-    let totalDiscountPct = 0;
-    mechDefects.forEach(d => { totalDiscountPct += d.pricePenaltyPct || 0; });
-    let legalName = '';
-    if (revealedLegal) {
-        const ldef = (typeof LEGAL_DEFECTS !== 'undefined' ? LEGAL_DEFECTS : []).find(l => l.id === revealedLegal);
-        if (ldef) {
-            totalDiscountPct += ldef.pricePenaltyPct || 0;
-            legalName = ldef.name;
-        }
-    }
-    totalDiscountPct = Math.min(60, totalDiscountPct);
-
-    const seller = (typeof SELLER_ARCHETYPES !== 'undefined' ? SELLER_ARCHETYPES : []).find(s => s.id === car.sellerArchetype);
-    let agreeChance = 0.55;
-    if (seller) {
-        if (seller.id === 'honest_grandpa' || seller.id === 'collector') agreeChance = 0.85;
-        if (seller.id === 'panicker') agreeChance = 0.90;
-        if (seller.id === 'cunning_perekup') agreeChance = 0.35;
-        if (seller.id === 'criminal') agreeChance = 0.30;
-        if (seller.id === 'pensioner') agreeChance = 0.70;
-    }
-    const karma = state.player?.karma || 50;
-    agreeChance += (karma - 50) * 0.003;
-    agreeChance = Math.max(0.15, Math.min(0.95, agreeChance));
-
-    car.hagglePatience = Math.max(0, (car.hagglePatience || 1) - 1);
-
-    if (Math.random() < agreeChance) {
-        const discountAmount = Math.round(car.price * (totalDiscountPct / 100));
-        car.price = Math.max(10000, car.price - discountAmount);
-        if (typeof setTxt === 'function') setTxt("dealCarPrice", `${car.price.toLocaleString()} ₽`);
-
-        let playerPhrase = `«Я проверил машину экспертизой. Нашёл проблем: ${mechDefects.length}${revealedLegal ? ' + юридическая' : ''}. Скидывай -${totalDiscountPct}%!»`;
-        if (typeof DIALOGUES_DATABASE !== 'undefined' && DIALOGUES_DATABASE.playerHagglePhrases) {
-            const phrases = DIALOGUES_DATABASE.playerHagglePhrases;
-            playerPhrase = phrases[Math.floor(Math.random() * phrases.length)](totalDiscountPct);
-        }
-
-        let sellerPhrase = `«Ладно, твоя взяла. Скидываю ${discountAmount.toLocaleString()} ₽ за найденные косяки!»`;
-        if (revealedLegal && legalName) {
-            sellerPhrase = `«По ${legalName} — согласен, проблема серьёзная. Уступаю ${discountAmount.toLocaleString()} ₽!»`;
-        }
-
-        if (thread) {
-            thread.innerHTML += `
-                <div class="chat-msg msg-player">${playerPhrase}</div>
-                <div class="chat-msg msg-seller" style="border-left-color:var(--green);">
-                    ${sellerPhrase} <b class="color-green">(-${totalDiscountPct}%)</b>
-                </div>`;
-            thread.scrollTop = thread.scrollHeight;
-        }
-
-        if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast(`✅ Продавец согласился! Скидка -${totalDiscountPct}%`);
-    } else {
-        let sellerPhrase = `«Все машины с косяками, за это скидок не даю. Цена окончательная!»`;
-        if (seller && seller.id === 'cunning_perekup') sellerPhrase = `«Слышал я эти байки. Всё в порядке с машиной, не морочь голову!»`;
-        if (seller && seller.id === 'criminal') sellerPhrase = `«Э, ты чё мне тут предъявляешь? Какие ещё дефекты? Или по-хорошему, или до свидания.»`;
-        if (seller && seller.id === 'collector') sellerPhrase = `«На этой машине косяки — это история. За неё цену не скидывают.»`;
-
-        if (thread) {
-            thread.innerHTML += `
-                <div class="chat-msg msg-player">«Нашёл у машины ${mechDefects.length} дефектов! Скидывай цену!»</div>
-                <div class="chat-msg msg-seller" style="border-left-color:var(--red); color:#fca5a5;">
-                    ${sellerPhrase}
-                </div>`;
-            thread.scrollTop = thread.scrollHeight;
-        }
-
-        if (typeof playSound === 'function') playSound('error');
-        if (typeof tgHaptic === 'function') tgHaptic('error');
-        showToast("Продавец отказался признавать дефекты!");
-    }
-
-    renderMarketHaggleControls();
-    if (typeof saveState === 'function') saveState();
-}
-
-// ========================================================
-// ВЫКУП ПОД РАСПИЛ
-// ========================================================
-function buyCarDirectToScrapYard(price) {
-    if (!pendingMarketCar || !pendingMarketCar.car) return;
-    const car = pendingMarketCar.car;
-    let cash = state.player?.cash || 0;
-    if (cash < price) return showToast("Не хватает денег на выкуп!");
-
-    state.player.cash -= price;
-    let salvageYield = Math.round(price * (1.35 + Math.random() * 0.25));
-    let gainedXp = 50;
-
-    if (state.businesses) {
-        let razborka = state.businesses.find(b => b.id === 'razborka');
-        if (razborka) {
-            razborka.stock = Math.min(razborka.maxStock || 100, (razborka.stock || 0) + 40);
-            razborka.stored = (razborka.stored || 0) + (salvageYield - price);
-        }
-    }
-
-    if (typeof addXp === 'function') addXp(gainedXp);
-    car.unavailable = true;
-
-    ModalManager.close("modalMarketDeal");
-    if (typeof saveState === 'function') saveState();
-    if (typeof updateHeaderUI === 'function') updateHeaderUI();
-    if (typeof renderMarketFeed === 'function') renderMarketFeed();
-    if (typeof playSound === 'function') playSound('win');
-    if (typeof tgHaptic === 'function') tgHaptic('success');
-
-    if (typeof openVerdictModal === 'function') {
-        openVerdictModal(
-            "РАСПИЛЕН НА РАЗБОРКЕ! 🔩",
-            `Автомобиль «${car.name}» доставлен на авторазборку!\nЧистая прибыль с запчастей: +${(salvageYield - price).toLocaleString()} ₽\nЗапас сырья пополнен (+40%).`,
-            true,
-            salvageYield
-        );
-    }
-
-    pendingMarketCar = null;
-    _dealActionPending = false;
-    window.__DKP_PENDING__ = false;
-}
-
-// ========================================================
-// ПРОДАЖА В ДАРКНЕТ
-// ========================================================
-function sellCarToDarknet(price) {
-    if (!pendingMarketCar || !pendingMarketCar.car) return;
-    const car = pendingMarketCar.car;
-
-    if (!confirm(`Слить «${car.name}» в Даркнет за ${price.toLocaleString()} ₽?\n\n⚠️ Без ДКП, без проверок. Карма -10.`)) return;
-
-    state.player.cash = (state.player.cash || 0) + price;
-    state.player.streetCred = (state.player.streetCred || 100) + 5;
-    state.player.karma = Math.max(0, (state.player.karma || 50) - 10);
-
-    state.marketFeed = (state.marketFeed || []).filter(c => c && c.id !== car.id);
-    if (Array.isArray(state.garage)) {
-        const gIdx = state.garage.findIndex(c => c && (c.uid === car.uid || c.id === car.id));
-        if (gIdx !== -1) state.garage.splice(gIdx, 1);
-    }
-
-    if (typeof logBankTransaction === 'function') {
-        logBankTransaction(`Даркнет: ${car.name}`, price, true);
-    }
-
-    if (typeof saveState === 'function') saveState();
-    if (typeof updateHeaderUI === 'function') updateHeaderUI();
-    if (typeof renderMarketFeed === 'function') renderMarketFeed();
-    if (typeof renderGarage === 'function') renderGarage();
-
-    ModalManager.close("modalMarketDeal");
-    if (typeof playSound === 'function') playSound('win');
-    if (typeof tgHaptic === 'function') tgHaptic('success');
-
-    if (typeof openVerdictModal === 'function') {
-        openVerdictModal(
-            "🏴‍☠️ СДЕЛКА В ДАРКНЕТЕ",
-            `Вы тайно слили «${car.name}» за ${price.toLocaleString()} ₽.\nКарма -10, но streetCred +5!`,
-            true,
-            price
-        );
-    }
-
-    pendingMarketCar = null;
-    _dealActionPending = false;
-    window.__DKP_PENDING__ = false;
-}
-
-// ========================================================
-// ТОРГ ПО ПРОЦЕНТАМ (NPC)
-// ========================================================
 function attemptMarketHaggle(percent, failRisk = 25) {
     if (!pendingMarketCar || !pendingMarketCar.car) return showToast("Машина недоступна!");
 
@@ -860,9 +619,6 @@ function attemptMarketHaggle(percent, failRisk = 25) {
     if (typeof saveState === 'function') saveState();
 }
 
-// ========================================================
-// НАЧАЛО ПОКУПКИ (NPC)
-// ========================================================
 function confirmMarketPurchaseSuccess() {
     if (_dealActionPending) return;
 
@@ -906,9 +662,6 @@ function confirmMarketPurchaseSuccess() {
     openRegistrationChoiceModal(deal);
 }
 
-// ========================================================
-// МОДАЛКА ВЫБОРА РЕГИСТРАЦИИ (МРЭО vs ДКП)
-// ========================================================
 function openRegistrationChoiceModal(deal) {
     if (!deal || !deal.car) return showToast("Ошибка данных сделки");
 
@@ -944,9 +697,6 @@ function confirmRegistrationChoice(registerOnPlayer) {
     openDKPModal(_activeDKPDeal);
 }
 
-// ========================================================
-// КОМПАКТНЫЙ БЛАНК ДКП
-// ========================================================
 function openDKPModal(deal) {
     if (!deal || !deal.car) {
         window.__DKP_PENDING__ = false;
@@ -1104,9 +854,6 @@ function openDKPModal(deal) {
     }, 50);
 }
 
-// ========================================================
-// СКАЧАТЬ PDF (ИМИТАЦИЯ)
-// ========================================================
 function downloadDKPPDF() {
     if (typeof showToast === 'function') {
         showToast("📄 Договор сохранён в буфер обмена (PDF-имитация)");
@@ -1133,9 +880,6 @@ VIN: ${car.vin || '—'}
     }
 }
 
-// ========================================================
-// ОСПОРИТЬ ДКП
-// ========================================================
 function disputeDKP() {
     if (!_activeDKPDeal || !_activeDKPDeal.car) return;
 
@@ -1174,9 +918,6 @@ function disputeDKP() {
     }
 }
 
-// ========================================================
-// ПОДПИСАНИЕ ДКП
-// ========================================================
 function confirmSignDKP() {
     console.log('[DKP] confirmSignDKP вызван. State:', window.__getDKPState());
 
@@ -1240,9 +981,6 @@ function confirmSignDKP() {
     }, 1500);
 }
 
-// ========================================================
-// ОТМЕНА ДКП
-// ========================================================
 function abortDKPDeal() {
     ModalManager.close('modalDKP');
     _activeDKPDeal = null;
@@ -1254,9 +992,6 @@ function abortDKPDeal() {
     if (typeof playSound === 'function') playSound('error');
 }
 
-// ========================================================
-// ФИНАЛИЗАЦИЯ ПОКУПКИ В ГАРАЖ
-// ========================================================
 function finishMarketCarBuyProcess(deal) {
     if (!deal || !deal.carId) {
         _dealActionPending = false;
@@ -1366,9 +1101,6 @@ function finishMarketCarBuyProcess(deal) {
     }
 }
 
-// ========================================================
-// ПРЕТЕНЗИЯ ПОКУПАТЕЛЯ (BACKFIRE)
-// ========================================================
 function _triggerBuyerBackfire(car, idx) {
     if (!car) return;
     const type = car._backfireType;
@@ -1467,13 +1199,8 @@ function resolveBackfire(carId, action) {
     ModalManager.close('modalBackfire');
 }
 
-// ========================================================
-// ЭКСПОРТ
-// ========================================================
 Object.assign(window, {
     initiateBuyMarketCar,
-    // ⚠️ v5.1.0: openP2PDealModal НЕ экспортируется — его владелец p2p-offers.js.
-    // Наш локальный openP2PDealModal используется только как internal helper.
     paidCallMarketCar,
     openMarketDeal,
     startMarketTestDrive,
@@ -1495,18 +1222,13 @@ Object.assign(window, {
     resolveBackfire
 });
 
-// ⭐ v5.1.0: Условная регистрация fallback.
-// Не перезаписываем реальную модалку из p2p-offers.js при любом порядке загрузки.
-if (typeof window.openP2PDealModal !== 'function' || window.openP2PDealModal._isFakeFromMarketDeal) {
+// Только если функции еще нет в window, вешаем резерв
+if (typeof window.openP2PDealModal !== 'function') {
     window.openP2PDealModal = _openP2PDealFallback;
-    _openP2PDealFallback._isFakeFromMarketDeal = true;
-    console.log('[MarketDeal v5.1.0] Зарегистрирован fallback openP2PDealModal (p2p-offers.js не загружен или загрузился раньше)');
-} else {
-    console.log('[MarketDeal v5.1.0] Реальная openP2PDealModal уже установлена (p2p-offers.js загружен ранее) ✓');
 }
 
 window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v5.1.0] ФИКС: P2P → реальная openP2PDealModal, fake chat удалён ✓');
+console.log('[🤝 market-deal v5.1.1] Защита window.openP2PDealModal сохранена ✓');

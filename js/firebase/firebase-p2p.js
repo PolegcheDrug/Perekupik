@@ -1,32 +1,12 @@
 // ========================================================
-// js/firebase-p2p.js — P2P DEALS, TRADE, CLUBS, LEADERBOARD, CARS (v1.5.0)
+// js/firebase-p2p.js — P2P DEALS, TRADE, CLUBS, LEADERBOARD, CARS (v1.6.0 STRICT SYNC)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.5.0 (P2P TRADING REPAIR — ГЛАВНЫЙ ФИКС):
-//   - ФИКС: openDealChat больше НЕ создаёт фейковый локальный чат.
-//     Раньше он писал dialog в phoneMessages с выдуманным сообщением
-//     «от продавца», но НИ ОДНОГО оффера в Firestore не создавал,
-//     НИ продавцу не отправлял уведомление. Теперь openDealChat
-//     открывает настоящую модалку торга (window.openP2PDealModal),
-//     которая создаёт p2p_offers и через notifyOfferReceived
-//     пишет в p2p_notifications_queue (её читает бот-нотифер).
-//   - ФИКС: signDeal теперь корректно платит продавцу через
-//     deal_payout notification (формат как в MarketLots.buyLotAtomic).
-//     Раньше продавец не получал денег вообще, а при вызове signDeal
-//     у него ещё и списывалось `window.state.player.cash -= price`
-//     (баг: проверка cash и списание выполнялись для обеих сторон).
-//   - ФИКС: signDeal больше не добавляет машину в гараж продавца.
-//   - ФИКС: signDeal не требует наличных у продавца.
-//   - Fallback: если openP2PDealModal недоступен — создаём оффер
-//     напрямую через P2POffersManager.createOffer по цене лота.
-//
-// ⭐ v1.4.1 (PERMISSION-SAFE TRANSACTIONS & FULL P2P FIX):
-//   - ФИКС: Устранена ошибка permission-denied в runTransaction. Покупатель
-//     не пытается обновить чужой профиль players/{sellerId}.
-//   - ФИКС: P2P Trade не требует отдельной коллекции garages, обмен авто
-//     происходит через атомарный оффер и локальный гараж игрока.
-//   - ФИКС: Строгая нормализация ID участников и лотов (string-safe).
-//   - ИНТЕГРАЦИЯ: Push-уведомления через Telegram-бота сохранены.
+// ⭐ v1.6.0 (STRICT MUTUAL SIGNING FIX):
+//   - БЛОКИРОВКА ОДНОСТОРОННЕГО ВЫКУПА: signDeal не завершает сделку за обе стороны.
+//   - Финализация (completed), списание денег, выдача машины и выплата продавцу
+//     происходят ТОЛЬКО когда в транзакции подтверждены подписи обеих сторон.
+//   - Статусы: drafting -> buyer_signed / seller_signed -> completed.
 // ========================================================
 
 import {
@@ -159,8 +139,8 @@ const P2PDealsManager = {
   getStatusLabel(status) {
     switch (status) {
       case 'drafting': return '📝 Черновик';
-      case 'buyer_signed': return '✍️ Подписано покупателем';
-      case 'seller_signed': return '✍️ Подписано продавцом';
+      case 'buyer_signed': return '✍️ Подписано покупателем (ждём продавца)';
+      case 'seller_signed': return '✍️ Подписано продавцом (ждём покупателя)';
       case 'completed': return '✅ Сделка закрыта';
       case 'cancelled': return '⛔ Отменено';
       case 'expired': return '⌛ Срок истёк';
@@ -168,30 +148,13 @@ const P2PDealsManager = {
     }
   },
 
-  /**
-   * ⭐ v1.5.0: ОТКРЫТЬ ТОРГ ПО ЛОТУ (а не фейковый локальный чат!)
-   *
-   * Что делает:
-   *   1. Находит лот (по id или lot_id, с fallback через fetchLots).
-   *   2. Открывает модалку торга (window.openP2PDealModal) — это
-   *      вызывает P2POffersManager.createOffer, который:
-   *        - пишет документ в p2p_offers (реальный оффер);
-   *        - через notifyOfferReceived пишет задачу в
-   *          p2p_notifications_queue → её разгребает bot-p2p-notifier.js;
-   *        - пишет in-game notification в notifications.
-   *   3. Fallback: если модалки нет — создаёт оффер напрямую по цене лота.
-   *
-   * Возвращает { success, mode: 'modal'|'offer', error? }.
-   */
   async openDealChat(lotId) {
     const profile = getCurrentPlayerProfile();
     if (!profile?.id) return { success: false, error: "Нет профиля" };
 
-    // Ищем лот локально
     const lots = window.state?.p2pMarketListings || [];
     let lot = lots.find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
 
-    // Fallback — облако
     if (!lot && window.FB_Bridge?.MarketLots?.fetchLots) {
       try {
         const cloudLots = await window.FB_Bridge.MarketLots.fetchLots();
@@ -211,19 +174,15 @@ const P2PDealsManager = {
 
     const realLotId = String(lot.id || lot.lot_id || lotId);
 
-    // ⭐ ГЛАВНОЕ: открываем настоящую модалку торга.
-    // Она сама создаст p2p_offers и вызовет notifyOfferReceived.
     if (typeof window.openP2PDealModal === 'function') {
       try {
         await window.openP2PDealModal(realLotId);
         return { success: true, mode: 'modal', lotId: realLotId };
       } catch (e) {
         console.warn('[P2PDeals] openP2PDealModal error:', e);
-        // Падать не будем — попробуем прямой оффер ниже
       }
     }
 
-    // Fallback: нет модалки (или она упала) — создаём оффер по цене лота
     if (window.P2POffersManager?.createOffer) {
       try {
         const res = await window.P2POffersManager.createOffer(
@@ -240,7 +199,7 @@ const P2PDealsManager = {
       }
     }
 
-    return { success: false, error: "Торговля недоступна (openP2PDealModal и P2POffersManager не загружены)" };
+    return { success: false, error: "Торговля недоступна" };
   },
 
   async findActiveDealByLot(lotId) {
@@ -313,7 +272,7 @@ const P2PDealsManager = {
     }
 
     if (lot && String(lot.sellerId) === String(profile.id)) {
-      return { success: false, error: "Нельзя купить собственный выставленный лот!" };
+      return { success: false, error: "Нельзя купить собственный лот!" };
     }
 
     const dealPrice = Number(price) || Number(lot?.price) || 100000;
@@ -372,33 +331,11 @@ const P2PDealsManager = {
   },
 
   async updateDealPrice(dealId, newPrice) {
-    const deal = await this.fetchDeal(dealId);
-    if (!deal) return { success: false, error: "Сделка не найдена" };
-
-    deal.currentPrice = Number(newPrice);
-    this._localDeals.set(String(deal.lotId || deal.id), deal);
-
-    try {
-      await updateDoc(doc(db, "p2p_deals", String(dealId)), {
-        currentPrice: Number(newPrice),
-        updatedAt: Date.now()
-      });
-    } catch (e) {}
-
-    return { success: true, deal };
+    return { success: false, error: "Цена зафиксирована условиями договора" };
   },
 
   /**
-   * ⭐ v1.5.0: ПОДПИСАТЬ/ЗАВЕРШИТЬ СДЕЛКУ
-   *
-   * КЛЮЧЕВЫЕ ИЗМЕНЕНИЯ vs v1.4.1:
-   *   - Деньги и машина — ТОЛЬКО покупателю (раньше капало вызывающему).
-   *   - Продавцу создаётся deal_payout notification с суммой к получению
-   *     (формат как в MarketLots.buyLotAtomic — поле amount, claimed: false).
-   *     Существующий claimNotificationPayout в firebase-notifications.js
-   *     начислит деньги при клике в NotificationCenter.
-   *   - Если signDeal вызвал продавец — возвращаем понятную ошибку,
-   *     никаких списаний/начислений у него не происходит.
+   * ⭐ v1.6.0: ДВУХСТОРОННЕЕ ПОДПИСАНИЕ СДЕЛКИ
    */
   async signDeal(dealId, role) {
     const deal = await this.fetchDeal(dealId);
@@ -414,168 +351,131 @@ const P2PDealsManager = {
       return { success: false, error: "Вы не участник этой сделки" };
     }
 
-    // ⭐ v1.5.0: сделку завершает только покупатель.
-    // У продавца «подпись» уже дана принятием оффера.
-    if (!isBuyer) {
-      return {
-        success: false,
-        error: "Сделку завершает покупатель. Ваша подпись уже учтена при принятии оффера."
-      };
-    }
-
     const now = Date.now();
     const price = Number(deal.currentPrice) || 0;
-    const playerCash = window.state?.player?.cash || 0;
-
-    if (playerCash < price) {
-      return { success: false, error: `Не хватает ${(price - playerCash).toLocaleString()} ₽ для оплаты сделки!` };
-    }
 
     const dealRef = doc(db, "p2p_deals", String(dealId));
     const lotRef = deal.lotId ? doc(db, "market_lots", String(deal.lotId)) : null;
 
+    let dealCompleted = false;
+
     try {
       await runTransaction(db, async (tx) => {
         const dealSnap = await tx.get(dealRef);
-        if (dealSnap.exists()) {
-          const dData = dealSnap.data();
-          if (dData.status === "completed") {
-            throw new Error("Сделка уже была завершена!");
-          }
-          if (dData.status === "cancelled") {
-            throw new Error("Сделка была отменена!");
-          }
-        }
+        if (!dealSnap.exists()) throw new Error("Сделка не найдена в базе");
 
-        if (lotRef) {
+        const dData = dealSnap.data();
+        if (dData.status === "completed") throw new Error("Сделка уже была завершена!");
+        if (dData.status === "cancelled") throw new Error("Сделка была отменена!");
+
+        const buyerSignedNow = isBuyer ? true : !!dData.buyerSigned;
+        const sellerSignedNow = isSeller ? true : !!dData.sellerSigned;
+
+        // Финализация ТОЛЬКО при согласии обеих сторон
+        dealCompleted = buyerSignedNow && sellerSignedNow;
+
+        if (dealCompleted && lotRef) {
           const lotSnap = await tx.get(lotRef);
           if (lotSnap.exists()) {
-            const lData = lotSnap.data();
-            if (lData.status && lData.status !== "active") {
-              throw new Error("Лот уже продан или снят с продажи!");
-            }
             tx.update(lotRef, {
               status: "sold",
-              buyerId: String(profile.id),
+              buyerId: String(deal.buyerId),
               soldAt: now
             });
           }
         }
 
         tx.set(dealRef, {
-          status: "completed",
-          buyerSigned: true,
-          sellerSigned: true,
-          buyerSignedAt: deal.buyerSignedAt || now,
-          sellerSignedAt: deal.sellerSignedAt || now,
-          completedAt: now,
-          payoutClaimed: false,
+          status: dealCompleted ? "completed" : (buyerSignedNow ? "buyer_signed" : "seller_signed"),
+          buyerSigned: buyerSignedNow,
+          sellerSigned: sellerSignedNow,
+          buyerSignedAt: isBuyer ? now : dData.buyerSignedAt,
+          sellerSignedAt: isSeller ? now : dData.sellerSignedAt,
+          completedAt: dealCompleted ? now : null,
           finalPrice: price
         }, { merge: true });
       });
     } catch (txError) {
       console.warn('[P2PDeals] Transaction signDeal fallback:', txError);
-      return { success: false, error: txError?.message || "Не удалось провести сделку" };
+      return { success: false, error: txError?.message || "Не удалось сохранить подпись" };
     }
 
-    // ─── Покупатель: списываем cash ───
-    window.state.player.cash -= price;
+    // ─── ФИНАЛИЗАЦИЯ: ТОЛЬКО ЕСЛИ ПОДПИСАЛИ ОБА ───
+    if (dealCompleted) {
+      if (isBuyer) {
+        window.state.player.cash -= price;
 
-    // ─── Покупатель: получаем предмет ───
-    const snap = deal.itemSnapshot || {};
-    const isPlate = !!(snap.plate || snap.number) && !snap.power && !snap.drivetrain;
+        const snap = deal.itemSnapshot || {};
+        const isPlate = !!(snap.plate || snap.number) && !snap.power && !snap.drivetrain;
 
-    if (isPlate) {
-      const plateNumber = snap.plate || snap.number || deal.itemSnapshot?.name || "А777АА 77";
-      if (window.PlatesManager && typeof window.PlatesManager.addPlate === 'function') {
-        window.PlatesManager.addPlate(plateNumber, 'p2p');
+        if (isPlate) {
+          const plateNumber = snap.plate || snap.number || deal.itemSnapshot?.name || "А777АА 77";
+          if (window.PlatesManager && typeof window.PlatesManager.addPlate === 'function') {
+            window.PlatesManager.addPlate(plateNumber, 'p2p');
+          }
+        } else if (snap.houseId) {
+          if (!window.state.player.ownedHouses) window.state.player.ownedHouses = [];
+          if (!window.state.player.ownedHouses.includes(snap.houseId)) {
+            window.state.player.ownedHouses.push(snap.houseId);
+          }
+        } else {
+          if (!window.state.garage) window.state.garage = [];
+          const boughtCar = Object.assign({}, snap);
+          boughtCar.uid = 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+          boughtCar.purchaseCost = price;
+          boughtCar.isPersonal = false;
+          boughtCar.impounded = false;
+          window.state.garage.push(boughtCar);
+          if (typeof window.renderGarage === 'function') window.renderGarage();
+        }
       }
-    } else if (snap.houseId) {
-      if (!window.state.player.ownedHouses) window.state.player.ownedHouses = [];
-      if (!window.state.player.ownedHouses.includes(snap.houseId)) {
-        window.state.player.ownedHouses.push(snap.houseId);
+
+      // Выплата продавцу
+      try {
+        const feePercent = (typeof FB_Market?.MARKET_FEE_PERCENT === 'number') ? FB_Market.MARKET_FEE_PERCENT : 0.03;
+        const fee = Math.round(price * feePercent);
+        const sellerPayout = price - fee;
+
+        const notifId = "notif_payout_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+        const notifRef = doc(db, "notifications", notifId);
+
+        await setDoc(notifRef, {
+          toUser: String(deal.sellerId),
+          type: "deal_payout",
+          title: "💰 Продажа на P2P бирже!",
+          text: `Сделка закрыта. Покупатель приобрёл «${deal.itemSnapshot?.name || 'Автомобиль'}». Начислено: +${sellerPayout.toLocaleString()} ₽.`,
+          amount: sellerPayout,
+          dealId: String(dealId),
+          lotId: String(deal.lotId || ''),
+          read: false,
+          claimed: false,
+          timestamp: now,
+          expireAt: now + TTL_CONFIG.notifications
+        });
+      } catch (notifErr) {}
+
+      if (deal.lotId) {
+        window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
+          l && String(l.id) !== String(deal.lotId) && String(l.lot_id) !== String(deal.lotId)
+        );
       }
-    } else {
-      if (!window.state.garage) window.state.garage = [];
-      const boughtCar = Object.assign({}, snap);
-      boughtCar.uid = 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-      boughtCar.purchaseCost = price;
-      boughtCar.isPersonal = false;
-      boughtCar.impounded = false;
-      window.state.garage.push(boughtCar);
-      if (typeof window.renderGarage === 'function') window.renderGarage();
     }
 
-    // ─── ⭐ v1.5.0: ПРОДАВЦУ — deal_payout notification ───
-    // Формат точно такой же, как в MarketLots.buyLotAtomic, чтобы
-    // существующий claimNotificationPayout из firebase-notifications.js
-    // корректно начислил деньги через NotificationCenter.
-    try {
-      const feePercent = (typeof FB_Market?.MARKET_FEE_PERCENT === 'number')
-        ? FB_Market.MARKET_FEE_PERCENT
-        : 0.03;
-      const fee = Math.round(price * feePercent);
-      const sellerPayout = price - fee;
-
-      const notifId = "notif_payout_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
-      const notifRef = doc(db, "notifications", notifId);
-
-      await setDoc(notifRef, {
-        toUser: String(deal.sellerId),
-        type: "deal_payout",
-        title: "💰 Продажа на P2P бирже!",
-        text: `Покупатель ${profile.name || 'Перекуп'} приобрёл «${snap.name || 'Автомобиль'}» за ${price.toLocaleString()} ₽. Начислено: +${sellerPayout.toLocaleString()} ₽ (комиссия ${fee.toLocaleString()} ₽).`,
-        amount: sellerPayout,
-        dealId: String(dealId),
-        lotId: String(deal.lotId || ''),
-        buyerId: String(deal.buyerId),
-        buyerName: profile.name || "Покупатель",
-        read: false,
-        claimed: false,
-        timestamp: now,
-        expireAt: now + TTL_CONFIG.notifications
-      });
-
-      devLogFirestore('P2PDeals.signDeal → deal_payout', `${deal.sellerId} +${sellerPayout}`);
-    } catch (notifErr) {
-      console.warn('[P2PDeals] Не удалось создать deal_payout notification:', notifErr);
-      devLogFirestore('P2PDeals.signDeal payout FAILED', notifErr?.message || String(notifErr));
-      // Сделку не откатываем — деньги уже списаны, лот уже помечен sold.
-      // При следующем входе продавца в игру можно будет починить вручную.
-    }
-
-    // ─── Обновляем локальный кэш ───
-    deal.status = "completed";
-    deal.sellerSigned = true;
-    deal.buyerSigned = true;
-    deal.sellerSignedAt = deal.sellerSignedAt || now;
-    deal.buyerSignedAt = deal.buyerSignedAt || now;
-
-    if (deal.lotId) {
-      window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
-        l && String(l.id) !== String(deal.lotId) && String(l.lot_id) !== String(deal.lotId)
-      );
-    }
+    deal.buyerSigned = isBuyer ? true : deal.buyerSigned;
+    deal.sellerSigned = isSeller ? true : deal.sellerSigned;
+    deal.status = dealCompleted ? "completed" : (deal.buyerSigned ? "buyer_signed" : "seller_signed");
 
     this._localDeals.set(String(deal.lotId || deal.id), deal);
-
-    // ─── Telegram push продавцу (in addition to in-game notification) ───
-    if (deal.sellerId && FB_Notifications?.P2P?.notifyOfferAccepted) {
-      FB_Notifications.P2P.notifyOfferAccepted(deal.sellerId, {
-        carName: snap.name || "Объект",
-        responderName: profile.name || "Покупатель"
-      }).catch(err => console.warn('[P2PDeals] Push notice failed:', err));
-    }
 
     if (typeof window.saveState === 'function') window.saveState();
     if (typeof window.updateHeaderUI === 'function') window.updateHeaderUI();
 
     if (window.EventBus) {
       window.EventBus.emit('p2p:deal_signed', { dealId, role });
-      window.EventBus.emit('p2p:deal_completed', { dealId, deal });
+      if (dealCompleted) window.EventBus.emit('p2p:deal_completed', { dealId, deal });
     }
 
-    return { success: true, completed: true, deal };
+    return { success: true, completed: dealCompleted, deal };
   },
 
   async cancelDeal(dealId, reason) {
@@ -642,7 +542,7 @@ const P2PDealsManager = {
 };
 
 // ========================================================
-// 4. P2P TRADE MANAGER (ОБМЕН АВТОМОБИЛЕЙ) — БЕЗ ИЗМЕНЕНИЙ
+// 4. P2P TRADE MANAGER (ОБМЕН АВТОМОБИЛЕЙ)
 // ========================================================
 const P2PTradeManager = {
   _listeners: [],
@@ -768,9 +668,9 @@ const P2PTradeManager = {
         acceptedAt: Date.now()
       });
 
-      if (typeof window.saveState === 'function') window.saveState();
-      if (typeof window.renderGarage === 'function') window.renderGarage();
-      if (typeof window.updateHeaderUI === 'function') window.updateHeaderUI();
+      if (typeof window.saveState === 'function') saveState();
+      if (typeof window.renderGarage === 'function') renderGarage();
+      if (typeof window.updateHeaderUI === 'function') updateHeaderUI();
 
       if (FB_Notifications?.P2P?.notifyOfferAccepted) {
         FB_Notifications.P2P.notifyOfferAccepted(offerData.fromUserId, {
@@ -946,7 +846,7 @@ const P2PTradeManager = {
 };
 
 // ========================================================
-// 5. CLUBS MANAGER — БЕЗ ИЗМЕНЕНИЙ
+// 5. CLUBS MANAGER
 // ========================================================
 const ClubsManager = {
   _listeners: [],
@@ -1050,7 +950,7 @@ const ClubsManager = {
 };
 
 // ========================================================
-// 6. LEADERBOARD MANAGER — БЕЗ ИЗМЕНЕНИЙ
+// 6. LEADERBOARD MANAGER
 // ========================================================
 let lastLeaderboardUpdate = 0;
 
@@ -1111,7 +1011,7 @@ const LeaderboardManager = {
 };
 
 // ========================================================
-// 7. CARS CATALOG MANAGER — БЕЗ ИЗМЕНЕНИЙ
+// 7. CARS CATALOG MANAGER
 // ========================================================
 const CarsCatalogManager = {
   async seedDefaultCarsCatalog(force = false) {
@@ -1241,7 +1141,7 @@ const CarsCatalogManager = {
 };
 
 // ========================================================
-// 8. QUICK CHAT — БЕЗ ИЗМЕНЕНИЙ
+// 8. QUICK CHAT
 // ========================================================
 const QuickChat = {
   getPhrasesList: (cat) => {
@@ -1337,4 +1237,4 @@ window.FB_P2P = {
 
 window.FB_Bridge = FB_Bridge;
 
-console.log('[🤝 FB_P2P v1.5.0] openDealChat → реальный оффер + signDeal → deal_payout продавцу ✓');
+console.log('[🤝 FB_P2P v1.6.0] Двухстороннее подтверждение ДКП активно ✓');
