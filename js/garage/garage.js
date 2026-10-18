@@ -1,12 +1,6 @@
 // ========================================================
-// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.7.2)
+// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.7.3)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.7.2:
-//   - Полностью восстановлен подробный лист инспекции авто в гараже
-//   - Отображение 4 блоков состояния: Кузов, ДВС, КПП/Ходовая, Салон
-//   - Блок выявленных механических и юридических дефектов
-//   - Интеграция кнопок: Толщиномер, Launch OBD2, Страховка, Тюнинг, Госномер
-//   - Сохранены фильтры: Все / Личные / Бизнес
 // ========================================================
 
 window.previewCarIndex = null;
@@ -172,9 +166,6 @@ function _sortGarageCars(filter = 'all') {
     return indexed;
 }
 
-// ========================================================
-// ГЛАВНЫЙ РЕНДЕР ГАРАЖА
-// ========================================================
 function renderGarage() {
     const list = document.getElementById('garageList');
     if (!list) return;
@@ -450,15 +441,11 @@ function renderGarage() {
     }
 }
 
-// ========================================================
-// ПОЛНАЯ МОДАЛКА ИНСПЕКЦИИ АВТО (ТЕХНИЧЕСКИЙ ЛИСТ)
-// ========================================================
 function openCarPreviewModal(idx) {
     const car = safeGetCar(idx);
-    if (!car) return safeShowToast("❌ Машина не найдена. Обновите гараж.");
+    if (!car) return safeShowToast("❌ Машина не найдена");
 
     window.previewCarIndex = idx;
-
     try {
         if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
     } catch (e) {}
@@ -475,71 +462,15 @@ function openCarPreviewModal(idx) {
         if (typeof getCarConditionGrade === 'function') grade = getCarConditionGrade(car) || grade;
     } catch (e) {}
 
-    const bodyDesc = car.isRepainted
-        ? "Вторичный окрас кузова (шпаклёвка на деталях)"
-        : (car.isPolished ? "Заводской окрас, глубокий глянец ✓" : "Заводское ЛКП со следами эксплуатации");
+    const bodyDesc = car.isRepainted ? "Вторичный окрас кузова" : "Заводское ЛКП со следами эксплуатации";
+    const engDesc = engWear < 50 ? "Требуется ремонт поршневой группы" : "Масло в норме, компрессия ровная";
+    const transDesc = transWear < 50 ? "Износ синхронизаторов" : "Переключения чёткие";
+    const salonDesc = car.cleanInterior ? "Химчистка выполнена ✓" : "Стандартный салон";
 
-    const engDesc = car.hasAdditive
-        ? "Залита демпферная присадка (шумы мотора скрыты)"
-        : (engWear < 50 ? "Требуется ремонт поршневой группы" : "Масло в норме, компрессия ровная");
-
-    const transDesc = transWear < 50
-        ? "Износ синхронизаторов и фрикционов"
-        : "Сцепление держит зацеп, переключения чёткие";
-
-    const salonDesc = car.cleanInterior
-        ? "Глубокая химчистка с озонацией ✓"
-        : (car.isBeaterProject ? "Салон потёрт, следы эксплуатации" : "Штатный аккуратный салон");
-
-    let legalStatus = "<b class='color-amber'>Договор ДКП (Без постановки на учёт)</b>";
-    if (car.assignedBusinessId) {
-        legalStatus = `<b class='color-green'>Баланс предприятия (${escapeHtml(car.assignedBusinessName || 'Бизнес')}) ✓</b>`;
-    } else if (car.commercialRegistered) {
-        legalStatus = "<b class='color-cyan'>На балансе юрлица (МРЭО) ✓</b>";
-    } else if (car.isRegisteredOnPlayer) {
-        legalStatus = "<b class='color-green'>Учёт в МРЭО РФ оформлен ✓</b>";
-    }
-
-    const insStatus = car.insurance
-        ? (car.insurance.type === 'comprehensive' || car.insurance === 'casco' ? "<b class='color-green'>КАСКО (Полное покрытие)</b>" : "<b class='color-cyan'>ОСАГО (Действует)</b>")
-        : "<b class='color-red'>Отсутствует (Риск штрафов ГИБДД)</b>";
-
-    const mechDefects = car.mechanicalDefects || [];
-    const revealedDefects = car._revealedDefects || [];
-    const revealedLegal = car._revealedLegal || null;
-    const knownList = mechDefects.filter(d => revealedDefects.includes(d.id));
-    const ldefObj = revealedLegal ? (typeof LEGAL_DEFECTS !== 'undefined' ? LEGAL_DEFECTS : []).find(l => l.id === revealedLegal) : null;
-
-    let defectsSection = '';
-    if (knownList.length > 0 || ldefObj) {
-        defectsSection = `
-            <div class="sub-label font-bold mb-1 mt-3" style="font-size:9.5px;">📋 ВЫЯВЛЕННЫЕ ПРОБЛЕМЫ:</div>
-            <div class="p-2 mb-3" style="background:rgba(255,51,102,0.08); border-radius:8px; border:1px solid rgba(255,51,102,0.3);">
-                ${knownList.map(d => `
-                    <div class="p-1 mb-1" style="border-left:3px solid var(--red); padding-left:6px;">
-                        <div class="flex-between">
-                            <b class="text-xs color-red" style="font-size:9.5px;">${escapeHtml(d.name)}</b>
-                            <span class="tag-badge bg-tag-red" style="font-size:7px;">${d.severity || 'ДЕФЕКТ'}</span>
-                        </div>
-                        <div class="sub-label" style="font-size:8.5px;">${escapeHtml(d.desc || '')}</div>
-                        <div class="flex-between mt-1" style="font-size:8px;">
-                            <span class="color-amber">Ремонт: ~${(d.cost || 0).toLocaleString()} ₽</span>
-                            <span class="color-red">-${d.pricePenaltyPct || 5}% к цене</span>
-                        </div>
-                    </div>
-                `).join('')}
-                ${ldefObj ? `
-                    <div class="p-1 mt-1" style="border-left:3px solid var(--red); padding-left:6px; background:rgba(220,38,38,0.1); border-radius:4px;">
-                        <div class="flex-between">
-                            <b class="text-xs color-red" style="font-size:9.5px;">⚖️ ${escapeHtml(ldefObj.name)}</b>
-                            <span class="tag-badge bg-tag-red" style="font-size:7px;">ЮРИД.</span>
-                        </div>
-                        <div class="sub-label" style="font-size:8.5px;">${escapeHtml(ldefObj.desc \vert{}\vert{} '')}</div>${ldefObj.consequence ? `<div class="sub-label color-red" style="font-size:8px; margin-top:2px;">⚠️ ${escapeHtml(ldefObj.consequence)}</div>` : ''}
-                    </div>
-                ` : ''}
-            </div>
-        `;
-    }
+    let legalStatus = "<b class='color-amber'>ДКП (Без учёта)</b>";
+    if (car.assignedBusinessId) legalStatus = `<b class='color-green'>Баланс предприятия (${escapeHtml(car.assignedBusinessName)})</b>`;
+    else if (car.commercialRegistered) legalStatus = "<b class='color-cyan'>На балансе юрлица</b>";
+    else if (car.isRegisteredOnPlayer) legalStatus = "<b class='color-green'>Учёт в МРЭО РФ</b>";
 
     modal.innerHTML = `
         <div class="modal-box text-left" style="max-width: 440px; max-height: 90vh; overflow-y: auto;">
@@ -551,79 +482,38 @@ function openCarPreviewModal(idx) {
                 <div class="text-right">
                     <span class="sub-label text-xs">Оценка:</span>
                     <div class="price-val color-green" style="font-size:16px;">${(car.marketValue || 100000).toLocaleString()} ₽</div>
-                    <div class="tag-badge ${grade.color === 'color-green' ? 'bg-tag-green' : (grade.color === 'color-amber' ? 'bg-tag-amber' : 'bg-tag-red')}" style="font-size:7.5px; margin-top:2px;">
-                        ${grade.grade} — ${grade.label}
-                    </div>
                 </div>
             </div>
 
-            <div class="sub-label font-bold mb-1" style="font-size:9.5px;">📋 ТЕХНИЧЕСКИЙ ЛИСТ СОСТОЯНИЯ:</div>
-
             <div class="space-y-1 mb-3">
-                <div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                <div class="p-2" style="background:#090e18; border-radius:8px;">
                     <div class="flex-between text-xs mb-1">
-                        <span><i class="fa-solid fa-shield color-green mr-1"></i> 1. Кузов & ЛКП:</span>
-                        <b class="${cond < 50 ? 'color-red' : 'color-green'}">${cond}% HP</b>
+                        <span>Кузов:</span> <b class="${cond < 50 ? 'color-red' : 'color-green'}">${cond}% HP</b>
                     </div>
                     <div class="sub-label" style="font-size:9px;">${bodyDesc}</div>
                 </div>
-
-                <div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                <div class="p-2" style="background:#090e18; border-radius:8px;">
                     <div class="flex-between text-xs mb-1">
-                        <span><i class="fa-solid fa-bolt color-amber mr-1"></i> 2. Силовой агрегат (ДВС):</span>
-                        <b class="${engWear < 50 ? 'color-red' : 'color-green'}">${engWear}% ресурс</b>
+                        <span>ДВС:</span> <b class="${engWear < 50 ? 'color-red' : 'color-green'}">${engWear}% ресурс</b>
                     </div>
-                    <div class="sub-label" style="font-size:9px;">${engDesc} • Т-ра: ${car.engineTemp || 90}°C</div>
+                    <div class="sub-label" style="font-size:9px;">${engDesc}</div>
                 </div>
-
-                <div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                <div class="p-2" style="background:#090e18; border-radius:8px;">
                     <div class="flex-between text-xs mb-1">
-                        <span><i class="fa-solid fa-gear color-cyan mr-1"></i> 3. КПП и ходовая часть:</span>
-                        <b class="${transWear < 50 ? 'color-red' : 'color-green'}">${transWear}% ресурс</b>
+                        <span>КПП:</span> <b class="${transWear < 50 ? 'color-red' : 'color-green'}">${transWear}% ресурс</b>
                     </div>
-                    <div class="sub-label" style="font-size:9px;">${transDesc} • Шины: ${tires}% остаток</div>
-                </div>
-
-                <div class="p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
-                    <div class="flex-between text-xs mb-1">
-                        <span><i class="fa-solid fa-chair color-purple mr-1"></i> 4. Салон и комфорт:</span>
-                        <b class="${car.cleanInterior ? 'color-green' : 'color-amber'}">${car.cleanInterior ? 'Идеал' : 'Стандарт'}</b>
-                    </div>
-                    <div class="sub-label" style="font-size:9px;">${salonDesc}</div>
-                </div>
-            </div>
-
-            ${defectsSection}
-
-            <div class="p-2 mb-3" style="background:rgba(0,242,254,0.06); border-radius:8px; border:1px solid var(--border-glow);">
-                <div class="flex-between text-xs mb-1">
-                    <span class="sub-label">Госучёт:</span>
-                    ${legalStatus}
-                </div>
-                <div class="flex-between text-xs">
-                    <span class="sub-label">Страховой полис:</span>
-                    ${insStatus}
+                    <div class="sub-label" style="font-size:9px;">${transDesc}</div>
                 </div>
             </div>
 
             <div class="grid-2 mb-2">
-                <button onclick="openGaugeModalFromPreview()" class="btn btn-dark btn-sm">
-                    <i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер
-                </button>
-                <button onclick="openOBD2ModalFromPreview()" class="btn btn-dark btn-sm">
-                    <i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> Launch OBD2
-                </button>
+                <button onclick="openGaugeModalFromPreview()" class="btn btn-dark btn-sm"><i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер</button>
+                <button onclick="openOBD2ModalFromPreview()" class="btn btn-dark btn-sm"><i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> Launch OBD2</button>
             </div>
             <div class="grid-2 mb-3">
-                <button onclick="openTuningFromPreview()" class="btn btn-dark btn-sm">
-                    <i class="fa-solid fa-screwdriver-wrench color-amber mr-1"></i> В мастерскую тюнинга
-                </button>
-                <button onclick="if(typeof openChangePlateModal==='function') openChangePlateModal(); else if(typeof openChangePlateModalFromGarage==='function') openChangePlateModalFromGarage(); else safeShowToast('Менеджер номеров открыт');" class="btn btn-dark btn-sm">
-                    <i class="fa-solid fa-id-card color-purple mr-1"></i> Сменить госномер
-                </button>
+                <button onclick="openTuningFromPreview()" class="btn btn-dark btn-sm"><i class="fa-solid fa-screwdriver-wrench color-amber mr-1"></i> Тюнинг</button>
+                <button onclick="ModalManager.close('modalPreview')" class="btn btn-dark btn-sm">Закрыть</button>
             </div>
-
-            <button onclick="ModalManager.close('modalPreview')" class="btn btn-dark w-full">Закрыть инспекцию</button>
         </div>
     `;
 
@@ -640,18 +530,14 @@ function openGaugeModalFromPreview() {
     if (window.previewCarIndex === null || window.previewCarIndex === undefined) return;
     const car = safeGetCar(window.previewCarIndex);
     if (!car) return;
-    if (typeof openGaugeModal === 'function') {
-        openGaugeModal(car.id);
-    }
+    if (typeof openGaugeModal === 'function') openGaugeModal(car.id);
 }
 
 function openOBD2ModalFromPreview() {
     if (window.previewCarIndex === null || window.previewCarIndex === undefined) return;
     const car = safeGetCar(window.previewCarIndex);
     if (!car) return;
-    if (typeof quickOBDScanMarketCar === 'function') {
-        quickOBDScanMarketCar(car.id);
-    }
+    if (typeof quickOBDScanMarketCar === 'function') quickOBDScanMarketCar(car.id);
 }
 
 function openTuningFromPreview() {
@@ -663,30 +549,18 @@ function openTuningFromPreview() {
     openTuningModal(idx);
 }
 
-// ========================================================
-// ЛИЧНЫЙ АВТО
-// ========================================================
 function togglePersonalCar(idx) {
     const car = safeGetCar(idx);
     if (!car) return safeShowToast("❌ Машина не найдена");
+    if (car.assignedBusinessId) return safeShowToast("🚫 Машина на линии бизнеса!");
 
-    if (car.assignedBusinessId) {
-        return safeShowToast("🚫 Машина на линии бизнеса! Сначала снимите её с линии.");
-    }
-
+    car.isPersonal = !car.isPersonal;
     if (car.isPersonal) {
-        car.isPersonal = false;
-        safeShowToast(`«${car.name}» больше не является личным авто.`);
+        state.garage.forEach((c, i) => { if (i !== idx && c) c.isPersonal = false; });
+        safeShowToast(`👑 «${car.name}» назначен личным авто!`);
     } else {
-        state.garage.forEach(c => { if (c) c.isPersonal = false; });
-        car.isPersonal = true;
-        if (state.player) state.player.selectedStreetCarIndex = idx;
-
-        safePlaySound('win');
-        safeTgHaptic('success');
-        safeShowToast(`👑 «${car.name}» назначен вашим личным автомобилем!`);
+        safeShowToast(`Снят статус личного авто.`);
     }
-
     safeSaveState();
     renderGarage();
 }
@@ -694,131 +568,65 @@ function togglePersonalCar(idx) {
 function selectCarForStreetDirect(idx) {
     const car = safeGetCar(idx);
     if (!car) return safeShowToast("❌ Машина не найдена");
-
     if (state.player) state.player.selectedStreetCarIndex = idx;
     safeSaveState();
     if (typeof switchTab === 'function') switchTab('tabPhone');
     setTimeout(() => {
-        if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.openApp === 'function') {
-            PhoneManager.openApp('street');
-        }
+        if (typeof PhoneManager !== 'undefined') PhoneManager.openApp('street');
     }, 120);
 }
 
 function buyGarageSlot() {
     const cost = (typeof getGarageSlotCost === 'function') ? getGarageSlotCost() : 100000;
     const cash = state.player?.cash || 0;
-    if (cash < cost) return safeShowToast("Не хватает денег на покупку бокса!");
-
+    if (cash < cost) return safeShowToast("Не хватает денег!");
     state.player.cash -= cost;
     state.player.baseSlots = (state.player.baseSlots || 2) + 1;
     safeSaveState();
     safeUpdateHeaderUI();
     renderGarage();
-    safePlaySound('win');
-    safeTgHaptic('success');
-    safeShowToast(`Гараж расширен!`);
+    safeShowToast("Гараж расширен!");
 }
 
 function openPutOnLotModal(idx) {
     const car = safeGetCar(idx);
     if (!car) return safeShowToast("❌ Машина не найдена");
-
-    if (car.isPersonal) return safeShowToast("🚫 Это ваш личный авто! Снимите статус лички перед продажей.");
-    if (car.assignedBusinessId) return safeShowToast("🚫 Машина на линии бизнеса! Снимите её с линии перед продажей.");
-
-    try {
-        if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
-    } catch (e) {}
-
-    const askInput = document.getElementById('lotAskingPriceInput');
-    const titleEl = document.getElementById('lotPutCarTitle');
-    const costEl = document.getElementById('lotCostInfo');
-
-    if (titleEl) titleEl.innerText = `${car.name} (${car.power || 100} л.с.)`;
-    if (costEl) costEl.innerText = `Себестоимость: ${(car.purchaseCost || car.basePrice || 100000).toLocaleString()} ₽`;
-    if (askInput) askInput.value = Math.round((car.marketValue || car.basePrice || 100000) * 1.25);
+    if (car.isPersonal) return safeShowToast("🚫 Это личный авто!");
+    if (car.assignedBusinessId) return safeShowToast("🚫 Машина на линии бизнеса!");
 
     window.currentLotPutIndex = idx;
     window.currentLotPutUid = car.uid || car.id || null;
-
-    if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
-        ModalManager.open('modalPutOnLot');
-    } else {
-        const m = document.getElementById('modalPutOnLot');
-        if (m) { m.classList.add('active'); m.style.display = 'flex'; }
-    }
+    if (typeof ModalManager !== 'undefined') ModalManager.open('modalPutOnLot');
 }
 
 function confirmPutOnLot() {
     const idx = window.currentLotPutIndex;
     if (idx === undefined || idx === null) return;
     const car = safeGetCar(idx);
-    if (!car) return safeShowToast("❌ Машина не найдена");
+    if (!car) return;
 
     const askInput = document.getElementById('lotAskingPriceInput');
     const price = parseInt(askInput?.value || 0, 10);
-    if (isNaN(price) || price <= 0) return safeShowToast("Укажите корректную цену продажи!");
+    if (isNaN(price) || price <= 0) return safeShowToast("Укажите цену!");
 
-    const carUid = window.currentLotPutUid || car.uid || car.id;
-    let liveIdx = state.garage.findIndex(c => c && (c.uid === carUid || c.id === carUid));
-    if (liveIdx === -1) liveIdx = idx;
-
-    if (liveIdx < 0 || liveIdx >= state.garage.length) return safeShowToast("❌ Ошибка: машина потеряна");
-
-    state.garage.splice(liveIdx, 1);
+    state.garage.splice(idx, 1);
     if (!Array.isArray(state.salesLot)) state.salesLot = [];
+    state.salesLot.push({ car: car, askingPrice: price, timer: 60, maxTimer: 60 });
 
-    const waitTime = (typeof calculateLotWaitTime === 'function')
-        ? calculateLotWaitTime(car)
-        : Math.floor(40 + Math.random() * 80);
-
-    state.salesLot.push({
-        car: car,
-        askingPrice: price,
-        timer: waitTime,
-        maxTimer: waitTime,
-        currentBuyer: null,
-        buyerTimerLeft: 0
-    });
-
-    if (typeof ModalManager !== 'undefined' && typeof ModalManager.close === 'function') {
-        ModalManager.close('modalPutOnLot');
-    } else {
-        const m = document.getElementById('modalPutOnLot');
-        if (m) { m.classList.remove('active'); m.style.display = 'none'; }
-    }
-
+    if (typeof ModalManager !== 'undefined') ModalManager.close('modalPutOnLot');
     safeSaveState();
     renderGarage();
     if (typeof renderSalesLot === 'function') renderSalesLot();
     safeUpdateHeaderUI();
-    safePlaySound('win');
-    safeShowToast(`«${car.name}» выставлен на продажу!`);
-
-    window.currentLotPutIndex = null;
-    window.currentLotPutUid = null;
+    safeShowToast(`Выставлено на продажу!`);
 }
 
 Object.assign(window, {
-    safeGetCar,
-    ensureModal,
-    openNeedCapabilityModal,
-    openNeedGarageModal,
-    renderGarage,
-    openCarPreviewModal,
-    openGaugeModalFromPreview,
-    openOBD2ModalFromPreview,
-    openTuningFromPreview,
-    togglePersonalCar,
-    selectCarForStreetDirect,
-    buyGarageSlot,
-    openPutOnLotModal,
-    confirmPutOnLot,
-    _sortGarageCars,
-    _getFixedCarImage,
-    setGarageFilter,
-    unassignCarFromGarage
+    safeGetCar, ensureModal, openNeedCapabilityModal, openNeedGarageModal,
+    renderGarage, openCarPreviewModal, openGaugeModalFromPreview, openOBD2ModalFromPreview,
+    openTuningFromPreview, togglePersonalCar, selectCarForStreetDirect, buyGarageSlot,
+    openPutOnLotModal, confirmPutOnLot, _sortGarageCars, _getFixedCarImage,
+    setGarageFilter, unassignCarFromGarage
 });
 
-console.log('[🏠 garage v1.7.2] Полный технический лист инспекции восстановлен ✓');
+console.log('[🏠 garage v1.7.3] Стабильный рендер гаража ✓');
