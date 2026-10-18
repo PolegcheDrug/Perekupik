@@ -1,14 +1,11 @@
 // ========================================================
-// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.0.2)
+// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.0.4)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.0.2 (ФИКС ВИДИМОСТИ ЛОТОВ И НОВЫЕ РАЗДЕЛЫ):
-//   - ФИКС: при публикации лота он МГНОВЕННО добавляется в локальный стейт
-//     (даже если Firestore не ответил).
-//   - ДОБАВЛЕН: раздел "Черный рынок" (black_market) с проблемными авто.
-//   - ДОБАВЛЕН: баннер "Сезонные события" в шапке биржи.
-//   - УЛУЧШЕНА: обработка изображений через buildCarImageAttrs.
-//   - ФИКС: cancelP2PListing корректно синхронизирует локальный стейт и Firestore.
+// ⭐ v9.0.4 (ИСПРАВЛЕНИЕ ОШИБОК РАНТАЙМА):
+//   - ФИКС: Устранён сбой TypeError: this._refreshCurrentScreen is not a function.
+//   - ФИКС: Корректный сброс флагов _buyPending и _refreshPending.
+//   - ФИКС: Синхронизация выкупа напрямую с FB_Market / buyLotAtomic.
 // ========================================================
 
 (function() {
@@ -21,6 +18,20 @@
 
     const AppM = window.AppM;
 
+    function getMarketManager() {
+        return window.FB_Market?.MarketLots || window.FB_MarketLots || window.FB_Bridge?.MarketLots || null;
+    }
+
+    function safeEscape(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     // ========================================================
     // 1. ОБНОВЛЕНИЕ ЛЕНТЫ (ЗАГРУЗКА С СЕРВЕРА)
     // ========================================================
@@ -30,15 +41,14 @@
 
         try {
             const btn = document.querySelector('button[onclick="AppM.refreshMarketFeed()"]');
-            const originalHtml = btn ? btn.innerHTML : '';
-
             if (btn) {
                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Загрузка...';
                 btn.disabled = true;
             }
 
-            if (window.FB_Bridge?.MarketLots?.fetchLots) {
-                const remoteLots = await window.FB_Bridge.MarketLots.fetchLots(true);
+            const marketMgr = getMarketManager();
+            if (marketMgr?.fetchLots) {
+                const remoteLots = await marketMgr.fetchLots(true);
                 
                 if (Array.isArray(remoteLots)) {
                     window.state.p2pMarketListings = remoteLots.filter(l => l && l.status === 'active');
@@ -57,7 +67,10 @@
             if (typeof showToast === 'function') showToast('❌ Ошибка обновления ленты', 'error');
         } finally {
             this._refreshPending = false;
-            this.render(document.getElementById('phoneAppContainer'));
+            const container = document.getElementById('phoneAppContainer');
+            if (container && typeof this.render === 'function') {
+                this.render(container);
+            }
         }
     };
 
@@ -111,7 +124,6 @@
         const f = this.marketFilter || 'cars';
         const pLvl = window.state.player?.level || 1;
         
-        // Баннер сезонных событий
         const seasonEvent = window.state.globalEvent || null;
         let seasonBannerHtml = '';
         if (seasonEvent && seasonEvent.isActive) {
@@ -133,7 +145,7 @@
 
             ${seasonBannerHtml}
 
-            <!-- ФИЛЬТРЫ (ДОБАВЛЕН ЧЕРНЫЙ РЫНОК) -->
+            <!-- ФИЛЬТРЫ -->
             <div class="mplus-nav-scroll-bar mb-2">
                 <button onclick="AppM.setMarketFilter('cars')" class="m-nav-pill ${f === 'cars' ? 'active' : ''}">
                     <i class="fa-solid fa-car"></i> Авто
@@ -173,13 +185,11 @@
     AppM.renderP2PLotsHtml = function(filter) {
         let lots = [];
 
-        // Черный рынок — из локального генератора
         if (filter === 'black_market') {
             lots = this._generateBlackMarketListings();
         } else {
             lots = window.state.p2pMarketListings || [];
             
-            // Убираем дубликаты
             const seen = new Set();
             const deduped = [];
             lots.forEach(l => {
@@ -191,7 +201,6 @@
             });
             window.state.p2pMarketListings = deduped;
 
-            // Фильтруем по типу
             lots = deduped.filter(l => {
                 if (filter === 'cars') return l.type === 'car' || l.type === 'cars';
                 if (filter === 'plates') return l.type === 'plate' || l.type === 'plates';
@@ -246,43 +255,45 @@
                 }
             } else if (item.type === 'plates' || item.type === 'plate') {
                 imgHtml = `<div class="p-3 mb-2 text-center" style="background:#050914; border-radius:10px; border:1px solid rgba(0, 242, 254, 0.3);">
-                    <div class="license-plate" style="font-size:15px; padding:4px 10px; display:inline-flex;">${this._escapeHtml(itemData.plate || item.name)}</div>
+                    <div class="license-plate" style="font-size:15px; padding:4px 10px; display:inline-flex;">${safeEscape(itemData.plate || item.name)}</div>
                 </div>`;
                 descText = 'Архивный знак РФ';
             } else if (item.type === 'business') {
                 imgHtml = `<div class="p-3 mb-2 text-center" style="background:#050914; border-radius:10px; border:1px solid rgba(0, 230, 118, 0.3);">
-                    <b class="color-green">${this._escapeHtml(item.name)}</b>
+                    <b class="color-green">${safeEscape(item.name)}</b>
                 </div>`;
                 descText = 'Готовый бизнес';
             } else if (item.type === 'housing') {
                 imgHtml = `<div class="p-3 mb-2 text-center" style="background:#050914; border-radius:10px; border:1px solid rgba(255, 179, 0, 0.3);">
-                    <b class="color-amber">${this._escapeHtml(item.name)}</b>
+                    <b class="color-amber">${safeEscape(item.name)}</b>
                 </div>`;
                 descText = 'Недвижимость / Бокс';
             }
+
+            const targetLotId = item.id || item.lot_id;
 
             return `
                 <div class="glass-card mb-2 p-2" style="border-left: 3px solid ${borderColor}; background:#090e18;">
                     ${imgHtml}
                     <div class="flex-between mb-1">
                         <div style="min-width:0; flex:1;">
-                            <b class="text-xs ${item.isBlackMarket ? 'color-red' : 'color-cyan'}" style="font-size:12px;">${this._escapeHtml(item.name)}</b>
-                            <div class="sub-label" style="font-size:8.5px;">${isMine ? 'Вы (Продавец)' : `Продавец: ${this._escapeHtml(item.sellerName || 'Игрок')}`}</div>
+                            <b class="text-xs ${item.isBlackMarket ? 'color-red' : 'color-cyan'}" style="font-size:12px;">${safeEscape(item.name)}</b>
+                            <div class="sub-label" style="font-size:8.5px;">${isMine ? 'Вы (Продавец)' : `Продавец: ${safeEscape(item.sellerName || 'Игрок')}`}</div>
                         </div>
                         <span class="price-val text-xs color-green">${Number(item.price).toLocaleString()} ₽</span>
                     </div>
                     <div class="sub-label mb-2" style="font-size:9.5px;">${descText}</div>
 
                     ${isMine ? `
-                        <button onclick="AppM.cancelP2PListing('${item.id || item.lot_id}')" class="btn btn-red btn-sm w-full" style="font-size:10px;">
+                        <button onclick="AppM.cancelP2PListing('${targetLotId}')" class="btn btn-red btn-sm w-full" style="font-size:10px;">
                             <i class="fa-solid fa-xmark mr-1"></i> Снять с продажи
                         </button>
                     ` : `
                         <div class="grid-2" style="gap:4px;">
-                            <button onclick="AppM.startTradeWithSeller('${item.id || item.lot_id}')" class="btn btn-cyan btn-sm" style="font-size:10px;">
+                            <button onclick="AppM.startTradeWithSeller('${targetLotId}')" class="btn btn-cyan btn-sm" style="font-size:10px;">
                                 <i class="fa-solid fa-comments"></i> Торг
                             </button>
-                            <button onclick="AppM.buyP2PInstantly('${item.id || item.lot_id}')" class="btn ${item.isBlackMarket ? 'btn-red' : 'btn-green'} btn-sm" style="font-size:10px;">
+                            <button onclick="AppM.buyP2PInstantly('${targetLotId}')" class="btn ${item.isBlackMarket ? 'btn-red' : 'btn-green'} btn-sm" style="font-size:10px;">
                                 <i class="fa-solid fa-bolt"></i> Выкупить
                             </button>
                         </div>
@@ -299,11 +310,8 @@
         if (!lotId) return;
         if (typeof window.openP2PDealModal === 'function') {
             window.openP2PDealModal(lotId);
-        } else if (typeof window.openP2PDealModal === 'undefined' && window.P2POffersManager) {
-            // Fallback, если openP2PDealModal не определён, но модуль есть
-            showToast('⚠️ Модуль торга инициализируется...');
         } else {
-            showToast('⚠️ Модуль P2P-торга не загружен');
+            if (typeof showToast === 'function') showToast('⚠️ Модуль P2P-торга не загружен');
         }
     };
 
@@ -319,34 +327,52 @@
             const isBlackMarket = !lot && String(lotId).startsWith('bm_car_');
 
             if (isBlackMarket) {
-                return this._buyBlackMarketCar(lotId);
+                this._buyBlackMarketCar(lotId);
+                return;
             }
 
             if (!lot) {
-                return showToast('❌ Лот не найден');
+                if (typeof showToast === 'function') showToast('❌ Лот не найден');
+                return;
             }
 
             const price = Number(lot.price) || 0;
             const myCash = Number(window.state?.player?.cash) || 0;
 
             if (myCash < price) {
-                return showToast(`❌ Не хватает ${(price - myCash).toLocaleString()} ₽`);
+                if (typeof showToast === 'function') showToast(`❌ Не хватает ${(price - myCash).toLocaleString()} ₽`);
+                return;
             }
 
-            const myProfile = window.FB_Bridge?.getProfile?.() || { id: window.state.player?.uid, name: window.state.player?.name };
+            // Прямой вызов через глобальный метод firebase-market.js
+            if (typeof window.buyP2PLotDirect === 'function') {
+                await window.buyP2PLotDirect(lot.id || lot.lot_id || lotId);
+                const area = document.getElementById('p2pLotsArea');
+                if (area) area.innerHTML = this.renderP2PLotsHtml(this.marketFilter || 'cars');
+                return;
+            }
 
-            if (window.FB_Bridge?.P2P?.buyLotAtomic) {
-                const res = await window.FB_Bridge.P2P.buyLotAtomic(lotId, myProfile, myCash);
+            // Резервный вызов через менеджер FB_Market
+            const marketMgr = getMarketManager();
+            const myProfile = window.FB_Market?.getCurrentPlayerProfile?.() || {
+                id: window.state.player?.uid || window.tgUserId,
+                name: window.state.player?.name || 'Покупатель'
+            };
+
+            if (marketMgr?.buyLotAtomic) {
+                const res = await marketMgr.buyLotAtomic(lot.id || lot.lot_id || lotId, myProfile, myCash);
                 if (!res.success) {
-                    return showToast(`❌ ${res.error}`);
+                    if (typeof showToast === 'function') showToast(`❌ ${res.error || 'Ошибка выкупа в облаке'}`);
+                    return;
                 }
             }
 
-            // Локальные расчёты
+            // Локальные операции
             window.state.player.cash -= price;
 
             if (lot.type === 'cars' || lot.type === 'car') {
                 const car = Object.assign({}, lot.itemData || {}, {
+                    name: lot.name,
                     uid: 'car_p2p_' + Date.now(),
                     purchaseCost: price,
                     isRegisteredOnPlayer: false,
@@ -369,8 +395,9 @@
                 }
             }
 
-            // Удаляем лот
-            window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l => l && (l.id !== lotId && l.lot_id !== lotId));
+            window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
+                l && (l.id !== lotId && l.lot_id !== lotId)
+            );
 
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -379,18 +406,19 @@
             if (typeof openVerdictModal === 'function') {
                 openVerdictModal(
                     "✅ СДЕЛКА ЗАКРЫТА!",
-                    `Вы выкупили «${lot.name}» за ${price.toLocaleString()} ₽. Товар доставлен в инвентарь.`,
+                    `Вы выкупили «${lot.name}» за ${price.toLocaleString()} ₽. Товар доставлен в гараж/инвентарь.`,
                     true,
                     price
                 );
             }
             if (window.AudioFx) window.AudioFx.play('win');
 
-            this._refreshCurrentScreen();
+            const area = document.getElementById('p2pLotsArea');
+            if (area) area.innerHTML = this.renderP2PLotsHtml(this.marketFilter || 'cars');
 
         } catch (e) {
             console.error('[AppM] buyP2PInstantly error:', e);
-            showToast('❌ Ошибка выкупа');
+            if (typeof showToast === 'function') showToast('❌ Ошибка выкупа: ' + (e.message || String(e)));
         } finally {
             this._buyPending = false;
         }
@@ -402,16 +430,21 @@
     AppM._buyBlackMarketCar = function(carId) {
         const bmCars = this._generateBlackMarketListings();
         const lot = bmCars.find(c => c.id === carId);
-        if (!lot) return showToast('❌ Лот не найден');
+        if (!lot) {
+            if (typeof showToast === 'function') showToast('❌ Лот не найден');
+            return;
+        }
 
         const price = lot.price;
         const myCash = window.state.player?.cash || 0;
-        if (myCash < price) return showToast('❌ Не хватает наличных!');
+        if (myCash < price) {
+            if (typeof showToast === 'function') showToast('❌ Не хватает наличных!');
+            return;
+        }
 
         window.state.player.cash -= price;
         bmCars.splice(bmCars.indexOf(lot), 1);
 
-        // Создаём проблемную машину
         const car = Object.assign({}, lot.itemData, {
             uid: 'car_bm_' + Date.now(),
             purchaseCost: price,
@@ -450,9 +483,10 @@
         if (!lotId) return;
         if (!confirm('Снять лот с продажи?')) return;
 
-        if (window.FB_Bridge?.MarketLots?.cancelLot) {
+        const marketMgr = getMarketManager();
+        if (marketMgr?.cancelLot) {
             try {
-                await window.FB_Bridge.MarketLots.cancelLot(lotId, window.state.player?.uid);
+                await marketMgr.cancelLot(lotId, window.state.player?.uid);
             } catch (e) {
                 console.warn('[AppM] cancelLot error:', e);
             }
@@ -463,8 +497,10 @@
         );
 
         if (typeof saveState === 'function') saveState();
-        showToast('✅ Лот снят с биржи');
-        this._refreshCurrentScreen();
+        if (typeof showToast === 'function') showToast('✅ Лот снят с биржи');
+
+        const area = document.getElementById('p2pLotsArea');
+        if (area) area.innerHTML = this.renderP2PLotsHtml(this.marketFilter || 'cars');
     };
 
     // ========================================================
@@ -475,13 +511,13 @@
         this.selectedItemIndex = null;
 
         const modal = document.getElementById('modalCreateP2P');
-        if (modal) {
-            if (typeof ModalManager !== 'undefined') ModalManager.open('modalCreateP2P');
+        if (modal && typeof ModalManager !== 'undefined') {
+            ModalManager.open('modalCreateP2P');
         }
     };
 
     // ========================================================
-    // 9. ПОДТВЕРЖДЕНИЕ ПУБЛИКАЦИИ (ФИКС ВИДИМОСТИ)
+    // 9. ПОДТВЕРЖДЕНИЕ ПУБЛИКАЦИИ
     // ========================================================
     AppM.confirmCreateP2PListing = async function() {
         if (this._publishPending) return;
@@ -493,7 +529,8 @@
             const idx = this.selectedItemIndex;
 
             if (idx === null || isNaN(price) || price <= 1000) {
-                return showToast('Укажите корректную цену');
+                if (typeof showToast === 'function') showToast('Укажите корректную цену');
+                return;
             }
 
             const type = this.selectedListingType;
@@ -502,7 +539,8 @@
 
             const targetItem = this._currentModalItems?.[idx];
             if (!targetItem) {
-                return showToast('Ошибка: выбранный объект не найден');
+                if (typeof showToast === 'function') showToast('Ошибка: выбранный объект не найден');
+                return;
             }
 
             let newListing = {
@@ -518,7 +556,6 @@
             if (type === 'cars') {
                 const car = targetItem;
                 newListing.name = car.name;
-                
                 newListing.img = car.assignedLotImg || car.img || car.baseImg || '';
                 newListing.fallback = car.fallback || '';
                 newListing.itemData = Object.assign({}, car);
@@ -546,37 +583,37 @@
                 window.state.player.ownedHouses = (window.state.player.ownedHouses || []).filter(x => x !== house.id);
             }
 
-            // ⭐ ФИКС: сначала кладём локально, чтобы лот 100% был виден
             if (!window.state.p2pMarketListings) window.state.p2pMarketListings = [];
             window.state.p2pMarketListings.unshift(newListing);
 
-            // Публикация в Firestore (best-effort)
-            if (window.FB_Bridge?.MarketLots?.publishLot) {
+            const marketMgr = getMarketManager();
+            if (marketMgr?.publishLot) {
                 try {
-                    const res = await window.FB_Bridge.MarketLots.publishLot(newListing, { id: myUid, name: myName });
+                    const res = await marketMgr.publishLot(newListing, { id: myUid, name: myName });
                     if (res && res.success && res.lotId) {
                         newListing.id = res.lotId;
                         newListing.lot_id = res.lotId;
                     } else if (res && !res.success) {
-                        showToast(`⚠️ Облако: ${res.error}. Лот сохранён локально.`);
+                        if (typeof showToast === 'function') showToast(`⚠️ Облако: ${res.error}. Лот сохранён локально.`);
                     }
                 } catch (e) {
                     console.warn('[AppM] Firestore publishLot error:', e);
-                    showToast('⚠️ Облако недоступно. Лот сохранён локально.');
+                    if (typeof showToast === 'function') showToast('⚠️ Облако недоступно. Лот сохранён локально.');
                 }
             }
 
             if (typeof saveState === 'function') saveState();
             if (typeof ModalManager !== 'undefined') ModalManager.close('modalCreateP2P');
-            showToast('✅ Лот выставлен на биржу');
-            if (typeof playSound === 'function') playSound('win');
+            if (typeof showToast === 'function') showToast('✅ Лот выставлен на биржу');
+            if (window.AudioFx) window.AudioFx.play('win');
 
-            this._refreshCurrentScreen();
+            const area = document.getElementById('p2pLotsArea');
+            if (area) area.innerHTML = this.renderP2PLotsHtml(this.marketFilter || 'cars');
 
         } finally {
             this._publishPending = false;
         }
     };
 
-    console.log('[💱 phone-m-market v9.0.2] Фикс видимости лотов + Черный рынок + Сезонные события ✓');
+    console.log('[💱 phone-m-market v9.0.4] Полная синхронизация с FB_Market без ошибок вызова ✓');
 })();

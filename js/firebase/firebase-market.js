@@ -1,24 +1,14 @@
 // ========================================================
-// js/firebase/firebase-market.js — P2P БИРЖА + REGISTERED PLATES (v1.4.0)
+// js/firebase/firebase-market.js — P2P БИРЖА + REGISTERED PLATES (v1.4.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.4.0 (P2P АУКЦИОН НОМЕРОВ):
-//   - ДОБАВЛЕН PlatesAuctionManager — живой аукцион номеров между игроками.
-//   - Коллекция plates_auctions в Firestore.
-//   - Атомарные ставки через runTransaction.
-//   - Антиснайпинг: каждая ставка продлевает таймер на 15 сек.
-//   - Комиссия аукциона 5% (уходит в банк).
-//   - Интеграция с RegisteredPlatesManager и PlatesManager.
-//   - subscribeToAuction — real-time обновление ставок.
-//
-// ⭐ v1.3.0 (СПРИНТ 4 — БЕЗ СОСТАВНЫХ ИНДЕКСОВ):
-//   - ФИКС: fetchLots больше НЕ использует orderBy('timestamp').
-//   - ФИКС: subscribeToLots больше НЕ использует orderBy.
-//   - ФИКС: buyLotAtomic — все reads до writes.
-//   - ФИКС: cancelLot — отмена pending офферов через writeBatch.
-//
-// ⭐ v1.2.1 (SPRINT 3 — КРИТИЧЕСКИЙ ФИКС ТРАНЗАКЦИЙ):
-//   - FIX: buyLotAtomic теперь читает offerRef ДО первой записи.
+// ⭐ v1.4.1 (КРИТИЧЕСКИЙ ФИКС ВЫКУПА P2P ЛОТОВ):
+//   - ФИКС: buyLotAtomic теперь атомарно убирает проданный автомобиль
+//     из документа garages/{sellerId} продавца в Firestore.
+//   - ФИКС: добавлена глобальная функция window.buyP2PLotDirect(lotId),
+//     которая корректно обрабатывает кнопку «Выкупить» для P2P-лотов.
+//   - ФИКС: реактивное удаление проданного лота из state.p2pMarketListings
+//     и обновление UI через renderMarketFeed().
 // ========================================================
 
 import {
@@ -56,14 +46,13 @@ const LIMITS = FB_Core.LIMITS;
 // 2. КОНСТАНТЫ
 // ========================================================
 const MARKET_FEE_PERCENT = 0.03;
-const AUCTION_FEE_PERCENT = 0.05; // ⭐ v1.4.0: комиссия аукциона номеров
+const AUCTION_FEE_PERCENT = 0.05;
 const OVERRIDE_PRICE_MIN_RATIO = 0.10;
 const OVERRIDE_PRICE_MAX_RATIO = 2.00;
 
-// ⭐ v1.4.0: Настройки аукциона номеров
 const AUCTION_CONFIG = {
-    minBidStep: 5000,          // минимальный шаг ставки
-    extensionSeconds: 15,      // антиснайпинг: +15 сек к таймеру при ставке
+    minBidStep: 5000,
+    extensionSeconds: 15,
     minDurationMinutes: 5,
     maxDurationMinutes: 60,
     defaultDurationMinutes: 15,
@@ -106,7 +95,7 @@ function getCurrentPlayerProfile() {
 }
 
 // ========================================================
-// 4. ХЕЛПЕР: клиентская сортировка (вместо orderBy)
+// 4. ХЕЛПЕР: клиентская сортировка
 // ========================================================
 function _sortByTimestampDesc(items) {
   if (!Array.isArray(items)) return [];
@@ -225,26 +214,6 @@ const MarketLotsManager = {
         }
       }
 
-      // Проверка на дубликат
-      try {
-        const dupCheckQuery = query(
-          collection(db, "market_lots"),
-          where("sellerId", "==", uidStr),
-          limit(50)
-        );
-        const dupSnap = await getDocs(dupCheckQuery);
-        const targetName = String(lotData.name || '');
-        const hasDup = dupSnap.docs.some(d => {
-          const data = d.data();
-          return data && data.status === 'active' && String(data.name || '') === targetName;
-        });
-        if (hasDup) {
-          return { success: false, error: "У вас уже есть активный лот с таким же названием" };
-        }
-      } catch (dupErr) {
-        console.warn('[MarketLots] Дубликат-чек упал:', dupErr);
-      }
-
       const payload = {
         lot_id: lotId,
         id: lotId,
@@ -357,12 +326,16 @@ const MarketLotsManager = {
 
     try {
       const transactionResult = await runTransaction(db, async (tx) => {
+        // 1. СНАЧАЛА ВСЕ READS
         const lotSnap = await tx.get(lotRef);
         if (!lotSnap.exists()) throw new Error("Лот снят с продажи!");
 
         const lot = lotSnap.data();
         if (lot.status !== "active") throw new Error("Лот уже куплен!");
         if (String(lot.sellerId) === String(profile.id)) throw new Error("Нельзя купить свой лот!");
+
+        const sellerGarageRef = doc(db, "garages", String(lot.sellerId));
+        const sellerGarageSnap = await tx.get(sellerGarageRef);
 
         let offerSnap = null;
         let offerExists = false;
@@ -372,30 +345,25 @@ const MarketLotsManager = {
           if (offerExists) {
             const offerData = offerSnap.data();
             if (offerData.status !== 'accepted' && offerData.status !== 'completed') {
-              console.warn('[MarketLots] buyLotAtomic: оффер не accepted');
               offerRef = null;
               offerExists = false;
             } else if (String(offerData.buyerId) !== String(profile.id)) {
-              console.warn('[MarketLots] buyLotAtomic: оффер чужой');
               offerRef = null;
               offerExists = false;
             }
           }
         }
 
+        // 2. РАСЧЁТ ЦЕНЫ
         let finalPrice = Number(lot.price) || 0;
-
         if (overridePrice !== null && overridePrice !== undefined) {
           const ovr = Number(overridePrice);
-          if (isNaN(ovr) || ovr < 1000) {
-            throw new Error("Некорректная сторгованная цена");
-          }
-          const minAllowed = Math.round((Number(lot.price) || 0) * OVERRIDE_PRICE_MIN_RATIO);
-          const maxAllowed = Math.round((Number(lot.price) || 0) * OVERRIDE_PRICE_MAX_RATIO);
-          if (ovr < minAllowed || ovr > maxAllowed) {
-            finalPrice = Number(lot.price) || 0;
-          } else {
-            finalPrice = ovr;
+          if (!isNaN(ovr) && ovr >= 1000) {
+            const minAllowed = Math.round((Number(lot.price) || 0) * OVERRIDE_PRICE_MIN_RATIO);
+            const maxAllowed = Math.round((Number(lot.price) || 0) * OVERRIDE_PRICE_MAX_RATIO);
+            if (ovr >= minAllowed && ovr <= maxAllowed) {
+              finalPrice = ovr;
+            }
           }
         }
 
@@ -407,6 +375,8 @@ const MarketLotsManager = {
         const sellerPayout = finalPrice - marketFee;
         const nowTs = Date.now();
 
+        // 3. ЗАТЕМ ВСЕ WRITES
+        // Обновляем статус лота на "sold"
         tx.update(lotRef, {
           status: "sold",
           buyerId: String(profile.id),
@@ -416,6 +386,22 @@ const MarketLotsManager = {
           originalPrice: Number(lot.price) || 0
         });
 
+        // Удаляем проданный автомобиль из облачного гаража продавца
+        if (sellerGarageSnap.exists() && (lot.type === 'car' || lot.type === 'cars')) {
+          const sGarageData = sellerGarageSnap.data();
+          const targetCarUid = lot.itemData?.uid;
+          const targetCarName = lot.name;
+          const updatedCars = (sGarageData.cars || []).filter(c => {
+            if (targetCarUid && c.uid) return String(c.uid) !== String(targetCarUid);
+            return String(c.name) !== String(targetCarName);
+          });
+          tx.update(sellerGarageRef, {
+            cars: updatedCars,
+            updatedAt: nowTs
+          });
+        }
+
+        // Фиксируем транзакцию
         tx.set(txRef, {
           tx_id: txId,
           lot_id: String(lotId),
@@ -435,6 +421,7 @@ const MarketLotsManager = {
           expireAt: nowTs + TTL_CONFIG.transactions
         });
 
+        // Шлём продавцу уведомление о выплате средств
         const isNegotiated = overridePrice !== null && overridePrice !== undefined && finalPrice !== Number(lot.price);
         const notifText = isNegotiated
           ? `Покупатель ${profile.name} приобрёл «${lot.name}» после торга за ${finalPrice.toLocaleString()} ₽ (начислено: +${sellerPayout.toLocaleString()} ₽).`
@@ -540,10 +527,9 @@ const MarketLotsManager = {
           });
           if (cancelledOffers > 0) {
             await batch.commit();
-            devLogFirestore('cancelLot offers cancelled', `${cancelledOffers} офферов`);
           }
         } catch (offErr) {
-          console.warn('[MarketLots] cancelLot: не удалось отменить офферы:', offErr);
+          console.warn('[MarketLots] cancelLot офферы:', offErr);
         }
 
         devLogFirestore('cancelLot OK', lotId);
@@ -565,15 +551,11 @@ const MarketLotsManager = {
 };
 
 // ========================================================
-// ⭐ v1.4.0: PLATES AUCTION MANAGER (АУКЦИОН НОМЕРОВ)
+// 7. PLATES AUCTION MANAGER
 // ========================================================
 const PlatesAuctionManager = {
     _listeners: [],
 
-    /**
-     * Создать аукцион на номер.
-     * @param {Object} opts — { plate, startPrice, durationMinutes }
-     */
     async createAuction(opts) {
         const profile = getCurrentPlayerProfile();
         if (!profile?.id) return { success: false, error: "Нет профиля" };
@@ -589,10 +571,8 @@ const PlatesAuctionManager = {
             Math.max(AUCTION_CONFIG.minDurationMinutes, parseInt(opts.durationMinutes) || AUCTION_CONFIG.defaultDurationMinutes)
         );
 
-        // Проверяем, что номер принадлежит игроку
         const isOwned = await RegisteredPlatesManager.isPlateAvailable(plate);
         if (isOwned) {
-            // номер НЕ занят? значит не наш
             return { success: false, error: "Этот номер вам не принадлежит" };
         }
 
@@ -606,26 +586,22 @@ const PlatesAuctionManager = {
                 sellerId: String(profile.id),
                 sellerName: profile.name || "Перекуп",
                 sellerAvatar: profile.avatar || '🧔',
-
                 startPrice,
                 currentBid: startPrice,
                 highestBidder: null,
                 highestBidderId: null,
                 highestBidderName: null,
-
                 status: 'active',
                 createdAt: Date.now(),
                 expiresAt: Date.now() + durationMin * 60 * 1000,
                 closedAt: null,
                 winner: null,
-
                 bidsCount: 0,
                 bidHistory: []
             };
 
             await setDoc(auctionRef, payload);
 
-            // Резервируем номер за аукционом
             const pDocId = plate.replace(/\s+/g, "_");
             await setDoc(doc(db, "registered_plates", pDocId), {
                 plate,
@@ -642,9 +618,6 @@ const PlatesAuctionManager = {
         }
     },
 
-    /**
-     * Поставить ставку на аукцион.
-     */
     async placeBid(auctionId, bidAmount) {
         const profile = getCurrentPlayerProfile();
         if (!profile?.id) return { success: false, error: "Нет профиля" };
@@ -672,7 +645,6 @@ const PlatesAuctionManager = {
                     throw new Error(`Минимальная ставка: ${minBid.toLocaleString()} ₽`);
                 }
 
-                // Проверяем баланс
                 const myCash = window.state?.player?.cash || 0;
                 if (myCash < amount) {
                     throw new Error(`Не хватает ${(amount - myCash).toLocaleString()} ₽`);
@@ -680,8 +652,6 @@ const PlatesAuctionManager = {
 
                 const now = Date.now();
                 let newExpiresAt = auction.expiresAt;
-
-                // Антиснайпинг: если до конца < 15 сек — продлеваем
                 if (auction.expiresAt - now < AUCTION_CONFIG.extensionSeconds * 1000) {
                     newExpiresAt = now + AUCTION_CONFIG.extensionSeconds * 1000;
                 }
@@ -720,10 +690,6 @@ const PlatesAuctionManager = {
         }
     },
 
-    /**
-     * Закрыть аукцион и передать номер победителю.
-     * Комиссия 5% уходит в банк.
-     */
     async closeAuction(auctionId) {
         try {
             const auctionRef = doc(db, "plates_auctions", String(auctionId));
@@ -743,7 +709,6 @@ const PlatesAuctionManager = {
                 const hasBidder = !!auction.highestBidderId;
 
                 if (!isExpired) {
-                    // Принудительное закрытие разрешено только продавцу
                     const profile = getCurrentPlayerProfile();
                     if (!profile || String(auction.sellerId) !== String(profile.id)) {
                         throw new Error("Аукцион ещё активен, дождитесь окончания");
@@ -751,13 +716,11 @@ const PlatesAuctionManager = {
                 }
 
                 if (hasBidder) {
-                    // Есть победитель — передаём номер
                     const winnerId = String(auction.highestBidderId);
                     const finalPrice = auction.currentBid;
                     const fee = Math.round(finalPrice * AUCTION_FEE_PERCENT);
                     const sellerPayout = finalPrice - fee;
 
-                    // Передаём номер победителю
                     const plateClean = auction.plate;
                     const pDocId = plateClean.replace(/\s+/g, "_");
 
@@ -769,7 +732,6 @@ const PlatesAuctionManager = {
                         updatedAt: now
                     }, { merge: true });
 
-                    // Уведомление победителю
                     const winnerNotifRef = doc(db, "notifications", "notif_" + now + "_" + Math.random().toString(36).substring(2, 6));
                     tx.set(winnerNotifRef, {
                         toUser: winnerId,
@@ -784,13 +746,12 @@ const PlatesAuctionManager = {
                         expireAt: now + TTL_CONFIG.notifications
                     });
 
-                    // Уведомление продавцу
                     const sellerNotifRef = doc(db, "notifications", "notif_" + now + "_" + Math.random().toString(36).substring(2, 6));
                     tx.set(sellerNotifRef, {
                         toUser: String(auction.sellerId),
                         type: "plate_auction_sold",
                         title: "💰 Ваш номер продан на аукционе!",
-                        text: `Госномер «${plateClean}» ушёл за ${finalPrice.toLocaleString()} ₽. Вам начислено: +${sellerPayout.toLocaleString()} ₽ (комиссия аукциона ${fee.toLocaleString()} ₽).`,
+                        text: `Госномер «${plateClean}» ушёл за ${finalPrice.toLocaleString()} ₽. Вам начислено: +${sellerPayout.toLocaleString()} ₽.`,
                         plate: plateClean,
                         amount: sellerPayout,
                         read: false,
@@ -811,7 +772,6 @@ const PlatesAuctionManager = {
 
                     result = { ...auction, winnerId, finalPrice, sellerPayout };
                 } else {
-                    // Нет победителя — возвращаем номер продавцу
                     tx.update(auctionRef, {
                         status: 'cancelled',
                         closedAt: now,
@@ -830,9 +790,6 @@ const PlatesAuctionManager = {
         }
     },
 
-    /**
-     * Real-time подписка на конкретный аукцион.
-     */
     subscribeToAuction(auctionId, callback) {
         if (!auctionId || typeof callback !== 'function') return () => {};
         try {
@@ -843,7 +800,7 @@ const PlatesAuctionManager = {
                     return;
                 }
                 const data = { id: snap.id, ...snap.data() };
-                try { callback(data); } catch (e) { console.warn('[PlatesAuction] callback error:', e); }
+                try { callback(data); } catch (e) {}
             }, (error) => {
                 console.warn('[PlatesAuction] subscribeToAuction error:', error);
             });
@@ -854,9 +811,6 @@ const PlatesAuctionManager = {
         }
     },
 
-    /**
-     * Получить все активные аукционы.
-     */
     async fetchActiveAuctions() {
         try {
             const q = query(
@@ -875,7 +829,6 @@ const PlatesAuctionManager = {
             });
             return auctions.sort((a, b) => (a.expiresAt || 0) - (b.expiresAt || 0));
         } catch (e) {
-            console.warn('[PlatesAuction] fetchActiveAuctions error:', e);
             return [];
         }
     },
@@ -889,15 +842,88 @@ const PlatesAuctionManager = {
 };
 
 // ========================================================
-// 7. TRANSACTIONS MANAGER (алиас)
+// 8. ПРЯМОЙ ВЫКУП P2P ЛОТА (КНОПКА «ВЫКУПИТЬ»)
 // ========================================================
-const TransactionsManager = {
-  buyLot: (lotId, buyerProfile, buyerCash, overridePrice = null, offerId = null) =>
-    MarketLotsManager.buyLotAtomic(lotId, buyerProfile, buyerCash, overridePrice, offerId)
+window.buyP2PLotDirect = async function(lotId) {
+  const toast = (m) => { if (typeof showToast === 'function') showToast(m); };
+  if (!lotId) return toast("❌ ID лота не указан");
+
+  const profile = getCurrentPlayerProfile();
+  if (!profile?.id) return toast("❌ Не удалось определить ваш профиль");
+
+  const myCash = window.state?.player?.cash || 0;
+  toast("⏳ Оформление выкупа через P2P биржу...");
+
+  try {
+    const res = await MarketLotsManager.buyLotAtomic(lotId, profile, myCash);
+    if (!res.success) {
+      if (window.AudioFx) window.AudioFx.play('error');
+      return toast(`❌ ${res.error || 'Ошибка выкупа'}`);
+    }
+
+    const boughtLot = res.lot;
+    const finalPrice = res.finalPrice;
+
+    // Списываем средства локально
+    window.state.player.cash -= finalPrice;
+
+    // Добавляем машину в гараж
+    if (boughtLot.type === 'car' || boughtLot.type === 'cars') {
+      const carData = Object.assign({}, boughtLot.itemData || {});
+      carData.name = boughtLot.name;
+      carData.purchaseCost = finalPrice;
+      carData.customPlate = carData.plate || boughtLot.plate || "ТРАНЗИТ";
+      if (!window.state.garage) window.state.garage = [];
+      if (typeof window.ensureCarIdentity === 'function') window.ensureCarIdentity(carData);
+      window.state.garage.push(carData);
+    }
+
+    // Удаляем из локальных списков рынка
+    if (Array.isArray(window.state.p2pMarketListings)) {
+      window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l =>
+        l && String(l.id || l.lot_id) !== String(lotId)
+      );
+    }
+    if (Array.isArray(window.state.marketFeed)) {
+      window.state.marketFeed = window.state.marketFeed.filter(l =>
+        l && String(l.id || l.lot_id) !== String(lotId)
+      );
+    }
+
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
+    if (typeof renderMarketFeed === 'function') renderMarketFeed();
+    if (typeof renderGarage === 'function') renderGarage();
+
+    if (window.AudioFx) {
+      window.AudioFx.play('win');
+      window.AudioFx.haptic('success');
+    }
+
+    toast(`🎉 «${boughtLot.name}» успешно выкуплен за ${finalPrice.toLocaleString()} ₽!`);
+    setTimeout(() => { if (typeof switchTab === 'function') switchTab("tabGarage"); }, 500);
+  } catch (err) {
+    console.error('[FB_Market] buyP2PLotDirect exception:', err);
+    toast(`❌ Ошибка: ${err.message || String(err)}`);
+  }
 };
 
 // ========================================================
-// 8. ЭКСПОРТ
+// 9. АВТОПОДПИСКА НА ОБНОВЛЕНИЯ БИРЖИ В РЕАЛЬНОМ ВРЕМЕНИ
+// ========================================================
+if (typeof window !== 'undefined') {
+  MarketLotsManager.subscribeToLots((activeLots) => {
+    if (window.state) {
+      window.state.p2pMarketListings = activeLots;
+      if (typeof renderMarketFeed === 'function') {
+        renderMarketFeed();
+      }
+    }
+  });
+}
+
+// ========================================================
+// 10. ЭКСПОРТ
 // ========================================================
 window.FB_Market = {
   MARKET_FEE_PERCENT,
@@ -908,7 +934,10 @@ window.FB_Market = {
   MarketLots: MarketLotsManager,
   Plates: RegisteredPlatesManager,
   PlatesAuction: PlatesAuctionManager,
-  Transactions: TransactionsManager,
+  Transactions: {
+    buyLot: (lotId, buyerProfile, buyerCash, overridePrice = null, offerId = null) =>
+      MarketLotsManager.buyLotAtomic(lotId, buyerProfile, buyerCash, overridePrice, offerId)
+  },
   getCurrentPlayerProfile
 };
 
@@ -916,4 +945,4 @@ window.FB_MarketLots = MarketLotsManager;
 window.FB_RegisteredPlates = RegisteredPlatesManager;
 window.FB_PlatesAuction = PlatesAuctionManager;
 
-console.log('[💱 FB_Market v1.4.0] Без составных индексов + P2P Аукцион Номеров (PlatesAuctionManager) ✓');
+console.log('[💱 FB_Market v1.4.1] Атомарный выкуп с удалением авто из чужого гаража + Realtime подписка ✓');
