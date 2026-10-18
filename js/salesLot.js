@@ -1,31 +1,13 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v3.0.1)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v3.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.0.1 (SPRINT 4 — ФИКС ЗАВИСАНИЯ ЛОТА):
-//   - КРИТИЧЕСКИЙ ФИКС: buyerGenerationPending теперь сбрасывается
-//     через try/finally в renderSalesLot() и updateSalesLotTimers().
-//
-//     Проблема: если generateRandomLotBuyer() бросал исключение
-//     (например, из-за битого car, кривого archetype, отсутствия
-//     state.player и т.п.), флаг оставался true НАВСЕГДА.
-//     Лот навсегда застревал на "Ожидание покупателя..." с таймером 0,
-//     без прогресс-бара и без кнопок — игрок не мог ни продать,
-//     ни забрать машину обратно.
-//
-//     ТЕПЕРЬ: при ошибке генерации — lot.timer = 30 (повторная
-//     попытка через 30 секунд), ошибка логируется в консоль,
-//     флаг гарантированно сбрасывается в finally.
-//
-// ⭐ v3.0.0 (САРАФАННОЕ РАДИО — VIP-ПОКУПАТЕЛИ):
-//   - Если karma > 80 и connections > 5 — приходят VIP-покупатели.
-//   - VIP: коллекционеры, олигархи, блогеры, дилеры.
-//   - VIP предлагают на 15–40% больше рыночной цены.
-//   - VIP не торгуются, у них больше терпения.
-//   - Отдельная визуальная плашка на карточке лота.
-//
-// ⭐ v2.9.0 (ДИНАМИЧЕСКИЕ ОБЛОЖКИ):
-//   - Добавлена функция getOrAssignLotCarImage().
+// ⭐ v3.1.0 (UI/UX & FIXES UPDATE):
+//   - ФИКС ЦЕНЫ: Генерация предложений от NPC теперь округляется до 1000.
+//   - АНИМАЦИИ: Добавлен неоновый радар в ожидании покупателя.
+//   - VIP UI: Золотая пульсирующая рамка для VIP-покупателей.
+//   - ШКАЛА ТЕРПЕНИЯ: В окне торга добавлена анимированная шкала.
+//   - ФИКС: try/finally для buyerGenerationPending (лот не зависает).
 // ========================================================
 
 let salesLotTimerInterval = null;
@@ -39,7 +21,7 @@ function _isStateReady() {
 }
 
 // --------------------------------------------------------
-// v3.0.0: БАЗОВЫЕ АРХЕТИПЫ ПОКУПАТЕЛЕЙ (NPC)
+// БАЗОВЫЕ АРХЕТИПЫ ПОКУПАТЕЛЕЙ (NPC)
 // --------------------------------------------------------
 const BUYER_ARCHETYPES = [
     {
@@ -90,7 +72,7 @@ const BUYER_ARCHETYPES = [
 ];
 
 // --------------------------------------------------------
-// ⭐ v3.0.0: VIP-ПОКУПАТЕЛИ (САРАФАННОЕ РАДИО)
+// ⭐ VIP-ПОКУПАТЕЛИ (САРАФАННОЕ РАДИО)
 // --------------------------------------------------------
 const VIP_BUYER_ARCHETYPES = [
     {
@@ -388,6 +370,25 @@ function renderSalesLot() {
 
     let html = "";
 
+    // ⭐ v3.1.0: Стили для анимаций
+    html += `
+        <style>
+            @keyframes radarSpin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            @keyframes vipPulse {
+                0% { box-shadow: 0 0 5px rgba(255,179,0,0.3); border-color: rgba(255,179,0,0.4); }
+                50% { box-shadow: 0 0 20px rgba(255,179,0,0.8); border-color: rgba(255,179,0,1); }
+                100% { box-shadow: 0 0 5px rgba(255,179,0,0.3); border-color: rgba(255,179,0,0.4); }
+            }
+            @keyframes progressShimmer {
+                0% { background-position: 0 0; }
+                100% { background-position: 40px 0; }
+            }
+        </style>
+    `;
+
     state.salesLot.forEach((lot, idx) => {
         if (!lot) return;
         const car = lot.car || lot;
@@ -411,8 +412,7 @@ function renderSalesLot() {
 
         let hasBuyer = !!lot.currentBuyer || !!lot.buyer;
 
-        // ⭐ v3.0.1: ФИКС — обёрнут в try/finally чтобы buyerGenerationPending
-        // гарантированно сбрасывался при любой ошибке.
+        // ⭐ v3.1.0: ФИКС — обёрнут в try/finally
         if (remainingSec === 0 && !hasBuyer && !lot.buyerGenerationPending) {
             lot.buyerGenerationPending = true;
             try {
@@ -424,7 +424,6 @@ function renderSalesLot() {
                 syncBuyerToMNetwork(lot, idx);
             } catch (e) {
                 console.error('[SalesLot] Ошибка генерации покупателя (render):', e);
-                // Откладываем следующую попытку на 30 секунд
                 lot.timer = 30;
                 lot.maxTimer = 30;
                 hasBuyer = false;
@@ -444,9 +443,10 @@ function renderSalesLot() {
 
         let statusBadgeHtml = "";
         let waitSectionHtml = "";
+        const isVIP = lot.currentBuyer && lot.currentBuyer.isVIP;
 
         if (!hasBuyer) {
-            statusBadgeHtml = `<span class="tag-badge bg-tag-cyan"><i class="fa-solid fa-arrows-rotate fa-spin mr-1"></i> ПОИСК ПОКУПАТЕЛЯ...</span>`;
+            statusBadgeHtml = `<span class="tag-badge bg-tag-cyan"><i class="fa-solid fa-satellite-dish mr-1"></i> СКАНИРОВАНИЕ...</span>`;
             waitSectionHtml = `
                 <div class="mb-2">
                     <div class="flex-between text-xs mb-1">
@@ -471,7 +471,7 @@ function renderSalesLot() {
             let buyer = lot.currentBuyer || lot.buyer;
             let isOnlineChat = buyer.dealType === 'chat';
 
-            if (buyer.isVIP) {
+            if (isVIP) {
                 statusBadgeHtml = `<span class="tag-badge bg-tag-amber"><i class="fa-solid fa-crown mr-1"></i> VIP-КЛИЕНТ</span>`;
             } else if (isOnlineChat) {
                 statusBadgeHtml = `<span class="tag-badge bg-tag-cyan"><i class="fa-solid fa-envelope mr-1"></i> НАПИСАЛ В M+</span>`;
@@ -490,8 +490,8 @@ function renderSalesLot() {
             ? 'color-green'
             : (condVal >= 50 ? 'color-amber' : 'color-red');
 
-        const vipGlow = (lot.currentBuyer && lot.currentBuyer.isVIP) 
-            ? 'border: 1.5px solid var(--amber) !important; box-shadow: 0 0 18px rgba(255,179,0,0.35) !important;' 
+        const vipGlow = isVIP
+            ? 'border: 1.5px solid var(--amber) !important; animation: vipPulse 2s infinite alternate;'
             : '';
 
         html += `
@@ -588,14 +588,14 @@ function renderBuyerCardActions(lot, idx) {
         : '';
 
     return `
-        <div class="p-2 mb-2" style="background:#060a14; border-radius:12px; border:1px solid ${isVIP ? 'rgba(255,179,0,0.4)' : 'rgba(0, 242, 254, 0.3)'};">
+        <div class="p-2 mb-2" style="background:#060a14; border-radius:12px; border:1px solid ${isVIP ? 'rgba(255,179,0,0.6)' : 'rgba(0, 242, 254, 0.3)'}; box-shadow: ${isVIP ? '0 0 15px rgba(255,179,0,0.2)' : 'none'};">
             <div class="flex-between mb-2">
                 <div class="flex-gap" style="align-items:center;">
                     <span style="font-size:24px;">${buyer.avatar}</span>
                     <div>
                         <b class="text-xs ${isVIP ? 'color-amber' : 'color-cyan'}" style="font-size:12px;">${buyer.name} ${vipBadgeHtml}</b>
                         <div class="sub-label" style="font-size:8.5px;">
-                            ${isVIP ? '👑 По сарафанному радио • ' : (isOnlineChat ? '📩 Написал в мессенджере M+ • ' : '🚗 Стоит перед вами у капота • ')}
+                            ${isVIP ? '👑 По сарафанному радио • ' : (isOnlineChat ? '📩 Написал в M+ • ' : '🚗 Стоит у капота • ')}
                             <span class="color-amber">⏳ ${lot.buyerTimerLeft || 120}с</span>
                         </div>
                     </div>
@@ -631,7 +631,7 @@ function renderBuyerCardActions(lot, idx) {
 }
 
 // --------------------------------------------------------
-// ⭐ v3.0.0: ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ (с учётом сарафанного радио)
+// ⭐ v3.1.0: ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ (с округлением цены)
 // --------------------------------------------------------
 function generateRandomLotBuyer(car, askingPrice) {
     if (!car) {
@@ -655,7 +655,10 @@ function generateRandomLotBuyer(car, askingPrice) {
         discountRatio = 0.82 + Math.random() * 0.12;
     }
 
-    const offeredPrice = Math.round(askingPrice * discountRatio);
+    // ⭐ v3.1.0: Округление до 1000 для красоты
+    const rawPrice = askingPrice * discountRatio;
+    const offeredPrice = Math.round(rawPrice / 1000) * 1000;
+
     const isOnlineChat = isVIP ? false : (Math.random() < 0.40);
 
     let initialDialogue = archetype.moodPhrase;
@@ -835,6 +838,13 @@ function renderLotHoodHaggleModalContent() {
     ` : '';
 
     modal.innerHTML = `
+        <style>
+            @keyframes patiencePulse {
+                0% { opacity: 1; }
+                50% { opacity: 0.6; }
+                100% { opacity: 1; }
+            }
+        </style>
         <div class="modal-box chat-deal-box" style="max-width:440px;">
             ${vipBanner}
             <div class="chat-header-bar flex-between mb-2">
@@ -864,7 +874,7 @@ function renderLotHoodHaggleModalContent() {
             <div class="mb-2 p-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
                 <div class="flex-between text-xs mb-1" style="font-size:9.5px;">
                     <span>Терпение ${isVIP ? 'VIP-клиента' : 'покупателя'}:</span>
-                    <b class="${patienceColor}">${patiencePct}% (${patience} попыток)</b>
+                    <b class="${patienceColor}" ${patiencePct < 30 ? 'style="animation: patiencePulse 1s infinite;"' : ''}>${patiencePct}% (${patience} попыток)</b>
                 </div>
                 <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
                     <div style="width:${patiencePct}%; height:100%; background:${progressBg}; transition:width 0.3s ease;"></div>
@@ -1189,7 +1199,6 @@ function updateSalesLotTimers() {
                     barEl.style.width = `${progressPct}%`;
                 }
             } else {
-                // ⭐ v3.0.1: ФИКС — try/finally гарантирует сброс флага
                 lot.buyerGenerationPending = true;
                 try {
                     let car = lot.car || lot;
@@ -1202,7 +1211,6 @@ function updateSalesLotTimers() {
                     needReRender = true;
                 } catch (e) {
                     console.error('[SalesLot] Ошибка генерации покупателя (timer):', e);
-                    // Откладываем следующую попытку на 30 секунд
                     lot.timer = 30;
                     lot.maxTimer = 30;
                     needReRender = true;
@@ -1271,7 +1279,7 @@ function speedUpLotSearch(idx, type) {
     let askingPrice = lot.askingPrice || car.price || 100000;
 
     lot.timer = 0;
-    lot.buyerGenerationPending = false;  // принудительно сбрасываем перед генерацией
+    lot.buyerGenerationPending = false;
     try {
         lot.currentBuyer = generateRandomLotBuyer(car, askingPrice);
         lot.buyer = lot.currentBuyer;
@@ -1359,4 +1367,4 @@ if (document.readyState === 'loading') {
     _startSalesLotTimerWhenReady();
 }
 
-console.log('[🏪 salesLot v3.0.1] ФИКС: buyerGenerationPending через try/finally (лот не застревает при ошибке) ✓');
+console.log('[🏪 salesLot v3.1.0] Округление цен, VIP-пульсация и анимированный радар ✓');

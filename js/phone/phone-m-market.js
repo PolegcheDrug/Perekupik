@@ -1,11 +1,13 @@
 // ========================================================
-// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.0.4)
+// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.0.4 (ИСПРАВЛЕНИЕ ОШИБОК РАНТАЙМА):
-//   - ФИКС: Устранён сбой TypeError: this._refreshCurrentScreen is not a function.
-//   - ФИКС: Корректный сброс флагов _buyPending и _refreshPending.
-//   - ФИКС: Синхронизация выкупа напрямую с FB_Market / buyLotAtomic.
+// ⭐ v9.1.0 (UI/UX UPDATE):
+//   - ДОБАВЛЕНА вкладка "Мои лоты" (фильтр my_lots).
+//   - Улучшены пустые состояния (анимированный радар).
+//   - Красивые карточки: бейдж "Ваш лот", анимация свежих лотов.
+//   - Кнопка "ПРОДАТЬ" в шапке теперь вызывает openCreateListingModal.
+//   - Исправлена ошибка с отсутствием метода _refreshCurrentScreen.
 // ========================================================
 
 (function() {
@@ -42,7 +44,7 @@
         try {
             const btn = document.querySelector('button[onclick="AppM.refreshMarketFeed()"]');
             if (btn) {
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Загрузка...';
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
                 btn.disabled = true;
             }
 
@@ -136,6 +138,18 @@
         }
 
         container.innerHTML = `
+            <style>
+                @keyframes radarSpin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                @keyframes lotPulse {
+                    0% { box-shadow: 0 0 5px rgba(0,242,254,0.2); border-color: rgba(0,242,254,0.3); }
+                    50% { box-shadow: 0 0 20px rgba(0,242,254,0.6); border-color: rgba(0,242,254,0.8); }
+                    100% { box-shadow: 0 0 5px rgba(0,242,254,0.2); border-color: rgba(0,242,254,0.3); }
+                }
+            </style>
+
             <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.12), #090e18); border-color: rgba(0, 230, 118, 0.35);">
                 <div>
                     <b class="text-xs color-green"><i class="fa-solid fa-globe"></i> Онлайн P2P Биржа</b>
@@ -151,16 +165,16 @@
                     <i class="fa-solid fa-car"></i> Авто
                 </button>
                 <button onclick="AppM.setMarketFilter('plates')" class="m-nav-pill ${f === 'plates' ? 'active' : ''}">
-                    <i class="fa-solid fa-id-card"></i> Номера ${pLvl < 3 ? '🔒' : ''}
+                    <i class="fa-solid fa-id-card"></i> Номера
                 </button>
                 <button onclick="AppM.setMarketFilter('business')" class="m-nav-pill ${f === 'business' ? 'active' : ''}">
-                    <i class="fa-solid fa-briefcase"></i> Бизнес ${pLvl < 6 ? '🔒' : ''}
+                    <i class="fa-solid fa-briefcase"></i> Бизнес
                 </button>
                 <button onclick="AppM.setMarketFilter('housing')" class="m-nav-pill ${f === 'housing' ? 'active' : ''}">
-                    <i class="fa-solid fa-house"></i> Жильё ${pLvl < 4 ? '🔒' : ''}
+                    <i class="fa-solid fa-house"></i> Жильё
                 </button>
-                <button onclick="AppM.setMarketFilter('black_market')" class="m-nav-pill ${f === 'black_market' ? 'active' : ''}">
-                    <i class="fa-solid fa-skull"></i> Черный рынок
+                <button onclick="AppM.setMarketFilter('my_lots')" class="m-nav-pill ${f === 'my_lots' ? 'active' : ''}">
+                    <i class="fa-solid fa-user"></i> Мои
                 </button>
             </div>
 
@@ -171,11 +185,6 @@
     };
 
     AppM.setMarketFilter = function(filter) {
-        const pLvl = window.state.player?.level || 1;
-        if (filter === 'plates' && pLvl < 3) return showToast('🔒 Категория с 3 уровня');
-        if (filter === 'housing' && pLvl < 4) return showToast('🔒 Категория с 4 уровня');
-        if (filter === 'business' && pLvl < 6) return showToast('🔒 Категория с 6 уровня');
-        
         this.marketFilter = filter;
         if (typeof playSound === 'function') playSound('tick');
         const area = document.getElementById('p2pLotsArea');
@@ -183,10 +192,13 @@
     };
 
     AppM.renderP2PLotsHtml = function(filter) {
+        const myUid = String(window.state?.player?.uid || window.tgUserId || '');
         let lots = [];
 
         if (filter === 'black_market') {
             lots = this._generateBlackMarketListings();
+        } else if (filter === 'my_lots') {
+            lots = (window.state.p2pMarketListings || []).filter(l => l && String(l.sellerId) === myUid);
         } else {
             lots = window.state.p2pMarketListings || [];
             
@@ -210,29 +222,34 @@
 
         if (lots.length === 0) {
             return `
-                <div class="glass-card text-center sub-label py-6" style="background:#090e18;">
-                    <i class="fa-solid fa-box-open color-cyan mb-2" style="font-size:26px;"></i>
-                    <div>Пока нет активных лотов</div>
-                    <div class="text-xs mt-1" style="font-size:9px;">
-                        ${filter === 'black_market' ? 'Барыги отдыхают...' : 'Нажмите «Обновить», чтобы подгрузить лоты'}
+                <div class="glass-card text-center sub-label py-6" style="background:#090e18; border: 1px dashed rgba(0,242,254,0.2);">
+                    <div style="position:relative; width:60px; height:60px; margin:0 auto 15px auto;">
+                        <div style="position:absolute; inset:0; border:2px solid rgba(0,242,254,0.2); border-radius:50%;"></div>
+                        <div style="position:absolute; inset:0; border-top:2px solid var(--cyan); border-radius:50%; animation: radarSpin 2s linear infinite;"></div>
+                        <i class="fa-solid fa-satellite-dish" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); font-size:20px; color:var(--cyan);"></i>
+                    </div>
+                    <div class="font-bold color-cyan" style="font-size:12px;">Сканирование сети...</div>
+                    <div class="text-xs mt-1" style="font-size:9px; color:#94a3b8;">
+                        ${filter === 'my_lots' ? 'Вы пока ничего не выставили на продажу. Нажмите "+ ПРОДАТЬ" сверху!' : 'Пока нет активных лотов. Нажмите "Обновить", чтобы подгрузить данные.'}
                     </div>
                 </div>
             `;
         }
 
-        const myUid = String(window.state?.player?.uid || window.tgUserId || '');
+        const now = Date.now();
 
         return lots.map(item => {
             const isMine = String(item.sellerId) === myUid;
             const itemData = item.itemData || {};
+            const isNew = item.createdAt && (now - item.createdAt < 5 * 60 * 1000);
+            const ageMinutes = Math.floor((now - (item.createdAt || now)) / 60000);
+            
+            let borderColor = isMine ? 'var(--green)' : 'var(--cyan)';
+            if (item.isBlackMarket) borderColor = 'var(--red)';
+            if (isNew) borderColor = 'var(--amber)';
 
             let imgHtml = '';
             let descText = '';
-            let borderColor = isMine ? 'var(--green)' : 'var(--cyan)';
-
-            if (item.isBlackMarket) {
-                borderColor = 'var(--red)';
-            }
 
             if (item.type === 'cars' || item.type === 'car') {
                 let rawImg = itemData.img || item.img;
@@ -273,27 +290,35 @@
             const targetLotId = item.id || item.lot_id;
 
             return `
-                <div class="glass-card mb-2 p-2" style="border-left: 3px solid ${borderColor}; background:#090e18;">
+                <div class="glass-card mb-2 p-2" style="border-left: 3px solid ${borderColor}; background:#090e18; ${isNew ? 'animation: lotPulse 2s infinite alternate;' : ''}">
                     ${imgHtml}
+                    
                     <div class="flex-between mb-1">
                         <div style="min-width:0; flex:1;">
-                            <b class="text-xs ${item.isBlackMarket ? 'color-red' : 'color-cyan'}" style="font-size:12px;">${safeEscape(item.name)}</b>
-                            <div class="sub-label" style="font-size:8.5px;">${isMine ? 'Вы (Продавец)' : `Продавец: ${safeEscape(item.sellerName || 'Игрок')}`}</div>
+                            <div class="flex-gap" style="align-items:center;">
+                                <b class="text-xs ${item.isBlackMarket ? 'color-red' : (isMine ? 'color-green' : 'color-cyan')}" style="font-size:12px;">${safeEscape(item.name)}</b>
+                                ${isMine ? '<span class="tag-badge bg-tag-green" style="font-size:7px;">ВАШ ЛОТ</span>' : ''}
+                                ${isNew ? '<span class="tag-badge bg-tag-amber" style="font-size:7px;">НОВЫЙ</span>' : ''}
+                            </div>
+                            <div class="sub-label" style="font-size:8.5px;">
+                                Продавец: ${isMine ? 'Вы' : safeEscape(item.sellerName || 'Игрок')} • ${ageMinutes < 1 ? 'Только что' : ageMinutes + ' мин назад'}
+                            </div>
                         </div>
-                        <span class="price-val text-xs color-green">${Number(item.price).toLocaleString()} ₽</span>
+                        <span class="price-val text-xs color-green" style="font-size:13px;">${Number(item.price).toLocaleString()} ₽</span>
                     </div>
+                    
                     <div class="sub-label mb-2" style="font-size:9.5px;">${descText}</div>
 
                     ${isMine ? `
-                        <button onclick="AppM.cancelP2PListing('${targetLotId}')" class="btn btn-red btn-sm w-full" style="font-size:10px;">
+                        <button onclick="AppM.cancelP2PListing('${targetLotId}')" class="btn btn-red btn-sm w-full" style="font-size:10px; padding:6px;">
                             <i class="fa-solid fa-xmark mr-1"></i> Снять с продажи
                         </button>
                     ` : `
                         <div class="grid-2" style="gap:4px;">
-                            <button onclick="AppM.startTradeWithSeller('${targetLotId}')" class="btn btn-cyan btn-sm" style="font-size:10px;">
+                            <button onclick="AppM.startTradeWithSeller('${targetLotId}')" class="btn btn-cyan btn-sm" style="font-size:10px; padding:6px;">
                                 <i class="fa-solid fa-comments"></i> Торг
                             </button>
-                            <button onclick="AppM.buyP2PInstantly('${targetLotId}')" class="btn ${item.isBlackMarket ? 'btn-red' : 'btn-green'} btn-sm" style="font-size:10px;">
+                            <button onclick="AppM.buyP2PInstantly('${targetLotId}')" class="btn ${item.isBlackMarket ? 'btn-red' : 'btn-green'} btn-sm" style="font-size:10px; padding:6px; box-shadow: 0 0 10px rgba(0,230,118,0.3);">
                                 <i class="fa-solid fa-bolt"></i> Выкупить
                             </button>
                         </div>
@@ -615,5 +640,5 @@
         }
     };
 
-    console.log('[💱 phone-m-market v9.0.4] Полная синхронизация с FB_Market без ошибок вызова ✓');
+    console.log('[💱 phone-m-market v9.1.0] Добавлена вкладка "Мои лоты", анимированные заглушки и премиум-карточки ✓');
 })();

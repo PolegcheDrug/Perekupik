@@ -1,29 +1,13 @@
 // ========================================================
-// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.4.0)
+// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.4.0 (FULL DEAL COMPLETION):
-//   - КРИТИЧЕСКИЙ ФИКС: acceptOffer теперь ПОЛНОСТЬЮ завершает
-//     сделку. Раньше он только ставил status='accepted', но
-//     деньги не списывались, машина не передавалась, deal_payout
-//     продавцу не создавался, лот оставался active.
-//   - _completeDealAtomic — единая runTransaction:
-//       • лот → sold, buyerId, finalPrice
-//       • оффер → completed
-//       • transactions/{txId}
-//       • deal_payout notification продавцу
-//       • p2p_deal_car_delivered notification покупателю
-//       • передача номера (если plate)
-//   - _applyBuyerSideCompletion — клиентское завершение у покупателя:
-//     списание cash + авто в гараж + удаление лота из кэша.
-//   - Проверка cash ДО транзакции (если покупатель не может — отказ).
-//   - Если текущий клиент = покупатель, p2p_deal_car_delivered
-//     покупателю НЕ отправляется (он применит локально).
-//
-// ⭐ v1.3.1 (FULL P2P REPAIR & COMPATIBILITY):
-//   - Поиск лотов поддерживает id и lot_id.
-//   - Защита от падения при сравнении UID.
-//   - window.openP2PDealModal безопасно открывает торг.
+// ⭐ v1.5.0 (UI/UX UPDATE):
+//   - ПОЛНЫЙ РЕДИЗАЙН МОДАЛКИ ТОРГА (openP2PDealModal).
+//   - Добавлены быстрые кнопки: -5%, -10%, Цена лота.
+//   - Добавлена анимированная шкала "Терпение продавца".
+//   - Кнопки получили неоновое свечение.
+//   - Атомарная сделка _completeDealAtomic сохранена без изменений.
 // ========================================================
 
 (function() {
@@ -376,18 +360,6 @@
             }
         },
 
-        /**
-         * ⭐ v1.4.0: Принять оффер + ПОЛНОСТЬЮ завершить сделку.
-         *
-         * Вызывается:
-         *   • Продавцом: pending offer → accepted
-         *   • Покупателем: countered offer → accepted
-         *
-         * После успеха — лот sold, оффер completed, деньги переведены
-         * (через deal_payout notification продавцу), авто доставлено
-         * покупателю (через p2p_deal_car_delivered notification, если
-         * текущий клиент — не покупатель; иначе локально).
-         */
         async acceptOffer(offerId) {
             const profile = _getMyProfile();
             if (!profile) return { success: false, error: 'Не авторизован' };
@@ -438,7 +410,6 @@
                     return { success: false, error: 'Некорректная финальная цена' };
                 }
 
-                // ⭐ v1.4.0: Если покупатель принимает — проверяем cash ДО транзакции.
                 if (isBuyer) {
                     const myCash = Number(window.state?.player?.cash) || 0;
                     if (myCash < fpNum) {
@@ -449,21 +420,18 @@
                     }
                 }
 
-                // ⭐ v1.4.0: Полная атомарная сделка
                 const completeRes = await this._completeDealAtomic(offerId, offer, fpNum, {
-                    skipBuyerNotif: isBuyer  // если текущий клиент — покупатель, он сам применит
+                    skipBuyerNotif: isBuyer
                 });
 
                 if (!completeRes.success) {
                     return { success: false, error: completeRes.error || 'Не удалось завершить сделку' };
                 }
 
-                // ⭐ v1.4.0: Локальное завершение у покупателя
                 if (isBuyer) {
                     await this._applyBuyerSideCompletion(completeRes.lot || {}, offer, fpNum);
                 }
 
-                // Push второй стороне
                 const toUser = isSeller ? offer.buyerId : offer.sellerId;
                 const pushMgr = window.FB_Notifications?.P2P;
                 if (pushMgr?.notifyOfferAccepted) {
@@ -491,10 +459,6 @@
             }
         },
 
-        /**
-         * ⭐ v1.4.0: Единая транзакция завершения сделки.
-         * Все reads → потом все writes (требование Firestore).
-         */
         async _completeDealAtomic(offerId, offer, finalPrice, opts = {}) {
             const ready = await _ensureReady();
             if (!ready) return { success: false, error: 'Нет связи' };
@@ -516,7 +480,6 @@
 
             try {
                 await fns.runTransaction(db, async (tx) => {
-                    // === READS ===
                     if (lotRef) {
                         const lotSnap = await tx.get(lotRef);
                         if (!lotSnap.exists()) throw new Error('Лот не найден');
@@ -533,7 +496,6 @@
                         throw new Error('Сделка уже завершена');
                     }
 
-                    // === WRITES ===
                     const fee = Math.round(finalPrice * P2P_MARKET_FEE_PERCENT);
                     const sellerPayout = finalPrice - fee;
                     const itemName = (lotData && lotData.name) || offer.lotName || 'Автомобиль';
@@ -576,7 +538,6 @@
                         expireAt: now + TTL_TRANSACTIONS
                     });
 
-                    // Продавцу — deal_payout
                     tx.set(sellerNotifRef, {
                         toUser: String(offer.sellerId),
                         type: 'deal_payout',
@@ -591,7 +552,6 @@
                         expireAt: now + TTL_NOTIFICATIONS
                     });
 
-                    // Покупателю — p2p_deal_car_delivered (только если НЕ текущий клиент)
                     if (!opts.skipBuyerNotif) {
                         const carData = (lotData && lotData.itemData) || { name: itemName };
                         tx.set(buyerNotifRef, {
@@ -612,7 +572,6 @@
                         });
                     }
 
-                    // Передача номера, если это plate-лот
                     if (lotData && (lotData.type === 'plate' || lotData.type === 'plates')) {
                         const plateStr = (lotData.itemData && lotData.itemData.plate) || lotData.name;
                         if (plateStr) {
@@ -636,11 +595,6 @@
             }
         },
 
-        /**
-         * ⭐ v1.4.0: Локальное завершение у покупателя.
-         * Списание cash + авто в гараж + удаление лота из кэша.
-         * Вызывается ТОЛЬКО когда текущий клиент = покупатель.
-         */
         async _applyBuyerSideCompletion(lot, offer, finalPrice) {
             try {
                 const player = window.state && window.state.player;
@@ -672,7 +626,6 @@
                 if (!Array.isArray(window.state.garage)) window.state.garage = [];
                 window.state.garage.push(car);
 
-                // Удаляем лот из локального кэша
                 if (Array.isArray(window.state.p2pMarketListings)) {
                     window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l =>
                         l && String(l.id || l.lot_id) !== String(offer.lotId)
@@ -909,8 +862,6 @@
         },
 
         async markCompleted(offerId) {
-            // Оставлено для обратной совместимости.
-            // Реальное завершение — в acceptOffer / _completeDealAtomic.
             const ready = await _ensureReady();
             if (!ready) return { success: false };
             const { db, fns } = ready;
@@ -1164,7 +1115,7 @@
     }
 
     // ========================================================
-    // 6. UI МОДАЛКА ТОРГА ПОКУПАТЕЛЯ (v1.3.1 — без изменений)
+    // 6. UI МОДАЛКА ТОРГА ПОКУПАТЕЛЯ (v1.5.0 — РЕДИЗАЙН)
     // ========================================================
     window.openP2PDealModal = async function(lotId) {
         if (!lotId) return;
@@ -1215,23 +1166,63 @@
             document.body.appendChild(modal);
         }
 
+        // ⭐ v1.5.0: Красивый UI с миниатюрой и быстрыми кнопками
         modal.innerHTML = `
-            <div class="modal-box" style="max-width: 420px;">
-                <div class="flex-between mb-2">
+            <style>
+                @keyframes offerPulse {
+                    0% { box-shadow: 0 0 5px rgba(0,242,254,0.2); }
+                    100% { box-shadow: 0 0 20px rgba(0,242,254,0.7); }
+                }
+                .quick-offer-btn {
+                    background: rgba(255,255,255,0.05);
+                    border: 1px solid rgba(255,255,255,0.1);
+                    border-radius: 8px;
+                    color: #fff;
+                    font-weight: 800;
+                    padding: 6px 0;
+                    font-size: 10px;
+                    transition: all 0.2s;
+                }
+                .quick-offer-btn:hover {
+                    background: rgba(0,242,254,0.15);
+                    border-color: var(--cyan);
+                    color: var(--cyan);
+                }
+            </style>
+            <div class="modal-box" style="max-width: 420px; border: 1.5px solid var(--cyan); box-shadow: 0 0 30px rgba(0,242,254,0.2);">
+                <div class="flex-between mb-3">
                     <div class="modal-glow-badge">
                         <i class="fa-solid fa-comments-dollar"></i> ТОРГ С ПРОДАВЦОМ
                     </div>
                     <button onclick="ModalManager.close('modalP2PBuyerOffer')" class="btn btn-dark btn-auto btn-sm">✕</button>
                 </div>
 
-                <div class="glass-card p-2 mb-2" style="background: #090e18; border-color: var(--cyan);">
-                    <b class="text-xs color-cyan">${lot.name || 'Автомобиль'}</b>
-                    <div class="sub-label mt-1" style="font-size:9.5px;">
-                        Продавец: <b class="color-amber">${lot.sellerName || 'Игрок сети'}</b>
+                <div class="glass-card p-2 mb-3" style="background: #060a14; border: 1px solid rgba(255,255,255,0.08);">
+                    <div class="flex-gap" style="align-items:center; gap:10px;">
+                        <div style="width:60px; height:45px; border-radius:6px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
+                            <img src="${lot.itemData?.img || lot.img || 'assets/cars/economy/2101/vaz-2101.jpg'}" style="width:100%; height:100%; object-fit:cover;">
+                        </div>
+                        <div>
+                            <b class="text-xs color-cyan">${lot.name || 'Автомобиль'}</b>
+                            <div class="sub-label mt-1" style="font-size:9px;">
+                                Продавец: <b class="color-amber">${lot.sellerName || 'Игрок сети'}</b>
+                            </div>
+                            <div class="flex-between mt-1">
+                                <span class="sub-label" style="font-size:8px;">Цена лота:</span>
+                                <b class="color-green" style="font-size:12px;">${lotPrice.toLocaleString()} ₽</b>
+                            </div>
+                        </div>
                     </div>
-                    <div class="flex-between mt-1">
-                        <span class="sub-label" style="font-size:9px;">Цена лота:</span>
-                        <b class="color-green" style="font-size:13px;">${lotPrice.toLocaleString()} ₽</b>
+                </div>
+
+                <!-- Шкала терпения (визуальная) -->
+                <div class="mb-3">
+                    <div class="flex-between text-xs mb-1" style="font-size:9px;">
+                        <span class="sub-label">Терпение продавца:</span>
+                        <b class="color-green">100%</b>
+                    </div>
+                    <div style="height:6px; background:rgba(255,255,255,0.06); border-radius:3px; overflow:hidden;">
+                        <div style="width:100%; height:100%; background:linear-gradient(90deg, #00e676, #00f2fe); animation: offerPulse 2s infinite alternate;"></div>
                     </div>
                 </div>
 
@@ -1240,8 +1231,15 @@
                 </div>
                 <input type="number" id="p2pBuyerPriceInput"
                        class="chat-input"
-                       style="width:100%; font-size:15px; padding:10px; margin-bottom:10px;"
+                       style="width:100%; font-size:18px; padding:12px; margin-bottom:8px; text-align:center; font-weight:900; color:var(--green);"
                        value="${suggestedPrice}" min="1000" max="${lotPrice}">
+
+                <!-- Быстрые кнопки -->
+                <div class="grid-3 mb-3" style="gap:6px;">
+                    <button class="quick-offer-btn" onclick="window._setP2POfferPrice(${lotPrice}, 0.95)">-5%</button>
+                    <button class="quick-offer-btn" onclick="window._setP2POfferPrice(${lotPrice}, 0.90)">-10%</button>
+                    <button class="quick-offer-btn" onclick="window._setP2POfferPrice(${lotPrice}, 1.0)">Цена лота</button>
+                </div>
 
                 <div class="sub-label mb-1" style="font-size:9.5px;">
                     Сообщение продавцу (опционально):
@@ -1252,7 +1250,7 @@
                        maxlength="200"
                        placeholder="Даю прямо сейчас, оформляем ДКП!">
 
-                <div class="glass-card p-2 mb-2" style="background:#090e18;">
+                <div class="glass-card p-2 mb-3" style="background:#090e18;">
                     <div class="flex-between text-xs">
                         <span class="sub-label">Ваш баланс:</span>
                         <b class="${myCash >= lotPrice ? 'color-green' : 'color-amber'}">${myCash.toLocaleString()} ₽</b>
@@ -1267,7 +1265,7 @@
                     <button onclick="ModalManager.close('modalP2PBuyerOffer')" class="btn btn-dark">
                         Отмена
                     </button>
-                    <button onclick="window._submitP2PBuyerOffer('${lot.id || lot.lot_id}')" class="btn btn-green font-bold">
+                    <button onclick="window._submitP2PBuyerOffer('${lot.id || lot.lot_id}')" class="btn btn-green font-bold" style="box-shadow: 0 0 15px rgba(0,230,118,0.4);">
                         <i class="fa-solid fa-paper-plane mr-1"></i> ОТПРАВИТЬ
                     </button>
                 </div>
@@ -1280,6 +1278,18 @@
             modal.classList.add('active');
         }
 
+        if (window.AudioFx) window.AudioFx.play('tick');
+    };
+
+    // Глобальная функция для быстрой подстановки цены
+    window._setP2POfferPrice = function(lotPrice, multiplier) {
+        const input = document.getElementById('p2pBuyerPriceInput');
+        if (!input) return;
+        const newPrice = Math.round(lotPrice * multiplier);
+        input.value = newPrice;
+        input.style.transform = 'scale(1.05)';
+        input.style.transition = 'transform 0.1s';
+        setTimeout(() => { input.style.transform = 'scale(1)'; }, 100);
         if (window.AudioFx) window.AudioFx.play('tick');
     };
 
@@ -1332,5 +1342,5 @@
         }
     }
 
-    console.log('[🤝 p2p-offers v1.4.0] acceptOffer → полная атомарная сделка (lot sold + deal_payout + car delivery) ✓');
+    console.log('[🤝 p2p-offers v1.5.0] Быстрые кнопки торга, анимированная шкала и премиум-дизайн ✓');
 })();

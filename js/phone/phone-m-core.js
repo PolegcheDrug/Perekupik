@@ -1,13 +1,14 @@
 // ========================================================
-// js/phone/phone-m-core.js — M+ HUB: ЯДРО И ЧАТЫ (v9.0.2)
+// js/phone/phone-m-core.js — M+ HUB: ЯДРО И ЧАТЫ (v9.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.0.2 (ФИНАЛИЗАЦИЯ КНОПКИ ОБНОВЛЕНИЯ):
-//   - Кнопка "+ Продать" в шапке M+ заменена на "🔄 Обновить".
-//   - Теперь она вызывает AppM.refreshMarketFeed() для подгрузки актуальных лотов.
-//   - Метод refreshMarketFeed финализирован в phone-m-market.js.
-//   - Добавлена защита от повторных кликов _refreshPending.
-//   - Бейджи непрочитанных сообщений обновляются корректно.
+// ⭐ v9.1.0 (UI/UX UPDATE):
+//   - Возвращена кнопка "+ ПРОДАТЬ" на вкладку Биржа с анимацией пульсации.
+//   - ФИКС: Системные сообщения (новости, банки) теперь рендерятся
+//     как отдельные карточки с иконкой и кнопкой "Очистить", 
+//     а не как диалоги с покупателями.
+//   - Добавлены анимированные заглушки (радар) для пустых чатов.
+//   - Добавлена неоновая пульсация для непрочитанных сообщений.
 // ========================================================
 
 if (typeof window.BUSINESS_TITLE_STYLES === 'undefined') window.BUSINESS_TITLE_STYLES = [];
@@ -22,7 +23,7 @@ const AppM = {
     socialSubTab: 'feed',         // 'feed' | 'top' | 'friends' | 'clubs'
 
     // Подтабы ЧАТОВ (фильтры)
-    chatFilter: 'all',            // 'all' | 'p2p' | 'buyers' | 'friends'
+    chatFilter: 'all',            // 'all' | 'p2p' | 'buyers' | 'friends' | 'system'
 
     // Биржа
     marketFilter: 'cars',         // 'cars' | 'plates' | 'business' | 'housing' | 'black_market'
@@ -113,14 +114,35 @@ const AppM = {
         const unreadCount = this._getUnreadCount();
         const activeDeals = this._getActiveDealsCount();
 
-        // ⭐ v9.0.2: Кнопка "Обновить" вместо "Продать" (только на вкладке market)
+        // ⭐ v9.1.0: Кнопка "ПРОДАТЬ" с анимацией пульсации
         const headerActionBtn = curTab === 'market' ? `
-            <button onclick="AppM.refreshMarketFeed()" class="btn btn-cyan btn-auto btn-sm" style="font-size:9.5px; padding:4px 9px; font-weight:900;">
-                <i class="fa-solid fa-arrows-rotate mr-1"></i> Обновить
-            </button>
+            <div class="flex-gap" style="align-items:center;">
+                <button onclick="AppM.refreshMarketFeed()" class="btn btn-dark btn-auto btn-sm" style="padding:4px 9px;" title="Обновить ленту">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                </button>
+                <button onclick="AppM.openCreateListingModal()" class="btn btn-green btn-auto btn-sm" style="padding:4px 12px; font-size:9.5px; font-weight:900; box-shadow: 0 0 10px rgba(0,230,118,0.5); animation: btnPulseGlow 2s infinite alternate;">
+                    <i class="fa-solid fa-plus mr-1"></i> ПРОДАТЬ
+                </button>
+            </div>
         ` : `<div style="width:40px;"></div>`;
 
         container.innerHTML = `
+            <style>
+                @keyframes btnPulseGlow {
+                    0% { box-shadow: 0 0 5px rgba(0,230,118,0.3); }
+                    100% { box-shadow: 0 0 15px rgba(0,230,118,0.8); }
+                }
+                @keyframes radarSpin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+                @keyframes msgPulse {
+                    0% { border-color: rgba(0,242,254,0.3); }
+                    50% { border-color: rgba(0,242,254,1); box-shadow: 0 0 15px rgba(0,242,254,0.4); }
+                    100% { border-color: rgba(0,242,254,0.3); }
+                }
+            </style>
+
             <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.4); padding: 6px 10px;">
                 <button onclick="PhoneManager.goHome()" class="phone-back-btn">
                     <i class="fa-solid fa-chevron-left"></i> Меню
@@ -225,6 +247,7 @@ const AppM = {
             all: allMsgs.length,
             p2p: allMsgs.filter(m => m && m.category === 'p2p').length,
             buyers: allMsgs.filter(m => m && m.category === 'buyers').length,
+            system: allMsgs.filter(m => m && (m.category === 'system' || m.isSystem)).length,
             friends: allMsgs.filter(m => m && m.category === 'friends').length
         };
 
@@ -241,8 +264,8 @@ const AppM = {
                 <button onclick="AppM.setChatFilter('buyers')" class="m-nav-pill ${curFilter === 'buyers' ? 'active' : ''}">
                     <i class="fa-solid fa-user-tag"></i> Покупатели (${counts.buyers})
                 </button>
-                <button onclick="AppM.setChatFilter('friends')" class="m-nav-pill ${curFilter === 'friends' ? 'active' : ''}">
-                    <i class="fa-solid fa-user-group"></i> Друзья (${counts.friends})
+                <button onclick="AppM.setChatFilter('system')" class="m-nav-pill ${curFilter === 'system' ? 'active' : ''}">
+                    <i class="fa-solid fa-newspaper"></i> Система (${counts.system})
                 </button>
             </div>
 
@@ -267,6 +290,8 @@ const AppM = {
             filtered = all.filter(m => m && m.category === 'p2p');
         } else if (f === 'buyers') {
             filtered = all.filter(m => m && m.category === 'buyers');
+        } else if (f === 'system') {
+            filtered = all.filter(m => m && (m.category === 'system' || m.isSystem));
         } else if (f === 'friends') {
             filtered = all.filter(m => m && m.category === 'friends');
         }
@@ -285,13 +310,17 @@ const AppM = {
     _renderDialogsListHtml(dialogs) {
         if (!dialogs || dialogs.length === 0) {
             return `
-                <div class="glass-card text-center sub-label py-6" style="background:#090e18;">
-                    <i class="fa-solid fa-comment-slash color-cyan mb-2" style="font-size:26px;"></i>
-                    <div>Здесь пока пусто</div>
-                    <div class="text-xs mt-1" style="font-size:9px;">
+                <div class="glass-card text-center sub-label py-6" style="background:#090e18; border: 1px dashed rgba(0,242,254,0.2);">
+                    <div style="position:relative; width:60px; height:60px; margin:0 auto 15px auto;">
+                        <div style="position:absolute; inset:0; border:2px solid rgba(0,242,254,0.2); border-radius:50%;"></div>
+                        <div style="position:absolute; inset:0; border-top:2px solid var(--cyan); border-radius:50%; animation: radarSpin 2s linear infinite;"></div>
+                        <i class="fa-solid fa-satellite-dish" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); font-size:20px; color:var(--cyan);"></i>
+                    </div>
+                    <div class="font-bold color-cyan" style="font-size:12px;">Эфир пуст</div>
+                    <div class="text-xs mt-1" style="font-size:9px; color:#94a3b8;">
                         ${this.chatFilter === 'p2p' ? 'Откройте Биржу и напишите продавцу' : 
                           this.chatFilter === 'buyers' ? 'Выставьте авто на площадку продаж' :
-                          this.chatFilter === 'friends' ? 'Найдите друзей в разделе Социум' :
+                          this.chatFilter === 'system' ? 'Системных уведомлений пока нет' :
                           'Начните переписку — биржа, площадка или друзья'}
                     </div>
                 </div>
@@ -308,11 +337,33 @@ const AppM = {
         const lastMsg = history.length > 0 ? history[history.length - 1].text : (m.preview || '');
         const isUnread = !!m.unread;
         const category = m.category || 'unknown';
+        const isSystem = category === 'system' || m.isSystem;
 
         const carData = m.carData || {};
         const rawImg = carData.img || "assets/cars/economy/2101/vaz-2101.jpg";
         const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(carData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
+
+        // ⭐ v9.1.0: СИСТЕМНЫЕ СООБЩЕНИЯ (Банки, Новости)
+        if (isSystem) {
+            return `
+                <div class="glass-card mb-2 p-3" style="border-left: 3px solid var(--amber); background: linear-gradient(135deg, rgba(255,179,0,0.08), #090e18);">
+                    <div class="flex-between mb-2">
+                        <div class="flex-gap" style="align-items:center;">
+                            <span style="font-size:18px; filter:drop-shadow(0 0 5px var(--amber));">📰</span>
+                            <b class="text-xs color-amber" style="font-size:11.5px;">${this._escapeHtml(m.sender || 'Система')}</b>
+                        </div>
+                        <span class="tag-badge bg-tag-amber" style="font-size:7.5px;">УВЕДОМЛЕНИЕ</span>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:10px; line-height:1.4; color:#f1f5f9;">
+                        ${this._escapeHtml(lastMsg)}
+                    </div>
+                    <button onclick="AppM.deleteDialog('${m.id}')" class="btn btn-dark btn-sm w-full" style="font-size:9px; padding:5px;">
+                        <i class="fa-solid fa-check mr-1"></i> Ознакомлен
+                    </button>
+                </div>
+            `;
+        }
 
         let categoryBadge = '';
         if (category === 'p2p') {
@@ -348,7 +399,7 @@ const AppM = {
         return `
             <div onclick="AppM.openDialog('${m.id}')" 
                  class="glass-card mb-2 p-2 cursor-pointer ${isUnread ? 'card-glow-deal' : ''}" 
-                 style="border-left: 3px solid ${isUnread ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}; background: #090e18;">
+                 style="border-left: 3px solid ${isUnread ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}; background: #090e18; ${isUnread ? 'animation: msgPulse 2s infinite alternate;' : ''}">
                 
                 <div class="car-img-wrap mb-2" style="height:100px; position:relative; border-radius:10px; overflow:hidden;">
                     <img src="${carImg}" 
@@ -932,4 +983,4 @@ const AppM = {
 window.AppM = AppM;
 window.AppMessenger = AppM;
 
-console.log('[💬 phone-m-core v9.0.2] Кнопка обновления ленты на бирже M+ финализирована ✓');
+console.log('[💬 phone-m-core v9.1.0] Возвращена кнопка ПРОДАТЬ, добавлены анимации и фикс системных сообщений ✓');
