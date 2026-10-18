@@ -9,52 +9,37 @@
 <meta name="format-detection" content="telephone=no">
 <title>PEREKUP OS — Симулятор Перекупа</title>
 
-<!-- ═══════════════════════════════════════════════════════
-     ⭐ v4.3.2: КОНФИГ ДО ЗАГРУЗКИ МОДУЛЕЙ FIREBASE
-     Это КРИТИЧЕСКИ ВАЖНО: firebase-core.js читает
-     window.AUTH_SERVER_URL при инициализации. Если его нет —
-     используется localhost:3000, что вызывает ERR_CONNECTION_REFUSED.
-     ═══════════════════════════════════════════════════════ -->
 <script>
-    // ⭐ URL сервера авторизации (замените на свой реальный домен!)
-    // Если у вас нет своего сервера — оставьте пустым, будет fallback на Telegram ID.
     window.AUTH_SERVER_URL = window.AUTH_SERVER_URL || '';
-
-    // ⭐ Флаги для логов
     window.__LOADER_VERSION__ = '4.3.2';
     console.log('[Loader] v' + window.__LOADER_VERSION__ + ' стартует. AUTH_SERVER_URL =', window.AUTH_SERVER_URL || '(не задан, fallback на Telegram ID)');
 </script>
 
 <!-- ═══════════ СТИЛИ ═══════════ -->
-<link rel="stylesheet" href="style.css?v=423">
-<link rel="stylesheet" href="css/base.css?v=423">
-<link rel="stylesheet" href="css/hud.css?v=423">
-<link rel="stylesheet" href="css/market.css?v=423">
-<link rel="stylesheet" href="css/phone.css?v=423">
-<link rel="stylesheet" href="css/m-hub.css?v=423">
-<link rel="stylesheet" href="css/radio.css?v=423">
-<link rel="stylesheet" href="css/modals.css?v=423">
-<link rel="stylesheet" href="css/p2p-deals.css?v=423">
-<link rel="stylesheet" href="css/nav.css?v=423">
+<link rel="stylesheet" href="style.css?v=425">
+<link rel="stylesheet" href="css/base.css?v=425">
+<link rel="stylesheet" href="css/hud.css?v=425">
+<link rel="stylesheet" href="css/market.css?v=425">
+<link rel="stylesheet" href="css/phone.css?v=425">
+<link rel="stylesheet" href="css/m-hub.css?v=425">
+<link rel="stylesheet" href="css/radio.css?v=425">
+<link rel="stylesheet" href="css/modals.css?v=425">
+<link rel="stylesheet" href="css/p2p-deals.css?v=425">
+<link rel="stylesheet" href="css/nav.css?v=425">
 
 <!-- ═══════════ БИБЛИОТЕКИ ═══════════ -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-<!-- ═══════════════════════════════════════════════════════
-     FIREBASE МОДУЛИ (ES-модули, загружаются deferred)
-     ═══════════════════════════════════════════════════════ -->
-<script type="module" src="js/firebase/firebase-core.js?v=424"></script>
-<script type="module" src="js/firebase/firebase-market.js?v=424"></script>
-<script type="module" src="js/firebase/firebase-friendships.js?v=424"></script>
-<script type="module" src="js/firebase/firebase-notifications.js?v=424"></script>
-<script type="module" src="js/firebase/firebase-p2p.js?v=424"></script>
+<!-- ═══════════ FIREBASE МОДУЛИ ═══════════ -->
+<script type="module" src="js/firebase/firebase-core.js?v=425"></script>
+<script type="module" src="js/firebase/firebase-market.js?v=425"></script>
+<script type="module" src="js/firebase/firebase-friendships.js?v=425"></script>
+<script type="module" src="js/firebase/firebase-notifications.js?v=425"></script>
+<script type="module" src="js/firebase/firebase-p2p.js?v=425"></script>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════════════
-     ЭКРАН DEV-АВТОРИЗАЦИИ ДЛЯ ПК
-     ═══════════════════════════════════════════════════════ -->
 <div id="pcAuthScreen" class="pc-auth-overlay" style="display:none;">
   <div class="pc-auth-box">
     <div class="pc-auth-logo"><i class="fa-solid fa-terminal"></i></div>
@@ -81,9 +66,6 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════
-     ЭКРАН ТРЕБОВАНИЯ TELEGRAM
-     ═══════════════════════════════════════════════════════ -->
 <div id="tgRequiredScreen" class="pc-auth-overlay" style="display:none;">
   <div class="pc-auth-box">
     <div class="pc-auth-logo" style="color: var(--cyan, #00f2fe);">
@@ -109,9 +91,6 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════
-     ЭКРАН ОТКАЗА В ДОСТУПЕ (AccessControl)
-     ═══════════════════════════════════════════════════════ -->
 <div id="accessDeniedScreen" class="pc-auth-overlay" style="display:none;">
   <div class="pc-auth-box">
     <div class="pc-auth-logo" style="color: #ff3366;">
@@ -144,12 +123,8 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════
-     ОСНОВНОЕ ПРИЛОЖЕНИЕ
-     ═══════════════════════════════════════════════════════ -->
 <div class="app-shell" id="appShell" style="display:none;">
 
-  <!-- HUD -->
   <header class="hud-header">
     <div class="hud-card hud-top-row">
       <div class="user-profile" onclick="switchTab('tabProfile')" title="Открыть профиль">
@@ -254,7 +229,6 @@
     </div>
   </header>
 
-  <!-- КОНТЕНТ -->
   <main class="main-content">
     <section id="tabMarket" class="tab-screen active">
       <div class="glass-card market-filter-card mb-3">
@@ -420,7 +394,6 @@
                 <span class="phone-app-label">Жильё</span>
               </div>
 
-              <!-- ⭐ ЕДИНЫЙ ТЕНЕВОЙ МОДУЛЬ «ДАРКНЕТ» -->
               <div class="phone-app-icon-wrap" onclick="PhoneManager.openApp('darknet')">
                 <div class="phone-app-icon bg-dark-purple"><i class="fa-solid fa-user-secret"></i></div>
                 <span class="phone-app-label color-purple font-bold">Даркнет</span>
@@ -527,10 +500,6 @@
   </nav>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════
-     МОДАЛЬНЫЕ ОКНА
-     ═══════════════════════════════════════════════════════ -->
-
 <div id="modalDevStudio" class="modal-overlay">
   <div class="modal-box" style="max-width: 440px; max-height: calc(100dvh - 20px);">
     <div id="devStudioContent"></div>
@@ -553,10 +522,8 @@
 <div id="modalBizCustomize" class="modal-overlay"></div>
 <div id="modalBizSell" class="modal-overlay"></div>
 
-<!-- Owner-панель доступа -->
 <div id="modalAccessManager" class="modal-overlay"></div>
 
-<!-- ⭐ P2P ДКП МЕЖДУ ИГРОКАМИ -->
 <div id="modalP2PDKP" class="modal-overlay">
   <div class="modal-box dkp-official-blank">
     <div class="dkp-blank-border">
@@ -693,19 +660,11 @@
   </div>
 </div>
 
-<!-- Trade Offer -->
 <div id="modalTradeOffer" class="modal-overlay"></div>
-
-<!-- Клуб -->
 <div id="modalCreateClub" class="modal-overlay"></div>
-
-<!-- Событие M+ -->
 <div id="modalCreateStreetPost" class="modal-overlay"></div>
-
-<!-- Онбординг игрока -->
 <div id="modalPlayerOnboarding" class="modal-overlay"></div>
 
-<!-- ⭐ Патчноут -->
 <div id="modalPatchNotes" class="modal-overlay">
   <div class="modal-box" style="max-width: 420px;">
     <div class="flex-between mb-2">
@@ -724,7 +683,6 @@
   </div>
 </div>
 
-<!-- ⭐ Страховка -->
 <div id="modalInsurance" class="modal-overlay">
   <div class="modal-box insurance-contract-blank" style="max-width: 420px;">
     <div class="flex-between mb-2 pb-2" style="border-bottom: 1px solid var(--border-glass);">
@@ -807,7 +765,6 @@
   </div>
 </div>
 
-<!-- ⭐ Регистрация -->
 <div id="modalRegistrationChoice" class="modal-overlay">
   <div class="modal-box text-center" style="max-width: 410px;">
     <div class="radar-spinner-ring mb-2"><div class="radar-spinner-center">📑</div></div>
@@ -832,7 +789,6 @@
   </div>
 </div>
 
-<!-- ⭐ ДКП (старая — для NPC-покупателей) -->
 <div id="modalDKP" class="modal-overlay">
   <div class="modal-box dkp-official-blank">
     <div class="dkp-blank-border">
@@ -885,7 +841,6 @@
   </div>
 </div>
 
-<!-- ⭐ Гараж-инцидент -->
 <div id="modalGarageEvent" class="modal-overlay">
   <div class="modal-box text-center">
     <div class="radar-spinner-ring mb-2">
@@ -901,7 +856,6 @@
   </div>
 </div>
 
-<!-- ⭐ Контракт-ПодКлюч -->
 <div id="modalSelectContractCar" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -914,7 +868,6 @@
   </div>
 </div>
 
-<!-- ⭐ SaveManager -->
 <div id="modalSaveManager" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -931,7 +884,6 @@
   </div>
 </div>
 
-<!-- ⭐ Тюнинг -->
 <div id="modalTuning" class="modal-overlay">
   <div class="modal-box" style="max-width: 420px;">
     <div class="flex-between mb-2">
@@ -957,7 +909,6 @@
   </div>
 </div>
 
-<!-- ⭐ MarketDeal (торг с NPC) -->
 <div id="modalMarketDeal" class="modal-overlay">
   <div class="modal-box chat-deal-box">
     <div class="chat-header-bar flex-between mb-2">
@@ -990,7 +941,6 @@
   </div>
 </div>
 
-<!-- ⭐ Autoteka -->
 <div id="modalAutoteka" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -1002,10 +952,8 @@
   </div>
 </div>
 
-<!-- ⭐ PreSale -->
 <div id="modalPreSale" class="modal-overlay"></div>
 
-<!-- ⭐ BuyCall -->
 <div id="modalBuyCall" class="modal-overlay">
   <div class="modal-box text-center">
     <div class="radar-spinner-ring mb-2">
@@ -1018,7 +966,6 @@
   </div>
 </div>
 
-<!-- ⭐ DailyBonus -->
 <div id="modalDailyBonus" class="modal-overlay">
   <div class="modal-box text-center">
     <div class="modal-glow-badge mb-1" style="color:#ffd700; border-color:rgba(255,179,0,0.4);"><i class="fa-solid fa-gift"></i> ЕЖЕДНЕВНЫЙ ПОДАРОК</div>
@@ -1029,7 +976,6 @@
   </div>
 </div>
 
-<!-- ⭐ DealVerdict -->
 <div id="modalDealVerdict" class="modal-overlay">
   <div class="modal-box text-center">
     <div class="radar-spinner-ring mb-2" id="verdictRingAnim">
@@ -1047,7 +993,6 @@
   </div>
 </div>
 
-<!-- ⭐ OBD2 -->
 <div id="modalOBD2" class="modal-overlay">
   <div class="modal-box" style="max-width:440px;">
     <div class="flex-between mb-2 border-b pb-2" style="border-bottom: 1px solid var(--border-glass);">
@@ -1062,7 +1007,6 @@
   </div>
 </div>
 
-<!-- ⭐ PutOnLot -->
 <div id="modalPutOnLot" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -1082,7 +1026,6 @@
 <div id="modalPreview" class="modal-overlay"></div>
 <div id="modalChangePlate" class="modal-overlay"></div>
 
-<!-- ⭐ Gauge -->
 <div id="modalGauge" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -1123,7 +1066,6 @@
   </div>
 </div>
 
-<!-- ⭐ CreateP2P -->
 <div id="modalCreateP2P" class="modal-overlay">
   <div class="modal-box">
     <div class="flex-between mb-2">
@@ -1151,9 +1093,6 @@
 
 <div id="toastNotification" class="toast">Уведомление</div>
 
-<!-- ═══════════════════════════════════════════════════════
-     СТИЛИ PC-АВТОРИЗАЦИИ
-     ═══════════════════════════════════════════════════════ -->
 <style>
   .pc-auth-overlay {
     position: fixed; inset: 0;
@@ -1209,18 +1148,13 @@
   .pc-auth-version { font-size: 9px; color: #475569; font-family: monospace; letter-spacing: 1px; }
 </style>
 
-<!-- ═══════════════════════════════════════════════════════
-     СИСТЕМНЫЙ ЗАГРУЗЧИК v4.3.2
-     ═══════════════════════════════════════════════════════ -->
 <script>
   (function() {
     'use strict';
 
     const PC_DEV_PASSWORD = "perekup2026";
     const PC_AUTH_STORAGE_KEY = "perekup_pc_auth_ok";
-    const CACHE_VER = '424';
-
-    // ⭐ v4.3.2: сколько ждать готовности Firebase перед initApp
+    const CACHE_VER = '425'; // ⭐ Обновлено до 425
     const FIREBASE_READY_TIMEOUT_MS = 8000;
 
     let isPcAuthenticated = false;
@@ -1342,32 +1276,18 @@
       document.getElementById('tgRequiredScreen').style.display = 'flex';
     }
 
-    // ═══════════════════════════════════════════════════════
-    // ⭐ v4.3.2: ПОЛНЫЙ СПИСОК СКРИПТОВ
-    // ═══════════════════════════════════════════════════════
     const scriptQueue = [
-        // ─── Утилиты (фундамент) ───
         'js/utils/event-bus.js',
         'js/utils/safe-state.js',
         'js/utils/game-helpers.js',
         'js/utils/money-manager.js',
-
-        // ─── Access ───
         'js/access-control.js',
-
-        // ─── Менеджеры ───
         'js/plates-manager.js',
         'js/notification-center.js',
         'js/realtime-manager.js',
-
-        // ─── P2P модули ───
         'js/p2p-offers.js',
         'js/p2p-deals-modal.js',
-
-        // ─── Темы ───
         'js/theme-manager.js',
-
-        // ─── Данные ───
         'data/data_core.js',
         'data/data_economy.js',
         'data/data_profile.js',
@@ -1379,8 +1299,6 @@
         'data/data_activities_port.js',
         'data/data_barn.js',
         'data/data_dialogues.js',
-
-        // ─── Каталог машин ───
         'data/cars/atv.js',
         'data/cars/comfort.js',
         'data/cars/economy.js',
@@ -1392,19 +1310,11 @@
         'data/cars/yacht.js',
         'data/cars/upcoming_cars_data.js',
         'data/data_cars.js',
-
-        // ─── Аудио ───
         'js/app/audio-fx.js',
-
-        // ─── M-Hub (социум) ───
         'js/m-hub/m-clubs.js',
         'js/m-hub/m-events.js',
         'js/m-hub/m-leaderboard.js',
-
-        // ─── Phone: ядро ───
         'js/phone/phone.js',
-
-        // ─── Phone: приложения ───
         'js/phone/phone-autostock.js',
         'js/phone/phone-bank.js',
         'js/phone/phone-barn.js',
@@ -1417,19 +1327,13 @@
         'js/phone/phone-post.js',
         'js/phone/phone-racing.js',
         'js/phone/phone-autodrot.js',
-
-        // ─── Phone: Сеть «М» ───
         'js/phone/phone-m-core.js',
         'js/phone/phone-m-market.js',
         'js/phone/phone-m-social.js',
-
-        // ─── Гараж ───
         'js/garage/garage-calc.js',
         'js/garage/garage-services.js',
         'js/garage/garage-dialogs.js',
         'js/garage/garage.js',
-
-        // ─── Рынок ───
         'js/market/market-generator.js',
         'js/market/market-inspection.js',
         'js/market/market-deal.js',
@@ -1437,20 +1341,14 @@
         'js/market/market.js',
         'js/salesLot.js',
         'js/player-listings.js',
-
-        // ─── Геймплей ───
         'js/life.js',
         'js/street.js',
         'js/syndicate.js',
         'js/storage-wars-p2p.js',
-
-        // ─── DEV ───
         'js/dev/dev-logger.js',
         'js/dev/dev-data-checker.js',
         'js/dev/phone-dev.js',
         'js/dev/dev-studio.js',
-
-        // ─── Финальные ядра приложения ───
         'js/app/app-core.js',
         'js/app/app-game.js',
         'js/app/app-loader.js'
@@ -1469,14 +1367,6 @@
       });
     }
 
-    // ═══════════════════════════════════════════════════════
-    // ⭐ v4.3.2: ОЖИДАНИЕ ГОТОВНОСТИ FIREBASE
-    // Это ВТОРАЯ половина фикса «Нет сети».
-    //
-    // Проблема: ES-модули firebase-*.js загружаются deferred
-    // и могут быть ещё не готовы, когда initApp() вызывает
-    // AccessControl.checkAccess(). Промис-поллинг решает.
-    // ═══════════════════════════════════════════════════════
     async function waitForFirebaseReady(timeoutMs = FIREBASE_READY_TIMEOUT_MS) {
       const start = Date.now();
       let attempts = 0;
@@ -1504,7 +1394,6 @@
           return false;
         }
 
-        // Логируем прогресс каждые 2 секунды
         if (attempts % 20 === 0) {
           console.log(
             `[Loader] Ждём Firebase... ${Math.round(elapsed / 1000)}с / ${timeoutMs / 1000}с ` +
@@ -1519,17 +1408,14 @@
     async function initAllModules() {
       const t0 = Date.now();
 
-      // 1. Загружаем все скрипты последовательно
       for (const scriptPath of scriptQueue) {
         await loadScript(scriptPath);
       }
 
       console.log(`[Loader] Все скрипты загружены за ${Date.now() - t0}мс`);
 
-      // 2. ⭐ v4.3.2: Ждём готовности Firebase перед initApp
       await waitForFirebaseReady();
 
-      // 3. Запускаем приложение
       if (typeof initApp === 'function') {
         try {
           initApp();
