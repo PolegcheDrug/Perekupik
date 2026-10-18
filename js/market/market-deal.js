@@ -1,10 +1,11 @@
 // ========================================================
-// js/market/market-deal.js — ТОРГ У КАПОТА И ДКП (v5.3.3 REDESIGN)
+// js/market/market-deal.js — ТОРГ У КАПОТА И ДКП (v5.3.4 FIX)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v5.3.3:
-//   - Полный редизайн карточки «Оформление ТС» (кнопки компактные, текст ровный)
-//   - Никаких растянутых во всю ширину кнопок «На баланс»
-//   - Полная интеграция с проверкой ИП/ООО и постановкой ТС на баланс бизнеса
+// ⭐ v5.3.4:
+//   - Исправлено добавление авто в гараж после подписания ДКП (защита от сброса marketFeed)
+//   - Машины на баланс бизнеса не блокируются лимитом бытовки
+//   - Автоматическое переключение вкладки гаража на купленный транспорт
+//   - Принудительное сохранение и обновление UI
 // ========================================================
 
 let pendingMarketCar = null;
@@ -54,6 +55,11 @@ function _forceCloseAllDealModals() {
             el.style.display = 'none';
         }
     });
+}
+
+function _getPersonalGarageCount() {
+    if (!state || !Array.isArray(state.garage)) return 0;
+    return state.garage.filter(c => c && !c.commercialRegistered && !c.assignedBusinessId).length;
 }
 
 function _openP2PDealFallback(p2pId) {
@@ -352,8 +358,8 @@ function renderMarketHaggleControls() {
 
     const seller = (typeof SELLER_ARCHETYPES !== 'undefined' ? SELLER_ARCHETYPES : []).find(s => s.id === car.sellerArchetype) || null;
 
-    let hasGauge = !!(state.player && state.player.tools && (state.player.tools.gauge || state.player.tools.gauge_pro));
-    let hasScanner = !!(state.player && state.player.tools && (state.player.tools.obd || state.player.tools.obd_launch));
+    let hasGauge = !!(state.player && (state.player.tools?.gauge || state.player.tools?.gauge_pro || state.player.hasGauge || (state.player.inventory || []).includes('gauge')));
+    let hasScanner = !!(state.player && (state.player.tools?.obd || state.player.tools?.obd_launch || state.player.hasOBD || (state.player.inventory || []).includes('obd')));
     const hasScrapYard = (state.businesses || []).some(b => b.id === 'razborka' && b.level > 0);
 
     let maxP = car.maxHagglePatience || 4;
@@ -372,7 +378,7 @@ function renderMarketHaggleControls() {
         const ldef = (typeof LEGAL_DEFECTS !== 'undefined' ? LEGAL_DEFECTS : []).find(l => l.id === revealedLegal);
         if (ldef) knownDiscountPct += ldef.pricePenaltyPct || 0;
     }
-    knownDiscountPct = Math.min(60, knownDiscountPct);
+    knownDiscountPct = Math.min(45, knownDiscountPct);
 
     let karma = state.player?.karma !== undefined ? state.player.karma : 50;
     let lvl = state.player?.level || 1;
@@ -411,40 +417,30 @@ function renderMarketHaggleControls() {
         return;
     }
 
-    let inspectionToolsBlock = "";
-    if (hasGauge || hasScanner) {
-        let toolsButtonsHtml = "";
-        if (hasGauge) {
-            toolsButtonsHtml += `
-                <button onclick="openGaugeModal('${car.id}')" class="btn btn-dark btn-sm">
-                    <i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер
-                </button>`;
-        }
-        if (hasScanner) {
-            toolsButtonsHtml += `
-                <button onclick="quickOBDScanMarketCar('${car.id}')" class="btn btn-dark btn-sm">
-                    <i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> OBD2
-                </button>`;
-        }
+    let toolsButtonsHtml = "";
+    if (hasGauge) {
         toolsButtonsHtml += `
-            <button onclick="startMarketTestDrive('${car.id}')" class="btn ${car.testDriven ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm">
-                <i class="fa-solid fa-gauge-high mr-1"></i> ${car.testDriven ? 'Прокатились ✓' : 'Тест-драйв'}
+            <button onclick="openGaugeModal('${car.id}')" class="btn btn-dark btn-sm">
+                <i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер
             </button>`;
-
-        inspectionToolsBlock = `
-            <div class="grid-3 mb-2" style="gap:6px;">
-                ${toolsButtonsHtml}
-            </div>
-        `;
-    } else {
-        inspectionToolsBlock = `
-            <div class="mb-2">
-                <button onclick="startMarketTestDrive('${car.id}')" class="btn ${car.testDriven ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm w-full">
-                    <i class="fa-solid fa-gauge-high mr-1"></i> ${car.testDriven ? 'Прокатились ✓' : 'Тест-драйв'}
-                </button>
-            </div>
-        `;
     }
+    if (hasScanner) {
+        toolsButtonsHtml += `
+            <button onclick="quickOBDScanMarketCar('${car.id}')" class="btn btn-dark btn-sm">
+                <i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> OBD2
+            </button>`;
+    }
+    toolsButtonsHtml += `
+        <button onclick="startMarketTestDrive('${car.id}')" class="btn ${car.testDriven ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm">
+            <i class="fa-solid fa-gauge-high mr-1"></i> ${car.testDriven ? 'Прокатились ✓' : 'Тест-драйв'}
+        </button>`;
+
+    const gridCols = (hasGauge && hasScanner) ? 'grid-3' : ((hasGauge || hasScanner) ? 'grid-2' : 'grid-1');
+    let inspectionToolsBlock = `
+        <div class="${gridCols} mb-2" style="gap:6px;">
+            ${toolsButtonsHtml}
+        </div>
+    `;
 
     let defectArgueBlock = '';
     if (mechDefects.length > 0 || revealedLegal) {
@@ -452,12 +448,12 @@ function renderMarketHaggleControls() {
             <div class="p-2 mb-2" style="background:rgba(255,179,0,0.08); border-radius:8px; border:1px solid rgba(255,179,0,0.4);">
                 <div class="flex-between mb-1">
                     <b class="text-xs color-amber">💡 У вас есть ${mechDefects.length + (revealedLegal ? 1 : 0)} аргумент(ов)</b>
-                    <span class="tag-badge bg-tag-amber">Потенциал: -${knownDiscountPct}%</span>
+                    <span class="tag-badge bg-tag-amber">Скидка: -${knownDiscountPct}%</span>
                 </div>
                 <div class="sub-label mb-2" style="font-size:9px;">Найденные дефекты, которые можно предъявить продавцу:</div>
                 ${mechDefects.slice(0, 3).map(d => `
                     <div class="sub-label mb-1" style="font-size:9px; color:#f1f5f9;">
-                        • <b>${d.name}</b> (-${d.pricePenaltyPct}% / ~${(d.cost || 0).toLocaleString()} ₽)
+                        • <b>${d.name}</b> (-${d.pricePenaltyPct}%)
                     </div>
                 `).join('')}
                 ${mechDefects.length > 3 ? `<div class="sub-label" style="font-size:8.5px; color:#94a3b8;">... и ещё ${mechDefects.length - 3}</div>` : ''}
@@ -467,8 +463,8 @@ function renderMarketHaggleControls() {
                     </div>
                 ` : ''}
 
-                <button onclick="argueKnownDefects('${car.id}')" class="btn btn-amber btn-sm w-full mt-2 font-bold">
-                    <i class="fa-solid fa-bullhorn mr-1"></i> Предъявить дефекты (скидка до -${knownDiscountPct}%)
+                <button onclick="argueKnownDefects('${car.id}')" class="btn btn-amber btn-sm w-full mt-2 font-bold" ${car._defectsArgued ? 'disabled' : ''}>
+                    <i class="fa-solid fa-bullhorn mr-1"></i> ${car._defectsArgued ? 'Дефекты уже предъявлены ✓' : `Предъявить дефекты (скидка -${knownDiscountPct}%)`}
                 </button>
             </div>
         `;
@@ -513,29 +509,21 @@ function renderMarketHaggleControls() {
     }
 
     const basePrice = car.price || 0;
-    const basePurchaseCost = car.baseMarketValue || Math.round(basePrice * 0.75);
-    const baseMargin = basePrice - basePurchaseCost;
-    const marginClass = baseMargin >= 0 ? 'color-green' : 'color-red';
-    const marginIcon = baseMargin >= 0 ? '▲' : '▼';
-
-    let brandRepBadgeHtml = '';
-    if (brandReputation > 1.1) {
-        brandRepBadgeHtml = `<span class="tag-badge bg-tag-green" style="font-size:7.5px;">🔥 ${(brandReputation * 100 - 100).toFixed(0)}% BRAND</span>`;
-    } else if (brandReputation < 0.9) {
-        brandRepBadgeHtml = `<span class="tag-badge bg-tag-red" style="font-size:7.5px;">📉 ${(100 - brandReputation * 100).toFixed(0)}% BRAND</span>`;
-    }
+    const estMarketVal = car.marketValue || car.baseMarketValue || Math.round(basePrice * 1.25);
+    const estProfit = estMarketVal - basePrice;
+    const marginClass = estProfit >= 0 ? 'color-green' : 'color-red';
+    const marginIcon = estProfit >= 0 ? '▲' : '▼';
 
     let realMarginBlock = `
         <div class="p-2 mb-2" style="background:rgba(0,242,254,0.05); border-radius:8px; border:1px solid rgba(0,242,254,0.3);">
             <div class="flex-between text-xs mb-1">
-                <span class="sub-label" style="font-size:9px;">Оценка рынка:</span>
-                <b class="color-cyan" style="font-size:10px;">${basePurchaseCost.toLocaleString()} ₽</b>
+                <span class="sub-label" style="font-size:9px;">Оценка вторичного рынка:</span>
+                <b class="color-cyan" style="font-size:10px;">~${estMarketVal.toLocaleString()} ₽</b>
             </div>
             <div class="flex-between text-xs">
-                <span class="sub-label" style="font-size:9px;">Маржа при текущей цене:</span>
-                <b class="${marginClass}" style="font-size:11px;">${marginIcon} ${baseMargin >= 0 ? '+' : ''}${baseMargin.toLocaleString()} ₽</b>
+                <span class="sub-label" style="font-size:9px;">Потенциальный навар:</span>
+                <b class="${marginClass}" style="font-size:11px;">${marginIcon} ${estProfit >= 0 ? '+' : ''}${estProfit.toLocaleString()} ₽</b>
             </div>
-            ${brandRepBadgeHtml ? `<div class="flex-between mt-1">${brandRepBadgeHtml}</div>` : ''}
         </div>
     `;
 
@@ -576,6 +564,7 @@ function renderMarketHaggleControls() {
 function argueKnownDefects(carId) {
     if (!pendingMarketCar || !pendingMarketCar.car) return;
     const car = pendingMarketCar.car;
+    if (car._defectsArgued) return showToast("Вы уже получили скидку за эти дефекты!");
 
     const revealed = car._revealedDefects || [];
     const revealedLegal = car._revealedLegal || null;
@@ -585,18 +574,19 @@ function argueKnownDefects(carId) {
     mechDefects.forEach(d => { totalDiscountPct += (d.pricePenaltyPct || 0); });
     if (revealedLegal) totalDiscountPct += 15;
 
-    totalDiscountPct = Math.min(50, Math.max(5, totalDiscountPct));
+    totalDiscountPct = Math.min(35, Math.max(5, totalDiscountPct));
 
     const discountAmount = Math.round(car.price * (totalDiscountPct / 100));
-    car.price = Math.max(10000, car.price - discountAmount);
+    car.price = Math.max(15000, car.price - discountAmount);
+    car._defectsArgued = true;
     car.hagglePatience = Math.max(0, (car.hagglePatience !== undefined ? car.hagglePatience : 3) - 1);
 
     const thread = document.getElementById("dealChatThread");
     if (thread) {
         thread.innerHTML += `
-            <div class="chat-msg msg-player">«Я проверил машину: есть дефекты! Скидывай ${totalDiscountPct}%.»</div>
+            <div class="chat-msg msg-player">«Я проверил машину приборами: есть косяки по технике и кузову! Скидывай ${totalDiscountPct}%.»</div>
             <div class="chat-msg msg-seller" style="border-left-color: var(--amber);">
-                «Да уж, против фактов не попрёшь... Скидываю <b>-${discountAmount.toLocaleString()} ₽</b>!»
+                «Ладно, против фактов не попрёшь... Скидываю <b>-${discountAmount.toLocaleString()} ₽</b>!»
             </div>
         `;
         thread.scrollTop = thread.scrollHeight;
@@ -706,7 +696,7 @@ function attemptMarketHaggle(percent, failRisk = 25) {
         }
     } else {
         let disc = Math.round(car.price * (percent / 100));
-        car.price = Math.max(10000, car.price - disc);
+        car.price = Math.max(15000, car.price - disc);
         if (typeof setTxt === 'function') setTxt("dealCarPrice", `${car.price.toLocaleString()} ₽`);
 
         if (thread) {
@@ -733,13 +723,6 @@ function confirmMarketPurchaseSuccess() {
     }
 
     const car = pendingMarketCar.car;
-
-    const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
-    let currentSlots = state.garage ? state.garage.length : 0;
-    if (currentSlots >= maxSlots) {
-        showToast(`🚫 Гараж полон! (${currentSlots}/${maxSlots} мест). Продайте авто или докупите бокс.`);
-        return;
-    }
 
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
     let price = car.price || 0;
@@ -770,7 +753,6 @@ function confirmMarketPurchaseSuccess() {
     openRegistrationChoiceModal(deal);
 }
 
-// ⭐ РЕДИЗАЙН: МОДАЛКА ВЫБОРА ОФОРМЛЕНИЯ
 function openRegistrationChoiceModal(deal) {
     if (!deal || !deal.car) return showToast("Ошибка данных сделки");
 
@@ -866,6 +848,10 @@ function openRegistrationChoiceModal(deal) {
         `;
     }
 
+    const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : (state.player?.baseSlots || 2);
+    const personalSlots = _getPersonalGarageCount();
+    const isPersonalFull = personalSlots >= maxSlots;
+
     modal.innerHTML = `
         <div class="modal-box" style="max-width:400px; padding:14px;">
             <div class="flex-between mb-2">
@@ -883,17 +869,23 @@ function openRegistrationChoiceModal(deal) {
             <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(0,229,255,0.25);">
                 <div class="flex-between mb-1">
                     <b class="text-xs color-cyan" style="font-size:10px;"><i class="fa-solid fa-user"></i> В личный гараж (Физлицо)</b>
-                    <span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">Гараж</span>
+                    <span class="tag-badge ${isPersonalFull ? 'bg-tag-red' : 'bg-tag-cyan'}" style="font-size:7.5px;">Мест: ${personalSlots}/${maxSlots}</span>
                 </div>
                 <div class="sub-label mb-2" style="font-size:8.5px;">Для личной езды, гаражного тюнинга или перепродажи.</div>
-                <div class="grid-2" style="gap:6px;">
-                    <button onclick="confirmRegistrationChoice('personal_mreo')" class="btn btn-green btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700;">
-                        С учетом МРЭО (2,850 ₽)
-                    </button>
-                    <button onclick="confirmRegistrationChoice('personal_dkp')" class="btn btn-dark btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700;">
-                        Только ДКП (Перекуп)
-                    </button>
-                </div>
+                ${isPersonalFull ? `
+                    <div class="p-1 text-center color-red font-bold" style="font-size:9px; background:rgba(255,51,102,0.1); border-radius:6px;">
+                        🚫 Личные боксы заняты (${personalSlots}/${maxSlots}). Расширьте гараж или оформите на бизнес!
+                    </div>
+                ` : `
+                    <div class="grid-2" style="gap:6px;">
+                        <button onclick="confirmRegistrationChoice('personal_mreo')" class="btn btn-green btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700;">
+                            С учетом МРЭО (2,850 ₽)
+                        </button>
+                        <button onclick="confirmRegistrationChoice('personal_dkp')" class="btn btn-dark btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700;">
+                            Только ДКП (Перекуп)
+                        </button>
+                    </div>
+                `}
             </div>
 
             ${bizOptionsHtml}
@@ -929,21 +921,29 @@ function confirmRegistrationChoice(mode, bizId = null, bizName = null) {
         _activeDKPDeal.buyer = compName;
         _activeDKPDeal.isRegisteredOnPlayer = true;
         showToast(`💼 Оформление на баланс «${bizName}»`);
-    } else if (mode === 'personal_mreo') {
-        const fee = 2850;
-        if ((state.player?.cash || 0) < fee) return showToast(`Нужно ${fee} ₽ на госпошлину!`);
-        state.player.cash -= fee;
-        if (typeof logBankTransaction === 'function') logBankTransaction('Госпошлина МРЭО', fee, false);
-
-        _activeDKPDeal.buyTarget = 'personal';
-        _activeDKPDeal.isRegisteredOnPlayer = true;
-        _activeDKPDeal.buyer = state.player?.name || "Игрок";
-        showToast("✅ Оформление в МРЭО на физлицо (-2,850 ₽)");
     } else {
-        _activeDKPDeal.buyTarget = 'personal';
-        _activeDKPDeal.isRegisteredOnPlayer = false;
-        _activeDKPDeal.buyer = state.player?.name || "Игрок";
-        showToast("📄 Оформление по ДКП без постановки на учет");
+        const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : (state.player?.baseSlots || 2);
+        const personalSlots = _getPersonalGarageCount();
+        if (personalSlots >= maxSlots) {
+            return showToast(`🚫 Личный гараж полон (${personalSlots}/${maxSlots})!`);
+        }
+
+        if (mode === 'personal_mreo') {
+            const fee = 2850;
+            if ((state.player?.cash || 0) < fee) return showToast(`Нужно ${fee} ₽ на госпошлину!`);
+            state.player.cash -= fee;
+            if (typeof logBankTransaction === 'function') logBankTransaction('Госпошлина МРЭО', fee, false);
+
+            _activeDKPDeal.buyTarget = 'personal';
+            _activeDKPDeal.isRegisteredOnPlayer = true;
+            _activeDKPDeal.buyer = state.player?.name || "Игрок";
+            showToast("✅ Оформление в МРЭО на физлицо (-2,850 ₽)");
+        } else {
+            _activeDKPDeal.buyTarget = 'personal';
+            _activeDKPDeal.isRegisteredOnPlayer = false;
+            _activeDKPDeal.buyer = state.player?.name || "Игрок";
+            showToast("📄 Оформление по ДКП без постановки на учет");
+        }
     }
 
     _forceCloseAllDealModals();
@@ -1199,7 +1199,7 @@ function confirmSignDKP() {
         _activeDKPDeal = null;
         window.__DKP_PENDING__ = false;
         _dealActionPending = false;
-    }, 600);
+    }, 500);
 }
 
 function abortDKPDeal() {
@@ -1213,8 +1213,9 @@ function abortDKPDeal() {
     if (typeof playSound === 'function') playSound('error');
 }
 
+// ⭐ НАДЁЖНОЕ ЗАВЕРШЕНИЕ СДЕЛКИ И ДОБАВЛЕНИЕ В ГАРАЖ
 function finishMarketCarBuyProcess(deal) {
-    if (!deal || !deal.carId) {
+    if (!deal || !deal.car) {
         _dealActionPending = false;
         window.__DKP_PENDING__ = false;
         return;
@@ -1224,22 +1225,17 @@ function finishMarketCarBuyProcess(deal) {
 
     try {
         const car = deal.car;
-        const carId = deal.carId;
-        const price = deal.price || car.price || 0;
+        const carId = deal.carId || car.id;
+        const price = Number(deal.price ?? car.price ?? 0);
+        const isBusinessBuy = deal.buyTarget === 'business' && Boolean(deal.targetBizId);
 
-        const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
-        const currentSlots = state.garage ? state.garage.length : 0;
-        if (currentSlots >= maxSlots) {
-            showToast(`🚫 Гараж полон! (${currentSlots}/${maxSlots} мест).`);
-            return;
-        }
-
-        const liveCarIndex = (state.marketFeed || []).findIndex(c => c && (String(c.id) === String(carId) || c.id == carId));
-        if (liveCarIndex === -1) {
-            showToast("❌ Лот уже снят с продажи!");
-            pendingMarketCar = null;
-            if (typeof renderMarketFeed === 'function') renderMarketFeed();
-            return;
+        if (!isBusinessBuy) {
+            const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : (state.player?.baseSlots || 2);
+            const personalSlots = _getPersonalGarageCount();
+            if (personalSlots >= maxSlots) {
+                showToast(`🚫 Личный гараж полон! (${personalSlots}/${maxSlots} мест).`);
+                return;
+            }
         }
 
         const cash = state.player?.cash || 0;
@@ -1251,20 +1247,22 @@ function finishMarketCarBuyProcess(deal) {
         state.player.cash -= price;
         if (!state.player.stats) state.player.stats = {};
         state.player.stats.bought = (state.player.stats.bought || 0) + 1;
-        if (!state.garage) state.garage = [];
+        if (!Array.isArray(state.garage)) state.garage = [];
 
         const newCar = Object.assign({}, car);
-        newCar.customPlate = car.plate;
+        newCar.uid = 'car_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+        newCar.id = car.id || newCar.uid;
+        newCar.customPlate = car.customPlate || car.plate || "ТРАНЗИТ";
         newCar.impounded = false;
         newCar.unregistered = false;
         newCar.insurance = null;
         newCar.purchaseCost = price;
-        newCar.wear = car.wear ? car.wear : { engine: 85, transmission: 85 };
+        newCar.wear = car.wear ? Object.assign({}, car.wear) : { engine: 85, transmission: 85 };
         newCar.isPersonal = false;
         newCar.ownershipDays = 0;
         newCar.engineTemp = 90;
         newCar.tireWear = car.tireWear !== undefined ? car.tireWear : 100;
-        newCar.tuning = car.tuning || {
+        newCar.tuning = car.tuning ? Object.assign({}, car.tuning) : {
             chip: 0, exhaust: false, stance: false, bodykit: false,
             rollCage: false, dragSlicks: false, hydroHandbrake: false,
             weldedDiff: false, steeringAngle: false, bucketSeats: false,
@@ -1276,7 +1274,9 @@ function finishMarketCarBuyProcess(deal) {
             : (car.img ? [car.img] : []);
         if (!newCar.img && newCar.images.length > 0) newCar.img = newCar.images[0];
 
-        if (typeof window.ensureCarIdentity === 'function') window.ensureCarIdentity(newCar);
+        if (typeof window.ensureCarIdentity === 'function') {
+            try { window.ensureCarIdentity(newCar); } catch (e) {}
+        }
 
         newCar.mechanicalDefects = car.mechanicalDefects || [];
         newCar.legalDefect = car.legalDefect || null;
@@ -1284,17 +1284,19 @@ function finishMarketCarBuyProcess(deal) {
         newCar._revealedLegal = car._revealedLegal || null;
         newCar.sellerArchetype = car.sellerArchetype || null;
 
-        if (deal.buyTarget === 'business' && deal.targetBizId) {
+        if (isBusinessBuy) {
             newCar.commercialRegistered = true;
             newCar.registeredCompany = deal.buyer;
             newCar.assignedBusinessId = deal.targetBizId;
             newCar.assignedBusinessName = deal.targetBizName;
             newCar.registrationDate = new Date().toLocaleDateString('ru-RU');
+            window.garageFilter = 'commercial';
         } else {
             newCar.commercialRegistered = false;
             newCar.isRegisteredOnPlayer = !!deal.isRegisteredOnPlayer;
             newCar.assignedBusinessId = null;
             newCar.assignedBusinessName = null;
+            if (window.garageFilter === 'commercial') window.garageFilter = 'all';
         }
 
         if (car.legalDefect && !car._legalResolved) {
@@ -1302,10 +1304,15 @@ function finishMarketCarBuyProcess(deal) {
             newCar._backfireType = car.legalDefect.id;
         }
 
-        if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(newCar);
+        if (typeof recalculateCarMarketValue === 'function') {
+            try { recalculateCarMarketValue(newCar); } catch (e) {}
+        }
 
         state.garage.push(newCar);
-        state.marketFeed = (state.marketFeed || []).filter(c => c && String(c.id) !== String(carId) && c.id != carId);
+
+        if (Array.isArray(state.marketFeed)) {
+            state.marketFeed = state.marketFeed.filter(c => c && String(c.id) !== String(carId) && c.id != carId);
+        }
         state.marketFeedVersion = (state.marketFeedVersion || 0) + 1;
 
         pendingMarketCar = null;
@@ -1320,15 +1327,19 @@ function finishMarketCarBuyProcess(deal) {
         }
 
         let msg = `✅ ${car.name} куплен за ${price.toLocaleString()} ₽!`;
-        if (deal.buyTarget === 'business') msg += ` Поставлен на баланс «${deal.targetBizName}»!`;
-        if (car.legalDefect) msg += ` ⚠️ Есть юридическая проблема (см. в гараже)`;
+        if (isBusinessBuy) msg += ` Поставлен на баланс «${deal.targetBizName}»!`;
         showToast(msg);
         if (typeof spawnFloatingReward === 'function') spawnFloatingReward(`-${price.toLocaleString()} ₽`);
 
         if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
         if (typeof renderMarketFeed === 'function') renderMarketFeed();
         if (typeof renderGarage === 'function') renderGarage();
-        setTimeout(() => { if (typeof switchTab === 'function') switchTab("tabGarage"); }, 300);
+
+        setTimeout(() => {
+            if (typeof switchTab === 'function') switchTab("tabGarage");
+            if (typeof renderGarage === 'function') renderGarage();
+        }, 250);
     } finally {
         _dealActionPending = false;
         window.__DKP_PENDING__ = false;
@@ -1495,4 +1506,4 @@ window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v5.3.3] Чистая верстка модалок и списков без растяжения кнопок ✓');
+console.log('[🤝 market-deal v5.3.4] Гарантированное добавление транспорта в гараж ✓');
