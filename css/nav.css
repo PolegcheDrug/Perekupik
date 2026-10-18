@@ -1,0 +1,457 @@
+/* ========================================================
+   css/nav.css — НИЖНЯЯ НАВИГАЦИЯ, TOAST, FLOATING REWARD (v3.1.0)
+   Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+   ⭐ v3.1.0:
+   - Улучшенные hover-эффекты нижней навигации
+   - Активная точка-индикатор под иконкой
+   - Более выразительные floating-reward анимации
+   - Улучшенный toast с вариантами (success/error/warning)
+   - Плавные переходы иконок с scale
+   ======================================================== */
+
+/* ========================================================
+   1. НИЖНЯЯ НАВИГАЦИЯ
+   ======================================================== */
+.bottom-nav {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 100% !important;
+  max-width: 480px !important;
+  height: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+  background: var(--nav-bg-custom) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border-top: 1px solid var(--border-glow) !important;
+  display: flex !important;
+  justify-content: space-around !important;
+  align-items: center !important;
+  z-index: 4000 !important;
+  box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.75);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* ========================================================
+   2. ПУНКТ НАВИГАЦИИ
+   ======================================================== */
+.b-nav-item {
+  position: relative;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+  color: var(--text-sub);
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  width: 20%;
+  opacity: 0.55;
+  transition: opacity 0.25s ease, 
+              color 0.25s ease, 
+              transform 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  padding: 6px 0;
+}
+
+/* Точка-индикатор под иконкой */
+.b-nav-item::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%) scale(0);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan-glow);
+  opacity: 0;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity 0.25s ease,
+              background 0.25s ease,
+              box-shadow 0.25s ease;
+}
+
+.b-nav-item:hover {
+  opacity: 0.85;
+  color: #cbd5e1;
+}
+
+.b-nav-item:hover i {
+  transform: translateY(-1px) scale(1.05);
+}
+
+.b-nav-item:active {
+  transform: scale(0.92);
+}
+
+.b-nav-item i {
+  font-size: 20px;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              text-shadow 0.25s ease, 
+              color 0.25s ease,
+              filter 0.25s ease;
+}
+
+/* Активный пункт */
+.b-nav-item.active {
+  opacity: 1 !important;
+  color: #ffffff !important;
+}
+
+.b-nav-item.active i {
+  transform: translateY(-2px) scale(1.08);
+}
+
+.b-nav-item.active::after {
+  transform: translateX(-50%) scale(1);
+  opacity: 1;
+}
+
+/* Индивидуальные цвета активных пунктов */
+#bnav-tabMarket.active i {
+  color: var(--cyan) !important;
+  text-shadow: 0 0 14px var(--cyan-glow);
+  filter: drop-shadow(0 0 6px var(--cyan-glow));
+}
+#bnav-tabMarket.active::after {
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+#bnav-tabGarage.active i {
+  color: var(--green) !important;
+  text-shadow: 0 0 14px var(--green-glow);
+  filter: drop-shadow(0 0 6px var(--green-glow));
+}
+#bnav-tabGarage.active::after {
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green-glow);
+}
+
+#bnav-tabSalesLot.active i {
+  color: var(--amber) !important;
+  text-shadow: 0 0 14px var(--amber-glow);
+  filter: drop-shadow(0 0 6px var(--amber-glow));
+}
+#bnav-tabSalesLot.active::after {
+  background: var(--amber);
+  box-shadow: 0 0 10px var(--amber-glow);
+}
+
+#bnav-tabLife.active i {
+  color: #fb7185 !important;
+  text-shadow: 0 0 14px rgba(251, 113, 133, 0.5);
+  filter: drop-shadow(0 0 6px rgba(251, 113, 133, 0.5));
+}
+#bnav-tabLife.active::after {
+  background: #fb7185;
+  box-shadow: 0 0 10px rgba(251, 113, 133, 0.5);
+}
+
+#bnav-tabPhone.active i {
+  color: var(--purple) !important;
+  text-shadow: 0 0 14px var(--purple-glow);
+  filter: drop-shadow(0 0 6px var(--purple-glow));
+}
+#bnav-tabPhone.active::after {
+  background: var(--purple);
+  box-shadow: 0 0 10px var(--purple-glow);
+}
+
+/* ========================================================
+   3. СЧЁТЧИК НА ИКОНКЕ ТЕЛЕФОНА
+   ======================================================== */
+.phone-nav-item {
+  position: relative !important;
+}
+
+.phone-nav-icon-wrap {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.phone-nav-counter {
+  position: absolute !important;
+  top: -4px !important;
+  right: -8px !important;
+  background: var(--red) !important;
+  color: #ffffff !important;
+  font-size: 8px !important;
+  font-weight: 900 !important;
+  border-radius: 10px !important;
+  padding: 1px 5px !important;
+  line-height: 1.1 !important;
+  box-shadow: 0 2px 8px rgba(255, 51, 102, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  animation: badgePulse 2s infinite ease-in-out;
+  min-width: 14px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+@keyframes badgePulse {
+  0%, 100% { 
+    transform: scale(1); 
+    box-shadow: 0 2px 8px rgba(255, 51, 102, 0.6);
+  }
+  50% { 
+    transform: scale(1.15); 
+    box-shadow: 0 2px 14px rgba(255, 51, 102, 0.9);
+  }
+}
+
+/* ========================================================
+   4. TOAST-УВЕДОМЛЕНИЯ
+   ======================================================== */
+.toast {
+  position: fixed !important;
+  top: calc(env(safe-area-inset-top, 0px) + 16px) !important;
+  left: 50% !important;
+  transform: translateX(-50%) translateY(-100px) scale(0.9);
+  background: #111a2a !important;
+  border: 1px solid var(--cyan) !important;
+  color: #ffffff !important;
+  padding: 10px 20px !important;
+  border-radius: 24px !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  z-index: 6000 !important;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.3s ease;
+  white-space: nowrap !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 15px var(--cyan-glow);
+  pointer-events: none;
+  opacity: 0;
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toast.show {
+  transform: translateX(-50%) translateY(0) scale(1);
+  opacity: 1;
+}
+
+/* Варианты toast */
+.toast.toast-success {
+  border-color: var(--green) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px var(--green-glow);
+}
+.toast.toast-success::before {
+  content: '✓';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #000;
+  font-size: 11px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.toast.toast-error {
+  border-color: var(--red) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px var(--red-glow);
+}
+.toast.toast-error::before {
+  content: '✕';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.toast.toast-warning {
+  border-color: var(--amber) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px var(--amber-glow);
+}
+.toast.toast-warning::before {
+  content: '!';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--amber);
+  color: #000;
+  font-size: 11px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.toast.toast-info::before {
+  content: 'i';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--cyan);
+  color: #000;
+  font-size: 11px;
+  font-weight: 900;
+  flex-shrink: 0;
+  font-style: italic;
+}
+
+/* ========================================================
+   5. FLOATING REWARD (всплывающие награды)
+   ======================================================== */
+.floating-reward {
+  position: fixed !important;
+  font-weight: 900 !important;
+  font-size: 20px !important;
+  color: var(--green) !important;
+  z-index: 7000 !important;
+  pointer-events: none !important;
+  text-shadow: 
+    0 0 12px rgba(0, 230, 118, 0.7),
+    0 0 24px rgba(0, 230, 118, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.95);
+  animation: floatUp 1.4s forwards cubic-bezier(0.16, 1, 0.3, 1);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+@keyframes floatUp {
+  0% { 
+    opacity: 0; 
+    transform: translate(-50%, 0) scale(0.6); 
+    filter: blur(2px);
+  }
+  25% { 
+    opacity: 1; 
+    transform: translate(-50%, -18px) scale(1.15); 
+    filter: blur(0);
+  }
+  50% {
+    transform: translate(-50%, -32px) scale(1);
+  }
+  100% { 
+    opacity: 0; 
+    transform: translate(-50%, -65px) scale(0.9); 
+    filter: blur(1px);
+  }
+}
+
+/* Варианты floating reward */
+.floating-reward.reward-negative {
+  color: var(--red) !important;
+  text-shadow: 
+    0 0 12px rgba(255, 51, 102, 0.7),
+    0 0 24px rgba(255, 51, 102, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.95);
+}
+
+.floating-reward.reward-amber {
+  color: var(--amber) !important;
+  text-shadow: 
+    0 0 12px rgba(255, 179, 0, 0.7),
+    0 0 24px rgba(255, 179, 0, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.95);
+}
+
+.floating-reward.reward-cyan {
+  color: var(--cyan) !important;
+  text-shadow: 
+    0 0 12px rgba(0, 242, 254, 0.7),
+    0 0 24px rgba(0, 242, 254, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.95);
+}
+
+.floating-reward.reward-purple {
+  color: var(--purple) !important;
+  text-shadow: 
+    0 0 12px rgba(192, 132, 252, 0.7),
+    0 0 24px rgba(192, 132, 252, 0.4),
+    0 2px 8px rgba(0, 0, 0, 0.95);
+}
+
+/* ========================================================
+   6. АДАПТИВ
+   ======================================================== */
+@media (max-width: 380px) {
+  .b-nav-item {
+    font-size: 9px;
+    gap: 3px;
+    padding: 4px 0;
+  }
+  .b-nav-item i {
+    font-size: 18px;
+  }
+  .phone-nav-counter {
+    font-size: 7px !important;
+    padding: 1px 4px !important;
+    min-width: 12px;
+  }
+  .toast {
+    font-size: 11px !important;
+    padding: 8px 16px !important;
+  }
+  .floating-reward {
+    font-size: 17px !important;
+  }
+}
+
+/* ========================================================
+   7. LANDSCAPE (маленькая высота)
+   ======================================================== */
+@media (max-height: 500px) and (orientation: landscape) {
+  .bottom-nav {
+    height: calc(48px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .b-nav-item {
+    gap: 2px;
+    padding: 2px 0;
+  }
+  .b-nav-item i {
+    font-size: 17px;
+  }
+  .b-nav-item span {
+    font-size: 8.5px;
+  }
+  .b-nav-item::after {
+    bottom: -1px;
+    width: 4px;
+    height: 4px;
+  }
+}
+
+/* ========================================================
+   8. PREFERS-REDUCED-MOTION
+   ======================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .b-nav-item i,
+  .b-nav-item::after,
+  .phone-nav-counter {
+    animation: none !important;
+    transition: none !important;
+  }
+  .toast,
+  .floating-reward {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

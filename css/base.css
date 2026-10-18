@@ -1,0 +1,1361 @@
+/* ========================================================
+   css/base.css — БАЗОВЫЕ ПЕРЕМЕННЫЕ И АДАПТИВ (v3.3.0)
+   Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+   ⭐ v3.3.0 (SPRINT 1 — КРИТИЧЕСКИЙ ФИКС ВВОДА):
+   - ФИКС: user-select:none на * блокировал IME на Android WebView.
+     Теперь input/textarea всегда могут принимать текст.
+   - ФИКС: -webkit-text-fill-color переопределён на currentColor —
+     каскад от .nick-fx-* больше не делает текст в input прозрачным.
+   - ФИКС: caret-color явно задан (видна каретка).
+   - ФИКС: text-transform:none для полей (каскад от .btn не ломает).
+   - ФИКС: background-clip:border-box для полей.
+   - Улучшенный :focus для полей ввода (glow + ring).
+   ⭐ v3.2.0:
+   - OWNER-ПАНЕЛЬ ПЕРЕНЕСЕНА В DEV-ПРИЛОЖЕНИЕ
+   - Плавающая кнопка .owner-panel-btn убрана (display: none)
+   - Добавлены стили для вкладки ДОСТУП в DEV
+   ======================================================== */
+
+/* ========================================================
+   1. ПЕРЕМЕННЫЕ ТЁМНОЙ ТЕМЫ (ЕДИНЫЙ ИСТОЧНИК)
+   ======================================================== */
+:root {
+  /* ─── Фоны ─── */
+  --bg-body: #05080f;
+  --bg-surface: #0b101a;
+  --bg-card: linear-gradient(145deg, rgba(20, 27, 43, 0.94) 0%, rgba(10, 15, 25, 0.96) 100%);
+  --bg-card-hover: rgba(26, 36, 54, 0.95);
+  --bg-modal: radial-gradient(circle at 50% 0%, rgba(26, 38, 64, 0.98) 0%, rgba(9, 14, 24, 0.98) 100%);
+
+  /* ─── Рамки ─── */
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-glow: rgba(0, 242, 254, 0.25);
+
+  /* ─── Акцентные цвета ─── */
+  --cyan: #00f2fe;
+  --cyan-glow: rgba(0, 242, 254, 0.45);
+  --green: #00e676;
+  --green-glow: rgba(0, 230, 118, 0.35);
+  --amber: #ffb300;
+  --amber-glow: rgba(255, 179, 0, 0.35);
+  --red: #ff3366;
+  --red-glow: rgba(255, 51, 102, 0.4);
+  --purple: #c084fc;
+  --purple-dark: #7e22ce;
+  --purple-glow: rgba(192, 132, 252, 0.4);
+  --teal: #14b8a6;
+
+  /* ─── Молния (Lightning theme) ─── */
+  --lightning-secondary: #7928ca;
+  --lightning-glow: rgba(121, 40, 202, 0.45);
+
+  /* ─── Кастомные цвета (перезаписываются из theme-manager.js) ─── */
+  --custom-fx-color: #00f2fe;
+  --custom-fx-glow: rgba(0, 242, 254, 0.45);
+
+  /* ─── Текст ─── */
+  --text-main: #f8fafc;
+  --text-sub: #94a3b8;
+  --text-muted: #64748b;
+
+  /* ─── Радиусы ─── */
+  --radius-xl: 20px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+
+  /* ─── HUD и NAV ─── */
+  --hud-bg-custom: linear-gradient(180deg, rgba(8, 13, 24, 0.98) 0%, rgba(5, 8, 15, 0.94) 100%);
+  --nav-bg-custom: rgba(11, 16, 26, 0.98);
+
+  /* ─── Тени ─── */
+  --shadow-card: 0 10px 28px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-card-hover: 0 12px 32px rgba(0, 0, 0, 0.85);
+  --shadow-modal: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 20px var(--cyan-glow);
+
+  /* ─── DEV-режим ─── */
+  --dev-accent: #00e676;
+  --dev-bg: #05080f;
+  --dev-border: rgba(0, 230, 118, 0.5);
+  --dev-glow: rgba(0, 230, 118, 0.35);
+
+  /* ══════════════════════════════════════════════════════
+     АДАПТИВНЫЕ РАЗМЕРЫ (clamp = fluid typography)
+     ══════════════════════════════════════════════════════ */
+  --app-max-width: 480px;
+  --font-xs: clamp(9px, 2.5vw, 11px);
+  --font-sm: clamp(10px, 2.8vw, 12px);
+  --font-md: clamp(11px, 3vw, 13px);
+  --font-lg: clamp(13px, 3.5vw, 16px);
+  --font-xl: clamp(16px, 4vw, 22px);
+  --font-2xl: clamp(20px, 5vw, 28px);
+  --space-xs: clamp(4px, 1vw, 6px);
+  --space-sm: clamp(6px, 1.5vw, 10px);
+  --space-md: clamp(10px, 2.5vw, 14px);
+  --space-lg: clamp(14px, 3.5vw, 20px);
+}
+
+/* ========================================================
+   2. ГЛОБАЛЬНЫЙ RESET
+   ⭐ v3.3.0: user-select:none ТЕПЕРЬ НЕ применяется к inputs
+   ======================================================== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* user-select:none — для ВСЕХ, кроме полей ввода */
+*:not(input):not(textarea):not(select) {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Скрытие мусора от хостинга */
+div:has(a[href*="tiiny.host"]), a[href*="tiiny.host"],
+[class*="tiiny"], [id*="tiiny"] {
+  display: none !important;
+  height: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ========================================================
+   3. СКРОЛЛБАРЫ (тонкие неоновые с glow)
+   ======================================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(5, 8, 15, 0.7);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--cyan), #0284c7);
+  border-radius: 8px;
+  box-shadow: 0 0 8px var(--cyan-glow);
+  transition: background 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--cyan), var(--purple));
+  box-shadow: 0 0 12px var(--cyan-glow);
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--cyan) rgba(5, 8, 15, 0.7);
+}
+
+/* ========================================================
+   4. КАРКАС ПРИЛОЖЕНИЯ
+   ======================================================== */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  position: relative;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.09) 0%, transparent 60%),
+    radial-gradient(circle at 80% 90%, rgba(192, 132, 252, 0.06) 0%, transparent 50%),
+    linear-gradient(180deg, #0f1728 0%, var(--bg-body) 100%);
+  overflow: hidden;
+  transition: max-width 0.3s ease;
+}
+
+/* ========================================================
+   5. КОНТЕНТ И ЭКРАНЫ
+   ======================================================== */
+.main-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-md) var(--space-md) 75px var(--space-md) !important;
+  position: relative;
+  z-index: 10;
+}
+
+.tab-screen {
+  display: none !important;
+  width: 100%;
+}
+.tab-screen.active {
+  display: block !important;
+  animation: fadeIn 0.25s ease-in-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ⭐ v3.1.0: Каскадное появление карточек */
+@keyframes cardStaggerIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.tab-screen.active > .glass-card {
+  animation: cardStaggerIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.tab-screen.active > .glass-card:nth-child(1) { animation-delay: 0.03s; }
+.tab-screen.active > .glass-card:nth-child(2) { animation-delay: 0.07s; }
+.tab-screen.active > .glass-card:nth-child(3) { animation-delay: 0.11s; }
+.tab-screen.active > .glass-card:nth-child(4) { animation-delay: 0.15s; }
+.tab-screen.active > .glass-card:nth-child(5) { animation-delay: 0.19s; }
+.tab-screen.active > .glass-card:nth-child(6) { animation-delay: 0.23s; }
+.tab-screen.active > .glass-card:nth-child(7) { animation-delay: 0.27s; }
+.tab-screen.active > .glass-card:nth-child(8) { animation-delay: 0.31s; }
+
+/* ========================================================
+   6. КАРТОЧКИ GLASS
+   ======================================================== */
+.glass-card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-xl);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s ease,
+              border-color 0.3s ease;
+  overflow: hidden;
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, 
+    rgba(0, 242, 254, 0.04) 0%, 
+    transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glass-card:hover::before { opacity: 1; }
+
+.glass-card:active {
+  transform: scale(0.992);
+}
+
+/* Персональные карточки (личный авто) */
+.glass-card.personal-car-card {
+  border: 1.5px solid rgba(255, 179, 0, 0.85) !important;
+  box-shadow: 0 0 24px rgba(255, 179, 0, 0.35), inset 0 0 15px rgba(255, 179, 0, 0.08) !important;
+}
+
+/* Owner-карточка (для владельца игры) */
+.glass-card.owner-card {
+  border: 1.5px solid rgba(255, 215, 0, 0.9) !important;
+  background:
+    linear-gradient(145deg, rgba(40, 35, 15, 0.95) 0%, rgba(15, 15, 25, 0.98) 100%) !important;
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.08) !important;
+}
+
+/* ========================================================
+   7. КНОПКИ (с микроанимациями)
+   ======================================================== */
+.btn {
+  position: relative;
+  width: 100%;
+  min-height: 42px;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: none;
+  font-weight: 800;
+  font-size: var(--font-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  line-height: 1.25;
+  text-align: center;
+  transition: transform 0.12s ease, 
+              filter 0.15s ease, 
+              box-shadow 0.25s ease;
+  flex-shrink: 0;
+  outline: none;
+  overflow: hidden;
+}
+
+/* Ripple-эффект при клике */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, 
+    rgba(255, 255, 255, 0.35) 0%, 
+    transparent 60%);
+  opacity: 0;
+  transform: scale(0);
+  transition: transform 0.4s ease, opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.btn:active::after {
+  opacity: 1;
+  transform: scale(2);
+  transition: transform 0s, opacity 0s;
+}
+
+.btn:active { 
+  transform: scale(0.97); 
+  filter: brightness(1.1); 
+}
+
+.btn:disabled { 
+  opacity: 0.35 !important; 
+  cursor: not-allowed; 
+}
+
+.btn-cyan {
+  background: linear-gradient(135deg, var(--cyan), #0284c7) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px var(--cyan-glow) !important;
+}
+.btn-cyan:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--cyan-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-green {
+  background: linear-gradient(135deg, var(--green), #059669) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px var(--green-glow) !important;
+}
+.btn-green:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--green-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-amber {
+  background: linear-gradient(135deg, #ffd700, var(--amber)) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px var(--amber-glow) !important;
+}
+.btn-amber:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--amber-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-purple {
+  background: linear-gradient(135deg, #c084fc, #9333ea) !important;
+  color: #fff !important;
+  box-shadow: 0 0 14px var(--purple-glow) !important;
+}
+.btn-purple:hover:not(:disabled) {
+  box-shadow: 0 0 22px var(--purple-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-red {
+  background: linear-gradient(135deg, var(--red), #dc2626) !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px var(--red-glow) !important;
+}
+.btn-red:hover:not(:disabled) {
+  box-shadow: 0 0 20px var(--red-glow), 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-dark {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #e2e8f0 !important;
+  border: 1px solid var(--border-glass) !important;
+}
+.btn-dark:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(0, 242, 254, 0.3) !important;
+}
+
+.btn-danger {
+  background: #dc2626 !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(220, 38, 38, 0.4) !important;
+}
+
+.btn-teal {
+  background: linear-gradient(135deg, #14b8a6, #0f766e) !important;
+  color: #fff !important;
+  box-shadow: 0 0 12px rgba(20, 184, 166, 0.35) !important;
+}
+
+.btn-sm { 
+  min-height: 36px; 
+  font-size: var(--font-xs); 
+  padding: 6px 12px; 
+}
+
+.btn-auto { 
+  width: auto; 
+  min-width: max-content; 
+  padding: 8px 16px; 
+  font-size: var(--font-xs); 
+  white-space: nowrap; 
+  flex-shrink: 0; 
+}
+
+/* ========================================================
+   8. СЕТКИ И УТИЛИТЫ
+   ======================================================== */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-sm); }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-xs); }
+.grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-xs); }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.flex-gap { display: flex; gap: 7px; }
+.flex-center { display: flex; justify-content: center; align-items: center; }
+.flex-col { display: flex; flex-direction: column; }
+
+/* Цвета */
+.color-cyan { color: var(--cyan); }
+.color-green { color: var(--green); }
+.color-amber { color: var(--amber); }
+.color-red { color: var(--red); }
+.color-purple { color: var(--purple); }
+.color-teal { color: var(--teal); }
+.color-sub { color: var(--text-sub); }
+.color-muted { color: var(--text-muted); }
+.color-main { color: var(--text-main); }
+
+/* Утилиты */
+.sub-label { font-size: var(--font-xs); color: var(--text-sub); }
+.font-bold { font-weight: 800; }
+.font-mono { font-family: monospace, sans-serif; }
+.mb-1 { margin-bottom: 4px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mt-1 { margin-top: 4px; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.p-1 { padding: 4px; }
+.p-2 { padding: 8px; }
+.p-3 { padding: 12px; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-xs { font-size: var(--font-xs); }
+.w-full { width: 100%; }
+.block { display: block; }
+.space-y-1 > * + * { margin-top: 4px; }
+.space-y-2 > * + * { margin-top: 8px; }
+.space-y-3 > * + * { margin-top: 12px; }
+.opacity-50 { opacity: 0.5; }
+.opacity-60 { opacity: 0.6; }
+.pointer { cursor: pointer; }
+
+/* ========================================================
+   9. TAG-BADGES
+   ======================================================== */
+.tag-badge {
+  font-size: var(--font-xs);
+  font-weight: 800;
+  padding: 3px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.bg-tag-cyan { background: #06283d; color: var(--cyan); }
+.bg-tag-amber { background: #3b2a05; color: var(--amber); }
+.bg-tag-green { background: #063518; color: var(--green); }
+.bg-tag-purple { background: #32134d; color: var(--purple); }
+.bg-tag-red { background: #3b050d; color: var(--red); }
+.bg-tag-dark { background: rgba(255, 255, 255, 0.06); color: #cbd5e1; }
+
+/* ========================================================
+   10. ЦЕНЗУРА
+   ======================================================== */
+.censor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  margin: 0 2px;
+  border-radius: 4px;
+  background: rgba(255, 51, 102, 0.16);
+  border: 1px solid rgba(255, 51, 102, 0.65);
+  color: #ff3366;
+  font-family: monospace, sans-serif;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  text-shadow: 0 0 6px rgba(255, 51, 102, 0.8);
+  box-shadow: 0 0 8px rgba(255, 51, 102, 0.35);
+  line-height: 1.1;
+  vertical-align: middle;
+  user-select: none;
+  pointer-events: none;
+}
+.censor-badge::before { content: '⚠'; font-size: 8px; opacity: 0.9; }
+
+/* ========================================================
+   11. БАЗОВЫЕ НИК-ЭФФЕКТЫ (совместимость, новые — в hud.css)
+   ======================================================== */
+@keyframes nickLightningAnim {
+  0% { color: #fff; text-shadow: 0 0 5px var(--cyan), 0 0 10px var(--cyan); }
+  50% { color: var(--cyan); text-shadow: 0 0 15px var(--cyan), 0 0 25px var(--lightning-secondary); }
+  100% { color: #fff; text-shadow: 0 0 5px var(--cyan), 0 0 10px var(--cyan); }
+}
+@keyframes nickFireAnim {
+  0% { color: #ff3366; text-shadow: 0 0 6px #ff3366, 0 0 12px #ff6600; }
+  50% { color: #ffcc00; text-shadow: 0 0 15px #ff6600, 0 0 25px #ff3366; }
+  100% { color: #ff3366; text-shadow: 0 0 6px #ff3366, 0 0 12px #ff6600; }
+}
+@keyframes nickGoldAnim {
+  0% { color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
+  50% { color: #fff; text-shadow: 0 0 18px rgba(255, 215, 0, 0.9), 0 0 5px #b45309; }
+  100% { color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
+}
+@keyframes nickMatrixAnim {
+  0% { color: #00e676; text-shadow: 0 0 8px #00e676; }
+  50% { color: #fff; text-shadow: 0 0 16px #00e676; }
+  100% { color: #00e676; text-shadow: 0 0 8px #00e676; }
+}
+@keyframes nickSakuraAnim {
+  0% { color: #f43f5e; text-shadow: 0 0 8px #f43f5e; }
+  50% { color: #c084fc; text-shadow: 0 0 16px #c084fc; }
+  100% { color: #f43f5e; text-shadow: 0 0 8px #f43f5e; }
+}
+
+.nick-fx-lightning { animation: nickLightningAnim 2.5s infinite ease-in-out; }
+.nick-fx-fire { animation: nickFireAnim 1.8s infinite ease-in-out; }
+.nick-fx-gold { animation: nickGoldAnim 3s infinite ease-in-out; }
+.nick-fx-matrix { animation: nickMatrixAnim 2s infinite steps(4, start); }
+.nick-fx-sakura { animation: nickSakuraAnim 3s infinite ease-in-out; }
+
+/* ========================================================
+   12. АУРА АВАТАРА (старая, для совместимости)
+   ======================================================== */
+@keyframes ringSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.avatar-fx-lightning-ring .avatar-glow {
+  background: conic-gradient(from 0deg, var(--cyan), var(--lightning-secondary), transparent, var(--cyan));
+  animation: ringSpin 4s linear infinite;
+}
+.avatar-fx-fire-ring .avatar-glow {
+  background: conic-gradient(from 0deg, #ff3366, #ff6600, #ffcc00, #ff3366);
+  animation: ringSpin 3s linear infinite;
+}
+.avatar-fx-gold-ring .avatar-glow {
+  background: conic-gradient(from 0deg, #ffd700, #b45309, #fff, #ffd700);
+  animation: ringSpin 5s linear infinite;
+}
+.avatar-fx-matrix-ring .avatar-glow {
+  background: conic-gradient(from 0deg, #00e676, #064e3b, transparent, #00e676);
+  animation: ringSpin 3.5s linear infinite;
+}
+.avatar-fx-sakura-ring .avatar-glow {
+  background: conic-gradient(from 0deg, #f43f5e, #c084fc, transparent, #f43f5e);
+  animation: ringSpin 4s linear infinite;
+}
+
+/* ========================================================
+   13. DEV-РЕЖИМ ДЛЯ ПК
+   ======================================================== */
+.dev-mode-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #00e676, #059669);
+  color: #000;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  margin-left: 4px;
+  text-transform: uppercase;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
+}
+
+.dev-quick-panel {
+  position: fixed;
+  bottom: 80px;
+  right: 10px;
+  z-index: 4500;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.dev-quick-panel > * { pointer-events: auto; }
+.dev-quick-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00e676, #059669);
+  border: 2px solid rgba(0, 0, 0, 0.4);
+  color: #000;
+  font-size: 16px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 230, 118, 0.4);
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.2s ease;
+}
+.dev-quick-btn:active { transform: scale(0.92); }
+.dev-quick-btn:hover { 
+  filter: brightness(1.15); 
+  box-shadow: 0 6px 18px rgba(0, 230, 118, 0.6);
+}
+
+.dev-corner-indicator {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  right: 8px;
+  z-index: 4500;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid var(--dev-border);
+  border-radius: 8px;
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 900;
+  color: var(--dev-accent);
+  letter-spacing: 0.5px;
+  font-family: monospace, sans-serif;
+  box-shadow: 0 0 10px var(--dev-glow);
+  pointer-events: none;
+  animation: devCornerPulse 2s infinite alternate ease-in-out;
+}
+@keyframes devCornerPulse {
+  0% { box-shadow: 0 0 6px var(--dev-glow); }
+  100% { box-shadow: 0 0 14px var(--dev-glow); }
+}
+
+/* ========================================================
+   14. OWNER-БЕЙДЖ (для владельца игры)
+   ======================================================== */
+.owner-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #ffd700, #f59e0b);
+  color: #000;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  animation: ownerBadgePulse 2s infinite alternate ease-in-out;
+}
+@keyframes ownerBadgePulse {
+  0% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.4); }
+  100% { box-shadow: 0 0 18px rgba(255, 215, 0, 0.8); }
+}
+
+.owner-crown-icon {
+  color: #ffd700;
+  filter: drop-shadow(0 0 4px #ffd700);
+}
+
+/* ========================================================
+   15. ACCESS CONTROL — ЭКРАН "ДОСТУП ЗАКРЫТ"
+   ======================================================== */
+.access-denied-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, #1f0a0e 0%, #05080f 100%);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.access-denied-box {
+  width: 100%;
+  max-width: 400px;
+  background: linear-gradient(145deg, rgba(30, 15, 20, 0.98) 0%, rgba(10, 15, 25, 0.98) 100%);
+  border: 1.5px solid rgba(255, 51, 102, 0.5);
+  border-radius: 20px;
+  padding: 32px 24px 24px 24px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(255, 51, 102, 0.2);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.access-denied-icon {
+  font-size: 56px;
+  color: #ff3366;
+  margin-bottom: 12px;
+  text-shadow: 0 0 25px rgba(255, 51, 102, 0.6);
+  animation: deniedIconShake 2.5s infinite ease-in-out;
+}
+@keyframes deniedIconShake {
+  0%, 100% { transform: rotate(0deg); }
+  10%, 30%, 50% { transform: rotate(-5deg); }
+  20%, 40%, 60% { transform: rotate(5deg); }
+  70% { transform: rotate(0deg); }
+}
+
+.access-denied-title {
+  font-size: 22px;
+  font-weight: 900;
+  color: #ff3366;
+  letter-spacing: 1.5px;
+  margin: 0 0 8px 0;
+  text-shadow: 0 0 15px rgba(255, 51, 102, 0.5);
+}
+
+.access-denied-subtitle {
+  font-size: 12px;
+  color: #fca5a5;
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.access-denied-hint {
+  padding: 12px;
+  background: rgba(255, 51, 102, 0.08);
+  border: 1px solid rgba(255, 51, 102, 0.3);
+  border-radius: 10px;
+  color: #fca5a5;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.access-invite-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: #05080f;
+  border: 1.5px solid rgba(255, 51, 102, 0.35);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-align: center;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  font-family: monospace, sans-serif;
+  margin-bottom: 12px;
+}
+.access-invite-input:focus {
+  border-color: #ff3366;
+  box-shadow: 0 0 16px rgba(255, 51, 102, 0.4);
+}
+
+.access-denied-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #c084fc, #9333ea);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(192, 132, 252, 0.4);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.access-denied-btn:hover { filter: brightness(1.1); }
+.access-denied-btn:active { transform: scale(0.97); }
+
+.access-pending-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(255, 179, 0, 0.12);
+  border: 1px solid rgba(255, 179, 0, 0.4);
+  border-radius: 10px;
+  color: #ffb300;
+  font-size: 11px;
+  font-weight: 800;
+  margin-top: 12px;
+}
+.access-pending-status .spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 179, 0, 0.2);
+  border-top-color: #ffb300;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ========================================================
+   ⭐ v3.3.0: 16. ПОЛЯ ВВОДА — КРИТИЧЕСКИЙ ФИКС
+   ======================================================== */
+
+/* Убеждаемся, что поля ввода получают фокус, текст и каретку */
+input,
+textarea,
+.chat-input,
+.input-dark,
+.access-invite-input,
+#pcAuthInput,
+#accessInviteInput,
+#listingPriceInput,
+#p2pPriceInput,
+#lotAskingPriceInput,
+#chatReplyInput,
+#mP2PChatInput,
+#feedMessageInput,
+#bankExchangeInput,
+#bizCustomName,
+#bizCustomSlogan,
+#devLogSearchInput,
+#devStateSearchInput,
+#onboardingNickInput,
+#newClubNameInput,
+#newClubMottoInput,
+#saveExportArea {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
+
+  /* Перебиваем каскад от .nick-fx-* (делал текст невидимым) */
+  -webkit-text-fill-color: currentColor !important;
+  text-fill-color: currentColor !important;
+  -webkit-background-clip: border-box !important;
+  background-clip: border-box !important;
+
+  /* Перебиваем каскад от .btn */
+  text-transform: none !important;
+
+  /* Каретка всегда видна */
+  caret-color: var(--cyan, #00f2fe) !important;
+
+  /* Touch-манипуляции для мобильного ввода */
+  touch-action: manipulation;
+  -webkit-touch-callout: default;
+}
+
+/* Дефолтная подсветка при выделении текста в полях */
+input::selection,
+textarea::selection {
+  background: rgba(0, 242, 254, 0.35);
+  color: #fff;
+}
+input::-webkit-selection,
+textarea::-webkit-selection {
+  background: rgba(0, 242, 254, 0.35);
+  color: #fff;
+}
+
+/* ========================================================
+   17. ПРОЧИЕ БАЗОВЫЕ ЭЛЕМЕНТЫ
+   ======================================================== */
+
+/* Инпуты (базовый стиль) */
+.chat-input,
+.input-dark,
+input[type="text"],
+input[type="number"],
+input[type="password"],
+input[type="email"],
+input[type="search"],
+textarea {
+  background: #090e18;
+  color: #fff;
+  border: 1px solid var(--border-glow);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: var(--font-sm);
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.chat-input:focus,
+.input-dark:focus,
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="search"]:focus,
+textarea:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px rgba(0, 242, 254, 0.15),
+              0 0 14px var(--cyan-glow);
+  background: #0c1322;
+}
+
+.chat-input::placeholder,
+input::placeholder,
+textarea::placeholder { 
+  color: #64748b; 
+  opacity: 0.7;
+}
+
+/* Select */
+select {
+  background: #090e18;
+  color: #fff;
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: var(--font-sm);
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  user-select: none;
+}
+select:hover {
+  border-color: rgba(0, 242, 254, 0.3);
+}
+
+/* Убираем стрелки у number */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Range slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  outline: none;
+  user-select: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--cyan);
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--cyan-glow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 14px var(--cyan-glow);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--cyan);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+/* ========================================================
+   18. СКРЫТИЕ ЭЛЕМЕНТОВ
+   ======================================================== */
+.hidden { display: none !important; }
+.invisible { visibility: hidden; }
+
+/* ========================================================
+   19. АНИМАЦИИ ОБЩИЕ
+   ======================================================== */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ⭐ v3.1.0: Появление карточек в списке */
+@keyframes listItemIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.list-stagger > * {
+  animation: listItemIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.list-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.list-stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.list-stagger > *:nth-child(3) { animation-delay: 0.08s; }
+.list-stagger > *:nth-child(4) { animation-delay: 0.11s; }
+.list-stagger > *:nth-child(5) { animation-delay: 0.14s; }
+.list-stagger > *:nth-child(6) { animation-delay: 0.17s; }
+.list-stagger > *:nth-child(7) { animation-delay: 0.20s; }
+.list-stagger > *:nth-child(8) { animation-delay: 0.23s; }
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   20. АДАПТИВ: БОЛЬШИЕ ТЕЛЕФОНЫ (iPhone Pro Max, Galaxy Ultra)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (min-width: 480px) {
+  :root {
+    --app-max-width: 520px;
+  }
+
+  .main-content {
+    padding-left: var(--space-lg);
+    padding-right: var(--space-lg);
+  }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   21. АДАПТИВ: ПЛАНШЕТЫ (iPad Mini/Air/Pro, Galaxy Tab)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (min-width: 768px) {
+  :root {
+    --app-max-width: 720px;
+    --font-xs: 11px;
+    --font-sm: 13px;
+    --font-md: 14px;
+    --font-lg: 17px;
+    --font-xl: 22px;
+    --font-2xl: 28px;
+    --space-xs: 6px;
+    --space-sm: 10px;
+    --space-md: 16px;
+    --space-lg: 22px;
+  }
+
+  .app-shell {
+    max-width: var(--app-max-width);
+    border-left: 1px solid var(--border-glow);
+    border-right: 1px solid var(--border-glow);
+    box-shadow:
+      0 0 40px rgba(0, 242, 254, 0.08),
+      inset 0 0 30px rgba(0, 242, 254, 0.02);
+  }
+
+  .grid-2.tablet-2col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .modal-box {
+    max-width: 520px;
+  }
+
+  .btn { min-height: 46px; font-size: 13px; }
+  .btn-sm { min-height: 38px; font-size: 12px; }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   22. АДАПТИВ: ПК / НОУТБУКИ (1200px+)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (min-width: 1200px) {
+  :root {
+    --app-max-width: 840px;
+    --font-xs: 12px;
+    --font-sm: 13px;
+    --font-md: 15px;
+    --font-lg: 18px;
+    --font-xl: 24px;
+    --font-2xl: 30px;
+    --space-xs: 8px;
+    --space-sm: 12px;
+    --space-md: 18px;
+    --space-lg: 26px;
+  }
+
+  .app-shell {
+    max-width: var(--app-max-width);
+    border-left: 1px solid var(--border-glow);
+    border-right: 1px solid var(--border-glow);
+    box-shadow:
+      0 0 60px rgba(0, 242, 254, 0.12),
+      0 0 100px rgba(0, 0, 0, 0.8),
+      inset 0 0 40px rgba(0, 242, 254, 0.02);
+  }
+
+  .grid-3.pc-2col {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .glass-card {
+    padding: 20px;
+  }
+
+  .main-content {
+    padding-left: var(--space-lg);
+    padding-right: var(--space-lg);
+  }
+
+  .glass-card:hover,
+  .btn:not(:disabled):hover {
+    cursor: pointer;
+  }
+
+  .glass-card:hover {
+    box-shadow: var(--shadow-card-hover);
+    border-color: rgba(0, 242, 254, 0.2);
+    transform: translateY(-2px);
+  }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   23. АДАПТИВ: ОЧЕНЬ МАЛЕНЬКИЕ ЭКРАНЫ (iPhone SE, старые)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (max-width: 360px) {
+  :root {
+    --font-xs: 9px;
+    --font-sm: 10px;
+    --font-md: 11px;
+    --font-lg: 13px;
+    --space-xs: 3px;
+    --space-sm: 5px;
+    --space-md: 8px;
+  }
+
+  .grid-4 { gap: 3px; }
+  .grid-3 { gap: 4px; }
+  .btn { font-size: 10px; padding: 8px 10px; min-height: 38px; }
+  .btn-sm { font-size: 9.5px; padding: 5px 8px; min-height: 32px; }
+  .sub-label { font-size: 9.5px; }
+  .glass-card { padding: 10px; }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   24. АДАПТИВ: ЛАНДШАФТ НА ТЕЛЕФОНЕ (маленькая высота)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hud-header {
+    padding: 4px 8px 6px 8px;
+  }
+
+  .hud-bottom-row {
+    display: none;
+  }
+
+  .bottom-nav {
+    height: calc(48px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .main-content {
+    padding-bottom: 60px !important;
+  }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   25. PREFERS-REDUCED-MOTION (доступность)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ========================================================
+   ══════════════════════════════════════════════════════
+   26. SAFE-AREA (iPhone с чёлкой / Dynamic Island)
+   ══════════════════════════════════════════════════════
+   ======================================================== */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .hud-header {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+  }
+
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    height: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* ========================================================
+   27. ОФФЛАЙН-ИНДИКАТОР
+   ======================================================== */
+.offline-banner {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 6px 14px;
+  border-radius: 20px;
+  z-index: 9999;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.5);
+  animation: offlinePulse 2s infinite alternate ease-in-out;
+  display: none;
+}
+.offline-banner.visible {
+  display: block;
+}
+@keyframes offlinePulse {
+  0% { box-shadow: 0 4px 16px rgba(220, 38, 38, 0.4); }
+  100% { box-shadow: 0 4px 24px rgba(220, 38, 38, 0.8); }
+}
+
+/* ========================================================
+   ⭐ v3.2.0: 28. OWNER-ПАНЕЛЬ ПЕРЕНЕСЕНА В DEV-ПРИЛОЖЕНИЕ
+   ======================================================== */
+
+/* Плавающая кнопка убрана — теперь управление доступом в DEV */
+.owner-panel-btn {
+  display: none !important;
+}
+
+/* ---- Стили для вкладки ДОСТУП в DEV-приложении ---- */
+
+.dev-access-invite-card {
+  background: #050914;
+  border-radius: 8px;
+  border-left: 3px solid var(--green);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  transition: all 0.2s ease;
+}
+
+.dev-access-invite-card:hover {
+  background: #0a1220;
+  transform: translateX(2px);
+}
+
+.dev-access-invite-card.is-expired {
+  border-left-color: var(--red);
+  opacity: 0.7;
+}
+
+.dev-access-invite-card.is-used {
+  border-left-color: var(--amber);
+  opacity: 0.8;
+}
+
+.dev-access-invite-code {
+  font-family: monospace, sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  color: #ffd700;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+
+.dev-access-player-card {
+  background: #050914;
+  border-radius: 8px;
+  border-left: 3px solid var(--green);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  transition: all 0.2s ease;
+}
+
+.dev-access-player-card:hover {
+  background: #0a1220;
+  transform: translateX(2px);
+}
+
+.dev-access-player-card.is-banned {
+  border-left-color: var(--red);
+  background: rgba(255, 51, 102, 0.05);
+}
+
+.dev-access-stat-tile {
+  padding: 10px;
+  border-radius: 10px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.dev-access-stat-tile:hover {
+  transform: translateY(-2px);
+}
+
+.dev-access-stat-tile.tile-players {
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+}
+
+.dev-access-stat-tile.tile-invites {
+  background: rgba(0, 242, 254, 0.08);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+}
+
+.dev-access-stat-tile.tile-bans {
+  background: rgba(255, 51, 102, 0.08);
+  border: 1px solid rgba(255, 51, 102, 0.3);
+}
+
+.dev-access-stat-value {
+  font-size: 20px;
+  font-weight: 900;
+  font-family: monospace, sans-serif;
+  line-height: 1.1;
+}
+
+.dev-access-stat-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.8;
+}
