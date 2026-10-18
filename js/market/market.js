@@ -1,12 +1,11 @@
 // ========================================================
-// js/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.8.2 COMPACT CATEGORIES)
+// js/market/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.9.4)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.8.2:
-//   - ФИКС: клик по кнопкам внутри карточки не всплывает до контейнера
-//   - ФИКС: таймеры занятости обновляются без полного перерендера
-//   - ФИКС: кнопка "На карте" защищена от отсутствия MarketMap
-//   - ФИКС: сворачивание категорий сохраняется в localStorage
+// ⭐ v1.9.4:
+//   - Бейджи соответствия бизнесу отображаются ТОЛЬКО после покупки Автотеки
+//   - Исправлена работа кнопки «Позвонить» / «Торг» с защитой от всплытия клика
+//   - Полная интеграция с FLEET_CALCULATOR и проверкой автопарков
 // ========================================================
 
 let marketSortOrder = 'asc';
@@ -74,28 +73,156 @@ function sortCurrentMarketFeed() {
 }
 
 // ========================================================
-// setCategory с авто-сворачиванием в компактный режим
+// ОПРЕДЕЛЕНИЕ ПРИГОДНОСТИ АВТО ДЛЯ БИЗНЕСА
 // ========================================================
-async function setCategory(cat) {
-    console.log('[Market] setCategory → ' + cat + ' (START)');
+function getCarBusinessSuitability(car, ownedBizIds = []) {
+    let matches = [];
 
-    if (window._setCategoryPending) {
-        console.warn('[Market] setCategory проигнорирован — предыдущий вызов в процессе');
+    if (window.FLEET_CALCULATOR && typeof window.FLEET_CALCULATOR.checkSuitability === 'function') {
+        try {
+            const res = window.FLEET_CALCULATOR.checkSuitability(car, null);
+            if (res && res.suitable && Array.isArray(res.matches) && res.matches.length > 0) {
+                matches = res.matches;
+            }
+        } catch (e) {
+            console.warn('[Market] Ошибка FLEET_CALCULATOR:', e);
+        }
+    }
+
+    if (matches.length === 0) {
+        const cat = String(car.category || car.type || '').toLowerCase();
+        const pwr = Number(car.power) || 0;
+        const trunk = Number(car.trunkVolume) || 0;
+        const name = String(car.name || '').toLowerCase();
+        const year = Number(car.year) || 2012;
+
+        if (cat === 'economy' || cat === 'comfort' || name.includes('solaris') || name.includes('rio') || name.includes('logan') || name.includes('camry') || name.includes('octavia') || name.includes('vesta') || name.includes('granta')) {
+            matches.push({ id: 'taxi', name: 'Такси', icon: 'fa-taxi', badgeColor: '#f59e0b' });
+        }
+
+        if (cat === 'economy' || name.includes('matiz') || name.includes('granta') || name.includes('polo') || name.includes('priora') || name.includes('fabia') || name.includes('getz') || name.includes('largus')) {
+            matches.push({ id: 'delivery', name: 'Доставка', icon: 'fa-box', badgeColor: '#10b981' });
+        }
+
+        if (cat === 'truck' || trunk >= 450 || name.includes('газель') || name.includes('фургон') || name.includes('porter') || name.includes('transit') || name.includes('largus') || name.includes('caddy')) {
+            matches.push({ id: 'cargo', name: 'Грузоперевозки', icon: 'fa-truck-fast', badgeColor: '#3b82f6' });
+        }
+
+        if ((cat === 'comfort' && year >= 2014) || (cat === 'economy' && year >= 2017)) {
+            matches.push({ id: 'carsharing', name: 'Каршеринг', icon: 'fa-car-side', badgeColor: '#06b6d4' });
+        }
+
+        if (cat === 'premium' || cat === 'hyper' || pwr >= 260 || name.includes('bmw') || name.includes('mercedes') || name.includes('porsche') || name.includes('audi') || name.includes('lexus')) {
+            matches.push({ id: 'vip', name: 'VIP-прокат', icon: 'fa-crown', badgeColor: '#a855f7' });
+        }
+    }
+
+    return matches;
+}
+
+// ========================================================
+// ДИСПЕТЧЕР ДЕЙСТВИЙ (ЗВОНОК / ОСМОТР)
+// ========================================================
+function dispatchMarketAction(carId, actionType = 'call') {
+    let car = null;
+    if (state && Array.isArray(state.marketFeed)) {
+        car = state.marketFeed.find(c => c && (c.id == carId || String(c.id) === String(carId)));
+    }
+    const targetId = (car && car.id !== undefined) ? car.id : carId;
+
+    const now = Date.now();
+    if (car && car.cooldownUntil && car.cooldownUntil > now) {
+        if (typeof showToast === 'function') {
+            const left = Math.ceil((car.cooldownUntil - now) / 1000);
+            showToast(`⏳ Абонент занят (${left}с). Дождитесь или используйте платный дозвон.`);
+        }
+        if (typeof playSound === 'function') playSound('error');
         return;
     }
+
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
+
+    if (typeof window.initiateBuyMarketCar === 'function') {
+        try {
+            return window.initiateBuyMarketCar(targetId);
+        } catch (e) {
+            console.warn('[Market] Ошибка initiateBuyMarketCar:', e);
+        }
+    }
+
+    if (typeof window.startMarketDeal === 'function') return window.startMarketDeal(targetId);
+    if (typeof window.callMarketCar === 'function') return window.callMarketCar(targetId);
+
+    if (window.MarketDeal && typeof window.MarketDeal.initiateBuyMarketCar === 'function') {
+        return window.MarketDeal.initiateBuyMarketCar(targetId);
+    }
+
+    if (actionType === 'inspect' && typeof window.openInspectionModal === 'function') {
+        return window.openInspectionModal(targetId);
+    }
+
+    console.error('[Market] Не найден обработчик вызова для carId:', carId);
+    if (typeof showToast === 'function') showToast("❌ Ошибка соединения с продавцом");
+}
+
+function onMarketCallClick(carId, event) {
+    if (event) {
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    }
+    dispatchMarketAction(carId, 'call');
+}
+
+function onMarketCardClick(carId, event) {
+    if (event && event.target) {
+        if (event.target.closest('button') || event.target.closest('.plate-hidden-capsule') || event.target.closest('.cooldown-timer')) {
+            return;
+        }
+    }
+    dispatchMarketAction(carId, 'inspect');
+}
+
+function onAutotekaClick(carId, event) {
+    if (event) {
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    }
+    let car = state?.marketFeed?.find(c => c && (c.id == carId || String(c.id) === String(carId)));
+    const targetId = (car && car.id !== undefined) ? car.id : carId;
+    if (typeof window.openAutotekaModal === 'function') {
+        window.openAutotekaModal(targetId);
+    } else if (typeof showToast === 'function') {
+        showToast("Автотека временно недоступна");
+    }
+}
+
+function onPaidCallClick(carId, event) {
+    if (event) {
+        if (typeof event.stopPropagation === 'function') event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+    }
+    let car = state?.marketFeed?.find(c => c && (c.id == carId || String(c.id) === String(carId)));
+    const targetId = (car && car.id !== undefined) ? car.id : carId;
+    if (typeof window.paidCallMarketCar === 'function') {
+        window.paidCallMarketCar(targetId);
+    } else {
+        dispatchMarketAction(targetId, 'call');
+    }
+}
+
+async function setCategory(cat) {
+    if (window._setCategoryPending) return;
     window._setCategoryPending = true;
 
     try {
         if (!cat || typeof cat !== 'string') {
-            console.warn('[Market] setCategory: некорректная категория');
             window._setCategoryPending = false;
             return;
         }
 
         let lvl = state.player?.level ? state.player.level : 1;
-        const levelGates = {
-            moto: 5, atv: 8, comfort: 15, premium: 30, hyper: 50, truck: 50, yacht: 100
-        };
+        const levelGates = { moto: 5, atv: 8, comfort: 15, premium: 30, hyper: 50, truck: 50, yacht: 100 };
         if (levelGates[cat] && lvl < levelGates[cat]) {
             if (typeof showToast === 'function') showToast(`🔒 Категория доступна с ${levelGates[cat]} уровня!`);
             window._setCategoryPending = false;
@@ -108,7 +235,6 @@ async function setCategory(cat) {
         const btn = document.getElementById("catBtn-" + cat);
         if (btn) btn.classList.add('active');
 
-        // Автоматически аккуратно сворачиваем блок после клика
         toggleMarketCategories(true);
 
         const meta = (typeof CATEGORY_META !== 'undefined' && CATEGORY_META[cat]) ? CATEGORY_META[cat] : { name: 'Рынок', title: 'Общий рынок', capital: '—', desc: '' };
@@ -133,16 +259,12 @@ async function setCategory(cat) {
         }
 
         const myToken = ++window.__marketRefreshToken;
-
-        const timeoutPromise = new Promise((resolve) => {
-            setTimeout(() => resolve('TIMEOUT'), 5000);
-        });
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 5000));
 
         let populateResult;
         if (typeof populateMarketFeed === 'function') {
             populateResult = await Promise.race([populateMarketFeed(), timeoutPromise]);
         } else {
-            console.error('[Market] populateMarketFeed не найдена!');
             populateResult = 'MISSING';
         }
 
@@ -153,36 +275,18 @@ async function setCategory(cat) {
 
         if (populateResult === 'TIMEOUT') {
             if (typeof showToast === 'function') showToast("⏱ Превышено время генерации. Повторите попытку.");
-            if (container) {
-                container.innerHTML = `
-                    <div class="glass-card text-center py-6" style="background:#090e18;">
-                        <div style="font-size:32px; margin-bottom:6px;">⏱</div>
-                        <b class="text-xs color-amber">Превышено время генерации</b>
-                        <button onclick="setCategory('${cat}')" class="btn btn-cyan btn-sm mt-2">Повторить</button>
-                    </div>
-                `;
-            }
             window._setCategoryPending = false;
             return;
         }
 
-        try {
-            renderMarketFeed();
-        } catch (e) {
-            console.error('[Market] Ошибка renderMarketFeed:', e);
-        }
-
+        renderMarketFeed();
     } catch (e) {
-        console.error('[Market] КРИТИЧЕСКАЯ ОШИБКА в setCategory:', e);
-        if (typeof showToast === 'function') showToast("❌ Ошибка при смене категории.");
+        console.error('[Market] Ошибка в setCategory:', e);
     } finally {
         window._setCategoryPending = false;
     }
 }
 
-// ========================================================
-// ОБНОВЛЕНИЕ ЛЕНТЫ (ручное)
-// ========================================================
 async function refreshMarketFeedManual() {
     if (window._setCategoryPending) return;
     window._setCategoryPending = true;
@@ -206,9 +310,7 @@ async function refreshMarketFeedManual() {
         state.player.cash -= cost;
         state.player.fuel -= 5;
 
-        // Сворачиваем блок категорий при обновлении ленты
         toggleMarketCategories(true);
-
         if (typeof saveState === 'function') saveState();
 
         const container = document.getElementById('marketCardContainer');
@@ -222,10 +324,7 @@ async function refreshMarketFeedManual() {
         }
 
         const myToken = ++window.__marketRefreshToken;
-
-        const timeoutPromise = new Promise((resolve) => {
-            setTimeout(() => resolve('TIMEOUT'), 5000);
-        });
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 5000));
 
         let populateResult;
         if (typeof populateMarketFeed === 'function') {
@@ -239,18 +338,10 @@ async function refreshMarketFeedManual() {
             return;
         }
 
-        if (populateResult === 'TIMEOUT') {
-            if (typeof showToast === 'function') showToast("⏱ Превышено время обновления");
-            window._setCategoryPending = false;
-            return;
-        }
-
         renderMarketFeed();
         if (typeof showToast === 'function') showToast("Лента обновлена (-5 ⛽)!");
-
     } catch (e) {
         console.error('[Market] Ошибка refresh:', e);
-        if (typeof showToast === 'function') showToast("❌ Ошибка обновления ленты");
     } finally {
         window._setCategoryPending = false;
     }
@@ -322,6 +413,18 @@ function renderMarketFeed() {
 
         let htmlContent = sortBarHtml;
 
+        let ownedBizIds = [];
+        if (Array.isArray(state.businesses)) {
+            ownedBizIds = state.businesses
+                .filter(b => b && (Number(b.level) > 0 || b.purchased || b.owned))
+                .map(b => b.id);
+        } else if (state.businesses && typeof state.businesses === 'object') {
+            ownedBizIds = Object.keys(state.businesses).filter(key => {
+                const b = state.businesses[key];
+                return b && (Number(b.level) > 0 || b.purchased || b.owned || b.unlocked);
+            });
+        }
+
         state.marketFeed.forEach(car => {
             if (!car || car.unavailable) return;
 
@@ -384,6 +487,32 @@ function renderMarketFeed() {
                 if (isPlateRevealed && pVal > 15000) statusBadgesHtml += "<span class='tag-badge badge-shimmer-gold'>🏷️ БЛАТНОЙ</span>";
                 if (car.isStolen && isPlateRevealed) statusBadgesHtml += "<span class='tag-badge badge-police-strobe'>🚨 РОЗЫСК</span>";
 
+                // ⭐ ОТОБРАЖЕНИЕ ПРИНАДЛЕЖНОСТИ К БИЗНЕСУ ТОЛЬКО ПОСЛЕ АВТОТЕКИ
+                let bizTopBadgeHtml = "";
+                if (isPlateRevealed) {
+                    const businessMatches = getCarBusinessSuitability(car, ownedBizIds);
+                    if (businessMatches.length > 0) {
+                        car.businessMatches = businessMatches;
+
+                        bizTopBadgeHtml = `
+                            <div class="biz-fleet-card-badge notranslate" translate="no" style="position:absolute; top:8px; left:8px; z-index:10; background:rgba(9,14,24,0.92); border:1px solid var(--green); color:var(--green); border-radius:6px; padding:3px 7px; font-size:8.5px; font-weight:800; display:flex; align-items:center; gap:4px; box-shadow:0 0 10px rgba(0,230,118,0.35);">
+                                <i class="fa-solid fa-briefcase"></i> ДЛЯ БИЗНЕСА
+                            </div>
+                        `;
+
+                        businessMatches.forEach(m => {
+                            const isOwned = ownedBizIds.includes(m.id);
+                            const ownedCheck = isOwned ? ' ✓' : '';
+                            const badgeColor = m.badgeColor || '#00e676';
+                            statusBadgesHtml += `
+                                <span class='tag-badge notranslate' translate='no' title='Подходит для: ${m.name}' style='background:rgba(9,14,24,0.85); color:${badgeColor}; border:1px solid ${badgeColor}; box-shadow:0 0 6px ${badgeColor}; font-weight:700; font-size:8px;'>
+                                    <i class='fa-solid ${m.icon || 'fa-briefcase'}' style='margin-right:3px;'></i>${m.name}${ownedCheck}
+                                </span>
+                            `;
+                        });
+                    }
+                }
+
                 let sellerNameRowHtml = "";
                 if (car.isP2PUserListing) {
                     let fxClass = car.sellerNickEffectClass || "nick-fx-lightning";
@@ -414,21 +543,21 @@ function renderMarketFeed() {
                 const actionBtnLabel = car.isP2PUserListing ? 'Торг' : 'Позвонить';
                 const actionBtnIcon = car.isP2PUserListing ? 'fa-solid fa-comments-dollar' : 'fa-solid fa-phone';
 
-                // ⭐ v1.8.2: используем event.preventDefault() и event.stopPropagation() для кнопок
                 htmlContent += `
                 <div class='glass-card mb-3 ${busyClass} ${viewedClass} ${cardAuraClass}' 
                      id='card_${car.id}'
                      style="cursor: pointer;"
-                     onclick="if(!event.target.closest('button') && !event.target.closest('.plate-hidden-capsule')) initiateBuyMarketCar('${car.id}')">
+                     onclick="onMarketCardClick('${car.id}', event)">
                     ${viewedBadge}
 
                     <div class='cooldown-timer notranslate' translate='no' style='${isBusy ? "display:flex !important;" : "display:none !important;"}'>
                         <div class='timer-clock notranslate' translate='no' id='timer_num_${car.id}'>${timeLeft}с</div>
                         <div class='timer-text'>Абонент занят</div>
-                        <button onclick="event.stopPropagation(); paidCallMarketCar('${car.id}')" class='btn btn-amber' style='width: 80%;'>Платный дозвон (1,000 ₽)</button>
+                        <button onclick="onPaidCallClick('${car.id}', event)" class='btn btn-amber' style='width: 80%;'>Платный дозвон (1,000 ₽)</button>
                     </div>
 
-                    <div class='car-img-wrap' style="height: 190px;">
+                    <div class='car-img-wrap' style="height: 190px; position: relative;">
+                        ${bizTopBadgeHtml}
                         <img id="market_car_img_${car.id}" ${carImgAttrs} class='car-img'>
                     </div>
 
@@ -489,10 +618,10 @@ function renderMarketFeed() {
                         </div>
 
                         <div class="grid-2" style="gap: 6px;">
-                            <button onclick="event.stopPropagation(); openAutotekaModal('${car.id}')" class='btn btn-dark btn-sm' style="height: 30px; font-size: 9.5px; padding: 0 6px;">
+                            <button onclick="onAutotekaClick('${car.id}', event)" class='btn btn-dark btn-sm' style="height: 30px; font-size: 9.5px; padding: 0 6px;">
                                 <i class='fa-solid fa-file-waveform color-green' style="font-size:10px;"></i> Автотека (${autoIcon})
                             </button>
-                            <button onclick="event.stopPropagation(); initiateBuyMarketCar('${car.id}')" class="btn btn-cyan btn-sm" style="height: 30px; font-size: 9.5px; padding: 0 6px; font-weight: 700;">
+                            <button onclick="onMarketCallClick('${car.id}', event)" class="btn btn-cyan btn-sm" style="height: 30px; font-size: 9.5px; padding: 0 6px; font-weight: 700;">
                                 <i class="${actionBtnIcon}" style="font-size:10px;"></i> ${actionBtnLabel}
                             </button>
                         </div>
@@ -513,19 +642,9 @@ function renderMarketFeed() {
 
     } catch (e) {
         console.error('[Market] Ошибка рендера:', e);
-        container.innerHTML = `
-            <div class='glass-card text-center py-6' style="background:#090e18; border-color:var(--red);">
-                <div style="font-size:32px; margin-bottom:6px;">❌</div>
-                <b class="text-xs color-red">Ошибка отображения</b>
-                <div class="sub-label mt-1" style="font-size:9.5px;">${String(e.message || e).substring(0, 100)}</div>
-            </div>
-        `;
     }
 }
 
-// ========================================================
-// ОБНОВЛЕНИЕ ТАЙМЕРОВ (БЕЗ ПОЛНОГО РЕРЕНДЕРА)
-// ========================================================
 function updateMarketTimers() {
     if (!state.marketFeed || !Array.isArray(state.marketFeed) || state.marketFeed.length === 0) return;
 
@@ -558,9 +677,6 @@ function updateMarketTimers() {
     }
 }
 
-// ========================================================
-// ЭКСПОРТ
-// ========================================================
 Object.assign(window, {
     toggleMarketCategories,
     toggleMarketSortOrder,
@@ -570,7 +686,13 @@ Object.assign(window, {
     refreshMarketFeedManual,
     promptHiddenPlateAutotekaHint,
     renderMarketFeed,
-    updateMarketTimers
+    updateMarketTimers,
+    onMarketCallClick,
+    onMarketCardClick,
+    onAutotekaClick,
+    onPaidCallClick,
+    getCarBusinessSuitability,
+    dispatchMarketAction
 });
 
-console.log('[🏪 market v1.8.2] Компактные сворачивающиеся категории + авто-сворачивание + защита кликов ✓');
+console.log('[🏪 market v1.9.4] Бейджи бизнеса строго после Автотеки ✓');

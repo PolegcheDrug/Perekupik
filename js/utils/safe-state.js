@@ -1,13 +1,11 @@
 // ========================================================
-// js/utils/safe-state.js — БЕЗОПАСНЫЙ ДОСТУП К STATE (v1.0.0)
+// js/utils/safe-state.js — БЕЗОПАСНЫЙ ДОСТУП К STATE (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ Помогает избежать TypeError при работе с state.
-//     Все модули используют SafeState.get('player.cash', 0).
-//
-// Использование:
-//   SafeState.get('player.cash', 0);
-//   SafeState.set('player.cash', 50000);
-//   SafeState.ensure('player.warehouse.cars', []);
+// ⭐ v1.1.0 (ЮРИДИЧЕСКИЕ ЛИЦА И КОММЕРЧЕСКИЙ АВТОПАРК):
+//   - Инициализация и валидация state.player.legalEntity (ИП/ООО)
+//   - Нормализация полей коммерческого учета для машин в гараже
+//   - Методы быстрого доступа к автопаркам предприятий
+//   - Защита от потери данных и undefined при сохранении/загрузке
 // ========================================================
 
 (function() {
@@ -35,7 +33,7 @@
 
         /**
          * Установить значение по пути.
-         * Создаёт промежуточные объекты.
+         * Создаёт промежуточные объекты при их отсутствии.
          */
         set(path, value) {
             if (!window.state || typeof path !== 'string') return false;
@@ -92,7 +90,7 @@
         },
 
         /**
-         * Безопасно найти машину по uid.
+         * Безопасно найти машину по uid или id.
          */
         findCarByUid(uid) {
             const garage = this.getGarage();
@@ -100,7 +98,7 @@
         },
 
         /**
-         * Безопасно найти индекс машины по uid.
+         * Безопасно найти индекс машины по uid или id.
          */
         findCarIndexByUid(uid) {
             const garage = this.getGarage();
@@ -116,11 +114,89 @@
             if (idx === -1) return null;
             const removed = window.state.garage.splice(idx, 1);
             return removed[0] || null;
+        },
+
+        // ========================================================
+        // МЕТОДЫ ЮРИДИЧЕСКИХ ЛИЦ И АВТОПАРКОВ
+        // ========================================================
+
+        /**
+         * Гарантирует наличие структуры юридического лица у игрока.
+         */
+        initLegalEntity() {
+            const player = this.getPlayer();
+            if (!player.legalEntity || typeof player.legalEntity !== 'object') {
+                player.legalEntity = {
+                    type: 'none',
+                    inn: null,
+                    ogrn: null,
+                    regDate: null,
+                    companyName: null
+                };
+            }
+            return player.legalEntity;
+        },
+
+        /**
+         * Получить статус юридического лица (none, ip, ooo).
+         */
+        getLegalEntity() {
+            return this.initLegalEntity();
+        },
+
+        /**
+         * Нормализует поля коммерческого учета для всех машин в гараже.
+         */
+        ensureCommercialCarFields() {
+            const garage = this.getGarage();
+            garage.forEach(car => {
+                if (!car || typeof car !== 'object') return;
+                if (typeof car.commercialRegistered !== 'boolean') {
+                    car.commercialRegistered = false;
+                }
+                if (car.assignedBusinessId === undefined) {
+                    car.assignedBusinessId = null;
+                }
+                if (car.assignedBusinessName === undefined) {
+                    car.assignedBusinessName = null;
+                }
+                if (car.registeredCompany === undefined) {
+                    car.registeredCompany = null;
+                }
+            });
+        },
+
+        /**
+         * Получить все машины, привязанные к автопарку конкретного бизнеса.
+         * @param {string} bizId — taxi, delivery, transport_company, tow_truck, razborka
+         */
+        getBusinessFleet(bizId) {
+            if (!bizId) return [];
+            return this.getGarage().filter(c => c && c.assignedBusinessId === bizId);
+        },
+
+        /**
+         * Комплексная проверка целостности структуры сохранения при старте игры.
+         */
+        validateStateIntegrity() {
+            this.getPlayer();
+            this.getGarage();
+            this.initLegalEntity();
+            this.ensureCommercialCarFields();
+            this.ensure('businesses', []);
+            this.ensure('player.cash', 50000);
+            this.ensure('player.level', 1);
+            this.ensure('player.day', 1);
         }
     };
 
     // Экспорт
     window.SafeState = SafeState;
 
-    console.log('[🛡 SafeState v1.0.0] Безопасный доступ к state загружен');
+    // Автоматическая валидация при первой загрузке
+    if (typeof window !== 'undefined') {
+        SafeState.validateStateIntegrity();
+    }
+
+    console.log('[🛡 SafeState v1.1.0] Загружен: Юрлица ИП/ООО + Валидация автопарков бизнеса ✓');
 })();

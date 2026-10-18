@@ -1,6 +1,7 @@
 // ========================================================
 // data_economy.js — ЭКОНОМИКА, БИЗНЕСЫ, НЕДВИЖИМОСТЬ И МАРКЕТ
 // ⭐ v2.0.0: РЕБАЛАНС ЭКОНОМИКИ
+// ⭐ v2.1.1: СТРОГАЯ ФИЛЬТРАЦИЯ ТОЛЬКО КУПЛЕННЫХ БИЗНЕСОВ
 // ========================================================
 
 // --------------------------------------------------------
@@ -97,8 +98,6 @@ const WHEEL_CONFIG = {
         ]
     },
     superWheel: {
-        // ⭐ v2.0.1: 60 ⭐ = 150,000 ₽ — синхронизировано с банком и PhoneMedia.
-        // costCash добавлен для явности и работы fallback'ов.
         costCash: 150000,
         costStars: 60,
         costTickets: 5,
@@ -128,19 +127,6 @@ const MARKET_ECONOMY_CONFIG = {
     urgentSaleChance: 0.08,
     hiddenDefectChance: 0.28
 };
-
-// --------------------------------------------------------
-// 0.3. КУРСЫ ВАЛЮТ
-// ⭐ v2.0.0: Смотри BANK_EXCHANGE_RATES в data_core.js.
-// Здесь оставляем только переопределения для документации.
-// --------------------------------------------------------
-// ВНИМАНИЕ: основная таблица курсов находится в data_core.js:
-//   stars: buyRub / sellRub = 2500  (было 100,000 — эксплойт)
-//   fuel:  2000
-//   tickets: 7500
-//   conn: 175000
-//   btc: 9500000
-//   eth: 340000
 
 // --------------------------------------------------------
 // 1. НЕДВИЖИМОСТЬ И БОКСЫ ПЕРЕКУПА
@@ -495,10 +481,7 @@ const HOUSING_RANDOM_EVENTS = [
 ];
 
 // --------------------------------------------------------
-// 2. БИЗНЕС-СЕТЬ (11 ПРЕДПРИЯТИЙ)
-// ⭐ v2.0.0: ДОХОД ×4-5. Окупаемость 20-40 дней вместо 90-190.
-// Раньше: автомойка за 85k приносила 950 ₽/день (payback 89 дней) — игрок бросал игру.
-// Теперь: 4,000 ₽/день (payback 21 день). Дороже — прибыльнее.
+// 2. БИЗНЕС-СЕТЬ (ПРЕДПРИЯТИЯ)
 // --------------------------------------------------------
 const BUSINESS_DATA = [
     {
@@ -507,7 +490,8 @@ const BUSINESS_DATA = [
         perk: 'Скидка 50% на полировку и химчистку',
         desc: 'Круглосуточный комплекс бесконтактной мойки и сушки кузова.',
         img: 'assets/business/wash.jpg',
-        fallback: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'service'
     },
     {
         id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 6,
@@ -515,7 +499,8 @@ const BUSINESS_DATA = [
         perk: '+10% к стоимости авто на правильных дисках',
         desc: 'Правка дисков, ошиповка, монтаж низкого профиля и полусликов.',
         img: 'assets/business/shina.jpg',
-        fallback: 'https://images.unsplash.com/photo-1578844251758-2f71da64c96f?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1578844251758-2f71da64c96f?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'service'
     },
     {
         id: 'sto', name: 'СТО дяди Вани', minLevel: 9,
@@ -523,7 +508,8 @@ const BUSINESS_DATA = [
         perk: 'Скидка 40% на ремонт мотора',
         desc: 'Капитальный ремонт ДВС, замена цепей ГРМ, подвески и агрегатов.',
         img: 'assets/business/sto.jpg',
-        fallback: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'service'
     },
     {
         id: 'tow_truck', name: 'Служба эвакуации «Шериф»', minLevel: 10,
@@ -531,7 +517,17 @@ const BUSINESS_DATA = [
         perk: 'Бесплатный забор авто со спецстоянки ГИБДД',
         desc: 'Парк эвакуаторов для оперативной эвакуации и спасения задержанных машин.',
         img: 'assets/business/tow.jpg',
-        fallback: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'fleet', fleetType: 'tow_truck'
+    },
+    {
+        id: 'delivery', name: 'Курьерская доставка «Экспресс»', minLevel: 11,
+        income: 18000, level: 0, cost: 480000, reqStars: 12, stored: 0, stock: 100,
+        perk: 'Высокая оборачиваемость малолитражек и фургонов',
+        desc: 'Логистическая сеть доставки товаров по городу и пригороду.',
+        img: 'assets/business/delivery.jpg',
+        fallback: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'fleet', fleetType: 'delivery'
     },
     {
         id: 'paint_shop', name: 'Малярный цех «Хамелеон»', minLevel: 13,
@@ -539,16 +535,17 @@ const BUSINESS_DATA = [
         perk: 'Облив в заводской микронный слой без следов шпаклёвки',
         desc: 'Покрасочная камера с инфракрасной сушкой. ЛКП ложится в заводской допуск.',
         img: 'assets/business/paint.jpg',
-        fallback: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'service'
     },
     {
         id: 'chip_tuning', name: 'Лаборатория Stage Lab', minLevel: 16,
         income: 30000, level: 0, cost: 800000, reqStars: 20, stored: 0, stock: 100,
-        // ⭐ v2.0.0: Скидка снижена с 70% до 30% (было ломало экономику тюнинга)
         perk: 'Скидка 30% на установку чип-тюнинга Stage 1-3',
         desc: 'Диностенд и калибровка прошивок ЭБУ под наддувные двигатели.',
         img: 'assets/business/chip.jpg',
-        fallback: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'service'
     },
     {
         id: 'detailing', name: 'Детейлинг Студия', minLevel: 19,
@@ -556,7 +553,8 @@ const BUSINESS_DATA = [
         perk: '+35% к баллам на Автошоу',
         desc: 'Нанесение керамики, бронеплёнка, полировка и глубокая химчистка салона.',
         img: 'assets/business/detailing.jpg',
-        fallback: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1607860108855-64acf2078ed9?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'service'
     },
     {
         id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22,
@@ -564,7 +562,8 @@ const BUSINESS_DATA = [
         perk: 'Детали на ремонт обходятся дешевле на 30%',
         desc: 'Скупка тотальных и аварийных авто на запчасти, продажа контрактных узлов.',
         img: 'assets/business/razborka.jpg',
-        fallback: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1530046339160-ce3e530c7d2f?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'fleet', fleetType: 'razborka'
     },
     {
         id: 'autopodbor', name: 'Агентство «Автоподбор Pro»', minLevel: 25,
@@ -572,15 +571,26 @@ const BUSINESS_DATA = [
         perk: '25% шанс найти эксклюзив со скидкой 35% на авторынке',
         desc: 'Штат выездных экспертов находит срочные варианты с огромным дисконтом.',
         img: 'assets/business/podbor.jpg',
-        fallback: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'service'
     },
     {
-        id: 'taxi', name: 'Таксопарк (15 авто)', minLevel: 30,
-        income: 120000, level: 0, cost: 3600000, reqStars: 50, stored: 0, stock: 100,
-        perk: 'Пассивный доход и +1 🤝 связь каждый день',
+        id: 'taxi', name: 'Таксопарк', minLevel: 30,
+        income: 80000, level: 0, cost: 3600000, reqStars: 50, stored: 0, stock: 100,
+        perk: 'Доход масштабируется от класса и состояния машин в таксопарке',
         desc: 'Парк лицензированных седанов под аренду проверенным водителям.',
         img: 'assets/business/taxi.jpg',
-        fallback: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'fleet', fleetType: 'taxi'
+    },
+    {
+        id: 'transport_company', name: 'Транспортная компания «Магистраль»', minLevel: 34,
+        income: 140000, level: 0, cost: 4800000, reqStars: 55, stored: 0, stock: 100,
+        perk: 'Огромный доход с магистральных фур и дальнобойных тягачей',
+        desc: 'Крупнотоннажные грузоперевозки по междугородним маршрутам.',
+        img: 'assets/business/cargo.jpg',
+        fallback: 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'fleet', fleetType: 'transport_company'
     },
     {
         id: 'customs_hub', name: 'Таможенный хаб Порта', minLevel: 38,
@@ -588,13 +598,13 @@ const BUSINESS_DATA = [
         perk: 'Прямые поставки контейнеров и +2 связи ПодКлюч',
         desc: 'Собственный терминал для таможенной очистки автовозов и контейнеров.',
         img: 'assets/business/hub.jpg',
-        fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80'
+        fallback: 'https://images.unsplash.com/photo-1518241353330-0f7941c2d9b5?auto=format&fit=crop&w=600&q=80',
+        reqLegal: true, legalCategory: 'heavy'
     }
 ];
 
 // --------------------------------------------------------
 // 3. УЛУЧШЕНИЯ, ПЕРСОНАЛ И ФЛОТ БИЗНЕСОВ
-// ⭐ v2.0.0: Бонусы складываются, но не ломают баланс.
 // --------------------------------------------------------
 const BUSINESS_UPGRADES_BRANCHES = {
     equipment: [
@@ -635,7 +645,6 @@ const BUSINESS_FLEET_CATALOG = [
 
 // --------------------------------------------------------
 // 4. КАТАЛОГ АВТО-МАРКЕТА (4 ПОЛНЫЕ КАТЕГОРИИ)
-// ⭐ v2.0.0: Звёздные цены адекватны курсу 2,500 ₽.
 // --------------------------------------------------------
 const SHOP_CATALOG = {
     tools: [
@@ -653,7 +662,7 @@ const SHOP_CATALOG = {
             id: "gauge_pro",
             name: "Ультразвуковой толщиномер Pro (Цветмет)",
             cost: 65000,
-            reqStars: 4,           // + 10,000 ₽
+            reqStars: 4,
             maxUses: 100,
             serviceCost: 6000,
             desc: "Высокая точность до 1 мкм. Различает алюминий и цинк. Ресурс: 100 замеров.",
@@ -663,7 +672,7 @@ const SHOP_CATALOG = {
             id: "obd",
             name: "Автосканер ELM327 Bluetooth v1.5",
             cost: 45000,
-            reqStars: 2,           // + 5,000 ₽
+            reqStars: 2,
             maxUses: 50,
             serviceCost: 4000,
             desc: "Базовый сканер для чтения и сброса кодов ошибок DTC в ЭБУ мотора. Ресурс: 50 сканов.",
@@ -673,7 +682,7 @@ const SHOP_CATALOG = {
             id: "obd_launch",
             name: "Диагностический планшет Launch Pro Pad",
             cost: 160000,
-            reqStars: 8,           // + 20,000 ₽
+            reqStars: 8,
             maxUses: 80,
             serviceCost: 12000,
             desc: "Профессиональный комбайн! Обязателен для сервиса «ПодКлюч» и глубокого анализа АКПП. Ресурс: 80 циклов.",
@@ -683,7 +692,7 @@ const SHOP_CATALOG = {
             id: "endoscope",
             name: "HD Видеоэндоскоп мотора с поворотной камерой",
             cost: 85000,
-            reqStars: 4,           // + 10,000 ₽
+            reqStars: 4,
             maxUses: 40,
             serviceCost: 7500,
             desc: "Осмотр цилиндров на задиры и нагар. Обязателен для контрактов «ПодКлюч» и досмотра контейнеров. Ресурс: 40 осмотров.",
@@ -693,7 +702,7 @@ const SHOP_CATALOG = {
             id: "compressor",
             name: "Профессиональный компрессометр с переходниками",
             cost: 38000,
-            reqStars: 2,           // + 5,000 ₽
+            reqStars: 2,
             maxUses: 50,
             serviceCost: 3500,
             desc: "Замер компрессии цилиндров ДВС. Позволяет выявлять износ колец и клапанов. Ресурс: 50 замеров.",
@@ -724,7 +733,7 @@ const SHOP_CATALOG = {
             id: "chem_pack",
             name: "Бочка автошампуня и нано-керамики (200л)",
             cost: 45000,
-            reqStars: 1,           // + 2,500 ₽
+            reqStars: 1,
             value: 50,
             targetBiz: "wash",
             desc: "+50% сырья для Автомойки и Детейлинг студии. Защищает кузов и придает зеркальный блеск."
@@ -733,7 +742,7 @@ const SHOP_CATALOG = {
             id: "tires_stock",
             name: "Партия спортивной резины и жгутов для шиномонтажа",
             cost: 35000,
-            reqStars: 1,           // + 2,500 ₽
+            reqStars: 1,
             value: 40,
             targetBiz: "shina",
             desc: "+40% сырья на Шиномонтаж «У Алика». Устраняет дефицит расходников при сезонном буме."
@@ -742,7 +751,7 @@ const SHOP_CATALOG = {
             id: "brake_pack",
             name: "Оптовая партия контрактных запчастей и суппортов",
             cost: 55000,
-            reqStars: 2,           // + 5,000 ₽
+            reqStars: 2,
             value: 50,
             targetBiz: "razborka",
             desc: "+50% запаса деталей на Авторазборку. Повышает доходность контрактов."
@@ -751,7 +760,7 @@ const SHOP_CATALOG = {
             id: "paint_barrel",
             name: "Комплект автоэмалей, грунта и лака «Хамелеон»",
             cost: 65000,
-            reqStars: 2,           // + 5,000 ₽
+            reqStars: 2,
             value: 50,
             targetBiz: "paint_shop",
             desc: "+50% сырья в Малярный цех. Позволяет красить авто заводским микронным слоем."
@@ -760,7 +769,7 @@ const SHOP_CATALOG = {
             id: "full_stock",
             name: "Генеральный оптовый запас (100% на все точки)",
             cost: 140000,
-            reqStars: 5,           // + 12,500 ₽
+            reqStars: 5,
             value: 100,
             targetBiz: "all",
             desc: "Мгновенно заполняет склады всех выкупленных предприятий до 100%!"
@@ -771,7 +780,7 @@ const SHOP_CATALOG = {
             id: "raf_license",
             name: "Гоночная Лицензия пилота РАФ (Категория Д)",
             cost: 85000,
-            reqStars: 15,          // + 37,500 ₽
+            reqStars: 15,
             desc: "Официальный регламентный допуск пилота к ночным заездам на 402м в Стрите.",
             icon: "fa-id-card"
         },
@@ -779,7 +788,7 @@ const SHOP_CATALOG = {
             id: "insurance_osago",
             name: "Генеральный полис «КАСКО / Анти-Угон»",
             cost: 45000,
-            reqStars: 5,           // + 12,500 ₽
+            reqStars: 5,
             desc: "100% защита от случайных повреждений на парковке, автоподстав и ночных угонов.",
             icon: "fa-shield-halved"
         },
@@ -787,7 +796,7 @@ const SHOP_CATALOG = {
             id: "gps_tracker",
             name: "Скрытый поисковый GPS/ГЛОНАСС маяк",
             cost: 30000,
-            reqStars: 3,           // + 7,500 ₽
+            reqStars: 3,
             desc: "Позволяет моментально вернуть угнанную машину без взяток полиции и Решале.",
             icon: "fa-satellite-dish"
         },
@@ -795,7 +804,7 @@ const SHOP_CATALOG = {
             id: "customs_pass",
             name: "Таможенный пропуск в свободную зону Порта",
             cost: 60000,
-            reqStars: 6,           // + 15,000 ₽
+            reqStars: 6,
             desc: "Снижает пошлины на вскрытие японских и европейских контейнеров на 15%.",
             icon: "fa-passport"
         }
@@ -805,7 +814,7 @@ const SHOP_CATALOG = {
             id: "home_ps5",
             name: "Игровая консоль PlayStation 5",
             cost: 75000,
-            reqStars: 5,           // + 12,500 ₽
+            reqStars: 5,
             perk: "+25% настроения и куража каждый день в полночь",
             icon: "fa-gamepad"
         },
@@ -813,7 +822,7 @@ const SHOP_CATALOG = {
             id: "home_leather_sofa",
             name: "Кожаный диван в клиентскую зону",
             cost: 120000,
-            reqStars: 8,           // + 20,000 ₽
+            reqStars: 8,
             perk: "+15% к восстановлению сил после смотровой ямы",
             icon: "fa-couch"
         },
@@ -821,7 +830,7 @@ const SHOP_CATALOG = {
             id: "home_garage_lift",
             name: "Гидравлический автоподъёмник (4 тонны)",
             cost: 320000,
-            reqStars: 20,          // + 50,000 ₽
+            reqStars: 20,
             perk: "Ускоряет устранение скрытых дефектов авто на 50% и поднимает статус бокса",
             icon: "fa-elevator"
         },
@@ -829,7 +838,7 @@ const SHOP_CATALOG = {
             id: "home_safe_valberg",
             name: "Огнеупорный сейф перекупа Valberg",
             cost: 180000,
-            reqStars: 10,          // + 25,000 ₽
+            reqStars: 10,
             perk: "100% защита заначки наличных от налоговых проверок и уличных облав",
             icon: "fa-vault"
         },
@@ -837,7 +846,7 @@ const SHOP_CATALOG = {
             id: "home_cctv",
             name: "Система видеонаблюдения периметра 4K",
             cost: 140000,
-            reqStars: 8,           // + 20,000 ₽
+            reqStars: 8,
             perk: "Снижает шанс ночного угона авто из гаража или двора до 0%",
             icon: "fa-video"
         }
@@ -847,26 +856,7 @@ const SHOP_CATALOG = {
 const HOUSING_INTERIOR_CATALOG = SHOP_CATALOG.homeItems;
 
 // --------------------------------------------------------
-// 5. ДОКУМЕНТАЦИЯ ПО КУРСУ ВАЛЮТ (для справки)
-// --------------------------------------------------------
-// Актуальные курсы (см. data_core.js BANK_EXCHANGE_RATES):
-//
-//   ⭐ Stars:    1 ⭐ = 2,500 ₽     (было 100,000 ₽ — эксплойт в 40 раз)
-//   ⛽ Топливо: 1 л = 2,000 ₽
-//   🎫 Талоны:  1 шт = 7,500 ₽
-//   🤝 Связи:   1 шт = 175,000 ₽
-//   ₿ BTC:      1 шт = 9,500,000 ₽
-//   Ξ ETH:      1 шт = 340,000 ₽
-//
-// Проверка сходимости:
-//   • SuperSpin ticket: 150,000 ₽ или 60 ⭐ → 60 × 2,500 = 150,000 ₽ ✓
-//   • ОСАГО: 8,500 ₽ + 2 ⭐ → 8,500 + 5,000 = 13,500 ₽ ✓
-//   • Barn tier 1: 35,000 ₽ + 2 ⭐ → 35,000 + 5,000 = 40,000 ₽ ✓
-//   • Вилла: 420,000,000 ₽ + 160 ⭐ → +400,000 ₽ (0.1%) ✓
-
-// --------------------------------------------------------
-// 6. ЕЖЕДНЕВНЫЕ НАГРАДЫ
-// ⭐ v2.0.0: Звёздные награды теперь сопоставимы с рублями.
+// 5. ЕЖЕДНЕВНЫЕ НАГРАДЫ
 // --------------------------------------------------------
 const DAILY_REWARDS_CONFIG = [
     { day: 1, title: "+25k ₽ & 15 ⛽", reward: { cash: 25000, fuel: 15 } },
@@ -879,14 +869,12 @@ const DAILY_REWARDS_CONFIG = [
 ];
 
 // --------------------------------------------------------
-// 7. БАНКОВСКИЕ ВКЛАДЫ
-// ⭐ v2.0.0: Ставка 0.3%/день. Раньше была 3%/день (= 2,000% годовых — эксплойт).
-// Теперь payback вклада ~330 дней — вклады это «тихая гавань», а не станок для денег.
+// 6. БАНКОВСКИЕ ВКЛАДЫ
 // --------------------------------------------------------
 const BANK_DEPOSIT_CONFIG = {
     minAmount: 100000,
     maxAmount: 500000000,
-    dailyPercent: 0.3,          // было 3.0 — 10× снижение
+    dailyPercent: 0.3,
     terms: [
         { days: 7,   label: "1 неделя",   dailyPercent: 0.2, autoCompound: false },
         { days: 30,  label: "1 месяц",    dailyPercent: 0.3, autoCompound: false },
@@ -894,6 +882,237 @@ const BANK_DEPOSIT_CONFIG = {
         { days: 365, label: "1 год",      dailyPercent: 0.8, autoCompound: true }
     ],
     earlyWithdrawPenaltyPct: 30
+};
+
+// ========================================================
+// 7. ЮРИДИЧЕСКИЕ ЛИЦА И НАЛОГООБЛОЖЕНИЕ
+// ========================================================
+const LEGAL_ENTITIES = {
+    none: {
+        id: 'none',
+        name: 'Физическое лицо',
+        taxRate: 0,
+        regFee: 0,
+        reqStars: 0,
+        maxFleetTotal: 0,
+        allowedBusinesses: [],
+        desc: 'Обычный гражданин. Покупка автобизнесов заблокирована.'
+    },
+    ip: {
+        id: 'ip',
+        name: 'Индивидуальный предприниматель (ИП)',
+        tag: 'ИП',
+        taxRate: 0.06,           // УСН 6%
+        regFee: 15000,
+        reqStars: 2,
+        minLevel: 4,
+        maxFleetPerBiz: 5,
+        maxFleetTotal: 15,
+        allowedBusinesses: ['wash', 'shina', 'sto', 'tow_truck', 'delivery', 'paint_shop', 'chip_tuning', 'detailing', 'razborka', 'taxi'],
+        desc: 'Упрощёнка 6%. До 5 машин на бизнес.'
+    },
+    ooo: {
+        id: 'ooo',
+        name: 'Общество с огр. ответственностью (ООО)',
+        tag: 'ООО',
+        taxRate: 0.15,          // ОСНО 15%
+        regFee: 80000,
+        reqStars: 10,
+        minLevel: 8,
+        maxFleetPerBiz: 25,
+        maxFleetTotal: 100,
+        allowedBusinesses: ['wash', 'shina', 'sto', 'tow_truck', 'delivery', 'paint_shop', 'chip_tuning', 'detailing', 'razborka', 'taxi', 'transport_company', 'customs_hub', 'autopodbor'],
+        desc: 'Налог 15%, автопарк до 25 машин на бизнес, доступ ко всем ТК.'
+    }
+};
+
+// ========================================================
+// 8. ТРЕБОВАНИЯ И КЛАССЫ АВТОПОДБОРА ДЛЯ АВТОПАРКОВ
+// ========================================================
+const BUSINESS_FLEET_REQUIREMENTS = {
+    taxi: {
+        bizId: 'taxi',
+        name: 'Таксопарк',
+        icon: 'fa-taxi',
+        badgeColor: '#f1c40f',
+        allowedCategories: ['economy', 'comfort', 'premium'],
+        forbiddenCategories: ['truck', 'moto', 'scooter', 'atv', 'yacht', 'hyper'],
+        minCondition: 45,
+        allowAccidents: false,
+        classIncomeMultipliers: {
+            economy: 1.0,
+            comfort: 1.45,
+            premium: 2.2
+        },
+        baseDailyIncomePercent: 0.045
+    },
+    delivery: {
+        bizId: 'delivery',
+        name: 'Курьерская доставка',
+        icon: 'fa-box-open',
+        badgeColor: '#3498db',
+        allowedCategories: ['scooter', 'economy', 'truck'],
+        forbiddenCategories: ['premium', 'hyper', 'yacht', 'atv'],
+        minCondition: 30,
+        allowAccidents: true,
+        classIncomeMultipliers: {
+            scooter: 0.8,
+            economy: 1.15,
+            truck: 1.85
+        },
+        baseDailyIncomePercent: 0.05
+    },
+    transport_company: {
+        bizId: 'transport_company',
+        name: 'Транспортная компания',
+        icon: 'fa-truck-moving',
+        badgeColor: '#e67e22',
+        allowedCategories: ['truck'],
+        forbiddenCategories: ['economy', 'comfort', 'premium', 'hyper', 'moto', 'scooter', 'atv', 'yacht'],
+        minCondition: 50,
+        allowAccidents: false,
+        classIncomeMultipliers: {
+            truck: 1.6
+        },
+        baseDailyIncomePercent: 0.065
+    },
+    tow_truck: {
+        bizId: 'tow_truck',
+        name: 'Служба эвакуации',
+        icon: 'fa-truck-pickup',
+        badgeColor: '#e74c3c',
+        allowedCategories: ['truck'],
+        forbiddenCategories: ['economy', 'comfort', 'premium', 'hyper', 'moto', 'scooter', 'atv', 'yacht'],
+        minCondition: 40,
+        allowAccidents: true,
+        classIncomeMultipliers: {
+            truck: 1.3
+        },
+        baseDailyIncomePercent: 0.05
+    },
+    razborka: {
+        bizId: 'razborka',
+        name: 'Авторазборка',
+        icon: 'fa-wrench',
+        badgeColor: '#9b59b6',
+        allowedCategories: ['economy', 'comfort', 'premium', 'truck'],
+        forbiddenCategories: ['yacht', 'hyper'],
+        maxCondition: 55,
+        allowAccidents: true,
+        classIncomeMultipliers: {
+            economy: 0.9,
+            comfort: 1.3,
+            premium: 2.1,
+            truck: 1.7
+        },
+        baseDailyIncomePercent: 0.055
+    }
+};
+
+// ========================================================
+// 9. ПРАВИЛА И ТАРИФЫ МРЭО (РЕГИСТРАЦИЯ НА ЮРЛИЦО)
+// ========================================================
+const MREO_CONFIG = {
+    commercialRegFee: 8500,
+    inspectionFee: 2500,
+    unregisteredPenaltyPct: 0.50,
+    allowedStatus: {
+        UNREGISTERED: 'unregistered',
+        REGISTERED: 'registered',
+        IN_SERVICE: 'in_service'
+    }
+};
+
+// ========================================================
+// 10. КАЛЬКУЛЯТОР ДОХОДНОСТИ АВТОПАРКА И СОВМЕСТИМОСТИ
+// ========================================================
+const FLEET_CALCULATOR = {
+    /**
+     * Проверка, подходит ли авто под какой-либо из открытых бизнесов игрока.
+     * @param {Object} car - объект машины с рынка
+     * @param {Array} ownedBusinesses - массив id выкупленных бизнесов игрока
+     * @returns {Object} результат совместимости и теги
+     */
+    checkSuitability: function(car, ownedBusinesses = []) {
+        if (!car) return { suitable: false, matches: [] };
+
+        // Если у игрока нет открытых бизнесов (массив пустой) — гарантированно ничего не подходит!
+        if (!Array.isArray(ownedBusinesses) || ownedBusinesses.length === 0) {
+            return { suitable: false, matches: [] };
+        }
+
+        const carCategory = (car.category || car.type || 'economy').toLowerCase();
+        const condition = Number(car.condition || 100);
+        const hasAccidents = Boolean(car.accidentCount > 0 || (car.defects && car.defects.length > 2));
+        const legalClean = !car.hasArrest && !car.hasPledge;
+
+        const matches = [];
+
+        Object.keys(BUSINESS_FLEET_REQUIREMENTS).forEach(bizKey => {
+            const req = BUSINESS_FLEET_REQUIREMENTS[bizKey];
+
+            // Строгая проверка: игрок ОБЯЗАН реально владеть этим бизнесом!
+            if (!ownedBusinesses.includes(req.bizId)) return;
+
+            // Проверка категории
+            const isCategoryAllowed = req.allowedCategories.includes(carCategory);
+            const isCategoryForbidden = req.forbiddenCategories && req.forbiddenCategories.includes(carCategory);
+
+            if (!isCategoryAllowed || isCategoryForbidden) return;
+
+            // Проверка состояния
+            if (req.minCondition && condition < req.minCondition) return;
+            if (req.maxCondition && condition > req.maxCondition) return;
+
+            // Проверка на ДТП
+            if (req.allowAccidents === false && hasAccidents) return;
+
+            matches.push({
+                bizId: req.bizId,
+                name: req.name,
+                icon: req.icon,
+                badgeColor: req.badgeColor,
+                isOwned: true,
+                legalClean: legalClean
+            });
+        });
+
+        return {
+            suitable: matches.length > 0,
+            matches: matches
+        };
+    },
+
+    /**
+     * Расчет суточного дохода машины в коммерческом автопарке
+     */
+    calculateCarDailyIncome: function(car, bizType, legalType = 'ip', isRegisteredMREO = true) {
+        const req = BUSINESS_FLEET_REQUIREMENTS[bizType];
+        if (!req) return { grossIncome: 0, taxDeduction: 0, netIncome: 0 };
+
+        const price = Number(car.basePrice || car.price || 300000);
+        const carCategory = (car.category || car.type || 'economy').toLowerCase();
+        const condition = Math.max(10, Math.min(100, Number(car.condition || 100))) / 100;
+
+        const classMul = req.classIncomeMultipliers[carCategory] || 1.0;
+
+        let gross = Math.round(price * req.baseDailyIncomePercent * classMul * condition);
+
+        if (!isRegisteredMREO) {
+            gross = Math.round(gross * (1 - MREO_CONFIG.unregisteredPenaltyPct));
+        }
+
+        const legal = LEGAL_ENTITIES[legalType] || LEGAL_ENTITIES.ip;
+        const tax = Math.round(gross * legal.taxRate);
+        const net = Math.max(0, gross - tax);
+
+        return {
+            grossIncome: gross,
+            taxDeduction: tax,
+            netIncome: net,
+            taxRate: legal.taxRate
+        };
+    }
 };
 
 // Экспорт в глобальный контекст window
@@ -910,3 +1129,8 @@ window.SHOP_CATALOG = SHOP_CATALOG;
 window.HOUSING_INTERIOR_CATALOG = HOUSING_INTERIOR_CATALOG;
 window.DAILY_REWARDS_CONFIG = DAILY_REWARDS_CONFIG;
 window.BANK_DEPOSIT_CONFIG = BANK_DEPOSIT_CONFIG;
+
+window.LEGAL_ENTITIES = LEGAL_ENTITIES;
+window.BUSINESS_FLEET_REQUIREMENTS = BUSINESS_FLEET_REQUIREMENTS;
+window.MREO_CONFIG = MREO_CONFIG;
+window.FLEET_CALCULATOR = FLEET_CALCULATOR;

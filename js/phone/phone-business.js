@@ -1,16 +1,10 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v6.0.0)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v6.2.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v6.0.0 (РАСШИРЕННЫЕ ДОСТИЖЕНИЯ):
-//   - ДОБАВЛЕНЫ достижения: Коллекционер номеров, Брендов, VIP-Дилер.
-//   - Обновлён счётчик brandSalesCount (продажи по брендам).
-//   - Добавлен vipSalesCount.
-//   - Прогресс-бары для коллекционных достижений.
-//   - Защита от гонок в checkAchievements.
-// ⭐ v5.2.2:
-//   - Усиленная защита ensureState
-//   - ФИКС D1: разделены _collectAllPending и _collectPointPending
-//   - ФИКС D2: drawSparkline через requestAnimationFrame
+// ⭐ v6.2.1:
+//   - Исправлена верстка желтого баннера «Требуется регистрация бизнеса»
+//   - Фиксированная кнопка «Госуслуги» без растяжения и сжатия текста
+//   - Аккуратная сетка вкладок «Цех», «Штат» и «Парк»
 // ========================================================
 
 const PhoneBusiness = {
@@ -24,121 +18,58 @@ const PhoneBusiness = {
     _tickPending: false,
     _upgradePending: false,
 
-    // Экономические циклы
-    ECONOMIC_CYCLES: {
-        boom:   { id: 'boom',   name: '📈 Экономический бум',   incomeMul: 1.30, daysLeft: 0, color: 'color-green',  desc: '+30% выручки у всех точек' },
-        stable: { id: 'stable', name: '⚖️ Стабильный рынок',    incomeMul: 1.00, daysLeft: 0, color: 'color-cyan',   desc: 'Обычная выручка' },
-        bust:   { id: 'bust',   name: '📉 Кризис рынка',        incomeMul: 0.70, daysLeft: 0, color: 'color-red',    desc: '-30% выручки у всех точек' }
-    },
+    get ECONOMIC_CYCLES() { return window.BusinessDataModule?.ECONOMIC_CYCLES || {}; },
+    get NETWORK_MILESTONES() { return window.BusinessDataModule?.NETWORK_MILESTONES || []; },
+    get DNA_LOCATIONS() { return window.BusinessDataModule?.DNA_LOCATIONS || []; },
+    get DNA_TRAFFIC() { return window.BusinessDataModule?.DNA_TRAFFIC || []; },
+    get DNA_CONDITION() { return window.BusinessDataModule?.DNA_CONDITION || []; },
+    get DNA_STAFF() { return window.BusinessDataModule?.DNA_STAFF || []; },
+    get CRISIS_EVENTS() { return window.BusinessDataModule?.CRISIS_EVENTS || []; },
+    get DAILY_BIZ_CHALLENGES() { return window.BusinessDataModule?.DAILY_BIZ_CHALLENGES || []; },
+    get workshopUpgrades() { return window.BusinessDataModule?.workshopUpgrades || []; },
+    get staffList() { return window.BusinessDataModule?.staffList || []; },
+    get fleetVehicles() { return window.BusinessDataModule?.fleetVehicles || []; },
+    get achievements() { return window.BusinessDataModule?.achievements || []; },
 
-    NETWORK_MILESTONES: [
-        { count: 5,  id: 'm5',  name: '🌱 Малая сеть',      bonus: '+5% к выручке',    incomeBonus: 0.05 },
-        { count: 10, id: 'm10', name: '🏪 Средняя сеть',    bonus: '+10% к выручке',   incomeBonus: 0.10 },
-        { count: 20, id: 'm20', name: '🏙 Мегаполис',       bonus: '+20% к выручке',   incomeBonus: 0.20 },
-        { count: 30, id: 'm30', name: '🌐 Империя',         bonus: '+35% к выручке',   incomeBonus: 0.35 }
-    ],
-
-    // FALLBACK-КАТАЛОГИ
-    _fallbackCoverSkins: [
-        { id: 'classic',   name: 'Классика',       cost: 0,      color: '#00f2fe', cssClass: '' },
-        { id: 'neon_cyan', name: 'Неон Cyan',      cost: 50000,  color: '#00f2fe', cssClass: 'skin-neon-cyan' },
-        { id: 'neon_pink', name: 'Neon Pink',      cost: 50000,  color: '#f43f5e', cssClass: 'skin-neon-pink' },
-        { id: 'golden',    name: 'Золотая жила',   cost: 120000, color: '#ffd700', cssClass: 'skin-golden' },
-        { id: 'matrix',    name: 'Matrix',         cost: 80000,  color: '#00e676', cssClass: 'skin-matrix' },
-        { id: 'sunset',    name: 'Закат',          cost: 90000,  color: '#ff6b35', cssClass: 'skin-sunset' },
-        { id: 'cyber',     name: 'Cyberpunk 2077', cost: 150000, color: '#fcee0a', cssClass: 'skin-cyber' },
-        { id: 'royal',     name: 'Royal Purple',   cost: 200000, color: '#c084fc', cssClass: 'skin-royal' }
-    ],
-
-    _fallbackStickers: [
-        { id: 'none',    name: 'Без стикера', cost: 0,     icon: '' },
-        { id: 'gold',    name: 'Золотой',     cost: 25000, icon: '👑' },
-        { id: 'fire',    name: 'Огненный',    cost: 30000, icon: '🔥' },
-        { id: 'diamond', name: 'Бриллиант',   cost: 60000, icon: '💎' },
-        { id: 'skull',   name: 'Череп',       cost: 40000, icon: '💀' },
-        { id: 'rocket',  name: 'Ракета',      cost: 50000, icon: '🚀' }
-    ],
+    _fallbackCoverSkins: window.BusinessDataModule?.fallbackCoverSkins || [],
+    _fallbackStickers: window.BusinessDataModule?.fallbackStickers || [],
 
     _getCoverSkins() {
-        if (typeof window.BUSINESS_COVER_SKINS !== 'undefined'
-            && Array.isArray(window.BUSINESS_COVER_SKINS)
-            && window.BUSINESS_COVER_SKINS.length > 0) {
+        if (typeof window.BUSINESS_COVER_SKINS !== 'undefined' && Array.isArray(window.BUSINESS_COVER_SKINS) && window.BUSINESS_COVER_SKINS.length > 0) {
             return window.BUSINESS_COVER_SKINS;
         }
-        return this._fallbackCoverSkins;
+        return window.BusinessDataModule?.fallbackCoverSkins || this._fallbackCoverSkins;
     },
 
     _getOwnerStickers() {
-        if (typeof window.BUSINESS_VIP_STICKERS !== 'undefined'
-            && Array.isArray(window.BUSINESS_VIP_STICKERS)
-            && window.BUSINESS_VIP_STICKERS.length > 0) {
+        if (typeof window.BUSINESS_VIP_STICKERS !== 'undefined' && Array.isArray(window.BUSINESS_VIP_STICKERS) && window.BUSINESS_VIP_STICKERS.length > 0) {
             return window.BUSINESS_VIP_STICKERS;
         }
-        return this._fallbackStickers;
+        return window.BusinessDataModule?.fallbackStickers || this._fallbackStickers;
     },
 
-    get COVER_SKINS() { return this._fallbackCoverSkins; },
-    get OWNER_STICKERS() { return this._fallbackStickers; },
+    get COVER_SKINS() { return this._getCoverSkins(); },
+    get OWNER_STICKERS() { return this._getOwnerStickers(); },
 
     _n(val, fb = 0) {
-        if (window.GameHelpers && window.GameHelpers.safeNum) {
-            return window.GameHelpers.safeNum(val, fb);
-        }
+        if (window.GameHelpers && window.GameHelpers.safeNum) return window.GameHelpers.safeNum(val, fb);
         const n = Number(val);
         return isNaN(n) || !isFinite(n) ? fb : n;
     },
-
-    DNA_LOCATIONS: [
-        { id: 'center',     name: 'Центр города',    mult: 1.30, icon: '🏙',  desc: 'Премиум-локация' },
-        { id: 'sleep',      name: 'Спальный район',  mult: 1.00, icon: '🏘',  desc: 'Средний поток' },
-        { id: 'industrial', name: 'Промзона',        mult: 1.15, icon: '🏭',  desc: 'Рабочий контингент' },
-        { id: 'highway',    name: 'Трасса М4',       mult: 0.90, icon: '🛣',  desc: 'Нестабильный график' },
-        { id: 'elite',      name: 'Элитный поселок', mult: 1.45, icon: '🏰',  desc: 'VIP-клиенты' }
-    ],
-    DNA_TRAFFIC: [
-        { id: 'high',   name: 'Высокий', mult: 1.20, icon: '🔥' },
-        { id: 'medium', name: 'Средний', mult: 1.00, icon: '⚡' },
-        { id: 'low',    name: 'Низкий',  mult: 0.80, icon: '🌙' }
-    ],
-    DNA_CONDITION: [
-        { id: 'new', name: 'Новое',   mult: 1.25, icon: '✨' },
-        { id: 'mid', name: 'Среднее', mult: 1.00, icon: '🔧' },
-        { id: 'old', name: 'Убитое',  mult: 0.75, icon: '🏚' }
-    ],
-    DNA_STAFF: [
-        { id: 'expert', name: 'Профи',         mult: 1.15, icon: '👨‍🔧' },
-        { id: 'junior', name: 'Новички',       mult: 1.00, icon: '🧑' },
-        { id: 'noname', name: 'Без персонала', mult: 0.85, icon: '👤' }
-    ],
-
-    CRISIS_EVENTS: [
-        { id: 'rospotreb',  icon: '🚔', name: 'Роспотребнадзор',        desc: 'Внеплановая проверка. Взятка 80k ₽ или штраф 150k ₽ + -30% дохода на 2 дня.', bribeCost: 80000,  penalty: 150000, debuffPct: 30, debuffDays: 2 },
-        { id: 'blackout',   icon: '🔌', name: 'Отключение электричества', desc: '-35% дохода на 2 дня.',                                                        bribeCost: 0,      penalty: 0,      debuffPct: 35, debuffDays: 2 },
-        { id: 'hype',       icon: '📱', name: 'Хайп в соцсетях!',        desc: '+50% дохода на 3 дня!',                                                          buffPct: 50,       buffDays: 3 },
-        { id: 'competitor', icon: '🏪', name: 'Открылся конкурент',       desc: '-25% дохода, пока не решите.',                                                   bribeCost: 120000, penalty: 0,      debuffPct: 25, debuffDays: 5 },
-        { id: 'fire',       icon: '🔥', name: 'Пожар!',                  desc: 'Теряете всю кассу, восстановление 200k ₽.',                                     bribeCost: 200000, penalty: 'store_lost', debuffPct: 0, debuffDays: 0 },
-        { id: 'inspection_pass', icon: '✅', name: 'Плановый осмотр пройден', desc: '+15% к репутации.',                                                          buffPct: 15,       buffDays: 5 }
-    ],
-
-    DAILY_BIZ_CHALLENGES: [
-        { id: 'collect_5',   text: 'Собрать кассу с 5 точек',      target: 5, action: 'collect',   reward: 80000,  xp: 80 },
-        { id: 'upgrade_2',   text: 'Улучшить 2 предприятия',       target: 2, action: 'upgrade',   reward: 100000, xp: 100 },
-        { id: 'stock_5',     text: 'Пополнить сырьё 5 раз',        target: 5, action: 'stock',     reward: 60000,  xp: 60 },
-        { id: 'no_crisis',   text: 'Избежать кризиса (решить через Решалу)', target: 1, action: 'bribe', reward: 90000, xp: 90 },
-        { id: 'expand_1',    text: 'Купить новое предприятие',     target: 1, action: 'new_biz',   reward: 150000, xp: 150 }
-    ],
 
     _bizIconsFA: {
         wash: 'fa-shower',
         shina: 'fa-circle-dot',
         sto: 'fa-screwdriver-wrench',
         tow_truck: 'fa-truck-pickup',
+        delivery: 'fa-box-open',
         paint_shop: 'fa-paint-roller',
         chip_tuning: 'fa-microchip',
         detailing: 'fa-sparkles',
         razborka: 'fa-gears',
         autopodbor: 'fa-clipboard-check',
         taxi: 'fa-taxi',
+        transport_company: 'fa-truck-moving',
         customs_hub: 'fa-landmark'
     },
 
@@ -146,59 +77,33 @@ const PhoneBusiness = {
     // ИНИЦИАЛИЗАЦИЯ
     // ========================================================
     ensureState() {
-        if (this._ensureStateInProgress) {
-            console.log('[PhoneBusiness] ensureState уже выполняется, пропускаем повтор');
-            return;
-        }
+        if (this._ensureStateInProgress) return;
         this._ensureStateInProgress = true;
 
         try {
-            if (!window.state) {
-                console.warn('[PhoneBusiness] window.state не существует, создаём заглушку');
-                window.state = {};
-            }
-
-            if (!window.state.player) {
-                console.warn('[PhoneBusiness] window.state.player не существует, создаём заглушку');
-                window.state.player = {};
-            }
-
-            if (!Array.isArray(window.state.businesses)) {
-                console.warn('[PhoneBusiness] window.state.businesses не массив, сбрасываем');
-                window.state.businesses = [];
-            }
+            if (!window.state) window.state = {};
+            if (!window.state.player) window.state.player = {};
+            if (!Array.isArray(window.state.businesses)) window.state.businesses = [];
 
             const baseData = (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA)) ? BUSINESS_DATA : [];
 
             if (baseData.length === 0) {
                 if (!this._ensureStateRetries) this._ensureStateRetries = 0;
                 this._ensureStateRetries++;
-
                 if (this._ensureStateRetries <= 6) {
-                    console.warn(`[PhoneBusiness] BUSINESS_DATA не загружен, retry ${this._ensureStateRetries}/6 через 500ms`);
                     setTimeout(() => {
                         this._ensureStateInProgress = false;
                         this.ensureState();
                     }, 500);
                     return;
-                } else {
-                    console.error('[PhoneBusiness] ❌ BUSINESS_DATA так и не загрузился после 6 попыток!');
-                    this._ensureStateInProgress = false;
-                    return;
                 }
             }
-
             this._ensureStateRetries = 0;
 
-            const existingIds = new Set(
-                window.state.businesses
-                    .filter(b => b && b.id)
-                    .map(b => b.id)
-            );
+            const existingIds = new Set(window.state.businesses.filter(b => b && b.id).map(b => b.id));
             const missing = baseData.filter(b => b && b.id && !existingIds.has(b.id));
 
             if (missing.length > 0) {
-                console.log('[PhoneBusiness] Добавляем отсутствующие бизнесы:', missing.length);
                 const newBusinesses = missing.map(b => ({
                     id: b.id,
                     name: b.name,
@@ -227,7 +132,8 @@ const PhoneBusiness = {
                     activeDebuffs: [],
                     reputation: 0,
                     totalEarned: 0,
-                    createdAt: 0
+                    createdAt: 0,
+                    fleetType: b.fleetType || null
                 }));
 
                 window.state.businesses = [...window.state.businesses, ...newBusinesses]
@@ -242,18 +148,8 @@ const PhoneBusiness = {
                 if (typeof b.stock !== 'number') b.stock = 100;
                 if (typeof b.maxStock !== 'number') b.maxStock = 100;
                 if (!Array.isArray(b.incomeHistory)) b.incomeHistory = [];
-                if (typeof b.lastIncomeDay !== 'number') b.lastIncomeDay = 0;
-                if (typeof b.lastStockDay !== 'number') b.lastStockDay = 0;
                 if (!b.icon) b.icon = this._iconForBiz(b.id);
                 if (!b.customName) b.customName = b.name;
-                if (typeof b.slogan !== 'string') b.slogan = '';
-                if (!b.coverSkin) b.coverSkin = 'classic';
-                if (!b.ownerSticker) b.ownerSticker = 'none';
-                if (!Array.isArray(b.activeBuffs)) b.activeBuffs = [];
-                if (!Array.isArray(b.activeDebuffs)) b.activeDebuffs = [];
-                if (typeof b.reputation !== 'number') b.reputation = 0;
-                if (typeof b.totalEarned !== 'number') b.totalEarned = 0;
-                if (typeof b.createdAt !== 'number') b.createdAt = 0;
                 if (b.level > 0 && !b.dna) b.dna = this._generateDNA(b.id);
             });
 
@@ -261,100 +157,74 @@ const PhoneBusiness = {
             if (!window.state.businessStaff) window.state.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
             if (!Array.isArray(window.state.businessFleet)) window.state.businessFleet = [];
             if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
-            if (!window.state.player.businessAdBonus) window.state.player.businessAdBonus = null;
-            if (typeof window.state.player.businessSalesCount !== 'number') window.state.player.businessSalesCount = 0;
 
-            // ⭐ v6.0.0: инициализация счётчиков для достижений
-            if (!window.state.player.brandSalesCount || typeof window.state.player.brandSalesCount !== 'object') {
-                window.state.player.brandSalesCount = {};
+            if (!window.state.player.legalEntity) {
+                const docs = window.state.player.documents || {};
+                let inferredType = 'none';
+                if (docs.oooRegistered || window.state.player.hasOOO) inferredType = 'ooo';
+                else if (docs.ipRegistered || window.state.player.hasIP || window.state.player.businessRegistered) inferredType = 'ip';
+
+                window.state.player.legalEntity = {
+                    type: inferredType,
+                    inn: docs.inn || window.state.player.inn || null,
+                    ogrn: null,
+                    companyName: null
+                };
             }
-            if (typeof window.state.player.vipSalesCount !== 'number') window.state.player.vipSalesCount = 0;
-            if (typeof window.state.player.cleanSalesCount !== 'number') window.state.player.cleanSalesCount = 0;
 
             if (!window.state.player.economicCycle) {
                 window.state.player.economicCycle = this._generateEconomicCycle();
             }
-
             if (!Array.isArray(window.state.player.dailyBizChallenges) || window.state.player.dailyBizChallenges.length === 0) {
                 this._generateDailyBizChallenges();
             }
 
             this._checkOfflineCapitalization();
             this._syncActiveBonus();
-
-        } catch (e) {
-            console.error('[PhoneBusiness] КРИТИЧЕСКАЯ ОШИБКА в ensureState:', e);
-            if (typeof showToast === 'function') {
-                showToast('⚠️ Ошибка инициализации бизнеса. Проверьте консоль.', 'error');
-            }
         } finally {
             this._ensureStateInProgress = false;
         }
     },
 
-    // ========================================================
-    // ЭКОНОМИЧЕСКИЙ ЦИКЛ
-    // ========================================================
     _generateEconomicCycle() {
         const roll = Math.random();
         let cycleId = 'stable';
         if (roll < 0.25) cycleId = 'boom';
         else if (roll < 0.55) cycleId = 'bust';
 
-        const cycle = { ...this.ECONOMIC_CYCLES[cycleId] };
+        const cycle = { ...(this.ECONOMIC_CYCLES[cycleId] || { incomeMul: 1.0, name: 'Стабильный рынок' }) };
         cycle.daysLeft = Math.floor(2 + Math.random() * 4);
-        cycle.startedDay = window.state.player?.day || 1;
-
-        console.log(`[PhoneBusiness] 🌍 Новый экономический цикл: ${cycle.name} (${cycle.daysLeft} дн.)`);
+        cycle.startedDay = window.state?.player?.day || 1;
         return cycle;
     },
 
     _getEconomicCycleMultiplier() {
-        const cycle = window.state.player?.economicCycle;
+        const cycle = window.state?.player?.economicCycle;
         if (!cycle) return 1.0;
-        const curDay = window.state.player?.day || 1;
+        const curDay = window.state?.player?.day || 1;
         const elapsed = curDay - (cycle.startedDay || curDay);
         if (elapsed >= cycle.daysLeft) return 1.0;
         return cycle.incomeMul || 1.0;
     },
 
     _tickEconomicCycle() {
-        const curDay = window.state.player?.day || 1;
-        const cycle = window.state.player?.economicCycle;
-
-        if (!cycle) {
-            window.state.player.economicCycle = this._generateEconomicCycle();
-            return;
-        }
-
-        const elapsed = curDay - (cycle.startedDay || curDay);
-        if (elapsed >= cycle.daysLeft) {
-            console.log(`[PhoneBusiness] 🌍 Цикл "${cycle.name}" закончился, генерируем новый`);
+        const curDay = window.state?.player?.day || 1;
+        const cycle = window.state?.player?.economicCycle;
+        if (!cycle || (curDay - (cycle.startedDay || curDay)) >= cycle.daysLeft) {
             window.state.player.economicCycle = this._generateEconomicCycle();
         }
     },
 
-    // ========================================================
-    // ЕЖЕДНЕВНЫЕ ЧЕЛЛЕНДЖИ
-    // ========================================================
     _generateDailyBizChallenges() {
-        const shuffled = [...this.DAILY_BIZ_CHALLENGES].sort(() => 0.5 - Math.random());
-        const count = 3;
-
-        window.state.player.dailyBizChallenges = shuffled.slice(0, count).map(ch => ({
-            id: ch.id,
-            text: ch.text,
-            cur: 0,
-            max: ch.target,
-            action: ch.action,
-            reward: ch.reward,
-            xp: ch.xp,
-            done: false
+        const list = this.DAILY_BIZ_CHALLENGES;
+        const shuffled = [...list].sort(() => 0.5 - Math.random());
+        window.state.player.dailyBizChallenges = shuffled.slice(0, 3).map(ch => ({
+            id: ch.id, text: ch.text, cur: 0, max: ch.target, action: ch.action, reward: ch.reward, xp: ch.xp, done: false
         }));
     },
 
     _trackBizChallenge(actionType, count = 1) {
-        const challenges = window.state.player?.dailyBizChallenges;
+        const challenges = window.state?.player?.dailyBizChallenges;
         if (!Array.isArray(challenges)) return;
 
         let updated = false;
@@ -362,7 +232,6 @@ const PhoneBusiness = {
             if (!ch.done && ch.action === actionType) {
                 ch.cur = Math.min(ch.max, (ch.cur || 0) + count);
                 updated = true;
-
                 if (ch.cur >= ch.max) {
                     ch.done = true;
                     if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
@@ -371,25 +240,16 @@ const PhoneBusiness = {
                         window.state.player.cash = (window.state.player.cash || 0) + ch.reward;
                     }
                     if (typeof addXp === 'function') addXp(ch.xp);
-                    if (typeof showToast === 'function') {
-                        showToast(`🏆 Челлендж выполнен: «${ch.text}» +${ch.reward.toLocaleString()} ₽`);
-                    }
-                    if (window.AudioFx) {
-                        window.AudioFx.play('win');
-                        window.AudioFx.haptic('success');
-                    }
+                    if (typeof showToast === 'function') showToast(`🏆 Челлендж выполнен: «${ch.text}» +${ch.reward.toLocaleString()} ₽`);
+                    if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
                 }
             }
         });
-
         if (updated && typeof saveState === 'function') saveState();
     },
 
-    // ========================================================
-    // ОФФЛАЙН-КАПИТАЛИЗАЦИЯ
-    // ========================================================
     _checkOfflineCapitalization() {
-        if (!window.state || !window.state.player) return;
+        if (!window.state?.player) return;
         const lastVisit = window.state.player.lastBizVisitDay || 0;
         const curDay = window.state.player.day || 1;
         const daysAway = curDay - lastVisit;
@@ -403,23 +263,14 @@ const PhoneBusiness = {
                     bonus += bns;
                 }
             });
-
-            if (bonus > 0) {
-                setTimeout(() => {
-                    if (typeof showToast === 'function') {
-                        showToast(`💎 Оффлайн-бонус: +${bonus.toLocaleString()} ₽ к кассе!`);
-                    }
-                }, 2000);
+            if (bonus > 0 && typeof showToast === 'function') {
+                setTimeout(() => showToast(`💎 Оффлайн-бонус: +${bonus.toLocaleString()} ₽ к кассе!`), 2000);
             }
         }
-
         window.state.player.lastBizVisitDay = curDay;
         if (typeof saveState === 'function') saveState();
     },
 
-    // ========================================================
-    // ЦЕЛЕВЫЕ УРОВНИ СЕТИ
-    // ========================================================
     _getNetworkMilestoneBonus() {
         const owned = this.countOwned();
         let bonus = 0;
@@ -438,20 +289,15 @@ const PhoneBusiness = {
     },
 
     _getDiversityBonus() {
-        if (!Array.isArray(window.state.businesses)) return 0;
+        if (!Array.isArray(window.state?.businesses)) return 0;
         const ownedTypes = new Set(
-            window.state.businesses
-                .filter(b => b && b.level > 0)
-                .map(b => String(b.id).replace(/\d+/g, '').trim())
+            window.state.businesses.filter(b => b && b.level > 0).map(b => String(b.id).replace(/\d+/g, '').trim())
         );
         if (ownedTypes.size >= 5) return 0.15;
         if (ownedTypes.size >= 3) return 0.07;
         return 0;
     },
 
-    // ========================================================
-    // БАЗОВЫЕ ХЕЛПЕРЫ
-    // ========================================================
     _generateDNA(bizId) {
         const uid = String(window.state?.player?.uid || 'guest');
         const seed = (uid + '_' + bizId).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -488,56 +334,46 @@ const PhoneBusiness = {
     _syncActiveBonus() {
         const curDay = window.state?.player?.day || 1;
         const storedBonus = window.state?.player?.businessAdBonus;
-
-        if (!storedBonus) {
+        if (!storedBonus || (storedBonus.expiresDay || 0) < curDay) {
             this._activeBonus = null;
-            return;
-        }
-
-        if ((storedBonus.expiresDay || 0) < curDay) {
-            window.state.player.businessAdBonus = null;
-            this._activeBonus = null;
+            if (window.state?.player) window.state.player.businessAdBonus = null;
         } else {
             this._activeBonus = storedBonus;
         }
     },
 
-    // ========================================================
-    // РАСЧЁТЫ
-    // ========================================================
     countOwned() {
         if (!Array.isArray(window.state?.businesses)) return 0;
         return window.state.businesses.filter(b => b && b.level > 0).length;
     },
 
     getWorkshopBonus(branch) {
-        if (!window.state.businessWorkshop) return 0;
-        return window.state.businessWorkshop[branch] || 0;
+        return window.state?.businessWorkshop?.[branch] || 0;
     },
 
     getBizIncome(b) {
-        if (!b || typeof b !== 'object') return 0;
-        if (b.level <= 0) return 0;
+        if (!b || typeof b !== 'object' || b.level <= 0) return 0;
 
         let inc = this._n(b.income, 0) * Math.pow(1.55, Math.max(0, b.level - 1));
         inc *= this.getDNAMultiplier(b.dna);
 
         if (b.stock <= 0) inc *= 0.15;
 
-        const curDay = window.state.player?.day || 1;
+        const curDay = window.state?.player?.day || 1;
         (b.activeBuffs || []).forEach(buff => {
-            if (buff && (buff.expiresDay || 0) >= curDay) {
-                inc *= (1 + (buff.pct || 0) / 100);
-            }
+            if (buff && (buff.expiresDay || 0) >= curDay) inc *= (1 + (buff.pct || 0) / 100);
         });
         (b.activeDebuffs || []).forEach(debuff => {
-            if (debuff && (debuff.expiresDay || 0) >= curDay) {
-                inc *= (1 - (debuff.pct || 0) / 100);
-            }
+            if (debuff && (debuff.expiresDay || 0) >= curDay) inc *= (1 - (debuff.pct || 0) / 100);
         });
 
         const repBonus = Math.min(20, (b.reputation || 0) * 0.2);
         inc *= (1 + repBonus / 100);
+
+        if (window.BusinessFleetModule) {
+            const fleetIncome = window.BusinessFleetModule.calculateFleetIncomeForBiz(b.id);
+            inc += fleetIncome.net;
+        }
 
         return Math.round(inc);
     },
@@ -547,16 +383,13 @@ const PhoneBusiness = {
         if (base <= 0) return 0;
 
         let total = base;
-
         total *= (1 + this.getWorkshopBonus('equipment') * 0.15);
         total *= (1 + this.getWorkshopBonus('brand') * 0.20);
 
-        if ((window.state.businessStaff?.accountant || 0) > 0) {
-            total *= 1.08;
-        }
+        if ((window.state?.businessStaff?.accountant || 0) > 0) total *= 1.08;
 
         this._syncActiveBonus();
-        if (this._activeBonus && this._activeBonus.expiresDay >= (window.state.player?.day || 1)) {
+        if (this._activeBonus && this._activeBonus.expiresDay >= (window.state?.player?.day || 1)) {
             total *= (1 + (this._activeBonus.bonusPct || 0) / 100);
         }
 
@@ -570,13 +403,10 @@ const PhoneBusiness = {
 
     getTotalDailyIncome() {
         if (!Array.isArray(window.state?.businesses)) return 0;
-
         let total = 0;
         window.state.businesses.forEach(b => {
-            if (!b || b.level <= 0) return;
-            total += this.getBizIncomeWithBonuses(b);
+            if (b && b.level > 0) total += this.getBizIncomeWithBonuses(b);
         });
-
         return Math.round(total);
     },
 
@@ -606,147 +436,23 @@ const PhoneBusiness = {
     },
 
     isWorkshopMaxed() {
-        if (!window.state.businessWorkshop) return false;
+        if (!window.state?.businessWorkshop) return false;
         return this.workshopUpgrades.every(u => (window.state.businessWorkshop[u.id] || 0) >= u.maxLevel);
     },
 
-    workshopUpgrades: [
-        { id: 'equipment',   fa: 'fa-wrench',         name: 'Оснащение цеха',          desc: '+15% к выручке сети за уровень',        baseCost: 147000, costMul: 1.70, maxLevel: 3 },
-        { id: 'storage',     fa: 'fa-boxes-stacked',  name: 'Склад и ёмкости',         desc: 'Вместимость сырья +50% за уровень',      baseCost: 105000, costMul: 1.60, maxLevel: 3 },
-        { id: 'brand',       fa: 'fa-bullhorn',       name: 'Брендирование и реклама', desc: '+20% пассивного дохода за уровень',      baseCost: 220000, costMul: 1.80, maxLevel: 3 },
-        { id: 'diagnostics', fa: 'fa-laptop-code',    name: 'Компьютерный стенд',      desc: '+10% к шансу выявить скрытые косяки',    baseCost: 310000, costMul: 1.90, maxLevel: 3 }
-    ],
-
-    staffList: [
-        { id: 'mechanic',   fa: 'fa-screwdriver-wrench', name: 'Мастер-универсал',     role: 'Ремонт и слесарка',    salary: 45000, maxHired: 5, perk: '+10% к скорости ремонта' },
-        { id: 'painter',    fa: 'fa-spray-can',           name: 'Колорист-маляр',       role: 'Покраска',              salary: 60000, maxHired: 3, perk: '-15% к расходу краски' },
-        { id: 'manager',    fa: 'fa-user-tie',            name: 'Управляющий филиалом', role: 'Администрирование',    salary: 85000, maxHired: 2, perk: 'Автосбор кассы раз в день' },
-        { id: 'accountant', fa: 'fa-calculator',          name: 'Главный бухгалтер',    role: 'Финансы и налоги',     salary: 75000, maxHired: 1, perk: '+8% к чистой выручке' }
-    ],
-
-    fleetVehicles: [
-        { id: 'gazelle',     fa: 'fa-truck',          name: 'ГАЗель NEXT (Фургон)',           cost: 850000,  dailyCost: 1200, bonus: 'Доставка сырья дешевле на 30%' },
-        { id: 'tow_truck',   fa: 'fa-truck-pickup',   name: 'Эвакуатор ГАЗон NEXT',           cost: 1650000, dailyCost: 2400, bonus: 'Бесплатный выезд за авто дальше 25 км' },
-        { id: 'service_van', fa: 'fa-shuttle-van',    name: 'Mercedes Sprinter (Моб. сервис)', cost: 3200000, dailyCost: 4500, bonus: 'Осмотр авто на выезде без СТО' }
-    ],
-
     // ========================================================
-    // ⭐ v6.0.0: РАСШИРЕННАЯ СИСТЕМА ДОСТИЖЕНИЙ
-    // ========================================================
-    achievements: [
-        // ─── Бизнес-сеть ───
-        { id: 'first_point',  title: '🏪 Первый объект',      cond: () => PhoneBusiness.countOwned() >= 1,   reward: { cash: 50000,  xp: 50 } },
-        { id: 'five_points',  title: '🏙 Бизнес-империя',     cond: () => PhoneBusiness.countOwned() >= 5,   reward: { cash: 250000, xp: 150 } },
-        { id: 'ten_points',   title: '👑 Магнат автобизнеса', cond: () => PhoneBusiness.countOwned() >= 10,  reward: { cash: 1000000, stars: 25, xp: 500 } },
-        { id: 'cash_100k',    title: '💰 Первая сотня',       cond: () => PhoneBusiness.getAccumulatedCash() >= 100000,   reward: { cash: 30000, xp: 40 } },
-        { id: 'cash_1m',      title: '💎 Миллион в кассах',   cond: () => PhoneBusiness.getAccumulatedCash() >= 1000000,  reward: { cash: 200000, xp: 200 } },
-        { id: 'all_workshop', title: '🔧 Полное оснащение',   cond: () => PhoneBusiness.isWorkshopMaxed(),                reward: { cash: 500000, stars: 15, xp: 300 } },
-        { id: 'corporation',  title: '🏢 Корпорация',         cond: () => PhoneBusiness._getCorporationBonus() >= 0.40,   reward: { cash: 750000, stars: 30, xp: 400 } },
-        { id: 'first_p2p',    title: '💸 Первая продажа бизнеса', cond: () => (window.state.player.businessSalesCount || 0) >= 1, reward: { cash: 100000, xp: 100 } },
-
-        // ─── ⭐ v6.0.0: КОЛЛЕКЦИОНЕР НОМЕРОВ ───
-        {
-            id: 'plate_collector',
-            title: '🏷️ Коллекционер номеров',
-            desc: 'Соберите 10 госномеров в инвентаре',
-            targetCount: 10,
-            progressFn: () => (window.PlatesManager ? window.PlatesManager.getAllPlates().length : 0),
-            reward: { cash: 150000, stars: 10, xp: 150 }
-        },
-        {
-            id: 'plate_legend',
-            title: '🏆 Властелин спецсерий',
-            desc: 'Имейте 3 номера из серий АМР, ЕКХ или 777',
-            targetCount: 3,
-            progressFn: () => {
-                if (!window.PlatesManager) return 0;
-                const plates = window.PlatesManager.getAllPlates();
-                const special = plates.filter(p => {
-                    const n = String(p.number || '').toUpperCase();
-                    return n.includes('АМР') || n.includes('ЕКХ') || n.includes('777');
-                });
-                return special.length;
-            },
-            reward: { cash: 300000, stars: 25, xp: 300 }
-        },
-
-        // ─── ⭐ v6.0.0: БРЕНД-ДОСТИЖЕНИЯ ───
-        {
-            id: 'brand_bmw_lover',
-            title: '🚗 Фанат BMW',
-            desc: 'Продайте 5 машин BMW',
-            targetCount: 5,
-            progressFn: () => (window.state.player?.brandSalesCount?.bmw || 0),
-            reward: { cash: 200000, stars: 5, xp: 120 }
-        },
-        {
-            id: 'brand_vaz_master',
-            title: '🔧 Мастер ВАЗа',
-            desc: 'Продайте 10 машин ВАЗ',
-            targetCount: 10,
-            progressFn: () => (window.state.player?.brandSalesCount?.vaz || 0),
-            reward: { cash: 180000, stars: 5, xp: 100 }
-        },
-        {
-            id: 'brand_toyota_king',
-            title: '👑 Король Toyota',
-            desc: 'Продайте 5 машин Toyota',
-            targetCount: 5,
-            progressFn: () => (window.state.player?.brandSalesCount?.toyota || 0),
-            reward: { cash: 200000, stars: 5, xp: 120 }
-        },
-        {
-            id: 'brand_collector',
-            title: '🏆 Коллекционер брендов',
-            desc: 'Продайте машины 5 разных брендов',
-            targetCount: 5,
-            progressFn: () => {
-                const bsc = window.state.player?.brandSalesCount || {};
-                return Object.values(bsc).filter(v => v > 0).length;
-            },
-            reward: { cash: 400000, stars: 15, xp: 250 }
-        },
-
-        // ─── ⭐ v6.0.0: VIP-ДИЛЕР ───
-        {
-            id: 'vip_dealer',
-            title: '💎 VIP-Дилер',
-            desc: 'Продайте 3 машины VIP-покупателям (сарафанное радио)',
-            targetCount: 3,
-            progressFn: () => (window.state.player?.vipSalesCount || 0),
-            reward: { cash: 350000, stars: 20, xp: 200 }
-        },
-        {
-            id: 'clean_dealer',
-            title: '✨ Честный делец',
-            desc: 'Закройте 10 чистых сделок без юридических проблем',
-            targetCount: 10,
-            progressFn: () => (window.state.player?.cleanSalesCount || 0),
-            reward: { cash: 250000, stars: 10, xp: 200 }
-        }
-    ],
-
-    // ========================================================
-    // ГЛАВНЫЙ РЕНДЕР
+    // РЕНДЕР
     // ========================================================
     render(container) {
-        if (!container) {
-            console.warn('[PhoneBusiness] нет контейнера');
-            return;
-        }
+        if (!container) return;
         this.ensureState();
 
         const tab = this.currentTab;
         const dailyIncome = this.getTotalDailyIncome();
         const accumulated = this.getAccumulatedCash();
-        const ownedCount = this.countOwned();
-        const totalBiz = (window.state.businesses || []).length;
-        const corpBonus = Math.round(this._getCorporationBonus() * 100);
-        const cycle = window.state.player?.economicCycle;
-        const cycleMul = this._getEconomicCycleMultiplier();
-        const milestoneBonus = Math.round(this._getNetworkMilestoneBonus() * 100);
-        const diversityBonus = Math.round(this._getDiversityBonus() * 100);
-        const nextMilestone = this._getNextMilestone();
+        const legal = window.state?.player?.legalEntity || { type: 'none' };
+        const legalConfig = window.LEGAL_ENTITIES ? window.LEGAL_ENTITIES[legal.type] : null;
+        const isLegalActive = legal.type !== 'none';
 
         container.innerHTML = `
             <div class="phone-app-header">
@@ -762,8 +468,10 @@ const PhoneBusiness = {
             <div class="phone-app-body">
                 <div class="biz-summary-bar mb-2">
                     <div class="biz-summary-cell">
-                        <div class="biz-summary-label">Точек</div>
-                        <div class="biz-summary-value">${ownedCount} / ${totalBiz}</div>
+                        <div class="biz-summary-label">Форма</div>
+                        <div class="biz-summary-value ${isLegalActive ? 'color-cyan' : 'color-amber'}" style="font-size:11px;">
+                            ${(legalConfig && legalConfig.tag) ? legalConfig.tag : (isLegalActive ? legal.type.toUpperCase() : 'Физлицо')}
+                        </div>
                     </div>
                     <div class="biz-summary-cell">
                         <div class="biz-summary-label">Доход</div>
@@ -778,50 +486,22 @@ const PhoneBusiness = {
                     </button>
                 </div>
 
-                ${cycle ? `
-                    <div class="biz-event-card ${cycle.id === 'boom' ? 'event-bonus' : (cycle.id === 'bust' ? 'event-crisis' : '')} mb-2">
-                        <div class="biz-event-icon">
-                            ${cycle.id === 'boom' ? '<i class="fa-solid fa-arrow-trend-up"></i>' : (cycle.id === 'bust' ? '<i class="fa-solid fa-arrow-trend-down"></i>' : '<i class="fa-solid fa-scale-balanced"></i>')}
+                ${!isLegalActive ? `
+                    <div class="glass-card mb-2" style="background: linear-gradient(135deg, rgba(255,179,0,0.08), rgba(9,14,24,0.96)); border: 1px solid rgba(255,179,0,0.35); border-left: 3px solid var(--amber); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                                <i class="fa-solid fa-triangle-exclamation" style="color: var(--amber); font-size: 13px;"></i>
+                                <b style="color: var(--amber); font-size: 11px;">Требуется регистрация бизнеса</b>
+                            </div>
+                            <div class="sub-label" style="font-size: 8.5px; color: #94a3b8; line-height: 1.3;">
+                                Для покупки объектов и автопарков оформите ИП или ООО через Госуслуги.
+                            </div>
                         </div>
-                        <div class="biz-event-body">
-                            <div class="biz-event-title">${cycle.name.replace(/[📈📉⚖️]\s?/, '')}</div>
-                            <div class="biz-event-desc">${cycle.desc}</div>
+                        <div style="flex-shrink: 0;">
+                            <button onclick="if(window.PhoneManager) PhoneManager.openApp('gosuslugi')" class="btn btn-amber btn-sm" style="width: auto !important; min-width: 95px; padding: 7px 12px; font-size: 10px; font-weight: 700; white-space: nowrap; border-radius: 8px; box-shadow: 0 0 10px rgba(255,179,0,0.3); display: inline-flex; align-items: center; justify-content: center; gap: 5px;">
+                                Госуслуги <i class="fa-solid fa-arrow-right" style="font-size: 8.5px;"></i>
+                            </button>
                         </div>
-                        <div class="biz-event-badge ${cycle.id === 'boom' ? 'badge-green' : (cycle.id === 'bust' ? 'badge-red' : '')}" style="${cycle.id === 'stable' ? 'background:rgba(0,242,254,0.15); color:#00f2fe; border:1px solid rgba(0,242,254,0.4);' : ''}">
-                            ×${cycleMul.toFixed(2)} · ${Math.max(0, cycle.daysLeft - ((window.state.player.day || 1) - (cycle.startedDay || 1)))}д
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${(milestoneBonus > 0 || diversityBonus > 0 || corpBonus > 0) ? `
-                    <div class="biz-progress-block mb-2" style="border-color:rgba(0,230,118,0.3);">
-                        <div class="biz-progress-header">
-                            <div class="biz-progress-title"><i class="fa-solid fa-gift"></i> Активные бонусы сети</div>
-                        </div>
-                        <div class="space-y-1" style="font-size:10px;">
-                            ${milestoneBonus > 0 ? `<div class="flex-between"><span><i class="fa-solid fa-trophy color-amber"></i> Milestone сети:</span> <b class="color-green">+${milestoneBonus}%</b></div>` : ''}
-                            ${diversityBonus > 0 ? `<div class="flex-between"><span><i class="fa-solid fa-star color-cyan"></i> Разнообразие типов:</span> <b class="color-green">+${diversityBonus}%</b></div>` : ''}
-                            ${corpBonus > 0 ? `<div class="flex-between"><span><i class="fa-solid fa-building color-purple"></i> Корпорация:</span> <b class="color-green">+${corpBonus}%</b></div>` : ''}
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${nextMilestone ? `
-                    <div class="biz-progress-block mb-2">
-                        <div class="biz-progress-header">
-                            <div class="biz-progress-title"><i class="fa-solid fa-network-wired"></i> ${nextMilestone.name.replace(/[🌱🏪🏙🌐]\s?/, '')}</div>
-                            <div class="biz-progress-value">${ownedCount} / ${nextMilestone.count}</div>
-                        </div>
-                        <div class="biz-progress-track">
-                            <div class="biz-progress-fill" style="width:${Math.min(100, (ownedCount / nextMilestone.count) * 100)}%;"></div>
-                        </div>
-                        <div class="biz-progress-hint">Награда: <b class="color-green">${nextMilestone.bonus}</b></div>
-                    </div>
-                ` : ''}
-
-                ${this._activeBonus && this._activeBonus.expiresDay >= (window.state.player?.day || 1) ? `
-                    <div class="biz-ad-bonus mb-2">
-                        <i class="fa-solid fa-bullhorn"></i> <b>Реклама активна!</b> +${this._activeBonus.bonusPct}% до дня ${this._activeBonus.expiresDay}
                     </div>
                 ` : ''}
 
@@ -850,71 +530,24 @@ const PhoneBusiness = {
         const content = document.getElementById('bizTabContent');
         if (!content) return;
 
-        try {
-            if (tab === 'points')        this.renderPointsTab(content);
-            else if (tab === 'workshop') this.renderWorkshopTab(content);
-            else if (tab === 'staff')    this.renderStaffTab(content);
-            else if (tab === 'fleet')    this.renderFleetTab(content);
-            else if (tab === 'corp')     this.renderCorporationTab(content);
-            else                         this.renderPointsTab(content);
-        } catch (e) {
-            console.error('[PhoneBusiness] Ошибка рендера таба:', tab, e);
-            content.innerHTML = `
-                <div class="glass-card p-3 text-center" style="border-color: var(--red);">
-                    <div style="font-size: 28px; margin-bottom: 6px;"><i class="fa-solid fa-triangle-exclamation color-red"></i></div>
-                    <b class="color-red text-xs">Ошибка рендера бизнес-сети</b>
-                    <div class="sub-label mt-1" style="font-size: 9.5px;">${String(e.message || e).substring(0, 120)}</div>
-                </div>
-            `;
-        }
-    },
-
-    _renderDailyChallenges() {
-        const challenges = window.state.player?.dailyBizChallenges;
-        if (!Array.isArray(challenges) || challenges.length === 0) return '';
-
-        const doneCount = challenges.filter(c => c.done).length;
-
-        return `
-            <div class="biz-bottom-quests">
-                <div class="phone-quests-widget">
-                    <div class="quest-widget-header">
-                        <b class="text-xs color-amber"><i class="fa-solid fa-bullseye"></i> Ежедневные челленджи</b>
-                        <span class="tag-badge bg-tag-amber" style="font-size:8px;">${doneCount} / ${challenges.length}</span>
-                    </div>
-                    <div class="space-y-2">
-                        ${challenges.map(ch => `
-                            <div class="quest-card-item ${ch.done ? 'quest-completed' : ''}">
-                                <div class="quest-card-info">
-                                    <div class="quest-card-title">${ch.text}</div>
-                                    <div class="quest-card-sub">
-                                        <span class="sub-label">${ch.cur || 0} / ${ch.max}</span>
-                                        <span class="color-green font-bold">+${ch.reward.toLocaleString()} ₽</span>
-                                    </div>
-                                </div>
-                                ${ch.done ? '<span class="quest-done-badge"><i class="fa-solid fa-check"></i></span>' : '<i class="fa-solid fa-hourglass-half color-amber"></i>'}
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            </div>
-        `;
+        if (tab === 'points')        this.renderPointsTab(content);
+        else if (tab === 'workshop') this.renderWorkshopTab(content);
+        else if (tab === 'staff')    this.renderStaffTab(content);
+        else if (tab === 'fleet')    this.renderFleetTab(content);
+        else if (tab === 'corp')     this.renderCorporationTab(content);
+        else                         this.renderPointsTab(content);
     },
 
     setTab(tab) {
         this.currentTab = tab;
-        if (window.AudioFx) window.AudioFx.play('tick');
-        if (window.AudioFx) window.AudioFx.haptic('light');
+        if (window.AudioFx) { window.AudioFx.play('tick'); window.AudioFx.haptic('light'); }
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // ========================================================
-    // ТАБ: ТОЧКИ
-    // ========================================================
     renderPointsTab(container) {
         if (!container) return;
-        const pLvl = window.state.player?.level || 1;
-        const curDay = window.state.player?.day || 1;
+        const pLvl = window.state?.player?.level || 1;
+        const curDay = window.state?.player?.day || 1;
 
         const sorted = [...window.state.businesses]
             .filter(b => b)
@@ -927,22 +560,10 @@ const PhoneBusiness = {
 
         let html = '';
         sorted.forEach(b => {
-            try {
-                html += this._renderBizCard(b, pLvl, curDay);
-            } catch (e) {
-                console.error('[PhoneBusiness] Ошибка рендера карточки:', b.id, e);
-                html += `
-                    <div class="glass-card mb-2 p-2" style="border-color: var(--red);">
-                        <b class="text-xs color-red">⚠️ Ошибка карточки: ${b.name || b.id}</b>
-                        <div class="sub-label mt-1" style="font-size: 9px;">${String(e.message || e).substring(0, 100)}</div>
-                    </div>
-                `;
-            }
+            html += this._renderBizCard(b, pLvl, curDay);
         });
 
         html += this.renderAchievementsBlock();
-        html += this._renderDailyChallenges();
-
         container.innerHTML = html;
 
         requestAnimationFrame(() => {
@@ -958,7 +579,6 @@ const PhoneBusiness = {
         const isOwned = b.level > 0;
         const upgradeCost = Math.round((b.cost || 0) * Math.pow(1.65, b.level || 0));
         const isMaxed = b.level >= 5;
-        const isLockedByLevel = !isOwned && pLvl < (b.minLevel || 1);
 
         const currentIncome = isOwned ? this.getBizIncomeWithBonuses(b) : 0;
         const cash = Math.floor(b.stored || 0);
@@ -967,22 +587,11 @@ const PhoneBusiness = {
         const stockPct = Math.round((stock / maxStock) * 100);
 
         const dna = b.dna ? this._getDNAObject(b.dna) : null;
-        const dnaMult = this.getDNAMultiplier(b.dna);
-
         const skin = this._getCoverSkins().find(s => s.id === b.coverSkin) || this._getCoverSkins()[0];
         const sticker = this._getOwnerStickers().find(s => s.id === b.ownerSticker) || this._getOwnerStickers()[0];
 
         const rawImg = b.img || '';
         const fallbackImg = b.fallback || 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=600&q=80';
-
-        let imgAttrs;
-        if (typeof buildCarImageAttrs === 'function' && rawImg) {
-            imgAttrs = buildCarImageAttrs(rawImg, {
-                img: rawImg, images: [rawImg], fallback: fallbackImg, type: 'comfort'
-            });
-        } else {
-            imgAttrs = `src="${rawImg || fallbackImg}" onerror="this.onerror=null; this.src='${fallbackImg}';"`;
-        }
 
         const stickerHtml = sticker.id !== 'none' ? `
             <div class="biz-owner-sticker" style="border-color:${skin.color}; box-shadow:0 0 10px ${skin.color};">
@@ -990,28 +599,15 @@ const PhoneBusiness = {
             </div>
         ` : '';
 
-        const bizIcon = b.icon && b.icon.startsWith('<i') ? b.icon : this._iconForBiz(b.id);
-        const statusBadge = this._renderBizStatusBadge(b, pLvl, isMaxed);
-        const effectsHtml = this._renderBizEffects(b, curDay);
-
-        let paybackText = '';
-        if (isOwned && currentIncome > 0) {
-            const totalInvested = (b.cost || 0) * (Math.pow(1.65, b.level) - 1) / 0.65;
-            const paybackDays = Math.ceil(totalInvested / currentIncome);
-            paybackText = `▲ окупаемость ~${paybackDays} дн.`;
-        } else if (!isOwned && (b.income || 0) > 0) {
-            const estDays = Math.ceil((b.cost || 0) / (b.income || 1));
-            paybackText = `▲ расчетная ~${estDays} дн.`;
-        }
+        const supportsFleet = Boolean(window.BUSINESS_FLEET_REQUIREMENTS && window.BUSINESS_FLEET_REQUIREMENTS[b.id]);
+        const fleetCount = supportsFleet && window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(b.id).length : 0;
 
         return `
-            <div class="biz-card mb-3 ${skin.cssClass || ''}" style="border-top: 1px solid rgba(255,255,255,0.15); border-left: 2px solid ${isOwned ? skin.color : 'rgba(255,255,255,0.1)'}; ${isLockedByLevel ? 'opacity:0.75;' : ''}">
-                <div class="biz-cover" style="${isLockedByLevel ? 'filter:grayscale(0.85) brightness(0.6);' : ''}">
-                    <img ${imgAttrs} class="biz-cover-img"
-                         onerror="if(this.dataset.fbAttempted!=='1'){this.dataset.fbAttempted='1'; this.src='${fallbackImg}';}else{this.style.display='none'; this.parentNode.style.background='linear-gradient(135deg,#090e18,#050914)';}">
-                    <div class="biz-cover-icon">${bizIcon}</div>
+            <div class="biz-card mb-3 ${skin.cssClass || ''}" style="border-top: 1px solid rgba(255,255,255,0.15); border-left: 2px solid ${isOwned ? skin.color : 'rgba(255,255,255,0.1)'};">
+                <div class="biz-cover">
+                    <img src="${rawImg || fallbackImg}" class="biz-cover-img" onerror="this.src='${fallbackImg}';">
+                    <div class="biz-cover-icon">${this._iconForBiz(b.id)}</div>
                     ${stickerHtml}
-                    <div class="biz-cover-status">${statusBadge}</div>
                     <div class="biz-cover-overlay"></div>
                     <div class="biz-cover-title">
                         <b class="${isOwned ? 'color-green' : 'color-cyan'}">${b.customName || b.name}</b>
@@ -1022,49 +618,36 @@ const PhoneBusiness = {
                 <div class="biz-main-row">
                     <div class="biz-head-block">
                         <div class="biz-head-name">${b.customName || b.name}</div>
-                        <div class="biz-head-loc">
-                            <i class="fa-solid fa-location-dot"></i>
-                            <span>${dna ? dna.location.name : 'Городская локация'}</span>
-                        </div>
                         <div class="biz-badges-row">
                             <span class="tag-badge bg-tag-cyan">${b.id.toUpperCase()}</span>
                             ${isOwned ? `<span class="tag-badge bg-tag-amber"><i class="fa-solid fa-bolt"></i> СЕТЬ</span>` : `<span class="tag-badge bg-tag-dark">ПОД ВЫКУП</span>`}
-                            ${dnaMult !== 1 ? `<span class="tag-badge ${dnaMult > 1 ? 'bg-tag-green' : 'bg-tag-red'}">${dnaMult > 1 ? '+' : ''}${Math.round((dnaMult - 1) * 100)}% ПОТОК</span>` : ''}
+                            ${supportsFleet ? `<span class="tag-badge bg-tag-green"><i class="fa-solid fa-car"></i> ФЛОТ: ${fleetCount}</span>` : ''}
                         </div>
                     </div>
 
-                    <div class="biz-price-badge-box ${!isOwned ? 'badge-box-locked' : ''}">
+                    <div class="biz-price-badge-box">
                         <div class="biz-price-label">${isOwned ? 'ДОХОД В ДЕНЬ' : 'СТОИМОСТЬ'}</div>
                         <div class="biz-price-num">${isOwned ? `+${currentIncome.toLocaleString()} ₽` : `${(b.cost || 0).toLocaleString()} ₽`}</div>
-                        <div class="biz-price-sub">${paybackText}</div>
                     </div>
                 </div>
 
                 <div class="biz-tri-props-grid">
                     <div class="biz-prop-card">
-                        <div class="biz-prop-icon icon-amber">
-                            <i class="fa-solid fa-wallet"></i>
-                        </div>
+                        <div class="biz-prop-icon icon-amber"><i class="fa-solid fa-wallet"></i></div>
                         <div class="biz-prop-info">
                             <span class="biz-prop-label">${isOwned ? 'В кассе' : 'Базовый'}</span>
                             <b class="biz-prop-val color-amber">${isOwned ? `${cash.toLocaleString()} ₽` : `+${(b.income || 0).toLocaleString()}`}</b>
                         </div>
                     </div>
-
                     <div class="biz-prop-card">
-                        <div class="biz-prop-icon icon-green">
-                            <i class="fa-solid fa-boxes-stacked"></i>
-                        </div>
+                        <div class="biz-prop-icon icon-green"><i class="fa-solid fa-boxes-stacked"></i></div>
                         <div class="biz-prop-info">
                             <span class="biz-prop-label">Сырьё</span>
-                            <b class="biz-prop-val ${stockPct < 30 ? 'color-red' : (stockPct < 60 ? 'color-amber' : 'color-green')}">${isOwned ? `${stockPct}%` : '100%'}</b>
+                            <b class="biz-prop-val ${stockPct < 30 ? 'color-red' : 'color-green'}">${isOwned ? `${stockPct}%` : '100%'}</b>
                         </div>
                     </div>
-
                     <div class="biz-prop-card">
-                        <div class="biz-prop-icon icon-cyan">
-                            <i class="fa-solid fa-chart-simple"></i>
-                        </div>
+                        <div class="biz-prop-icon icon-cyan"><i class="fa-solid fa-chart-simple"></i></div>
                         <div class="biz-prop-info">
                             <span class="biz-prop-label">Трафик</span>
                             <b class="biz-prop-val color-cyan">${dna ? dna.traffic.name : 'Норма'}</b>
@@ -1072,95 +655,57 @@ const PhoneBusiness = {
                     </div>
                 </div>
 
-                ${isOwned ? `
-                    <div class="biz-progress-track mt-1">
-                        <div class="biz-progress-fill ${stockPct < 30 ? 'fill-red' : (stockPct < 60 ? 'fill-amber' : '')}" style="width: ${stockPct}%;"></div>
-                    </div>
-                ` : ''}
-
                 <div class="biz-quote-block">
-                    <div class="biz-quote-icon">
-                        ${b.stock <= 0 ? '⚠️' : (isOwned ? '💼' : '🏢')}
-                    </div>
                     <div class="biz-quote-text">
-                        ${b.stock <= 0
-                            ? '<span class="color-red font-bold">Сырьё на нуле! Выручка упала на 85%. Срочно пополните склад.</span>'
-                            : (b.perk ? `${b.perk}. ${b.desc || ''}` : (b.desc || 'Предприятие готово приносить пассивную прибыль сети.'))}
+                        ${b.desc || b.perk || 'Коммерческий объект сети.'}
                     </div>
                 </div>
 
-                ${effectsHtml}
-
                 ${isOwned ? this.renderSparkline(b) : ''}
-
-                ${this._renderBizActions(b, pLvl, isOwned, isMaxed, upgradeCost)}
+                ${this._renderBizActions(b, pLvl, isOwned, isMaxed, upgradeCost, supportsFleet)}
             </div>
         `;
     },
 
-    _renderBizStatusBadge(b, pLvl, isMaxed) {
-        const isOwned = b.level > 0;
+    _renderBizActions(b, pLvl, isOwned, isMaxed, upgradeCost, supportsFleet) {
         const isLockedByLevel = !isOwned && pLvl < (b.minLevel || 1);
-
-        if (!isOwned && isLockedByLevel) return `<span class="tag-badge bg-tag-red"><i class="fa-solid fa-lock"></i> ${b.minLevel} УР.</span>`;
-        if (!isOwned)                    return `<span class="tag-badge bg-tag-cyan">ДОСТУПНО</span>`;
-        if (isMaxed)                     return `<span class="tag-badge bg-tag-amber"><i class="fa-solid fa-crown"></i> MAX LVL</span>`;
-        return `<span class="tag-badge bg-tag-green">LVL ${b.level}</span>`;
-    },
-
-    _renderBizEffects(b, curDay) {
-        const activeBuffs = (b.activeBuffs || []).filter(x => x && (x.expiresDay || 0) >= curDay);
-        const activeDebuffs = (b.activeDebuffs || []).filter(x => x && (x.expiresDay || 0) >= curDay);
-        if (activeBuffs.length === 0 && activeDebuffs.length === 0) return '';
-
-        let html = `<div class="biz-effects-row" style="display:flex; flex-wrap:wrap; gap:5px;">`;
-        activeBuffs.forEach(buff => {
-            html += `<span class="tag-badge bg-tag-green" style="font-size:8px;"><i class="fa-solid fa-circle-check"></i> +${buff.pct}% (${buff.expiresDay - curDay + 1}д)</span>`;
-        });
-        activeDebuffs.forEach(d => {
-            html += `<span class="tag-badge bg-tag-red" style="font-size:8px;"><i class="fa-solid fa-triangle-exclamation"></i> -${d.pct}% (${d.expiresDay - curDay + 1}д)</span>`;
-        });
-        html += `</div>`;
-        return html;
-    },
-
-    _renderBizActions(b, pLvl, isOwned, isMaxed, upgradeCost) {
-        const isLockedByLevel = !isOwned && pLvl < (b.minLevel || 1);
-
         if (isLockedByLevel) {
             return `<button class="btn btn-dark btn-sm w-full opacity-50" disabled><i class="fa-solid fa-lock"></i> Требуется ${b.minLevel} ур.</button>`;
         }
 
         if (!isOwned) {
-            const canAfford = (window.state.player?.cash || 0) >= (b.cost || 0);
-            return `<button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn ${canAfford ? 'btn-green' : 'btn-dark opacity-50'} btn-sm w-full font-bold" style="min-height:44px; font-size:12px;" ${canAfford ? '' : 'disabled'}>
-                <i class="fa-solid fa-plus-circle"></i> Купить объект (${(b.cost || 0).toLocaleString()} ₽${b.reqStars ? ` + ${b.reqStars} ⭐` : ''})
-            </button>`;
+            const canAfford = (window.state?.player?.cash || 0) >= (b.cost || 0);
+            return `
+                <button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn ${canAfford ? 'btn-green' : 'btn-dark opacity-50'} btn-sm w-full font-bold" style="min-height:42px;">
+                    <i class="fa-solid fa-plus-circle"></i> Купить объект (${(b.cost || 0).toLocaleString()} ₽)
+                </button>
+            `;
         }
 
         const cash = Math.floor(b.stored || 0);
         return `
             <div class="biz-actions-grid">
-                <button onclick="PhoneBusiness.collectPointCash('${b.id}')" class="btn btn-green btn-sm" ${cash <= 0 ? 'disabled' : ''} title="Собрать кассу">
+                <button onclick="PhoneBusiness.collectPointCash('${b.id}')" class="btn btn-green btn-sm" ${cash <= 0 ? 'disabled' : ''}>
                     <i class="fa-solid fa-hand-holding-dollar"></i> ${cash > 0 ? (cash/1000).toFixed(1) + 'k' : 'Касса'}
                 </button>
-                <button onclick="PhoneBusiness.buySupplies('${b.id}')" class="btn btn-cyan btn-sm" title="Пополнить сырьё (15k)">
+                <button onclick="PhoneBusiness.buySupplies('${b.id}')" class="btn btn-cyan btn-sm">
                     <i class="fa-solid fa-boxes-stacked"></i> Сырьё
                 </button>
-                <button onclick="PhoneBusiness.openCustomizeModal('${b.id}')" class="btn btn-purple btn-sm" title="Изменить название/обложку">
-                    <i class="fa-solid fa-pen"></i> Инфо
-                </button>
+                ${supportsFleet ? `
+                    <button onclick="BusinessFleetModule.renderFleetManagerModal('${b.id}')" class="btn btn-amber btn-sm">
+                        <i class="fa-solid fa-truck-ramp-box"></i> Автопарк
+                    </button>
+                ` : `
+                    <button onclick="PhoneBusiness.openCustomizeModal('${b.id}')" class="btn btn-purple btn-sm">
+                        <i class="fa-solid fa-pen"></i> Инфо
+                    </button>
+                `}
             </div>
             ${!isMaxed ? `
-                <button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn btn-amber btn-sm w-full mt-1" ${(window.state.player?.cash || 0) < upgradeCost ? 'disabled' : ''}>
+                <button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn btn-amber btn-sm w-full mt-1">
                     <i class="fa-solid fa-arrow-up"></i> Улучшить до ур. ${b.level + 1} (${upgradeCost.toLocaleString()} ₽)
                 </button>
-            ` : `
-                <button class="btn btn-dark btn-sm w-full mt-1 opacity-50" disabled><i class="fa-solid fa-crown color-amber"></i> Максимальный уровень</button>
-            `}
-            <button onclick="PhoneBusiness.openSellModal('${b.id}')" class="btn btn-dark btn-sm w-full opacity-60 mt-1" style="font-size:9px; border-color:rgba(255,51,102,0.3);">
-                <i class="fa-solid fa-tag color-red"></i> Продать на P2P бирже
-            </button>
+            ` : ''}
         `;
     },
 
@@ -1171,7 +716,7 @@ const PhoneBusiness = {
                     <span><i class="fa-solid fa-chart-line color-green"></i> Доход за 7 дней:</span>
                     <span id="sparkLabel_${biz.id}" class="biz-spark-label">—</span>
                 </div>
-                <canvas id="bizSpark_${biz.id}" width="360" height="50"></canvas>
+                <canvas id="bizSpark_${biz.id}" width="360" height="45"></canvas>
             </div>
         `;
     },
@@ -1179,526 +724,245 @@ const PhoneBusiness = {
     drawSparkline(biz) {
         const canvas = document.getElementById(`bizSpark_${biz.id}`);
         if (!canvas) return;
-
-        if (!canvas.isConnected) {
-            console.warn(`[PhoneBusiness] drawSparkline: canvas для ${biz.id} не в DOM`);
-            return;
-        }
-
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
         const W = canvas.width, H = canvas.height;
         const history = (biz.incomeHistory || []).slice(-7);
         ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = 'rgba(0,0,0,0.3)';
-        ctx.fillRect(0, 0, W, H);
-
-        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-        for (let i = 1; i < 4; i++) {
-            const y = (H / 4) * i;
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-        }
 
         if (history.length < 2) {
             ctx.fillStyle = 'rgba(148,163,184,0.5)';
             ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText('Накапливаем данные с первого дня...', W / 2, H / 2 + 3);
-            const label = document.getElementById(`sparkLabel_${biz.id}`);
-            if (label) label.innerText = 'Нет данных';
+            ctx.fillText('Накапливаем статистику...', W / 2, H / 2 + 3);
             return;
         }
 
         const maxVal = Math.max(...history, 1);
         const stepX = W / (history.length - 1);
-        const padY = 6, usableH = H - padY * 2;
         ctx.strokeStyle = '#00e676'; ctx.lineWidth = 2; ctx.beginPath();
         history.forEach((val, i) => {
-            const x = i * stepX, y = H - padY - (val / maxVal) * usableH;
+            const x = i * stepX, y = H - 5 - (val / maxVal) * (H - 10);
             if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         });
         ctx.stroke();
-        ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath();
-        const grad = ctx.createLinearGradient(0, 0, 0, H);
-        grad.addColorStop(0, 'rgba(0,230,118,0.35)');
-        grad.addColorStop(1, 'rgba(0,230,118,0.02)');
-        ctx.fillStyle = grad; ctx.fill();
-        history.forEach((val, i) => {
-            const x = i * stepX, y = H - padY - (val / maxVal) * usableH;
-            ctx.fillStyle = '#00e676'; ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
-        });
-
-        const label = document.getElementById(`sparkLabel_${biz.id}`);
-        if (label) label.textContent = `Макс: ${maxVal.toLocaleString()} ₽`;
     },
 
-    // ========================================================
-    // ⭐ v6.0.0: ДОСТИЖЕНИЯ (С ПРОГРЕСС-БАРАМИ)
-    // ========================================================
     renderAchievementsBlock() {
-        const unlocked = window.state.player?.businessAchievements || [];
-
+        const unlocked = window.state?.player?.businessAchievements || [];
         const html = this.achievements.map(a => {
             const isDone = unlocked.includes(a.id);
-
-            let progressHtml = '';
-            if (!isDone && a.progressFn && a.targetCount) {
-                let cur = 0;
-                try { cur = a.progressFn() || 0; } catch (e) { cur = 0; }
-                const pct = Math.min(100, Math.round((cur / a.targetCount) * 100));
-                progressHtml = `
-                    <div class="mt-1">
-                        <div class="biz-progress-track" style="height:5px;">
-                            <div class="biz-progress-fill" style="width:${pct}%;"></div>
-                        </div>
-                        <div class="sub-label mt-1" style="font-size:7.5px; color:#94a3b8;">${cur} / ${a.targetCount}</div>
-                    </div>
-                `;
-            }
-
             return `
-                <div class="p-2 mb-1" style="background:${isDone ? 'rgba(0,230,118,0.08)' : '#050914'}; border-radius:8px; border:1px solid ${isDone ? 'rgba(0,230,118,0.3)' : 'rgba(255,255,255,0.05)'};">
-                    <div class="flex-between mb-1">
-                        <b class="text-xs ${isDone ? 'color-green' : 'color-main'}" style="font-size:11px;">${a.title}</b>
-                        ${isDone ? '<span class="tag-badge bg-tag-green"><i class="fa-solid fa-check"></i></span>' : '<span class="tag-badge bg-tag-dark"><i class="fa-solid fa-lock"></i></span>'}
+                <div class="p-2 mb-1 flex-between" style="background:#050914; border-radius:6px;">
+                    <div>
+                        <b class="text-xs ${isDone ? 'color-green' : 'color-main'}">${a.title}</b>
+                        <div class="sub-label" style="font-size:8px;">${a.desc || ''}</div>
                     </div>
-                    ${a.desc ? `<div class="sub-label mb-1" style="font-size:8.5px;">${a.desc}</div>` : ''}
-                    <div class="sub-label" style="font-size:8.5px;">Награда: ${a.reward.cash ? `+${a.reward.cash.toLocaleString()} ₽ ` : ''}${a.reward.stars ? `+${a.reward.stars} ⭐ ` : ''}${a.reward.xp ? `+${a.reward.xp} XP` : ''}</div>
-                    ${progressHtml}
+                    ${isDone ? '<span class="tag-badge bg-tag-green">✓</span>' : '<span class="tag-badge bg-tag-dark"><i class="fa-solid fa-lock"></i></span>'}
                 </div>
             `;
         }).join('');
 
         return `
-            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(255,179,0,0.1), #090e18); border-color: rgba(255,179,0,0.3);">
-                <div class="flex-between mb-2">
-                    <b class="text-xs color-amber"><i class="fa-solid fa-trophy"></i> Достижения</b>
-                    <span class="tag-badge bg-tag-amber">${unlocked.length} / ${this.achievements.length}</span>
-                </div>
+            <div class="glass-card mb-2 p-2">
+                <b class="text-xs color-amber mb-2 block"><i class="fa-solid fa-trophy"></i> Достижения автобизнеса:</b>
                 ${html}
             </div>
         `;
     },
 
-    /**
-     * Проверка и выдача достижений.
-     * Вызывается после каждой продажи / покупки бизнеса / ремонта.
-     */
     checkAchievements() {
-        if (!window.state.player) return;
+        if (!window.state?.player) return;
         if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
-        let unlocked = false;
-
         this.achievements.forEach(a => {
             if (window.state.player.businessAchievements.includes(a.id)) return;
             try {
-                if (a.cond()) {
+                if (a.cond && a.cond()) {
                     window.state.player.businessAchievements.push(a.id);
-
-                    if (a.reward.cash) {
-                        if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
-                            window.MoneyManager.earn(a.reward.cash, `Достижение: ${a.title}`, { silent: true });
-                        } else {
-                            window.state.player.cash = (window.state.player.cash || 0) + a.reward.cash;
-                        }
-                    }
-                    if (a.reward.stars) {
-                        window.state.player.stars = (window.state.player.stars || 0) + a.reward.stars;
-                    }
-                    if (a.reward.xp && typeof addXp === 'function') {
-                        addXp(a.reward.xp);
-                    }
-
+                    if (a.reward?.cash) window.state.player.cash = (window.state.player.cash || 0) + a.reward.cash;
                     if (typeof showToast === 'function') showToast(`🏆 Достижение: «${a.title}»!`);
-                    if (window.AudioFx) window.AudioFx.play('win');
-
-                    if (window.EventBus) {
-                        window.EventBus.emit('business:achievement', { id: a.id, title: a.title });
-                    }
-
-                    unlocked = true;
                 }
-            } catch (e) { console.warn('[Business] ошибка достижения:', a.id, e); }
+            } catch (e) {}
         });
-
-        if (unlocked && typeof saveState === 'function') saveState();
-    },
-
-    // ========================================================
-    // ТАБ: ЦЕХ
-    // ========================================================
-    renderWorkshopTab(container) {
-        if (!container) return;
-        let html = `
-            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0,242,254,0.12), #090e18); border-color: rgba(0,242,254,0.3);">
-                <b class="text-xs color-cyan"><i class="fa-solid fa-screwdriver-wrench"></i> Центральный цех сети</b>
-                <div class="sub-label mt-1" style="font-size:9px;">Прокачка даёт пассивные бонусы всем точкам одновременно.</div>
-            </div>
-        `;
-
-        this.workshopUpgrades.forEach(u => {
-            const curLvl = window.state.businessWorkshop[u.id] || 0;
-            const isMax = curLvl >= u.maxLevel;
-            const cost = Math.round(u.baseCost * Math.pow(u.costMul, curLvl));
-            const canAfford = (window.state.player?.cash || 0) >= cost;
-
-            html += `
-                <div class="biz-upgrade-item ${isMax ? 'item-maxed' : ''}">
-                    <div class="biz-upgrade-icon">
-                        <i class="fa-solid ${u.fa}"></i>
-                    </div>
-                    <div class="biz-upgrade-body">
-                        <div class="biz-upgrade-name">${u.name}</div>
-                        <div class="biz-upgrade-desc">${u.desc}</div>
-                    </div>
-                    <div class="biz-upgrade-level ${isMax ? 'level-maxed' : ''}">${curLvl}/${u.maxLevel}</div>
-                </div>
-                ${!isMax ? `
-                    <button onclick="PhoneBusiness.upgradeWorkshop('${u.id}')" class="btn ${canAfford ? 'btn-cyan' : 'btn-dark opacity-50'} btn-sm w-full mb-2" ${canAfford ? '' : 'disabled'}>
-                        <i class="fa-solid fa-arrow-up"></i> Прокачать до ${curLvl + 1} ур. (${cost.toLocaleString()} ₽)
-                    </button>
-                ` : `
-                    <button class="btn btn-dark btn-sm w-full mb-2 opacity-50" disabled><i class="fa-solid fa-check"></i> Максимум прокачано</button>
-                `}
-            `;
-        });
-        container.innerHTML = html;
-    },
-
-    // ========================================================
-    // ТАБ: ШТАТ
-    // ========================================================
-    renderStaffTab(container) {
-        if (!container) return;
-        let html = `
-            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(192,132,252,0.12), #090e18); border-color: rgba(192,132,252,0.3);">
-                <b class="text-xs color-purple"><i class="fa-solid fa-users"></i> Управление кадрами</b>
-                <div class="sub-label mt-1" style="font-size:9px;">Специалисты автоматизируют рутину и увеличивают прибыль сети.</div>
-            </div>
-        `;
-
-        this.staffList.forEach(s => {
-            const hired = window.state.businessStaff[s.id] || 0;
-            const isMax = hired >= s.maxHired;
-            const canAfford = (window.state.player?.cash || 0) >= s.salary;
-
-            html += `
-                <div class="glass-card mb-2 p-2">
-                    <div class="flex-between mb-1">
-                        <div class="flex-gap" style="align-items:center;">
-                            <div class="biz-point-icon" style="width:36px; height:36px;">
-                                <i class="fa-solid ${s.fa}"></i>
-                            </div>
-                            <div>
-                                <b class="text-xs color-purple">${s.name}</b>
-                                <div class="sub-label" style="font-size:8.5px;">${s.role}</div>
-                            </div>
-                        </div>
-                        <span class="tag-badge ${isMax ? 'bg-tag-amber' : 'bg-tag-purple'}">${hired}/${s.maxHired}</span>
-                    </div>
-                    <div class="p-2 mb-2" style="background:rgba(0,0,0,0.4); border-radius:8px;">
-                        <div class="sub-label" style="font-size:9px;"><i class="fa-solid fa-star color-amber"></i> ${s.perk}</div>
-                        <div class="sub-label mt-1" style="font-size:8.5px;">Оклад: <b class="color-amber">${s.salary.toLocaleString()} ₽</b> / мес.</div>
-                    </div>
-                    ${isMax ? `
-                        <button class="btn btn-dark btn-sm w-full opacity-50" disabled>Штат укомплектован</button>
-                    ` : `
-                        <button onclick="PhoneBusiness.hireStaff('${s.id}')" class="btn ${canAfford ? 'btn-purple' : 'btn-dark opacity-50'} btn-sm w-full" ${canAfford ? '' : 'disabled'}>
-                            <i class="fa-solid fa-user-plus"></i> Нанять (${s.salary.toLocaleString()} ₽)
-                        </button>
-                    `}
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-    },
-
-    // ========================================================
-    // ТАБ: АВТОПАРК
-    // ========================================================
-    renderFleetTab(container) {
-        if (!container) return;
-        let html = `
-            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(255,179,0,0.12), #090e18); border-color: rgba(255,179,0,0.3);">
-                <b class="text-xs color-amber"><i class="fa-solid fa-truck"></i> Корпоративный транспорт</b>
-                <div class="sub-label mt-1" style="font-size:9px;">Спецтехника снижает расходы и расширяет радиус.</div>
-            </div>
-        `;
-        this.fleetVehicles.forEach(v => {
-            const isOwned = window.state.businessFleet.includes(v.id);
-            const canAfford = (window.state.player?.cash || 0) >= v.cost;
-            html += `
-                <div class="glass-card mb-2 p-2">
-                    <div class="flex-between mb-1">
-                        <div class="flex-gap" style="align-items:center;">
-                            <div class="biz-point-icon" style="width:36px; height:36px;">
-                                <i class="fa-solid ${v.fa}"></i>
-                            </div>
-                            <div>
-                                <b class="text-xs color-amber">${v.name}</b>
-                                <div class="sub-label" style="font-size:8.5px;">${v.bonus}</div>
-                            </div>
-                        </div>
-                        ${isOwned ? '<span class="tag-badge bg-tag-green">В парке ✓</span>' : `<span class="tag-badge bg-tag-dark">${v.cost.toLocaleString()} ₽</span>`}
-                    </div>
-                    ${isOwned ? `
-                        <button class="btn btn-dark btn-sm w-full opacity-50" disabled><i class="fa-solid fa-check"></i> Куплено</button>
-                    ` : `
-                        <button onclick="PhoneBusiness.buyFleetVehicle('${v.id}')" class="btn ${canAfford ? 'btn-amber' : 'btn-dark opacity-50'} btn-sm w-full" ${canAfford ? '' : 'disabled'}>
-                            <i class="fa-solid fa-cart-shopping"></i> Купить (${v.cost.toLocaleString()} ₽)
-                        </button>
-                    `}
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-    },
-
-    // ========================================================
-    // ТАБ: КОРПОРАЦИИ
-    // ========================================================
-    renderCorporationTab(container) {
-        if (!container) return;
-        const groups = {};
-        window.state.businesses.forEach(b => {
-            if (!b || b.level < 1) return;
-            const rawId = String(b.id || '');
-            const key = rawId.replace(/\d+/g, '').trim() || rawId || '_default';
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(b);
-        });
-
-        let corpsHtml = '';
-        let hasAnyCorp = false;
-
-        for (const key in groups) {
-            const list = groups[key];
-            const eligible = list.filter(b => b.level >= 3);
-            const isCorp = eligible.length >= 3;
-            if (isCorp) hasAnyCorp = true;
-            const totalIncome = list.reduce((sum, b) => sum + this.getBizIncomeWithBonuses(b), 0);
-
-            corpsHtml += `
-                <div class="glass-card mb-2 p-2" style="border-left:3px solid ${isCorp ? 'var(--green)' : 'var(--border-glass)'};">
-                    <div class="flex-between mb-1">
-                        <div>
-                            <b class="text-xs ${isCorp ? 'color-green' : 'color-cyan'}">${list[0].name} × ${list.length}</b>
-                            <div class="sub-label" style="font-size:8.5px;">Точек уровня 3+: <b>${eligible.length} / 3</b></div>
-                        </div>
-                        ${isCorp
-                            ? '<span class="tag-badge bg-tag-green"><i class="fa-solid fa-building"></i> КОРПОРАЦИЯ +40%</span>'
-                            : `<span class="tag-badge bg-tag-dark">Не корпорация</span>`}
-                    </div>
-                    <div class="grid-2 text-xs" style="gap:4px;">
-                        <div>Суммарный доход: <b class="color-green">+${totalIncome.toLocaleString()} ₽/д</b></div>
-                        <div>Участников: <b>${list.length}</b></div>
-                    </div>
-                </div>
-            `;
-        }
-
-        if (!hasAnyCorp && Object.keys(groups).length === 0) {
-            corpsHtml = `<div class="glass-card text-center py-6 sub-label">Купите минимум 3 точки одного типа и прокачайте их до ур. 3 → получите корпорацию и бонус +40% к доходу.</div>`;
-        }
-
-        container.innerHTML = `
-            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0,230,118,0.12), #090e18); border-color: rgba(0,230,118,0.4);">
-                <div class="flex-between mb-1">
-                    <b class="text-xs color-green"><i class="fa-solid fa-building"></i> Корпорации бизнесов</b>
-                    <span class="tag-badge bg-tag-green">+40% к доходу</span>
-                </div>
-                <div class="sub-label" style="font-size:9px;">
-                    Объединяйте 3+ точки одного типа уровня 3+ в корпорацию.
-                </div>
-            </div>
-            ${corpsHtml}
-        `;
-    },
-
-    // ========================================================
-    // ДЕЙСТВИЯ
-    // ========================================================
-    collectAllCash() {
-        if (this._collectAllPending) return;
-        this._collectAllPending = true;
-
-        try {
-            this.ensureState();
-            let total = 0;
-            let points = 0;
-            window.state.businesses.forEach(b => {
-                if (b && b.level > 0 && b.stored > 0) {
-                    total += Math.floor(b.stored);
-                    b.totalEarned = (b.totalEarned || 0) + Math.floor(b.stored);
-                    b.stored = 0;
-                    points++;
-                }
-            });
-            if (total <= 0) {
-                if (typeof showToast === 'function') showToast('В кассах пусто!');
-                return;
-            }
-
-            if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
-                window.MoneyManager.earn(total, 'Сбор кассы бизнес-сети');
-            } else {
-                window.state.player.cash = (window.state.player.cash || 0) + total;
-                if (typeof logBankTransaction === 'function') logBankTransaction('Сбор кассы бизнес-сети', total, true);
-            }
-
-            if (typeof trackQuestProgress === 'function') trackQuestProgress('collect_biz', 1);
-            this._trackBizChallenge('collect', points);
-            if (typeof saveState === 'function') saveState();
-            if (typeof updateHeaderUI === 'function') updateHeaderUI();
-            if (window.AudioFx) window.AudioFx.play('win');
-            if (window.AudioFx) window.AudioFx.haptic('success');
-            if (typeof showToast === 'function') showToast(`💰 Собрано: +${total.toLocaleString()} ₽!`);
-            if (typeof spawnFloatingReward === 'function') spawnFloatingReward(`+${total.toLocaleString()} ₽`);
-
-            if (window.EventBus) {
-                window.EventBus.emit('business:income_collected', { total, source: 'all' });
-            }
-
-            this.checkAchievements();
-            this.render(document.getElementById('phoneAppContainer'));
-        } finally {
-            this._collectAllPending = false;
-        }
-    },
-
-    collectPointCash(bizId) {
-        if (this._collectPointPending) return;
-
-        this.ensureState();
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        if (!b || b.stored <= 0) return;
-
-        this._collectPointPending = true;
-        try {
-            const amount = Math.floor(b.stored);
-            b.stored = 0;
-            b.totalEarned = (b.totalEarned || 0) + amount;
-
-            if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
-                window.MoneyManager.earn(amount, `Сбор кассы: ${b.customName || b.name}`);
-            } else {
-                window.state.player.cash = (window.state.player.cash || 0) + amount;
-                if (typeof logBankTransaction === 'function') logBankTransaction(`Сбор кассы: ${b.customName || b.name}`, amount, true);
-            }
-
-            if (typeof saveState === 'function') saveState();
-            if (typeof updateHeaderUI === 'function') updateHeaderUI();
-            if (window.AudioFx) window.AudioFx.play('win');
-            if (window.AudioFx) window.AudioFx.haptic('success');
-            if (typeof showToast === 'function') showToast(`+${amount.toLocaleString()} ₽ из «${b.customName || b.name}»!`);
-            if (typeof trackQuestProgress === 'function') trackQuestProgress('collect_biz', 1);
-            this._trackBizChallenge('collect', 1);
-
-            if (window.EventBus) {
-                window.EventBus.emit('business:income_collected', { bizId, amount, source: 'point' });
-            }
-
-            this.checkAchievements();
-            this.render(document.getElementById('phoneAppContainer'));
-        } finally {
-            this._collectPointPending = false;
-        }
-    },
-
-    buySupplies(bizId) {
-        this.ensureState();
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        if (!b || b.level <= 0) return;
-
-        let cost = 15000;
-        if (window.state.businessFleet.includes('gazelle')) cost = Math.round(cost * 0.7);
-
-        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-            const ok = window.MoneyManager.spend(cost, `Сырьё: ${b.customName || b.name}`);
-            if (!ok) {
-                if (typeof showToast === 'function') showToast(`Не хватает ${cost.toLocaleString()} ₽!`);
-                return;
-            }
-        } else {
-            if ((window.state.player.cash || 0) < cost) {
-                if (typeof showToast === 'function') showToast(`Нужно ${cost.toLocaleString()} ₽!`);
-                return;
-            }
-            window.state.player.cash -= cost;
-            if (typeof logBankTransaction === 'function') logBankTransaction(`Сырьё: ${b.customName || b.name}`, cost, false);
-        }
-
-        b.stock = b.maxStock;
-
         if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('tick');
-        if (typeof showToast === 'function') showToast(`Склад «${b.customName || b.name}» пополнен до 100%`);
-        this._trackBizChallenge('stock', 1);
-
-        if (window.EventBus) {
-            window.EventBus.emit('business:supplies_bought', { bizId, cost });
-        }
-
-        this.render(document.getElementById('phoneAppContainer'));
     },
 
+    // ЦЕХ
+    renderWorkshopTab(container) {
+        let html = '<div class="sub-label mb-2 px-1" style="font-size:10px;">Прокачка цеха даёт постоянные процентные бонусы ко всей вашей бизнес-сети:</div>';
+        this.workshopUpgrades.forEach(u => {
+            const curLvl = window.state?.businessWorkshop?.[u.id] || 0;
+            const cost = Math.round(u.baseCost * Math.pow(u.costMul, curLvl));
+            const isMax = curLvl >= u.maxLevel;
+            
+            html += `
+                <div class="glass-card mb-2" style="background:linear-gradient(135deg, rgba(13,20,36,0.95), rgba(9,14,24,0.98)); border:1px solid rgba(0,242,254,0.18); border-radius:12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+                        <div style="width:38px; height:38px; border-radius:10px; background:rgba(0,242,254,0.1); border:1px solid rgba(0,242,254,0.25); display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--cyan); flex-shrink:0;">
+                            <i class="fa-solid ${u.fa}"></i>
+                        </div>
+                        <div style="flex:1; min-width:0;">
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+                                <b style="font-size:11.5px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${u.name}</b>
+                                <span class="tag-badge ${isMax ? 'bg-tag-amber' : 'bg-tag-cyan'}" style="font-size:7.5px; padding:1px 5px;">${curLvl}/${u.maxLevel} УР</span>
+                            </div>
+                            <div class="sub-label" style="font-size:9px; color:#94a3b8; line-height:1.25;">${u.desc}</div>
+                        </div>
+                    </div>
+                    <div style="flex-shrink:0;">
+                        ${!isMax ? `
+                            <button onclick="PhoneBusiness.upgradeWorkshop('${u.id}')" class="btn btn-cyan btn-sm" style="width:auto !important; min-width:115px; padding:7px 12px; font-size:10px; font-weight:700; white-space:nowrap; border-radius:8px; box-shadow:0 0 10px rgba(0,242,254,0.25);">
+                                +1 ур. (${cost.toLocaleString()} ₽)
+                            </button>
+                        ` : `
+                            <span class="tag-badge bg-tag-amber font-bold" style="padding:6px 10px; font-size:9.5px; border-radius:8px; display:inline-block;">МАКС. УР. ✓</span>
+                        `}
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    },
+
+    // ШТАТ
+    renderStaffTab(container) {
+        let html = '<div class="sub-label mb-2 px-1" style="font-size:10px;">Найм специалистов для снижения расходов и автоматизации:</div>';
+        this.staffList.forEach(s => {
+            const hired = window.state?.businessStaff?.[s.id] || 0;
+            const isFull = hired >= s.maxHired;
+            
+            html += `
+                <div class="glass-card mb-2" style="background:linear-gradient(135deg, rgba(13,20,36,0.95), rgba(9,14,24,0.98)); border:1px solid rgba(192,132,252,0.2); border-radius:12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+                        <div style="width:38px; height:38px; border-radius:10px; background:rgba(192,132,252,0.12); border:1px solid rgba(192,132,252,0.3); display:flex; align-items:center; justify-content:center; font-size:16px; color:#c084fc; flex-shrink:0;">
+                            <i class="fa-solid ${s.fa}"></i>
+                        </div>
+                        <div style="flex:1; min-width:0;">
+                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+                                <b style="font-size:11.5px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.name}</b>
+                                <span class="tag-badge bg-tag-purple" style="font-size:7.5px; padding:1px 5px;">${hired}/${s.maxHired}</span>
+                            </div>
+                            <div class="sub-label" style="font-size:9px; color:#c084fc; font-weight:600; margin-bottom:1px;">${s.perk}</div>
+                            <div class="sub-label" style="font-size:8.5px; color:#64748b;">Оклад: ${s.salary.toLocaleString()} ₽/мес</div>
+                        </div>
+                    </div>
+                    <div style="flex-shrink:0;">
+                        <button onclick="PhoneBusiness.hireStaff('${s.id}')" class="btn btn-purple btn-sm" ${isFull ? 'disabled' : ''} style="width:auto !important; min-width:110px; padding:7px 12px; font-size:10px; font-weight:700; white-space:nowrap; border-radius:8px; ${isFull ? 'opacity:0.5;' : 'box-shadow:0 0 10px rgba(192,132,252,0.25);'}">
+                            ${isFull ? 'Штат полон' : `Нанять (${(s.salary/1000).toFixed(0)}k ₽)`}
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    },
+
+    // ПАРК
+    renderFleetTab(container) {
+        let html = '<div class="sub-label mb-2 px-1" style="font-size:10px;">Спецтехника для обслуживания логистики и снижения себестоимости:</div>';
+        this.fleetVehicles.forEach(v => {
+            const isOwned = (window.state?.businessFleet || []).includes(v.id);
+            
+            html += `
+                <div class="glass-card mb-2" style="background:linear-gradient(135deg, rgba(13,20,36,0.95), rgba(9,14,24,0.98)); border:1px solid rgba(255,179,0,0.2); border-radius:12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                    <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+                        <div style="width:38px; height:38px; border-radius:10px; background:rgba(255,179,0,0.12); border:1px solid rgba(255,179,0,0.3); display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--amber); flex-shrink:0;">
+                            <i class="fa-solid ${v.fa}"></i>
+                        </div>
+                        <div style="flex:1; min-width:0;">
+                            <b style="font-size:11.5px; color:#fff; display:block; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.name}</b>
+                            <div class="sub-label" style="font-size:9px; color:#94a3b8; line-height:1.25;">${v.bonus}</div>
+                        </div>
+                    </div>
+                    <div style="flex-shrink:0;">
+                        ${isOwned ? `
+                            <span class="tag-badge bg-tag-green font-bold" style="padding:6px 12px; font-size:9.5px; border-radius:8px; display:inline-block;">В ПАРКЕ ✓</span>
+                        ` : `
+                            <button onclick="PhoneBusiness.buyFleetVehicle('${v.id}')" class="btn btn-amber btn-sm" style="width:auto !important; min-width:115px; padding:7px 12px; font-size:10px; font-weight:700; white-space:nowrap; border-radius:8px; box-shadow:0 0 10px rgba(255,179,0,0.25);">
+                                Купить (${v.cost.toLocaleString()} ₽)
+                            </button>
+                        `}
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+    },
+
+    renderCorporationTab(container) {
+        container.innerHTML = `
+            <div class="glass-card p-3 text-center">
+                <b class="text-xs color-green block mb-1"><i class="fa-solid fa-building"></i> Корпорации</b>
+                <div class="sub-label" style="font-size:9.5px;">
+                    Владейте 3+ точками одного типа уровня 3+, чтобы объединить их в корпорацию и получать +40% к выручке.
+                </div>
+            </div>
+        `;
+    },
+
+    // ========================================================
+    // ДЕЙСТВИЯ И ПОКУПКА С ПРОВЕРКОЙ ЮРЛИЦА
+    // ========================================================
     upgradePoint(bizId) {
         if (this._upgradePending) return;
-
         this.ensureState();
-        const b = window.state.businesses.find(x => x && x.id === bizId);
+
+        const b = (window.state?.businesses || []).find(x => x && x.id === bizId);
         if (!b) return;
 
         const isNew = b.level === 0;
-        const cost = isNew ? b.cost : Math.round(b.cost * Math.pow(1.65, b.level));
-        const pLvl = window.state.player?.level || 1;
 
-        if (isNew && pLvl < (b.minLevel || 1)) {
-            if (typeof showToast === 'function') showToast(`Нужен ${b.minLevel} уровень!`);
-            return;
+        if (isNew) {
+            const legal = window.state?.player?.legalEntity || { type: 'none' };
+            const docs = window.state?.player?.documents || {};
+            const hasIP = legal.type === 'ip' || Boolean(docs.ipRegistered) || Boolean(window.state?.player?.hasIP);
+            const hasOOO = legal.type === 'ooo' || Boolean(docs.oooRegistered) || Boolean(window.state?.player?.hasOOO);
+
+            if (!hasIP && !hasOOO) {
+                if (typeof showToast === 'function') {
+                    showToast('⚠️ Для покупки бизнеса необходимо оформить ИП или ООО в Госуслугах!');
+                }
+                if (window.AudioFx) { window.AudioFx.play('error'); window.AudioFx.haptic('warning'); }
+                if (window.PhoneManager && typeof window.PhoneManager.openApp === 'function') {
+                    window.PhoneManager.openApp('gosuslugi');
+                }
+                return;
+            }
+
+            const currentType = hasOOO ? 'ooo' : 'ip';
+            const legalConfig = window.LEGAL_ENTITIES ? window.LEGAL_ENTITIES[currentType] : null;
+
+            if (legalConfig && Array.isArray(legalConfig.allowedBusinesses) && !legalConfig.allowedBusinesses.includes(b.id)) {
+                if (typeof showToast === 'function') {
+                    showToast(`⚠️ Форма «${legalConfig.name || 'ИП'}» не дает права на владение этим объектом. Требуется ООО!`);
+                }
+                if (window.AudioFx) { window.AudioFx.play('error'); window.AudioFx.haptic('warning'); }
+                return;
+            }
         }
+
+        const cost = isNew ? b.cost : Math.round(b.cost * Math.pow(1.65, b.level));
+        const cash = window.state?.player?.cash || 0;
+
+        if (cash < cost) return showToast(`Не хватает ${cost.toLocaleString()} ₽!`);
 
         this._upgradePending = true;
         try {
-            if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-                const ok = window.MoneyManager.spend(cost, isNew ? `Покупка бизнеса: ${b.name}` : `Апгрейд бизнеса: ${b.name}`);
-                if (!ok) {
-                    if (typeof showToast === 'function') showToast(`Не хватает ${cost.toLocaleString()} ₽!`);
-                    return;
-                }
-            } else {
-                if ((window.state.player.cash || 0) < cost) {
-                    if (typeof showToast === 'function') showToast(`Нужно ${cost.toLocaleString()} ₽!`);
-                    return;
-                }
-                window.state.player.cash -= cost;
-                if (typeof logBankTransaction === 'function') logBankTransaction(isNew ? `Покупка бизнеса: ${b.name}` : `Апгрейд бизнеса: ${b.name}`, cost, false);
-            }
+            window.state.player.cash -= cost;
 
-            if (b.level === 0) {
+            if (isNew) {
                 b.level = 1;
                 b.stock = 100;
-                b.createdAt = Date.now();
                 b.dna = this._generateDNA(b.id);
-                b.reputation = 5;
                 this._trackBizChallenge('new_biz', 1);
             } else {
                 b.level += 1;
-                b.reputation = Math.min(100, (b.reputation || 0) + 3);
                 this._trackBizChallenge('upgrade', 1);
             }
 
-            if (typeof addXp === 'function') addXp(isNew ? 60 : 30);
-
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
-            if (window.AudioFx) window.AudioFx.play('win');
-            if (window.AudioFx) window.AudioFx.haptic('success');
-            if (typeof showToast === 'function') showToast(isNew ? `🎉 Куплено: «${b.name}»!` : `⬆ Апгрейд «${b.name}» до ур. ${b.level}!`);
-
-            if (window.EventBus) {
-                window.EventBus.emit('business:upgraded', { bizId, newLevel: b.level, isNew, cost });
-            }
+            if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+            showToast(isNew ? `🎉 Открыт объект: «${b.name}»!` : `Уровень повышен до ${b.level}!`);
 
             this.checkAchievements();
             this.render(document.getElementById('phoneAppContainer'));
@@ -1707,638 +971,145 @@ const PhoneBusiness = {
         }
     },
 
+    collectAllCash() {
+        if (this._collectAllPending) return;
+        this._collectAllPending = true;
+        try {
+            this.ensureState();
+            let total = 0;
+            (window.state?.businesses || []).forEach(b => {
+                if (b && b.level > 0 && b.stored > 0) {
+                    total += Math.floor(b.stored);
+                    b.stored = 0;
+                }
+            });
+            if (total <= 0) return showToast('В кассах пусто!');
+
+            window.state.player.cash = (window.state.player.cash || 0) + total;
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+            showToast(`💰 Собрано: +${total.toLocaleString()} ₽!`);
+            this.render(document.getElementById('phoneAppContainer'));
+        } finally {
+            this._collectAllPending = false;
+        }
+    },
+
+    collectPointCash(bizId) {
+        if (this._collectPointPending) return;
+        this._collectPointPending = true;
+        try {
+            const b = (window.state?.businesses || []).find(x => x && x.id === bizId);
+            if (!b || b.stored <= 0) return;
+
+            const amount = Math.floor(b.stored);
+            b.stored = 0;
+            window.state.player.cash = (window.state.player.cash || 0) + amount;
+
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+            showToast(`+${amount.toLocaleString()} ₽ из «${b.customName || b.name}»!`);
+            this.render(document.getElementById('phoneAppContainer'));
+        } finally {
+            this._collectPointPending = false;
+        }
+    },
+
+    buySupplies(bizId) {
+        const b = (window.state?.businesses || []).find(x => x && x.id === bizId);
+        if (!b || b.level <= 0) return;
+        const cost = 15000;
+        if ((window.state?.player?.cash || 0) < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽!`);
+
+        window.state.player.cash -= cost;
+        b.stock = b.maxStock || 100;
+
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (window.AudioFx) window.AudioFx.play('tick');
+        showToast(`Сырьё пополнено до 100%`);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
     upgradeWorkshop(branch) {
         const u = this.workshopUpgrades.find(x => x.id === branch);
         if (!u) return;
-        const curLvl = window.state.businessWorkshop[branch] || 0;
-        if (curLvl >= u.maxLevel) return;
+        const curLvl = window.state?.businessWorkshop?.[branch] || 0;
         const cost = Math.round(u.baseCost * Math.pow(u.costMul, curLvl));
+        if ((window.state?.player?.cash || 0) < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽!`);
 
-        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-            const ok = window.MoneyManager.spend(cost, `Апгрейд цеха: ${u.name}`);
-            if (!ok) {
-                if (typeof showToast === 'function') showToast(`Нужно ${cost.toLocaleString()} ₽!`);
-                return;
-            }
-        } else {
-            if ((window.state.player.cash || 0) < cost) {
-                if (typeof showToast === 'function') showToast(`Нужно ${cost.toLocaleString()} ₽!`);
-                return;
-            }
-            window.state.player.cash -= cost;
-            if (typeof logBankTransaction === 'function') logBankTransaction(`Апгрейд цеха: ${u.name}`, cost, false);
-        }
-
+        window.state.player.cash -= cost;
         window.state.businessWorkshop[branch] = curLvl + 1;
-        if (typeof addXp === 'function') addXp(40);
 
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         if (window.AudioFx) window.AudioFx.play('win');
-        if (window.AudioFx) window.AudioFx.haptic('success');
-        if (typeof showToast === 'function') showToast(`🛠 ${u.name}: уровень ${curLvl + 1}!`);
-
-        if (window.EventBus) {
-            window.EventBus.emit('business:workshop_upgraded', { branch, newLevel: curLvl + 1 });
-        }
-
-        this.checkAchievements();
+        showToast(`🛠 ${u.name}: ур. ${curLvl + 1}!`);
         this.render(document.getElementById('phoneAppContainer'));
     },
 
     hireStaff(staffId) {
         const s = this.staffList.find(x => x.id === staffId);
         if (!s) return;
-        const hired = window.state.businessStaff[staffId] || 0;
+        const hired = window.state?.businessStaff?.[staffId] || 0;
         if (hired >= s.maxHired) return;
+        if ((window.state?.player?.cash || 0) < s.salary) return showToast(`Нужно ${s.salary.toLocaleString()} ₽!`);
 
-        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-            const ok = window.MoneyManager.spend(s.salary, `Найм: ${s.name}`);
-            if (!ok) {
-                if (typeof showToast === 'function') showToast(`Нужно ${s.salary.toLocaleString()} ₽!`);
-                return;
-            }
-        } else {
-            if ((window.state.player.cash || 0) < s.salary) {
-                if (typeof showToast === 'function') showToast(`Нужно ${s.salary.toLocaleString()} ₽!`);
-                return;
-            }
-            window.state.player.cash -= s.salary;
-            if (typeof logBankTransaction === 'function') logBankTransaction(`Найм: ${s.name}`, s.salary, false);
-        }
-
+        window.state.player.cash -= s.salary;
         window.state.businessStaff[staffId] = hired + 1;
 
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         if (window.AudioFx) window.AudioFx.play('win');
-        if (window.AudioFx) window.AudioFx.haptic('success');
-        if (typeof showToast === 'function') showToast(`👤 Нанят: ${s.name}`);
-
-        if (window.EventBus) {
-            window.EventBus.emit('business:staff_hired', { staffId, count: hired + 1 });
-        }
-
+        showToast(`👤 Нанят: ${s.name}`);
         this.render(document.getElementById('phoneAppContainer'));
     },
 
     buyFleetVehicle(vehId) {
         const v = this.fleetVehicles.find(x => x.id === vehId);
         if (!v) return;
-        if (window.state.businessFleet.includes(vehId)) return;
+        if ((window.state?.player?.cash || 0) < v.cost) return showToast(`Нужно ${v.cost.toLocaleString()} ₽!`);
 
-        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-            const ok = window.MoneyManager.spend(v.cost, `Транспорт: ${v.name}`);
-            if (!ok) {
-                if (typeof showToast === 'function') showToast(`Нужно ${v.cost.toLocaleString()} ₽!`);
-                return;
-            }
-        } else {
-            if ((window.state.player.cash || 0) < v.cost) {
-                if (typeof showToast === 'function') showToast(`Нужно ${v.cost.toLocaleString()} ₽!`);
-                return;
-            }
-            window.state.player.cash -= v.cost;
-            if (typeof logBankTransaction === 'function') logBankTransaction(`Транспорт: ${v.name}`, v.cost, false);
-        }
-
+        window.state.player.cash -= v.cost;
         window.state.businessFleet.push(vehId);
-        if (typeof addXp === 'function') addXp(80);
 
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         if (window.AudioFx) window.AudioFx.play('win');
-        if (window.AudioFx) window.AudioFx.haptic('success');
-        if (typeof showToast === 'function') showToast(`🚚 Куплено: ${v.name}`);
-
-        if (window.EventBus) {
-            window.EventBus.emit('business:fleet_added', { vehicleId: vehId, cost: v.cost });
-        }
-
+        showToast(`🚚 Куплено: ${v.name}`);
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // --------------------------------------------------------
-    // КАСТОМИЗАЦИЯ
-    // --------------------------------------------------------
     openCustomizeModal(bizId) {
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        if (!b || b.level <= 0) return;
-
-        let modal = document.getElementById('modalBizCustomize');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'modalBizCustomize';
-            modal.className = 'modal-overlay';
-            document.body.appendChild(modal);
-        }
-
-        const coverSkins = this._getCoverSkins();
-        const stickers = this._getOwnerStickers();
-
-        const skinsHtml = coverSkins.map(s => {
-            const isOwned = (window.state.player.ownedBizSkins || []).includes(s.id) || s.cost === 0;
-            const isCurrent = b.coverSkin === s.id;
-            return `
-                <div onclick="PhoneBusiness.selectCoverSkin('${b.id}', '${s.id}')" class="p-2 mb-1 flex-between" style="background:${isCurrent ? 'rgba(0,242,254,0.1)' : '#050914'}; border:1.5px solid ${isCurrent ? s.color : 'rgba(255,255,255,0.08)'}; border-radius:8px; cursor:pointer;">
-                    <div class="flex-gap" style="align-items:center;">
-                        <div style="width:24px; height:24px; border-radius:6px; background:${s.color}; box-shadow:0 0 10px ${s.color};"></div>
-                        <div>
-                            <b class="text-xs" style="font-size:10.5px;">${s.name}</b>
-                            <div class="sub-label" style="font-size:8.5px;">${isOwned ? (isCurrent ? '✓ Активно' : 'Куплено') : `${s.cost.toLocaleString()} ₽`}</div>
-                        </div>
-                    </div>
-                    ${isCurrent ? '<span class="tag-badge bg-tag-green" style="font-size:7.5px;">АКТИВНО</span>' : (isOwned ? '' : '<span class="tag-badge bg-tag-amber" style="font-size:7.5px;">КУПИТЬ</span>')}
-                </div>
-            `;
-        }).join('');
-
-        const stickersHtml = stickers.map(st => {
-            const isOwned = (window.state.player.ownedBizStickers || []).includes(st.id) || st.cost === 0;
-            const isCurrent = b.ownerSticker === st.id;
-            return `
-                <div onclick="PhoneBusiness.selectOwnerSticker('${b.id}', '${st.id}')" class="p-2 mb-1 flex-between" style="background:${isCurrent ? 'rgba(0,242,254,0.1)' : '#050914'}; border:1.5px solid ${isCurrent ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; border-radius:8px; cursor:pointer;">
-                    <div class="flex-gap" style="align-items:center;">
-                        <span style="font-size:18px;">${st.icon || '—'}</span>
-                        <b class="text-xs" style="font-size:10px;">${st.name}</b>
-                    </div>
-                    ${isCurrent ? '<span class="tag-badge bg-tag-green" style="font-size:7.5px;">АКТИВНО</span>' : (isOwned ? '' : `<span class="tag-badge bg-tag-amber" style="font-size:7.5px;">${st.cost.toLocaleString()} ₽</span>`)}
-                </div>
-            `;
-        }).join('');
-
-        modal.innerHTML = `
-            <div class="modal-box" style="max-width:420px;">
-                <div class="flex-between mb-2">
-                    <div class="modal-glow-badge" style="color:var(--cyan); border-color:var(--cyan);"><i class="fa-solid fa-pen"></i> КАСТОМИЗАЦИЯ</div>
-                    <button onclick="ModalManager.close('modalBizCustomize')" class="btn btn-dark btn-auto btn-sm">✕</button>
-                </div>
-
-                <div class="mb-2">
-                    <label class="sub-label block mb-1" style="font-size:9px;">Название объекта:</label>
-                    <input type="text" id="bizCustomName" class="chat-input" maxlength="28" value="${b.customName || b.name}" style="font-size:12px; padding:8px; font-weight:800;">
-                </div>
-
-                <div class="mb-3">
-                    <label class="sub-label block mb-1" style="font-size:9px;">Слоган (+5% трафика):</label>
-                    <input type="text" id="bizCustomSlogan" class="chat-input" maxlength="42" value="${b.slogan || ''}" placeholder="«Чистота как в аптеке!»" style="font-size:11px; padding:8px;">
-                </div>
-
-                <div class="sub-label mb-1" style="font-size:9px;"><i class="fa-solid fa-palette color-cyan"></i> Обложка:</div>
-                <div style="max-height:150px; overflow-y:auto; margin-bottom:10px;">${skinsHtml}</div>
-
-                <div class="sub-label mb-1" style="font-size:9px;"><i class="fa-solid fa-crown color-amber"></i> Стикер:</div>
-                <div style="max-height:120px; overflow-y:auto; margin-bottom:10px;">${stickersHtml}</div>
-
-                <button onclick="PhoneBusiness.saveCustomization('${b.id}')" class="btn btn-green w-full font-bold">
-                    <i class="fa-solid fa-check"></i> Сохранить
-                </button>
-            </div>
-        `;
-
-        if (typeof ModalManager !== 'undefined') {
-            ModalManager.open('modalBizCustomize', { closeOthers: true });
-        } else {
-            modal.classList.add('active');
-        }
-        if (window.AudioFx) window.AudioFx.play('tick');
-    },
-
-    saveCustomization(bizId) {
-        const b = window.state.businesses.find(x => x && x.id === bizId);
+        const b = (window.state?.businesses || []).find(x => x && x.id === bizId);
         if (!b) return;
-        const nameEl = document.getElementById('bizCustomName');
-        const sloganEl = document.getElementById('bizCustomSlogan');
-        const newName = (nameEl?.value || '').trim().substring(0, 28);
-        const newSlogan = (sloganEl?.value || '').trim().substring(0, 42);
-        if (newName && newName.length >= 2) b.customName = newName;
-        b.slogan = newSlogan;
-        if (typeof saveState === 'function') saveState();
-        if (window.AudioFx) window.AudioFx.play('win');
-        if (window.AudioFx) window.AudioFx.haptic('success');
-        if (typeof showToast === 'function') showToast('✓ Кастомизация сохранена');
-        if (typeof ModalManager !== 'undefined') ModalManager.close('modalBizCustomize');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    selectCoverSkin(bizId, skinId) {
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        const skin = this._getCoverSkins().find(s => s.id === skinId);
-        if (!b || !skin) return;
-        if (!window.state.player.ownedBizSkins) window.state.player.ownedBizSkins = [];
-        const isOwned = window.state.player.ownedBizSkins.includes(skinId) || skin.cost === 0;
-
-        if (!isOwned) {
-            if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-                const ok = window.MoneyManager.spend(skin.cost, `Скин бизнеса: ${skin.name}`);
-                if (!ok) {
-                    if (typeof showToast === 'function') showToast(`Нужно ${skin.cost.toLocaleString()} ₽!`);
-                    return;
-                }
-            } else {
-                if ((window.state.player.cash || 0) < skin.cost) {
-                    if (typeof showToast === 'function') showToast(`Нужно ${skin.cost.toLocaleString()} ₽!`);
-                    return;
-                }
-                window.state.player.cash -= skin.cost;
-                if (typeof logBankTransaction === 'function') logBankTransaction(`Скин бизнеса: ${skin.name}`, skin.cost, false);
-            }
-            window.state.player.ownedBizSkins.push(skinId);
+        const newName = prompt("Введите новое название точки:", b.customName || b.name);
+        if (newName && newName.trim().length >= 2) {
+            b.customName = newName.trim();
+            if (typeof saveState === 'function') saveState();
+            showToast("Название обновлено");
+            this.render(document.getElementById('phoneAppContainer'));
         }
-
-        b.coverSkin = skinId;
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('win');
-        if (typeof showToast === 'function') showToast(`🎨 Скин «${skin.name}» применён!`);
-        this.openCustomizeModal(bizId);
-    },
-
-    selectOwnerSticker(bizId, stickerId) {
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        const sticker = this._getOwnerStickers().find(s => s.id === stickerId);
-        if (!b || !sticker) return;
-        if (!window.state.player.ownedBizStickers) window.state.player.ownedBizStickers = [];
-        const isOwned = window.state.player.ownedBizStickers.includes(stickerId) || sticker.cost === 0;
-
-        if (!isOwned) {
-            if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-                const ok = window.MoneyManager.spend(sticker.cost, `Стикер: ${sticker.name}`);
-                if (!ok) {
-                    if (typeof showToast === 'function') showToast(`Нужно ${sticker.cost.toLocaleString()} ₽!`);
-                    return;
-                }
-            } else {
-                if ((window.state.player.cash || 0) < sticker.cost) {
-                    if (typeof showToast === 'function') showToast(`Нужно ${sticker.cost.toLocaleString()} ₽!`);
-                    return;
-                }
-                window.state.player.cash -= sticker.cost;
-                if (typeof logBankTransaction === 'function') logBankTransaction(`Стикер: ${sticker.name}`, sticker.cost, false);
-            }
-            window.state.player.ownedBizStickers.push(stickerId);
-        }
-
-        b.ownerSticker = stickerId;
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('win');
-        if (typeof showToast === 'function') showToast(`👑 Стикер «${sticker.name}» установлен!`);
-        this.openCustomizeModal(bizId);
-    },
-
-    // --------------------------------------------------------
-    // P2P ПРОДАЖА
-    // --------------------------------------------------------
-    openSellModal(bizId) {
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        if (!b || b.level <= 0) return;
-
-        const dailyIncome = this.getBizIncomeWithBonuses(b);
-        const annualIncome = dailyIncome * 365;
-        const dnaMult = this.getDNAMultiplier(b.dna);
-        const multiplier = 1.5 + (dnaMult - 0.5) * 1.0;
-        const cosmeticsBonus = (b.coverSkin !== 'classic' ? 0.15 : 0) + (b.slogan ? 0.05 : 0) + (b.ownerSticker !== 'none' ? 0.10 : 0);
-        const estimatedValue = Math.round(annualIncome * multiplier * (1 + cosmeticsBonus));
-        const quickSaleValue = Math.round(estimatedValue * 0.65);
-
-        let modal = document.getElementById('modalBizSell');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'modalBizSell';
-            modal.className = 'modal-overlay';
-            document.body.appendChild(modal);
-        }
-
-        modal.innerHTML = `
-            <div class="modal-box" style="max-width:420px;">
-                <div class="flex-between mb-2">
-                    <div class="modal-glow-badge" style="color:var(--green); border-color:rgba(0,230,118,0.4);"><i class="fa-solid fa-handshake"></i> ПРОДАЖА БИЗНЕСА</div>
-                    <button onclick="ModalManager.close('modalBizSell')" class="btn btn-dark btn-auto btn-sm">✕</button>
-                </div>
-
-                <div class="glass-card p-2 mb-3">
-                    <b class="text-xs color-cyan">${b.customName || b.name}</b>
-                    <div class="sub-label" style="font-size:9px;">Уровень ${b.level} • ${dailyIncome.toLocaleString()} ₽/день</div>
-                </div>
-
-                <div class="p-2 mb-3" style="background:#050914; border-radius:10px; border:1px solid rgba(0,230,118,0.3);">
-                    <div class="flex-between text-xs mb-1">
-                        <span class="sub-label">Годовой доход:</span>
-                        <b class="color-cyan">${annualIncome.toLocaleString()} ₽</b>
-                    </div>
-                    <div class="flex-between text-xs mb-1">
-                        <span class="sub-label">Множитель:</span>
-                        <b class="color-cyan">×${multiplier.toFixed(2)}</b>
-                    </div>
-                    <div class="flex-between text-xs mb-1">
-                        <span class="sub-label">Косметика:</span>
-                        <b class="color-amber">+${Math.round(cosmeticsBonus * 100)}%</b>
-                    </div>
-                    <div class="flex-between text-base mt-2 pt-2" style="border-top:1px dashed rgba(255,255,255,0.1);">
-                        <span class="font-bold">ОЦЕНКА P2P:</span>
-                        <b class="color-green font-bold" style="font-size:15px;">${estimatedValue.toLocaleString()} ₽</b>
-                    </div>
-                </div>
-
-                <button onclick="PhoneBusiness.sellToBot('${b.id}', ${quickSaleValue})" class="btn btn-amber w-full mb-2" style="font-size:11px;">
-                    <i class="fa-solid fa-bolt"></i> Быстрая продажа боту (${quickSaleValue.toLocaleString()} ₽)
-                </button>
-                <button onclick="PhoneBusiness.listOnP2P('${b.id}', ${estimatedValue})" class="btn btn-green w-full mb-2" style="font-size:11px;">
-                    <i class="fa-solid fa-cloud-arrow-up"></i> На P2P биржу (${estimatedValue.toLocaleString()} ₽)
-                </button>
-                <button onclick="ModalManager.close('modalBizSell')" class="btn btn-dark w-full">Отмена</button>
-            </div>
-        `;
-
-        if (typeof ModalManager !== 'undefined') {
-            ModalManager.open('modalBizSell', { closeOthers: true });
-        } else {
-            modal.classList.add('active');
-        }
-        if (window.AudioFx) window.AudioFx.play('tick');
-    },
-
-    sellToBot(bizId, price) {
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        if (!b || b.level <= 0) return;
-        if (!confirm(`Продать «${b.customName || b.name}» боту за ${price.toLocaleString()} ₽?`)) return;
-
-        if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
-            window.MoneyManager.earn(price, `Продажа бизнеса: ${b.customName || b.name}`);
-        } else {
-            window.state.player.cash = (window.state.player.cash || 0) + price;
-            if (typeof logBankTransaction === 'function') logBankTransaction(`Продажа бизнеса: ${b.customName || b.name}`, price, true);
-        }
-
-        window.state.player.businessSalesCount = (window.state.player.businessSalesCount || 0) + 1;
-
-        b.level = 0; b.stored = 0; b.stock = 100;
-        b.incomeHistory = []; b.dna = null;
-        b.customName = b.name; b.slogan = ''; b.coverSkin = 'classic'; b.ownerSticker = 'none';
-        b.reputation = 0; b.activeBuffs = []; b.activeDebuffs = [];
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('win');
-        if (window.AudioFx) window.AudioFx.haptic('success');
-        if (typeof showToast === 'function') showToast(`💰 Продано боту: +${price.toLocaleString()} ₽`);
-
-        if (window.EventBus) {
-            window.EventBus.emit('business:sold', { bizId, price, buyer: 'bot' });
-        }
-
-        this.checkAchievements();
-        if (typeof ModalManager !== 'undefined') ModalManager.close('modalBizSell');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    listOnP2P(bizId, price) {
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        if (!b || b.level <= 0) return;
-
-        if (!window.state.p2pMarketListings) window.state.p2pMarketListings = [];
-
-        const lot = {
-            id: 'biz_lot_' + Date.now(),
-            sellerId: String(window.state.player?.uid || 'me'),
-            sellerName: window.state.player?.name || 'Перекуп',
-            type: 'business',
-            name: `${b.customName || b.name} (Ур. ${b.level})`,
-            price: price,
-            itemData: {
-                bizId: b.id, level: b.level, dna: b.dna,
-                customName: b.customName, slogan: b.slogan,
-                coverSkin: b.coverSkin, ownerSticker: b.ownerSticker,
-                reputation: b.reputation, income: b.income,
-                perk: b.perk, desc: b.desc, img: b.img, fallback: b.fallback,
-                dailyIncome: this.getBizIncomeWithBonuses(b), estimatedValue: price
-            },
-            createdAt: Date.now()
-        };
-
-        window.state.p2pMarketListings.push(lot);
-
-        if (window.FB_Bridge?.MarketLots?.publishLot) {
-            try {
-                window.FB_Bridge.MarketLots.publishLot(lot, { id: window.state.player?.uid, name: window.state.player?.name });
-            } catch (e) { console.warn('[Biz P2P] Ошибка:', e); }
-        }
-
-        b.level = 0; b.stored = 0; b.incomeHistory = []; b.dna = null;
-        b.customName = b.name; b.slogan = ''; b.coverSkin = 'classic'; b.ownerSticker = 'none';
-        b.reputation = 0; b.activeBuffs = []; b.activeDebuffs = [];
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('win');
-        if (window.AudioFx) window.AudioFx.haptic('success');
-        if (typeof showToast === 'function') showToast(`☁️ Лот на P2P за ${price.toLocaleString()} ₽!`);
-
-        if (window.EventBus) {
-            window.EventBus.emit('p2p:lot_published', { lotId: lot.id, price, itemType: 'business' });
-        }
-
-        if (typeof ModalManager !== 'undefined') ModalManager.close('modalBizSell');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    // --------------------------------------------------------
-    // КРИЗИСЫ
-    // --------------------------------------------------------
-    rollCrisisEvent() {
-        if (!Array.isArray(window.state?.businesses)) return null;
-        const owned = window.state.businesses.filter(b => b && b.level > 0);
-        if (owned.length === 0) return null;
-        if (Math.random() > 0.35) return null;
-        const biz = owned[Math.floor(Math.random() * owned.length)];
-        const ev = this.CRISIS_EVENTS[Math.floor(Math.random() * this.CRISIS_EVENTS.length)];
-        return { biz, ev };
-    },
-
-    handleCrisisEvent(bizId, eventId, action) {
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        const ev = this.CRISIS_EVENTS.find(e => e.id === eventId);
-        if (!b || !ev) return;
-        const curDay = window.state.player?.day || 1;
-
-        if (action === 'bribe' && ev.bribeCost > 0) {
-            if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-                const ok = window.MoneyManager.spend(ev.bribeCost, `Взятка: ${ev.name}`);
-                if (!ok) {
-                    if (typeof showToast === 'function') showToast(`Нужно ${ev.bribeCost.toLocaleString()} ₽!`);
-                    return;
-                }
-            } else {
-                if ((window.state.player.cash || 0) < ev.bribeCost) {
-                    if (typeof showToast === 'function') showToast(`Нужно ${ev.bribeCost.toLocaleString()} ₽!`);
-                    return;
-                }
-                window.state.player.cash -= ev.bribeCost;
-                if (typeof logBankTransaction === 'function') logBankTransaction(`Взятка: ${ev.name}`, ev.bribeCost, false);
-            }
-            if (typeof showToast === 'function') showToast(`✅ Решено за ${ev.bribeCost.toLocaleString()} ₽`);
-            this._trackBizChallenge('bribe', 1);
-        } else if (action === 'accept') {
-            if (ev.penalty === 'store_lost') {
-                b.stored = 0;
-                if (typeof showToast === 'function') showToast(`🔥 Касса «${b.customName || b.name}» сгорела!`);
-            } else if (typeof ev.penalty === 'number' && ev.penalty > 0) {
-                if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-                    window.MoneyManager.spend(ev.penalty, `Штраф: ${ev.name}`, { force: true });
-                } else {
-                    window.state.player.cash = Math.max(0, (window.state.player.cash || 0) - ev.penalty);
-                    if (typeof logBankTransaction === 'function') logBankTransaction(`Штраф: ${ev.name}`, ev.penalty, false);
-                }
-                if (typeof showToast === 'function') showToast(`💸 Штраф ${ev.penalty.toLocaleString()} ₽!`);
-            }
-            if (ev.debuffPct > 0) {
-                b.activeDebuffs.push({ id: ev.id, name: ev.name, pct: ev.debuffPct, expiresDay: curDay + (ev.debuffDays || 2) });
-            }
-            b.reputation = Math.max(0, (b.reputation || 0) - 5);
-        } else if (action === 'accept_buff') {
-            b.activeBuffs.push({ id: ev.id, name: ev.name, pct: ev.buffPct || 15, expiresDay: curDay + (ev.buffDays || 3) });
-            b.reputation = Math.min(100, (b.reputation || 0) + 3);
-            if (typeof showToast === 'function') showToast(`🎉 ${ev.name}!`);
-        }
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('win');
-        if (window.AudioFx) window.AudioFx.haptic('success');
-
-        if (window.EventBus) {
-            window.EventBus.emit('business:crisis', { bizId, eventId, action });
-        }
-
-        if (typeof ModalManager !== 'undefined') ModalManager.close('modalBizCrisis');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    openCrisisModal(bizId, eventId) {
-        const b = window.state.businesses.find(x => x && x.id === bizId);
-        const ev = this.CRISIS_EVENTS.find(e => e.id === eventId);
-        if (!b || !ev) return;
-
-        let modal = document.getElementById('modalBizCrisis');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'modalBizCrisis';
-            modal.className = 'modal-overlay';
-            document.body.appendChild(modal);
-        }
-
-        const isBuff = !!ev.buffPct;
-        modal.innerHTML = `
-            <div class="modal-box text-center" style="max-width:400px; border-color:${isBuff ? 'var(--green)' : 'var(--red)'};">
-                <div class="radar-spinner-ring mb-2" style="border-top-color:${isBuff ? 'var(--green)' : 'var(--red)'};">
-                    <div class="radar-spinner-center" style="font-size:26px;">${ev.icon}</div>
-                </div>
-                <div class="modal-glow-badge mb-1" style="color:${isBuff ? 'var(--green)' : 'var(--red)'}; border-color:${isBuff ? 'var(--green)' : 'var(--red)'};">
-                    ${isBuff ? 'СОБЫТИЕ' : 'КРИЗИС'}
-                </div>
-                <h3 class="font-bold mb-1 color-${isBuff ? 'green' : 'red'}" style="font-size:14px;">${ev.name}</h3>
-                <div class="sub-label mb-3" style="font-size:10.5px;">${ev.desc}</div>
-                <div class="p-2 mb-3" style="background:#050914; border-radius:8px;">
-                    <b class="text-xs color-cyan">${b.customName || b.name}</b>
-                </div>
-                ${isBuff ? `
-                    <button onclick="PhoneBusiness.handleCrisisEvent('${b.id}', '${ev.id}', 'accept_buff')" class="btn btn-green w-full">🎉 Отлично!</button>
-                ` : `
-                    ${ev.bribeCost > 0 ? `<button onclick="PhoneBusiness.handleCrisisEvent('${b.id}', '${ev.id}', 'bribe')" class="btn btn-green w-full mb-2"><i class="fa-solid fa-money-bill-wave"></i> Откупиться (${ev.bribeCost.toLocaleString()} ₽)</button>` : ''}
-                    <button onclick="PhoneBusiness.handleCrisisEvent('${b.id}', '${ev.id}', 'accept')" class="btn btn-danger w-full mb-2"><i class="fa-solid fa-triangle-exclamation"></i> Принять последствия</button>
-                `}
-            </div>
-        `;
-        if (typeof ModalManager !== 'undefined') {
-            ModalManager.open('modalBizCrisis', { closeOthers: true });
-        } else {
-            modal.classList.add('active');
-        }
-        if (window.AudioFx) window.AudioFx.play('tick');
-    },
-
-    // --------------------------------------------------------
-    // РЕКЛАМА / ТИК / ДЕНЬ
-    // --------------------------------------------------------
-    orderAdCampaign() {
-        const cost = 50000;
-        const curDay = window.state.player?.day || 1;
-
-        if (this._activeBonus && this._activeBonus.expiresDay >= curDay) {
-            if (typeof showToast === 'function') showToast('Реклама уже крутится!');
-            return;
-        }
-
-        if (window.MoneyManager && typeof window.MoneyManager.spend === 'function') {
-            const ok = window.MoneyManager.spend(cost, 'Рекламная кампания');
-            if (!ok) {
-                if (typeof showToast === 'function') showToast(`Нужно ${cost.toLocaleString()} ₽!`);
-                return;
-            }
-        } else {
-            if ((window.state.player.cash || 0) < cost) {
-                if (typeof showToast === 'function') showToast(`Нужно ${cost.toLocaleString()} ₽!`);
-                return;
-            }
-            window.state.player.cash -= cost;
-            if (typeof logBankTransaction === 'function') logBankTransaction('Рекламная кампания', cost, false);
-        }
-
-        this._activeBonus = { type: 'ad_campaign', expiresDay: curDay + 3, bonusPct: 15 };
-        window.state.player.businessAdBonus = this._activeBonus;
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('win');
-        if (window.AudioFx) window.AudioFx.haptic('success');
-        if (typeof showToast === 'function') showToast('📻 Реклама запущена! +15% на 3 дня');
-
-        if (window.EventBus) {
-            window.EventBus.emit('business:ad_campaign', { cost, expiresDay: curDay + 3 });
-        }
-
-        this.render(document.getElementById('phoneAppContainer'));
     },
 
     tickIncome() {
-        if (!window.state || !Array.isArray(window.state.businesses)) return;
+        if (!window.state?.businesses) return;
         this.ensureState();
-        let anyIncome = false;
-
-        try {
-            window.state.businesses.forEach(b => {
-                if (!b || b.level <= 0) return;
-                if (b.stock > 0) b.stock = Math.max(0, b.stock - 0.15);
-                else if ((window.state.businessStaff?.manager || 0) > 0 && Math.random() < 0.1) b.stock = Math.min(b.maxStock, b.stock + 5);
-                const bizIncome = this.getBizIncome(b);
-                b.stored = (b.stored || 0) + (bizIncome / 24 / 3600) * 30;
-                anyIncome = true;
-            });
-            if (anyIncome && Math.random() < 0.15) {
-                if (typeof updateHeaderUI === 'function') updateHeaderUI();
-                if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.renderBusinessWidget === 'function') {
-                    PhoneManager.renderBusinessWidget();
-                }
-            }
-        } catch (e) {
-            console.warn('[PhoneBusiness] tick error:', e);
-        }
+        window.state.businesses.forEach(b => {
+            if (!b || b.level <= 0) return;
+            if (b.stock > 0) b.stock = Math.max(0, b.stock - 0.15);
+            const bizIncome = this.getBizIncome(b);
+            b.stored = (b.stored || 0) + (bizIncome / 24 / 3600) * 30;
+        });
     },
 
     onNewDay() {
-        if (!window.state || !window.state.player) return;
+        if (!window.state?.player || !Array.isArray(window.state.businesses)) return;
         const curDay = window.state.player.day || 1;
-
-        if (!Array.isArray(window.state.businesses)) return;
-
         this._syncActiveBonus();
         this._tickEconomicCycle();
-
-        if (!Array.isArray(window.state.player.dailyBizChallenges) ||
-            window.state.player.dailyBizChallenges.every(c => c.done)) {
-            this._generateDailyBizChallenges();
-        }
 
         window.state.businesses.forEach(b => {
             if (!b || b.level <= 0) return;
@@ -2350,47 +1121,7 @@ const PhoneBusiness = {
             b.stock = Math.max(0, (b.stock || 0) - 25);
         });
 
-        if ((window.state.businessStaff?.manager || 0) > 0) {
-            let autoCollected = 0;
-            window.state.businesses.forEach(b => {
-                if (b && b.level > 0 && b.stored > 0) {
-                    autoCollected += Math.floor(b.stored);
-                    b.stored = 0;
-                }
-            });
-            if (autoCollected > 0) {
-                if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
-                    window.MoneyManager.earn(autoCollected, 'Автосбор кассы (Управляющий)');
-                } else {
-                    window.state.player.cash = (window.state.player.cash || 0) + autoCollected;
-                    if (typeof logBankTransaction === 'function') logBankTransaction('Автосбор кассы (Управляющий)', autoCollected, true);
-                }
-                if (typeof showToast === 'function') showToast(`🤖 Управляющий собрал: +${autoCollected.toLocaleString()} ₽`);
-            }
-        }
-
-        const crisis = this.rollCrisisEvent();
-        if (crisis) {
-            setTimeout(() => {
-                this.openCrisisModal(crisis.biz.id, crisis.ev.id);
-            }, 1000);
-        }
-
-        const totalStored = this.getAccumulatedCash();
-        if (totalStored >= 500000 && (window.state.businessStaff?.manager || 0) === 0) {
-            setTimeout(() => {
-                if (typeof showToast === 'function') {
-                    showToast(`💰 В кассах накопилось ${totalStored.toLocaleString()} ₽ — наймите Управляющего!`);
-                }
-            }, 2500);
-        }
-
         this.checkAchievements();
-
-        if (window.EventBus) {
-            window.EventBus.emit('business:new_day', { day: curDay });
-        }
-
         if (typeof saveState === 'function') saveState();
     },
 
@@ -2403,13 +1134,8 @@ const PhoneBusiness = {
 window.PhoneBusiness = PhoneBusiness;
 window.AppBusiness = PhoneBusiness;
 
-window.BUSINESS_COVER_SKINS = PhoneBusiness._fallbackCoverSkins;
-window.BUSINESS_VIP_STICKERS = PhoneBusiness._fallbackStickers;
-
 if (typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => PhoneBusiness.startTickLoop(), 3000);
     });
 }
-
-console.log('[💼 phone-business v6.0.0] Расширенные достижения (Коллекционер номеров, Бренды, VIP-Дилер) ✓');

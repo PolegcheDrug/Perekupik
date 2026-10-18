@@ -1,29 +1,34 @@
 // ========================================================
-// js/theme-manager.js — МЕНЕДЖЕР ТЕМ И КАСТОМИЗАЦИИ (v4.0.1)
+// js/theme-manager.js — МЕНЕДЖЕР ТЕМ, АВАТАРОВ И НИКНЕЙМА (v4.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v4.0.1 (SPRINT 2 — ФИКС C2):
-//   - grantCosmeticFromSpin теперь вызывает saveState() и updateHeaderUI()
-//   - При выдаче предмета и при конвертации в Stars — стейт сохраняется
-//   - Добавлены EventBus-эмиты: cosmetic:granted, cosmetic:converted_to_stars
-//   - UI-подписка на эти события (см. phone-media.js) мгновенно обновляет
-//     вкладку «Скин», если она открыта
-// ⭐ v4.0.0 (ПЛАТНАЯ КАСТОМИЗАЦИЯ ПРОФИЛЯ):
-//   - ТРИ ВАЛЮТЫ: ₽ (рубли), ⭐ (Stars), 🎟️ (билеты)
-//   - reqTickets в темах, ник-эффектах, аурах, титулах
-//   - ГЛИТЧ-предметы только за билеты
-//   - ownedThemes — отдельный трекер купленных тем
-//   - Валидация в applyTheme (откат, если тема не куплена)
-//   - Баланс валют в шапке модалки
-//   - Тема Cyber Black Neo — платная (1 🎟️)
+// ⭐ v4.1.0:
+//   - Скролл тем без обрезания и сжатия
+//   - Смена никнейма игрока с валидацией и мгновенным обновлением
+//   - Выбор из 10 кастомных иконок аватара
+//   - Сохранена полная совместимость с аурами, звуками и валютами
 // ========================================================
 
 const ThemeManager = {
     activeCustomizerTab: 'colors',
 
     // --------------------------------------------------------
+    // 10 ИКОНОК АВАТАРА НА ВЫБОР
+    // --------------------------------------------------------
+    avatarIcons: [
+        { id: 'ninja',      icon: 'fa-solid fa-user-ninja',       name: 'Ниндзя' },
+        { id: 'secret',     icon: 'fa-solid fa-user-secret',      name: 'Агент' },
+        { id: 'boss',       icon: 'fa-solid fa-user-tie',         name: 'Босс' },
+        { id: 'astronaut',  icon: 'fa-solid fa-user-astronaut',   name: 'Астронавт' },
+        { id: 'crown',      icon: 'fa-solid fa-crown',            name: 'Король' },
+        { id: 'skull',      icon: 'fa-solid fa-skull',            name: 'Корчевод' },
+        { id: 'racer',      icon: 'fa-solid fa-car-side',         name: 'Гонщик' },
+        { id: 'mechanic',   icon: 'fa-solid fa-wrench',           name: 'Механик' },
+        { id: 'lightning',  icon: 'fa-solid fa-bolt',             name: 'Молния' },
+        { id: 'gem',        icon: 'fa-solid fa-gem',              name: 'Олигарх' }
+    ],
+
+    // --------------------------------------------------------
     // 11 ТЕМ (10 игровых + DEV)
-    // Три валюты: cost (₽), reqStars (⭐), reqTickets (🎟️)
-    // isExclusive — глитч-предметы (покупаются ТОЛЬКО за билеты)
     // --------------------------------------------------------
     themes: [
         {
@@ -317,9 +322,6 @@ const ThemeManager = {
         { id: 'oligarch',       title: '💠 ОЛИГАРХ СИНДИКАТА',    minLvl: 50, cost: 5000000, reqStars: 50, reqTickets: 5, desc: '🎰 ГЛИТЧ-ТИТУЛ. Абсолютная власть на всех авторынках', isExclusive: true }
     ],
 
-    // --------------------------------------------------------
-    // ИНИЦИАЛИЗАЦИЯ
-    // --------------------------------------------------------
     init() {
         this.applyTheme();
     },
@@ -332,13 +334,9 @@ const ThemeManager = {
         return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
     },
 
-    // --------------------------------------------------------
-    // ВАЛИДАЦИЯ ВЛАДЕНИЯ
-    // --------------------------------------------------------
     ownsThem(themeId) {
         const p = state.player || {};
         if (!Array.isArray(p.ownedThemes)) {
-            // Миграция: если поле отсутствует — выдаём базовую + текущую активную
             p.ownedThemes = ['cyber_neon'];
             if (p.hudColorId && p.hudColorId !== 'cyber_neon') {
                 p.ownedThemes.push(p.hudColorId);
@@ -363,7 +361,7 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ПРИМЕНЕНИЕ ТЕМЫ (с валидацией владения)
+    // ПРИМЕНЕНИЕ ТЕМЫ, НИКА И АВАТАРА
     // --------------------------------------------------------
     applyTheme() {
         const root = document.documentElement;
@@ -371,12 +369,9 @@ const ThemeManager = {
         if (!window.state?.player) return;
 
         const isDev = (typeof window.isPcDevMode === 'function') ? window.isPcDevMode() : false;
-
         let curColorId = state.player.hudColorId || 'cyber_neon';
 
-        // Валидация владения — если не куплено, откат на базовую
         if (!isDev && !this.ownsThem(curColorId)) {
-            console.warn(`[ThemeManager] Тема «${curColorId}» не куплена → откат на cyber_neon`);
             curColorId = 'cyber_neon';
             state.player.hudColorId = 'cyber_neon';
         }
@@ -410,13 +405,12 @@ const ThemeManager = {
         root.style.setProperty('--custom-fx-color', targetHex);
         root.style.setProperty('--custom-fx-glow', targetGlow);
 
-        if (body) body.classList.remove('theme-light');
         if (body) {
+            body.classList.remove('theme-light');
             if (isDev) body.classList.add('is-dev-mode');
             else body.classList.remove('is-dev-mode');
         }
 
-        // Корпус телефона
         const phoneDevice = document.querySelector('.phone-device-wrapper');
         if (phoneDevice) {
             if (isCyberThemeActive && !isDev) phoneDevice.classList.add('theme-cyber-icons');
@@ -429,7 +423,13 @@ const ThemeManager = {
             else phoneDevice.classList.remove('theme-lightning-active');
         }
 
-        // Ник-эффект — валидация
+        // Никнейм и ник-эффект
+        const nameEls = document.querySelectorAll('#playerName, .player-name-label, #playerProfileName');
+        const pName = state.player.name || 'DEV_Перекуп';
+        nameEls.forEach(el => {
+            if (el) el.innerText = pName;
+        });
+
         const nameEl = document.getElementById('playerName');
         let nickFxId = state.player.nickEffect || 'none';
         if (!this.ownsNick(nickFxId)) {
@@ -444,7 +444,13 @@ const ThemeManager = {
             if (activeFx && activeFx.className) nameEl.classList.add(activeFx.className);
         }
 
-        // Аура аватара — валидация
+        // Аватарка (иконка)
+        const curAvatarIcon = state.player.avatarIcon || 'fa-solid fa-user-ninja';
+        document.querySelectorAll('.avatar i, #playerAvatarIcon, .hud-avatar-icon, .profile-avatar-icon').forEach(iconEl => {
+            iconEl.className = curAvatarIcon;
+        });
+
+        // Аура аватара
         const ringEl = document.querySelector('.avatar-ring');
         let avatarFxId = state.player.avatarEffect || 'none';
         if (!this.ownsAvatar(avatarFxId)) {
@@ -478,16 +484,16 @@ const ThemeManager = {
         }
     },
 
-    // --------------------------------------------------------
-    // МОДАЛКА КАСТОМИЗАЦИИ
-    // --------------------------------------------------------
     openCustomizer() {
         this.renderCustomizerModal();
-        if (typeof ModalManager !== 'undefined') {
+        if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
             ModalManager.open('modalHudCustomizer');
         } else {
             const m = document.getElementById('modalHudCustomizer');
-            if (m) m.classList.add('active');
+            if (m) {
+                m.classList.add('active');
+                m.style.display = 'flex';
+            }
         }
         if (typeof playSound === 'function') playSound('tick');
     },
@@ -498,9 +504,6 @@ const ThemeManager = {
         if (typeof playSound === 'function') playSound('tick');
     },
 
-    // --------------------------------------------------------
-    // ХЕЛПЕР — формат цены
-    // --------------------------------------------------------
     _formatPrice(item) {
         const parts = [];
         if (item.cost && item.cost > 0) parts.push(`${item.cost.toLocaleString()} ₽`);
@@ -527,6 +530,44 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
+    // СМЕНА НИКНЕЙМА
+    // --------------------------------------------------------
+    changeNickname() {
+        const input = document.getElementById('customizerNickInput');
+        if (!input) return;
+        const newNick = input.value.trim();
+
+        if (newNick.length < 2) {
+            return showToast("⚠️ Никнейм должен быть не менее 2 символов!");
+        }
+        if (newNick.length > 18) {
+            return showToast("⚠️ Максимальная длина никнейма — 18 символов!");
+        }
+
+        state.player.name = newNick;
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        this.applyTheme();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        showToast(`✅ Никнейм изменён на «${newNick}»!`);
+    },
+
+    // --------------------------------------------------------
+    // ВЫБОР ИКОНКИ АВАТАРА
+    // --------------------------------------------------------
+    selectAvatarIcon(iconClass) {
+        state.player.avatarIcon = iconClass;
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        this.applyTheme();
+        this.renderCustomizerModal();
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
+        showToast("✅ Иконка аватара обновлена!");
+    },
+
+    // --------------------------------------------------------
     // РЕНДЕР МОДАЛКИ
     // --------------------------------------------------------
     renderCustomizerModal() {
@@ -540,7 +581,7 @@ const ThemeManager = {
 
         let bodyHtml = "";
 
-        // -------- СКИН / ТЕМА --------
+        // -------- 1. СКИН / ТЕМА (ПЛАВНЫЙ СКРОЛЛ) --------
         if (curTab === 'colors') {
             let colorsGrid = "";
             this.themes.forEach(c => {
@@ -553,9 +594,7 @@ const ThemeManager = {
                 const canAfford = this._canAfford(c, bal);
                 const isLocked = (c.reqLevel || 1) > bal.level;
 
-                let priceHtml = "";
                 let btnHtml = "";
-
                 if (isSel) {
                     btnHtml = `<span class="tag-badge bg-tag-green" style="font-size:7px;">✓ АКТИВНА</span>`;
                 } else if (isOwned) {
@@ -563,17 +602,16 @@ const ThemeManager = {
                 } else if (isLocked) {
                     btnHtml = `<span class="tag-badge bg-tag-dark" style="font-size:7px;">🔒 ${c.reqLevel} ур.</span>`;
                 } else {
-                    priceHtml = this._formatPrice(c);
-                    btnHtml = `<button onclick="ThemeManager.buyTheme('${c.id}')" class="btn ${canAfford ? 'btn-green' : 'btn-dark opacity-50'} btn-auto" style="font-size:8px; padding:3px 8px;">${priceHtml}</button>`;
+                    btnHtml = `<button onclick="ThemeManager.buyTheme('${c.id}')" class="btn ${canAfford ? 'btn-green' : 'btn-dark opacity-50'} btn-auto" style="font-size:8px; padding:3px 8px;">${this._formatPrice(c)}</button>`;
                 }
 
                 const exclusiveFrame = c.isExclusive ? 'border:1.5px solid #ffd700; box-shadow:0 0 10px rgba(255,215,0,0.4);' : '';
 
                 colorsGrid += `
-                    <div class="color-palette-tile ${isSel ? 'selected' : ''}" onclick="${isOwned || isSel ? `ThemeManager.setThemeColor('${c.id}')` : (isLocked ? '' : `ThemeManager.buyTheme('${c.id}')`)}" style="--tile-color:${c.hex}; ${exclusiveFrame} cursor:${isLocked ? 'not-allowed' : 'pointer'}; opacity:${isLocked ? 0.5 : 1};">
+                    <div class="color-palette-tile ${isSel ? 'selected' : ''}" onclick="${isOwned || isSel ? `ThemeManager.setThemeColor('${c.id}')` : (isLocked ? '' : `ThemeManager.buyTheme('${c.id}')`)}" style="--tile-color:${c.hex}; ${exclusiveFrame} cursor:${isLocked ? 'not-allowed' : 'pointer'}; opacity:${isLocked ? 0.5 : 1}; margin-bottom:6px;">
                         <div class="color-palette-swatch" style="background:${c.bgGrad}; box-shadow:0 0 10px ${c.glow};"></div>
                         <div style="flex:1; min-width:0;">
-                            <div class="color-palette-name">${c.name}</div>
+                            <div class="color-palette-name" style="font-size:10px;">${c.name}</div>
                             <div class="sub-label" style="font-size:7.5px; line-height:1.15; color:#94a3b8;">${c.desc}</div>
                         </div>
                         <div style="display:flex; flex-direction:column; gap:2px; align-items:flex-end;">
@@ -597,9 +635,11 @@ const ThemeManager = {
                     </button>
                 </div>
 
-                <div class="sub-label mb-2" style="font-size:9.5px;">Выберите тему HUD (🎰 — эксклюзив за билеты):</div>
-                <div class="hud-colors-palette-grid mb-2">
-                    ${colorsGrid}
+                <div class="sub-label mb-1" style="font-size:9.5px;">Выберите тему HUD (прокручивайте список вниз ↓):</div>
+                <div style="max-height:280px; overflow-y:auto; overflow-x:hidden; padding-right:4px; margin-bottom:10px;">
+                    <div style="display:grid; grid-template-columns:1fr; gap:6px;">
+                        ${colorsGrid}
+                    </div>
                 </div>
 
                 ${!isDev ? `
@@ -613,8 +653,10 @@ const ThemeManager = {
                 ` : ''}
             `;
         }
-        // -------- НИК --------
+        // -------- 2. НИК (СМЕНА ИМЕНИ + ЭФФЕКТЫ) --------
         else if (curTab === 'nick') {
+            const currentNick = p.name || 'DEV_Перекуп';
+
             let listHtml = "";
             this.nickEffects.forEach(fx => {
                 const isOwned = this.ownsNick(fx.id);
@@ -629,30 +671,63 @@ const ThemeManager = {
                 else actionBtn = `<button onclick="ThemeManager.buyNickEffect('${fx.id}')" class="btn ${canAfford ? 'btn-green' : 'btn-dark opacity-50'} btn-sm btn-auto">${this._formatPrice(fx)}</button>`;
 
                 const previewClass = fx.className || '';
-                const previewText = fx.id === 'none' ? 'Ace!' : 'Перекуп';
+                const previewText = fx.id === 'none' ? currentNick : currentNick;
                 const exclusiveFrame = fx.isExclusive ? 'border:1.5px solid #ffd700; box-shadow:0 0 10px rgba(255,215,0,0.3);' : '';
 
                 listHtml += `
-                    <div class="glass-card p-3 mb-2 ${isCur ? 'personal-car-card' : ''}" style="${exclusiveFrame}">
-                        <div class="flex-between mb-2">
+                    <div class="glass-card p-2 mb-2 ${isCur ? 'personal-car-card' : ''}" style="${exclusiveFrame}">
+                        <div class="flex-between mb-1">
                             <b class="text-xs color-cyan">${fx.name}</b>
                             ${isCur ? '<span class="tag-badge bg-tag-green" style="font-size:7.5px;">АКТИВНО</span>' : (fx.isExclusive ? '<span class="tag-badge bg-tag-amber" style="font-size:7.5px;">🎰 ГЛИТЧ</span>' : '')}
                         </div>
 
-                        <div class="nick-preview-box mb-2">
-                            <span class="nick-preview-text ${previewClass}">${previewText}</span>
+                        <div class="nick-preview-box mb-1" style="padding:6px; background:#050914; border-radius:6px; text-align:center;">
+                            <span class="nick-preview-text ${previewClass}" style="font-size:13px; font-weight:800;">${previewText}</span>
                         </div>
 
-                        <div class="sub-label mb-2" style="font-size:8.5px;">${fx.desc}</div>
-
+                        <div class="sub-label mb-2" style="font-size:8px;">${fx.desc}</div>
                         ${actionBtn}
                     </div>
                 `;
             });
-            bodyHtml = `<div class="sub-label mb-2" style="font-size:9.5px;">8 эффектов для никнейма (🎰 — глитч):</div><div class="space-y-1 mb-2" style="max-height:400px; overflow-y:auto;">${listHtml}</div>`;
+
+            bodyHtml = `
+                <div class="glass-card p-2 mb-2" style="background:#090e18; border:1px solid var(--border-glow);">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-pen-to-square mr-1"></i> Смена никнейма</b>
+                        <span class="sub-label" style="font-size:8.5px;">Бесплатно</span>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="customizerNickInput" value="${currentNick}" maxlength="18" placeholder="Введите никнейм..." style="flex:1; background:#050914; border:1px solid rgba(255,255,255,0.15); border-radius:8px; padding:6px 10px; color:#fff; font-size:11px; outline:none;">
+                        <button onclick="ThemeManager.changeNickname()" class="btn btn-green btn-sm btn-auto" style="padding:6px 12px; font-size:10px; font-weight:700;">
+                            Сохранить
+                        </button>
+                    </div>
+                </div>
+
+                <div class="sub-label mb-1" style="font-size:9.5px;">Эффекты подсветки никнейма:</div>
+                <div class="space-y-1 mb-2" style="max-height:260px; overflow-y:auto; overflow-x:hidden; padding-right:4px;">
+                    ${listHtml}
+                </div>
+            `;
         }
-        // -------- АВАТАР --------
+        // -------- 3. АВАТАР (10 ИКОНОК + АУРЫ) --------
         else if (curTab === 'avatar') {
+            const currentAvatarIcon = p.avatarIcon || 'fa-solid fa-user-ninja';
+
+            let avatarIconsGrid = "";
+            this.avatarIcons.forEach(item => {
+                const isSelected = currentAvatarIcon === item.icon;
+                avatarIconsGrid += `
+                    <div onclick="ThemeManager.selectAvatarIcon('${item.icon}')" class="p-2 text-center" style="cursor:pointer; background:${isSelected ? 'rgba(0,242,254,0.15)' : '#090e18'}; border:1px solid ${isSelected ? 'var(--cyan)' : 'rgba(255,255,255,0.08)'}; border-radius:10px; transition:all 0.2s ease;">
+                        <div style="font-size:20px; color:${isSelected ? 'var(--cyan)' : '#94a3b8'}; margin-bottom:3px;">
+                            <i class="${item.icon}"></i>
+                        </div>
+                        <div style="font-size:8px; color:${isSelected ? '#fff' : '#64748b'}; font-weight:700;">${item.name}</div>
+                    </div>
+                `;
+            });
+
             let listHtml = "";
             this.avatarEffects.forEach(fx => {
                 const isOwned = this.ownsAvatar(fx.id);
@@ -670,31 +745,43 @@ const ThemeManager = {
                 const exclusiveFrame = fx.isExclusive ? 'border:1.5px solid #ffd700; box-shadow:0 0 10px rgba(255,215,0,0.3);' : '';
 
                 listHtml += `
-                    <div class="glass-card p-3 mb-2 ${isCur ? 'personal-car-card' : ''}" style="${exclusiveFrame}">
-                        <div class="flex-between mb-2">
+                    <div class="glass-card p-2 mb-2 ${isCur ? 'personal-car-card' : ''}" style="${exclusiveFrame}">
+                        <div class="flex-between mb-1">
                             <b class="text-xs color-cyan">${fx.name}</b>
                             ${isCur ? '<span class="tag-badge bg-tag-green" style="font-size:7.5px;">АКТИВНО</span>' : (fx.isExclusive ? '<span class="tag-badge bg-tag-amber" style="font-size:7.5px;">🎰 ГЛИТЧ</span>' : '')}
                         </div>
 
-                        <div class="avatar-preview-box mb-2">
+                        <div class="avatar-preview-box mb-2" style="display:flex; justify-content:center; padding:6px;">
                             <div class="avatar-ring ${previewClass}">
                                 <div class="avatar-glow"></div>
                                 <div class="avatar-fx-glow"></div>
-                                <div class="avatar" style="width:44px; height:44px; font-size:18px;">
-                                    <i class="fa-solid fa-user-ninja"></i>
+                                <div class="avatar" style="width:44px; height:44px; font-size:18px; display:flex; align-items:center; justify-content:center; background:#162238; border-radius:50%; color:var(--cyan);">
+                                    <i class="${currentAvatarIcon}"></i>
                                 </div>
                             </div>
                         </div>
 
                         <div class="sub-label mb-2" style="font-size:8.5px;">${fx.desc}</div>
-
                         ${actionBtn}
                     </div>
                 `;
             });
-            bodyHtml = `<div class="sub-label mb-2" style="font-size:9.5px;">10 аур вокруг фото (🎰 — глитч):</div><div class="space-y-1 mb-2" style="max-height:400px; overflow-y:auto;">${listHtml}</div>`;
+
+            bodyHtml = `
+                <div class="glass-card p-2 mb-2" style="background:#090e18; border:1px solid rgba(255,255,255,0.08);">
+                    <b class="text-xs color-cyan mb-2 block"><i class="fa-solid fa-icons mr-1"></i> Выберите иконку аватара:</b>
+                    <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:6px;">
+                        ${avatarIconsGrid}
+                    </div>
+                </div>
+
+                <div class="sub-label mb-1" style="font-size:9.5px;">Ауры и визуальные кольца вокруг аватара:</div>
+                <div class="space-y-1 mb-2" style="max-height:220px; overflow-y:auto; overflow-x:hidden; padding-right:4px;">
+                    ${listHtml}
+                </div>
+            `;
         }
-        // -------- ТИТУЛ --------
+        // -------- 4. ТИТУЛ --------
         else if (curTab === 'titles') {
             let listHtml = "";
             this.traderTitles.forEach(t => {
@@ -724,10 +811,9 @@ const ThemeManager = {
                     </div>
                 `;
             });
-            bodyHtml = `<div class="sub-label mb-2" style="font-size:9.5px;">8 титулов (🎰 — глитч):</div><div class="space-y-1 mb-2" style="max-height:360px; overflow-y:auto;">${listHtml}</div>`;
+            bodyHtml = `<div class="sub-label mb-2" style="font-size:9.5px;">8 титулов перекупа (🎰 — глитч):</div><div class="space-y-1 mb-2" style="max-height:360px; overflow-y:auto; overflow-x:hidden; padding-right:4px;">${listHtml}</div>`;
         }
 
-        // Баланс валют в шапке
         const balanceBar = `
             <div class="p-2 mb-2 flex-between" style="background:#050914; border-radius:8px; border:1px solid rgba(255,215,0,0.3);">
                 <div class="flex-gap" style="gap:10px; flex-wrap:wrap; align-items:center;">
@@ -740,10 +826,10 @@ const ThemeManager = {
         `;
 
         modal.innerHTML = `
-            <div class="modal-box" style="max-width:430px;">
+            <div class="modal-box" style="max-width:430px; max-height:92vh; display:flex; flex-direction:column; overflow:hidden;">
                 <div class="flex-between mb-2">
                     <div class="modal-glow-badge"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> СТИЛЬ ПЕРЕКУПА</div>
-                    <button onclick="ModalManager.close('modalHudCustomizer')" class="btn btn-dark btn-auto btn-sm">✕</button>
+                    <button onclick="ModalManager.close('modalHudCustomizer')" class="btn btn-dark btn-auto btn-sm" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center;">✕</button>
                 </div>
 
                 ${balanceBar}
@@ -755,9 +841,11 @@ const ThemeManager = {
                     <button onclick="ThemeManager.switchTab('titles')" class="btn ${curTab === 'titles' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:6px 2px;">👑 Титул</button>
                 </div>
 
-                ${bodyHtml}
+                <div style="flex:1; overflow-y:auto; overflow-x:hidden;">
+                    ${bodyHtml}
+                </div>
 
-                <div class="p-2 mb-2 flex-between" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
+                <div class="p-2 my-2 flex-between" style="background:#090e18; border-radius:10px; border:1px solid var(--border-glass);">
                     <div>
                         <b class="text-xs color-amber"><i class="fa-solid fa-volume-high mr-1"></i> Звуки интерфейса</b>
                         <div class="sub-label" style="font-size:8.5px;">Отклик кнопок</div>
@@ -776,7 +864,7 @@ const ThemeManager = {
     },
 
     // --------------------------------------------------------
-    // ПОКУПКА ТЕМЫ
+    // ПОКУПКА И ПРИМЕНЕНИЕ ТЕМЫ
     // --------------------------------------------------------
     buyTheme(themeId) {
         const isDev = (typeof window.isPcDevMode === 'function') ? window.isPcDevMode() : false;
@@ -799,12 +887,10 @@ const ThemeManager = {
         if ((theme.reqStars || 0) > bal.stars) return showToast(`Нужно ${theme.reqStars} ⭐!`);
         if ((theme.reqTickets || 0) > bal.tickets) return showToast(`Нужно ${theme.reqTickets} 🎟️ билетов!`);
 
-        // Списание
         state.player.cash -= (theme.cost || 0);
         state.player.stars -= (theme.reqStars || 0);
         state.player.superSpinTickets = (state.player.superSpinTickets || 0) - (theme.reqTickets || 0);
 
-        // Добавляем во владение
         if (!state.player.ownedThemes) state.player.ownedThemes = ['cyber_neon'];
         state.player.ownedThemes.push(themeId);
         state.player.hudColorId = themeId;
@@ -861,9 +947,6 @@ const ThemeManager = {
         if (typeof showToast === 'function') showToast(`Установлен оттенок ${hexValue}!`);
     },
 
-    // --------------------------------------------------------
-    // CYBER BLACK NEO — ПЛАТНЫЙ
-    // --------------------------------------------------------
     toggleCyberTheme() {
         const isActive = state.player.themePresetId === 'cyber_black_neo';
 
@@ -916,9 +999,6 @@ const ThemeManager = {
         if (typeof showToast === 'function') showToast("💚 Cyber Black Neo куплена и активирована!");
     },
 
-    // --------------------------------------------------------
-    // ПОКУПКА НИК-ЭФФЕКТА
-    // --------------------------------------------------------
     buyNickEffect(fxId) {
         const fx = this.nickEffects.find(f => f.id === fxId);
         if (!fx) return;
@@ -964,9 +1044,6 @@ const ThemeManager = {
         if (typeof showToast === 'function') showToast("Эффект ника установлен!");
     },
 
-    // --------------------------------------------------------
-    // ПОКУПКА АУРЫ
-    // --------------------------------------------------------
     buyAvatarEffect(fxId) {
         const fx = this.avatarEffects.find(f => f.id === fxId);
         if (!fx) return;
@@ -1012,9 +1089,6 @@ const ThemeManager = {
         if (typeof showToast === 'function') showToast("Аура установлена!");
     },
 
-    // --------------------------------------------------------
-    // ПОКУПКА ТИТУЛА
-    // --------------------------------------------------------
     buyTraderTitle(titleId) {
         const t = this.traderTitles.find(x => x.id === titleId);
         if (!t) return;
@@ -1069,20 +1143,10 @@ const ThemeManager = {
         if (typeof showToast === 'function') showToast("Звуковой профиль обновлён!");
     },
 
-    // --------------------------------------------------------
-    // ⭐ v4.0.1 (ФИКС C2): ВЫДАЧА ПРЕДМЕТА ИЗ СУПЕРВИЛСПИНА
-    // Возвращает {success, item, convertedToStars}
-    //
-    // ФИКС: добавлен saveState() + updateHeaderUI() во все ветки,
-    //       чтобы предмет не потерялся, если игрок сразу закроет игру.
-    //       Также эмитятся EventBus-события для UI-слоя
-    //       (см. phone-media.js — обновление вкладки «Скин» в реальном времени).
-    // --------------------------------------------------------
     grantCosmeticFromSpin(category, itemId) {
         const p = state.player;
         if (!p) return { success: false };
 
-        // Найти предмет
         let item = null;
         let ownedList = null;
 
@@ -1106,18 +1170,13 @@ const ThemeManager = {
 
         if (!item || !ownedList) return { success: false };
 
-        // ═════════════════════════════════════════════════════
-        // ВЕТКА 1: Уже владеет → конвертируем в Stars
-        // ═════════════════════════════════════════════════════
         if (ownedList.includes(itemId)) {
-            const compensation = 10 + Math.floor(Math.random() * 20); // 10-30 ⭐
+            const compensation = 10 + Math.floor(Math.random() * 20);
             p.stars = (p.stars || 0) + compensation;
 
-            // ⭐ ФИКС C2: сохраняем стейт
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
 
-            // EventBus — UI-слой реагирует
             if (window.EventBus) {
                 window.EventBus.emit('cosmetic:converted_to_stars', {
                     category,
@@ -1134,16 +1193,11 @@ const ThemeManager = {
             };
         }
 
-        // ═════════════════════════════════════════════════════
-        // ВЕТКА 2: Новый предмет → выдаём
-        // ═════════════════════════════════════════════════════
         ownedList.push(itemId);
 
-        // ⭐ ФИКС C2: сохраняем стейт
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
 
-        // EventBus — UI-слой реагирует
         if (window.EventBus) {
             window.EventBus.emit('cosmetic:granted', {
                 category,
@@ -1180,4 +1234,4 @@ window.setAvatarEffectAction = (id) => ThemeManager.setAvatarEffect(id);
 window.setSoundProfileAction = (p) => ThemeManager.setSoundProfile(p);
 window.grantCosmeticFromSpin = (cat, id) => ThemeManager.grantCosmeticFromSpin(cat, id);
 
-console.log('[🎨 theme-manager v4.0.1] ФИКС C2: saveState + EventBus в grantCosmeticFromSpin ✓');
+console.log('[🎨 theme-manager v4.1.0] Скролл тем + смена ника + выбор 10 аватаров ✓');

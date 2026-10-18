@@ -1,23 +1,59 @@
 // ========================================================
-// js/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v1.1.0)
-// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.1.0 (SPRINT 2 — ФИКСЫ АУКЦИОНА):
-//   - ФИКС E2: bidPlate не даёт перебить самого себя
-//     (проверка lot.highestBidderId === myUid)
-//   - ФИКС: при создании лота пишется highestBidderId (для проверки)
-//   - ФИКС: _bidPending защищает от двойного клика
-//   - Дополнительно: при выигрыше лота игрок получает госномер
-//     через PlatesManager и в лог пишется его имя + id
-// ⭐ v1.0.0 (ЕДИНЫЙ PLATESMANAGER):
-//   - bidPlate → PlatesManager.addPlate
-//   - Все остальные методы без изменений
+// js/phone/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v2.1.1)
+// ⭐ v2.1.1:
+//   - Полная синхронизация статуса ИП / ООО с профилем игрока и бизнес-сетью
+//   - Регистрация юридических лиц: ИП (6%) и ООО (15%) через ФНС
+//   - Коммерческий учет МРЭО: регистрация авто на компанию, выдача СТС
+//   - Снятие с учета / перевод ТС между гаражом и балансом юрлица
+//   - Аукцион красивых и архивных госномеров с защитой от перебива своей ставки
 // ========================================================
 
 const AppGosuslugi = {
-    subTab: 'fines', // 'fines', 'taxes', 'plates'
+    subTab: 'fines', // 'fines', 'taxes', 'legal', 'mreo', 'plates'
     _bidPending: false,
 
+    _syncLegalState() {
+        if (!state.player) state.player = {};
+        if (!state.player.documents) state.player.documents = {};
+
+        const docs = state.player.documents;
+        const currentLegal = state.player.legalEntity;
+
+        // Если legalEntity отсутствует или 'none', но в документах есть оформленное юрлицо — восстанавливаем
+        if (!currentLegal || currentLegal.type === 'none') {
+            if (docs.oooRegistered || state.player.hasOOO) {
+                state.player.legalEntity = {
+                    type: 'ooo',
+                    inn: docs.inn || state.player.inn || '7701984210',
+                    ogrn: docs.ogrn || '1207700892145',
+                    regDate: docs.regDate || new Date().toLocaleDateString('ru-RU'),
+                    companyName: docs.companyName || state.player.companyName || 'ООО «ВЕКТОР МОТОРС»'
+                };
+            } else if (docs.ipRegistered || state.player.hasIP || state.player.businessRegistered) {
+                const pName = state.player.name || 'Игрок';
+                state.player.legalEntity = {
+                    type: 'ip',
+                    inn: docs.inn || state.player.inn || '7705312489',
+                    ogrn: docs.ogrn || '3207700512849',
+                    regDate: docs.regDate || new Date().toLocaleDateString('ru-RU'),
+                    companyName: docs.companyName || `ИП ${pName}`
+                };
+            } else {
+                state.player.legalEntity = {
+                    type: 'none',
+                    inn: null,
+                    ogrn: null,
+                    regDate: null,
+                    companyName: null
+                };
+            }
+        }
+    },
+
     render(container) {
+        if (!container) return;
+        this._syncLegalState();
+
         let sub = this.subTab;
 
         if (state.player.trafficFines === undefined) state.player.trafficFines = 0;
@@ -30,14 +66,18 @@ const AppGosuslugi = {
                 <div style="width:40px;"></div>
             </div>
             <div class="phone-app-body">
-                <div class="grid-3 mb-2" style="grid-template-columns: repeat(3, 1fr); gap: 4px;">
-                    <button onclick="AppGosuslugi.switchTab('fines')" class="btn ${sub === 'fines' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:5px 2px; font-size:9.5px;">Штрафы</button>
-                    <button onclick="AppGosuslugi.switchTab('taxes')" class="btn ${sub === 'taxes' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:5px 2px; font-size:9.5px;">Налоги</button>
-                    <button onclick="AppGosuslugi.switchTab('plates')" class="btn ${sub === 'plates' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:5px 2px; font-size:9.5px;">Аукцион</button>
+                <div class="grid-5 mb-2" style="display:grid; grid-template-columns: repeat(5, 1fr); gap: 3px;">
+                    <button onclick="AppGosuslugi.switchTab('fines')" class="btn ${sub === 'fines' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:5px 1px; font-size:8.5px;">Штрафы</button>
+                    <button onclick="AppGosuslugi.switchTab('taxes')" class="btn ${sub === 'taxes' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:5px 1px; font-size:8.5px;">Налоги</button>
+                    <button onclick="AppGosuslugi.switchTab('legal')" class="btn ${sub === 'legal' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:5px 1px; font-size:8.5px;">Юрлица</button>
+                    <button onclick="AppGosuslugi.switchTab('mreo')" class="btn ${sub === 'mreo' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:5px 1px; font-size:8.5px;">МРЭО Учёт</button>
+                    <button onclick="AppGosuslugi.switchTab('plates')" class="btn ${sub === 'plates' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="padding:5px 1px; font-size:8.5px;">Номера</button>
                 </div>
 
                 ${sub === 'fines' ? this.renderFinesTab() : ''}
                 ${sub === 'taxes' ? this.renderTaxesTab() : ''}
+                ${sub === 'legal' ? this.renderLegalTab() : ''}
+                ${sub === 'mreo' ? this.renderMreoTab() : ''}
                 ${sub === 'plates' ? this.renderPlatesAuctionTab() : ''}
             </div>
         `;
@@ -50,6 +90,9 @@ const AppGosuslugi = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
+    // ========================================================
+    // 1. ШТРАФЫ
+    // ========================================================
     renderFinesTab() {
         let fines = state.player?.trafficFines || 0;
 
@@ -89,14 +132,17 @@ const AppGosuslugi = {
         state.player.cash -= toPay;
         state.player.trafficFines = 0;
 
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
         showToast("Штрафы успешно оплачены через Госуслуги!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
+    // ========================================================
+    // 2. НАЛОГИ
+    // ========================================================
     renderTaxesTab() {
         let totalPowerTax = 0;
         if (state.garage) {
@@ -145,16 +191,300 @@ const AppGosuslugi = {
         state.player.cash -= tax;
         state.player.taxDebt = 0;
 
-        saveState();
-        updateHeaderUI();
-        playSound('win');
-        tgHaptic('success');
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
         showToast("Транспортный налог успешно уплачен!");
         this.render(document.getElementById('phoneAppContainer'));
     },
 
     // ========================================================
-    // АУКЦИОН ГОСНОМЕРОВ
+    // 3. РЕГИСТРАЦИЯ ЮРИДИЧЕСКИХ ЛИЦ (ИП / ООО)
+    // ========================================================
+    renderLegalTab() {
+        this._syncLegalState();
+        const legal = state.player.legalEntity || { type: 'none' };
+        const currentType = legal.type || 'none';
+        const isRegistered = currentType !== 'none';
+        const currentConfig = window.LEGAL_ENTITIES ? window.LEGAL_ENTITIES[currentType] : null;
+
+        const ipConfig = window.LEGAL_ENTITIES?.ip || { regFee: 15000, reqStars: 2, minLevel: 4, taxRate: 0.06 };
+        const oooConfig = window.LEGAL_ENTITIES?.ooo || { regFee: 80000, reqStars: 10, minLevel: 8, taxRate: 0.15 };
+
+        return `
+            <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.15), #090e18);">
+                <div class="font-bold text-xs color-cyan mb-1">РЕЕСТР СУБЪЕКТОВ ПРЕДПРИНИМАТЕЛЬСТВА</div>
+                <div class="price-val color-cyan my-1" style="font-size:22px;">
+                    ${isRegistered ? `${legal.companyName || currentConfig?.name}` : 'ФИЗИЧЕСКОЕ ЛИЦО'}
+                </div>
+                <div class="sub-label" style="font-size:10px;">
+                    ${isRegistered 
+                        ? `ИНН: ${legal.inn} • ОГРН: ${legal.ogrn} • Ставка налога: ${((currentConfig?.taxRate || 0.06) * 100)}%` 
+                        : 'Без регистрации юридического лица покупка автобизнесов невозможна.'}
+                </div>
+            </div>
+
+            ${!isRegistered ? `
+                <div class="glass-card p-2 mb-2">
+                    <b class="text-xs color-amber mb-2 block"><i class="fa-solid fa-briefcase"></i> Выберите форму собственности:</b>
+
+                    <!-- Карточка ИП -->
+                    <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(0,229,255,0.2);">
+                        <div class="flex-between mb-1">
+                            <b class="text-xs color-cyan">ИП (Индивидуальный предприниматель)</b>
+                            <span class="tag-badge bg-tag-cyan">УСН 6%</span>
+                        </div>
+                        <div class="sub-label mb-2" style="font-size:9.5px;">
+                            • Налог: <b>6% с дохода автопарков</b><br>
+                            • Лимит автопарка: <b>до 5 машин на бизнес</b><br>
+                            • Доступ: Автомойки, СТО, Таксопарк, Доставка, Разборка.<br>
+                            • Пошлина: <b>${ipConfig.regFee.toLocaleString()} ₽</b> + <b>${ipConfig.reqStars} ⭐</b> (Ур. ${ipConfig.minLevel})
+                        </div>
+                        <button onclick="AppGosuslugi.registerLegal('ip')" class="btn btn-cyan btn-sm w-full">Оформить ИП</button>
+                    </div>
+
+                    <!-- Карточка ООО -->
+                    <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,179,0,0.3);">
+                        <div class="flex-between mb-1">
+                            <b class="text-xs color-amber">ООО (Общество с огр. ответственностью)</b>
+                            <span class="tag-badge bg-tag-amber">ОСНО 15%</span>
+                        </div>
+                        <div class="sub-label mb-2" style="font-size:9.5px;">
+                            • Налог: <b>15% с дохода</b><br>
+                            • Лимит автопарка: <b>до 25 машин на бизнес</b><br>
+                            • Доступ: Все виды бизнеса + Тяжелые ТК («Магистраль») и Хабы.<br>
+                            • Пошлина и капитал: <b>${oooConfig.regFee.toLocaleString()} ₽</b> + <b>${oooConfig.reqStars} ⭐</b> (Ур. ${oooConfig.minLevel})
+                        </div>
+                        <button onclick="AppGosuslugi.registerLegal('ooo')" class="btn btn-green btn-sm w-full">Учредить ООО</button>
+                    </div>
+                </div>
+            ` : `
+                <div class="glass-card p-2 mb-2">
+                    <b class="text-xs color-green mb-2 block"><i class="fa-solid fa-circle-check"></i> Данные вашей организации:</b>
+                    <div class="p-2 mb-2" style="background:#090e18; border-radius:8px;">
+                        <div class="flex-between mb-1">
+                            <span class="sub-label">Организационно-правовая форма:</span>
+                            <b>${currentConfig?.tag || currentType.toUpperCase()}</b>
+                        </div>
+                        <div class="flex-between mb-1">
+                            <span class="sub-label">Налоговая ставка:</span>
+                            <b class="color-amber">${(currentConfig?.taxRate || 0) * 100}% с выручки</b>
+                        </div>
+                        <div class="flex-between mb-1">
+                            <span class="sub-label">Лимит авто на точку:</span>
+                            <b>до ${currentConfig?.maxFleetPerBiz || 5} ед.</b>
+                        </div>
+                        <div class="flex-between mb-1">
+                            <span class="sub-label">Дата регистрации:</span>
+                            <b>${legal.regDate || 'Недавно'}</b>
+                        </div>
+                    </div>
+
+                    ${currentType === 'ip' ? `
+                        <div class="p-2" style="background:rgba(255,179,0,0.06); border-radius:8px; border:1px solid rgba(255,179,0,0.2);">
+                            <div class="sub-label mb-2" style="font-size:9.5px;">
+                                Требуется расширить автопарк до 25 машин или открыть Транспортную компанию тягачей? Реорганизуйте ИП в ООО.
+                            </div>
+                            <button onclick="AppGosuslugi.registerLegal('ooo')" class="btn btn-amber btn-sm w-full">Реорганизовать в ООО (${oooConfig.regFee.toLocaleString()} ₽)</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `}
+        `;
+    },
+
+    registerLegal(type) {
+        const config = window.LEGAL_ENTITIES ? window.LEGAL_ENTITIES[type] : null;
+        if (!config) return showToast("Неизвестный тип организации");
+
+        const player = state.player;
+        const level = player.level || 1;
+        const cash = player.cash || 0;
+        const stars = player.stars || 0;
+
+        if (level < config.minLevel) {
+            if (typeof playSound === 'function') playSound('error');
+            return showToast(`Требуется ${config.minLevel} уровень персонажа!`);
+        }
+        if (cash < config.regFee) {
+            if (typeof playSound === 'function') playSound('error');
+            return showToast(`Не хватает наличных: требуется ${config.regFee.toLocaleString()} ₽`);
+        }
+        if (stars < config.reqStars) {
+            if (typeof playSound === 'function') playSound('error');
+            return showToast(`Не хватает звёзд: требуется ${config.reqStars} ⭐`);
+        }
+
+        player.cash -= config.regFee;
+        player.stars -= config.reqStars;
+
+        const pName = player.name || 'Игрок';
+        const randomInn = String(Math.floor(7700000000 + Math.random() * 99999999));
+        const randomOgrn = String(Math.floor(1207700000000 + Math.random() * 999999999));
+        const regDate = new Date().toLocaleDateString('ru-RU');
+        const companyName = type === 'ip' ? `ИП ${pName}` : `ООО «ВЕКТОР МОТОРС»`;
+
+        player.legalEntity = {
+            type: type,
+            inn: randomInn,
+            ogrn: randomOgrn,
+            regDate: regDate,
+            companyName: companyName
+        };
+
+        // Двусторонняя синхронизация с документами игрока
+        if (!player.documents) player.documents = {};
+        player.documents.inn = randomInn;
+        player.documents.ogrn = randomOgrn;
+        player.documents.companyName = companyName;
+        player.documents.regDate = regDate;
+
+        if (type === 'ip') {
+            player.documents.ipRegistered = true;
+            player.documents.oooRegistered = false;
+            player.hasIP = true;
+            player.hasOOO = false;
+            player.businessRegistered = true;
+        } else if (type === 'ooo') {
+            player.documents.ipRegistered = false;
+            player.documents.oooRegistered = true;
+            player.hasIP = false;
+            player.hasOOO = true;
+            player.businessRegistered = true;
+        }
+
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+
+        if (typeof openVerdictModal === 'function') {
+            openVerdictModal(
+                "ЮРИДИЧЕСКОЕ ЛИЦО ЗАРЕГИСТРИРОВАНО! 🏛️",
+                `Федеральная налоговая служба одобрила регистрацию!\nОрганизация: <b>${player.legalEntity.companyName}</b>\nНалоговая ставка: <b>${config.taxRate * 100}%</b>\nТеперь вы можете выкупать предприятия и ставить машины на баланс через МРЭО.`,
+                true,
+                config.regFee
+            );
+        } else {
+            showToast(`Успешно зарегистрировано: ${player.legalEntity.companyName}!`);
+        }
+
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // ========================================================
+    // 4. МРЭО: КОММЕРЧЕСКИЙ УЧЕТ ТРАНСПОРТА
+    // ========================================================
+    renderMreoTab() {
+        this._syncLegalState();
+        const legal = state.player.legalEntity || { type: 'none' };
+        if (legal.type === 'none') {
+            return `
+                <div class="glass-card p-3 text-center">
+                    <i class="fa-solid fa-building-circle-xmark color-red mb-2" style="font-size:32px;"></i>
+                    <b class="text-xs color-red block mb-1">МРЭО: Доступ заблокирован</b>
+                    <div class="sub-label mb-3" style="font-size:10px;">
+                        Для постановки машин на коммерческий баланс предприятий необходимо сначала оформить ИП или ООО во вкладке «Юрлица».
+                    </div>
+                    <button onclick="AppGosuslugi.switchTab('legal')" class="btn btn-cyan btn-sm">Перейти к регистрации юрлица</button>
+                </div>
+            `;
+        }
+
+        const fee = window.MREO_CONFIG?.commercialRegFee || 8500;
+        const garage = state.garage || [];
+
+        let carsHtml = '';
+        if (garage.length === 0) {
+            carsHtml = `<div class="sub-label text-center py-4">В вашем личном гараже нет автомобилей. Купите подходящее ТС на рынке.</div>`;
+        } else {
+            garage.forEach((car, idx) => {
+                const isComRegistered = Boolean(car.commercialRegistered);
+                const regOrg = car.registeredCompany || legal.companyName;
+                const assignedBiz = car.assignedBusinessName || null;
+
+                carsHtml += `
+                    <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid ${isComRegistered ? 'rgba(0,230,118,0.3)' : 'rgba(255,179,0,0.3)'};">
+                        <div class="flex-between mb-1">
+                            <b class="text-xs color-cyan">${car.brand || ''} ${car.name || car.model || 'Авто'}</b>
+                            <span class="tag-badge ${isComRegistered ? 'bg-tag-green' : 'bg-tag-amber'}">
+                                ${isComRegistered ? 'На балансе компании' : 'Личный учет (Физлицо)'}
+                            </span>
+                        </div>
+                        <div class="sub-label mb-2" style="font-size:9.5px;">
+                            • Класс: <b>${(car.category || car.type || 'economy').toUpperCase()}</b> • Состояние: <b>${car.condition || 100}%</b><br>
+                            ${isComRegistered ? `• Закреплено за: <b>${regOrg}</b>${assignedBiz ? ` (${assignedBiz})` : ''}` : `• Требуется госпошлина МРЭО: <b>${fee.toLocaleString()} ₽</b>`}
+                        </div>
+                        ${!isComRegistered ? `
+                            <button onclick="AppGosuslugi.registerCommercialCar(${idx})" class="btn btn-green btn-sm w-full">
+                                <i class="fa-solid fa-stamp"></i> Поставить на баланс юрлица (${fee.toLocaleString()} ₽)
+                            </button>
+                        ` : `
+                            <button onclick="AppGosuslugi.deregisterCommercialCar(${idx})" class="btn btn-dark btn-sm w-full opacity-70">
+                                Снять с баланса и вернуть в личный гараж
+                            </button>
+                        `}
+                    </div>
+                `;
+            });
+        }
+
+        return `
+            <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.15), #090e18);">
+                <div class="font-bold text-xs color-green mb-1">МРЭО: РЕЕСТР КОММЕРЧЕСКОГО ТРАНСПОРТА</div>
+                <div class="price-val color-green my-1" style="font-size:22px;">${legal.companyName}</div>
+                <div class="sub-label" style="font-size:10px;">
+                    Оформление СТС на организацию. Автомобили без регистрации в МРЭО приносят на 50% меньше дохода из-за штрафов ГИБДД!
+                </div>
+            </div>
+
+            <div class="glass-card p-2">
+                <b class="text-xs color-cyan mb-2 block"><i class="fa-solid fa-car-side"></i> Автомобили для коммерческой регистрации:</b>
+                ${carsHtml}
+            </div>
+        `;
+    },
+
+    registerCommercialCar(carIdx) {
+        const fee = window.MREO_CONFIG?.commercialRegFee || 8500;
+        const player = state.player;
+        const car = state.garage ? state.garage[carIdx] : null;
+
+        if (!car) return showToast("Автомобиль не найден");
+        if ((player.cash || 0) < fee) return showToast(`Не хватает денег на госпошлину: ${fee.toLocaleString()} ₽`);
+
+        player.cash -= fee;
+        car.commercialRegistered = true;
+        car.registeredCompany = player.legalEntity?.companyName || 'ООО Компания';
+        car.registrationDate = new Date().toLocaleDateString('ru-RU');
+
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+
+        showToast(`✅ ${car.brand || ''} ${car.name || ''} оформлен на баланс компании!`);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    deregisterCommercialCar(carIdx) {
+        const car = state.garage ? state.garage[carIdx] : null;
+        if (!car) return showToast("Автомобиль не найден");
+
+        car.commercialRegistered = false;
+        car.registeredCompany = null;
+        car.assignedBusinessId = null;
+        car.assignedBusinessName = null;
+
+        if (typeof saveState === 'function') saveState();
+        if (typeof playSound === 'function') playSound('tick');
+        showToast(`Машина снята с коммерческого учета.`);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // ========================================================
+    // 5. АУКЦИОН ГОСНОМЕРОВ
     // ========================================================
     renderPlatesAuctionTab() {
         if (!state.officialPlateAuction || state.officialPlateAuction.length === 0) {
@@ -166,13 +496,11 @@ const AppGosuslugi = {
 
         let html = "";
         state.officialPlateAuction.forEach((lot, lIdx) => {
-            // ⭐ v1.1.0: проверяем, лидирует ли уже игрок
             const isPlayerLeading =
                 (lot.highestBidderId && String(lot.highestBidderId) === myUid) ||
                 (!lot.highestBidderId && String(lot.highestBidder || "") === myName && myName !== 'Государство' && myName !== '');
 
             const currentBid = Number(lot.currentBid) || 0;
-            const lotId = lot.id || `auc_${lIdx}`;
 
             html += `
             <div class="glass-card mb-2 p-2" style="${isPlayerLeading ? 'border-color:var(--green); background:rgba(0,230,118,0.05);' : ''}">
@@ -223,9 +551,6 @@ const AppGosuslugi = {
         `;
     },
 
-    /**
-     * ⭐ v1.1.0: генерация стартовых лотов с highestBidderId
-     */
     _generateInitialAuctionLots() {
         return [
             { id: 'p_' + Date.now() + '_1', plate: 'А777АА 777', currentBid: 450000, highestBidder: 'Государство', highestBidderId: null },
@@ -234,11 +559,7 @@ const AppGosuslugi = {
         ];
     },
 
-    /**
-     * ⭐ v1.1.0: ставка на лот с защитой от самоперебивания
-     */
     bidPlate(lotIdx, raiseAmount) {
-        // Защита от двойного клика
         if (this._bidPending) return;
 
         const lot = state.officialPlateAuction[lotIdx];
@@ -247,7 +568,6 @@ const AppGosuslugi = {
         const myUid = String(state.player?.uid || window.tgUserId || "");
         const myName = String(state.player?.name || "Вы");
 
-        // ⭐ ФИКС E2: проверка "вы уже лидируете"
         const isPlayerLeading =
             (lot.highestBidderId && String(lot.highestBidderId) === myUid) ||
             (!lot.highestBidderId && String(lot.highestBidder || "") === myName && myName !== 'Государство' && myName !== '');
@@ -258,12 +578,10 @@ const AppGosuslugi = {
             return showToast("⚠️ Вы уже лидируете на этом лоте!");
         }
 
-        // Проверка модуля номеров
         if (!window.PlatesManager) {
             return showToast("⚠️ Модуль номеров не загружен");
         }
 
-        // Расчёт новой ставки
         const currentBid = Number(lot.currentBid) || 0;
         const newBid = currentBid + raiseAmount;
         const cash = state.player?.cash || 0;
@@ -276,24 +594,19 @@ const AppGosuslugi = {
         this._bidPending = true;
 
         try {
-            // Списываем деньги
             state.player.cash -= newBid;
 
-            // Выдаём номер через PlatesManager
             const addRes = window.PlatesManager.addPlate(lot.plate, 'gosuslugi_auction', { silent: true });
 
             if (!addRes) {
-                // Откат денег
                 state.player.cash += newBid;
                 return showToast("❌ Не удалось выиграть номер (ошибка менеджера)");
             }
 
-            // Обновляем лот — теперь лидер это игрок
             lot.highestBidder = myName;
             lot.highestBidderId = myUid;
             lot.currentBid = newBid;
 
-            // ⭐ v1.1.0: генерируем новый лот с новым номером вместо выигранного
             const newPlate = (typeof generateCoolPlate === 'function') ? generateCoolPlate() : "А777АА 77";
             state.officialPlateAuction[lotIdx] = {
                 id: 'p_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
@@ -303,12 +616,11 @@ const AppGosuslugi = {
                 highestBidderId: null
             };
 
-            saveState();
-            updateHeaderUI();
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
             if (typeof playSound === 'function') playSound('win');
             if (typeof tgHaptic === 'function') tgHaptic('success');
 
-            // ⭐ v1.1.0: логируем транзакцию
             if (typeof logBankTransaction === 'function') {
                 logBankTransaction(`Аукцион номеров МРЭО: ${lot.plate}`, newBid, false);
             }
@@ -332,4 +644,4 @@ const AppGosuslugi = {
 
 window.AppGosuslugi = AppGosuslugi;
 
-console.log('[🏛 phone-gosuslugi v1.1.0] ФИКС E2: запрет самоперебивания ставки + highestBidderId + _bidPending защита ✓');
+console.log('[🏛 phone-gosuslugi v2.1.1] Загружен: Юрлица ИП/ООО + Коммерческий учет МРЭО + Аукцион номеров ✓');

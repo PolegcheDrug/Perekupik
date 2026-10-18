@@ -1,12 +1,10 @@
 // ========================================================
-// js/market-deal.js — ТОРГ У КАПОТА (v5.1.3 FIXED)
+// js/market/market-deal.js — ТОРГ У КАПОТА И ДКП (v5.3.3 REDESIGN)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-//
-// ⭐ v5.1.3 (STRICT NPC MODAL):
-//   - ФИКС: initiateBuyMarketCar защищён от двойного вызова
-//   - ФИКС: при открытии модалки ТОРГ У КАПОТА сбрасываются
-//     все флаги, чтобы предотвратить конфликты с другими модалками
-//   - ФИКС: проверка на существование модалки перед открытием
+// ⭐ v5.3.3:
+//   - Полный редизайн карточки «Оформление ТС» (кнопки компактные, текст ровный)
+//   - Никаких растянутых во всю ширину кнопок «На баланс»
+//   - Полная интеграция с проверкой ИП/ООО и постановкой ТС на баланс бизнеса
 // ========================================================
 
 let pendingMarketCar = null;
@@ -31,15 +29,39 @@ window.__getDKPState = function() {
 window.__resetDKPFlags = function() {
     _dealActionPending = false;
     window.__DKP_PENDING__ = false;
-    console.log('[DKP] Все флаги сброшены:', window.__getDKPState());
+    const overlays = ['modalBuyCall', 'modalMarketDeal', 'modalRegistrationChoice', 'modalDKP', 'modalBackfire'];
+    overlays.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.remove('active');
+            el.style.display = 'none';
+        }
+    });
 };
+
+function _forceCloseAllDealModals() {
+    const list = ['modalBuyCall', 'modalMarketDeal', 'modalRegistrationChoice', 'modalDKP', 'modalBackfire'];
+    list.forEach(id => {
+        if (typeof ModalManager !== 'undefined' && typeof ModalManager.close === 'function') {
+            try { ModalManager.close(id); } catch (e) {}
+        }
+        if (typeof closeModal === 'function') {
+            try { closeModal(id); } catch (e) {}
+        }
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.remove('active');
+            el.style.display = 'none';
+        }
+    });
+}
 
 function _openP2PDealFallback(p2pId) {
     if (!p2pId) return;
     const toast = (m) => { if (typeof showToast === 'function') showToast(m); };
 
     if (!window.P2POffersManager?.createOffer) {
-        return toast("❌ P2P торговля недоступна (p2p-offers.js не загружен)");
+        return toast("❌ P2P торговля недоступна");
     }
 
     const profile = (typeof getCurrentPlayerProfile === 'function') ? getCurrentPlayerProfile() : null;
@@ -92,16 +114,15 @@ function _openP2PDealFallback(p2pId) {
     toast("❌ Лот не найден");
 }
 
-// ⭐ v5.1.3: initiateBuyMarketCar защищён от двойного вызова
 function initiateBuyMarketCar(carId) {
-    if (buyCallTimeoutTimer) { clearTimeout(buyCallTimeoutTimer); buyCallTimeoutTimer = null; }
+    if (buyCallTimeoutTimer) {
+        clearTimeout(buyCallTimeoutTimer);
+        buyCallTimeoutTimer = null;
+    }
     if (!carId) return;
 
-    // Проверка на двойной вызов
-    if (_dealActionPending) {
-        console.warn('[MarketDeal] initiateBuyMarketCar уже в процессе');
-        return;
-    }
+    _dealActionPending = false;
+    window.__DKP_PENDING__ = false;
 
     let p2pItem = (state.p2pMarketListings || []).find(l => l && (
         String(l.id) === String(carId) || String(l.lot_id) === String(carId)
@@ -113,7 +134,7 @@ function initiateBuyMarketCar(carId) {
         return _openP2PDealFallback(p2pItem.id || p2pItem.lot_id);
     }
 
-    const car = (state.marketFeed || []).find(c => c && c.id === carId);
+    const car = (state.marketFeed || []).find(c => c && (String(c.id) === String(carId) || c.id == carId));
     if (!car) {
         if (typeof showToast === 'function') showToast("Лот не найден.");
         return;
@@ -124,7 +145,8 @@ function initiateBuyMarketCar(carId) {
 
     const now = Date.now();
     if (car.cooldownUntil && car.cooldownUntil > now) {
-        return showToast("Абонент всё ещё занят! Подождите.");
+        const left = Math.ceil((car.cooldownUntil - now) / 1000);
+        return showToast(`⏳ Абонент всё ещё занят (${left}с)! Подождите.`);
     }
 
     if (typeof setTxt === 'function') {
@@ -136,23 +158,30 @@ function initiateBuyMarketCar(carId) {
     const btnBox = document.getElementById("buyCallActionBtnBox");
     if (btnBox) btnBox.innerHTML = "<button class='btn btn-dark w-full' disabled>Гудки в трубке...</button>";
 
-    ModalManager.open("modalBuyCall", { closeOthers: true });
+    const modalCall = document.getElementById("modalBuyCall");
+    if (typeof ModalManager !== 'undefined' && modalCall) {
+        ModalManager.open("modalBuyCall", { closeOthers: true });
+    } else if (modalCall) {
+        modalCall.classList.add("active");
+        modalCall.style.display = "flex";
+    }
+
     if (typeof tgHaptic === 'function') tgHaptic('light');
 
     buyCallTimeoutTimer = setTimeout(() => {
         let karma = (state.player && state.player.karma !== undefined) ? state.player.karma : 50;
-        let callSuccessChance = 75;
-        if (karma > 65) callSuccessChance += 15;
+        let callSuccessChance = 80;
+        if (karma > 65) callSuccessChance += 10;
         if (karma < 35) callSuccessChance -= 15;
         if (car.dealType === 'urgent' || car.isBeaterProject) callSuccessChance += 20;
 
         const roll = Math.random() * 100;
 
         if (roll < callSuccessChance) {
-            ModalManager.close("modalBuyCall");
-            showToast("🚗 Вы приехали по адресу и осматриваете машину у капота!");
+            _forceCloseAllDealModals();
+            if (typeof showToast === 'function') showToast("🚗 Вы приехали по адресу и осматриваете машину у капота!");
             openMarketDeal(carId);
-        } else if (roll < 92) {
+        } else if (roll < 93) {
             const waitSec = Math.floor(15 + Math.random() * 20);
             car.cooldownUntil = Date.now() + (waitSec * 1000);
             if (typeof setTxt === 'function') {
@@ -160,7 +189,7 @@ function initiateBuyMarketCar(carId) {
                 setTxt("buyCallTitle", "Продавец занят");
                 setTxt("buyCallDesc", "«Сейчас на работе, перезвоните через " + waitSec + " сек!»");
             }
-            if (btnBox) btnBox.innerHTML = `<button onclick="ModalManager.close('modalBuyCall')" class='btn btn-dark w-full'>Понятно</button>`;
+            if (btnBox) btnBox.innerHTML = `<button onclick="_forceCloseAllDealModals()" class='btn btn-dark w-full'>Понятно</button>`;
             if (typeof saveState === 'function') saveState();
             if (typeof renderMarketFeed === 'function') renderMarketFeed();
         } else {
@@ -172,9 +201,9 @@ function initiateBuyMarketCar(carId) {
             car.unavailable = true;
             if (typeof saveState === 'function') saveState();
             if (typeof renderMarketFeed === 'function') renderMarketFeed();
-            if (btnBox) btnBox.innerHTML = `<button onclick="ModalManager.close('modalBuyCall')" class='btn btn-dark w-full'>Закрыть</button>`;
+            if (btnBox) btnBox.innerHTML = `<button onclick="_forceCloseAllDealModals()" class='btn btn-dark w-full'>Закрыть</button>`;
         }
-    }, 700);
+    }, 450);
 }
 
 function paidCallMarketCar(carId) {
@@ -183,7 +212,7 @@ function paidCallMarketCar(carId) {
     if (cash < 1000) return showToast("Не хватает 1,000 ₽ на приоритетный дозвон!");
     state.player.cash -= 1000;
 
-    const car = (state.marketFeed || []).find(c => c && c.id === carId);
+    const car = (state.marketFeed || []).find(c => c && (String(c.id) === String(carId) || c.id == carId));
     if (!car) return showToast("Лот уже снят с продажи!");
 
     car.cooldownUntil = 0;
@@ -195,11 +224,10 @@ function paidCallMarketCar(carId) {
     openMarketDeal(carId);
 }
 
-// ⭐ v5.1.3: openMarketDeal принудительно сбрасывает флаги
 function openMarketDeal(carId) {
     if (!carId) return;
 
-    const car = (state.marketFeed || []).find(c => c && c.id === carId);
+    const car = (state.marketFeed || []).find(c => c && (String(c.id) === String(carId) || c.id == carId));
     if (!car) return showToast("Автомобиль недоступен!");
 
     if (car.isP2PUserListing) {
@@ -216,7 +244,7 @@ function openMarketDeal(carId) {
     _dealActionPending = false;
     window.__DKP_PENDING__ = false;
 
-    pendingMarketCar = { car: car, carId: carId };
+    pendingMarketCar = { car: car, carId: car.id || carId };
     car.inspectedAtHood = true;
     if (typeof saveState === 'function') saveState();
 
@@ -255,14 +283,19 @@ function openMarketDeal(carId) {
             ${(car._revealedDefects && car._revealedDefects.length > 0) ? `
                 <div class='chat-msg msg-seller' style='border-left:3px solid var(--amber); background:rgba(255,179,0,0.06);'>
                     <b class="color-amber" style="font-size:9.5px;">💡 Вы уже знаете о ${car._revealedDefects.length} дефектах этой машины!</b>
-                    <div class="sub-label" style="font-size:9px; margin-top:2px;">Используйте их для аргументированного торга ↓</div>
+                    <div class="sub-label" style="font-size:9px; margin-top:2px;">Используйте их для торга ↓</div>
                 </div>
             ` : ''}
         `;
     }
 
     renderMarketHaggleControls();
-    ModalManager.open("modalMarketDeal", { closeOthers: true });
+    if (typeof ModalManager !== 'undefined') {
+        ModalManager.open("modalMarketDeal", { closeOthers: true });
+    } else {
+        const m = document.getElementById("modalMarketDeal");
+        if (m) { m.classList.add("active"); m.style.display = "flex"; }
+    }
     if (typeof playSound === 'function') playSound('tick');
 }
 
@@ -296,7 +329,7 @@ function startMarketTestDrive(carId) {
         thread.scrollTop = thread.scrollHeight;
     }
 
-    showToast("Тест-драйв проведён!");
+    if (typeof showToast === 'function') showToast("Тест-драйв проведён!");
     renderMarketHaggleControls();
     if (typeof saveState === 'function') saveState();
 }
@@ -379,7 +412,6 @@ function renderMarketHaggleControls() {
     }
 
     let inspectionToolsBlock = "";
-
     if (hasGauge || hasScanner) {
         let toolsButtonsHtml = "";
         if (hasGauge) {
@@ -541,6 +573,69 @@ function renderMarketHaggleControls() {
         </div>`;
 }
 
+function argueKnownDefects(carId) {
+    if (!pendingMarketCar || !pendingMarketCar.car) return;
+    const car = pendingMarketCar.car;
+
+    const revealed = car._revealedDefects || [];
+    const revealedLegal = car._revealedLegal || null;
+    const mechDefects = (car.mechanicalDefects || []).filter(d => revealed.includes(d.id));
+
+    let totalDiscountPct = 0;
+    mechDefects.forEach(d => { totalDiscountPct += (d.pricePenaltyPct || 0); });
+    if (revealedLegal) totalDiscountPct += 15;
+
+    totalDiscountPct = Math.min(50, Math.max(5, totalDiscountPct));
+
+    const discountAmount = Math.round(car.price * (totalDiscountPct / 100));
+    car.price = Math.max(10000, car.price - discountAmount);
+    car.hagglePatience = Math.max(0, (car.hagglePatience !== undefined ? car.hagglePatience : 3) - 1);
+
+    const thread = document.getElementById("dealChatThread");
+    if (thread) {
+        thread.innerHTML += `
+            <div class="chat-msg msg-player">«Я проверил машину: есть дефекты! Скидывай ${totalDiscountPct}%.»</div>
+            <div class="chat-msg msg-seller" style="border-left-color: var(--amber);">
+                «Да уж, против фактов не попрёшь... Скидываю <b>-${discountAmount.toLocaleString()} ₽</b>!»
+            </div>
+        `;
+        thread.scrollTop = thread.scrollHeight;
+    }
+
+    if (typeof setTxt === 'function') setTxt("dealCarPrice", `${car.price.toLocaleString()} ₽`);
+    showToast(`Аргументированная скидка: -${discountAmount.toLocaleString()} ₽!`);
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+
+    renderMarketHaggleControls();
+    if (typeof saveState === 'function') saveState();
+}
+
+function buyCarDirectToScrapYard(price) {
+    if (!pendingMarketCar || !pendingMarketCar.car) return;
+    const car = pendingMarketCar.car;
+    const cash = state.player?.cash || 0;
+    if (cash < price) return showToast("Не хватает денег!");
+
+    state.player.cash -= price;
+    car.unavailable = true;
+    showToast(`🔩 ${car.name} выкуплен на разборку за ${price.toLocaleString()} ₽!`);
+    _forceCloseAllDealModals();
+    if (typeof saveState === 'function') saveState();
+    if (typeof renderMarketFeed === 'function') renderMarketFeed();
+}
+
+function sellCarToDarknet(price) {
+    if (!pendingMarketCar || !pendingMarketCar.car) return;
+    const car = pendingMarketCar.car;
+    state.player.cash = (state.player.cash || 0) + price;
+    car.unavailable = true;
+    showToast(`🏴‍☠️ ${car.name} продан в Даркнет за ${price.toLocaleString()} ₽!`);
+    _forceCloseAllDealModals();
+    if (typeof saveState === 'function') saveState();
+    if (typeof renderMarketFeed === 'function') renderMarketFeed();
+}
+
 function attemptMarketHaggle(percent, failRisk = 25) {
     if (!pendingMarketCar || !pendingMarketCar.car) return showToast("Машина недоступна!");
 
@@ -589,7 +684,7 @@ function attemptMarketHaggle(percent, failRisk = 25) {
             car.unavailable = true;
             showToast("🚫 Продавец психанул, сел в машину и уехал!");
             setTimeout(() => {
-                ModalManager.close("modalMarketDeal");
+                _forceCloseAllDealModals();
                 if (typeof renderMarketFeed === 'function') renderMarketFeed();
             }, 1200);
             pendingMarketCar = null;
@@ -665,13 +760,17 @@ function confirmMarketPurchaseSuccess() {
         seller: pendingMarketCar.sellerName || "Продавец",
         buyer: (state.player && state.player.name) ? state.player.name : "Перекуп #777",
         price: price,
-        isRegisteredOnPlayer: false
+        isRegisteredOnPlayer: false,
+        buyTarget: 'personal',
+        targetBizId: null,
+        targetBizName: null
     };
 
-    ModalManager.close("modalMarketDeal");
+    _forceCloseAllDealModals();
     openRegistrationChoiceModal(deal);
 }
 
+// ⭐ РЕДИЗАЙН: МОДАЛКА ВЫБОРА ОФОРМЛЕНИЯ
 function openRegistrationChoiceModal(deal) {
     if (!deal || !deal.car) return showToast("Ошибка данных сделки");
 
@@ -679,31 +778,175 @@ function openRegistrationChoiceModal(deal) {
     window.__DKP_PENDING__ = false;
     _dealActionPending = false;
 
-    ModalManager.open('modalRegistrationChoice', { closeOthers: true });
+    const car = deal.car;
+    const legal = state.player?.legalEntity || { type: 'none' };
+    const docs = state.player?.documents || {};
+    const hasLegal = legal.type === 'ip' || legal.type === 'ooo' || Boolean(docs.ipRegistered) || Boolean(docs.oooRegistered) || Boolean(state.player?.hasIP) || Boolean(state.player?.hasOOO);
+    const legalType = hasLegal ? (legal.type !== 'none' ? legal.type : (docs.oooRegistered ? 'ooo' : 'ip')) : 'none';
+    const legalConfig = window.LEGAL_ENTITIES ? window.LEGAL_ENTITIES[legalType] : null;
+
+    const ownedBiz = (state.businesses || []).filter(b => b && (b.level > 0 || b.purchased || b.owned));
+    const ownedBizIds = ownedBiz.map(b => b.id);
+    let matchingBusinesses = [];
+
+    if (typeof window.getCarBusinessSuitability === 'function') {
+        const matches = window.getCarBusinessSuitability(car, ownedBizIds);
+        matchingBusinesses = matches.filter(m => ownedBizIds.includes(m.id)).map(m => {
+            const bObj = ownedBiz.find(b => b.id === m.id);
+            return {
+                bizId: m.id,
+                name: bObj?.customName || bObj?.name || m.name,
+                icon: m.icon || 'fa-briefcase',
+                badgeColor: m.badgeColor || 'var(--cyan)'
+            };
+        });
+    } else if (window.FLEET_CALCULATOR && ownedBizIds.length > 0) {
+        const suit = window.FLEET_CALCULATOR.checkSuitability(car, ownedBizIds);
+        if (suit && suit.suitable) {
+            matchingBusinesses = (suit.matches || []).filter(m => m.isOwned);
+        }
+    }
+
+    let modal = document.getElementById('modalRegistrationChoice');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalRegistrationChoice';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    let bizOptionsHtml = '';
+    if (!hasLegal) {
+        bizOptionsHtml = `
+            <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; opacity:0.85; border:1px dashed rgba(255,179,0,0.3);">
+                <b class="text-xs color-amber"><i class="fa-solid fa-lock"></i> Покупка на юрлицо заблокирована</b>
+                <div class="sub-label mt-1" style="font-size:8.5px;">Оформите ИП или ООО в Госуслугах, чтобы ставить машины на баланс коммерческих парков.</div>
+            </div>
+        `;
+    } else if (matchingBusinesses.length === 0) {
+        bizOptionsHtml = `
+            <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
+                <b class="text-xs color-cyan"><i class="fa-solid fa-building"></i> ${legal.companyName || docs.companyName || 'Ваша организация'}</b>
+                <div class="sub-label mt-1" style="font-size:8.5px;">У вас нет открытых автобизнесов, подходящих под категорию этого автомобиля.</div>
+            </div>
+        `;
+    } else {
+        const buttons = matchingBusinesses.map(m => {
+            const currentFleetCount = window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(m.bizId).length : 0;
+            const maxFleet = legalConfig?.maxFleetPerBiz || 5;
+            const isFull = currentFleetCount >= maxFleet;
+
+            return `
+                <div style="background:rgba(9,14,24,0.95); border:1px solid rgba(255,255,255,0.08); border-left:3px solid ${m.badgeColor}; border-radius:10px; padding:8px 12px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+                            <i class="fa-solid ${m.icon}" style="color:${m.badgeColor}; font-size:12px;"></i>
+                            <b style="color:#fff; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.name}</b>
+                        </div>
+                        <div class="sub-label" style="font-size:8.5px; color:#94a3b8;">
+                            Автопарк: <b style="color:${m.badgeColor};">${currentFleetCount} из ${maxFleet}</b> ед.
+                        </div>
+                    </div>
+                    <div style="flex-shrink:0;">
+                        ${!isFull ? `
+                            <button onclick="confirmRegistrationChoice('business', '${m.bizId}', '${m.name}')" class="btn btn-green btn-sm" style="width:auto !important; min-width:90px; padding:6px 12px; font-size:10px; font-weight:700; white-space:nowrap; border-radius:7px; box-shadow:0 0 10px rgba(0,230,118,0.25);">
+                                На баланс
+                            </button>
+                        ` : `<span class="tag-badge bg-tag-red" style="padding:4px 8px; font-size:8.5px;">Парк полон</span>`}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        bizOptionsHtml = `
+            <div class="mb-2">
+                <div class="sub-label mb-1" style="font-size:9px;"><i class="fa-solid fa-briefcase color-green"></i> На баланс компании (${legalConfig?.tag || 'Юрлицо'}):</div>
+                ${buttons}
+            </div>
+        `;
+    }
+
+    modal.innerHTML = `
+        <div class="modal-box" style="max-width:400px; padding:14px;">
+            <div class="flex-between mb-2">
+                <div class="modal-glow-badge" style="font-size:9px; padding:3px 8px;"><i class="fa-solid fa-file-signature"></i> ОФОРМЛЕНИЕ ТС</div>
+                <button onclick="_forceCloseAllDealModals()" class="btn btn-dark btn-auto btn-sm" style="width:28px; height:28px; padding:0; display:flex; align-items:center; justify-content:center;">✕</button>
+            </div>
+
+            <div class="p-2 mb-2" style="background:#050914; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+                <b class="text-xs color-cyan">${car.name}</b>
+                <div class="sub-label" style="font-size:9px;">Сумма сделки: <b style="color:#fff;">${(deal.price || 0).toLocaleString()} ₽</b></div>
+            </div>
+
+            <div class="sub-label mb-2" style="font-size:9.5px;">Куда оформить приобретаемый автомобиль?</div>
+
+            <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(0,229,255,0.25);">
+                <div class="flex-between mb-1">
+                    <b class="text-xs color-cyan" style="font-size:10px;"><i class="fa-solid fa-user"></i> В личный гараж (Физлицо)</b>
+                    <span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">Гараж</span>
+                </div>
+                <div class="sub-label mb-2" style="font-size:8.5px;">Для личной езды, гаражного тюнинга или перепродажи.</div>
+                <div class="grid-2" style="gap:6px;">
+                    <button onclick="confirmRegistrationChoice('personal_mreo')" class="btn btn-green btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700;">
+                        С учетом МРЭО (2,850 ₽)
+                    </button>
+                    <button onclick="confirmRegistrationChoice('personal_dkp')" class="btn btn-dark btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700;">
+                        Только ДКП (Перекуп)
+                    </button>
+                </div>
+            </div>
+
+            ${bizOptionsHtml}
+
+            <button onclick="_forceCloseAllDealModals()" class="btn btn-dark btn-sm w-full mt-1" style="padding:7px; font-size:10px;">Отмена</button>
+        </div>
+    `;
+
+    modal.classList.add('active');
+    modal.style.display = 'flex';
     if (typeof playSound === 'function') playSound('tick');
 }
 
-function confirmRegistrationChoice(registerOnPlayer) {
+function confirmRegistrationChoice(mode, bizId = null, bizName = null) {
     if (!_activeDKPDeal) return showToast("Ошибка: сделка потеряна");
 
-    _activeDKPDeal.isRegisteredOnPlayer = !!registerOnPlayer;
+    if (mode === 'business') {
+        const legal = state.player?.legalEntity || { type: 'none' };
+        const docs = state.player?.documents || {};
+        const hasLegal = legal.type === 'ip' || legal.type === 'ooo' || Boolean(docs.ipRegistered) || Boolean(docs.oooRegistered) || Boolean(state.player?.hasIP) || Boolean(state.player?.hasOOO);
 
-    if (registerOnPlayer) {
-        const gosposhlina = 2850;
-        if ((state.player?.cash || 0) < gosposhlina) {
-            showToast(`Не хватает ${gosposhlina} ₽ на госпошлину!`);
+        if (!hasLegal) {
+            showToast("⚠️ Требуется зарегистрировать ИП или ООО в Госуслугах!");
+            if (window.PhoneManager) window.PhoneManager.openApp('gosuslugi');
             return;
         }
-        state.player.cash -= gosposhlina;
-        if (typeof logBankTransaction === 'function') {
-            logBankTransaction('Госпошлина МРЭО', gosposhlina, false);
-        }
-        showToast("✅ Оформление в МРЭО (-2,850 ₽)");
+
+        const compName = legal.companyName || docs.companyName || state.player?.companyName || (docs.oooRegistered ? 'ООО «ВЕКТОР МОТОРС»' : `ИП ${state.player?.name || 'Игрок'}`);
+
+        _activeDKPDeal.buyTarget = 'business';
+        _activeDKPDeal.targetBizId = bizId;
+        _activeDKPDeal.targetBizName = bizName;
+        _activeDKPDeal.buyer = compName;
+        _activeDKPDeal.isRegisteredOnPlayer = true;
+        showToast(`💼 Оформление на баланс «${bizName}»`);
+    } else if (mode === 'personal_mreo') {
+        const fee = 2850;
+        if ((state.player?.cash || 0) < fee) return showToast(`Нужно ${fee} ₽ на госпошлину!`);
+        state.player.cash -= fee;
+        if (typeof logBankTransaction === 'function') logBankTransaction('Госпошлина МРЭО', fee, false);
+
+        _activeDKPDeal.buyTarget = 'personal';
+        _activeDKPDeal.isRegisteredOnPlayer = true;
+        _activeDKPDeal.buyer = state.player?.name || "Игрок";
+        showToast("✅ Оформление в МРЭО на физлицо (-2,850 ₽)");
     } else {
-        showToast("📄 Автомобиль оформляется по ДКП");
+        _activeDKPDeal.buyTarget = 'personal';
+        _activeDKPDeal.isRegisteredOnPlayer = false;
+        _activeDKPDeal.buyer = state.player?.name || "Игрок";
+        showToast("📄 Оформление по ДКП без постановки на учет");
     }
 
-    ModalManager.close('modalRegistrationChoice');
+    _forceCloseAllDealModals();
     openDKPModal(_activeDKPDeal);
 }
 
@@ -723,6 +966,10 @@ function openDKPModal(deal) {
     const buyerName = deal.buyer || (state.player?.name) || "Перекуп #777";
     const sellerName = deal.seller || "Продавец";
 
+    const isCompany = deal.buyTarget === 'business';
+    const legal = state.player?.legalEntity || {};
+    const docs = state.player?.documents || {};
+
     const hasLegalDefect = !!(car.legalDefect && !car._legalResolved);
     const legalDefectInfo = hasLegalDefect
         ? (typeof LEGAL_DEFECTS !== 'undefined' ? LEGAL_DEFECTS.find(l => l.id === car.legalDefect.id) : null)
@@ -731,9 +978,12 @@ function openDKPModal(deal) {
     const dkpModal = document.getElementById('modalDKP');
     if (!dkpModal) return;
 
-    const contractNum = `МРЭО-${String(Date.now()).slice(-6)}-${car.id ? car.id.slice(-3) : '777'}`;
+    const contractNum = `МРЭО-${String(Date.now()).slice(-6)}-${car.id ? String(car.id).slice(-3) : '777'}`;
     const contractDate = new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const carVIN = car.vin || `XTA${String(car.id || '2107000').slice(-13).padEnd(13, '0')}`;
+
+    const displayInn = legal.inn || docs.inn || '7701234567';
+    const displayOgrn = legal.ogrn || docs.ogrn || '1207700012345';
 
     dkpModal.innerHTML = `
         <div class="modal-box dkp-official-blank" style="max-width: 420px;">
@@ -756,10 +1006,15 @@ function openDKPModal(deal) {
                             </div>
                         </div>
                         <div>
-                            <div class="dkp-section-title">ПОКУПАТЕЛЬ</div>
+                            <div class="dkp-section-title">${isCompany ? 'ПОКУПАТЕЛЬ (ЮРЛИЦО)' : 'ПОКУПАТЕЛЬ'}</div>
                             <div class="dkp-row-compact">
                                 <b class="dkp-value color-cyan" id="dkpBuyerName">${buyerName}</b>
                             </div>
+                            ${isCompany ? `
+                                <div class="sub-label" style="font-size:7.5px; color:#94a3b8;">
+                                    ИНН: ${displayInn} • ОГРН: ${displayOgrn}
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                 </div>
@@ -790,8 +1045,10 @@ function openDKPModal(deal) {
                         <b class="price-val color-green" style="font-size:15px;" id="dkpPriceAmount">${price.toLocaleString()} ₽</b>
                     </div>
                     <div class="dkp-row-compact">
-                        <span class="dkp-label">Учёт:</span>
-                        <b class="dkp-value color-amber">${deal.isRegisteredOnPlayer ? '✅ МРЭО' : '📄 ДКП'}</b>
+                        <span class="dkp-label">Назначение:</span>
+                        <b class="dkp-value ${isCompany ? 'color-green' : 'color-amber'}">
+                            ${isCompany ? `💼 Баланс (${deal.targetBizName})` : (deal.isRegisteredOnPlayer ? '✅ Личный учет МРЭО' : '📄 ДКП физлица')}
+                        </b>
                     </div>
                 </div>
 
@@ -814,7 +1071,7 @@ function openDKPModal(deal) {
                     </div>
                     <div id="dkpOfficialStamp" class="official-mreo-stamp">
                         <div class="stamp-inner">
-                            <span>МРЭО ГИБДД</span>
+                            <span>${isCompany ? 'РЕЕСТР ЮРЛИЦ' : 'МРЭО ГИБДД'}</span>
                             <span>ЗАРЕГИСТРИРОВАНО</span>
                             <span>РФ</span>
                         </div>
@@ -844,29 +1101,19 @@ function openDKPModal(deal) {
                     <button id="btnAbortDKP" onclick="abortDKPDeal()" class="btn btn-danger btn-sm w-full mt-1" style="${hasLegalDefect ? '' : 'display:none;'}">
                         ❌ Разорвать сделку
                     </button>
-                    <button id="btnCloseDKP" onclick="closeModal('modalDKP')" class="btn btn-dark w-full mt-1" style="display:none;">Готово</button>
                 </div>
             </div>
         </div>
     `;
 
-    ModalManager.open('modalDKP', { closeOthers: true });
+    dkpModal.classList.add('active');
+    dkpModal.style.display = 'flex';
     if (typeof playSound === 'function') playSound('tick');
-
-    setTimeout(() => {
-        const btnSign = document.getElementById('btnSignDKP');
-        const btnAbort = document.getElementById('btnAbortDKP');
-        const btnClose = document.getElementById('btnCloseDKP');
-
-        if (btnSign) { btnSign.onclick = confirmSignDKP; btnSign.style.display = 'block'; btnSign.disabled = false; }
-        if (btnAbort) { btnAbort.onclick = abortDKPDeal; btnAbort.style.display = hasLegalDefect ? 'block' : 'none'; }
-        if (btnClose) { btnClose.style.display = 'none'; }
-    }, 50);
 }
 
 function downloadDKPPDF() {
     if (typeof showToast === 'function') {
-        showToast("📄 Договор сохранён в буфер обмена (PDF-имитация)");
+        showToast("📄 Договор сохранён в буфер обмена");
     }
     if (typeof playSound === 'function') playSound('win');
     if (typeof tgHaptic === 'function') tgHaptic('success');
@@ -878,6 +1125,7 @@ function downloadDKPPDF() {
 Дата: ${new Date().toLocaleDateString('ru-RU')}
 Продавец: ${_activeDKPDeal.seller || 'Продавец'}
 Покупатель: ${_activeDKPDeal.buyer || 'Покупатель'}
+Назначение: ${_activeDKPDeal.buyTarget === 'business' ? `Баланс компании (${_activeDKPDeal.targetBizName})` : 'Личное владение'}
 Автомобиль: ${car.name}
 VIN: ${car.vin || '—'}
 Госномер: ${car.customPlate || car.plate || 'ТРАНЗИТ'}
@@ -894,48 +1142,36 @@ function disputeDKP() {
     if (!_activeDKPDeal || !_activeDKPDeal.car) return;
 
     const car = _activeDKPDeal.car;
-
-    if (typeof showToast === 'function') {
-        showToast("⚖️ Вы вызвали юриста для оспаривания сделки...");
-    }
-
     const hasConnections = (state.player?.connections || 0) >= 1;
     const hasMoney = (state.player?.cash || 0) >= 100000;
 
     if (hasConnections && Math.random() < 0.6) {
         state.player.connections -= 1;
-        if (typeof showToast === 'function') showToast("🤝 Решала уладил юридические проблемы (-1 связь)!");
+        showToast("🤝 Решала уладил юридические проблемы (-1 связь)!");
         car.legalDefect = null;
         car._legalResolved = true;
         if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        setTimeout(() => { openDKPModal(_activeDKPDeal); }, 800);
+        setTimeout(() => { openDKPModal(_activeDKPDeal); }, 600);
     } else if (hasMoney) {
         state.player.cash -= 100000;
         car.legalDefect = null;
         car._legalResolved = true;
-        if (typeof logBankTransaction === 'function') {
-            logBankTransaction('Юридическое сопровождение ДКП', 100000, false);
-        }
-        if (typeof showToast === 'function') showToast("💸 Юрист уладил проблемы (-100,000 ₽)!");
+        if (typeof logBankTransaction === 'function') logBankTransaction('Юридическое сопровождение ДКП', 100000, false);
+        showToast("💸 Юрист уладил проблемы (-100,000 ₽)!");
         if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        setTimeout(() => { openDKPModal(_activeDKPDeal); }, 800);
+        setTimeout(() => { openDKPModal(_activeDKPDeal); }, 600);
     } else {
-        if (typeof showToast === 'function') showToast("❌ Не хватает ни связей, ни денег для оспаривания!");
+        showToast("❌ Не хватает связей или денег для оспаривания!");
         if (typeof playSound === 'function') playSound('error');
-        if (typeof tgHaptic === 'function') tgHaptic('error');
     }
 }
 
 function confirmSignDKP() {
-    console.log('[DKP] confirmSignDKP вызван. State:', window.__getDKPState());
-
     if (window.__DKP_PENDING__) return;
 
     if (!_activeDKPDeal) {
         showToast("❌ Ошибка: сделка потеряна");
-        ModalManager.close('modalDKP');
+        _forceCloseAllDealModals();
         window.__DKP_PENDING__ = false;
         _dealActionPending = false;
         return;
@@ -957,42 +1193,17 @@ function confirmSignDKP() {
     if (typeof playSound === 'function') playSound('win');
     if (typeof tgHaptic === 'function') tgHaptic('success');
 
-    const btnClose = document.getElementById('btnCloseDKP');
-    if (btnClose) {
-        setTimeout(() => {
-            btnClose.style.display = 'block';
-            btnClose.onclick = () => {
-                ModalManager.close('modalDKP');
-                closeModal('modalDKP');
-            };
-        }, 800);
-    }
-
     setTimeout(() => {
-        ModalManager.close('modalDKP');
-
-        const type = deal.type;
-        if (type === 'buy') {
-            finishMarketCarBuyProcess(deal);
-        } else if (type === 'sale') {
-            const idx = deal.lotIndex;
-            if (idx !== undefined && typeof finishSalesLotDeal === 'function') {
-                finishSalesLotDeal(idx, deal.price, deal.profit);
-            } else {
-                showToast("❌ Ошибка: не удалось завершить сделку продажи");
-            }
-        } else {
-            showToast("❌ Неизвестный тип сделки");
-        }
-
+        _forceCloseAllDealModals();
+        finishMarketCarBuyProcess(deal);
         _activeDKPDeal = null;
         window.__DKP_PENDING__ = false;
         _dealActionPending = false;
-    }, 1500);
+    }, 600);
 }
 
 function abortDKPDeal() {
-    ModalManager.close('modalDKP');
+    _forceCloseAllDealModals();
     _activeDKPDeal = null;
     window.__DKP_PENDING__ = false;
     _dealActionPending = false;
@@ -1023,7 +1234,7 @@ function finishMarketCarBuyProcess(deal) {
             return;
         }
 
-        const liveCarIndex = (state.marketFeed || []).findIndex(c => c && c.id === carId);
+        const liveCarIndex = (state.marketFeed || []).findIndex(c => c && (String(c.id) === String(carId) || c.id == carId));
         if (liveCarIndex === -1) {
             showToast("❌ Лот уже снят с продажи!");
             pendingMarketCar = null;
@@ -1050,7 +1261,6 @@ function finishMarketCarBuyProcess(deal) {
         newCar.purchaseCost = price;
         newCar.wear = car.wear ? car.wear : { engine: 85, transmission: 85 };
         newCar.isPersonal = false;
-        newCar.isRegisteredOnPlayer = !!deal.isRegisteredOnPlayer;
         newCar.ownershipDays = 0;
         newCar.engineTemp = 90;
         newCar.tireWear = car.tireWear !== undefined ? car.tireWear : 100;
@@ -1074,6 +1284,19 @@ function finishMarketCarBuyProcess(deal) {
         newCar._revealedLegal = car._revealedLegal || null;
         newCar.sellerArchetype = car.sellerArchetype || null;
 
+        if (deal.buyTarget === 'business' && deal.targetBizId) {
+            newCar.commercialRegistered = true;
+            newCar.registeredCompany = deal.buyer;
+            newCar.assignedBusinessId = deal.targetBizId;
+            newCar.assignedBusinessName = deal.targetBizName;
+            newCar.registrationDate = new Date().toLocaleDateString('ru-RU');
+        } else {
+            newCar.commercialRegistered = false;
+            newCar.isRegisteredOnPlayer = !!deal.isRegisteredOnPlayer;
+            newCar.assignedBusinessId = null;
+            newCar.assignedBusinessName = null;
+        }
+
         if (car.legalDefect && !car._legalResolved) {
             newCar._backfireDay = (state.player.day || 1) + 3 + Math.floor(Math.random() * 4);
             newCar._backfireType = car.legalDefect.id;
@@ -1082,7 +1305,7 @@ function finishMarketCarBuyProcess(deal) {
         if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(newCar);
 
         state.garage.push(newCar);
-        state.marketFeed = (state.marketFeed || []).filter(c => c && c.id !== carId);
+        state.marketFeed = (state.marketFeed || []).filter(c => c && String(c.id) !== String(carId) && c.id != carId);
         state.marketFeedVersion = (state.marketFeedVersion || 0) + 1;
 
         pendingMarketCar = null;
@@ -1097,6 +1320,7 @@ function finishMarketCarBuyProcess(deal) {
         }
 
         let msg = `✅ ${car.name} куплен за ${price.toLocaleString()} ₽!`;
+        if (deal.buyTarget === 'business') msg += ` Поставлен на баланс «${deal.targetBizName}»!`;
         if (car.legalDefect) msg += ` ⚠️ Есть юридическая проблема (см. в гараже)`;
         showToast(msg);
         if (typeof spawnFloatingReward === 'function') spawnFloatingReward(`-${price.toLocaleString()} ₽`);
@@ -1104,7 +1328,7 @@ function finishMarketCarBuyProcess(deal) {
         if (typeof saveState === 'function') saveState();
         if (typeof renderMarketFeed === 'function') renderMarketFeed();
         if (typeof renderGarage === 'function') renderGarage();
-        setTimeout(() => { if (typeof switchTab === 'function') switchTab("tabGarage"); }, 400);
+        setTimeout(() => { if (typeof switchTab === 'function') switchTab("tabGarage"); }, 300);
     } finally {
         _dealActionPending = false;
         window.__DKP_PENDING__ = false;
@@ -1168,15 +1392,20 @@ function _triggerBuyerBackfire(car, idx) {
             </div>
         </div>
     `;
-    ModalManager.open('modalBackfire', { closeOthers: true });
+    if (typeof ModalManager !== 'undefined') {
+        ModalManager.open('modalBackfire', { closeOthers: true });
+    } else {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
     if (typeof playSound === 'function') playSound('error');
     if (typeof tgHaptic === 'function') tgHaptic('error');
 }
 
 function resolveBackfire(carId, action) {
-    const car = (state.garage || []).find(c => c && c.id === carId);
+    const car = (state.garage || []).find(c => c && (String(c.id) === String(carId) || c.id == carId));
     if (!car) {
-        ModalManager.close('modalBackfire');
+        _forceCloseAllDealModals();
         return showToast("Машина уже не в гараже.");
     }
 
@@ -1206,8 +1435,34 @@ function resolveBackfire(carId, action) {
     if (typeof updateHeaderUI === 'function') updateHeaderUI();
     if (typeof playSound === 'function') playSound('win');
     if (typeof tgHaptic === 'function') tgHaptic('success');
-    ModalManager.close('modalBackfire');
+    _forceCloseAllDealModals();
 }
+
+const MarketDeal = {
+    initiateBuyMarketCar,
+    startCall: initiateBuyMarketCar,
+    paidCallMarketCar,
+    openMarketDeal,
+    startMarketTestDrive,
+    renderMarketHaggleControls,
+    buyCarDirectToScrapYard,
+    sellCarToDarknet,
+    attemptMarketHaggle,
+    argueKnownDefects,
+    confirmMarketPurchaseSuccess,
+    openRegistrationChoiceModal,
+    confirmRegistrationChoice,
+    openDKPModal,
+    confirmSignDKP,
+    abortDKPDeal,
+    downloadDKPPDF,
+    disputeDKP,
+    _triggerBuyerBackfire,
+    resolveBackfire,
+    _forceCloseAllDealModals
+};
+
+window.MarketDeal = MarketDeal;
 
 Object.assign(window, {
     initiateBuyMarketCar,
@@ -1220,7 +1475,6 @@ Object.assign(window, {
     attemptMarketHaggle,
     argueKnownDefects,
     confirmMarketPurchaseSuccess,
-    finishMarketCarBuyProcess,
     openRegistrationChoiceModal,
     confirmRegistrationChoice,
     openDKPModal,
@@ -1229,10 +1483,10 @@ Object.assign(window, {
     downloadDKPPDF,
     disputeDKP,
     _triggerBuyerBackfire,
-    resolveBackfire
+    resolveBackfire,
+    _forceCloseAllDealModals
 });
 
-// Только если функции еще нет в window, вешаем резерв
 if (typeof window.openP2PDealModal !== 'function') {
     window.openP2PDealModal = _openP2PDealFallback;
 }
@@ -1241,4 +1495,4 @@ window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v5.1.3] Строгий запуск модалки торга у капота + сброс флагов ✓');
+console.log('[🤝 market-deal v5.3.3] Чистая верстка модалок и списков без растяжения кнопок ✓');

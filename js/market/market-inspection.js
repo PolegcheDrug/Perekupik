@@ -1,17 +1,6 @@
 // ========================================================
-// js/market-inspection.js — СИСТЕМА ПРОВЕРОК 2.2 (v2.2.1)
+// js/market/market-inspection.js — СИСТЕМА ПРОВЕРОК (v2.3.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v2.2.1 (КОМПАКТНАЯ АВТОТЕКА):
-//   - Убрана кнопка «Скачать PDF».
-//   - Уменьшены размеры окна и внутренние отступы.
-// ⭐ v2.2.0 (ИНТЕРАКТИВНАЯ АВТОТЕКА):
-//   - openAutotekaModal полностью переработан: теперь это
-//     официальный отчёт с водяными знаками, разделами,
-//     шкалой рисков.
-//   - Стилистика совпадает с бланком ДКП.
-// ⭐ v2.1.0:
-//   - ФИКС кликов по плиткам проверки.
-//   - Защита от двойного клика (_inspectionPending).
 // ========================================================
 
 let activeInspectCarId = null;
@@ -351,7 +340,6 @@ function openInspectionChoiceModal(carId) {
             e.preventDefault();
             e.stopPropagation();
             const tierId = el.getAttribute('data-inspection-tier');
-            console.log('[Inspection] Клик по тиру:', tierId);
             runInspection(tierId);
         });
     });
@@ -364,27 +352,16 @@ function openInspectionChoiceModal(carId) {
 // 4. ЗАПУСК ПРОВЕРКИ
 // --------------------------------------------------------
 function runInspection(tierId) {
-    if (_inspectionPending) {
-        console.warn('[Inspection] runInspection уже в процессе');
-        return;
-    }
+    if (_inspectionPending) return;
 
     const car = _getInspectCar();
-    if (!car) {
-        console.warn('[Inspection] Машина не найдена');
-        return showToast("⚠️ Машина не найдена");
-    }
+    if (!car) return showToast("⚠️ Машина не найдена");
 
     const tier = _getInspectionTiers().find(t => t.id === tierId);
-    if (!tier) {
-        console.warn('[Inspection] Тир не найден:', tierId);
-        return showToast("⚠️ Уровень проверки не найден");
-    }
+    if (!tier) return showToast("⚠️ Уровень проверки не найден");
 
     const status = car.inspectionStatus || {};
-    if (status[tierId] === true) {
-        return showToast("✓ Этот уровень уже пройден");
-    }
+    if (status[tierId] === true) return showToast("✓ Этот уровень уже пройден");
 
     const detects = tier.detects || [];
     if (detects.includes('gauge') && !(_hasTool('gauge') || _hasTool('gauge_pro'))) {
@@ -611,7 +588,7 @@ function closeInspectionResults() {
 }
 
 // --------------------------------------------------------
-// 6. ⭐ v2.2.1: ИНТЕРАКТИВНАЯ АВТОТЕКА (КОМПАКТНЫЙ ОТЧЁТ)
+// 6. ИНТЕРАКТИВНАЯ АВТОТЕКА + СТРОГИЙ АНАЛИЗ БИЗНЕСА
 // --------------------------------------------------------
 function openAutotekaModal(carId) {
     if (!state.marketFeed) return;
@@ -619,7 +596,6 @@ function openAutotekaModal(carId) {
     if (!car) return;
     car.viewed = true;
 
-    // Покупка отчёта
     if (!car.autotekaChecked) {
         const isVip = !!(state.player && state.player.vipPro);
         const cost = isVip ? 0 : 5000;
@@ -640,7 +616,6 @@ function openAutotekaModal(carId) {
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
     }
 
-    // === Подготовка данных ===
     const legal = car.legalDefect;
     const cName = car.name || "Автомобиль";
     const cPlate = car.customPlate || car.plate || "ТРАНЗИТ";
@@ -671,7 +646,48 @@ function openAutotekaModal(carId) {
         if (legal.id === 'legal_pts_duplicate') ptsTypeStatus = "⚠️ Дубликат ПТС";
     }
 
-    // Общий рейтинг
+    // ⭐ АНАЛИЗ СОВМЕСТИМОСТИ ТОЛЬКО С РЕАЛЬНО КУПЛЕННЫМИ БИЗНЕСАМИ (level > 0)
+    const ownedBizIds = (state.businesses || [])
+        .filter(b => b && b.level > 0)
+        .map(b => b.id);
+
+    let bizSuitabilityHtml = '';
+    if (window.FLEET_CALCULATOR && ownedBizIds.length > 0) {
+        const suitability = window.FLEET_CALCULATOR.checkSuitability(car, ownedBizIds);
+        car.businessTag = suitability;
+
+        if (suitability && suitability.suitable && Array.isArray(suitability.matches) && suitability.matches.length > 0) {
+            const items = suitability.matches.map(m => {
+                const estIncome = window.FLEET_CALCULATOR.calculateCarDailyIncome(
+                    car, m.bizId, state.player?.legalEntity?.type || 'ip', true
+                );
+                return `
+                    <div class="p-1 mb-1 flex-between" style="background:#090e18; border-radius:6px; border-left:3px solid ${m.badgeColor};">
+                        <span style="font-size:9px;">
+                            <i class="fa-solid ${m.icon}" style="color:${m.badgeColor};"></i>
+                            <b>${m.name}</b> <span class="color-green font-bold">[Ваш бизнес]</span>
+                        </span>
+                        <b class="color-green" style="font-size:9.5px;">+${estIncome.netIncome.toLocaleString()} ₽/д</b>
+                    </div>
+                `;
+            }).join('');
+
+            bizSuitabilityHtml = `
+                <div class="autoteka-section-compact" style="border:1px solid rgba(0,230,118,0.3); background:rgba(0,230,118,0.03);">
+                    <div class="autoteka-section-title">
+                        <span>5. КОММЕРЧЕСКИЙ ПОТЕНЦИАЛ</span>
+                        <span class="tag-badge bg-tag-green">ПОДХОДИТ</span>
+                    </div>
+                    <div class="sub-label mb-1" style="font-size:8.5px;">Автомобиль можно поставить на баланс через МРЭО:</div>
+                    ${items}
+                    ${legal ? '<div class="sub-label color-red font-bold mt-1" style="font-size:8px;">⚠️ Внимание: регистрация в МРЭО возможна только после снятия арестов/залогов!</div>' : ''}
+                </div>
+            `;
+        }
+    } else {
+        car.businessTag = { suitable: false, matches: [] };
+    }
+
     let overallScore = 10;
     if (car.hiddenDefect) overallScore -= 2;
     if (car.rolledOdometer) overallScore -= 2;
@@ -683,18 +699,14 @@ function openAutotekaModal(carId) {
     let scoreColor = overallScore >= 8 ? "color-green" : (overallScore >= 5 ? "color-amber" : "color-red");
     let scoreLabel = overallScore >= 9 ? "ИДЕАЛЬНО" : (overallScore >= 7 ? "ХОРОШО" : (overallScore >= 5 ? "ЕСТЬ РИСКИ" : "ОПАСНО"));
 
-    // Статус юридической чистоты
     let legalCleanBadge = legal
         ? `<span class='tag-badge bg-tag-red'>⚠️ ПРОБЛЕМА</span>`
         : (car.isStolen
             ? `<span class='tag-badge bg-tag-red'>🚨 В РОЗЫСКЕ</span>`
             : `<span class='tag-badge bg-tag-green'>✓ ЮРИДИЧЕСКИ ЧИСТ</span>`);
 
-    // Номер отчёта
     const reportNum = `AT-${String(Date.now()).slice(-8)}`;
     const reportDate = new Date().toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-    // VIN
     const carVIN = car.vin || pts.vin || `XTA${String(car.id || '2107000').slice(-13).padEnd(13, '0')}`;
 
     const rep = document.getElementById("autotekaReportContent");
@@ -794,6 +806,8 @@ function openAutotekaModal(carId) {
                     </div>
                 </div>
 
+                ${bizSuitabilityHtml}
+
                 ${legal ? `
                     <div class="autoteka-legal-warning">
                         <div class="flex-between mb-1">
@@ -801,7 +815,7 @@ function openAutotekaModal(carId) {
                             <span class="tag-badge bg-tag-red">${legal.severity}</span>
                         </div>
                         <div class="sub-label mb-1" style="font-size:9px;">
-                            <b>${legal.name}</b> — ${legal.desc}
+                            <b>${legal.name}</b> —${legal.desc}
                         </div>
                         <div class="sub-label color-red font-bold" style="font-size:8.5px;">
                             Последствие: ${legal.consequence}
@@ -858,4 +872,4 @@ Object.assign(window, {
     _showInspectionResults
 });
 
-console.log('[🔬 market-inspection v2.2.1] Компактная Автотека без PDF ✓');
+console.log('[🔬 market-inspection v2.3.1] Автотека со строгой фильтрацией бизнесов игрока ✓');
