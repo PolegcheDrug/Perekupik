@@ -1,12 +1,12 @@
 // ========================================================
-// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.4 FULL FIXED)
+// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.5 BULLETPROOF)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.1.4 (P2P SELL MODAL & SELECTION RESTORATION):
-//   - ВОССТАНОВЛЕНА openCreateListingModal (кнопка + ПРОДАТЬ теперь открывает окно).
-//   - Гарантированный показ #modalCreateP2P поверх экрана телефона (z-index / display).
-//   - Корректный возврат машины в гараж при отмене/снятии лота с продажи.
-//   - Автовыбор объекта при открытии списка.
+// ⭐ v9.1.5 (MODAL AUTO-INJECT & GUARANTEED DISPLAY):
+//   - АВТО-СОЗДАНИЕ #modalCreateP2P в DOM: если окна нет в index.html,
+//     оно генерируется на лету и открывается поверх экрана телефона.
+//   - Принудительные стили z-index: 999999 и display: flex.
+//   - Полная синхронизация карточек, автовыбор и возврат в гараж при отмене.
 // ========================================================
 
 (function() {
@@ -546,32 +546,89 @@
     };
 
     // ========================================================
-    // 8. СОЗДАНИЕ ЛОТА (МОДАЛКА)
+    // 8. СОЗДАНИЕ ЛОТА (МОДАЛКА С АВТО-ИНЖЕКТОМ В DOM)
     // ========================================================
+    AppM._ensureCreateModalExists = function() {
+        let modal = document.getElementById('modalCreateP2P');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalCreateP2P';
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-box" style="max-width: 420px; width:92%; background:#090e18; border:1.5px solid var(--green); border-radius:12px; padding:16px; box-shadow:0 0 35px rgba(0,230,118,0.25);">
+                    <div class="flex-between mb-3" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div class="modal-glow-badge" style="color:var(--green); border-color:var(--green); font-size:12px; font-weight:800;">
+                            <i class="fa-solid fa-handshake"></i> ВЫСТАВИТЬ НА P2P
+                        </div>
+                        <button onclick="AppM.closeCreateListingModal()" class="btn btn-dark btn-auto btn-sm" style="padding:4px 10px;">✕</button>
+                    </div>
+
+                    <div class="grid-4 mb-3" style="display:grid; grid-template-columns: repeat(4, 1fr); gap:4px;">
+                        <button id="btnP2PTypeCar" onclick="AppM.selectP2PListingType('cars')" class="btn btn-cyan btn-sm active" style="font-size:10px; padding:6px 0;">АВТО</button>
+                        <button id="btnP2PTypePlate" onclick="AppM.selectP2PListingType('plates')" class="btn btn-dark btn-sm" style="font-size:10px; padding:6px 0;">НОМЕР</button>
+                        <button id="btnP2PTypeBiz" onclick="AppM.selectP2PListingType('business')" class="btn btn-dark btn-sm" style="font-size:10px; padding:6px 0;">БИЗНЕС</button>
+                        <button id="btnP2PTypeHouse" onclick="AppM.selectP2PListingType('housing')" class="btn btn-dark btn-sm" style="font-size:10px; padding:6px 0;">ЖИЛЬЁ</button>
+                    </div>
+
+                    <div class="sub-label mb-1" style="font-size:9.5px; color:#94a3b8;">Выберите объект:</div>
+                    <div id="p2pCardsListContainer" style="max-height:180px; overflow-y:auto; margin-bottom:12px; border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:4px; background:#050811;">
+                        <div class="sub-label text-center py-4">Загрузка...</div>
+                    </div>
+
+                    <div class="sub-label mb-1" style="font-size:9.5px; color:#94a3b8;">Цена (₽):</div>
+                    <input type="number" id="p2pPriceInput" class="chat-input" 
+                           style="width:100%; font-size:16px; font-weight:800; color:var(--green); padding:10px; margin-bottom:12px; background:#050811; border:1px solid rgba(0,230,118,0.3); border-radius:6px;"
+                           placeholder="Цена в рублях" min="1000">
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                        <button onclick="AppM.confirmCreateP2PListing()" class="btn btn-green font-bold" style="padding:10px; background:var(--green); color:#000; font-weight:bold; border:none; border-radius:6px; cursor:pointer;">
+                            ВЫСТАВИТЬ ☁️
+                        </button>
+                        <button onclick="AppM.closeCreateListingModal()" class="btn btn-dark" style="padding:10px; border-radius:6px;">
+                            ОТМЕНА
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        return modal;
+    };
+
     AppM.openCreateListingModal = function() {
+        const modal = this._ensureCreateModalExists();
         this._currentModalItems = [];
         this.selectedItemIndex = 0;
 
+        modal.style.display = 'flex';
+        modal.style.position = 'fixed';
+        modal.style.inset = '0';
+        modal.style.zIndex = '999999';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.background = 'rgba(0, 0, 0, 0.85)';
+        modal.style.backdropFilter = 'blur(6px)';
+        modal.classList.add('active');
+
+        if (typeof ModalManager !== 'undefined') {
+            try { ModalManager.open('modalCreateP2P'); } catch (e) {}
+        }
+
+        setTimeout(() => {
+            this.selectP2PListingType('cars', false);
+        }, 50);
+
+        if (window.AudioFx) window.AudioFx.play('tick');
+    };
+
+    AppM.closeCreateListingModal = function() {
         const modal = document.getElementById('modalCreateP2P');
         if (modal) {
-            modal.style.display = 'flex';
-            modal.style.position = 'fixed';
-            modal.style.inset = '0';
-            modal.style.zIndex = '99999';
-            modal.style.alignItems = 'center';
-            modal.style.justifyContent = 'center';
-            modal.style.background = 'rgba(0, 0, 0, 0.85)';
-            modal.classList.add('active');
-
-            if (typeof ModalManager !== 'undefined') {
-                try { ModalManager.open('modalCreateP2P'); } catch (e) {}
-            }
-
-            setTimeout(() => {
-                this.selectP2PListingType('cars', false);
-            }, 50);
-        } else {
-            console.warn('[P2P Market] modalCreateP2P element not found');
+            modal.style.display = 'none';
+            modal.classList.remove('active');
+        }
+        if (typeof ModalManager !== 'undefined') {
+            try { ModalManager.close('modalCreateP2P'); } catch (e) {}
         }
     };
 
@@ -612,15 +669,15 @@
                         const isSelected = this.selectedItemIndex === i;
                         const img = resolveCarImage(car);
                         html += `
-                            <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'var(--border-glass)'}; background:${isSelected ? 'rgba(0,230,118,0.1)' : '#090e18'};">
-                                <div class="flex-gap" style="align-items:center;">
+                            <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'rgba(255,255,255,0.08)'}; background:${isSelected ? 'rgba(0,230,118,0.12)' : '#070b14'}; display:flex; justify-content:space-between; align-items:center; border-radius:6px;">
+                                <div class="flex-gap" style="display:flex; align-items:center; gap:8px;">
                                     <img src="${img}" style="width:45px; height:32px; object-fit:cover; border-radius:4px; border:1px solid rgba(255,255,255,0.1);">
                                     <div>
-                                        <b class="text-xs ${isSelected ? 'color-green' : 'color-cyan'}">${safeEscape(car.name)}</b>
-                                        <div class="sub-label" style="font-size:9px;">${car.power || 100} л.с. | ${car.condition || 80}%</div>
+                                        <b class="text-xs ${isSelected ? 'color-green' : 'color-cyan'}" style="font-size:11px;">${safeEscape(car.name)}</b>
+                                        <div class="sub-label" style="font-size:9px; color:#94a3b8;">${car.power || 100} л.с. | ${car.condition || 80}%</div>
                                     </div>
                                 </div>
-                                ${isSelected ? '<i class="fa-solid fa-circle-check color-green" style="font-size:16px;"></i>' : ''}
+                                ${isSelected ? '<i class="fa-solid fa-circle-check color-green" style="font-size:16px; color:var(--green);"></i>' : ''}
                             </div>
                         `;
                     });
@@ -635,12 +692,12 @@
                         this._currentModalItems.push(p);
                         const isSelected = this.selectedItemIndex === i;
                         html += `
-                            <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'var(--border-glass)'}; background:${isSelected ? 'rgba(0,230,118,0.1)' : '#090e18'};">
+                            <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'rgba(255,255,255,0.08)'}; background:${isSelected ? 'rgba(0,230,118,0.12)' : '#070b14'}; display:flex; justify-content:space-between; align-items:center; border-radius:6px;">
                                 <div>
                                     <b class="text-xs font-mono ${isSelected ? 'color-green' : 'color-cyan'}">${safeEscape(p.number)}</b>
-                                    <div class="sub-label" style="font-size:9px;">Регион: ${p.region || 77}</div>
+                                    <div class="sub-label" style="font-size:9px; color:#94a3b8;">Регион: ${p.region || 77}</div>
                                 </div>
-                                ${isSelected ? '<i class="fa-solid fa-circle-check color-green" style="font-size:16px;"></i>' : ''}
+                                ${isSelected ? '<i class="fa-solid fa-circle-check color-green" style="font-size:16px; color:var(--green);"></i>' : ''}
                             </div>
                         `;
                     });
@@ -656,12 +713,12 @@
                         this._currentModalItems.push(b);
                         const isSelected = this.selectedItemIndex === i;
                         html += `
-                            <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'var(--border-glass)'}; background:${isSelected ? 'rgba(0,230,118,0.1)' : '#090e18'};">
+                            <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'rgba(255,255,255,0.08)'}; background:${isSelected ? 'rgba(0,230,118,0.12)' : '#070b14'}; display:flex; justify-content:space-between; align-items:center; border-radius:6px;">
                                 <div>
                                     <b class="text-xs ${isSelected ? 'color-green' : 'color-cyan'}">${safeEscape(b.name)}</b>
-                                    <div class="sub-label" style="font-size:9px;">Уровень ${b.level}</div>
+                                    <div class="sub-label" style="font-size:9px; color:#94a3b8;">Уровень ${b.level}</div>
                                 </div>
-                                ${isSelected ? '<i class="fa-solid fa-circle-check color-green" style="font-size:16px;"></i>' : ''}
+                                ${isSelected ? '<i class="fa-solid fa-circle-check color-green" style="font-size:16px; color:var(--green);"></i>' : ''}
                             </div>
                         `;
                     });
@@ -678,12 +735,12 @@
                         const houseObj = (window.HOUSING_LIST || []).find(h => h.id === hId);
                         const hName = houseObj ? houseObj.name : hId;
                         html += `
-                            <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'var(--border-glass)'}; background:${isSelected ? 'rgba(0,230,118,0.1)' : '#090e18'};">
+                            <div onclick="AppM.selectP2PItemToSell(${i})" class="glass-card p-2 flex-between mb-1" style="cursor:pointer; border-color:${isSelected ? 'var(--green)' : 'rgba(255,255,255,0.08)'}; background:${isSelected ? 'rgba(0,230,118,0.12)' : '#070b14'}; display:flex; justify-content:space-between; align-items:center; border-radius:6px;">
                                 <div>
                                     <b class="text-xs ${isSelected ? 'color-green' : 'color-cyan'}">${safeEscape(hName)}</b>
-                                    <div class="sub-label" style="font-size:9px;">Жильё / Бокс</div>
+                                    <div class="sub-label" style="font-size:9px; color:#94a3b8;">Жильё / Бокс</div>
                                 </div>
-                                ${isSelected ? '<i class="fa-solid fa-circle-check color-green" style="font-size:16px;"></i>' : ''}
+                                ${isSelected ? '<i class="fa-solid fa-circle-check color-green" style="font-size:16px; color:var(--green);"></i>' : ''}
                             </div>
                         `;
                     });
@@ -824,14 +881,7 @@
 
             if (typeof saveState === 'function') saveState();
             
-            const modal = document.getElementById('modalCreateP2P');
-            if (modal) {
-                modal.style.display = 'none';
-                modal.classList.remove('active');
-            }
-            if (typeof ModalManager !== 'undefined') {
-                try { ModalManager.close('modalCreateP2P'); } catch (e) {}
-            }
+            this.closeCreateListingModal();
 
             if (typeof showToast === 'function') showToast('✅ Лот успешно выставлен на биржу!');
             if (window.AudioFx) window.AudioFx.play('win');
@@ -844,5 +894,5 @@
         }
     };
 
-    console.log('[💱 phone-m-market v9.1.4] ФИКС: openCreateListingModal восстановлен, модалка открывается гарантированно ✓');
+    console.log('[💱 phone-m-market v9.1.5] Авто-создание #modalCreateP2P в DOM и гарантированный показ ✓');
 })();
