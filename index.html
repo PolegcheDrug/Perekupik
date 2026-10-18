@@ -9,6 +9,22 @@
 <meta name="format-detection" content="telephone=no">
 <title>PEREKUP OS — Симулятор Перекупа</title>
 
+<!-- ═══════════════════════════════════════════════════════
+     ⭐ v4.3.2: КОНФИГ ДО ЗАГРУЗКИ МОДУЛЕЙ FIREBASE
+     Это КРИТИЧЕСКИ ВАЖНО: firebase-core.js читает
+     window.AUTH_SERVER_URL при инициализации. Если его нет —
+     используется localhost:3000, что вызывает ERR_CONNECTION_REFUSED.
+     ═══════════════════════════════════════════════════════ -->
+<script>
+    // ⭐ URL сервера авторизации (замените на свой реальный домен!)
+    // Если у вас нет своего сервера — оставьте пустым, будет fallback на Telegram ID.
+    window.AUTH_SERVER_URL = window.AUTH_SERVER_URL || '';
+
+    // ⭐ Флаги для логов
+    window.__LOADER_VERSION__ = '4.3.2';
+    console.log('[Loader] v' + window.__LOADER_VERSION__ + ' стартует. AUTH_SERVER_URL =', window.AUTH_SERVER_URL || '(не задан, fallback на Telegram ID)');
+</script>
+
 <!-- ═══════════ СТИЛИ ═══════════ -->
 <link rel="stylesheet" href="style.css?v=423">
 <link rel="stylesheet" href="css/base.css?v=423">
@@ -26,13 +42,13 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <!-- ═══════════════════════════════════════════════════════
-     FIREBASE МОДУЛИ (ES-модули загружаются асинхронно)
+     FIREBASE МОДУЛИ (ES-модули, загружаются deferred)
      ═══════════════════════════════════════════════════════ -->
-<script type="module" src="js/firebase/firebase-core.js?v=423"></script>
-<script type="module" src="js/firebase/firebase-market.js?v=423"></script>
-<script type="module" src="js/firebase/firebase-friendships.js?v=423"></script>
-<script type="module" src="js/firebase/firebase-notifications.js?v=423"></script>
-<script type="module" src="js/firebase/firebase-p2p.js?v=423"></script>
+<script type="module" src="js/firebase/firebase-core.js?v=424"></script>
+<script type="module" src="js/firebase/firebase-market.js?v=424"></script>
+<script type="module" src="js/firebase/firebase-friendships.js?v=424"></script>
+<script type="module" src="js/firebase/firebase-notifications.js?v=424"></script>
+<script type="module" src="js/firebase/firebase-p2p.js?v=424"></script>
 </head>
 <body>
 
@@ -60,7 +76,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Если вы играете через Telegram — просто откройте бота заново.</div>
-      <div class="pc-auth-version">v4.3.1 // BUILD 423</div>
+      <div class="pc-auth-version">v4.3.2 // BUILD 424</div>
     </div>
   </div>
 </div>
@@ -88,7 +104,7 @@
     </button>
 
     <div class="pc-auth-footer">
-      <div class="pc-auth-version">v4.3.1 // BUILD 423</div>
+      <div class="pc-auth-version">v4.3.2 // BUILD 424</div>
     </div>
   </div>
 </div>
@@ -123,7 +139,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Инвайт-код выдаёт владелец игры в личном сообщении.</div>
-      <div class="pc-auth-version">v4.3.1 // BUILD 423</div>
+      <div class="pc-auth-version">v4.3.2 // BUILD 424</div>
     </div>
   </div>
 </div>
@@ -540,7 +556,7 @@
 <!-- Owner-панель доступа -->
 <div id="modalAccessManager" class="modal-overlay"></div>
 
-<!-- ⭐ v4.3.0: P2P ДКП МЕЖДУ ИГРОКАМИ -->
+<!-- ⭐ P2P ДКП МЕЖДУ ИГРОКАМИ -->
 <div id="modalP2PDKP" class="modal-overlay">
   <div class="modal-box dkp-official-blank">
     <div class="dkp-blank-border">
@@ -693,15 +709,16 @@
 <div id="modalPatchNotes" class="modal-overlay">
   <div class="modal-box" style="max-width: 420px;">
     <div class="flex-between mb-2">
-      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.3.1</div>
+      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.3.2</div>
       <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
     </div>
     <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-    <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #423</div>
+    <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #424</div>
     <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-      <div class="patch-item"><b>🛠 ФИКС ЗАГРУЗКИ:</b> Устранено дублирование загрузчика, игра запускается стабильно.</div>
-      <div class="patch-item"><b>👑 DEV-ПАНЕЛЬ:</b> Добавлены кнопки глобального сброса БД.</div>
-      <div class="patch-item"><b>🐛 Фиксы:</b> исправлены баги с AccessControl и инициализацией.</div>
+      <div class="patch-item"><b>🔧 КРИТИЧЕСКИЙ ФИКС «НЕТ СЕТИ»:</b> access-control.js теперь ждёт инициализации Firebase до 8 секунд.</div>
+      <div class="patch-item"><b>🛡 FAIL-OPEN:</b> при сетевой ошибке игрок пускается в игру, а не блокируется.</div>
+      <div class="patch-item"><b>🔐 БЕЗОПАСНОСТЬ:</b> BOT_TOKEN убран из кода, читается из .env.</div>
+      <div class="patch-item"><b>🐛 Фиксы:</b> опечатка autopoddbor_order → autopodbor_order.</div>
     </div>
     <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
   </div>
@@ -1193,7 +1210,7 @@
 </style>
 
 <!-- ═══════════════════════════════════════════════════════
-     СИСТЕМНЫЙ ЗАГРУЗЧИК
+     СИСТЕМНЫЙ ЗАГРУЗЧИК v4.3.2
      ═══════════════════════════════════════════════════════ -->
 <script>
   (function() {
@@ -1201,7 +1218,10 @@
 
     const PC_DEV_PASSWORD = "perekup2026";
     const PC_AUTH_STORAGE_KEY = "perekup_pc_auth_ok";
-    const CACHE_VER = '423';
+    const CACHE_VER = '424';
+
+    // ⭐ v4.3.2: сколько ждать готовности Firebase перед initApp
+    const FIREBASE_READY_TIMEOUT_MS = 8000;
 
     let isPcAuthenticated = false;
 
@@ -1209,6 +1229,12 @@
     const forceDev = urlParams.get('dev') === '1';
     const isTelegram = !!(window.Telegram?.WebApp?.initDataUnsafe?.user?.id);
     const savedAuth = sessionStorage.getItem(PC_AUTH_STORAGE_KEY) === 'true';
+
+    console.log('[Loader] decideStartup:',
+      'isTelegram=' + isTelegram,
+      'forceDev=' + forceDev,
+      'savedAuth=' + savedAuth
+    );
 
     window.togglePcAuthPassword = function() {
       const input = document.getElementById('pcAuthInput');
@@ -1317,7 +1343,7 @@
     }
 
     // ═══════════════════════════════════════════════════════
-    // ⭐ ПОЛНЫЙ СПИСОК СКРИПТОВ (единственный загрузчик)
+    // ⭐ v4.3.2: ПОЛНЫЙ СПИСОК СКРИПТОВ
     // ═══════════════════════════════════════════════════════
     const scriptQueue = [
         // ─── Утилиты (фундамент) ───
@@ -1436,19 +1462,85 @@
         s.src = path + '?v=' + CACHE_VER;
         s.onload = () => resolve(true);
         s.onerror = () => {
-          console.warn('[Loader] Ошибка загрузки скрипта: ' + path);
+          console.warn('[Loader] ❌ Ошибка загрузки скрипта: ' + path);
           resolve(false);
         };
         document.body.appendChild(s);
       });
     }
 
+    // ═══════════════════════════════════════════════════════
+    // ⭐ v4.3.2: ОЖИДАНИЕ ГОТОВНОСТИ FIREBASE
+    // Это ВТОРАЯ половина фикса «Нет сети».
+    //
+    // Проблема: ES-модули firebase-*.js загружаются deferred
+    // и могут быть ещё не готовы, когда initApp() вызывает
+    // AccessControl.checkAccess(). Промис-поллинг решает.
+    // ═══════════════════════════════════════════════════════
+    async function waitForFirebaseReady(timeoutMs = FIREBASE_READY_TIMEOUT_MS) {
+      const start = Date.now();
+      let attempts = 0;
+
+      console.log('[Loader] Ожидание готовности Firebase...');
+
+      while (true) {
+        attempts++;
+        const elapsed = Date.now() - start;
+
+        const hasCore = !!(window.FB_Core && window.FB_Core.db);
+        const hasBridge = !!window.FB_Bridge;
+
+        if (hasCore && hasBridge) {
+          console.log(`[Loader] ✓ Firebase готов (${elapsed}мс, ${attempts} попыток)`);
+          return true;
+        }
+
+        if (elapsed >= timeoutMs) {
+          console.warn(
+            `[Loader] ⚠️ Firebase не готов за ${timeoutMs}мс. ` +
+            `FB_Core.db=${hasCore}, FB_Bridge=${hasBridge}. ` +
+            `Продолжаем с fallback (fail-open).`
+          );
+          return false;
+        }
+
+        // Логируем прогресс каждые 2 секунды
+        if (attempts % 20 === 0) {
+          console.log(
+            `[Loader] Ждём Firebase... ${Math.round(elapsed / 1000)}с / ${timeoutMs / 1000}с ` +
+            `(FB_Core=${hasCore}, FB_Bridge=${hasBridge})`
+          );
+        }
+
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+
     async function initAllModules() {
+      const t0 = Date.now();
+
+      // 1. Загружаем все скрипты последовательно
       for (const scriptPath of scriptQueue) {
         await loadScript(scriptPath);
       }
+
+      console.log(`[Loader] Все скрипты загружены за ${Date.now() - t0}мс`);
+
+      // 2. ⭐ v4.3.2: Ждём готовности Firebase перед initApp
+      await waitForFirebaseReady();
+
+      // 3. Запускаем приложение
       if (typeof initApp === 'function') {
-        initApp();
+        try {
+          initApp();
+        } catch (e) {
+          console.error('[Loader] ❌ initApp threw error:', e);
+          if (typeof showToast === 'function') {
+            showToast('⚠️ Ошибка загрузки игры. Откройте консоль.', 'error');
+          }
+        }
+      } else {
+        console.error('[Loader] ❌ initApp не найден! app-loader.js не загрузился?');
       }
     }
 
