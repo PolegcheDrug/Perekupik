@@ -1,14 +1,12 @@
 // ========================================================
-// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.3 FIXED)
+// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.4 FULL FIXED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.1.3 (FULL P2P SELECTION & FIRESTORE LOTS SYNC):
-//   - ИСПРАВЛЕН БАГ ВЫБОРА: selectP2PListingType больше не сбрасывает 
-//     selectedItemIndex при перерендере выбранной карточки.
-//   - Автовыбор первого доступного авто/объекта при открытии модалки.
-//   - Починены картинки превью (фоллбек на базу авто при пустом img).
-//   - Исправлена очистка цены (удаление пробелов/форматирования).
-//   - Корректная синхронизация и публикация в Firestore (market_lots).
+// ⭐ v9.1.4 (P2P SELL MODAL & SELECTION RESTORATION):
+//   - ВОССТАНОВЛЕНА openCreateListingModal (кнопка + ПРОДАТЬ теперь открывает окно).
+//   - Гарантированный показ #modalCreateP2P поверх экрана телефона (z-index / display).
+//   - Корректный возврат машины в гараж при отмене/снятии лота с продажи.
+//   - Автовыбор объекта при открытии списка.
 // ========================================================
 
 (function() {
@@ -547,6 +545,36 @@
         if (area) area.innerHTML = this.renderP2PLotsHtml(this.marketFilter || 'cars');
     };
 
+    // ========================================================
+    // 8. СОЗДАНИЕ ЛОТА (МОДАЛКА)
+    // ========================================================
+    AppM.openCreateListingModal = function() {
+        this._currentModalItems = [];
+        this.selectedItemIndex = 0;
+
+        const modal = document.getElementById('modalCreateP2P');
+        if (modal) {
+            modal.style.display = 'flex';
+            modal.style.position = 'fixed';
+            modal.style.inset = '0';
+            modal.style.zIndex = '99999';
+            modal.style.alignItems = 'center';
+            modal.style.justifyContent = 'center';
+            modal.style.background = 'rgba(0, 0, 0, 0.85)';
+            modal.classList.add('active');
+
+            if (typeof ModalManager !== 'undefined') {
+                try { ModalManager.open('modalCreateP2P'); } catch (e) {}
+            }
+
+            setTimeout(() => {
+                this.selectP2PListingType('cars', false);
+            }, 50);
+        } else {
+            console.warn('[P2P Market] modalCreateP2P element not found');
+        }
+    };
+
     // ПЕРЕКЛЮЧЕНИЕ ТИПОВ ОБЪЕКТОВ В МОДАЛКЕ
     AppM.selectP2PListingType = function(type, resetSelection = true) {
         try {
@@ -664,7 +692,6 @@
 
             container.innerHTML = html;
 
-            // Автоматическая установка начальной цены для выбранного объекта
             if (this.selectedItemIndex !== null && this._currentModalItems[this.selectedItemIndex]) {
                 const currentItem = this._currentModalItems[this.selectedItemIndex];
                 const priceInput = document.getElementById('p2pPriceInput');
@@ -796,7 +823,16 @@
             }
 
             if (typeof saveState === 'function') saveState();
-            if (typeof ModalManager !== 'undefined') ModalManager.close('modalCreateP2P');
+            
+            const modal = document.getElementById('modalCreateP2P');
+            if (modal) {
+                modal.style.display = 'none';
+                modal.classList.remove('active');
+            }
+            if (typeof ModalManager !== 'undefined') {
+                try { ModalManager.close('modalCreateP2P'); } catch (e) {}
+            }
+
             if (typeof showToast === 'function') showToast('✅ Лот успешно выставлен на биржу!');
             if (window.AudioFx) window.AudioFx.play('win');
 
@@ -808,5 +844,5 @@
         }
     };
 
-    console.log('[💱 phone-m-market v9.1.3] ФИКС: Выбор объекта P2P, автовыбор и синхронизация Firestore ✓');
+    console.log('[💱 phone-m-market v9.1.4] ФИКС: openCreateListingModal восстановлен, модалка открывается гарантированно ✓');
 })();
