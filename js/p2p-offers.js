@@ -1,12 +1,29 @@
 // ========================================================
-// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.3.1)
+// js/p2p-offers.js — РЕАЛЬНЫЙ P2P ТОРГ МЕЖДУ ИГРОКАМИ (v1.4.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
+// ⭐ v1.4.0 (FULL DEAL COMPLETION):
+//   - КРИТИЧЕСКИЙ ФИКС: acceptOffer теперь ПОЛНОСТЬЮ завершает
+//     сделку. Раньше он только ставил status='accepted', но
+//     деньги не списывались, машина не передавалась, deal_payout
+//     продавцу не создавался, лот оставался active.
+//   - _completeDealAtomic — единая runTransaction:
+//       • лот → sold, buyerId, finalPrice
+//       • оффер → completed
+//       • transactions/{txId}
+//       • deal_payout notification продавцу
+//       • p2p_deal_car_delivered notification покупателю
+//       • передача номера (если plate)
+//   - _applyBuyerSideCompletion — клиентское завершение у покупателя:
+//     списание cash + авто в гараж + удаление лота из кэша.
+//   - Проверка cash ДО транзакции (если покупатель не может — отказ).
+//   - Если текущий клиент = покупатель, p2p_deal_car_delivered
+//     покупателю НЕ отправляется (он применит локально).
+//
 // ⭐ v1.3.1 (FULL P2P REPAIR & COMPATIBILITY):
-//   - ФИКС: Поиск лотов поддерживает оба формата идентификаторов (id и lot_id).
-//   - ФИКС: Устранено падение при сравнении UID покупателя и продавца.
-//   - ФИКС: Топ-левел загрузка Firestore с корректным фоллбэком.
-//   - ФИКС: window.openP2PDealModal теперь безопасно открывает торг без race conditions.
+//   - Поиск лотов поддерживает id и lot_id.
+//   - Защита от падения при сравнении UID.
+//   - window.openP2PDealModal безопасно открывает торг.
 // ========================================================
 
 (function() {
@@ -44,6 +61,7 @@
                 orderBy: mod.orderBy,
                 limit: mod.limit,
                 onSnapshot: mod.onSnapshot,
+                runTransaction: mod.runTransaction,
                 serverTimestamp: mod.serverTimestamp,
                 Timestamp: mod.Timestamp
             };
@@ -103,6 +121,13 @@
     };
 
     const ACTIVE_STATUSES = [OFFER_STATUSES.PENDING, OFFER_STATUSES.COUNTERED];
+
+    // Комиссия P2P (совпадает с firebase-market.js MARKET_FEE_PERCENT)
+    const P2P_MARKET_FEE_PERCENT = 0.03;
+
+    // TTL (совпадает с firebase-core.js)
+    const TTL_NOTIFICATIONS = 7 * 24 * 60 * 60 * 1000;
+    const TTL_TRANSACTIONS = 90 * 24 * 60 * 60 * 1000;
 
     // ========================================================
     // 2. ВНУТРЕННИЕ ПЕРЕМЕННЫЕ
@@ -351,6 +376,18 @@
             }
         },
 
+        /**
+         * ⭐ v1.4.0: Принять оффер + ПОЛНОСТЬЮ завершить сделку.
+         *
+         * Вызывается:
+         *   • Продавцом: pending offer → accepted
+         *   • Покупателем: countered offer → accepted
+         *
+         * После успеха — лот sold, оффер completed, деньги переведены
+         * (через deal_payout notification продавцу), авто доставлено
+         * покупателю (через p2p_deal_car_delivered notification, если
+         * текущий клиент — не покупатель; иначе локально).
+         */
         async acceptOffer(offerId) {
             const profile = _getMyProfile();
             if (!profile) return { success: false, error: 'Не авторизован' };
@@ -374,6 +411,9 @@
                 if (offer.status === OFFER_STATUSES.ACCEPTED) {
                     return { success: false, error: 'Оффер уже принят' };
                 }
+                if (offer.status === OFFER_STATUSES.COMPLETED) {
+                    return { success: false, error: 'Сделка уже завершена' };
+                }
 
                 const isSeller = String(offer.sellerId) === String(profile.id);
                 const isBuyer  = String(offer.buyerId) === String(profile.id);
@@ -393,39 +433,37 @@
                     return { success: false, error: 'Вы не можете принять этот оффер' };
                 }
 
-                if (offer.lotId) {
-                    try {
-                        const lotRef = fns.doc(db, 'market_lots', String(offer.lotId));
-                        const lotSnap = await fns.getDoc(lotRef);
-                        if (lotSnap.exists()) {
-                            const lotData = lotSnap.data();
-                            if (lotData.status && lotData.status !== 'active') {
-                                return { success: false, error: 'Лот уже продан или снят с продажи' };
-                            }
-                        }
-                    } catch (e) {
-                        console.warn('[P2POffers] acceptOffer verify lot:', e.message);
+                const fpNum = Number(finalPrice);
+                if (!fpNum || fpNum < 1000) {
+                    return { success: false, error: 'Некорректная финальная цена' };
+                }
+
+                // ⭐ v1.4.0: Если покупатель принимает — проверяем cash ДО транзакции.
+                if (isBuyer) {
+                    const myCash = Number(window.state?.player?.cash) || 0;
+                    if (myCash < fpNum) {
+                        return {
+                            success: false,
+                            error: `Не хватает ${_fmtMoney(fpNum - myCash)} для оплаты сделки`
+                        };
                     }
                 }
 
-                const now = Date.now();
-                const newHistory = [...(offer.history || []), {
-                    round: offer.round,
-                    actorId: String(profile.id),
-                    actorName: profile.name,
-                    actorRole: isSeller ? 'seller' : 'buyer',
-                    type: 'accept',
-                    price: finalPrice,
-                    ts: now
-                }];
-
-                await fns.updateDoc(offerRef, {
-                    status: OFFER_STATUSES.ACCEPTED,
-                    currentPrice: finalPrice,
-                    respondedAt: now,
-                    history: newHistory
+                // ⭐ v1.4.0: Полная атомарная сделка
+                const completeRes = await this._completeDealAtomic(offerId, offer, fpNum, {
+                    skipBuyerNotif: isBuyer  // если текущий клиент — покупатель, он сам применит
                 });
 
+                if (!completeRes.success) {
+                    return { success: false, error: completeRes.error || 'Не удалось завершить сделку' };
+                }
+
+                // ⭐ v1.4.0: Локальное завершение у покупателя
+                if (isBuyer) {
+                    await this._applyBuyerSideCompletion(completeRes.lot || {}, offer, fpNum);
+                }
+
+                // Push второй стороне
                 const toUser = isSeller ? offer.buyerId : offer.sellerId;
                 const pushMgr = window.FB_Notifications?.P2P;
                 if (pushMgr?.notifyOfferAccepted) {
@@ -435,20 +473,229 @@
                     }).catch(err => console.warn('[P2POffers] Push error:', err));
                 }
 
-                _log('acceptOffer OK', offerId);
+                _log('acceptOffer OK', `${offerId} → ${fpNum}`);
                 _emit('p2p:offer_accepted', {
                     offerId,
                     lotId: offer.lotId,
-                    price: finalPrice,
+                    price: fpNum,
                     buyerId: offer.buyerId,
                     sellerId: offer.sellerId,
-                    acceptedBy: isSeller ? 'seller' : 'buyer'
+                    acceptedBy: isSeller ? 'seller' : 'buyer',
+                    completed: true
                 });
 
-                return { success: true, offerId, price: finalPrice };
+                return { success: true, offerId, price: fpNum, completed: true };
             } catch (e) {
                 _log('acceptOffer ERROR', e.message);
                 return { success: false, error: e.message };
+            }
+        },
+
+        /**
+         * ⭐ v1.4.0: Единая транзакция завершения сделки.
+         * Все reads → потом все writes (требование Firestore).
+         */
+        async _completeDealAtomic(offerId, offer, finalPrice, opts = {}) {
+            const ready = await _ensureReady();
+            if (!ready) return { success: false, error: 'Нет связи' };
+            const { db, fns } = ready;
+
+            const offerRef = fns.doc(db, OFFER_CONFIG.collectionName, offerId);
+            const lotRef = offer.lotId ? fns.doc(db, 'market_lots', String(offer.lotId)) : null;
+            const now = Date.now();
+            const txId = 'tx_' + now + '_' + Math.random().toString(36).substring(2, 6);
+            const txRef = fns.doc(db, 'transactions', txId);
+
+            const sellerNotifId = 'notif_payout_' + now + '_' + Math.random().toString(36).substring(2, 6);
+            const sellerNotifRef = fns.doc(db, 'notifications', sellerNotifId);
+
+            const buyerNotifId = 'notif_car_' + now + '_' + Math.random().toString(36).substring(2, 6);
+            const buyerNotifRef = fns.doc(db, 'notifications', buyerNotifId);
+
+            let lotData = null;
+
+            try {
+                await fns.runTransaction(db, async (tx) => {
+                    // === READS ===
+                    if (lotRef) {
+                        const lotSnap = await tx.get(lotRef);
+                        if (!lotSnap.exists()) throw new Error('Лот не найден');
+                        lotData = lotSnap.data();
+                        if (lotData.status && lotData.status !== 'active') {
+                            throw new Error('Лот уже продан или снят с продажи');
+                        }
+                    }
+
+                    const offerSnap = await tx.get(offerRef);
+                    if (!offerSnap.exists()) throw new Error('Оффер не найден');
+                    const of = offerSnap.data();
+                    if (of.status === OFFER_STATUSES.COMPLETED) {
+                        throw new Error('Сделка уже завершена');
+                    }
+
+                    // === WRITES ===
+                    const fee = Math.round(finalPrice * P2P_MARKET_FEE_PERCENT);
+                    const sellerPayout = finalPrice - fee;
+                    const itemName = (lotData && lotData.name) || offer.lotName || 'Автомобиль';
+
+                    if (lotRef) {
+                        tx.update(lotRef, {
+                            status: 'sold',
+                            buyerId: String(offer.buyerId),
+                            buyerName: offer.buyerName || 'Покупатель',
+                            soldAt: now,
+                            finalPrice: finalPrice,
+                            offerId: offerId
+                        });
+                    }
+
+                    tx.update(offerRef, {
+                        status: OFFER_STATUSES.COMPLETED,
+                        currentPrice: finalPrice,
+                        finalPrice: finalPrice,
+                        completedAt: now,
+                        respondedAt: now
+                    });
+
+                    tx.set(txRef, {
+                        tx_id: txId,
+                        lot_id: offer.lotId || null,
+                        offer_id: offerId,
+                        buyerId: String(offer.buyerId),
+                        buyerName: offer.buyerName || 'Покупатель',
+                        sellerId: String(offer.sellerId),
+                        sellerName: offer.sellerName || 'Продавец',
+                        item: itemName,
+                        type: (lotData && lotData.type) || offer.lotType || 'cars',
+                        price: finalPrice,
+                        originalPrice: Number(offer.originalPrice) || finalPrice,
+                        fee: fee,
+                        payout: sellerPayout,
+                        source: 'p2p_offer',
+                        timestamp: now,
+                        expireAt: now + TTL_TRANSACTIONS
+                    });
+
+                    // Продавцу — deal_payout
+                    tx.set(sellerNotifRef, {
+                        toUser: String(offer.sellerId),
+                        type: 'deal_payout',
+                        title: '💰 Продажа на P2P бирже!',
+                        text: `Покупатель ${offer.buyerName || 'Перекуп'} купил «${itemName}» за ${finalPrice.toLocaleString()} ₽. Начислено: +${sellerPayout.toLocaleString()} ₽ (комиссия ${fee.toLocaleString()} ₽).`,
+                        amount: sellerPayout,
+                        lotId: offer.lotId || null,
+                        offerId: offerId,
+                        read: false,
+                        claimed: false,
+                        timestamp: now,
+                        expireAt: now + TTL_NOTIFICATIONS
+                    });
+
+                    // Покупателю — p2p_deal_car_delivered (только если НЕ текущий клиент)
+                    if (!opts.skipBuyerNotif) {
+                        const carData = (lotData && lotData.itemData) || { name: itemName };
+                        tx.set(buyerNotifRef, {
+                            toUser: String(offer.buyerId),
+                            type: 'p2p_deal_car_delivered',
+                            title: '🚗 Автомобиль ваш!',
+                            text: `Вы приобрели «${itemName}» за ${finalPrice.toLocaleString()} ₽. Авто уже в гараже.`,
+                            meta: {
+                                lotId: offer.lotId || null,
+                                offerId: offerId,
+                                carData: carData,
+                                finalPrice: finalPrice
+                            },
+                            read: false,
+                            claimed: false,
+                            timestamp: now,
+                            expireAt: now + TTL_NOTIFICATIONS
+                        });
+                    }
+
+                    // Передача номера, если это plate-лот
+                    if (lotData && (lotData.type === 'plate' || lotData.type === 'plates')) {
+                        const plateStr = (lotData.itemData && lotData.itemData.plate) || lotData.name;
+                        if (plateStr) {
+                            const cleanId = String(plateStr).replace(/\s+/g, '_');
+                            tx.set(fns.doc(db, 'registered_plates', cleanId), {
+                                plate: plateStr,
+                                ownerId: String(offer.buyerId),
+                                carId: null,
+                                status: 'owned',
+                                updatedAt: now
+                            }, { merge: true });
+                        }
+                    }
+                });
+
+                _log('_completeDealAtomic OK', `${offerId} → ${finalPrice}`);
+                return { success: true, lot: lotData };
+            } catch (e) {
+                _log('_completeDealAtomic ERROR', e.message);
+                return { success: false, error: e.message };
+            }
+        },
+
+        /**
+         * ⭐ v1.4.0: Локальное завершение у покупателя.
+         * Списание cash + авто в гараж + удаление лота из кэша.
+         * Вызывается ТОЛЬКО когда текущий клиент = покупатель.
+         */
+        async _applyBuyerSideCompletion(lot, offer, finalPrice) {
+            try {
+                const player = window.state && window.state.player;
+                if (!player) return;
+
+                const cash = Number(player.cash) || 0;
+                if (cash < finalPrice) {
+                    _toast(`⚠️ Сделка завершена, но не хватает ${_fmtMoney(finalPrice - cash)}. Проверьте баланс.`);
+                    _log('_applyBuyerSideCompletion WARN', 'not enough cash');
+                    return;
+                }
+
+                player.cash = cash - finalPrice;
+
+                const item = (lot && lot.itemData) || { name: (lot && lot.name) || offer.lotName || 'Автомобиль' };
+                const car = Object.assign({}, item);
+                car.uid = 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+                car.purchaseCost = finalPrice;
+                car.isPersonal = false;
+                car.impounded = false;
+                car.ownershipDays = 0;
+                car.insurance = null;
+                car.engineTemp = 90;
+                if (car.tireWear === undefined) car.tireWear = 100;
+                if (car.wear === undefined) car.wear = { engine: 85, transmission: 85 };
+
+                if (typeof window.ensureCarIdentity === 'function') window.ensureCarIdentity(car);
+
+                if (!Array.isArray(window.state.garage)) window.state.garage = [];
+                window.state.garage.push(car);
+
+                // Удаляем лот из локального кэша
+                if (Array.isArray(window.state.p2pMarketListings)) {
+                    window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l =>
+                        l && String(l.id || l.lot_id) !== String(offer.lotId)
+                    );
+                }
+
+                if (typeof window.logBankTransaction === 'function') {
+                    window.logBankTransaction(`P2P покупка: ${car.name || 'Автомобиль'}`, finalPrice, false);
+                }
+
+                if (typeof saveState === 'function') saveState();
+                if (typeof updateHeaderUI === 'function') updateHeaderUI();
+                if (typeof renderGarage === 'function') renderGarage();
+
+                _toast(`✅ Сделка закрыта: «${car.name || 'Автомобиль'}» за ${_fmtMoney(finalPrice)}`);
+                if (window.AudioFx) {
+                    window.AudioFx.play('win');
+                    window.AudioFx.haptic('success');
+                }
+
+                _log('_applyBuyerSideCompletion OK', `${car.name} за ${finalPrice}`);
+            } catch (e) {
+                _log('_applyBuyerSideCompletion EXCEPTION', e.message);
             }
         },
 
@@ -618,6 +865,9 @@
                 if (offer.status === OFFER_STATUSES.ACCEPTED) {
                     return { success: false, error: 'Оффер уже принят — отменить нельзя' };
                 }
+                if (offer.status === OFFER_STATUSES.COMPLETED) {
+                    return { success: false, error: 'Сделка уже завершена — отменить нельзя' };
+                }
 
                 const now = Date.now();
                 const newHistory = [...(offer.history || []), {
@@ -659,6 +909,8 @@
         },
 
         async markCompleted(offerId) {
+            // Оставлено для обратной совместимости.
+            // Реальное завершение — в acceptOffer / _completeDealAtomic.
             const ready = await _ensureReady();
             if (!ready) return { success: false };
             const { db, fns } = ready;
@@ -912,7 +1164,7 @@
     }
 
     // ========================================================
-    // 6. UI МОДАЛКА ТОРГА ПОКУПАТЕЛЯ
+    // 6. UI МОДАЛКА ТОРГА ПОКУПАТЕЛЯ (v1.3.1 — без изменений)
     // ========================================================
     window.openP2PDealModal = async function(lotId) {
         if (!lotId) return;
@@ -1080,5 +1332,5 @@
         }
     }
 
-    console.log('[🤝 p2p-offers v1.3.1] Полная совместимость и фикс поиска лотов ✓');
+    console.log('[🤝 p2p-offers v1.4.0] acceptOffer → полная атомарная сделка (lot sold + deal_payout + car delivery) ✓');
 })();

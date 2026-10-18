@@ -1,14 +1,23 @@
 // ========================================================
-// js/market-deal.js — ТОРГ У КАПОТА (v5.0.0)
+// js/market-deal.js — ТОРГ У КАПОТА (v5.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v5.1.0 (КРИТИЧЕСКИЙ ФИКС P2P — FAKE CHAT):
+//   - УБРАНА фейковая openP2PDealModal, которая создавала
+//     локальный чат в phoneMessages и НЕ создавала оффер.
+//   - Все вызовы openP2PDealModal → window.openP2PDealModal
+//     (реальная модалка из p2p-offers.js, которая пишет
+//     p2p_offers + notifyOfferReceived + бот push).
+//   - Fallback _openP2PDealFallback через P2POffersManager.createOffer
+//     с prompt() если реальная модалка недоступна.
+//   - Object.assign больше не затирает реальную модалку.
+//   - Условная регистрация fallback: не перезаписываем реальную
+//     функцию при любом порядке загрузки.
+//
 // ⭐ v5.0.0 (РЕПУТАЦИЯ БРЕНДА + ДАРКНЕТ):
-//   - ДОБАВЛЕН учёт репутации бренда при торге.
-//   - ДОБАВЛЕНА кнопка "Слить в Даркнет" для проблемных авто.
-//   - ИНТЕГРАЦИЯ с updateBrandReputationAfterSale после покупки.
-//   - УЛУЧШЕНА логика торга с учётом репутации.
-//   - P2P-лоты перенаправляются в openP2PDealModal.
-// ⭐ v4.8.0:
-//   - Восстановлена initiateBuyMarketCar (кнопка "Позвонить").
+//   - Учёт репутации бренда при торге.
+//   - Кнопка «Слить в Даркнет» для проблемных авто.
+// ⭐ v4.8.0: восстановлена initiateBuyMarketCar (кнопка «Позвонить»).
 // ========================================================
 
 let pendingMarketCar = null;
@@ -37,17 +46,96 @@ window.__resetDKPFlags = function() {
 };
 
 // ========================================================
-// ⭐ v4.8.0: ЗВОНОК ПРОДАВЦУ
+// ⭐ v5.1.0: FALLBACK P2P МОДАЛКА (замена фейкового чата)
+// ========================================================
+function _openP2PDealFallback(p2pId) {
+    if (!p2pId) return;
+    const toast = (m) => { if (typeof showToast === 'function') showToast(m); };
+
+    if (!window.P2POffersManager?.createOffer) {
+        return toast("❌ P2P торговля недоступна (p2p-offers.js не загружен)");
+    }
+
+    const profile = (typeof getCurrentPlayerProfile === 'function') ? getCurrentPlayerProfile() : null;
+    const myUid = String(
+        profile?.id ||
+        state.player?.uid ||
+        window.tgUserId ||
+        ''
+    );
+
+    const findLot = (lots) => (lots || []).find(l => l && (
+        String(l.id) === String(p2pId) ||
+        String(l.lot_id) === String(p2pId)
+    ));
+
+    const doOffer = (lot) => {
+        if (!lot) return toast("❌ Лот не найден на бирже");
+        if (String(lot.sellerId) === myUid) return toast("🚫 Это ваш собственный лот");
+
+        const askingPrice = Number(lot.price) || 100000;
+        const raw = prompt(
+            `Ваше предложение по «${lot.name}»?\n\nЦена продавца: ${askingPrice.toLocaleString()} ₽\nВведите сумму (не менее 1 000 ₽):`,
+            String(askingPrice)
+        );
+        if (raw === null) return;
+        const offeredPrice = parseInt(raw, 10);
+        if (!offeredPrice || offeredPrice < 1000) return toast("❌ Цена не менее 1 000 ₽");
+
+        window.P2POffersManager.createOffer(String(lot.id || lot.lot_id || p2pId), offeredPrice, "")
+            .then(res => {
+                if (res.success) {
+                    toast(`📤 Оффер отправлен продавцу: ${offeredPrice.toLocaleString()} ₽`);
+                    if (window.AudioFx) {
+                        window.AudioFx.play('win');
+                        window.AudioFx.haptic('success');
+                    }
+                } else {
+                    toast(`❌ ${res.error || 'Ошибка создания оффера'}`);
+                    if (window.AudioFx) window.AudioFx.play('error');
+                }
+            })
+            .catch(e => toast(`❌ ${e.message}`));
+    };
+
+    const localLot = findLot(state.p2pMarketListings);
+    if (localLot) return doOffer(localLot);
+
+    if (window.FB_Bridge?.MarketLots?.fetchLots) {
+        toast('⏳ Загрузка лота с биржи...');
+        window.FB_Bridge.MarketLots.fetchLots(true)
+            .then(lots => doOffer(findLot(lots)))
+            .catch(() => toast("❌ Не удалось загрузить лот"));
+        return;
+    }
+
+    toast("❌ Лот не найден");
+}
+
+// ========================================================
+// ЗВОНОК ПРОДАВЦУ (NPC + роутинг P2P → window.openP2PDealModal)
 // ========================================================
 function initiateBuyMarketCar(carId) {
     if (buyCallTimeoutTimer) { clearTimeout(buyCallTimeoutTimer); buyCallTimeoutTimer = null; }
     if (!carId) return;
 
-    let p2pItem = (state.p2pMarketListings || []).find(l => l && l.id === carId);
-    if (p2pItem) { openP2PDealModal(p2pItem.id); return; }
+    // ⭐ v5.1.0: Для P2P-лота делегируем реальной модалке торга
+    // (той, что в p2p-offers.js, а не фейковому чату)
+    let p2pItem = (state.p2pMarketListings || []).find(l => l && (
+        String(l.id) === String(carId) || String(l.lot_id) === String(carId)
+    ));
+    if (p2pItem) {
+        if (typeof window.openP2PDealModal === 'function') {
+            return window.openP2PDealModal(p2pItem.id || p2pItem.lot_id);
+        }
+        return _openP2PDealFallback(p2pItem.id || p2pItem.lot_id);
+    }
 
     const car = (state.marketFeed || []).find(c => c && c.id === carId);
-    if (!car) { if (typeof showToast === 'function') showToast("Лот не найден."); return; }
+    if (!car) {
+        if (typeof showToast === 'function') showToast("Лот не найден.");
+        return;
+    }
 
     car.viewed = true;
     if (typeof renderMarketFeed === 'function') renderMarketFeed();
@@ -108,142 +196,20 @@ function initiateBuyMarketCar(carId) {
 }
 
 // ========================================================
-// ⭐ v4.7.0: P2P ДИАЛОГ — РЕАЛЬНЫЙ ТОРГ ЧЕРЕЗ M+
+// P2P: делегирование window.openP2PDealModal
 // ========================================================
 function openP2PDealModal(p2pId) {
-    if (!p2pId) return;
-
-    let p2pItem = (state.p2pMarketListings || []).find(l => l && l.id === p2pId);
-
-    if (!p2pItem && window.FB_Bridge?.MarketLots?.fetchLots) {
-        showToast('⏳ Синхронизация P2P лота...');
-        window.FB_Bridge.MarketLots.fetchLots(true).then(remoteLots => {
-            if (!Array.isArray(remoteLots)) {
-                return showToast("❌ Лот не найден на бирже!");
-            }
-            const remote = remoteLots.find(l => (l.lot_id || l.id) === p2pId);
-            if (!remote) {
-                return showToast("❌ Лот больше не активен!");
-            }
-            if (!state.p2pMarketListings) state.p2pMarketListings = [];
-            const cachedLot = {
-                id: remote.lot_id || remote.id,
-                sellerId: remote.sellerId,
-                sellerName: remote.sellerName || "Игрок сети",
-                type: remote.type,
-                name: remote.name,
-                price: remote.price,
-                itemData: remote.itemData || {}
-            };
-            if (!state.p2pMarketListings.find(l => l.id === cachedLot.id)) {
-                state.p2pMarketListings.push(cachedLot);
-            }
-            openP2PDealModal(p2pId);
-        }).catch(err => {
-            console.warn('[MarketDeal] fetchLots fallback error:', err);
-            showToast("❌ Не удалось загрузить лот");
-        });
-        return;
+    // Внутренние вызовы попадают сюда только если p2p-offers.js НЕ загружен.
+    // Иначе используется window.openP2PDealModal (реальная модалка).
+    if (typeof window.openP2PDealModal === 'function' && window.openP2PDealModal !== _openP2PDealFallback) {
+        return window.openP2PDealModal(p2pId);
     }
-
-    if (!p2pItem) return showToast("❌ Лот не найден на бирже!");
-
-    if (!state.player) state.player = {};
-    if (!state.player.phoneMessages) state.player.phoneMessages = [];
-
-    const myUid = String(state.player?.uid || window.tgUserId || "");
-
-    if (String(p2pItem.sellerId || "") === myUid) {
-        return showToast("🚫 Вы не можете торговаться по своему лоту!");
-    }
-
-    const dialogId = `p2p_deal_${p2pItem.id}`;
-    let existingMsg = state.player.phoneMessages.find(m => m && m.id === dialogId);
-
-    const askingPrice = Number(p2pItem.price) || 100000;
-
-    let activeOffer = null;
-    try {
-        const myOffers = state.player._myP2POffers || [];
-        activeOffer = myOffers.find(o => o.lotId === p2pItem.id &&
-            ['pending', 'countered', 'accepted'].includes(o.status));
-    } catch (e) {}
-
-    if (!existingMsg) {
-        if ((p2pItem.type === 'car' || p2pItem.type === 'cars') && p2pItem.itemData) {
-            if (typeof window.ensureCarIdentity === 'function') {
-                window.ensureCarIdentity(p2pItem.itemData);
-            }
-        }
-
-        existingMsg = {
-            id: dialogId,
-            dialogId: dialogId,
-            category: 'p2p_market',
-            sender: `${p2pItem.sellerName || 'Игрок P2P'}`,
-            time: "Сейчас",
-            unread: false,
-            viewed: true,
-            isP2PMarket: true,
-            p2pId: p2pItem.id,
-            sellerId: String(p2pItem.sellerId || ""),
-            sellerName: p2pItem.sellerName || "Продавец",
-            carData: {
-                name: p2pItem.name || 'Имущество P2P',
-                img: p2pItem.itemData?.img || p2pItem.img || "assets/cars/economy/2101/vaz-2101.jpg",
-                images: p2pItem.itemData?.images || [],
-                type: p2pItem.itemData?.type || p2pItem.type || 'economy',
-                price: askingPrice,
-                power: p2pItem.itemData?.power || 100,
-                condition: p2pItem.itemData?.condition || 85
-            },
-            askingPrice: askingPrice,
-            offerPrice: activeOffer ? (activeOffer.offeredPrice || 0) : 0,
-            preview: "Нажмите, чтобы обсудить условия торга",
-            chatHistory: [
-                { from: 'them', text: `«Здорово! Пишу по объявлению на «${p2pItem.name}». Готов обсудить условия.»` }
-            ]
-        };
-        state.player.phoneMessages.unshift(existingMsg);
-    } else {
-        existingMsg.p2pId = p2pItem.id;
-        existingMsg.sellerId = String(p2pItem.sellerId || "");
-        existingMsg.sellerName = p2pItem.sellerName || existingMsg.sellerName;
-        existingMsg.isP2PMarket = true;
-        existingMsg.askingPrice = askingPrice;
-        if (existingMsg.carData) existingMsg.carData.price = askingPrice;
-    }
-
-    existingMsg.unread = false;
-    existingMsg.viewed = true;
-
-    if (typeof saveState === 'function') saveState();
-
-    if (typeof switchTab === 'function') switchTab('tabPhone');
-
-    setTimeout(() => {
-        if (typeof PhoneManager !== 'undefined' && PhoneManager.openApp) {
-            PhoneManager.openApp('m');
-        }
-
-        setTimeout(() => {
-            if (typeof AppM !== 'undefined') {
-                AppM.activeTab = 'chats';
-                AppM.activeDialogId = dialogId;
-                if (activeOffer) {
-                    AppM.activeP2POfferId = activeOffer.id;
-                    AppM.activeP2POffer = activeOffer;
-                } else {
-                    AppM.activeP2POfferId = null;
-                    AppM.activeP2POffer = null;
-                }
-                const c = document.getElementById('phoneAppContainer');
-                if (c && typeof AppM.render === 'function') AppM.render(c);
-            }
-        }, 150);
-    }, 100);
+    return _openP2PDealFallback(p2pId);
 }
 
+// ========================================================
+// ПЛАТНЫЙ ДОЗВОН
+// ========================================================
 function paidCallMarketCar(carId) {
     if (!carId) return;
     let cash = (state.player && state.player.cash) ? state.player.cash : 0;
@@ -263,7 +229,7 @@ function paidCallMarketCar(carId) {
 }
 
 // ========================================================
-// ВСТРЕЧА У КАПОТА (NPC)
+// ВСТРЕЧА У КАПОТА (NPC + P2P роутинг)
 // ========================================================
 function openMarketDeal(carId) {
     if (!carId) return;
@@ -271,8 +237,16 @@ function openMarketDeal(carId) {
     const car = (state.marketFeed || []).find(c => c && c.id === carId);
     if (!car) return showToast("Автомобиль недоступен!");
 
+    // ⭐ v5.1.0: P2P → реальная модалка торга
     if (car.isP2PUserListing) {
-        return openP2PDealModal(car.id);
+        const p2pItem = (state.p2pMarketListings || []).find(l => l && (
+            String(l.id) === String(carId) || String(l.lot_id) === String(carId)
+        ));
+        const targetId = p2pItem ? (p2pItem.id || p2pItem.lot_id) : carId;
+        if (typeof window.openP2PDealModal === 'function') {
+            return window.openP2PDealModal(targetId);
+        }
+        return _openP2PDealFallback(targetId);
     }
 
     _dealActionPending = false;
@@ -367,7 +341,7 @@ function startMarketTestDrive(carId) {
 }
 
 // ========================================================
-// ПАНЕЛЬ ТОРГА (С УЧЁТОМ РЕПУТАЦИИ БРЕНДА)
+// ПАНЕЛЬ ТОРГА NPC (с репутацией бренда)
 // ========================================================
 function renderMarketHaggleControls() {
     const haggleArea = document.getElementById("dealHaggleArea");
@@ -425,8 +399,6 @@ function renderMarketHaggleControls() {
 
         const levelBonus = Math.min(15, Math.floor(lvl / 5));
         const karmaBonus = Math.round((karma - 50) * 0.15);
-
-        // ⭐ Учёт репутации бренда
         const brandBonus = Math.round((brandReputation - 1.0) * 30);
 
         risk = risk - levelBonus - karmaBonus + brandBonus;
@@ -521,7 +493,6 @@ function renderMarketHaggleControls() {
         </button>`;
     }
 
-    // ⭐ v5.0.0: Кнопка "Слить в Даркнет"
     let darknetOptionBtn = '';
     if (car.legalDefect || car.isStolen || car.isBeaterProject) {
         const hasDarknet = (state.player?.unlockedApps || []).includes('darknet') || (state.player?.level || 1) >= 7;
@@ -753,7 +724,7 @@ function buyCarDirectToScrapYard(price) {
 }
 
 // ========================================================
-// ⭐ v5.0.0: ПРОДАЖА В ДАРКНЕТ
+// ПРОДАЖА В ДАРКНЕТ
 // ========================================================
 function sellCarToDarknet(price) {
     if (!pendingMarketCar || !pendingMarketCar.car) return;
@@ -761,12 +732,10 @@ function sellCarToDarknet(price) {
 
     if (!confirm(`Слить «${car.name}» в Даркнет за ${price.toLocaleString()} ₽?\n\n⚠️ Без ДКП, без проверок. Карма -10.`)) return;
 
-    // Начисляем деньги
     state.player.cash = (state.player.cash || 0) + price;
     state.player.streetCred = (state.player.streetCred || 100) + 5;
     state.player.karma = Math.max(0, (state.player.karma || 50) - 10);
 
-    // Удаляем машину из ленты и гаража
     state.marketFeed = (state.marketFeed || []).filter(c => c && c.id !== car.id);
     if (Array.isArray(state.garage)) {
         const gIdx = state.garage.findIndex(c => c && (c.uid === car.uid || c.id === car.id));
@@ -828,8 +797,6 @@ function attemptMarketHaggle(percent, failRisk = 25) {
 
     const levelBonus = Math.min(15, Math.floor(lvl / 5));
     const karmaBonus = Math.round((karma - 50) * 0.15);
-
-    // ⭐ Репутация бренда
     const brandReputation = typeof getBrandReputation === 'function' ? getBrandReputation(car.name) : 1.0;
     const brandPenalty = Math.round((brandReputation - 1.0) * 30);
 
@@ -1379,7 +1346,6 @@ function finishMarketCarBuyProcess(deal) {
         if (typeof trackQuestProgress === 'function') trackQuestProgress('buy_car', 1);
         if (typeof logBankTransaction === 'function') logBankTransaction(`Покупка авто: ${car.name}`, price, false);
 
-        // ⭐ v5.0.0: Обновляем репутацию бренда
         if (typeof updateBrandReputationAfterSale === 'function') {
             const isCleanSale = !car.legalDefect && !car.rolledOdometer && !car.hiddenDefect && !car.isStolen;
             updateBrandReputationAfterSale(car.name, isCleanSale);
@@ -1506,7 +1472,8 @@ function resolveBackfire(carId, action) {
 // ========================================================
 Object.assign(window, {
     initiateBuyMarketCar,
-    openP2PDealModal,
+    // ⚠️ v5.1.0: openP2PDealModal НЕ экспортируется — его владелец p2p-offers.js.
+    // Наш локальный openP2PDealModal используется только как internal helper.
     paidCallMarketCar,
     openMarketDeal,
     startMarketTestDrive,
@@ -1528,8 +1495,18 @@ Object.assign(window, {
     resolveBackfire
 });
 
+// ⭐ v5.1.0: Условная регистрация fallback.
+// Не перезаписываем реальную модалку из p2p-offers.js при любом порядке загрузки.
+if (typeof window.openP2PDealModal !== 'function' || window.openP2PDealModal._isFakeFromMarketDeal) {
+    window.openP2PDealModal = _openP2PDealFallback;
+    _openP2PDealFallback._isFakeFromMarketDeal = true;
+    console.log('[MarketDeal v5.1.0] Зарегистрирован fallback openP2PDealModal (p2p-offers.js не загружен или загрузился раньше)');
+} else {
+    console.log('[MarketDeal v5.1.0] Реальная openP2PDealModal уже установлена (p2p-offers.js загружен ранее) ✓');
+}
+
 window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v5.0.0] Репутация бренда + Даркнет + P2P роутинг ✓');
+console.log('[🤝 market-deal v5.1.0] ФИКС: P2P → реальная openP2PDealModal, fake chat удалён ✓');

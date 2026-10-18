@@ -1,30 +1,44 @@
 // ========================================================
-// js/notification-center.js — ЕДИНЫЙ ЦЕНТР УВЕДОМЛЕНИЙ (v2.0.0)
+// js/notification-center.js — ЕДИНЫЙ ЦЕНТР УВЕДОМЛЕНИЙ (v2.1.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
+// ⭐ v2.1.1 (P2P CAR DELIVERY DEBIT):
+//   - ФИКС: _handleP2PDealCarDelivered теперь дебетует cash
+//     покупателя и добавляет авто в гараж из meta.carData.
+//     Раньше показывал только тост — покупатель получал
+//     уведомление «авто ваше», но в гараже ничего не появлялось.
+//     Срабатывает при сценарии «продавец принял оффер, покупатель
+//     был оффлайн» — при следующем заходе покупателя в игру
+//     processStartupNotifications подхватывает уведомление и
+//     локально завершает сделку.
+//
+// ⭐ v2.1.0 (P2P TRADING REPAIR):
+//   - ФИКС: p2p_offer_* больше НЕ игнорируются как legacy.
+//     Добавлены реальные обработчики:
+//       • p2p_offer_received  — продавцу приходит оффер
+//       • p2p_offer_accepted  — продавец принял → покупателю
+//       • p2p_offer_rejected  — отклонён
+//       • p2p_offer_countered — встречное предложение
+//       • p2p_offer_cancelled — отменён
+//       • p2p_offer_expired   — истёк
+//     Каждый показывает тост + эмитит EventBus.
+//
+//   - ДОБАВЛЕНО: _showIncomingOfferModal — минимальная модалка
+//     ответа на оффер (Принять / Встречное / Отклонить) через
+//     P2POffersManager.
+//
+//   - ФИКС: _handleNewMessage читает message || text и
+//     dialogId || meta.dialogId. Раньше читал только text и
+//     dialogId на верхнем уровне — а queueP2PNotification пишет
+//     message в text, а dialogId в meta.dialogId.
+//
+//   - ФИКС: _handleDealPayout корректно начисляет деньги
+//     напрямую в state.player.cash, если pushToMailbox недоступна.
+//
+//   - УДАЛЕНО: _handleLegacyP2POffer (больше не нужна).
+//
 // ⭐ v2.0.0 (SPRINT 1 — РЕДИЗАЙН P2P):
-//   - УБРАНЫ обработчики p2p_offer_* (старая система p2p-offers.js)
-//   - ДОБАВЛЕНЫ новые типы для P2PDeals:
-//       • p2p_deal_created              — черновик ДКП создан
-//       • p2p_deal_signed_by_counterparty — вторая сторона подписала
-//       • p2p_deal_completed            — сделка закрыта
-//       • p2p_deal_cancelled            — ДКП отменён
-//       • p2p_deal_payout               — продавцу зачислены деньги
-//       • p2p_deal_car_delivered        — покупателю доставлено авто
-//   - Интеграция с P2PDKPModal: при уведомлении о подписи
-//     автоматически открывает/обновляет модалку ДКП
-//   - EventBus p2p:deal_* для UI-слоя
-//   - Хелпер _openDealModalForNotification
-//
-// ⭐ v1.1.0:
-//   - 6 типов P2P offer (устаревшие, заменены)
-//   - Хелпер _isAppOnScreen
-//   - EventBus-эмиты
-//
-// ⭐ v1.0.0:
-//   - Единый обработчик всех уведомлений
-//   - Идемпотентность через state.player._processedNotifIds
-//   - processStartupNotifications, subscribe
+//   - Типы p2p_deal_* и интеграция с P2PDKPModal.
 //
 // ВАЖНО: загружается ПОСЛЕ firebase-*, p2p-deals.js и p2p-deals-modal.js
 // ========================================================
@@ -36,18 +50,11 @@
         _processing: false,
         _maxHistoryIds: 200,
 
-        /**
-         * Централизованная обработка уведомления.
-         * Идемпотентна — повторная обработка не производится.
-         * @param {Object} notif — уведомление из Firestore
-         * @returns {Promise<boolean>} — true, если обработано
-         */
         async handleIncomingNotification(notif) {
             if (!notif || !notif.id) return false;
             if (!window.state) window.state = {};
             if (!window.state.player) window.state.player = {};
 
-            // Дедупликация
             if (!Array.isArray(window.state.player._processedNotifIds)) {
                 window.state.player._processedNotifIds = [];
             }
@@ -74,7 +81,27 @@
                         handled = this._handleLotSold(notif);
                         break;
 
-                    // === ⭐ v2.0.0: P2P ДКП ===
+                    // === P2P ОФФЕРЫ (v2.1.0) ===
+                    case 'p2p_offer_received':
+                        handled = this._handleP2POfferReceived(notif);
+                        break;
+                    case 'p2p_offer_accepted':
+                        handled = this._handleP2POfferAccepted(notif);
+                        break;
+                    case 'p2p_offer_rejected':
+                        handled = this._handleP2POfferRejected(notif);
+                        break;
+                    case 'p2p_offer_countered':
+                        handled = this._handleP2POfferCountered(notif);
+                        break;
+                    case 'p2p_offer_cancelled':
+                        handled = this._handleP2POfferCancelled(notif);
+                        break;
+                    case 'p2p_offer_expired':
+                        handled = this._handleP2POfferExpired(notif);
+                        break;
+
+                    // === P2P ДКП (типы p2p_deal_*) ===
                     case 'p2p_deal_created':
                         handled = this._handleP2PDealCreated(notif);
                         break;
@@ -118,19 +145,6 @@
                         handled = this._handleTradeRejected(notif);
                         break;
 
-                    // ═══════════════════════════════════════
-                    // ⭐ v2.0.0: СТАРЫЕ p2p_offer_* БОЛЬШЕ НЕ ОБРАБАТЫВАЮТСЯ
-                    // (оставлены заглушки для старых непрочитанных уведомлений)
-                    // ═══════════════════════════════════════
-                    case 'p2p_offer_received':
-                    case 'p2p_offer_accepted':
-                    case 'p2p_offer_rejected':
-                    case 'p2p_offer_countered':
-                    case 'p2p_offer_cancelled':
-                    case 'p2p_offer_expired':
-                        handled = this._handleLegacyP2POffer(notif);
-                        break;
-
                     default:
                         console.log('[NotificationCenter] Неизвестный тип:', notif.type);
                         handled = true;
@@ -142,7 +156,6 @@
                 }
             }
 
-            // Помечаем как обработанное
             if (handled) {
                 window.state.player._processedNotifIds.push(notif.id);
                 if (window.state.player._processedNotifIds.length > this._maxHistoryIds) {
@@ -166,9 +179,6 @@
             return handled;
         },
 
-        /**
-         * Проверить, открыт ли сейчас экран M+ на конкретной вкладке.
-         */
         _isAppOnScreen(tabName) {
             try {
                 if (!window.AppM) return false;
@@ -181,9 +191,6 @@
             }
         },
 
-        /**
-         * Форсированно обновить UI M+ (если открыт).
-         */
         _refreshAppM() {
             try {
                 if (!window.AppM) return;
@@ -198,22 +205,16 @@
             }
         },
 
-        /**
-         * ⭐ v2.0.0: Открыть модалку ДКП, если открыт диалог или вкладка чатов.
-         */
         _openDealModalForNotification(dealId, lotId) {
             if (!dealId) return;
 
             try {
-                // Если игрок сейчас в чате — открываем модалку
                 const isOnChats = this._isAppOnScreen('chats');
                 if (isOnChats && window.P2PDKPModal) {
-                    // Проверяем, не открыта ли уже эта модалка
                     const modal = document.getElementById('modalP2PDKP');
                     const alreadyOpen = modal && modal.classList.contains('active');
 
                     if (!alreadyOpen) {
-                        // Небольшая задержка, чтобы тост/уведомление показались
                         setTimeout(() => {
                             try {
                                 window.P2PDKPModal.open(dealId);
@@ -229,12 +230,329 @@
         },
 
         // ====================================================
-        // ⭐ v2.0.0: P2P ДКП — ОБРАБОТЧИКИ
+        // P2P ОФФЕРЫ — ОБРАБОТЧИКИ
+        //
+        // Данные приходят из P2PNotificationsManager.queueP2PNotification:
+        //   notif.message  — текст
+        //   notif.fromUser — ID отправителя
+        //   notif.fromUserName
+        //   notif.meta.offerId / lotId / carName / counterPrice
         // ====================================================
 
-        /**
-         * Черновик ДКП создан (для продавца).
-         */
+        _handleP2POfferReceived(notif) {
+            const meta = notif.meta || {};
+            const offerId = meta.offerId || notif.offerId;
+            const carName = meta.carName || notif.title || 'Объект';
+            const buyerName = notif.fromUserName || 'Покупатель';
+            const offeredPrice = Number(meta.offeredPrice || meta.cash || notif.amount || 0);
+
+            if (typeof showToast === 'function') {
+                showToast(`🤝 ${buyerName}: ${offeredPrice.toLocaleString()} ₽ по «${carName}»`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('win');
+                window.AudioFx.haptic('success');
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_received_notif', {
+                    offerId,
+                    lotId: meta.lotId || notif.lotId,
+                    buyerId: notif.fromUser || notif.fromUserId,
+                    buyerName,
+                    carName,
+                    offeredPrice,
+                    notif
+                });
+            }
+
+            this._refreshAppM();
+
+            setTimeout(() => {
+                this._showIncomingOfferModal(offerId, notif);
+            }, 500);
+
+            return true;
+        },
+
+        async _showIncomingOfferModal(offerId, notif) {
+            if (!offerId) return;
+            if (!window.P2POffersManager?.fetchOffer) {
+                console.warn('[NotificationCenter] P2POffersManager не загружен — модалка оффера не открыта');
+                return;
+            }
+
+            if (this._isAppOnScreen('chats')) return;
+
+            let offer = null;
+            try {
+                offer = await window.P2POffersManager.fetchOffer(offerId);
+            } catch (e) {
+                console.warn('[NotificationCenter] fetchOffer error:', e);
+                return;
+            }
+
+            if (!offer) {
+                console.warn('[NotificationCenter] Оффер не найден:', offerId);
+                return;
+            }
+
+            if (offer.status !== 'pending' && offer.status !== 'countered') {
+                console.log('[NotificationCenter] Оффер уже неактуален:', offer.status);
+                return;
+            }
+
+            const myProfile = (typeof window.FB_Bridge?.getProfile === 'function')
+                ? window.FB_Bridge.getProfile()
+                : null;
+            const myUid = String(myProfile?.id || window.state?.player?.uid || '');
+
+            if (String(offer.sellerId) !== myUid) {
+                console.log('[NotificationCenter] Оффер не для текущего игрока');
+                return;
+            }
+
+            let modal = document.getElementById('modalIncomingP2POffer');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'modalIncomingP2POffer';
+                modal.className = 'modal-overlay';
+                document.body.appendChild(modal);
+            }
+
+            const originalPrice = Number(offer.originalPrice) || 0;
+            const offeredPrice = Number(offer.offeredPrice) || 0;
+            const lotName = offer.lotName || 'Автомобиль';
+            const buyerName = offer.buyerName || 'Покупатель';
+            const buyerMessage = offer.buyerMessage || '';
+            const round = offer.round || 1;
+
+            modal.innerHTML = `
+                <div class="modal-box" style="max-width: 420px; border-color: var(--cyan);">
+                    <div class="flex-between mb-2">
+                        <div class="modal-glow-badge" style="color:var(--cyan); border-color:var(--cyan);">
+                            <i class="fa-solid fa-comments-dollar"></i> ВХОДЯЩЕЕ ПРЕДЛОЖЕНИЕ
+                        </div>
+                        <button onclick="ModalManager.close('modalIncomingP2POffer')" class="btn btn-dark btn-auto btn-sm">✕</button>
+                    </div>
+
+                    <div class="p-2 mb-2" style="background:#050914; border-radius:8px; border:1px solid rgba(0,242,254,0.3);">
+                        <b class="text-xs color-cyan">${lotName}</b>
+                        <div class="flex-between mt-2 text-xs">
+                            <span class="sub-label">Цена лота:</span>
+                            <b class="color-amber">${originalPrice.toLocaleString()} ₽</b>
+                        </div>
+                        <div class="flex-between mt-1 text-xs">
+                            <span class="sub-label">Предложение покупателя:</span>
+                            <b class="color-green" style="font-size:14px;">${offeredPrice.toLocaleString()} ₽</b>
+                        </div>
+                        <div class="flex-between mt-1 text-xs">
+                            <span class="sub-label">Раунд:</span>
+                            <b class="color-cyan">${round}</b>
+                        </div>
+                    </div>
+
+                    <div class="p-2 mb-2" style="background:rgba(0,242,254,0.05); border-radius:8px; border-left:3px solid var(--cyan);">
+                        <b class="text-xs color-cyan">${buyerName}:</b>
+                        <div class="sub-label mt-1" style="font-size:10px; color:#f1f5f9;">
+                            ${buyerMessage || '«Предлагаю указанную сумму, готов оформлять!»'}
+                        </div>
+                    </div>
+
+                    <div class="grid-3 mb-2" style="gap:6px;">
+                        <button onclick="window._p2pOfferAccept('${offerId}')" class="btn btn-green btn-sm font-bold" style="padding:8px 0;">
+                            ✅ ПРИНЯТЬ
+                        </button>
+                        <button onclick="window._p2pOfferCounter('${offerId}', ${originalPrice})" class="btn btn-amber btn-sm font-bold" style="padding:8px 0;">
+                            🔄 ВСТРЕЧНОЕ
+                        </button>
+                        <button onclick="window._p2pOfferReject('${offerId}')" class="btn btn-danger btn-sm font-bold" style="padding:8px 0;">
+                            ❌ ОТКЛОНИТЬ
+                        </button>
+                    </div>
+
+                    <button onclick="ModalManager.close('modalIncomingP2POffer')" class="btn btn-dark w-full btn-sm">
+                        Закрыть (оффер останется активным)
+                    </button>
+                </div>
+            `;
+
+            window._p2pOfferAccept = async (oId) => {
+                try {
+                    const res = await window.P2POffersManager.acceptOffer(oId);
+                    if (res.success) {
+                        if (typeof showToast === 'function') showToast(`✅ Оффер принят: ${Number(res.price || 0).toLocaleString()} ₽`);
+                        if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+                        ModalManager.close('modalIncomingP2POffer');
+                        if (window.EventBus) window.EventBus.emit('p2p:offer_accepted_ui', { offerId: oId, price: res.price });
+                    } else {
+                        if (typeof showToast === 'function') showToast(`❌ ${res.error || 'Не удалось принять'}`);
+                        if (window.AudioFx) window.AudioFx.play('error');
+                    }
+                } catch (e) {
+                    if (typeof showToast === 'function') showToast(`❌ ${e.message}`);
+                }
+            };
+
+            window._p2pOfferCounter = async (oId, maxPrice) => {
+                const raw = prompt(`Встречная цена (макс. ${Number(maxPrice).toLocaleString()} ₽):`, String(Math.round(maxPrice * 0.95)));
+                if (raw === null) return;
+                const cp = parseInt(raw, 10);
+                if (!cp || cp < 1000) return showToast('❌ Некорректная цена');
+
+                try {
+                    const res = await window.P2POffersManager.counterOffer(oId, cp, '');
+                    if (res.success) {
+                        if (typeof showToast === 'function') showToast(`🔄 Встречное: ${cp.toLocaleString()} ₽`);
+                        if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+                        ModalManager.close('modalIncomingP2POffer');
+                    } else {
+                        if (typeof showToast === 'function') showToast(`❌ ${res.error || 'Не удалось'}`);
+                    }
+                } catch (e) {
+                    if (typeof showToast === 'function') showToast(`❌ ${e.message}`);
+                }
+            };
+
+            window._p2pOfferReject = async (oId) => {
+                if (!confirm('Отклонить предложение покупателя?')) return;
+                try {
+                    const res = await window.P2POffersManager.rejectOffer(oId);
+                    if (res.success) {
+                        if (typeof showToast === 'function') showToast('❌ Оффер отклонён');
+                        if (window.AudioFx) window.AudioFx.play('error');
+                        ModalManager.close('modalIncomingP2POffer');
+                    } else {
+                        if (typeof showToast === 'function') showToast(`❌ ${res.error || 'Не удалось'}`);
+                    }
+                } catch (e) {
+                    if (typeof showToast === 'function') showToast(`❌ ${e.message}`);
+                }
+            };
+
+            if (window.ModalManager && typeof window.ModalManager.open === 'function') {
+                window.ModalManager.open('modalIncomingP2POffer', { closeOthers: false });
+            } else {
+                modal.classList.add('active');
+            }
+            if (typeof playSound === 'function') playSound('tick');
+        },
+
+        _handleP2POfferAccepted(notif) {
+            const meta = notif.meta || {};
+            const carName = meta.carName || notif.title || 'Объект';
+            const responder = notif.fromUserName || 'Продавец';
+
+            if (typeof showToast === 'function') {
+                showToast(`✅ ${responder} принял ваш оффер по «${carName}»!`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('win');
+                window.AudioFx.haptic('success');
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_accepted_notif', {
+                    offerId: meta.offerId || notif.offerId,
+                    lotId: meta.lotId || notif.lotId,
+                    responderName: responder,
+                    notif
+                });
+            }
+
+            this._refreshAppM();
+            return true;
+        },
+
+        _handleP2POfferRejected(notif) {
+            const meta = notif.meta || {};
+            const carName = meta.carName || notif.title || 'Объект';
+
+            if (typeof showToast === 'function') {
+                showToast(`❌ Оффер по «${carName}» отклонён`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('error');
+                window.AudioFx.haptic('warning');
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_rejected_notif', {
+                    offerId: meta.offerId || notif.offerId,
+                    notif
+                });
+            }
+
+            this._refreshAppM();
+            return true;
+        },
+
+        _handleP2POfferCountered(notif) {
+            const meta = notif.meta || {};
+            const carName = meta.carName || notif.title || 'Объект';
+            const counterPrice = Number(meta.counterPrice || 0);
+
+            if (typeof showToast === 'function') {
+                showToast(`🔄 Встречное предложение по «${carName}»: ${counterPrice.toLocaleString()} ₽`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('win');
+                window.AudioFx.haptic('success');
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_countered_notif', {
+                    offerId: meta.offerId || notif.offerId,
+                    counterPrice,
+                    notif
+                });
+            }
+
+            this._refreshAppM();
+            return true;
+        },
+
+        _handleP2POfferCancelled(notif) {
+            const meta = notif.meta || {};
+            const carName = meta.carName || notif.title || 'Объект';
+
+            if (typeof showToast === 'function') {
+                showToast(`⚠️ Оффер по «${carName}» отозван`);
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_cancelled_notif', {
+                    offerId: meta.offerId || notif.offerId,
+                    notif
+                });
+            }
+
+            this._refreshAppM();
+            return true;
+        },
+
+        _handleP2POfferExpired(notif) {
+            const meta = notif.meta || {};
+            const carName = meta.carName || notif.title || 'Объект';
+
+            if (typeof showToast === 'function') {
+                showToast(`⌛ Оффер по «${carName}» истёк`);
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:offer_expired_notif', {
+                    offerId: meta.offerId || notif.offerId,
+                    notif
+                });
+            }
+
+            return true;
+        },
+
+        // ====================================================
+        // P2P ДКП — обработчики (типы p2p_deal_*)
+        // ====================================================
+
         _handleP2PDealCreated(notif) {
             const buyerName = notif.buyerName || 'Покупатель';
             const price = Number(notif.price) || 0;
@@ -257,10 +575,8 @@
                 });
             }
 
-            // Обновляем чаты
             this._refreshAppM();
 
-            // Открываем модалку, если игрок в M+
             if (this._isAppOnScreen('chats')) {
                 this._openDealModalForNotification(notif.dealId, notif.lotId);
             }
@@ -268,9 +584,6 @@
             return true;
         },
 
-        /**
-         * Вторая сторона подписала ДКП.
-         */
         _handleP2PDealSigned(notif) {
             const price = Number(notif.price) || 0;
 
@@ -296,9 +609,6 @@
             return true;
         },
 
-        /**
-         * Сделка полностью завершена.
-         */
         _handleP2PDealCompleted(notif) {
             const price = Number(notif.price) || 0;
             const lotName = notif.title || 'авто';
@@ -321,22 +631,15 @@
             }
 
             this._refreshAppM();
-
-            // Обновляем HUD (деньги могли измениться)
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
-
-            // Обновляем гараж, если открыт
             if (typeof renderGarage === 'function') renderGarage();
 
             return true;
         },
 
-        /**
-         * ДКП отменён.
-         */
         _handleP2PDealCancelled(notif) {
             if (typeof showToast === 'function') {
-                showToast(`⛔ ${notif.text || 'ДКП отменён'}`);
+                showToast(`⛔ ${notif.message || notif.text || 'ДКП отменён'}`);
             }
             if (window.AudioFx) {
                 window.AudioFx.play('error');
@@ -351,17 +654,11 @@
             }
 
             this._refreshAppM();
-
             return true;
         },
 
-        /**
-         * Выплата продавцу (деньги зачислены в Почту).
-         */
         _handleP2PDealPayout(notif) {
             const amount = Number(notif.amount) || 0;
-
-            // Зачисляем деньги продавцу
             if (amount > 0) {
                 window.state.player.cash = (window.state.player.cash || 0) + amount;
             }
@@ -376,8 +673,6 @@
             if (typeof spawnFloatingReward === 'function') {
                 spawnFloatingReward(`+${amount.toLocaleString()} ₽`);
             }
-
-            // Логируем
             if (typeof logBankTransaction === 'function') {
                 logBankTransaction('P2P продажа авто', amount, true);
             }
@@ -396,68 +691,120 @@
         },
 
         /**
-         * Авто доставлено покупателю (на платную парковку).
+         * ⭐ v2.1.1: Авто доставлено покупателю — списываем cash,
+         * добавляем авто из meta.carData в гараж.
+         *
+         * Срабатывает при сценарии «продавец принял оффер,
+         * покупатель был оффлайн» — при следующем заходе покупателя
+         * в игру processStartupNotifications подхватывает уведомление
+         * и локально завершает сделку.
+         *
+         * Если покупатель был онлайн и сам принял counter-offer —
+         * p2p-offers.js v1.4.0 уже применил _applyBuyerSideCompletion,
+         * и эта функция не вызывается (skipBuyerNotif: true).
          */
         _handleP2PDealCarDelivered(notif) {
+            const meta = notif.meta || {};
+            const carData = meta.carData;
+            const finalPrice = Number(meta.finalPrice || notif.amount || 0);
+
+            if (carData && carData.name) {
+                try {
+                    const player = window.state && window.state.player;
+                    if (player) {
+                        const cash = Number(player.cash) || 0;
+
+                        if (cash >= finalPrice) {
+                            player.cash = cash - finalPrice;
+
+                            const car = Object.assign({}, carData);
+                            car.uid = 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+                            car.purchaseCost = finalPrice;
+                            car.isPersonal = false;
+                            car.impounded = false;
+                            car.ownershipDays = 0;
+                            car.insurance = null;
+                            car.engineTemp = 90;
+                            if (car.tireWear === undefined) car.tireWear = 100;
+                            if (car.wear === undefined) car.wear = { engine: 85, transmission: 85 };
+
+                            if (typeof window.ensureCarIdentity === 'function') window.ensureCarIdentity(car);
+
+                            if (!Array.isArray(window.state.garage)) window.state.garage = [];
+                            window.state.garage.push(car);
+
+                            if (Array.isArray(window.state.p2pMarketListings) && meta.lotId) {
+                                window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l =>
+                                    l && String(l.id || l.lot_id) !== String(meta.lotId)
+                                );
+                            }
+
+                            if (typeof window.logBankTransaction === 'function') {
+                                window.logBankTransaction(`P2P покупка: ${car.name}`, finalPrice, false);
+                            }
+
+                            if (typeof saveState === 'function') saveState();
+                            if (typeof renderGarage === 'function') renderGarage();
+
+                            console.log(`[NotificationCenter] ✅ P2P: ${car.name} за ${finalPrice} добавлен в гараж`);
+                        } else {
+                            console.warn(`[NotificationCenter] P2P car delivery: не хватает ${finalPrice - cash} ₽ для списания`);
+                        }
+                    }
+                } catch (e) {
+                    console.error('[NotificationCenter] P2P car delivery error:', e);
+                }
+            }
+
             if (typeof showToast === 'function') {
-                showToast(`🚗 ${notif.text || 'Авто на парковке'}`);
+                showToast(`🚗 ${notif.message || notif.text || 'Авто доставлено'}`);
             }
             if (window.AudioFx) {
                 window.AudioFx.play('win');
                 window.AudioFx.haptic('success');
             }
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
 
             if (window.EventBus) {
                 window.EventBus.emit('p2p:deal_car_delivered_notif', {
                     dealId: notif.dealId,
-                    lotId: notif.lotId
+                    lotId: notif.lotId || meta.lotId,
+                    meta
                 });
             }
 
-            // Обновляем парковку/гараж если открыты
-            if (window.PhoneManager?.currentApp === 'post' && window.AppPost?.render) {
-                const container = document.getElementById('phoneAppContainer');
-                if (container) window.AppPost.render(container);
-            }
-            if (typeof renderGarage === 'function') renderGarage();
-
             this._refreshAppM();
-
-            return true;
-        },
-
-        /**
-         * ⭐ v2.0.0: Заглушка для старых p2p_offer_* уведомлений.
-         * Они больше не создаются (система заменена), но если попадутся
-         * старые непрочитанные — просто помечаем как обработанные.
-         */
-        _handleLegacyP2POffer(notif) {
-            console.log('[NotificationCenter] Legacy P2P offer тип:', notif.type, '→ игнор');
             return true;
         },
 
         // ====================================================
-        // СУЩЕСТВУЮЩИЕ ОБРАБОТЧИКИ
+        // ЭКОНОМИКА
         // ====================================================
 
-        /**
-         * Продажа лота P2P (деньги в Почту — старая система).
-         */
         _handleDealPayout(notif) {
             const amount = Number(notif.amount) || 0;
             if (amount <= 0) return false;
 
-            if (typeof window.pushToMailbox === 'function') {
-                window.pushToMailbox({
-                    type: "cash",
-                    amount: amount,
-                    title: `Продажа P2P: ${notif.title || 'Лот'}`,
-                    sender: "P2P Биржа M+",
-                    desc: `Покупатель приобрёл ваш лот! Сумма: ${amount.toLocaleString()} ₽.`,
-                    badge: "P2P ВЫПЛАТА"
-                });
-            } else {
+            let usedMailbox = false;
+            try {
+                if (typeof window.pushToMailbox === 'function') {
+                    window.pushToMailbox({
+                        type: "cash",
+                        amount: amount,
+                        title: `Продажа P2P: ${notif.title || 'Лот'}`,
+                        sender: "P2P Биржа M+",
+                        desc: `Покупатель приобрёл ваш лот! Сумма: ${amount.toLocaleString()} ₽.`,
+                        badge: "P2P ВЫПЛАТА"
+                    });
+                    usedMailbox = true;
+                }
+            } catch (e) {
+                console.warn('[NotificationCenter] pushToMailbox error:', e);
+            }
+
+            if (!usedMailbox) {
                 window.state.player.cash = (window.state.player.cash || 0) + amount;
+                if (typeof spawnFloatingReward === 'function') spawnFloatingReward(`+${amount.toLocaleString()} ₽`);
             }
 
             if (typeof showToast === 'function') {
@@ -467,17 +814,67 @@
                 window.AudioFx.play('win');
                 window.AudioFx.haptic('success');
             }
+            if (typeof logBankTransaction === 'function') {
+                logBankTransaction(`P2P продажа: ${notif.title || 'Лот'}`, amount, true);
+            }
 
             try {
                 if (Array.isArray(window.state.p2pMarketListings)) {
-                    window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l =>
-                        l && l.id !== notif.offerId && l.name !== notif.title
-                    );
+                    const lotId = notif.lotId || notif.offerId;
+                    window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l => {
+                        if (!l) return false;
+                        const lid = l.id || l.lot_id;
+                        if (lotId && String(lid) === String(lotId)) return false;
+                        if (notif.title && l.name === notif.title) return false;
+                        return true;
+                    });
                 }
             } catch (e) {}
 
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+
+            if (window.EventBus) {
+                window.EventBus.emit('p2p:payout_received', { amount, notif });
+            }
+
             return true;
         },
+
+        _handleLotBought(notif) {
+            const amount = Number(notif.amount) || 0;
+            if (amount <= 0) return false;
+
+            try {
+                if (Array.isArray(window.state.p2pMarketListings)) {
+                    const lotId = notif.lotId || notif.offerId;
+                    window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l => {
+                        if (!l) return false;
+                        return String(l.id || l.lot_id) !== String(lotId);
+                    });
+                }
+            } catch (e) {}
+
+            if (typeof showToast === 'function') {
+                showToast(`🔔 Лот продан: ${notif.title || ''}`);
+            }
+
+            return true;
+        },
+
+        _handleLotSold(notif) {
+            if (typeof showToast === 'function') {
+                showToast(`🎉 Лот куплен: ${notif.title || ''}`);
+            }
+            if (window.AudioFx) {
+                window.AudioFx.play('win');
+                window.AudioFx.haptic('success');
+            }
+            return true;
+        },
+
+        // ====================================================
+        // TRADE OFFERS (обмен авто)
+        // ====================================================
 
         _handleTradeOffer(notif) {
             if (!window.state.player.incomingTradeOffers) {
@@ -488,7 +885,7 @@
                 window.state.player.incomingTradeOffers.push({
                     id: notif.offerId,
                     title: notif.title,
-                    text: notif.text,
+                    text: notif.message || notif.text,
                     timestamp: notif.timestamp
                 });
             }
@@ -516,7 +913,7 @@
             if (typeof openVerdictModal === 'function') {
                 openVerdictModal(
                     "🤝 ОФФЕР ПРИНЯТ!",
-                    `${notif.text || 'Игрок принял ваше предложение обмена.'}\nСвяжитесь для оформления сделки.`,
+                    `${notif.message || notif.text || 'Игрок принял ваше предложение обмена.'}\nСвяжитесь для оформления сделки.`,
                     true
                 );
             }
@@ -535,14 +932,19 @@
             return true;
         },
 
+        // ====================================================
+        // ДРУЗЬЯ
+        // ====================================================
+
         _handleFriendRequest(notif) {
+            const fromId = notif.fromUserId || notif.fromUser;
             if (!window.state.player.pendingFriendRequests) {
                 window.state.player.pendingFriendRequests = [];
             }
-            const exists = window.state.player.pendingFriendRequests.some(p => p.id === notif.fromUserId);
+            const exists = window.state.player.pendingFriendRequests.some(p => p.id === fromId);
             if (!exists) {
                 window.state.player.pendingFriendRequests.push({
-                    id: notif.fromUserId,
+                    id: fromId,
                     name: notif.fromUserName || 'Перекуп',
                     timestamp: notif.timestamp
                 });
@@ -561,9 +963,10 @@
         },
 
         _handleFriendAccepted(notif) {
+            const fromId = notif.fromUserId || notif.fromUser;
             if (!window.state.player.friendsList) window.state.player.friendsList = [];
-            if (notif.fromUserId && !window.state.player.friendsList.includes(notif.fromUserId)) {
-                window.state.player.friendsList.push(notif.fromUserId);
+            if (fromId && !window.state.player.friendsList.includes(fromId)) {
+                window.state.player.friendsList.push(fromId);
             }
 
             if (typeof showToast === 'function') {
@@ -581,14 +984,25 @@
             return true;
         },
 
+        // ====================================================
+        // ЧАТ (читаем message || text, dialogId || meta.dialogId)
+        // ====================================================
+
         _handleNewMessage(notif) {
             if (!window.state.player) window.state.player = {};
             if (!Array.isArray(window.state.player.phoneMessages)) {
                 window.state.player.phoneMessages = [];
             }
 
-            const dialogId = notif.dialogId;
-            if (!dialogId) return false;
+            const meta = notif.meta || {};
+            const dialogId = notif.dialogId || meta.dialogId;
+            if (!dialogId) {
+                console.warn('[NotificationCenter] new_message без dialogId — пропуск');
+                return true;
+            }
+
+            const msgText = notif.message || notif.text || '';
+            const fromName = notif.fromUserName || meta.senderName || 'Игрок';
 
             let msg = window.state.player.phoneMessages.find(m => m && m.id === dialogId);
             if (!msg) {
@@ -596,7 +1010,7 @@
                     id: dialogId,
                     dialogId: dialogId,
                     category: 'chat',
-                    sender: notif.fromUserName || 'Игрок',
+                    sender: fromName,
                     time: "Сейчас",
                     unread: true,
                     viewed: false,
@@ -609,54 +1023,34 @@
             if (!msg.chatHistory) msg.chatHistory = [];
             msg.chatHistory.push({
                 from: 'them',
-                text: notif.text || ''
+                text: msgText
             });
-            msg.preview = notif.text || '';
+            msg.preview = msgText;
 
             if (typeof PhoneManager !== 'undefined') {
                 PhoneManager.updateUnreadBadge();
             }
 
             if (typeof showToast === 'function') {
-                showToast(`💬 Новое сообщение от ${notif.fromUserName || 'игрока'}`);
+                showToast(`💬 ${fromName}: ${String(msgText).substring(0, 60)}`);
+            }
+
+            if (window.EventBus) {
+                window.EventBus.emit('chat:new_message_notif', {
+                    dialogId,
+                    fromName,
+                    text: msgText,
+                    notif
+                });
             }
 
             return true;
         },
 
-        _handleLotBought(notif) {
-            const amount = Number(notif.amount) || 0;
-            if (amount <= 0) return false;
+        // ====================================================
+        // СТАРТ И ПОДПИСКА
+        // ====================================================
 
-            try {
-                if (Array.isArray(window.state.p2pMarketListings)) {
-                    window.state.p2pMarketListings = window.state.p2pMarketListings.filter(l =>
-                        l && l.id !== notif.offerId
-                    );
-                }
-            } catch (e) {}
-
-            if (typeof showToast === 'function') {
-                showToast(`🔔 Лот продан: ${notif.title || ''}`);
-            }
-
-            return true;
-        },
-
-        _handleLotSold(notif) {
-            if (typeof showToast === 'function') {
-                showToast(`🎉 Лот куплен: ${notif.title || ''}`);
-            }
-            if (window.AudioFx) {
-                window.AudioFx.play('win');
-                window.AudioFx.haptic('success');
-            }
-            return true;
-        },
-
-        /**
-         * Обработать все накопленные уведомления при старте.
-         */
         async processStartupNotifications() {
             if (!window.state.player) window.state.player = {};
             if (!Array.isArray(window.state.player._processedNotifIds)) {
@@ -679,9 +1073,6 @@
             }
         },
 
-        /**
-         * Подписаться на real-time уведомления.
-         */
         subscribe() {
             if (!window.FB_Bridge?.Notifications?.subscribeToNotifications) return () => {};
             if (!window.tgUserId) return () => {};
@@ -699,9 +1090,6 @@
             }
         },
 
-        /**
-         * Очистить историю обработанных ID (для DEV).
-         */
         resetProcessedIds() {
             if (window.state?.player) {
                 window.state.player._processedNotifIds = [];
@@ -710,10 +1098,9 @@
         }
     };
 
-    // Экспорт
     window.NotificationCenter = NotificationCenter;
 
-    console.log('[🔔 NotificationCenter v2.0.0] SPRINT 1: новые типы p2p_deal_* + интеграция с P2PDKPModal ✓');
-    console.log('[🔔 NotificationCenter] Старые p2p_offer_* обрабатываются как legacy (игнорируются) ✓');
+    console.log('[🔔 NotificationCenter v2.1.1] ФИКС: _handleP2PDealCarDelivered дебетует cash + добавляет авто ✓');
+    console.log('[🔔 NotificationCenter] p2p_offer_* реальные обработчики + _showIncomingOfferModal ✓');
 
 })();

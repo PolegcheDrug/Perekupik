@@ -1,6 +1,24 @@
 // ========================================================
-// js/firebase-p2p.js — P2P DEALS, TRADE, CLUBS, LEADERBOARD, CARS (v1.4.1)
+// js/firebase-p2p.js — P2P DEALS, TRADE, CLUBS, LEADERBOARD, CARS (v1.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v1.5.0 (P2P TRADING REPAIR — ГЛАВНЫЙ ФИКС):
+//   - ФИКС: openDealChat больше НЕ создаёт фейковый локальный чат.
+//     Раньше он писал dialog в phoneMessages с выдуманным сообщением
+//     «от продавца», но НИ ОДНОГО оффера в Firestore не создавал,
+//     НИ продавцу не отправлял уведомление. Теперь openDealChat
+//     открывает настоящую модалку торга (window.openP2PDealModal),
+//     которая создаёт p2p_offers и через notifyOfferReceived
+//     пишет в p2p_notifications_queue (её читает бот-нотифер).
+//   - ФИКС: signDeal теперь корректно платит продавцу через
+//     deal_payout notification (формат как в MarketLots.buyLotAtomic).
+//     Раньше продавец не получал денег вообще, а при вызове signDeal
+//     у него ещё и списывалось `window.state.player.cash -= price`
+//     (баг: проверка cash и списание выполнялись для обеих сторон).
+//   - ФИКС: signDeal больше не добавляет машину в гараж продавца.
+//   - ФИКС: signDeal не требует наличных у продавца.
+//   - Fallback: если openP2PDealModal недоступен — создаём оффер
+//     напрямую через P2POffersManager.createOffer по цене лота.
 //
 // ⭐ v1.4.1 (PERMISSION-SAFE TRANSACTIONS & FULL P2P FIX):
 //   - ФИКС: Устранена ошибка permission-denied в runTransaction. Покупатель
@@ -150,16 +168,37 @@ const P2PDealsManager = {
     }
   },
 
+  /**
+   * ⭐ v1.5.0: ОТКРЫТЬ ТОРГ ПО ЛОТУ (а не фейковый локальный чат!)
+   *
+   * Что делает:
+   *   1. Находит лот (по id или lot_id, с fallback через fetchLots).
+   *   2. Открывает модалку торга (window.openP2PDealModal) — это
+   *      вызывает P2POffersManager.createOffer, который:
+   *        - пишет документ в p2p_offers (реальный оффер);
+   *        - через notifyOfferReceived пишет задачу в
+   *          p2p_notifications_queue → её разгребает bot-p2p-notifier.js;
+   *        - пишет in-game notification в notifications.
+   *   3. Fallback: если модалки нет — создаёт оффер напрямую по цене лота.
+   *
+   * Возвращает { success, mode: 'modal'|'offer', error? }.
+   */
   async openDealChat(lotId) {
     const profile = getCurrentPlayerProfile();
+    if (!profile?.id) return { success: false, error: "Нет профиля" };
+
+    // Ищем лот локально
     const lots = window.state?.p2pMarketListings || [];
     let lot = lots.find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
 
+    // Fallback — облако
     if (!lot && window.FB_Bridge?.MarketLots?.fetchLots) {
       try {
         const cloudLots = await window.FB_Bridge.MarketLots.fetchLots();
         lot = (cloudLots || []).find(l => l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId)));
-      } catch (e) {}
+      } catch (e) {
+        console.warn('[P2PDeals] openDealChat fetchLots:', e);
+      }
     }
 
     if (!lot) {
@@ -167,41 +206,41 @@ const P2PDealsManager = {
     }
 
     if (String(lot.sellerId) === String(profile.id)) {
-      return { success: false, error: "Нельзя начать торг со своим лотом" };
+      return { success: false, error: "Это ваш собственный лот" };
     }
 
-    const dialogId = `dlg_p2p_${lot.id || lot.lot_id}_${lot.sellerId}`;
-    if (!window.state.player) window.state.player = {};
-    if (!window.state.player.phoneMessages) window.state.player.phoneMessages = [];
+    const realLotId = String(lot.id || lot.lot_id || lotId);
 
-    let dialog = window.state.player.phoneMessages.find(m => m.id === dialogId);
-    if (!dialog) {
-      dialog = {
-        id: dialogId,
-        dialogId: dialogId,
-        category: 'p2p',
-        p2pLotId: lot.id || lot.lot_id,
-        p2pRole: 'buyer',
-        sellerId: lot.sellerId,
-        sender: lot.sellerName || 'Продавец',
-        askingPrice: lot.price,
-        carData: lot.itemData || { name: lot.name, img: lot.img, fallback: lot.fallback },
-        unread: false,
-        viewed: true,
-        createdAt: Date.now(),
-        chatHistory: [
-          { from: 'them', text: `Здравствуйте! Объект «${lot.name}» выставлен за ${Number(lot.price).toLocaleString()} ₽. Готов обсудить условия ДКП!` }
-        ]
-      };
-      window.state.player.phoneMessages.unshift(dialog);
-      if (typeof window.saveState === 'function') window.saveState();
+    // ⭐ ГЛАВНОЕ: открываем настоящую модалку торга.
+    // Она сама создаст p2p_offers и вызовет notifyOfferReceived.
+    if (typeof window.openP2PDealModal === 'function') {
+      try {
+        await window.openP2PDealModal(realLotId);
+        return { success: true, mode: 'modal', lotId: realLotId };
+      } catch (e) {
+        console.warn('[P2PDeals] openP2PDealModal error:', e);
+        // Падать не будем — попробуем прямой оффер ниже
+      }
     }
 
-    if (window.AppM && typeof window.AppM.openDialog === 'function') {
-      window.AppM.openDialog(dialogId);
+    // Fallback: нет модалки (или она упала) — создаём оффер по цене лота
+    if (window.P2POffersManager?.createOffer) {
+      try {
+        const res = await window.P2POffersManager.createOffer(
+          realLotId,
+          Number(lot.price) || 100000,
+          "Готов забрать по цене лота"
+        );
+        if (res && res.success) {
+          return { success: true, mode: 'offer', lotId: realLotId, offerId: res.offerId };
+        }
+        return { success: false, error: res?.error || "Не удалось создать оффер" };
+      } catch (e) {
+        return { success: false, error: e?.message || String(e) };
+      }
     }
 
-    return { success: true, dialogId };
+    return { success: false, error: "Торговля недоступна (openP2PDealModal и P2POffersManager не загружены)" };
   },
 
   async findActiveDealByLot(lotId) {
@@ -349,11 +388,41 @@ const P2PDealsManager = {
     return { success: true, deal };
   },
 
+  /**
+   * ⭐ v1.5.0: ПОДПИСАТЬ/ЗАВЕРШИТЬ СДЕЛКУ
+   *
+   * КЛЮЧЕВЫЕ ИЗМЕНЕНИЯ vs v1.4.1:
+   *   - Деньги и машина — ТОЛЬКО покупателю (раньше капало вызывающему).
+   *   - Продавцу создаётся deal_payout notification с суммой к получению
+   *     (формат как в MarketLots.buyLotAtomic — поле amount, claimed: false).
+   *     Существующий claimNotificationPayout в firebase-notifications.js
+   *     начислит деньги при клике в NotificationCenter.
+   *   - Если signDeal вызвал продавец — возвращаем понятную ошибку,
+   *     никаких списаний/начислений у него не происходит.
+   */
   async signDeal(dealId, role) {
     const deal = await this.fetchDeal(dealId);
     if (!deal) return { success: false, error: "Сделка не найдена" };
 
     const profile = getCurrentPlayerProfile();
+    if (!profile?.id) return { success: false, error: "Нет профиля" };
+
+    const isBuyer  = String(deal.buyerId)  === String(profile.id);
+    const isSeller = String(deal.sellerId) === String(profile.id);
+
+    if (!isBuyer && !isSeller) {
+      return { success: false, error: "Вы не участник этой сделки" };
+    }
+
+    // ⭐ v1.5.0: сделку завершает только покупатель.
+    // У продавца «подпись» уже дана принятием оффера.
+    if (!isBuyer) {
+      return {
+        success: false,
+        error: "Сделку завершает покупатель. Ваша подпись уже учтена при принятии оффера."
+      };
+    }
+
     const now = Date.now();
     const price = Number(deal.currentPrice) || 0;
     const playerCash = window.state?.player?.cash || 0;
@@ -400,22 +469,19 @@ const P2PDealsManager = {
           buyerSignedAt: deal.buyerSignedAt || now,
           sellerSignedAt: deal.sellerSignedAt || now,
           completedAt: now,
-          payoutClaimed: false
+          payoutClaimed: false,
+          finalPrice: price
         }, { merge: true });
       });
     } catch (txError) {
       console.warn('[P2PDeals] Transaction signDeal fallback:', txError);
-      deal.status = "completed";
+      return { success: false, error: txError?.message || "Не удалось провести сделку" };
     }
 
+    // ─── Покупатель: списываем cash ───
     window.state.player.cash -= price;
 
-    deal.status = "completed";
-    deal.sellerSigned = true;
-    deal.buyerSigned = true;
-    deal.sellerSignedAt = deal.sellerSignedAt || now;
-    deal.buyerSignedAt = deal.buyerSignedAt || now;
-
+    // ─── Покупатель: получаем предмет ───
     const snap = deal.itemSnapshot || {};
     const isPlate = !!(snap.plate || snap.number) && !snap.power && !snap.drivetrain;
 
@@ -430,7 +496,6 @@ const P2PDealsManager = {
         window.state.player.ownedHouses.push(snap.houseId);
       }
     } else {
-      const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
       if (!window.state.garage) window.state.garage = [];
       const boughtCar = Object.assign({}, snap);
       boughtCar.uid = 'car_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
@@ -438,9 +503,53 @@ const P2PDealsManager = {
       boughtCar.isPersonal = false;
       boughtCar.impounded = false;
       window.state.garage.push(boughtCar);
-
       if (typeof window.renderGarage === 'function') window.renderGarage();
     }
+
+    // ─── ⭐ v1.5.0: ПРОДАВЦУ — deal_payout notification ───
+    // Формат точно такой же, как в MarketLots.buyLotAtomic, чтобы
+    // существующий claimNotificationPayout из firebase-notifications.js
+    // корректно начислил деньги через NotificationCenter.
+    try {
+      const feePercent = (typeof FB_Market?.MARKET_FEE_PERCENT === 'number')
+        ? FB_Market.MARKET_FEE_PERCENT
+        : 0.03;
+      const fee = Math.round(price * feePercent);
+      const sellerPayout = price - fee;
+
+      const notifId = "notif_payout_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+      const notifRef = doc(db, "notifications", notifId);
+
+      await setDoc(notifRef, {
+        toUser: String(deal.sellerId),
+        type: "deal_payout",
+        title: "💰 Продажа на P2P бирже!",
+        text: `Покупатель ${profile.name || 'Перекуп'} приобрёл «${snap.name || 'Автомобиль'}» за ${price.toLocaleString()} ₽. Начислено: +${sellerPayout.toLocaleString()} ₽ (комиссия ${fee.toLocaleString()} ₽).`,
+        amount: sellerPayout,
+        dealId: String(dealId),
+        lotId: String(deal.lotId || ''),
+        buyerId: String(deal.buyerId),
+        buyerName: profile.name || "Покупатель",
+        read: false,
+        claimed: false,
+        timestamp: now,
+        expireAt: now + TTL_CONFIG.notifications
+      });
+
+      devLogFirestore('P2PDeals.signDeal → deal_payout', `${deal.sellerId} +${sellerPayout}`);
+    } catch (notifErr) {
+      console.warn('[P2PDeals] Не удалось создать deal_payout notification:', notifErr);
+      devLogFirestore('P2PDeals.signDeal payout FAILED', notifErr?.message || String(notifErr));
+      // Сделку не откатываем — деньги уже списаны, лот уже помечен sold.
+      // При следующем входе продавца в игру можно будет починить вручную.
+    }
+
+    // ─── Обновляем локальный кэш ───
+    deal.status = "completed";
+    deal.sellerSigned = true;
+    deal.buyerSigned = true;
+    deal.sellerSignedAt = deal.sellerSignedAt || now;
+    deal.buyerSignedAt = deal.buyerSignedAt || now;
 
     if (deal.lotId) {
       window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
@@ -450,6 +559,7 @@ const P2PDealsManager = {
 
     this._localDeals.set(String(deal.lotId || deal.id), deal);
 
+    // ─── Telegram push продавцу (in addition to in-game notification) ───
     if (deal.sellerId && FB_Notifications?.P2P?.notifyOfferAccepted) {
       FB_Notifications.P2P.notifyOfferAccepted(deal.sellerId, {
         carName: snap.name || "Объект",
@@ -532,7 +642,7 @@ const P2PDealsManager = {
 };
 
 // ========================================================
-// 4. P2P TRADE MANAGER (ОБМЕН АВТОМОБИЛЕЙ)
+// 4. P2P TRADE MANAGER (ОБМЕН АВТОМОБИЛЕЙ) — БЕЗ ИЗМЕНЕНИЙ
 // ========================================================
 const P2PTradeManager = {
   _listeners: [],
@@ -836,7 +946,7 @@ const P2PTradeManager = {
 };
 
 // ========================================================
-// 5. CLUBS MANAGER
+// 5. CLUBS MANAGER — БЕЗ ИЗМЕНЕНИЙ
 // ========================================================
 const ClubsManager = {
   _listeners: [],
@@ -940,7 +1050,7 @@ const ClubsManager = {
 };
 
 // ========================================================
-// 6. LEADERBOARD MANAGER
+// 6. LEADERBOARD MANAGER — БЕЗ ИЗМЕНЕНИЙ
 // ========================================================
 let lastLeaderboardUpdate = 0;
 
@@ -1001,7 +1111,7 @@ const LeaderboardManager = {
 };
 
 // ========================================================
-// 7. CARS CATALOG MANAGER
+// 7. CARS CATALOG MANAGER — БЕЗ ИЗМЕНЕНИЙ
 // ========================================================
 const CarsCatalogManager = {
   async seedDefaultCarsCatalog(force = false) {
@@ -1131,7 +1241,7 @@ const CarsCatalogManager = {
 };
 
 // ========================================================
-// 8. QUICK CHAT
+// 8. QUICK CHAT — БЕЗ ИЗМЕНЕНИЙ
 // ========================================================
 const QuickChat = {
   getPhrasesList: (cat) => {
@@ -1227,4 +1337,4 @@ window.FB_P2P = {
 
 window.FB_Bridge = FB_Bridge;
 
-console.log('[🤝 FB_P2P v1.4.1] Устранена блокировка транзакций Firestore и налажен обмен авто ✓');
+console.log('[🤝 FB_P2P v1.5.0] openDealChat → реальный оффер + signDeal → deal_payout продавцу ✓');

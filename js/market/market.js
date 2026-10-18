@@ -1,21 +1,32 @@
 // ========================================================
-// js/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.7.0)
+// js/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v1.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v1.8.0 (CARD CLICK → OPEN DEAL):
+//   - ДОБАВЛЕН onclick на карточку лота (кроме кнопок).
+//     Клик по картинке/названию/цене/характеристикам открывает
+//     процесс покупки: для P2P — offer modal (p2p-offers.js),
+//     для NPC — звонок + торг у капота.
+//   - Кнопка «Позвонить» для P2P-лотов переименована в «Торг»
+//     с иконкой 💬 — честнее отражает поведение.
+//   - cursor: pointer на кликабельной карточке.
+//   - Внутри карточки клик по любой кнопке НЕ дублирует card-click
+//     (проверка event.target.closest('button')).
+//
 // ⭐ v1.7.0 (АВТО-СВОРАЧИВАНИЕ КАТЕГОРИЙ И ГЛОБАЛЬНЫЕ ИВЕНТЫ):
 //   - Сетка категорий автоматически сворачивается при выборе.
-//   - Сетка автоматически разворачивается при переходе на вкладку "Рынок".
-//   - Улучшена анимация переключения иконки (шеврона).
-//   - Добавлен баннер сезонных событий (глобальные множители цен).
+//   - Сетка разворачивается при переходе на вкладку "Рынок".
+//   - Добавлен баннер сезонных событий.
 // ========================================================
 
 let marketSortOrder = 'asc';
 let activePendingDKPDeal = null;
 
-// ⭐ Токены защиты от гонок
+// Токены защиты от гонок
 if (typeof window.__marketRefreshToken !== 'number') window.__marketRefreshToken = 0;
 if (typeof window.__marketRenderToken !== 'number') window.__marketRenderToken = 0;
 
-// ⭐ Защита от двойного клика по категориям
+// Защита от двойного клика по категориям
 if (typeof window._setCategoryPending !== 'boolean') window._setCategoryPending = false;
 
 function toggleMarketCategories() {
@@ -70,12 +81,11 @@ function sortCurrentMarketFeed() {
 }
 
 // ========================================================
-// ⭐ v1.7.0: setCategory с авто-сворачиванием и полной защитой
+// setCategory с авто-сворачиванием и полной защитой
 // ========================================================
 async function setCategory(cat) {
     console.log('[Market] setCategory → ' + cat + ' (START)');
 
-    // Защита от двойного клика
     if (window._setCategoryPending) {
         console.warn('[Market] setCategory проигнорирован — предыдущий вызов в процессе');
         return;
@@ -89,7 +99,6 @@ async function setCategory(cat) {
             return;
         }
 
-        // Проверка уровня
         let lvl = state.player?.level ? state.player.level : 1;
         const levelGates = {
             moto: 5, atv: 8, comfort: 15, premium: 30, hyper: 50, truck: 50, yacht: 100
@@ -100,15 +109,12 @@ async function setCategory(cat) {
             return;
         }
 
-        // Обновляем активную категорию
         state.activeCategory = cat;
 
-        // Обновляем визуально активную кнопку
         document.querySelectorAll('.cat-tile').forEach(c => c.classList.remove('active'));
         const btn = document.getElementById("catBtn-" + cat);
         if (btn) btn.classList.add('active');
 
-        // ⭐ АВТО-СВОРАЧИВАНИЕ СЕТКИ КАТЕГОРИЙ
         const grid = document.getElementById('marketCatListContainer');
         const btnIcon = document.querySelector('#btnToggleMarketGrid i');
         if (grid && !grid.classList.contains('collapsed')) {
@@ -116,7 +122,6 @@ async function setCategory(cat) {
             if (btnIcon) btnIcon.className = "fa-solid fa-chevron-down";
         }
 
-        // Обновляем инфо-баннер
         const meta = (typeof CATEGORY_META !== 'undefined' && CATEGORY_META[cat]) ? CATEGORY_META[cat] : { name: 'Рынок', title: 'Общий рынок', capital: '—', desc: '' };
         if (typeof setTxt === 'function') {
             setTxt("currentCatBadge", meta.name);
@@ -128,7 +133,6 @@ async function setCategory(cat) {
         if (typeof playSound === 'function') playSound('tick');
         if (typeof tgHaptic === 'function') tgHaptic('light');
 
-        // Показываем индикатор загрузки в контейнере
         const container = document.getElementById('marketCardContainer');
         if (container) {
             container.innerHTML = `
@@ -139,10 +143,8 @@ async function setCategory(cat) {
             `;
         }
 
-        // Токен для защиты от гонок
         const myToken = ++window.__marketRefreshToken;
 
-        // Таймаут: если populateMarketFeed не завершится за 5 сек — сообщаем
         const timeoutPromise = new Promise((resolve) => {
             setTimeout(() => resolve('TIMEOUT'), 5000);
         });
@@ -178,7 +180,6 @@ async function setCategory(cat) {
             return;
         }
 
-        // Финальный рендер
         try {
             renderMarketFeed();
         } catch (e) {
@@ -288,7 +289,7 @@ function promptHiddenPlateAutotekaHint(event) {
 }
 
 // ========================================================
-// РЕНДЕР ЛЕНТЫ
+// ⭐ v1.8.0: РЕНДЕР ЛЕНТЫ С КЛИКАБЕЛЬНОЙ КАРТОЧКОЙ
 // ========================================================
 function renderMarketFeed() {
     const container = document.getElementById('marketCardContainer');
@@ -318,7 +319,6 @@ function renderMarketFeed() {
             return;
         }
 
-        // ⭐ v1.7.0: Баннер сезонных глобальных ивентов (если есть)
         let seasonBannerHtml = "";
         if (state.globalEvent && state.globalEvent.isActive) {
             seasonBannerHtml = `
@@ -436,8 +436,15 @@ function renderMarketFeed() {
                     ? `<span class="color-red font-bold ml-1" style="font-size:8px;">[скручен]</span>`
                     : "";
 
+                // ⭐ v1.8.0: P2P-лоты → кнопка «Торг», NPC → «Позвонить»
+                const actionBtnLabel = car.isP2PUserListing ? 'Торг' : 'Позвонить';
+                const actionBtnIcon = car.isP2PUserListing ? 'fa-solid fa-comments-dollar' : 'fa-solid fa-phone';
+
                 htmlContent += `
-                <div class='glass-card mb-3 ${busyClass} ${viewedClass} ${cardAuraClass}' id='card_${car.id}'>
+                <div class='glass-card mb-3 ${busyClass} ${viewedClass} ${cardAuraClass}' 
+                     id='card_${car.id}'
+                     style="cursor: pointer;"
+                     onclick="if(!event.target.closest('button') && !event.target.closest('.plate-hidden-capsule')) initiateBuyMarketCar('${car.id}')">
                     ${viewedBadge}
 
                     <div class='cooldown-timer notranslate' translate='no' style='${isBusy ? "display:flex !important;" : "display:none !important;"}'>
@@ -511,7 +518,7 @@ function renderMarketFeed() {
                                 <i class='fa-solid fa-file-waveform color-green' style="font-size:10px;"></i> Автотека (${autoIcon})
                             </button>
                             <button onclick="initiateBuyMarketCar('${car.id}')" class="btn btn-cyan btn-sm" style="height: 30px; font-size: 9.5px; padding: 0 6px; font-weight: 700;">
-                                <i class="fa-solid fa-phone" style="font-size:10px;"></i> Позвонить
+                                <i class="${actionBtnIcon}" style="font-size:10px;"></i> ${actionBtnLabel}
                             </button>
                         </div>
                     </div>
@@ -578,7 +585,7 @@ function updateMarketTimers() {
 }
 
 // ========================================================
-// ⭐ v1.7.0: АВТО-РАЗВОРАЧИВАНИЕ ПРИ ОТКРЫТИИ ВКЛАДКИ "РЫНОК"
+// АВТО-РАЗВОРАЧИВАНИЕ ПРИ ОТКРЫТИИ ВКЛАДКИ «РЫНОК»
 // ========================================================
 if (window.EventBus) {
     window.EventBus.on('ui:tab_changed', (data) => {
@@ -610,4 +617,4 @@ Object.assign(window, {
     updateMarketTimers
 });
 
-console.log('[🏪 market v1.7.0] Авто-сворачивание/разворачивание сетки категорий + Сезонные ивенты ✓');
+console.log('[🏪 market v1.8.0] Кликабельная карточка → открывает покупку/торг. P2P: «Торг» 💬, NPC: «Позвонить» 📞 ✓');
