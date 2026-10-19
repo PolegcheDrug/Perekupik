@@ -1,12 +1,12 @@
 // ========================================================
-// js/garage/garage-calc.js — РАСЧЁТЫ, КОНФИГУРАЦИИ И БЕЙДЖИ ГАРАЖА (v1.3.0 BALANCED)
+// js/garage/garage-calc.js — РАСЧЁТЫ, КОНФИГУРАЦИИ И БЕЙДЖИ ГАРАЖА (v1.4.0 BALANCED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.3.0 (РЕБАЛАНС МАРЖИНАЛЬНОСТИ И ОЦЕНКИ РЫНКА):
-//   - Исправлен обвал цены авто до 15k ₽ при наличии шпатлёвки и дефектов
-//   - Гарантированный пол рыночной оценки авто (не ниже 72% от базы)
-//   - Процентный учёт дефектов с мягким капом (до 18% макс. снижения)
-//   - Высокая маржинальность: выкуп битого авто у капота приносит честный профит
-//   - Сохранены все капабилити жилья, тюнинг и бейджи конфигурации
+// ⭐ v1.4.0 (ПРОПОРЦИОНАЛЬНЫЙ РАСЧЁТ & БАЛАНС КЛАССОВ):
+//   - Бонусы детейлинга (полировка, облив, химчистка) теперь пропорциональны базовой цене авто,
+//     что исключает сверхприбыль на дешёвых моделях и неокупаемость на премиуме.
+//   - Полная синхронизация со стоимостью услуг из garage-services.js v1.4.0.
+//   - Гарантированный пол рыночной оценки (не ниже 72% от базы) с мягким капом дефектов.
+//   - Сохранены все капабилити жилья, бейджи тюнинга и экспорт в window.
 // ========================================================
 
 const INSURANCE_CONFIG = {
@@ -143,7 +143,7 @@ function getCarConditionGrade(car) {
 }
 
 // ========================================================
-// ⭐ v1.3.0: СБАЛАНСИРОВАННЫЙ РАСЧЁТ РЫНОЧНОЙ СТОИМОСТИ
+// ⭐ v1.4.0: СБАЛАНСИРОВАННЫЙ РАСЧЁТ РЫНОЧНОЙ СТОИМОСТИ
 // ========================================================
 function recalculateCarMarketValue(car) {
     if (!car) return 0;
@@ -181,7 +181,6 @@ function recalculateCarMarketValue(car) {
 
     mechDefects.forEach(d => {
         if (revealedDefects.includes(d.id)) {
-            // Штраф считается от процента дефекта, а не от рублей ремонта!
             const pPct = Number(d.pricePenaltyPct) || 3;
             defectPenaltyPct += Math.min(6, pPct * 0.5);
         }
@@ -213,11 +212,27 @@ function recalculateCarMarketValue(car) {
     // Защита пола рыночной стоимости перед добавлением бонусов
     currentVal = Math.max(guaranteedFloor, currentVal);
 
-    // ==================== ПРЕДПРОДАЖНАЯ ПОДГОТОВКА И БОНУСЫ ====================
-    if (car.isPolished) currentVal = Math.round(currentVal * 1.12);
-    if (car.isRepainted) currentVal += 35000;
-    if (car.cleanInterior) currentVal += 20000;
-    if (car.hasAdditive) currentVal += 8000;
+    // ==================== ПРОПОРЦИОНАЛЬНЫЙ ДЕТЕЙЛИНГ ====================
+    // Полировка: +7% к рынку (окупает затраты в 3.5%, исключая эксплойт +12%)
+    if (car.isPolished) {
+        currentVal = Math.round(currentVal * 1.07);
+    }
+
+    // Облив кузова: пропорционально базовой стоимости (+12% к оценке за идеальное ЛКП вместо фикса 35k)
+    if (car.isRepainted) {
+        const paintBonus = Math.max(12000, Math.round(base * 0.12));
+        currentVal += paintBonus;
+    }
+
+    // Химчистка: пропорционально классу (+6% к оценке вместо фикса 20k)
+    if (car.cleanInterior) {
+        const interiorBonus = Math.max(6000, Math.round(base * 0.06));
+        currentVal += interiorBonus;
+    }
+
+    if (car.hasAdditive) {
+        currentVal += Math.max(4000, Math.round(base * 0.02));
+    }
 
     if (car.isMuseumStock) currentVal = Math.round(currentVal * 1.25);
     if (car.isTunedSpec && car.tuning && car.tuning.chip >= 2) currentVal = Math.round(currentVal * 1.10);
@@ -308,4 +323,4 @@ Object.assign(window, {
     renderCarModsBadges
 });
 
-console.log('[🏠 garage-calc v1.3.0] Сбалансированная экономика: защита маржи перекупа ✓');
+console.log('[🏠 garage-calc v1.4.0] Пропорциональный баланс стоимости детейлинга и маржи ✓');
