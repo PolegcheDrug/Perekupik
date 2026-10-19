@@ -14,68 +14,68 @@ const APP_ACCESS_CONFIG = {
     barn: {
         id: 'tabBarn',
         name: 'Сараи (Barn Find)',
-        minLevel: 3,
-        costStars: 50,         // 50 × 2,500 = 125,000 ₽
-        costCash: 0,
+        minLevel: 8,
+        costStars: 0,
+        costCash: 800000,
         costTickets: 0,
         desc: 'Экспедиции по заброшенным гаражам и деревням в поисках раритетов.',
-        lockMessage: 'Доступно с 3 уровня за 50 звёзд ⭐'
+        lockMessage: 'Доступно с 8 уровня (взнос 800,000 ₽ за карту сараев)'
     },
     // Морские контейнеры (Порт)
     containers: {
         id: 'tabContainers',
         name: 'Контейнеры (Морской Порт)',
-        minLevel: 5,
-        costStars: 100,        // 100 × 2,500 = 250,000 ₽
-        costCash: 0,
+        minLevel: 12,
+        costStars: 10,
+        costCash: 2500000,
         costTickets: 5,
         desc: 'Аукцион невостребованных контейнеров из Японии, Европы и США.',
-        lockMessage: 'Требуется 5 уровень, 100 звёзд ⭐ и 5 билетов 🎫'
+        lockMessage: 'Требуется 12 уровень, лицензия брокера (2,500,000 ₽ + 10 ⭐) и 5 билетов 🎫'
     },
     // Автоподбор «Под ключ»
     autopodbor_order: {
         id: 'servicePodkluch',
         name: 'Автоподбор «Под ключ»',
-        minLevel: 6,
-        costStars: 0,
-        costCash: 500000,
+        minLevel: 5,
+        costStars: 5,
+        costCash: 350000,
         costTickets: 0,
         reqTool: 'obd_launch',
         desc: 'Лицензия на выполнение официальных клиентских подборов авто с высокой маржой.',
-        lockMessage: 'Требуется 6 уровень, сканер Launch Pro Pad и взнос 500,000 ₽'
+        lockMessage: 'Требуется 5 уровень, сканер Launch Pro Pad и взнос 350,000 ₽ + 5 ⭐'
     },
     // Уличные нелегальные гонки
     street: {
         id: 'tabStreet',
         name: 'Стритрейсинг (402м)',
-        minLevel: 4,
-        costStars: 15,         // 15 × 2,500 = 37,500 ₽
-        costCash: 50000,
+        minLevel: 6,
+        costStars: 15,
+        costCash: 250000,
         costTickets: 0,
         desc: 'Ночные заезды на деньги и уважение автоклубов.',
-        lockMessage: 'Доступно с 4 уровня (взнос 50,000 ₽ и 15 ⭐)'
+        lockMessage: 'Доступно с 6 уровня (взнос 250,000 ₽ и 15 ⭐)'
     },
     // Даркнет и серые схемы
     darknet: {
         id: 'tabDarknet',
         name: 'Даркнет (Теневой рынок)',
-        minLevel: 7,
-        costStars: 40,         // 40 × 2,500 = 100,000 ₽
-        costCash: 200000,
+        minLevel: 16,
+        costStars: 25,
+        costCash: 6000000,
         costTickets: 0,
         desc: 'Скупка проблемных документов, двойников и перебитых номеров.',
-        lockMessage: 'Доступно с 7 уровня для опытных перекупов (200,000 ₽ и 40 ⭐)'
+        lockMessage: 'Доступно с 16 уровня для опытных перекупов (6,000,000 ₽ и 25 ⭐)'
     },
     // Автосалон и Торговая Площадка (Синдикат)
     syndicate: {
         id: 'tabSyndicate',
         name: 'Синдикат Перекупов',
-        minLevel: 10,
-        costStars: 75,         // 75 × 2,500 = 187,500 ₽
-        costCash: 1000000,
+        minLevel: 20,
+        costStars: 50,
+        costCash: 20000000,
         costTickets: 0,
         desc: 'Элитный закрытый клуб для оптовой перепродажи автопарков.',
-        lockMessage: 'Доступно с 10 уровня. Вступительный взнос: 1,000,000 ₽ и 75 ⭐'
+        lockMessage: 'Доступно с 20 уровня. Вступительный взнос: 20,000,000 ₽ и 50 ⭐'
     }
 };
 
@@ -98,15 +98,15 @@ const WHEEL_CONFIG = {
         ]
     },
     superWheel: {
-        costCash: 150000,
-        costStars: 60,
+        costCash: 1500000,
+        costStars: 50,
         costTickets: 5,
         canFreeDaily: false,
         dropTable: [
-            { type: 'cash', value: 250000, label: '250,000 ₽', weight: 28 },
-            { type: 'cash', value: 600000, label: '600,000 ₽', weight: 20 },
-            { type: 'cash', value: 1500000, label: '1,500,000 ₽', weight: 10 },
-            { type: 'stars', value: 60, label: '60 ⭐ (150,000 ₽)', weight: 15 },
+            { type: 'cash', value: 500000, label: '500,000 ₽', weight: 28 },
+            { type: 'cash', value: 1200000, label: '1,200,000 ₽', weight: 20 },
+            { type: 'cash', value: 3000000, label: '3,000,000 ₽', weight: 10 },
+            { type: 'stars', value: 50, label: '50 ⭐ (125,000 ₽)', weight: 15 },
             { type: 'tickets', value: 10, label: '10 🎫 Билетов', weight: 12 },
             { type: 'tool', id: 'obd_launch', label: 'Планшет Launch Pro', weight: 8 },
             { type: 'car', tier: 'rare', label: 'BMW E34 525i (Идеал)', weight: 5 },
@@ -147,8 +147,8 @@ const BANK_EXCHANGE_RATES = {
     superSpinTicket: {
         name: 'Билет «Супер Вилспин»',
         emoji: '🎟️',
-        buyRub: 150000,
-        sellRub: 144000
+        buyRub: 1500000,
+        sellRub: 1400000
     },
     tickets: {
         name: 'Экспресс-талон',
