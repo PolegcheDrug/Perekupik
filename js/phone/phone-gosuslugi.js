@@ -1,9 +1,11 @@
 // ========================================================
-// js/phone/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v2.2.0)
+// js/phone/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v2.2.1)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v2.2.0 (ФИКС «НЕИЗВЕСТНЫЙ ТИП ОРГАНИЗАЦИИ»):
+// ⭐ v2.2.1 (ФИКС ОПЛАТЫ НАЛОГОВ И НАЧИСЛЕНИЙ):
+//   - Добавлен отсутствовавший метод payTaxes().
+//   - Исправлено бесконечное задвоение налога при каждом открытии вкладки.
+//   - Добавлено корректное логирование в банк и сброс налогового долга.
 //   - Встроен автономный fallback для LEGAL_ENTITIES (ИП и ООО).
-//   - Гарантированная регистрация бизнеса без сбоев конфигуратора.
 //   - Полная синхронизация со стейтом игрока и бизнес-сетью.
 // ========================================================
 
@@ -147,6 +149,10 @@ const AppGosuslugi = {
         state.player.cash -= toPay;
         state.player.trafficFines = 0;
 
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction("Оплата штрафов ГИБДД", toPay, false);
+        }
+
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
@@ -159,41 +165,90 @@ const AppGosuslugi = {
     // 2. НАЛОГИ
     // ========================================================
     renderTaxesTab() {
-        let totalPowerTax = 0;
-        if (state.garage) {
+        let calculatedPowerTax = 0;
+        if (state.garage && Array.isArray(state.garage)) {
             state.garage.forEach(c => {
-                let p = c.power || 100;
+                let p = Number(c.power) || 100;
                 if (p > 250) {
-                    totalPowerTax += (p - 250) * 150;
+                    calculatedPowerTax += (p - 250) * 150;
                 }
             });
         }
-        state.player.taxDebt = (state.player.taxDebt || 0) + totalPowerTax;
-        let tax = state.player.taxDebt;
+        
+        let existingDebt = Number(state.player.taxDebt) || 0;
+        let totalTax = existingDebt + calculatedPowerTax;
 
         return `
             <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(255, 179, 0, 0.15), #090e18);">
                 <div class="font-bold text-xs color-amber mb-1">ТРАНСПОРТНЫЙ НАЛОГ НА МОЩНЫЕ АВТО</div>
-                <div class="price-val color-amber my-1" style="font-size:26px;">${tax.toLocaleString()} ₽</div>
+                <div class="price-val color-amber my-1" style="font-size:26px;">${totalTax.toLocaleString()} ₽</div>
                 <div class="sub-label" style="font-size:10px;">Налог на роскошь и спортивные моторы (>250 л.с.).</div>
             </div>
 
             <div class="glass-card p-2">
                 <b class="text-xs color-cyan mb-2 block">🏛️ Налоговая задолженность:</b>
-                ${tax > 0 ? `
+                ${totalTax > 0 ? `
                     <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,179,0,0.3);">
                         <div class="flex-between mb-1">
                             <b class="text-xs color-amber">Федеральная налоговая служба</b>
                             <span class="tag-badge bg-tag-amber">К уплате</span>
                         </div>
-                        <div class="sub-label mb-2" style="font-size:9.5px;">Начислено за мощные автомобили в автопарке: <b>${tax.toLocaleString()} ₽</b></div>
-                        <button onclick="AppGosuslugi.payTaxes()" class="btn btn-green btn-sm w-full">Оплатить налог (${tax.toLocaleString()} ₽)</button>
+                        <div class="sub-label mb-2" style="font-size:9.5px;">Начислено за мощные автомобили в автопарке: <b>${totalTax.toLocaleString()} ₽</b></div>
+                        <button onclick="AppGosuslugi.payTaxes()" class="btn btn-green btn-sm w-full">Оплатить налог (${totalTax.toLocaleString()} ₽)</button>
                     </div>
                 ` : `
                     <div class="sub-label text-center py-4">Все налоговые сборы полностью уплачены.</div>
                 `}
             </div>
         `;
+    },
+
+    payTaxes() {
+        let calculatedPowerTax = 0;
+        if (state.garage && Array.isArray(state.garage)) {
+            state.garage.forEach(c => {
+                let p = Number(c.power) || 100;
+                if (p > 250) {
+                    calculatedPowerTax += (p - 250) * 150;
+                }
+            });
+        }
+        let totalTax = (Number(state.player?.taxDebt) || 0) + calculatedPowerTax;
+
+        if (totalTax <= 0) {
+            return showToast("У вас нет налоговой задолженности!");
+        }
+
+        let cash = Number(state.player?.cash) || 0;
+        if (cash < totalTax) {
+            if (typeof playSound === 'function') playSound('error');
+            return showToast(`Не хватает денег для оплаты налога: требуется ${totalTax.toLocaleString()} ₽!`);
+        }
+
+        state.player.cash -= totalTax;
+        state.player.taxDebt = 0;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction("Уплата транспортного налога в ФНС", totalTax, false);
+        }
+
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+
+        if (typeof openVerdictModal === 'function') {
+            openVerdictModal(
+                "НАЛОГ УСПЕШНО ОПЛАЧЕН! 🏛️",
+                `Задолженность перед Федеральной налоговой службой в размере <b>${totalTax.toLocaleString()} ₽</b> полностью погашена!\nАресты с регистрационных действий сняты.`,
+                true,
+                totalTax
+            );
+        } else {
+            showToast("✓ Налоги успешно уплачены!");
+        }
+
+        this.render(document.getElementById('phoneAppContainer'));
     },
 
     // ========================================================
@@ -640,4 +695,4 @@ const AppGosuslugi = {
 
 window.AppGosuslugi = AppGosuslugi;
 
-console.log('[🏛 phone-gosuslugi v2.2.0] Загружен: Автономный fallback юрлиц ИП/ООО ✓');
+console.log('[🏛 phone-gosuslugi v2.2.1] Загружен: Оплата налогов и штрафов исправлена ✓');
