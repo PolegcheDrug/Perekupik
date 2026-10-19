@@ -1,26 +1,20 @@
 // ========================================================
-// js/access-control.js — СИСТЕМА ДОСТУПА ПО ПРИГЛАШЕНИЯМ (v1.2.0)
+// js/access-control.js — СИСТЕМА ДОСТУПА ПО ПРИГЛАШЕНИЯМ И ПРОГРЕССИИ (v2.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v2.0.0:
+//   1. Встроен игровой контроль разделов (FeatureAccess):
+//      Сараи, Контейнеры, Под ключ, Стритрейсинг, Даркнет, Синдикат.
+//   2. Ограничения по уровню (minLevel) и платная покупка лицензий/пропусков.
+//   3. Модальное окно подтверждения открытия контента с ценой в ₽ и ⭐.
+//   4. Сохранены все инвайт-коды, whitelist, Firestore fail-open и Owner-панель.
 //
 // ⭐ v1.2.0 (SPRINT 4 — КРИТИЧЕСКИЙ ФИКС «НЕТ СЕТИ»):
 //   1. _ensureInit() теперь ЖДЁТ появления window.FB_Core.db (до 8с).
-//      Это главная причина «Нет сети» на первом запуске: ES-модули
-//      Firebase не успевали загрузиться к моменту первого checkAccess.
 //   2. _syncGlobalFlagFromCloud() — fail-open: если Firestore недоступен
-//      И нет локального кэша, игрока ПУСКАЕМ (было — блокировали).
+//      И нет локального кэша, игрока ПУСКАЕМ.
 //   3. checkAccess() — подробное диагностическое логирование каждого шага.
 //   4. Все Firestore-запросы обёрнуты в таймауты (не зависаем).
-//   5. Owner-панель и все функции — без изменений.
-//
-// ⭐ v1.1.0 (SPRINT 3 — ГЛОБАЛЬНЫЙ ФЛАГ ДОСТУПА):
-//   - Глобальный флаг access_settings/global.accessDisabled
-//   - Кэш флага 60 секунд
-//   - disableAccessControl / enableAccessControl (async)
-//
-// ⭐ v1.0.0:
-//   - Владелец игры автоматически получает доступ
-//   - Инвайт-коды, whitelist, баны, Owner-панель
-//   - Firestore-хранилище, кэш 5 мин
 // ========================================================
 
 (function() {
@@ -128,12 +122,10 @@
     /**
      * ⭐ v1.2.0: главный фикс «Нет сети».
      * Ждём появления window.FB_Core.db до FB_WAIT_TIMEOUT_MS.
-     * Раньше возвращали false сразу → checkAccess ложно решал «offline».
      */
     async function _ensureInit() {
         if (_db) return true;
 
-        // Защита от параллельных вызовов — все ждут одного процесса
         if (_fbInitInProgress) {
             const start = Date.now();
             while (_fbInitInProgress && Date.now() - start < FB_WAIT_TIMEOUT_MS + 500) {
@@ -147,7 +139,6 @@
         let attempts = 0;
 
         try {
-            // Поллим window.FB_Core.db
             while (!window.FB_Core?.db) {
                 attempts++;
                 const elapsed = Date.now() - startTs;
@@ -239,7 +230,7 @@
     }
 
     // ========================================================
-    // ⭐ v1.2.0: ГЛОБАЛЬНЫЙ ФЛАГ ДОСТУПА (с fail-open)
+    // ГЛОБАЛЬНЫЙ ФЛАГ ДОСТУПА В ИГРУ (с fail-open)
     // ========================================================
 
     function _readGlobalFlagLocal() {
@@ -291,29 +282,15 @@
         }
     }
 
-    /**
-     * ⭐ v1.2.0: логика с fail-open.
-     * Возвращает true  → "система доступа отключена" (пускать всех).
-     * Возвращает false → "система доступа включена" (проверять whitelist).
-     * Возвращает null  → "не удалось определить" (используется локальный кэш).
-     *
-     * ПРАВИЛА:
-     * 1. Firestore доступен → используем его значение (и кэшируем локально).
-     * 2. Firestore недоступен, но есть локальный кэш → используем кэш.
-     * 3. Firestore недоступен И кэша нет → fail-open = true (пускаем игрока).
-     *    Это защищает от блокировки всех игроков при падении Firestore.
-     */
     async function _syncGlobalFlagFromCloud(force = false) {
         const now = Date.now();
 
-        // Кэш в памяти свежий?
         if (!force &&
             _globalFlagCache.value !== null &&
             (now - _globalFlagCache.ts) < GLOBAL_ACCESS_FLAG_TTL_MS) {
             return _globalFlagCache.value;
         }
 
-        // Уже идёт загрузка?
         if (_globalFlagCache.loading) {
             const start = Date.now();
             while (_globalFlagCache.loading && Date.now() - start < FIRESTORE_REQUEST_TIMEOUT_MS) {
@@ -322,7 +299,6 @@
             return _globalFlagCache.value;
         }
 
-        // Локальный кэш свежий?
         const localCached = _readGlobalFlagLocal();
         if (!force && localCached.value !== null && (now - localCached.ts) < GLOBAL_ACCESS_FLAG_TTL_MS) {
             _globalFlagCache = { value: localCached.value, ts: localCached.ts, loading: false };
@@ -333,7 +309,6 @@
         try {
             const cloudValue = await _readGlobalFlagCloud();
 
-            // ─── Успех ───
             if (cloudValue !== null) {
                 _globalFlagCache = { value: cloudValue, ts: now, loading: false };
                 _writeGlobalFlagLocal(cloudValue);
@@ -341,15 +316,12 @@
                 return cloudValue;
             }
 
-            // ─── Firestore недоступен ───
             if (localCached.value !== null) {
                 _log('Firestore недоступен → используем локальный кэш:', localCached.value);
                 _globalFlagCache = { value: localCached.value, ts: now, loading: false };
                 return localCached.value;
             }
 
-            // ⭐ v1.2.0: FAIL-OPEN — нет данных, сеть недоступна, кэша нет.
-            // Пускаем игрока, чтобы не блокировать игру из-за сетевой ошибки.
             _logWarn('⚠️ FAIL-OPEN: Firestore недоступен и кэша нет → пускаем игрока');
             _globalFlagCache = { value: true, ts: now, loading: false };
             return true;
@@ -358,7 +330,6 @@
             _logWarn('syncGlobalFlag исключение:', e.message);
             _globalFlagCache.loading = false;
             if (localCached.value !== null) return localCached.value;
-            // FAIL-OPEN и тут
             _logWarn('⚠️ FAIL-OPEN (catch): пускаем игрока');
             return true;
         }
@@ -405,7 +376,7 @@
     }
 
     // ========================================================
-    // 4. ГЛАВНЫЙ МЕТОД: ПРОВЕРКА ДОСТУПА
+    // 4. ГЛАВНЫЙ МЕТОД: ПРОВЕРКА ДОСТУПА В ИГРУ
     // ========================================================
     async function checkAccess(uid) {
         if (!uid) {
@@ -416,19 +387,16 @@
         const cleanUid = String(uid);
         _log(`checkAccess(${cleanUid}) → START`);
 
-        // ─── 1. Владелец ───
         if (_isOwner(cleanUid)) {
             _log('👑 Owner — доступ разрешён');
             return { success: true, reason: 'owner', isOwner: true };
         }
 
-        // ─── 2. DEV-режим ───
         if (cleanUid.startsWith('pc_dev_') || cleanUid.startsWith('dev_')) {
             _log('DEV-режим — доступ разрешён');
             return { success: true, reason: 'dev_mode' };
         }
 
-        // ─── 3. Глобальный флаг ───
         try {
             const isGloballyDisabled = await _syncGlobalFlagFromCloud();
             if (isGloballyDisabled === true) {
@@ -439,7 +407,6 @@
             _logWarn('Ошибка проверки глобального флага, продолжаем:', e.message);
         }
 
-        // ─── 4. Кэш игрока ───
         const cached = _readCache(cleanUid);
         if (cached && cached.allowed === true) {
             _log('Доступ из кэша (allowed)');
@@ -450,13 +417,10 @@
             return { success: false, reason: cached.reason || 'cache_denied' };
         }
 
-        // ─── 5. Firestore whitelist ───
         try {
             const fbReady = await _ensureInit();
 
             if (!fbReady) {
-                // ⭐ v1.2.0: FAIL-OPEN при отсутствии Firestore и кэша.
-                // Игрок не должен страдать от того, что у него плохая сеть.
                 _logWarn('⚠️ Firestore недоступен, кэша нет → FAIL-OPEN (пускаем игрока)');
                 return { success: true, reason: 'offline_fail_open' };
             }
@@ -499,12 +463,10 @@
         } catch (e) {
             _logWarn('Ошибка Firestore-запроса whitelist:', e.message);
 
-            // Положительный кэш — пускаем
             if (cached && cached.allowed === true) {
                 return { success: true, reason: 'cache_fallback' };
             }
 
-            // ⭐ v1.2.0: FAIL-OPEN — сетевой сбой, не блокируем игрока
             _logWarn('⚠️ FAIL-OPEN: ошибка Firestore без кэша → пускаем игрока');
             return { success: true, reason: 'firestore_error_fail_open' };
         }
@@ -876,7 +838,7 @@
     }
 
     // ========================================================
-    // 7. УПРАВЛЕНИЕ СИСТЕМОЙ ДОСТУПА
+    // 7. УПРАВЛЕНИЕ СИСТЕМОЙ ДОСТУПА В ИГРУ
     // ========================================================
     async function disableAccessControl() {
         try {
@@ -1054,7 +1016,7 @@
                                         <span class="${statusColor}" style="font-size:9px; font-weight:800;">${status}</span>
                                     </div>
                                     <div class="flex-between" style="font-size:8.5px;">
-                                        <span class="sub-label">Использовано: ${inv.usedCount || 0}/${inv.maxUses || 1}</span>
+                                        <span class="sub-label">Использовано: ${inv.usedCount \vert{}\vert{} 0}/${inv.maxUses || 1}</span>
                                         <span class="sub-label">${inv.isActive ? `⏳ ${daysLeft}д` : ''}</span>
                                     </div>
                                     ${inv.isActive ? `
@@ -1203,7 +1165,242 @@
     }
 
     // ========================================================
-    // 9. ЭКСПОРТ В WINDOW
+    // ⭐ 9. МОДУЛЬ FEATURE ACCESS (КОНТРОЛЬ РАЗДЕЛОВ И УРОВНЕЙ)
+    // ========================================================
+    const FeatureAccess = {
+        getConfig(featureKey) {
+            const cfg = window.APP_ACCESS_CONFIG || (typeof APP_ACCESS_CONFIG !== 'undefined' ? APP_ACCESS_CONFIG : null);
+            if (cfg && cfg[featureKey]) return cfg[featureKey];
+
+            const fallback = {
+                barn: { minLevel: 8, costCash: 800000, costStars: 0, name: "Сараи (Barn Find)" },
+                containers: { minLevel: 12, costCash: 2500000, costStars: 10, costTickets: 5, name: "Контейнеры (Порт)" },
+                autopodbor_order: { minLevel: 5, costCash: 350000, costStars: 5, reqTool: 'obd_launch', name: "Подбор под ключ" },
+                street: { minLevel: 6, costCash: 250000, costStars: 15, name: "Стритрейсинг" },
+                darknet: { minLevel: 16, costCash: 6000000, costStars: 25, name: "Даркнет" },
+                syndicate: { minLevel: 20, costCash: 20000000, costStars: 50, name: "Синдикат" }
+            };
+            return fallback[featureKey] || null;
+        },
+
+        isUnlocked(featureKey) {
+            if (!state.player) return false;
+            if (!state.player.unlockedFeatures) state.player.unlockedFeatures = [];
+            return state.player.unlockedFeatures.includes(featureKey);
+        },
+
+        check(featureKey) {
+            const config = this.getConfig(featureKey);
+            if (!config) return { allowed: true };
+
+            const playerLevel = Number(state.player?.level) || 1;
+            if (playerLevel < config.minLevel) {
+                return {
+                    allowed: false,
+                    reason: 'level_locked',
+                    requiredLevel: config.minLevel,
+                    message: `Раздел «${config.name}» станет доступен с ${config.minLevel} уровня!`
+                };
+            }
+
+            if (!this.isUnlocked(featureKey)) {
+                return {
+                    allowed: false,
+                    reason: 'payment_required',
+                    config: config,
+                    message: `Требуется приобрести лицензию/взнос для раздела «${config.name}».`
+                };
+            }
+
+            return { allowed: true, config: config };
+        },
+
+        showUnlockModal(featureKey, onSuccessCallback = null) {
+            const config = this.getConfig(featureKey);
+            if (!config) return;
+
+            const playerLevel = Number(state.player?.level) || 1;
+            const playerCash = Number(state.player?.cash) || 0;
+            const playerStars = Number(state.player?.stars) || 0;
+            const playerTickets = Number(state.player?.tickets) || 0;
+
+            if (playerLevel < config.minLevel) {
+                if (typeof showToast === 'function') {
+                    showToast(`🔒 Доступно с ${config.minLevel} уровня (ваш уровень: ${playerLevel})`);
+                }
+                if (typeof playSound === 'function') playSound('error');
+                return;
+            }
+
+            let modal = document.getElementById('modalFeatureUnlock');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'modalFeatureUnlock';
+                modal.className = 'modal-overlay';
+                document.body.appendChild(modal);
+            }
+
+            const canAffordCash = playerCash >= (config.costCash || 0);
+            const canAffordStars = playerStars >= (config.costStars || 0);
+            const canAffordTickets = playerTickets >= (config.costTickets || 0);
+            const canAffordAll = canAffordCash && canAffordStars && canAffordTickets;
+
+            modal.innerHTML = `
+                <div class="modal-box" style="max-width: 420px; border-color: var(--cyan);">
+                    <div class="flex-between mb-2">
+                        <div class="modal-glow-badge" style="color:var(--cyan); border-color:rgba(0,242,254,0.4);">
+                            <i class="fa-solid fa-lock-open mr-1"></i> ОТКРЫТИЕ РАЗДЕЛА
+                        </div>
+                        <button onclick="AccessControl.FeatureAccess.closeModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
+                    </div>
+
+                    <div class="glass-card p-3 mb-2 text-center" style="background:#090e18;">
+                        <b class="text-xs color-cyan" style="font-size:15px;">${config.name}</b>
+                        <div class="sub-label mt-1" style="font-size:10px; line-height:1.4;">
+                            ${config.desc || 'Получите доступ к новым возможностям, редким автомобилям и повышенной марже.'}
+                        </div>
+                    </div>
+
+                    <div class="glass-card p-2 mb-3" style="background:#050914;">
+                        <b class="text-xs color-amber mb-2 block" style="font-size:11px;">Условия получения доступа:</b>
+                        <div class="space-y-1" style="font-size:10px;">
+                            <div class="flex-between">
+                                <span class="sub-label">Уровень персонажа:</span>
+                                <b class="color-green">Ур. ${config.minLevel} ✓</b>
+                            </div>
+                            ${config.costCash ? `
+                                <div class="flex-between">
+                                    <span class="sub-label">Денежный взнос:</span>
+                                    <b class="${canAffordCash ? 'color-green' : 'color-red'}">${config.costCash.toLocaleString()} ₽</b>
+                                </div>
+                            ` : ''}
+                            ${config.costStars ? `
+                                <div class="flex-between">
+                                    <span class="sub-label">Звёзды репутации:</span>
+                                    <b class="${canAffordStars ? 'color-green' : 'color-red'}">${config.costStars} ⭐</b>
+                                </div>
+                            ` : ''}
+                            ${config.costTickets ? `
+                                <div class="flex-between">
+                                    <span class="sub-label">Билеты/талоны:</span>
+                                    <b class="${canAffordTickets ? 'color-green' : 'color-red'}">${config.costTickets} 🎫</b>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    <div class="grid-2" style="gap:6px;">
+                        <button onclick="AccessControl.FeatureAccess.closeModal()" class="btn btn-dark btn-sm">
+                            Отмена
+                        </button>
+                        <button onclick="AccessControl.FeatureAccess.confirmUnlock('${featureKey}')" class="btn btn-green btn-sm" ${canAffordAll ? '' : 'disabled style="opacity:0.6;"'}>
+                            ${canAffordAll ? 'Оплатить и открыть' : 'Не хватает средств'}
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            this._pendingCallback = onSuccessCallback;
+
+            if (typeof ModalManager !== 'undefined') {
+                ModalManager.open('modalFeatureUnlock');
+            } else {
+                modal.classList.add('active');
+            }
+            if (typeof playSound === 'function') playSound('tick');
+        },
+
+        closeModal() {
+            if (typeof ModalManager !== 'undefined') {
+                ModalManager.close('modalFeatureUnlock');
+            } else {
+                const m = document.getElementById('modalFeatureUnlock');
+                if (m) m.classList.remove('active');
+            }
+            this._pendingCallback = null;
+        },
+
+        confirmUnlock(featureKey) {
+            const config = this.getConfig(featureKey);
+            if (!config) return;
+
+            const playerCash = Number(state.player?.cash) || 0;
+            const playerStars = Number(state.player?.stars) || 0;
+            const playerTickets = Number(state.player?.tickets) || 0;
+
+            if (config.costCash && playerCash < config.costCash) {
+                if (typeof showToast === 'function') showToast(`Не хватает ${config.costCash.toLocaleString()} ₽!`);
+                if (typeof playSound === 'function') playSound('error');
+                return;
+            }
+            if (config.costStars && playerStars < config.costStars) {
+                if (typeof showToast === 'function') showToast(`Не хватает ${config.costStars} ⭐!`);
+                if (typeof playSound === 'function') playSound('error');
+                return;
+            }
+            if (config.costTickets && playerTickets < config.costTickets) {
+                if (typeof showToast === 'function') showToast(`Не хватает ${config.costTickets} 🎫!`);
+                if (typeof playSound === 'function') playSound('error');
+                return;
+            }
+
+            if (config.costCash) {
+                state.player.cash -= config.costCash;
+                if (typeof logBankTransaction === 'function') {
+                    logBankTransaction(`Открытие доступа: ${config.name}`, config.costCash, false);
+                }
+            }
+            if (config.costStars) state.player.stars -= config.costStars;
+            if (config.costTickets) state.player.tickets -= config.costTickets;
+
+            if (!state.player.unlockedFeatures) state.player.unlockedFeatures = [];
+            if (!state.player.unlockedFeatures.includes(featureKey)) {
+                state.player.unlockedFeatures.push(featureKey);
+            }
+
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (typeof playSound === 'function') playSound('win');
+            if (typeof tgHaptic === 'function') tgHaptic('success');
+
+            const cb = this._pendingCallback;
+            this.closeModal();
+
+            if (typeof openVerdictModal === 'function') {
+                openVerdictModal(
+                    "РАЗДЕЛ РАЗБЛОКИРОВАН! 🔓",
+                    `Вы успешно приобрели постоянный доступ к разделу «${config.name}»!\nУдачи в новых сделках и покорении авторынка.`,
+                    true
+                );
+            } else if (typeof showToast === 'function') {
+                showToast(`✓ Раздел «${config.name}» открыт!`);
+            }
+
+            if (typeof cb === 'function') {
+                setTimeout(cb, 300);
+            }
+        },
+
+        guard(featureKey, onAllowed) {
+            const status = this.check(featureKey);
+            if (status.allowed) {
+                if (typeof onAllowed === 'function') onAllowed();
+                return true;
+            }
+
+            if (status.reason === 'level_locked') {
+                if (typeof showToast === 'function') showToast(status.message);
+                if (typeof playSound === 'function') playSound('error');
+                return false;
+            }
+
+            this.showUnlockModal(featureKey, onAllowed);
+            return false;
+        }
+    };
+
+    // ========================================================
+    // 10. ЭКСПОРТ В WINDOW
     // ========================================================
     window.AccessControl = {
         checkAccess: checkAccess,
@@ -1234,11 +1431,18 @@
         disableSystem: disableSystem,
         enableSystem: enableSystem,
 
+        // Геймплейный модуль прогрессии
+        FeatureAccess: FeatureAccess,
+        checkFeature: function(key) { return FeatureAccess.check(key); },
+        guardFeature: function(key, cb) { return FeatureAccess.guard(key, cb); },
+        isFeatureUnlocked: function(key) { return FeatureAccess.isUnlocked(key); },
+        showFeatureUnlockModal: function(key, cb) { return FeatureAccess.showUnlockModal(key, cb); },
+
         OWNER_TELEGRAM_ID: OWNER_TELEGRAM_ID,
         OWNER_USERNAME: OWNER_USERNAME
     };
 
-    _log('v1.2.0 загружен. Главный фикс «Нет сети»: ожидание FB_Core.db до ' + FB_WAIT_TIMEOUT_MS + 'мс + fail-open ✓');
+    _log('v2.0.0 загружен: Инвайты + FeatureAccess прогрессии разделов ✓');
     _log('Владелец:', OWNER_TELEGRAM_ID, '(@' + OWNER_USERNAME + ')');
 
 })();
