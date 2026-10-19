@@ -1,14 +1,12 @@
 // ========================================================
-// js/phone/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v1.3.0)
+// js/phone/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v1.4.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.3.0 (РЕГУЛЯРНАЯ АРЕНДА И ГАРАЖНЫЕ СЛОТЫ):
-//   - ДОБАВЛЕНО: processHousingDailyRent() — автосписание аренды жилья/боксов
-//     при смене дней и оффлайне с логированием в банк и выселением при нехватке денег.
-//   - ДОБАВЛЕНО: getTotalGarageSlots() — гарантированное расширение слотов гаража
-//     с учетом купленных домов (ownedHouses) и текущего активного жилья.
-//   - ФИКС: При покупке жилья слоты гарантированно применяются к гаражу мгновенно.
-//   - СОХРАНЕНО: Все фиксы E3 (защита от повторных покупок и накрутки настроения).
+// ⭐ v1.4.0 (ВОЗВРАЩЕНИЕ ВСЕХ 14 ОБЪЕКТОВ НЕДВИЖИМОСТИ):
+//   - ФИКС: Устранен сброс каталога до 3 объектов при задержке загрузки data_economy.js.
+//   - Полный встроенный каталог из 14 объектов (от бытовки до острова в нейтральных водах).
+//   - Синхронизация window.HOUSING_LIST и гарантированное расширение слотов гаража.
+//   - Автосписание регулярной аренды раз в 3 дня и защита от повторных покупок.
 // ========================================================
 
 const PhoneHousing = {
@@ -27,36 +25,345 @@ const PhoneHousing = {
     },
 
     getHousingDatabase() {
-        if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST) && HOUSING_LIST.length > 0) {
-            return HOUSING_LIST;
+        // Проверяем глобальный список из data_economy.js
+        const globalList = (typeof window !== 'undefined' && window.HOUSING_LIST) || 
+                           (typeof HOUSING_LIST !== 'undefined' ? HOUSING_LIST : null);
+        if (Array.isArray(globalList) && globalList.length >= 14) {
+            return globalList;
         }
-        // Fallback (минимальный набор, если data_economy.js не загружен)
-        return [
+
+        // Полный эталонный каталог из 14 объектов недвижимости
+        const fullDatabase = [
             {
-                id: 'trailer', name: 'Бытовка на стройплощадке', category: 'street',
-                rent: 600, buyPrice: 350000, reqStars: 0, slots: 0, moodBonus: -5, minLevel: 1,
+                id: 'trailer',
+                name: 'Бытовка на стройплощадке',
+                category: 'street',
+                typeLabel: 'Временная стоянка',
+                rent: 600,
+                buyPrice: 350000,
+                reqStars: 0,
+                slots: 0,
+                slotsBonus: 0,
+                moodBonus: -5,
+                minLevel: 1,
+                canTune: false,
+                canDetail: false,
+                canService: false,
+                canOBDGarage: false,
+                hasPersonalSlot: false,
+                reshalaDiscountPct: 0,
                 perk: 'Только ночлег. Доработки и ремонт невозможны.',
-                desc: 'Временный строительный вагончик у обочины. Сквозняки, верстака нет.',
+                desc: 'Временный строительный вагончик у обочины. Сквозняки, верстака нет. Автомобили стоят под открытым небом.',
                 img: 'assets/houses/trailer.jpg',
                 fallback: 'https://images.unsplash.com/photo-1590725140246-201552a488c9?auto=format&fit=crop&w=600&q=80'
             },
             {
-                id: 'gsk_box', name: 'Стандартный бокс в ГСК-7', category: 'box',
-                rent: 6500, buyPrice: 1500000, reqStars: 12, slots: 2, moodBonus: 8, minLevel: 4,
-                perk: 'Смотровая яма, электричество 220V, верстак.',
-                desc: 'Настоящее логово перекупа! Сухая яма, верстак и диодное освещение.',
+                id: 'shed_yard',
+                name: 'Навес у частного дома',
+                category: 'street',
+                typeLabel: 'Уличный навес',
+                rent: 1400,
+                buyPrice: 750000,
+                reqStars: 5,
+                slots: 1,
+                slotsBonus: 1,
+                moodBonus: 0,
+                minLevel: 2,
+                canTune: false,
+                canDetail: false,
+                canService: true,
+                canOBDGarage: false,
+                hasPersonalSlot: false,
+                reshalaDiscountPct: 0,
+                perk: '1 машиноместо под навесом. Доступна замена масел и свечей.',
+                desc: 'Деревянный навес от дождя. Есть розетка 220V и базовый набор гаечных ключей.',
+                img: 'assets/houses/room.jpg',
+                fallback: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'room',
+                name: 'Комната в общежитии + Двор',
+                category: 'living',
+                typeLabel: 'Жильё + Двор',
+                rent: 2200,
+                buyPrice: 1300000,
+                reqStars: 8,
+                slots: 1,
+                slotsBonus: 1,
+                moodBonus: 4,
+                minLevel: 3,
+                canTune: false,
+                canDetail: false,
+                canService: true,
+                canOBDGarage: false,
+                hasPersonalSlot: false,
+                reshalaDiscountPct: 0,
+                perk: 'Одно машиноместо во дворе. Разрешена замена расходников.',
+                desc: 'Комната в спальном районе. Автомобиль стоит под окнами на асфальте.',
+                img: 'assets/houses/room.jpg',
+                fallback: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'gsk_box',
+                name: 'Стандартный бокс в ГСК-7',
+                category: 'box',
+                typeLabel: 'Капитальный бокс ГСК',
+                rent: 6500,
+                buyPrice: 1500000,
+                reqStars: 12,
+                slots: 2,
+                slotsBonus: 2,
+                moodBonus: 8,
+                minLevel: 4,
+                canTune: true,
+                canDetail: false,
+                canService: true,
+                canOBDGarage: true,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 5,
+                perk: 'Смотровая яма, электричество 220V, верстак со слесарными тисками.',
+                desc: 'Настоящее логово перекупа! Сухая яма, верстак и диодное освещение. Открывает диагностику и тюнинг.',
                 img: 'assets/houses/garage.jpg',
                 fallback: 'https://images.unsplash.com/photo-1588854337221-4cf9fa96059c?auto=format&fit=crop&w=600&q=80'
             },
             {
-                id: 'villa', name: 'Особняк на Рублёвке', category: 'estate',
-                rent: 600000, buyPrice: 420000000, reqStars: 160, slots: 18, moodBonus: 85, minLevel: 70,
-                perk: 'Свой автосервисный цех, малярная камера, охрана ЧОП.',
-                desc: 'Гектар соснового бора, собственный автосервис на 4 поста.',
+                id: 'khrusch',
+                name: 'Квартира в "Хрущевке"',
+                category: 'living',
+                typeLabel: 'Городское жильё',
+                rent: 12000,
+                buyPrice: 3800000,
+                reqStars: 15,
+                slots: 1,
+                slotsBonus: 1,
+                moodBonus: 10,
+                minLevel: 5,
+                canTune: false,
+                canDetail: false,
+                canService: true,
+                canOBDGarage: false,
+                hasPersonalSlot: false,
+                reshalaDiscountPct: 0,
+                perk: 'Уютный сон, быстрое восстановление настроения (+10).',
+                desc: 'Своя кухня, душ и спокойный сон. Машина паркуется во дворе под фонарём.',
+                img: 'assets/houses/khrusch.jpg',
+                fallback: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'garage',
+                name: 'Двойной бокс с ямой и печкой',
+                category: 'box',
+                typeLabel: 'Слесарная мастерская',
+                rent: 18000,
+                buyPrice: 2900000,
+                reqStars: 20,
+                slots: 3,
+                slotsBonus: 3,
+                moodBonus: 14,
+                minLevel: 7,
+                canTune: true,
+                canDetail: true,
+                canService: true,
+                canOBDGarage: true,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 10,
+                perk: 'Сварка, полировальный пост, печь на отработке и 3 свободных машиноместа.',
+                desc: 'Широкий бокс с печью, верстаком, компрессором и мойкой. Позволяет готовить тачки под ключ.',
+                img: 'assets/houses/garage.jpg',
+                fallback: 'https://images.unsplash.com/photo-1616423640778-28d1b53229bd?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'dvushka',
+                name: 'Двушка в спальном районе',
+                category: 'living',
+                typeLabel: 'Городская квартира',
+                rent: 26000,
+                buyPrice: 7500000,
+                reqStars: 25,
+                slots: 2,
+                slotsBonus: 2,
+                moodBonus: 18,
+                minLevel: 10,
+                canTune: false,
+                canDetail: false,
+                canService: true,
+                canOBDGarage: false,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 0,
+                perk: 'Закреплённое парковочное место со шлагбаумом во дворе.',
+                desc: 'Кирпичный дом, стеклопакеты, видеонаблюдение за парковкой. Высокий комфорт проживания.',
+                img: 'assets/houses/dvushka.jpg',
+                fallback: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'workshop_pro',
+                name: 'Тюнинг-Ангар с подъёмником',
+                category: 'box',
+                typeLabel: 'Профессиональный сервис',
+                rent: 48000,
+                buyPrice: 11000000,
+                reqStars: 35,
+                slots: 5,
+                slotsBonus: 5,
+                moodBonus: 22,
+                minLevel: 15,
+                canTune: true,
+                canDetail: true,
+                canService: true,
+                canOBDGarage: true,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 20,
+                perk: 'Двухстоечный подъёмник, камера обдува, скидка 20% на услуги Решалы!',
+                desc: 'Коммерческий цех в промзоне. Подъёмник, мощная приточка, возможность отмывать VIN дешевле.',
+                img: 'assets/houses/workshop.jpg',
+                fallback: 'https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'euro_treshka',
+                name: 'Евро-трешка (Новостройка)',
+                category: 'living',
+                typeLabel: 'Бизнес-класс с паркингом',
+                rent: 42000,
+                buyPrice: 15000000,
+                reqStars: 40,
+                slots: 3,
+                slotsBonus: 3,
+                moodBonus: 28,
+                minLevel: 20,
+                canTune: false,
+                canDetail: true,
+                canService: true,
+                canOBDGarage: true,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 0,
+                perk: 'Подземный теплый паркинг с детейлинг-постом и зарядкой.',
+                desc: 'ЖК комфорт-класса. Закрытый двор, охраняемый подземный паркинг, автомойка в цоколе.',
+                img: 'assets/houses/treshka.jpg',
+                fallback: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'cottage',
+                name: 'Коттедж за городом с гаражом',
+                category: 'estate',
+                typeLabel: 'Загородная усадьба',
+                rent: 70000,
+                buyPrice: 22000000,
+                reqStars: 55,
+                slots: 7,
+                slotsBonus: 7,
+                moodBonus: 35,
+                minLevel: 28,
+                canTune: true,
+                canDetail: true,
+                canService: true,
+                canOBDGarage: true,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 15,
+                perk: 'Свой закрытый двор на 7 авто, тёплый гараж, зона отдыха и барбекю.',
+                desc: 'Собственный участок, трёхфазная сеть 380V, смотровая яма и мойка высокого давления.',
+                img: 'assets/houses/cottage.jpg',
+                fallback: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'loft',
+                name: 'Дизайнерский Лофт в центре',
+                category: 'living',
+                typeLabel: 'Премиум-апартаменты',
+                rent: 90000,
+                buyPrice: 35000000,
+                reqStars: 75,
+                slots: 4,
+                slotsBonus: 4,
+                moodBonus: 40,
+                minLevel: 35,
+                canTune: false,
+                canDetail: true,
+                canService: true,
+                canOBDGarage: true,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 0,
+                perk: '+40% настроения каждый день, персональные места на VIP-паркинге.',
+                desc: 'Красный кирпич, панорамные окна на набережную, стильный интерьер для отдыха автоолигарха.',
+                img: 'assets/houses/loft.jpg',
+                fallback: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'penthouse',
+                name: 'Пентхаус в Москва-Сити',
+                category: 'estate',
+                typeLabel: 'Небоскрёб & VIP Паркинг',
+                rent: 250000,
+                buyPrice: 140000000,
+                reqStars: 110,
+                slots: 8,
+                slotsBonus: 8,
+                moodBonus: 55,
+                minLevel: 50,
+                canTune: true,
+                canDetail: true,
+                canService: true,
+                canOBDGarage: true,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 25,
+                perk: 'Личный VIP-бокс на -3 этаже Башни с охраной, консьержем и мойкой.',
+                desc: 'Панорамный вид с 65 этажа, консьерж-сервис, охраняемый подземный гаражный комплекс.',
+                img: 'assets/houses/penthouse.jpg',
+                fallback: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'villa',
+                name: 'Особняк на Рублёвке',
+                category: 'estate',
+                typeLabel: 'Резиденция миллионера',
+                rent: 600000,
+                buyPrice: 420000000,
+                reqStars: 160,
+                slots: 18,
+                slotsBonus: 18,
+                moodBonus: 85,
+                minLevel: 70,
+                canTune: true,
+                canDetail: true,
+                canService: true,
+                canOBDGarage: true,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 35,
+                perk: 'Свой автосервисный цех, малярная камера, охрана ЧОП, скидка 35% у Решалы!',
+                desc: 'Гектар соснового бора, собственный автосервис на 4 поста, малярная камера и ангар для редких лотов.',
                 img: 'assets/houses/villa.jpg',
                 fallback: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=600&q=80'
+            },
+            {
+                id: 'island',
+                name: 'Частный остров с виллой',
+                category: 'estate',
+                typeLabel: 'Личный Остров Олигарха',
+                rent: 2000000,
+                buyPrice: 1200000000,
+                reqStars: 300,
+                slots: 35,
+                slotsBonus: 35,
+                moodBonus: 100,
+                minLevel: 90,
+                canTune: true,
+                canDetail: true,
+                canService: true,
+                canOBDGarage: true,
+                hasPersonalSlot: true,
+                reshalaDiscountPct: 50,
+                perk: 'Полный иммунитет от проверок ГИБДД, личный пирс для яхт и скидка 50% у Решалы!',
+                desc: 'Абсолютная автономия в нейтральных водах. Свой порт, вертолётная площадка и музей для гиперкаров.',
+                img: 'assets/houses/island.jpg',
+                fallback: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'
             }
         ];
+
+        // Синхронизируем глобальную переменную
+        if (typeof window !== 'undefined') {
+            window.HOUSING_LIST = fullDatabase;
+        }
+
+        return fullDatabase;
     },
 
     ensureHousingState() {
@@ -595,4 +902,4 @@ if (document.readyState === 'loading') {
     PhoneHousing.init();
 }
 
-console.log('[🏠 phone-housing v1.3.0] Автосписание аренды при смене дней и расчет слотов гаража готовы ✓');
+console.log('[🏠 phone-housing v1.4.0] Каталог 14 объектов недвижимости гарантирован и зафиксирован ✓');
