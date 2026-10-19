@@ -1,32 +1,30 @@
 // ========================================================
-// js/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v1.2.0)
+// js/phone/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v1.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.2.0 (SPRINT 2 — ФИКС E3):
-//   - ФИКС E3: buyHouse проверяет владение перед списанием.
-//     Нельзя купить одно жильё дважды.
-//   - rentHouse: повторная аренда того же жилья блокируется
-//   - buyInteriorItem: защита от повторной покупки одного предмета
-//   - moveToHouse: если игрок уже здесь — короткое сообщение и выход
-// ⭐ v1.1.0 (КРИТИЧЕСКИЙ ФИКС):
-//   - ФИКС: applyHousingBonuses больше НЕ мутирует mood.
-//     Раньше игрок мог кликать moveToHouse много раз и
-//     накручивать mood до 100. Теперь mood-бонус жилья
-//     применяется ЕЖЕДНЕВНО в app.js → executeDayCycleMidnight.
-//   - ФИКС: moveToHouse блокирует переезд в не-своё жильё.
-//   - ФИКС: buyInteriorItem вызывает ensureHousingState перед
-//     работой с interior (защита от null).
-//   - ФИКС: render() обёрнут в try/catch.
-//   - ФИКС: все методы защищены от !state.player.
-//   - Улучшение: в buyHouse логируется встроенное число
-//     слотов из HOUSING_LIST.
-// ⭐ v1.5.0 (базовая):
-//   - Каталог HOUSING_LIST с 14 объектами.
-// ⭐ v1.0.0:
-//   - Первая версия.
+//
+// ⭐ v1.3.0 (РЕГУЛЯРНАЯ АРЕНДА И ГАРАЖНЫЕ СЛОТЫ):
+//   - ДОБАВЛЕНО: processHousingDailyRent() — автосписание аренды жилья/боксов
+//     при смене дней и оффлайне с логированием в банк и выселением при нехватке денег.
+//   - ДОБАВЛЕНО: getTotalGarageSlots() — гарантированное расширение слотов гаража
+//     с учетом купленных домов (ownedHouses) и текущего активного жилья.
+//   - ФИКС: При покупке жилья слоты гарантированно применяются к гаражу мгновенно.
+//   - СОХРАНЕНО: Все фиксы E3 (защита от повторных покупок и накрутки настроения).
 // ========================================================
 
 const PhoneHousing = {
     activeTab: 'catalog', // 'catalog' | 'my_home'
+
+    init() {
+        this.ensureHousingState();
+        this.processHousingDailyRent();
+        this._bindEvents();
+    },
+
+    _bindEvents() {
+        if (!window.EventBus) return;
+        window.EventBus.on('day:passed', () => this.processHousingDailyRent());
+        window.EventBus.on('app:resume', () => this.processHousingDailyRent());
+    },
 
     getHousingDatabase() {
         if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST) && HOUSING_LIST.length > 0) {
@@ -75,6 +73,66 @@ const PhoneHousing = {
         if (!state.player.interior || typeof state.player.interior !== 'object') {
             state.player.interior = {};
         }
+        if (state.player.housingType === 'rent' && !state.player.housingRentDue) {
+            state.player.housingRentDue = (state.player.day || 1) + 3;
+        }
+    },
+
+    // ========================================================
+    // АВТОСПИСАНИЕ АРЕНДЫ ЖИЛЬЯ / ВЫСЕЛЕНИЕ ПРИ НЕХВАТКЕ СРЕДСТВ
+    // ========================================================
+    processHousingDailyRent() {
+        this.ensureHousingState();
+        const p = state?.player;
+        if (!p || p.housingType !== 'rent') return;
+
+        const currentDay = p.day || 1;
+        const dueDay = p.housingRentDue || currentDay;
+        const db = this.getHousingDatabase();
+        const house = db.find(h => h.id === p.housingId);
+
+        if (!house) {
+            p.housingId = 'trailer';
+            p.housingType = 'own';
+            return;
+        }
+
+        // Если срок аренды истек
+        if (currentDay >= dueDay) {
+            const rentPerDay = house.rent || house.rentPerDay || 0;
+            const renewDays = 3;
+            const totalRent = rentPerDay * renewDays;
+            const cash = p.cash || 0;
+
+            if (cash >= totalRent) {
+                // Автопродление аренды
+                p.cash -= totalRent;
+                p.housingRentDue = currentDay + renewDays;
+
+                if (typeof logBankTransaction === 'function') {
+                    logBankTransaction(`Продление аренды жилья (${renewDays} дн): ${house.name}`, totalRent, false);
+                }
+                if (typeof showToast === 'function') {
+                    showToast(`🏠 Списана аренда за «${house.name}»: -${totalRent.toLocaleString()} ₽ на ${renewDays} дн.`, 'warning');
+                }
+            } else {
+                // Денег нет — выселение в бытовку
+                p.housingId = 'trailer';
+                p.housingType = 'own';
+                p.housingRentDue = null;
+
+                if (typeof logBankTransaction === 'function') {
+                    logBankTransaction(`Выселение за неуплату аренды: ${house.name}`, 0, false);
+                }
+                if (typeof showToast === 'function') {
+                    showToast(`⚠️ Не хватило денег на аренду «${house.name}»! Вы вернулись в строительную бытовку.`, 'error');
+                }
+            }
+
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (typeof renderGarage === 'function') renderGarage();
+        }
     },
 
     render(container) {
@@ -82,6 +140,7 @@ const PhoneHousing = {
 
         try {
             this.ensureHousingState();
+            this.processHousingDailyRent();
 
             const db = this.getHousingDatabase();
             const currentHouseId = state.player.housingId || 'trailer';
@@ -249,7 +308,7 @@ const PhoneHousing = {
                     ${hasItem ? `
                         <span class="tag-badge bg-tag-green">УСТАНОВЛЕНО</span>
                     ` : `
-                        <button onclick="PhoneHousing.buyInteriorItem('${currentHouse.id}', '${item.id}', ${item.cost})" class="btn btn-dark btn-sm btn-auto" style="padding:4px 8px; font-size:9.5px;">
+                        <button onclick="PhoneHousing.buyInteriorItem('${currentHouse.id}', '${item.id}',${item.cost})" class="btn btn-dark btn-sm btn-auto" style="padding:4px 8px; font-size:9.5px;">
                             Купить (${item.cost.toLocaleString()} ₽)
                         </button>
                     `}
@@ -264,6 +323,18 @@ const PhoneHousing = {
         let houseImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         let fallbackImg = currentHouse.fallback || 'https://images.unsplash.com/photo-1590725140246-201552a488c9?auto=format&fit=crop&w=600&q=80';
 
+        let rentInfoHtml = '';
+        if (state.player.housingType === 'rent' && state.player.housingRentDue) {
+            let leftDays = Math.max(0, state.player.housingRentDue - (state.player.day || 1));
+            rentInfoHtml = `
+                <div class="p-1 mb-2 text-center" style="background:rgba(255,179,0,0.12); border-radius:6px; border:1px solid var(--amber);">
+                    <span class="sub-label" style="font-size:8.5px; color:var(--amber);">
+                        Арендовано: осталось <b>${leftDays} дн.</b> (оплата раз в 3 дня)
+                    </span>
+                </div>
+            `;
+        }
+
         return `
             <div class="glass-card p-3 mb-2 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(45, 212, 191, 0.18), #090e18); border-color: var(--teal);">
                 <div class="car-img-wrap mb-2" style="height:140px; border-radius:12px; border:2px solid ${catColor};">
@@ -271,6 +342,7 @@ const PhoneHousing = {
                 </div>
                 <h3 class="font-bold color-teal mb-1">${currentHouse.name}</h3>
                 <div class="sub-label mb-2" style="font-size:10px;">Текущая локация проживания и хранения авто</div>
+                ${rentInfoHtml}
 
                 <div class="grid-3 text-xs p-2 mb-1" style="background:#050811; border-radius:8px;">
                     <div>Боксов: <b class="color-cyan">+${slots}</b></div>
@@ -288,7 +360,6 @@ const PhoneHousing = {
 
     // --------------------------------------------------------
     // ПОКУПКА ДОМА
-    // ⭐ v1.2.0 (ФИКС E3): защита от повторной покупки того же жилья
     // --------------------------------------------------------
     buyHouse(houseId) {
         this.ensureHousingState();
@@ -296,7 +367,6 @@ const PhoneHousing = {
         const target = db.find(h => h.id === houseId);
         if (!target) return showToast("❌ Объект не найден!");
 
-        // ⭐ ФИКС E3: проверка — не куплено ли уже
         const alreadyOwned = (state.player.ownedHouses || []).includes(houseId);
         if (alreadyOwned) {
             if (typeof playSound === 'function') playSound('tick');
@@ -324,20 +394,17 @@ const PhoneHousing = {
         state.player.cash -= price;
         if (reqStars > 0) state.player.stars -= reqStars;
 
-        // ⭐ ФИКС E3: двойная защита от дубликата
         if (!state.player.ownedHouses.includes(houseId)) {
             state.player.ownedHouses.push(houseId);
         }
 
         state.player.housingId = houseId;
         state.player.housingType = 'own';
+        state.player.housingRentDue = null;
 
         if (typeof logBankTransaction === 'function') {
             logBankTransaction(`Покупка недвижимости: ${target.name}`, price, false);
         }
-
-        // Mood-бонус применится ежедневно в app.js → executeDayCycleMidnight
-        // (не мутируем mood вручную, чтобы не накрутить его кликами)
 
         const slotsGranted = target.slots !== undefined ? target.slots : (target.slotsBonus || 0);
 
@@ -350,7 +417,7 @@ const PhoneHousing = {
         if (typeof openVerdictModal === 'function') {
             openVerdictModal(
                 "НОВОСЕЛЬЕ! 🏢",
-                `Поздравляем с покупкой «${target.name}»!\n• Вместимость гаража: +${slotsGranted} мест\n• Бонусы куража активируются в полночь (ежедневно)\n• Тюнинг-посты и скидки Решалы доступны в этом жилье!`,
+                `Поздравляем с покупкой «${target.name}»!\n• Вместимость гаража увеличена: +${slotsGranted} мест\n• Доступен тюнинг и верстак\n• Бонусы куража активируются в полночь`,
                 true,
                 price
             );
@@ -361,7 +428,6 @@ const PhoneHousing = {
 
     // --------------------------------------------------------
     // АРЕНДА ДОМА
-    // ⭐ v1.2.0: повторная аренда того же жилья блокируется
     // --------------------------------------------------------
     rentHouse(houseId) {
         this.ensureHousingState();
@@ -369,7 +435,6 @@ const PhoneHousing = {
         const target = db.find(h => h.id === houseId);
         if (!target) return showToast("❌ Объект не найден!");
 
-        // ⭐ ФИКС: если игрок уже здесь и арендует — не брать залог повторно
         if (state.player.housingId === houseId && state.player.housingType === 'rent') {
             if (typeof playSound === 'function') playSound('tick');
             return showToast(`✅ Вы уже арендуете «${target.name}»!`);
@@ -404,7 +469,6 @@ const PhoneHousing = {
 
     // --------------------------------------------------------
     // ПЕРЕЕЗД
-    // ⭐ v1.2.0: короткое сообщение, если игрок уже здесь
     // --------------------------------------------------------
     moveToHouse(houseId) {
         this.ensureHousingState();
@@ -412,13 +476,11 @@ const PhoneHousing = {
         const target = db.find(h => h.id === houseId);
         if (!target) return showToast("❌ Объект не найден!");
 
-        // ⭐ ФИКС: уже здесь — не делать лишнюю работу
         if (state.player.housingId === houseId) {
             if (typeof playSound === 'function') playSound('tick');
             return showToast(`✅ Вы уже находитесь в «${target.name}»`);
         }
 
-        // Проверка прав: нельзя переехать в чужое
         const isOwned = (state.player.ownedHouses || []).includes(houseId);
         const isCurrentRent = (state.player.housingId === houseId && state.player.housingType === 'rent');
 
@@ -428,8 +490,6 @@ const PhoneHousing = {
 
         state.player.housingId = houseId;
         state.player.housingType = isOwned ? 'own' : 'rent';
-
-        // Mood-бонус применится в executeDayCycleMidnight
 
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -443,13 +503,11 @@ const PhoneHousing = {
 
     // --------------------------------------------------------
     // ПОКУПКА МЕБЕЛИ / ИНТЕРЬЕРА
-    // ⭐ v1.2.0: защита от повторной покупки одного предмета
     // --------------------------------------------------------
     buyInteriorItem(houseId, itemId, cost) {
         this.ensureHousingState();
         if (!state.player) return;
 
-        // ⭐ ФИКС: защита от дубликата
         if (!state.player.interior || typeof state.player.interior !== 'object') {
             state.player.interior = {};
         }
@@ -468,11 +526,7 @@ const PhoneHousing = {
         }
 
         state.player.cash -= cost;
-
-        // Добавляем в интерьер
         state.player.interior[houseId].push(itemId);
-
-        // Разово даём +15 mood за установку (это не «накрутка», а сюрприз)
         state.player.mood = Math.min(100, (state.player.mood || 80) + 15);
 
         if (typeof logBankTransaction === 'function') {
@@ -488,18 +542,8 @@ const PhoneHousing = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // --------------------------------------------------------
-    // applyHousingBonuses больше НЕ мутирует mood
-    // --------------------------------------------------------
-    // Раньше: state.player.mood += houseObj.moodBonus → можно
-    //         было накрутить mood до 100, переключаясь между домами.
-    // Теперь: функция только валидирует и логирует. Mood-бонус
-    //         применяется ежедневно в app.js → executeDayCycleMidnight.
-    // --------------------------------------------------------
     applyHousingBonuses(houseObj) {
         if (!houseObj) return;
-        // Проверка, что слоты действительно пересчитываются на лету
-        // через getTotalGarageSlots (уже учитывает housingId).
         if (typeof getTotalGarageSlots === 'function') {
             const slots = getTotalGarageSlots();
             console.log(`[Housing] Слотов гаража сейчас: ${slots} (housingId=${state.player?.housingId})`);
@@ -507,7 +551,48 @@ const PhoneHousing = {
     }
 };
 
+// ========================================================
+// ГЛОБАЛЬНЫЙ РАСЧЕТ СЛОТОВ ГАРАЖА
+// ========================================================
+window.getTotalGarageSlots = function() {
+    const baseSlots = 3;
+    if (!window.state?.player) return baseSlots;
+
+    const db = PhoneHousing.getHousingDatabase();
+    const owned = window.state.player.ownedHouses || ['trailer'];
+    const currentId = window.state.player.housingId || 'trailer';
+    const isRent = window.state.player.housingType === 'rent';
+
+    let maxBonus = 0;
+
+    // Считаем максимальные слоты среди всей купленной недвижимости
+    owned.forEach(hId => {
+        const obj = db.find(h => h.id === hId);
+        if (obj) {
+            const s = obj.slots !== undefined ? obj.slots : (obj.slotsBonus || 0);
+            if (s > maxBonus) maxBonus = s;
+        }
+    });
+
+    // Если текущее жилье в аренде — учитываем его слоты
+    if (isRent) {
+        const currentObj = db.find(h => h.id === currentId);
+        if (currentObj) {
+            const s = currentObj.slots !== undefined ? currentObj.slots : (currentObj.slotsBonus || 0);
+            if (s > maxBonus) maxBonus = s;
+        }
+    }
+
+    return baseSlots + maxBonus;
+};
+
 window.PhoneHousing = PhoneHousing;
 window.AppHousing = PhoneHousing;
 
-console.log('[🏠 phone-housing v1.2.0] ФИКС E3: защита от дубликатов в buyHouse/rentHouse/buyInteriorItem/moveToHouse ✓');
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => PhoneHousing.init());
+} else {
+    PhoneHousing.init();
+}
+
+console.log('[🏠 phone-housing v1.3.0] Автосписание аренды при смене дней и расчет слотов гаража готовы ✓');
