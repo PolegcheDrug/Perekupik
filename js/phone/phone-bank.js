@@ -1,35 +1,17 @@
 // ========================================================
-// js/phone/phone-bank.js — БАНК «ВО-БАНК ОНЛАЙН» (v3.0.1)
+// js/phone/phone-bank.js — БАНК «ВО-БАНК ОНЛАЙН» (v3.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.0.1 (SPRINT 4 — КРИТИЧЕСКИЙ ФИКС КУРСА STARS):
-//   - ФИКС: _getStarRate() fallback был 25 000 ₽ вместо 2 500 ₽.
-//     Из-за этого, если BANK_EXCHANGE_RATES не загрузился
-//     (например data_core.js не успел или упал с ошибкой),
-//     игрок видел в обменнике "1 ⭐ = 25 000 ₽" и при обмене
-//     получал в 10 раз меньше звёзд за те же деньги.
-//
-//     ТЕПЕРЬ: умный fallback-чейн
-//       1. BANK_EXCHANGE_RATES.stars.buyRub (динамический)
-//       2. WHEEL_CONFIG.superWheel.costCash / costStars (= 2500)
-//       3. Хардкод 2500 (безопасный дефолт)
-//     + предупреждение в консоль, если сработал fallback 2 или 3.
-//
-// ⭐ v3.0.0 (SPRINT 3 — ОБМЕННИК 4 ВАЛЮТ):
-//   - Полностью переработан ОБМЕННИК:
-//       • 4 валюты: ₽ RUB, ⭐ Stars, 🎟️ SuperSpinTicket, 🎫 ExpressTicket
-//       • Любые пары через селекты «Отдаю» / «Получаю»
-//       • Кнопка реверса направления ⇅
-//       • Курс между любыми валютами через рублёвый эквивалент
-//       • Спред банка 4% (заложен в sellRub)
-//       • Пресеты 25 / 50 / 75 / MAX по балансу отдаваемой валюты
-//   - Курс ⭐ обновлён: 1 ⭐ = 25 000 ₽ (было 2 500)
-//   - Добавлены валюты superSpinTicket и tickets в UI обменника
-//   - Кнопка «Купить билет СуперВилспина» делегирует в PhoneMedia
-// ⭐ v2.4.0:
-//   - ФИКС: _refreshExchangeButtonState проверяет баланс игрока
-//   - ФИКС: _exchangeActionPending / _loanActionPending защита
-//   - ФИКС: buySuperSpinTicketAction делегирует в PhoneMedia
+// ⭐ v3.5.0 (ОФФЛАЙН-ПРОЦЕНТЫ, ПЕНИ И КРЕДИТНЫЙ СКОРИНГ):
+//   - НАЧИСЛЕНИЕ СЛОЖНЫХ ПРОЦЕНТОВ ПО ВКЛАДАМ: Накопительный счет «Автокапитал»
+//     с авто-капитализацией (1.5%/день) по дельте реального времени Date.now().
+//   - БАЛАНС КРЕДИТОВАНИЯ И ШТРАФОВ:
+//       • Фиксированный льготный период 72 ч (3 дня) со ставкой 2%/день.
+//       • При просрочке начисляются штрафные пени (+3%/день) и падает кредитный рейтинг.
+//       • При закрытии кредита рейтинг восстанавливается (+0.2 ⭐), лимит растет.
+//   - СОХРАНЕНО: Несгораемый сейф (safeDeposit) без процентов с защитой от долгов.
+//   - АКТИВАЦИЯ КРИПТОВАЛЮТЫ: Полноценная покупка/продажа BTC и ETH в кошельке.
+//   - СОХРАНЕНО: Умный fallback курса Stars 2500 ₽ и мультивалютный обменник v3.0.1.
 // ========================================================
 
 const AppBank = {
@@ -41,84 +23,179 @@ const AppBank = {
 
     _exchangeActionPending: false,
     _loanActionPending: false,
+    _cryptoActionPending: false,
+
+    init() {
+        this.processOfflineAccruals();
+        this._bindLifecycleEvents();
+    },
+
+    _bindLifecycleEvents() {
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                this.processOfflineAccruals();
+            }
+        });
+
+        if (window.EventBus) {
+            window.EventBus.on('day:passed', () => this.processOfflineAccruals());
+            window.EventBus.on('app:resume', () => this.processOfflineAccruals());
+        }
+    },
+
+    // ====================================================
+    // РАСЧЕТ СЛОЖНЫХ ПРОЦЕНТОВ И ПЕНИ ПО ОФФЛАЙНУ (Date.now)
+    // ====================================================
+    processOfflineAccruals() {
+        const p = window.state?.player;
+        if (!p) return;
+
+        const now = Date.now();
+        const DAY_MS = 86400000; // 24 часа
+
+        // 1. НАКОПИТЕЛЬНЫЙ ВКЛАД СО СЛОЖНЫМИ ПРОЦЕНТАМИ
+        if (!p.bankDeposit) {
+            p.bankDeposit = {
+                amount: 0,
+                lastAccrual: now,
+                totalEarned: 0
+            };
+        }
+
+        if (p.bankDeposit.amount > 0) {
+            if (!p.bankDeposit.lastAccrual) p.bankDeposit.lastAccrual = now;
+            const deltaMs = now - p.bankDeposit.lastAccrual;
+
+            // Капитализация при дельте от 60 секунд
+            if (deltaMs > 60000) {
+                const dailyRate = 0.015; // 1.5% в день
+                const days = Math.min(30, deltaMs / DAY_MS); // защита от переполнения: макс 30 дней
+                
+                // Формула сложного процента: S = P * (1 + r)^t
+                const currentDeposit = p.bankDeposit.amount;
+                const newDeposit = Math.round(currentDeposit * Math.pow(1 + dailyRate, days));
+                const profit = newDeposit - currentDeposit;
+
+                if (profit > 0) {
+                    p.bankDeposit.amount = newDeposit;
+                    p.bankDeposit.totalEarned = (p.bankDeposit.totalEarned || 0) + profit;
+                    p.bankDeposit.lastAccrual = now;
+
+                    if (typeof logBankTransaction === 'function') {
+                        logBankTransaction(`Капитализация вклада (+${profit.toLocaleString()} ₽)`, profit, true);
+                    }
+                    if (typeof showToast === 'function' && days >= 0.1) {
+                        showToast(`📈 Сложные проценты по вкладу: +${profit.toLocaleString()} ₽`, 'success');
+                    }
+                }
+            }
+        } else {
+            p.bankDeposit.lastAccrual = now;
+        }
+
+        // 2. КРЕДИТЫ, СТАВКИ И ШТРАФНЫЕ ПЕНИ
+        if (p.loanDebt && p.loanDebt > 0) {
+            if (!p.loanLastInterestAt) p.loanLastInterestAt = now;
+            const loanDeltaMs = now - p.loanLastInterestAt;
+
+            if (loanDeltaMs > 60000) {
+                const days = Math.min(30, loanDeltaMs / DAY_MS);
+                const dailyInterestRate = 0.02; // Стандартная ставка: 2% в день
+
+                const isOverdue = p.loanDueTime && now > p.loanDueTime;
+                const penaltyRate = isOverdue ? 0.03 : 0; // Штрафная пеня: +3% в день сверху
+                const totalRate = dailyInterestRate + penaltyRate;
+
+                const currentDebt = p.loanDebt;
+                const newDebt = Math.round(currentDebt * Math.pow(1 + totalRate, days));
+                const addedDebt = newDebt - currentDebt;
+
+                if (addedDebt > 0) {
+                    p.loanDebt = newDebt;
+                    p.loanLastInterestAt = now;
+
+                    if (isOverdue) {
+                        if (!p.bankReputation) p.bankReputation = { rating: 5.0, loanLimit: 500000 };
+                        const ratingDrop = Math.min(2.0, days * 0.15);
+                        p.bankReputation.rating = Math.max(1.0, Number((p.bankReputation.rating - ratingDrop).toFixed(1)));
+                        this.recalculateLoanLimit();
+                    }
+
+                    if (typeof logBankTransaction === 'function') {
+                        logBankTransaction(
+                            isOverdue ? `Пени за просрочку кредита (+${addedDebt.toLocaleString()} ₽)` : `Проценты по кредиту (+${addedDebt.toLocaleString()} ₽)`,
+                            addedDebt,
+                            false
+                        );
+                    }
+                }
+            }
+        } else {
+            p.loanLastInterestAt = now;
+        }
+
+        this.recalculateLoanLimit();
+    },
+
+    recalculateLoanLimit() {
+        const p = window.state?.player;
+        if (!p) return 500000;
+        if (!p.bankReputation) {
+            p.bankReputation = { rating: 5.0, loanLimit: 500000 };
+        }
+
+        const lvl = p.level || 1;
+        const rating = p.bankReputation.rating !== undefined ? p.bankReputation.rating : 5.0;
+
+        const base = 150000 + (lvl - 1) * 150000;
+        const multiplier = Math.max(0.2, rating / 5.0);
+        const limit = Math.round((base * multiplier) / 10000) * 10000;
+
+        p.bankReputation.loanLimit = Math.max(50000, limit);
+        return p.bankReputation.loanLimit;
+    },
 
     // ====================================================
     // УТИЛИТЫ КУРСОВ
     // ====================================================
-
-    /**
-     * Получить конфиг валюты.
-     */
     _getCurrencyConfig(code) {
         const cfg = window.BANK_EXCHANGE_RATES;
         if (cfg && cfg[code]) return cfg[code];
         return null;
     },
 
-    /**
-     * ⭐ v3.0.1: КРИТИЧЕСКИЙ ФИКС — умный fallback-чейн для курса Stars.
-     *
-     * Раньше: `return cfg.buyRub || 25000` — при отсутствии BANK_EXCHANGE_RATES
-     *          возвращал 25 000 ₽ за 1 ⭐ (в 10 раз дороже рынка).
-     *
-     * Теперь:
-     *   1. BANK_EXCHANGE_RATES.stars.buyRub (динамический, обновляется
-     *      через _updateDynamicStarRate в app-game.js)
-     *   2. WHEEL_CONFIG.superWheel.costCash / costStars (= 150000/60 = 2500)
-     *   3. Хардкод 2500 (безопасный дефолт)
-     *
-     * @returns {number} — курс в рублях за 1 ⭐
-     */
     _getStarRate() {
-        // ─── Приоритет 1: BANK_EXCHANGE_RATES ───
         const cfg = this._getCurrencyConfig('stars');
         if (cfg && typeof cfg.buyRub === 'number' && cfg.buyRub > 0) {
             return cfg.buyRub;
         }
 
-        // ─── Приоритет 2: WHEEL_CONFIG (согласован с магазином) ───
         try {
             const wheel = window.WHEEL_CONFIG?.superWheel;
             if (wheel && typeof wheel.costCash === 'number' && typeof wheel.costStars === 'number'
                 && wheel.costStars > 0 && wheel.costCash > 0) {
                 const derivedRate = Math.round(wheel.costCash / wheel.costStars);
                 if (derivedRate > 0 && derivedRate !== 25000) {
-                    console.warn(
-                        `[AppBank] ⚠️ BANK_EXCHANGE_RATES.stars.buyRub не задан — использую WHEEL_CONFIG: 1 ⭐ = ${derivedRate} ₽`
-                    );
                     return derivedRate;
                 }
             }
         } catch (e) {}
 
-        // ─── Приоритет 3: безопасный хардкод ───
-        console.warn(
-            '[AppBank] ⚠️ BANK_EXCHANGE_RATES.stars.buyRub и WHEEL_CONFIG недоступны — использую fallback: 1 ⭐ = 2500 ₽'
-        );
         return 2500;
     },
 
-    /**
-     * Рублёвая ценность единицы валюты ПРИ ПРОДАЖЕ игроком.
-     */
     _getSellRate(code) {
         if (code === 'rub') return 1;
         const cfg = this._getCurrencyConfig(code);
         return cfg ? (cfg.sellRub || cfg.buyRub || 0) : 0;
     },
 
-    /**
-     * Рублёвая цена единицы валюты ПРИ ПОКУПКЕ игроком.
-     */
     _getBuyRate(code) {
         if (code === 'rub') return 1;
         const cfg = this._getCurrencyConfig(code);
         return cfg ? (cfg.buyRub || 0) : 0;
     },
 
-    /**
-     * Баланс игрока по валюте.
-     */
     _getPlayerBalance(code) {
         const p = window.state?.player || {};
         switch (code) {
@@ -130,9 +207,6 @@ const AppBank = {
         }
     },
 
-    /**
-     * Списать валюту с игрока.
-     */
     _spendCurrency(code, amount) {
         const p = window.state?.player;
         if (!p) return false;
@@ -157,9 +231,6 @@ const AppBank = {
         }
     },
 
-    /**
-     * Начислить валюту игроку.
-     */
     _gainCurrency(code, amount) {
         const p = window.state?.player;
         if (!p) return false;
@@ -186,9 +257,6 @@ const AppBank = {
         }
     },
 
-    /**
-     * Имя валюты для UI.
-     */
     _getCurrencyLabel(code) {
         const cfg = this._getCurrencyConfig(code);
         if (code === 'rub') return '₽ Рубли';
@@ -196,18 +264,12 @@ const AppBank = {
         return `${cfg.emoji || ''} ${cfg.name || code}`.trim();
     },
 
-    /**
-     * Единица валюты для подписи.
-     */
     _getCurrencyUnit(code) {
         if (code === 'rub') return '₽';
         const cfg = this._getCurrencyConfig(code);
         return cfg ? (cfg.emoji || '') : '';
     },
 
-    /**
-     * Список доступных валют обменника.
-     */
     _getExchangeCurrencies() {
         return [
             { code: 'rub',             label: '₽ Рубли',            icon: 'fa-ruble-sign',   emoji: '₽'  },
@@ -217,9 +279,6 @@ const AppBank = {
         ];
     },
 
-    /**
-     * Расчёт результата обмена.
-     */
     _calcExchangeResult(fromCurrency, toCurrency, amountFrom) {
         const amt = Number(amountFrom) || 0;
         if (amt <= 0) return 0;
@@ -243,6 +302,7 @@ const AppBank = {
     render(container) {
         if (!container) return;
 
+        this.processOfflineAccruals();
         let sub = this.activeSubTab;
 
         container.innerHTML = `
@@ -319,7 +379,7 @@ const AppBank = {
     },
 
     // ====================================================
-    // ОБМЕННИК ВАЛЮТ (4 ВАЛЮТЫ)
+    // ОБМЕННИК ВАЛЮТ
     // ====================================================
     renderExchangeScreen(container) {
         if (!container) return;
@@ -398,7 +458,7 @@ const AppBank = {
                 </div>
                 <div class="font-bold text-xs color-green" style="font-size:14px;">1 ⭐ = ${starRate.toLocaleString()} ₽</div>
                 <div class="sub-label mt-1" style="font-size:8.5px;">
-                    Спред банка: продажа банку (банк покупает у вас) — ${this._getSellRate('stars').toLocaleString()} ₽ / покупка (вы покупаете у банка) — ${this._getBuyRate('stars').toLocaleString()} ₽.
+                    Спред банка: продажа банку — ${this._getSellRate('stars').toLocaleString()} ₽ / покупка у банка — ${this._getBuyRate('stars').toLocaleString()} ₽.
                 </div>
             </div>
 
@@ -483,7 +543,7 @@ const AppBank = {
                 </button>
             </div>
 
-            <!-- ПРОДАЖА БИЛЕТА СУПЕРВИЛСПИНА -->
+            <!-- БИЛЕТ СУПЕРВИЛСПИНА -->
             <div class="glass-card p-2 flex-between" style="border-left: 3px solid var(--green); background:#090e18;">
                 <div>
                     <div class="font-bold text-xs color-green">
@@ -752,9 +812,9 @@ const AppBank = {
         this.renderExchangeScreen(document.getElementById('bankSubContentBox'));
     },
 
-    // ========================================================
-    // ДРУГИЕ РАЗДЕЛЫ
-    // ========================================================
+    // ====================================================
+    // СЧЕТА И ИСТОРИЯ
+    // ====================================================
     renderAccountsScreen(container) {
         if (!container) return;
         let p = state.player || {};
@@ -784,34 +844,127 @@ const AppBank = {
         `;
     },
 
+    // ====================================================
+    // ВКЛАДЫ И СЛОЖНЫЕ ПРОЦЕНТЫ
+    // ====================================================
     renderDepositsScreen(container) {
         if (!container) return;
+        this.processOfflineAccruals();
+
         let safe = state.player?.safeDeposit || 0;
+        let deposit = state.player?.bankDeposit?.amount || 0;
+        let totalEarned = state.player?.bankDeposit?.totalEarned || 0;
 
         container.innerHTML = `
-            <div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.12), #090e18); border-color: var(--cyan);">
-                <div>
-                    <b class="text-xs color-cyan"><i class="fa-solid fa-vault mr-1"></i> Несгораемый депозитный сейф</b>
-                    <div class="sub-label" style="font-size:8.5px;">Иммунитет к долгам и ограблениям. Без процентов.</div>
+            <!-- НАКОПИТЕЛЬНЫЙ ВКЛАД СО СЛОЖНЫМИ ПРОЦЕНТАМИ -->
+            <div class="glass-card mb-2 p-3" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.15), #090e18); border-color: var(--green);">
+                <div class="flex-between mb-1">
+                    <div>
+                        <b class="text-xs color-green"><i class="fa-solid fa-chart-pie mr-1"></i> Накопительный вклад «Автокапитал»</b>
+                        <div class="sub-label" style="font-size:8.5px;">Сложные проценты 1.5% в день с авто-капитализацией.</div>
+                    </div>
+                    <span class="tag-badge bg-tag-green" style="font-size:8px;">1.5% / ДЕНЬ</span>
                 </div>
-                <div class="text-right">
-                    <span class="sub-label" style="font-size:8px;">В СЕЙФЕ:</span>
-                    <div class="price-val color-green text-xs" style="font-size:14px;">${safe.toLocaleString()} ₽</div>
+
+                <div class="grid-2 my-2 p-2" style="background:#050914; border-radius:8px; gap:8px;">
+                    <div>
+                        <span class="sub-label" style="font-size:8px;">СУММА ВКЛАДА:</span>
+                        <div class="price-val color-green text-xs" style="font-size:15px;">${deposit.toLocaleString()} ₽</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="sub-label" style="font-size:8px;">ДОХОД ЗА ВСЕ ВРЕМЯ:</span>
+                        <div class="price-val color-cyan text-xs" style="font-size:15px;">+${totalEarned.toLocaleString()} ₽</div>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="gap:6px;">
+                    <button onclick="AppBank.depositToBankPrompt()" class="btn btn-green btn-sm font-bold">
+                        <i class="fa-solid fa-plus mr-1"></i> Пополнить вклад
+                    </button>
+                    <button onclick="AppBank.withdrawBankDepositPrompt()" class="btn btn-dark btn-sm font-bold" ${deposit <= 0 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-arrow-up-from-bracket mr-1"></i> Забрать вклад
+                    </button>
                 </div>
             </div>
 
-            <div class="grid-2">
-                <button onclick="AppBank.depositToSafePrompt()" class="btn btn-cyan btn-sm">Внести в сейф 📥</button>
-                <button onclick="AppBank.withdrawSafePrompt()" class="btn btn-dark btn-sm" ${safe <= 0 ? 'disabled' : ''}>Снять из сейфа 📤</button>
+            <!-- НЕСГОРАЕМЫЙ ДЕПОЗИТНЫЙ СЕЙФ -->
+            <div class="glass-card mb-2 p-3" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.12), #090e18); border-color: var(--cyan);">
+                <div class="flex-between mb-1">
+                    <div>
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-vault mr-1"></i> Несгораемый депозитный сейф</b>
+                        <div class="sub-label" style="font-size:8.5px;">Иммунитет к долгам и ограблениям. 0% годовых.</div>
+                    </div>
+                    <div class="text-right">
+                        <span class="sub-label" style="font-size:8px;">В СЕЙФЕ:</span>
+                        <div class="price-val color-cyan text-xs" style="font-size:14px;">${safe.toLocaleString()} ₽</div>
+                    </div>
+                </div>
+
+                <div class="grid-2 mt-2" style="gap:6px;">
+                    <button onclick="AppBank.depositToSafePrompt()" class="btn btn-cyan btn-sm">Внести в сейф 📥</button>
+                    <button onclick="AppBank.withdrawSafePrompt()" class="btn btn-dark btn-sm" ${safe <= 0 ? 'disabled' : ''}>Снять из сейфа 📤</button>
+                </div>
             </div>
         `;
+    },
+
+    depositToBankPrompt() {
+        if (!state.player) return;
+        let str = prompt("Сумма пополнения накопительного вклада (₽):", "250000");
+        if (!str) return;
+        let val = parseInt(str.replace(/\s+/g, ''), 10);
+        if (isNaN(val) || val <= 0) return showToast("Некорректная сумма!");
+
+        let cash = state.player.cash || 0;
+        if (cash < val) return showToast("Недостаточно денег на балансе!");
+
+        state.player.cash -= val;
+        if (!state.player.bankDeposit) {
+            state.player.bankDeposit = { amount: 0, lastAccrual: Date.now(), totalEarned: 0 };
+        }
+        state.player.bankDeposit.amount += val;
+        state.player.bankDeposit.lastAccrual = Date.now();
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Пополнение вклада «Автокапитал»`, val, false);
+        }
+
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        showToast(`Вклад пополнен на +${val.toLocaleString()} ₽! Сложные проценты активированы.`);
+        this.renderDepositsScreen(document.getElementById('bankSubContentBox'));
+    },
+
+    withdrawBankDepositPrompt() {
+        if (!state.player) return;
+        let deposit = state.player.bankDeposit?.amount || 0;
+        if (deposit <= 0) return showToast("На вкладе нет средств!");
+
+        let str = prompt(`Сколько снять с вклада? (Доступно: ${deposit.toLocaleString()} ₽):`, String(deposit));
+        if (!str) return;
+        let val = parseInt(str.replace(/\s+/g, ''), 10);
+        if (isNaN(val) || val <= 0 || val > deposit) return showToast("Некорректная сумма!");
+
+        state.player.bankDeposit.amount -= val;
+        state.player.cash += val;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Снятие с вклада «Автокапитал»`, val, true);
+        }
+
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        showToast(`С вклада снято +${val.toLocaleString()} ₽!`);
+        this.renderDepositsScreen(document.getElementById('bankSubContentBox'));
     },
 
     depositToSafePrompt() {
         if (!state.player) return;
         let str = prompt("Сумма для внесения в сейф (₽):", "100000");
         if (!str) return;
-        let val = parseInt(str, 10);
+        let val = parseInt(str.replace(/\s+/g, ''), 10);
         if (isNaN(val) || val <= 0) return showToast("Некорректная сумма!");
 
         let cash = state.player.cash || 0;
@@ -831,7 +984,7 @@ const AppBank = {
         let safe = state.player.safeDeposit || 0;
         let str = prompt(`Сколько снять из сейфа? (Доступно: ${safe.toLocaleString()} ₽):`, String(safe));
         if (!str) return;
-        let val = parseInt(str, 10);
+        let val = parseInt(str.replace(/\s+/g, ''), 10);
         if (isNaN(val) || val <= 0 || val > safe) return showToast("Некорректная сумма!");
 
         state.player.safeDeposit -= val;
@@ -843,42 +996,138 @@ const AppBank = {
         this.renderDepositsScreen(document.getElementById('bankSubContentBox'));
     },
 
+    // ====================================================
+    // РЕПУТАЦИЯ И КРЕДИТНЫЙ СКОРИНГ
+    // ====================================================
     renderReputationScreen(container) {
         if (!container) return;
+        this.processOfflineAccruals();
         let rep = state.player?.bankReputation || { rating: 5.0, loanLimit: 500000 };
+        let rating = Number(rep.rating || 5.0);
+        let color = rating >= 4.0 ? 'color-green' : (rating >= 2.5 ? 'color-amber' : 'color-red');
+
         container.innerHTML = `
-            <div class="glass-card mb-2 p-3 text-center" style="background:#090e18; border-color:var(--green);">
+            <div class="glass-card mb-2 p-3 text-center" style="background:#090e18; border-color:${rating >= 4.0 ? 'var(--green)' : 'var(--red)'};">
                 <div class="font-bold text-xs color-green mb-1">РЕЙТИНГ КРЕДИТОСПОСОБНОСТИ</div>
-                <div class="price-val color-amber my-1" style="font-size:26px;">⭐ ${Number(rep.rating).toFixed(1)} / 5.0</div>
-                <div class="sub-label" style="font-size:9.5px;">Лимит кредитования: <b class="color-green">${Number(rep.loanLimit).toLocaleString()} ₽</b></div>
+                <div class="price-val ${color} my-1" style="font-size:26px;">⭐ ${rating.toFixed(1)} / 5.0</div>
+                <div class="sub-label mb-2" style="font-size:9.5px;">Лимит кредитования: <b class="color-green">${Number(rep.loanLimit).toLocaleString()} ₽</b></div>
+                <div class="sub-label" style="font-size:8.5px; line-height:1.4;">
+                    Закрывайте кредиты вовремя, чтобы растить лимит. Просрочки снижают рейтинг и накладывают штрафные пени.
+                </div>
             </div>
         `;
     },
 
+    // ====================================================
+    // КРИПТОВАЛЮТНЫЙ МОДУЛЬ
+    // ====================================================
     renderCryptoScreen(container) {
         if (!container) return;
-        let crypto = state.player?.crypto || { btc: 0, eth: 0, prices: { btc: 9500000, eth: 340000 } };
+        if (!state.player.crypto) {
+            state.player.crypto = { btc: 0, eth: 0, prices: { btc: 9450000, eth: 320000 } };
+        }
+        let crypto = state.player.crypto;
+
         container.innerHTML = `
-            <div class="glass-card mb-2 p-2">
+            <div class="glass-card mb-2 p-2" style="border-left:3px solid var(--amber); background:#090e18;">
                 <div class="flex-between mb-1">
                     <b class="text-xs color-amber"><i class="fa-brands fa-bitcoin"></i> Bitcoin (BTC)</b>
                     <span class="color-green text-xs font-bold">${Number(crypto.prices.btc).toLocaleString()} ₽</span>
                 </div>
-                <div class="sub-label mb-2" style="font-size:8.5px;">На кошельке: <b>${crypto.btc || 0} BTC</b></div>
-                <button onclick="showToast('Биржа крипты на техобслуживании')" class="btn btn-dark btn-sm w-full">Купить / Продать BTC</button>
+                <div class="sub-label mb-2" style="font-size:8.5px;">Баланс: <b>${(crypto.btc || 0).toFixed(4)} BTC</b></div>
+                <div class="grid-2" style="gap:4px;">
+                    <button onclick="AppBank.buyCryptoAction('btc')" class="btn btn-green btn-sm" style="font-size:9.5px;">Купить BTC</button>
+                    <button onclick="AppBank.sellCryptoAction('btc')" class="btn btn-dark btn-sm" style="font-size:9.5px;" ${(!crypto.btc || crypto.btc <= 0) ? 'disabled' : ''}>Продать BTC</button>
+                </div>
+            </div>
+
+            <div class="glass-card mb-2 p-2" style="border-left:3px solid var(--cyan); background:#090e18;">
+                <div class="flex-between mb-1">
+                    <b class="text-xs color-cyan"><i class="fa-brands fa-ethereum"></i> Ethereum (ETH)</b>
+                    <span class="color-green text-xs font-bold">${Number(crypto.prices.eth).toLocaleString()} ₽</span>
+                </div>
+                <div class="sub-label mb-2" style="font-size:8.5px;">Баланс: <b>${(crypto.eth || 0).toFixed(4)} ETH</b></div>
+                <div class="grid-2" style="gap:4px;">
+                    <button onclick="AppBank.buyCryptoAction('eth')" class="btn btn-green btn-sm" style="font-size:9.5px;">Купить ETH</button>
+                    <button onclick="AppBank.sellCryptoAction('eth')" class="btn btn-dark btn-sm" style="font-size:9.5px;" ${(!crypto.eth || crypto.eth <= 0) ? 'disabled' : ''}>Продать ETH</button>
+                </div>
             </div>
         `;
     },
 
+    buyCryptoAction(coin) {
+        if (!state.player) return;
+        const prices = state.player.crypto?.prices || { btc: 9450000, eth: 320000 };
+        const pricePerUnit = prices[coin];
+        const cash = state.player.cash || 0;
+
+        let str = prompt(`На какую сумму купить ${coin.toUpperCase()} в рублях? (Доступно: ${cash.toLocaleString()} ₽):`, "100000");
+        if (!str) return;
+        let rubAmount = parseInt(str.replace(/\s+/g, ''), 10);
+        if (isNaN(rubAmount) || rubAmount <= 0) return showToast("Некорректная сумма!");
+        if (cash < rubAmount) return showToast("Недостаточно рублей на балансе!");
+
+        const coinsToAdd = rubAmount / pricePerUnit;
+        state.player.cash -= rubAmount;
+        if (!state.player.crypto) state.player.crypto = { btc: 0, eth: 0, prices };
+        state.player.crypto[coin] = (state.player.crypto[coin] || 0) + coinsToAdd;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Покупка ${coin.toUpperCase()}`, rubAmount, false);
+        }
+
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        showToast(`Куплено ${coinsToAdd.toFixed(4)} ${coin.toUpperCase()}!`);
+        this.renderCryptoScreen(document.getElementById('bankSubContentBox'));
+    },
+
+    sellCryptoAction(coin) {
+        if (!state.player) return;
+        const prices = state.player.crypto?.prices || { btc: 9450000, eth: 320000 };
+        const pricePerUnit = prices[coin];
+        const balance = state.player.crypto?.[coin] || 0;
+        if (balance <= 0) return showToast(`У вас нет ${coin.toUpperCase()}!`);
+
+        let str = prompt(`Сколько ${coin.toUpperCase()} продать? (Доступно: ${balance.toFixed(4)}):`, String(balance.toFixed(4)));
+        if (!str) return;
+        let amount = parseFloat(str);
+        if (isNaN(amount) || amount <= 0 || amount > balance) return showToast("Некорректное количество!");
+
+        const rubGain = Math.floor(amount * pricePerUnit);
+        state.player.crypto[coin] -= amount;
+        state.player.cash += rubGain;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Продажа ${coin.toUpperCase()}`, rubGain, true);
+        }
+
+        saveState();
+        updateHeaderUI();
+        if (typeof playSound === 'function') playSound('win');
+        showToast(`Продано ${amount.toFixed(4)} ${coin.toUpperCase()} за +${rubGain.toLocaleString()} ₽!`);
+        this.renderCryptoScreen(document.getElementById('bankSubContentBox'));
+    },
+
+    // ====================================================
+    // КРЕДИТЫ И ПРОСРОЧКИ
+    // ====================================================
     renderLoanScreen(container) {
         if (!container) return;
+        this.processOfflineAccruals();
+
         let debt = state.player?.loanDebt || 0;
         let lvl = state.player?.level || 1;
+        let rep = state.player?.bankReputation || { rating: 5.0, loanLimit: 500000 };
+        let maxLimit = rep.loanLimit || 500000;
+        let now = Date.now();
+        let isOverdue = debt > 0 && state.player?.loanDueTime && now > state.player.loanDueTime;
 
         let options = [
-            { id: "starter", title: "Стартовый овердрафт",    amount: 150000,  repay: 165000,  minLvl: 1, desc: "Быстрый выкуп первой классики под ремонт" },
-            { id: "comfort", title: "Займ «Шаг в Комфорт»",   amount: 500000,  repay: 550000,  minLvl: 4, desc: "Хватает на покупку Solaris или Focus на авторынке" },
-            { id: "pro",     title: "Бизнес-кредит перекупа", amount: 1500000, repay: 1680000, minLvl: 8, desc: "Оптовый выкуп автопарков и редких янгтаймеров" }
+            { id: "starter", title: "Стартовый овердрафт",    amount: Math.min(maxLimit, 150000),  repay: Math.round(Math.min(maxLimit, 150000) * 1.08), minLvl: 1, desc: "Быстрый выкуп первой классики под ремонт" },
+            { id: "comfort", title: "Займ «Шаг в Комфорт»",   amount: Math.min(maxLimit, 500000),  repay: Math.round(Math.min(maxLimit, 500000) * 1.10), minLvl: 3, desc: "Хватает на покупку иномарки на авторынке" },
+            { id: "pro",     title: "Бизнес-кредит перекупа", amount: Math.min(maxLimit, 1500000), repay: Math.round(Math.min(maxLimit, 1500000) * 1.12), minLvl: 6, desc: "Оптовый выкуп автопарков и редких лотов" }
         ];
 
         let loanCardsHtml = options.map(opt => {
@@ -905,11 +1154,21 @@ const AppBank = {
             `;
         }).join('');
 
+        let dueStatusHtml = '';
+        if (debt > 0) {
+            if (isOverdue) {
+                dueStatusHtml = `<b class="color-red blink text-xs block mt-1">⚠️ ПРОСРОЧКА! Начисляются штрафные пени +3%/день!</b>`;
+            } else if (state.player?.loanDueTime) {
+                let hoursLeft = Math.max(1, Math.round((state.player.loanDueTime - now) / 3600000));
+                dueStatusHtml = `<div class="sub-label color-amber text-xs mt-1">Льготный срок: осталось ${hoursLeft} ч. (ставка 2%/день)</div>`;
+            }
+        }
+
         container.innerHTML = `
-            <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(255,51,102,0.12), #090e18); border-color: ${debt > 0 ? 'var(--red)' : 'var(--border-glass)'};">
+            <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, ${isOverdue ? 'rgba(255,51,102,0.25)' : 'rgba(0,230,118,0.12)'}, #090e18); border-color: ${debt > 0 ? (isOverdue ? 'var(--red)' : 'var(--amber)') : 'var(--border-glass)'};">
                 <span class="sub-label text-xs">Текущая задолженность по кредиту:</span>
                 <div class="price-val ${debt > 0 ? 'color-red' : 'color-green'} my-1" style="font-size:22px;">${debt.toLocaleString()} ₽</div>
-                <div class="sub-label" style="font-size:8.5px;">Начисление: 2% в полночь на остаток задолженности</div>
+                ${dueStatusHtml}
             </div>
 
             ${debt > 0 ? `
@@ -918,7 +1177,7 @@ const AppBank = {
                 </button>
             ` : ''}
 
-            <div class="sub-label mb-1" style="font-size:9.5px;">Доступные кредитные программы Во-Банка:</div>
+            <div class="sub-label mb-1" style="font-size:9.5px;">Доступные кредитные программы (лимит: ${maxLimit.toLocaleString()} ₽):</div>
             ${loanCardsHtml}
         `;
     },
@@ -933,6 +1192,9 @@ const AppBank = {
         try {
             state.player.cash = (state.player.cash || 0) + amount;
             state.player.loanDebt = repayAmount;
+            state.player.loanTakenAt = Date.now();
+            state.player.loanLastInterestAt = Date.now();
+            state.player.loanDueTime = Date.now() + (3 * 86400000); // 3 суток льготный период
 
             if (typeof logBankTransaction === 'function') {
                 logBankTransaction(`Зачисление кредита`, amount, true);
@@ -962,6 +1224,15 @@ const AppBank = {
         try {
             state.player.cash -= debt;
             state.player.loanDebt = 0;
+            state.player.loanDueTime = null;
+            state.player.loanLastInterestAt = null;
+
+            // Повышаем кредитный рейтинг за успешное закрытие
+            if (!state.player.bankReputation) {
+                state.player.bankReputation = { rating: 5.0, loanLimit: 500000 };
+            }
+            state.player.bankReputation.rating = Math.min(5.0, Number((state.player.bankReputation.rating + 0.2).toFixed(1)));
+            this.recalculateLoanLimit();
 
             if (typeof logBankTransaction === 'function') {
                 logBankTransaction(`Полное погашение кредита`, debt, false);
@@ -971,7 +1242,7 @@ const AppBank = {
             updateHeaderUI();
             if (typeof playSound === 'function') playSound('win');
             if (typeof tgHaptic === 'function') tgHaptic('success');
-            showToast("Кредит полностью закрыт!");
+            showToast(`Кредит полностью закрыт! Рейтинг повышен до ⭐ ${state.player.bankReputation.rating}`);
             this.renderLoanScreen(document.getElementById('bankSubContentBox'));
         } finally {
             this._loanActionPending = false;
@@ -991,5 +1262,10 @@ const AppBank = {
 };
 
 window.AppBank = AppBank;
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => AppBank.init());
+} else {
+    AppBank.init();
+}
 
-console.log('[🏦 phone-bank v3.0.1] ФИКС: fallback курса Stars 25000 → 2500 (умный чейн BANK_EXCHANGE_RATES → WHEEL_CONFIG → 2500) ✓');
+console.log('[🏦 phone-bank v3.5.0] Сложные проценты по вкладам (Date.now), пени и кредитный скоринг готовы ✓');
