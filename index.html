@@ -40,6 +40,30 @@
 </head>
 <body>
 
+<!-- ═══════════ ИНТЕРАКТИВНЫЙ СПЛЭШ-СКРИН ЗАГРУЗКИ ═══════════ -->
+<div id="appLoadingScreen" class="loading-screen-overlay" style="display:none;">
+  <div class="loading-screen-content">
+    <div class="loading-logo-glow">
+      <span class="loading-logo-badge">M+</span>
+      <span class="loading-logo-title">AUTODROT</span>
+    </div>
+    
+    <div class="loading-status-text" id="loadingStatusText">
+      Подключение к серверу...
+    </div>
+
+    <div class="loading-progress-track">
+      <div class="loading-progress-bar" id="loadingProgressBar"></div>
+    </div>
+
+    <div class="loading-percentage" id="loadingPercentageText">0%</div>
+
+    <div class="loading-tips" id="loadingTipText">
+      Совет: Проверяйте толщину ЛКП перед покупкой авто у капота.
+    </div>
+  </div>
+</div>
+
 <div id="pcAuthScreen" class="pc-auth-overlay" style="display:none;">
   <div class="pc-auth-box">
     <div class="pc-auth-logo"><i class="fa-solid fa-terminal"></i></div>
@@ -1064,6 +1088,66 @@
 <div id="toastNotification" class="toast">Уведомление</div>
 
 <style>
+  /* ═══════════ FULLSCREEN LOADING SCREEN ═══════════ */
+  .loading-screen-overlay {
+    position: fixed; inset: 0;
+    z-index: 9999999;
+    background: radial-gradient(circle at 50% 25%, #0d1829 0%, #04070e 100%);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; box-sizing: border-box;
+    opacity: 1; visibility: visible;
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+  }
+  .loading-screen-overlay.loaded {
+    opacity: 0; visibility: hidden; pointer-events: none;
+  }
+  .loading-screen-content {
+    width: 100%; max-width: 320px;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .loading-logo-glow {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 24px;
+  }
+  .loading-logo-badge {
+    background: linear-gradient(135deg, #00f2fe, #7928ca);
+    color: #000; font-weight: 900; font-size: 14px; padding: 4px 10px;
+    border-radius: 8px; box-shadow: 0 0 16px rgba(0, 242, 254, 0.45);
+  }
+  .loading-logo-title {
+    font-size: 20px; font-weight: 900; letter-spacing: 2.5px; color: #fff;
+    text-shadow: 0 0 14px rgba(0, 242, 254, 0.5);
+  }
+  .loading-status-text {
+    font-size: 12px; font-weight: 800; color: var(--cyan, #00f2fe);
+    margin-bottom: 12px; min-height: 18px; letter-spacing: 0.3px;
+    text-shadow: 0 0 8px rgba(0, 242, 254, 0.3);
+  }
+  .loading-progress-track {
+    width: 100%; height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(0, 242, 254, 0.3);
+    border-radius: 999px; overflow: hidden; position: relative;
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.8);
+  }
+  .loading-progress-bar {
+    width: 0%; height: 100%;
+    background: linear-gradient(90deg, #00e676, #00f2fe);
+    border-radius: 999px;
+    box-shadow: 0 0 14px rgba(0, 242, 254, 0.85);
+    transition: width 0.2s ease-out;
+  }
+  .loading-percentage {
+    font-size: 11px; font-weight: 800; color: #94a3b8;
+    margin-top: 8px; font-variant-numeric: tabular-nums;
+  }
+  .loading-tips {
+    margin-top: 28px; font-size: 10px; line-height: 1.45;
+    color: #94a3b8; padding: 10px 14px; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(0, 242, 254, 0.2);
+  }
+
+  /* ═══════════ PC AUTH STYLES ═══════════ */
   .pc-auth-overlay {
     position: fixed; inset: 0;
     background: radial-gradient(circle at 50% 0%, #151d2f 0%, #05080f 100%);
@@ -1128,6 +1212,56 @@
     const FIREBASE_READY_TIMEOUT_MS = 8000;
 
     let isPcAuthenticated = false;
+
+    // ═══════════ МЕНЕДЖЕР ШКАЛЫ ЗАГРУЗКИ ═══════════
+    window.AppLoadingManager = {
+      currentPercent: 0,
+      tips: [
+        "Совет: Проверяйте толщину ЛКП перед покупкой авто у капота.",
+        "Совет: Сложные проценты на вкладе «Автокапитал» начисляются даже в оффлайне.",
+        "Совет: Лицензия РАФ защищает от лишнего внимания ДПС на заездах 402м.",
+        "Совет: Сдавайте проблемные корчи скупщику в Даркнете без лишних вопросов.",
+        "Совет: Замена масла и полировка поднимают цену авто при перепродаже.",
+        "Совет: Внимательно читайте отчёт Автотеки на смотанный пробег."
+      ],
+
+      show() {
+        const overlay = document.getElementById('appLoadingScreen');
+        if (overlay) {
+          overlay.style.display = 'flex';
+          overlay.classList.remove('loaded');
+        }
+        const tipEl = document.getElementById('loadingTipText');
+        if (tipEl) {
+          tipEl.innerText = this.tips[Math.floor(Math.random() * this.tips.length)];
+        }
+        this.setProgress(5, "Запуск PEREKUP OS...");
+      },
+
+      setProgress(percent, statusText) {
+        this.currentPercent = Math.min(100, Math.max(this.currentPercent, percent));
+        const bar = document.getElementById('loadingProgressBar');
+        const text = document.getElementById('loadingStatusText');
+        const num = document.getElementById('loadingPercentageText');
+
+        if (bar) bar.style.width = `${this.currentPercent}%`;
+        if (text && statusText) text.innerText = statusText;
+        if (num) num.innerText = `${Math.round(this.currentPercent)}%`;
+      },
+
+      finish() {
+        this.setProgress(100, "Вход в гараж...");
+        setTimeout(() => {
+          const overlay = document.getElementById('appLoadingScreen');
+          if (overlay) {
+            overlay.classList.add('loaded');
+            setTimeout(() => {
+              overlay.style.display = 'none';
+            }, 450);
+          }
+        }, 250);
+      }
+    };
 
     const urlParams = new URLSearchParams(window.location.search);
     const forceDev = urlParams.get('dev') === '1';
@@ -1378,27 +1512,55 @@
     }
 
     async function initAllModules() {
-      const t0 = Date.now();
+      if (window.AppLoadingManager) {
+        window.AppLoadingManager.show();
+      }
 
-      for (const scriptPath of scriptQueue) {
+      const t0 = Date.now();
+      const totalScripts = scriptQueue.length;
+
+      for (let i = 0; i < totalScripts; i++) {
+        const scriptPath = scriptQueue[i];
         await loadScript(scriptPath);
+
+        if (window.AppLoadingManager) {
+          const pct = 5 + Math.round(((i + 1) / totalScripts) * 60);
+          const name = scriptPath.split('/').pop().replace('.js', '');
+          window.AppLoadingManager.setProgress(pct, `Загрузка: ${name}...`);
+        }
       }
 
       console.log(`[Loader] Все скрипты загружены за ${Date.now() - t0}мс`);
 
+      if (window.AppLoadingManager) {
+        window.AppLoadingManager.setProgress(72, "Синхронизация с сервером...");
+      }
+
       await waitForFirebaseReady();
+
+      if (window.AppLoadingManager) {
+        window.AppLoadingManager.setProgress(88, "Загрузка профиля перекупа...");
+      }
 
       if (typeof initApp === 'function') {
         try {
           initApp();
+          // Защитный авто-финиш, если модуль профиля не вызвал finish() вручную
+          setTimeout(() => {
+            if (window.AppLoadingManager && window.AppLoadingManager.currentPercent < 100) {
+              window.AppLoadingManager.finish();
+            }
+          }, 2000);
         } catch (e) {
           console.error('[Loader] ❌ initApp threw error:', e);
+          if (window.AppLoadingManager) window.AppLoadingManager.finish();
           if (typeof showToast === 'function') {
             showToast('⚠️ Ошибка загрузки игры. Откройте консоль.', 'error');
           }
         }
       } else {
         console.error('[Loader] ❌ initApp не найден! app-loader.js не загрузился?');
+        if (window.AppLoadingManager) window.AppLoadingManager.finish();
       }
     }
 
