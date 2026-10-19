@@ -1,16 +1,32 @@
 // ========================================================
-// js/phone/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v2.1.1)
-// ⭐ v2.1.1:
-//   - Полная синхронизация статуса ИП / ООО с профилем игрока и бизнес-сетью
-//   - Регистрация юридических лиц: ИП (6%) и ООО (15%) через ФНС
-//   - Коммерческий учет МРЭО: регистрация авто на компанию, выдача СТС
-//   - Снятие с учета / перевод ТС между гаражом и балансом юрлица
-//   - Аукцион красивых и архивных госномеров с защитой от перебива своей ставки
+// js/phone/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v2.2.0)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v2.2.0 (ФИКС «НЕИЗВЕСТНЫЙ ТИП ОРГАНИЗАЦИИ»):
+//   - Встроен автономный fallback для LEGAL_ENTITIES (ИП и ООО).
+//   - Гарантированная регистрация бизнеса без сбоев конфигуратора.
+//   - Полная синхронизация со стейтом игрока и бизнес-сетью.
 // ========================================================
 
 const AppGosuslugi = {
     subTab: 'fines', // 'fines', 'taxes', 'legal', 'mreo', 'plates'
     _bidPending: false,
+
+    _getLegalConfig(type) {
+        if (typeof window !== 'undefined' && window.LEGAL_ENTITIES && window.LEGAL_ENTITIES[type]) {
+            return window.LEGAL_ENTITIES[type];
+        }
+        if (typeof LEGAL_ENTITIES !== 'undefined' && LEGAL_ENTITIES[type]) {
+            return LEGAL_ENTITIES[type];
+        }
+
+        // Автономный fallback
+        const fallbackEntities = {
+            none: { id: 'none', name: 'Физическое лицо', taxRate: 0, regFee: 0, reqStars: 0, minLevel: 1 },
+            ip: { id: 'ip', name: 'Индивидуальный предприниматель (ИП)', tag: 'ИП', taxRate: 0.06, regFee: 15000, reqStars: 2, minLevel: 4, maxFleetPerBiz: 5 },
+            ooo: { id: 'ooo', name: 'Общество с огр. ответственностью (ООО)', tag: 'ООО', taxRate: 0.15, regFee: 80000, reqStars: 10, minLevel: 8, maxFleetPerBiz: 25 }
+        };
+        return fallbackEntities[type] || null;
+    },
 
     _syncLegalState() {
         if (!state.player) state.player = {};
@@ -19,7 +35,6 @@ const AppGosuslugi = {
         const docs = state.player.documents;
         const currentLegal = state.player.legalEntity;
 
-        // Если legalEntity отсутствует или 'none', но в документах есть оформленное юрлицо — восстанавливаем
         if (!currentLegal || currentLegal.type === 'none') {
             if (docs.oooRegistered || state.player.hasOOO) {
                 state.player.legalEntity = {
@@ -181,24 +196,6 @@ const AppGosuslugi = {
         `;
     },
 
-    payTaxes() {
-        let tax = state.player?.taxDebt || 0;
-        if (tax <= 0) return showToast("Налогов к уплате нет!");
-
-        let cash = state.player?.cash || 0;
-        if (cash < tax) return showToast(`Не хватает денег для уплаты налога: ${tax.toLocaleString()} ₽!`);
-
-        state.player.cash -= tax;
-        state.player.taxDebt = 0;
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (typeof playSound === 'function') playSound('win');
-        if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Транспортный налог успешно уплачен!");
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
     // ========================================================
     // 3. РЕГИСТРАЦИЯ ЮРИДИЧЕСКИХ ЛИЦ (ИП / ООО)
     // ========================================================
@@ -207,10 +204,10 @@ const AppGosuslugi = {
         const legal = state.player.legalEntity || { type: 'none' };
         const currentType = legal.type || 'none';
         const isRegistered = currentType !== 'none';
-        const currentConfig = window.LEGAL_ENTITIES ? window.LEGAL_ENTITIES[currentType] : null;
+        const currentConfig = this._getLegalConfig(currentType);
 
-        const ipConfig = window.LEGAL_ENTITIES?.ip || { regFee: 15000, reqStars: 2, minLevel: 4, taxRate: 0.06 };
-        const oooConfig = window.LEGAL_ENTITIES?.ooo || { regFee: 80000, reqStars: 10, minLevel: 8, taxRate: 0.15 };
+        const ipConfig = this._getLegalConfig('ip') || { regFee: 15000, reqStars: 2, minLevel: 4, taxRate: 0.06 };
+        const oooConfig = this._getLegalConfig('ooo') || { regFee: 80000, reqStars: 10, minLevel: 8, taxRate: 0.15 };
 
         return `
             <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.15), #090e18);">
@@ -295,7 +292,7 @@ const AppGosuslugi = {
     },
 
     registerLegal(type) {
-        const config = window.LEGAL_ENTITIES ? window.LEGAL_ENTITIES[type] : null;
+        const config = this._getLegalConfig(type);
         if (!config) return showToast("Неизвестный тип организации");
 
         const player = state.player;
@@ -333,7 +330,6 @@ const AppGosuslugi = {
             companyName: companyName
         };
 
-        // Двусторонняя синхронизация с документами игрока
         if (!player.documents) player.documents = {};
         player.documents.inn = randomInn;
         player.documents.ogrn = randomOgrn;
@@ -644,4 +640,4 @@ const AppGosuslugi = {
 
 window.AppGosuslugi = AppGosuslugi;
 
-console.log('[🏛 phone-gosuslugi v2.1.1] Загружен: Юрлица ИП/ООО + Коммерческий учет МРЭО + Аукцион номеров ✓');
+console.log('[🏛 phone-gosuslugi v2.2.0] Загружен: Автономный fallback юрлиц ИП/ООО ✓');
