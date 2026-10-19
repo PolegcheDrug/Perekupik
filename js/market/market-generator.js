@@ -1,16 +1,13 @@
 // ========================================================
-// js/market-generator.js — ГЕНЕРАТОР ЛОТОВ (v2.3.0)
+// js/market/market-generator.js — ГЕНЕРАТОР ЛОТОВ (v2.4.0 BALANCED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v2.3.0 (РЕПУТАЦИЯ БРЕНДОВ + СЕЗОННЫЕ СОБЫТИЯ):
-//   - ДОБАВЛЕНА система репутации брендов (BMW, ВАЗ, Toyota...).
-//   - Чистые сделки повышают репутацию → цены растут.
-//   - Скрученный пробег/криминал роняют репутацию → цены падают.
-//   - ДОБАВЛЕНЫ глобальные сезонные события (Новый год, 8 марта, Дрифт).
-//   - Флаг isBlackMarketCandidate для "убитых" и криминальных машин.
-// ⭐ v2.2.0:
-//   - Улучшенная логика дефектов (без дубликатов)
-//   - Цены зависят от архетипа + рыночной ситуации
-//   - P2P-лоты не конфликтуют с обычными
+// ⭐ v2.4.0:
+//   - Синхронизация оценки: marketValue лота сразу рассчитывается через recalculateCarMarketValue,
+//     устраняя падение цены после покупки при попадании в гараж.
+//   - Исправлена логика ЛКП: толщина >180 мкм корректно выставляет флаг isRepainted.
+//   - Скрученный пробег синхронизирован с autotekaMileageDiscrepancy.
+//   - Расширен детектор брендов для репутации (Ока, ВАЗ-классика).
+//   - Полная интеграция сезонных событий, Даркнета и P2P-лотов.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -179,7 +176,7 @@ function refreshPlateCatalog() {
 }
 
 // ========================================================
-// ⭐ v2.3.0: РЕПУТАЦИЯ БРЕНДА
+// РЕПУТАЦИЯ БРЕНДА
 // ========================================================
 function _ensureBrandReputation() {
     if (!window.state) window.state = {};
@@ -192,7 +189,7 @@ function _ensureBrandReputation() {
 }
 
 /**
- * Определяет бренд по названию машины.
+ * Определяет бренд по названию машины с улучшенным распознаванием отечественных авто.
  */
 function _detectBrand(carName) {
     if (!carName) return 'default';
@@ -207,7 +204,7 @@ function _detectBrand(carName) {
     if (lower.includes('honda') || lower.includes('хонда')) return 'honda';
     if (lower.includes('mazda') || lower.includes('мазда')) return 'mazda';
     if (lower.includes('subaru') || lower.includes('субару')) return 'subaru';
-    if (lower.includes('vaz') || lower.includes('ваз') || lower.includes('lada') || lower.includes('лада') || lower.includes('жигули')) return 'vaz';
+    if (lower.includes('vaz') || lower.includes('ваз') || lower.includes('lada') || lower.includes('лада') || lower.includes('жигули') || lower.includes('ока') || lower.includes('oka') || lower.includes('1111') || lower.includes('210') || lower.includes('211')) return 'vaz';
     if (lower.includes('gaz') || lower.includes('газ') || lower.includes('волга')) return 'gaz';
     if (lower.includes('uaz') || lower.includes('уаз')) return 'uaz';
     if (lower.includes('moskvich') || lower.includes('москвич')) return 'moskvich';
@@ -219,19 +216,12 @@ function _detectBrand(carName) {
     return 'default';
 }
 
-/**
- * Возвращает текущую репутацию бренда (множитель).
- */
 function getBrandReputation(carName) {
     _ensureBrandReputation();
     const brand = _detectBrand(carName);
     return window.state.brandReputation[brand] || 1.0;
 }
 
-/**
- * Обновляет репутацию бренда после сделки.
- * Чистая продажа → +0.05, проблемная → -0.10.
- */
 function updateBrandReputationAfterSale(carName, isCleanSale) {
     _ensureBrandReputation();
     const brand = _detectBrand(carName);
@@ -250,7 +240,7 @@ function updateBrandReputationAfterSale(carName, isCleanSale) {
 }
 
 // ========================================================
-// ⭐ v2.3.0: СЕЗОННЫЕ СОБЫТИЯ
+// СЕЗОННЫЕ СОБЫТИЯ
 // ========================================================
 function _ensureGlobalEvent() {
     if (!window.state) window.state = {};
@@ -258,7 +248,6 @@ function _ensureGlobalEvent() {
         return;
     }
 
-    // Не каждый раз генерируем событие (25% шанс при открытии)
     if (Math.random() > 0.25) {
         window.state.globalEvent = null;
         return;
@@ -274,9 +263,6 @@ function _ensureGlobalEvent() {
     console.log(`[Event] Активировано сезонное событие: ${ev.name}`);
 }
 
-/**
- * Возвращает множитель цены от сезонного события.
- */
 function getSeasonMultiplier(carType) {
     const ev = window.state?.globalEvent;
     if (!ev || !ev.isActive || ev.daysLeft <= 0) return 1.0;
@@ -292,6 +278,7 @@ function formatCarBrandBadgeHtml(carName) {
     const brands = [
         { brand: "ВАЗ", badgeClass: "brand-vaz" },
         { brand: "Lada", badgeClass: "brand-vaz" },
+        { brand: "Ока", badgeClass: "brand-vaz" },
         { brand: "ГАЗ", badgeClass: "brand-gaz" },
         { brand: "Москвич", badgeClass: "brand-gaz" },
         { brand: "BMW", badgeClass: "brand-bmw" },
@@ -378,8 +365,6 @@ function generateCarDefects(car, seller, isBeaterProject) {
 
     try {
         const cond = car.condition || 80;
-        const sellerHideChance = seller ? (seller.hideDefectChance || 0.5) : 0.5;
-
         let baseCount = 2;
         if (isBeaterProject) baseCount = 4;
         if (cond < 40) baseCount += 2;
@@ -464,7 +449,7 @@ function generateCarDefects(car, seller, isBeaterProject) {
 }
 
 // ========================================================
-// ⭐ v2.3.0: ГЛАВНЫЙ ГЕНЕРАТОР (С РЕПУТАЦИЕЙ И СОБЫТИЯМИ)
+// ГЛАВНЫЙ ГЕНЕРАТОР ЛОТОВ ВИТРИНЫ
 // ========================================================
 async function populateMarketFeed() {
     console.log('[Market] populateMarketFeed → START');
@@ -525,7 +510,7 @@ async function populateMarketFeed() {
     state.marketFeed = [];
     state.marketFeedVersion = (state.marketFeedVersion || 0) + 1;
 
-    // P2P-лоты не конфликтуют с обычными
+    // Интеграция P2P-лотов игроков
     try {
         if (state.p2pMarketListings && state.p2pMarketListings.length > 0) {
             state.p2pMarketListings.forEach(p2pLot => {
@@ -544,11 +529,12 @@ async function populateMarketFeed() {
                             type: carType,
                             drivetrain: p2pCarData.drivetrain || 'rwd',
                             basePrice: p2pLot.price,
+                            purchaseCost: p2pLot.price,
                             mileage: p2pCarData.mileage || 65000,
                             price: p2pLot.price,
                             originalAskingPrice: p2pLot.price,
                             baseMarketValue: p2pLot.price,
-                            marketValue: Math.round(p2pLot.price * 1.10),
+                            marketValue: Math.round(p2pLot.price * 1.05),
                             img: p2pCarData.img || "assets/cars/economy/2101/vaz-2101.jpg",
                             images: Array.isArray(p2pCarData.images) && p2pCarData.images.length > 0 ? [...p2pCarData.images] : (p2pCarData.img ? [p2pCarData.img] : []),
                             fallback: getCategoryFallback(carType),
@@ -647,7 +633,6 @@ async function populateMarketFeed() {
             const baseVal = Math.round(dynPrice * 0.95);
             const isCoolNumber = Math.random() < 0.15;
             let genPlate = isCoolNumber ? generateCoolPlate() : generateNormalPlate();
-            const plateVal = evaluatePlate(genPlate);
             let sellerPrice = Math.round(dynPrice * priceMultiplier);
 
             let rawImg = "";
@@ -701,7 +686,6 @@ async function populateMarketFeed() {
             let cName = template.name ? template.name : "Техника";
             let cPower = template.power ? template.power : 100;
 
-            // ⭐ v2.3.0: флаг для Даркнета
             let isBlackMarketCandidate = false;
             if (defectsResult.legalDefect) {
                 isBlackMarketCandidate = true;
@@ -709,12 +693,16 @@ async function populateMarketFeed() {
                 isBlackMarketCandidate = true;
             }
 
+            const isRolledOdo = seller.id === 'pensioner' || (isBeaterProject && Math.random() < 0.45);
+            const isRepaintedCar = isBeaterProject || isThickDoors > 180 || isThickHood > 180;
+
             const lotObject = {
                 id: carId, name: cName, power: cPower, type: tType,
                 drivetrain: template.drivetrain || 'rwd',
                 basePrice: baseP, mileage: mileageVal, price: sellerPrice,
                 originalAskingPrice: sellerPrice,
-                baseMarketValue: baseVal, marketValue: baseVal + plateVal,
+                baseMarketValue: baseVal,
+                marketValue: baseVal, // пересчитается ниже
                 img: rawImg, images: carGallery, fallback: cFallback,
                 plate: genPlate,
                 isStolen: Math.random() < (isBeaterProject ? 0.16 : (isUrgentDeal ? 0.08 : 0.03)),
@@ -731,9 +719,10 @@ async function populateMarketFeed() {
                 condition: cCond, insurance: null, tuning: carTuning,
                 wear: { engine: engWear, transmission: transWear },
                 bodyThickness: { hood: isThickHood, roof: 100, doors: isThickDoors, wings: 110 },
-                rolledOdometer: seller.id === 'pensioner' || (isBeaterProject && Math.random() < 0.45),
+                rolledOdometer: isRolledOdo,
+                autotekaMileageDiscrepancy: isRolledOdo,
                 hasAdditive: isBeaterProject && Math.random() < 0.35,
-                isRepainted: isBeaterProject,
+                isRepainted: isRepaintedCar,
                 isPolished: isMuseumStock,
                 isPersonal: false, isRegisteredOnPlayer: true,
                 ownershipDays: 0, engineTemp: 90,
@@ -763,6 +752,11 @@ async function populateMarketFeed() {
             }
 
             if (typeof window.ensureCarIdentity === 'function') window.ensureCarIdentity(lotObject);
+
+            // Синхронизируем честную рыночную оценку с функцией гаража
+            if (typeof recalculateCarMarketValue === 'function') {
+                lotObject.marketValue = recalculateCarMarketValue(lotObject);
+            }
 
             state.marketFeed.push(lotObject);
             generatedCount++;
@@ -818,4 +812,4 @@ Object.assign(window, {
     _ensureGlobalEvent
 });
 
-console.log('[🏪 market-generator v2.3.0] Репутация брендов + Сезонные события + Флаг Даркнета ✓');
+console.log('[🏪 market-generator v2.4.0] Синхронизация реальной оценки рынка + фикс ЛКП и Автотеки ✓');
