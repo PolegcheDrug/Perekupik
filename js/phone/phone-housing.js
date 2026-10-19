@@ -1,16 +1,23 @@
 // ========================================================
-// js/phone/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v1.4.0)
+// js/phone/phone-housing.js — НЕДВИЖИМОСТЬ, ЖИЛЬЁ И БОКСЫ (v2.0.0 PRO)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.4.0 (ВОЗВРАЩЕНИЕ ВСЕХ 14 ОБЪЕКТОВ НЕДВИЖИМОСТИ):
-//   - ФИКС: Устранен сброс каталога до 3 объектов при задержке загрузки data_economy.js.
-//   - Полный встроенный каталог из 14 объектов (от бытовки до острова в нейтральных водах).
-//   - Синхронизация window.HOUSING_LIST и гарантированное расширение слотов гаража.
-//   - Автосписание регулярной аренды раз в 3 дня и защита от повторных покупок.
+// ⭐ v2.0.0 (СУБАРЕНДА, ДОМАШНИЙ ВЕРСТАК И БЫТ ПЕРЕКУПА):
+//   - СУБАРЕНДА НЕАКТИВНОГО ЖИЛЬЯ: Сдавайте купленные боксы и квартиры
+//     в аренду другим жильцам и получайте ежедневный пассивный доход!
+//   - БЫТ ПЕРЕКУПА В «МОЁ ЖИЛЬЁ»:
+//       • ☕ Заварить кофе (+15% сытости и настроения).
+//       • 🎮 Игра в PS5 (бафф настроения и куража перед рынком).
+//       • 💰 Быстрый доступ к огнеупорному сейфу Valberg.
+//       • 📹 Видеомониторинг периметра 4K (нулевой риск угона).
+//   - ДОМАШНИЙ ВЕРСТАК И УХОД: Бесплатная мойка из шланга, замена свечей
+//     и заливка присадки в мотор прямо в боксе.
+//   - СОХРАНЕНО: Полный каталог 14 объектов и расчет слотов автопарка.
 // ========================================================
 
 const PhoneHousing = {
     activeTab: 'catalog', // 'catalog' | 'my_home'
+    selectedWorkbenchCarIdx: 0,
 
     init() {
         this.ensureHousingState();
@@ -25,14 +32,12 @@ const PhoneHousing = {
     },
 
     getHousingDatabase() {
-        // Проверяем глобальный список из data_economy.js
         const globalList = (typeof window !== 'undefined' && window.HOUSING_LIST) || 
                            (typeof HOUSING_LIST !== 'undefined' ? HOUSING_LIST : null);
         if (Array.isArray(globalList) && globalList.length >= 14) {
             return globalList;
         }
 
-        // Полный эталонный каталог из 14 объектов недвижимости
         const fullDatabase = [
             {
                 id: 'trailer',
@@ -52,6 +57,7 @@ const PhoneHousing = {
                 canOBDGarage: false,
                 hasPersonalSlot: false,
                 reshalaDiscountPct: 0,
+                subletIncome: 350,
                 perk: 'Только ночлег. Доработки и ремонт невозможны.',
                 desc: 'Временный строительный вагончик у обочины. Сквозняки, верстака нет. Автомобили стоят под открытым небом.',
                 img: 'assets/houses/trailer.jpg',
@@ -75,6 +81,7 @@ const PhoneHousing = {
                 canOBDGarage: false,
                 hasPersonalSlot: false,
                 reshalaDiscountPct: 0,
+                subletIncome: 900,
                 perk: '1 машиноместо под навесом. Доступна замена масел и свечей.',
                 desc: 'Деревянный навес от дождя. Есть розетка 220V и базовый набор гаечных ключей.',
                 img: 'assets/houses/room.jpg',
@@ -98,6 +105,7 @@ const PhoneHousing = {
                 canOBDGarage: false,
                 hasPersonalSlot: false,
                 reshalaDiscountPct: 0,
+                subletIncome: 1500,
                 perk: 'Одно машиноместо во дворе. Разрешена замена расходников.',
                 desc: 'Комната в спальном районе. Автомобиль стоит под окнами на асфальте.',
                 img: 'assets/houses/room.jpg',
@@ -121,6 +129,7 @@ const PhoneHousing = {
                 canOBDGarage: true,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 5,
+                subletIncome: 4500,
                 perk: 'Смотровая яма, электричество 220V, верстак со слесарными тисками.',
                 desc: 'Настоящее логово перекупа! Сухая яма, верстак и диодное освещение. Открывает диагностику и тюнинг.',
                 img: 'assets/houses/garage.jpg',
@@ -144,6 +153,7 @@ const PhoneHousing = {
                 canOBDGarage: false,
                 hasPersonalSlot: false,
                 reshalaDiscountPct: 0,
+                subletIncome: 8000,
                 perk: 'Уютный сон, быстрое восстановление настроения (+10).',
                 desc: 'Своя кухня, душ и спокойный сон. Машина паркуется во дворе под фонарём.',
                 img: 'assets/houses/khrusch.jpg',
@@ -167,6 +177,7 @@ const PhoneHousing = {
                 canOBDGarage: true,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 10,
+                subletIncome: 12000,
                 perk: 'Сварка, полировальный пост, печь на отработке и 3 свободных машиноместа.',
                 desc: 'Широкий бокс с печью, верстаком, компрессором и мойкой. Позволяет готовить тачки под ключ.',
                 img: 'assets/houses/garage.jpg',
@@ -190,6 +201,7 @@ const PhoneHousing = {
                 canOBDGarage: false,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 0,
+                subletIncome: 18000,
                 perk: 'Закреплённое парковочное место со шлагбаумом во дворе.',
                 desc: 'Кирпичный дом, стеклопакеты, видеонаблюдение за парковкой. Высокий комфорт проживания.',
                 img: 'assets/houses/dvushka.jpg',
@@ -213,6 +225,7 @@ const PhoneHousing = {
                 canOBDGarage: true,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 20,
+                subletIncome: 32000,
                 perk: 'Двухстоечный подъёмник, камера обдува, скидка 20% на услуги Решалы!',
                 desc: 'Коммерческий цех в промзоне. Подъёмник, мощная приточка, возможность отмывать VIN дешевле.',
                 img: 'assets/houses/workshop.jpg',
@@ -236,6 +249,7 @@ const PhoneHousing = {
                 canOBDGarage: true,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 0,
+                subletIncome: 28000,
                 perk: 'Подземный теплый паркинг с детейлинг-постом и зарядкой.',
                 desc: 'ЖК комфорт-класса. Закрытый двор, охраняемый подземный паркинг, автомойка в цоколе.',
                 img: 'assets/houses/treshka.jpg',
@@ -259,6 +273,7 @@ const PhoneHousing = {
                 canOBDGarage: true,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 15,
+                subletIncome: 48000,
                 perk: 'Свой закрытый двор на 7 авто, тёплый гараж, зона отдыха и барбекю.',
                 desc: 'Собственный участок, трёхфазная сеть 380V, смотровая яма и мойка высокого давления.',
                 img: 'assets/houses/cottage.jpg',
@@ -282,6 +297,7 @@ const PhoneHousing = {
                 canOBDGarage: true,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 0,
+                subletIncome: 60000,
                 perk: '+40% настроения каждый день, персональные места на VIP-паркинге.',
                 desc: 'Красный кирпич, панорамные окна на набережную, стильный интерьер для отдыха автоолигарха.',
                 img: 'assets/houses/loft.jpg',
@@ -305,6 +321,7 @@ const PhoneHousing = {
                 canOBDGarage: true,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 25,
+                subletIncome: 160000,
                 perk: 'Личный VIP-бокс на -3 этаже Башни с охраной, консьержем и мойкой.',
                 desc: 'Панорамный вид с 65 этажа, консьерж-сервис, охраняемый подземный гаражный комплекс.',
                 img: 'assets/houses/penthouse.jpg',
@@ -328,6 +345,7 @@ const PhoneHousing = {
                 canOBDGarage: true,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 35,
+                subletIncome: 380000,
                 perk: 'Свой автосервисный цех, малярная камера, охрана ЧОП, скидка 35% у Решалы!',
                 desc: 'Гектар соснового бора, собственный автосервис на 4 поста, малярная камера и ангар для редких лотов.',
                 img: 'assets/houses/villa.jpg',
@@ -351,6 +369,7 @@ const PhoneHousing = {
                 canOBDGarage: true,
                 hasPersonalSlot: true,
                 reshalaDiscountPct: 50,
+                subletIncome: 1200000,
                 perk: 'Полный иммунитет от проверок ГИБДД, личный пирс для яхт и скидка 50% у Решалы!',
                 desc: 'Абсолютная автономия в нейтральных водах. Свой порт, вертолётная площадка и музей для гиперкаров.',
                 img: 'assets/houses/island.jpg',
@@ -358,7 +377,6 @@ const PhoneHousing = {
             }
         ];
 
-        // Синхронизируем глобальную переменную
         if (typeof window !== 'undefined') {
             window.HOUSING_LIST = fullDatabase;
         }
@@ -383,62 +401,103 @@ const PhoneHousing = {
         if (state.player.housingType === 'rent' && !state.player.housingRentDue) {
             state.player.housingRentDue = (state.player.day || 1) + 3;
         }
+
+        // Новые поля для субаренды и быта
+        if (!state.player.subletHouses || typeof state.player.subletHouses !== 'object') {
+            state.player.subletHouses = {};
+        }
+        if (typeof state.player.subletAccrued !== 'number') {
+            state.player.subletAccrued = 0;
+        }
+        if (!state.player.lastSubletDay) {
+            state.player.lastSubletDay = state.player.day || 1;
+        }
+        if (!state.player.lastCoffeeTime) state.player.lastCoffeeTime = 0;
+        if (!state.player.lastPs5Time) state.player.lastPs5Time = 0;
     },
 
     // ========================================================
-    // АВТОСПИСАНИЕ АРЕНДЫ ЖИЛЬЯ / ВЫСЕЛЕНИЕ ПРИ НЕХВАТКЕ СРЕДСТВ
+    // АВТОСПИСАНИЕ АРЕНДЫ И НАЧИСЛЕНИЕ СУБАРЕНДЫ
     // ========================================================
     processHousingDailyRent() {
         this.ensureHousingState();
         const p = state?.player;
-        if (!p || p.housingType !== 'rent') return;
+        if (!p) return;
 
         const currentDay = p.day || 1;
-        const dueDay = p.housingRentDue || currentDay;
         const db = this.getHousingDatabase();
-        const house = db.find(h => h.id === p.housingId);
 
-        if (!house) {
-            p.housingId = 'trailer';
-            p.housingType = 'own';
-            return;
-        }
+        // 1. Начисление дохода от сданной в субаренду недвижимости
+        const subletMap = p.subletHouses || {};
+        const subletKeys = Object.keys(subletMap);
 
-        // Если срок аренды истек
-        if (currentDay >= dueDay) {
-            const rentPerDay = house.rent || house.rentPerDay || 0;
-            const renewDays = 3;
-            const totalRent = rentPerDay * renewDays;
-            const cash = p.cash || 0;
+        if (subletKeys.length > 0) {
+            const daysDelta = Math.max(0, currentDay - (p.lastSubletDay || currentDay));
+            if (daysDelta > 0) {
+                let dailySum = 0;
+                subletKeys.forEach(hId => {
+                    const houseObj = db.find(h => h.id === hId);
+                    if (houseObj) {
+                        dailySum += (houseObj.subletIncome || Math.round((houseObj.rent || 1000) * 0.65));
+                    }
+                });
 
-            if (cash >= totalRent) {
-                // Автопродление аренды
-                p.cash -= totalRent;
-                p.housingRentDue = currentDay + renewDays;
+                const totalGained = dailySum * daysDelta;
+                p.subletAccrued = (p.subletAccrued || 0) + totalGained;
+                p.lastSubletDay = currentDay;
 
-                if (typeof logBankTransaction === 'function') {
-                    logBankTransaction(`Продление аренды жилья (${renewDays} дн): ${house.name}`, totalRent, false);
-                }
-                if (typeof showToast === 'function') {
-                    showToast(`🏠 Списана аренда за «${house.name}»: -${totalRent.toLocaleString()} ₽ на ${renewDays} дн.`, 'warning');
-                }
-            } else {
-                // Денег нет — выселение в бытовку
-                p.housingId = 'trailer';
-                p.housingType = 'own';
-                p.housingRentDue = null;
-
-                if (typeof logBankTransaction === 'function') {
-                    logBankTransaction(`Выселение за неуплату аренды: ${house.name}`, 0, false);
-                }
-                if (typeof showToast === 'function') {
-                    showToast(`⚠️ Не хватило денег на аренду «${house.name}»! Вы вернулись в строительную бытовку.`, 'error');
+                if (totalGained > 0 && typeof showToast === 'function') {
+                    showToast(`📈 Субаренда принесла доход: +${totalGained.toLocaleString()} ₽ (доступно к сбору в «Моё жильё»)`, 'success');
                 }
             }
+        } else {
+            p.lastSubletDay = currentDay;
+        }
 
-            if (typeof saveState === 'function') saveState();
-            if (typeof updateHeaderUI === 'function') updateHeaderUI();
-            if (typeof renderGarage === 'function') renderGarage();
+        // 2. Списание аренды текущего жилья
+        if (p.housingType === 'rent') {
+            const dueDay = p.housingRentDue || currentDay;
+            const house = db.find(h => h.id === p.housingId);
+
+            if (!house) {
+                p.housingId = 'trailer';
+                p.housingType = 'own';
+                return;
+            }
+
+            if (currentDay >= dueDay) {
+                const rentPerDay = house.rent || house.rentPerDay || 0;
+                const renewDays = 3;
+                const totalRent = rentPerDay * renewDays;
+                const cash = p.cash || 0;
+
+                if (cash >= totalRent) {
+                    p.cash -= totalRent;
+                    p.housingRentDue = currentDay + renewDays;
+
+                    if (typeof logBankTransaction === 'function') {
+                        logBankTransaction(`Продление аренды (${renewDays} дн): ${house.name}`, totalRent, false);
+                    }
+                    if (typeof showToast === 'function') {
+                        showToast(`🏠 Списана аренда за «${house.name}»: -${totalRent.toLocaleString()} ₽ на ${renewDays} дн.`, 'warning');
+                    }
+                } else {
+                    p.housingId = 'trailer';
+                    p.housingType = 'own';
+                    p.housingRentDue = null;
+
+                    if (typeof logBankTransaction === 'function') {
+                        logBankTransaction(`Выселение за неуплату аренды: ${house.name}`, 0, false);
+                    }
+                    if (typeof showToast === 'function') {
+                        showToast(`⚠️ Не хватило денег на аренду «${house.name}»! Вы вернулись в бытовку.`, 'error');
+                    }
+                }
+
+                if (typeof saveState === 'function') saveState();
+                if (typeof updateHeaderUI === 'function') updateHeaderUI();
+                if (typeof renderGarage === 'function') renderGarage();
+            }
         }
     },
 
@@ -457,10 +516,10 @@ const PhoneHousing = {
             let tabsHtml = `
                 <div class="grid-2 mb-2">
                     <button onclick="PhoneHousing.switchTab('catalog')" class="btn ${this.activeTab === 'catalog' ? 'btn-teal' : 'btn-dark'} btn-sm">
-                        <i class="fa-solid fa-list-ul mr-1"></i> Каталог Объектов 🏢
+                        <i class="fa-solid fa-list-ul mr-1"></i> Каталог Объектов (${db.length})
                     </button>
                     <button onclick="PhoneHousing.switchTab('my_home')" class="btn ${this.activeTab === 'my_home' ? 'btn-teal' : 'btn-dark'} btn-sm">
-                        <i class="fa-solid fa-house-user mr-1"></i> Моё Жильё & Мебель 🛋️
+                        <i class="fa-solid fa-house-user mr-1"></i> Моё Жильё & Верстак 🛋️
                     </button>
                 </div>
             `;
@@ -469,7 +528,7 @@ const PhoneHousing = {
             if (this.activeTab === 'catalog') {
                 contentHtml = this.renderCatalogHtml(db, currentHouseId, ownedList);
             } else {
-                contentHtml = this.renderMyHomeHtml(currentHouse);
+                contentHtml = this.renderMyHomeHtml(currentHouse, db);
             }
 
             container.innerHTML = `
@@ -511,14 +570,17 @@ const PhoneHousing = {
 
     renderCatalogHtml(db, currentHouseId, ownedList) {
         let pLvl = state.player?.level || 1;
+        const subletMap = state.player?.subletHouses || {};
 
         let cards = db.map(h => {
             const isCurrent = h.id === currentHouseId;
             const isOwned = ownedList.includes(h.id);
+            const isSublet = !!subletMap[h.id];
             const isLvlLocked = pLvl < (h.minLevel || 1);
 
             let price = h.buyPrice || h.price || 0;
             let rent = h.rent || h.rentPerDay || 0;
+            let subletRate = h.subletIncome || Math.round(rent * 0.65);
             let slots = h.slots !== undefined ? h.slots : (h.slotsBonus || 0);
             let mood = h.moodBonus || 0;
             let reqStars = h.reqStars || 0;
@@ -534,7 +596,16 @@ const PhoneHousing = {
             } else if (isCurrent) {
                 actionBtn = `<button class="btn btn-dark btn-sm w-full opacity-60" disabled><i class="fa-solid fa-check mr-1"></i> Вы находитесь здесь</button>`;
             } else if (isOwned) {
-                actionBtn = `<button onclick="PhoneHousing.moveToHouse('${h.id}')" class="btn btn-cyan btn-sm w-full"><i class="fa-solid fa-truck-ramp-box mr-1"></i> Переехать сюда (В собственности)</button>`;
+                actionBtn = `
+                    <div class="grid-2" style="gap:6px;">
+                        <button onclick="PhoneHousing.moveToHouse('${h.id}')" class="btn btn-cyan btn-sm font-bold">
+                            <i class="fa-solid fa-truck-ramp-box mr-1"></i> Жить здесь
+                        </button>
+                        <button onclick="PhoneHousing.toggleSubletHouse('${h.id}')" class="btn ${isSublet ? 'btn-amber' : 'btn-dark'} btn-sm font-bold">
+                            ${isSublet ? '✕ Забрать (Сдаётся)' : `🔑 Сдать (${subletRate.toLocaleString()} ₽/д)`}
+                        </button>
+                    </div>
+                `;
             } else {
                 actionBtn = `
                     <div class="grid-2" style="gap:6px;">
@@ -551,12 +622,12 @@ const PhoneHousing = {
             let catColor = h.category === 'box' ? '#c084fc' : (h.category === 'estate' ? '#fbbf24' : (h.category === 'living' ? '#38bdf8' : '#94a3b8'));
 
             return `
-                <div class="glass-card p-3 mb-2" style="border-left: 3px solid ${catColor}; background: ${isCurrent ? 'rgba(45, 212, 191, 0.08)' : '#090e18'};">
+                <div class="glass-card p-3 mb-2" style="border-left: 3px solid ${catColor}; background: ${isCurrent ? 'rgba(45, 212, 191, 0.08)' : (isSublet ? 'rgba(255, 179, 0, 0.06)' : '#090e18')};">
                     <div class="car-img-wrap mb-2" style="height:130px; position:relative;">
                         <img src="${houseImg}" class="car-img" onerror="this.onerror=null; this.src='${fallbackImg}';">
                         <div class="badge-tag badge-br">
-                            <span class="tag-badge ${isCurrent ? 'bg-tag-green' : (isOwned ? 'bg-tag-cyan' : 'bg-tag-dark')}">
-                                ${isCurrent ? 'АКТИВНОЕ' : (isOwned ? 'КУПЛЕНО' : 'ПРОДАЁТСЯ')}
+                            <span class="tag-badge ${isCurrent ? 'bg-tag-green' : (isSublet ? 'bg-tag-amber' : (isOwned ? 'bg-tag-cyan' : 'bg-tag-dark'))}">
+                                ${isCurrent ? 'АКТИВНОЕ ЖИЛЬЁ' : (isSublet ? 'СДАНО В СУБАРЕНДУ' : (isOwned ? 'В СОБСТВЕННОСТИ' : 'ПРОДАЁТСЯ'))}
                             </span>
                         </div>
                     </div>
@@ -565,7 +636,7 @@ const PhoneHousing = {
                         <div>
                             <b class="text-xs" style="color:${isCurrent ? 'var(--teal)' : '#fff'}; font-size:13px;">${h.name}</b>
                             <div class="sub-label" style="font-size:9px;">
-                                ${isOwned ? 'В собственности ✓' : `Покупка: ${price.toLocaleString()} ₽${starsTxt}`}
+                                ${isOwned ? (isSublet ? `Доход субаренды: +${subletRate.toLocaleString()} ₽/день` : 'В вашей собственности ✓') : `Покупка: ${price.toLocaleString()} ₽${starsTxt}`}
                             </div>
                         </div>
                         <span class="tag-badge bg-tag-cyan">+${slots} боксов</span>
@@ -574,7 +645,7 @@ const PhoneHousing = {
                     <div class="sub-label my-2" style="font-size:9.5px; line-height:1.35;">${h.desc || h.perk || ''}</div>
 
                     <div class="grid-2 text-xs p-2 mb-2" style="background:rgba(0,0,0,0.45); border-radius:8px;">
-                        <div>Машиномест: <b class="color-cyan">+${slots} мест</b></div>
+                        <div>Машиномест: <b class="color-cyan">${isSublet ? '0 (Сдано)' : `+${slots} мест`}</b></div>
                         <div>Кураж в полночь: <b class="${mood >= 0 ? 'color-green' : 'color-red'}">${mood >= 0 ? '+' : ''}${mood}%</b></div>
                     </div>
 
@@ -585,25 +656,148 @@ const PhoneHousing = {
 
         return `
             <div class="sub-label mb-2" style="font-size:10px;">
-                Покупка недвижимости и боксов ГСК открывает слоты для автопарка, верстаки для тюнинга и перки настроения:
+                Покупка недвижимости открывает слоты для автопарка, домашний верстак и пассивный доход от субаренды:
             </div>
             ${cards}
         `;
     },
 
-    renderMyHomeHtml(currentHouse) {
+    renderMyHomeHtml(currentHouse, db) {
         this.ensureHousingState();
         const interiorItems = state.player.interior?.[currentHouse.id] || [];
         const catalogItems = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.homeItems)
             ? SHOP_CATALOG.homeItems
             : [
-                { id: "home_ps5", name: "Игровая консоль PlayStation 5", cost: 75000, reqStars: 5, perk: "+25% настроения в полночь" },
+                { id: "home_ps5", name: "Игровая консоль PlayStation 5", cost: 75000, reqStars: 5, perk: "+25% настроения и куража в полночь" },
                 { id: "home_leather_sofa", name: "Кожаный диван в клиентскую зону", cost: 120000, reqStars: 8, perk: "+15% к восстановлению сил" },
                 { id: "home_garage_lift", name: "Гидравлический автоподъёмник (4т)", cost: 320000, reqStars: 20, perk: "Ускоряет ремонт на 50%" },
                 { id: "home_safe_valberg", name: "Огнеупорный сейф перекупа", cost: 180000, reqStars: 10, perk: "100% защита заначки наличных" },
                 { id: "home_cctv", name: "Система видеонаблюдения 4K", cost: 140000, reqStars: 8, perk: "Снижает риск угона до 0%" }
             ];
 
+        // ─── 1. КАССА СУБАРЕНДЫ ───
+        const accruedIncome = state.player?.subletAccrued || 0;
+        const subletMap = state.player?.subletHouses || {};
+        const subletCount = Object.keys(subletMap).length;
+
+        let subletBoxHtml = '';
+        if (subletCount > 0 || accruedIncome > 0) {
+            subletBoxHtml = `
+                <div class="glass-card p-3 mb-2" style="background: radial-gradient(circle at 50% 0%, rgba(255,179,0,0.14), #090e18); border-color: var(--amber);">
+                    <div class="flex-between mb-1">
+                        <div>
+                            <b class="text-xs color-amber"><i class="fa-solid fa-hand-holding-dollar mr-1"></i> Касса субаренды (${subletCount} объектов)</b>
+                            <div class="sub-label" style="font-size:8.5px;">Пассивный доход от арендаторов ваших боксов и квартир.</div>
+                        </div>
+                        <b class="price-val color-green text-xs" style="font-size:15px;">+${accruedIncome.toLocaleString()} ₽</b>
+                    </div>
+                    <button onclick="PhoneHousing.collectSubletIncome()" class="btn btn-amber btn-sm w-full font-bold mt-2" ${accruedIncome <= 0 ? 'disabled' : ''}>
+                        📥 Забрать выручку субаренды (+${accruedIncome.toLocaleString()} ₽)
+                    </button>
+                </div>
+            `;
+        }
+
+        // ─── 2. ИНТЕРАКТИВНЫЙ БЫТ ПЕРЕКУПА ───
+        const now = Date.now();
+        const coffeeReady = (now - (state.player.lastCoffeeTime || 0)) > 4 * 3600 * 1000;
+        const hasPs5 = interiorItems.includes('home_ps5');
+        const hasSafe = interiorItems.includes('home_safe_valberg');
+        const hasCctv = interiorItems.includes('home_cctv');
+
+        const interactiveLifestyleHtml = `
+            <div class="glass-card p-2 mb-2" style="background:#090e18;">
+                <div class="flex-between mb-2">
+                    <b class="text-xs color-teal"><i class="fa-solid fa-mug-hot mr-1"></i> Быт и отдых перекупа:</b>
+                    <span class="tag-badge bg-tag-cyan">РЕЛАКС</span>
+                </div>
+                <div class="grid-2" style="gap:6px;">
+                    <button onclick="PhoneHousing.drinkCoffeeAction()" class="btn btn-dark btn-sm text-left" ${!coffeeReady ? 'disabled' : ''}>
+                        <div class="font-bold text-xs color-cyan">☕ Сварить кофе</div>
+                        <div class="sub-label" style="font-size:7.5px;">${coffeeReady ? '+15% сытости и настроения' : 'Кулдаун 4ч'}</div>
+                    </button>
+
+                    <button onclick="PhoneHousing.playPs5Action()" class="btn btn-dark btn-sm text-left" ${!hasPs5 ? 'disabled' : ''}>
+                        <div class="font-bold text-xs color-amber">🎮 Запустить PS5</div>
+                        <div class="sub-label" style="font-size:7.5px;">${hasPs5 ? 'Кураж перед рынком' : 'Нужна консоль в мебели'}</div>
+                    </button>
+
+                    <button onclick="PhoneHousing.openHomeSafePrompt()" class="btn btn-dark btn-sm text-left" ${!hasSafe ? 'disabled' : ''}>
+                        <div class="font-bold text-xs color-green">💰 Сейф Valberg</div>
+                        <div class="sub-label" style="font-size:7.5px;">${hasSafe ? 'Заначка наличных' : 'Требуется сейф'}</div>
+                    </button>
+
+                    <button onclick="PhoneHousing.checkCctvSecurity()" class="btn btn-dark btn-sm text-left" ${!hasCctv ? 'disabled' : ''}>
+                        <div class="font-bold text-xs color-purple">📹 Камеры 4K</div>
+                        <div class="sub-label" style="font-size:7.5px;">${hasCctv ? 'Угон: 0% риска' : 'Нужна система CCTV'}</div>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // ─── 3. ДОМАШНИЙ ВЕРСТАК И УХОД ЗА МАШИНАМИ ───
+        const garage = state.garage || [];
+        let workbenchHtml = '';
+
+        if (garage.length === 0) {
+            workbenchHtml = `
+                <div class="glass-card p-2 mb-2 text-center sub-label" style="font-size:10px;">
+                    В гараже нет авто для обслуживания на домашнем верстаке.
+                </div>
+            `;
+        } else {
+            let carIdx = this.selectedWorkbenchCarIdx;
+            if (carIdx >= garage.length) carIdx = 0;
+            const car = garage[carIdx];
+
+            let carOptions = garage.map((c, i) => `<option value="${i}" ${i === carIdx ? 'selected' : ''}>${c.name} (${c.condition || 80}%)</option>`).join('');
+
+            workbenchHtml = `
+                <div class="glass-card p-3 mb-2" style="background:#070b14; border-left:3px solid var(--cyan);">
+                    <div class="flex-between mb-2">
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-wrench mr-1"></i> Домашний верстак и обслуживание</b>
+                        <span class="tag-badge bg-tag-green">СВОЙ БОКС</span>
+                    </div>
+
+                    <div class="flex-between mb-2">
+                        <span class="sub-label" style="font-size:9px;">Автомобиль:</span>
+                        <select onchange="PhoneHousing.selectWorkbenchCar(this.value)" class="chat-input" style="width:65%; font-size:10px; padding:4px 6px;">
+                            ${carOptions}
+                        </select>
+                    </div>
+
+                    <div class="grid-3 mb-2 text-xs p-2" style="background:#04070e; border-radius:6px;">
+                        <div>Кузов: <b>${car.condition || 80}%</b></div>
+                        <div>Мотор: <b>${car.wear?.engine || 85}%</b></div>
+                        <div>Присадка: <b class="${car.hasAdditive ? 'color-green' : 'color-amber'}">${car.hasAdditive ? 'Залита ✓' : 'Нет'}</b></div>
+                    </div>
+
+                    <div class="grid-2" style="gap:6px;">
+                        <button onclick="PhoneHousing.washCarWithHose(${carIdx})" class="btn btn-dark btn-sm text-left">
+                            <div class="font-bold text-xs color-cyan">🚿 Мойка из шланга</div>
+                            <div class="sub-label" style="font-size:7.5px;">Бесплатно · Чистота кузова</div>
+                        </button>
+
+                        <button onclick="PhoneHousing.servicePlugsAtHome(${carIdx})" class="btn btn-dark btn-sm text-left" ${!currentHouse.canService ? 'disabled' : ''}>
+                            <div class="font-bold text-xs color-green">🔧 Свечи и фильтры</div>
+                            <div class="sub-label" style="font-size:7.5px;">${currentHouse.canService ? '1,500 ₽ · +4% к мотору' : 'Нужен навес или бокс'}</div>
+                        </button>
+
+                        <button onclick="PhoneHousing.addEngineAdditiveAtHome(${carIdx})" class="btn btn-dark btn-sm text-left" ${!currentHouse.canTune || car.hasAdditive ? 'disabled' : ''}>
+                            <div class="font-bold text-xs color-amber">🧪 Присадка в масло</div>
+                            <div class="sub-label" style="font-size:7.5px;">${currentHouse.canTune ? (car.hasAdditive ? 'Уже залита' : '5,000 ₽ · Скрывает стук') : 'Нужен бокс ГСК'}</div>
+                        </button>
+
+                        <button onclick="PhoneHousing.eliminateSmallDefectAtHome(${carIdx})" class="btn btn-dark btn-sm text-left" ${!currentHouse.canDetail ? 'disabled' : ''}>
+                            <div class="font-bold text-xs color-purple">🪛 Полировка царапин</div>
+                            <div class="sub-label" style="font-size:7.5px;">${currentHouse.canDetail ? '3,500 ₽ · Убирает дефект' : 'Нужен двойной бокс'}</div>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ─── 4. МЕБЕЛЬ И УСТАНОВКА ───
         let interiorListHtml = catalogItems.map(item => {
             const hasItem = interiorItems.includes(item.id);
             return `
@@ -658,11 +852,221 @@ const PhoneHousing = {
                 </div>
             </div>
 
+            ${subletBoxHtml}
+            ${interactiveLifestyleHtml}
+            ${workbenchHtml}
+
             <b class="text-xs color-teal block mb-1"><i class="fa-solid fa-couch mr-1"></i> Обустройство и мебель:</b>
             <div class="space-y-1 mb-2">
                 ${interiorListHtml}
             </div>
         `;
+    },
+
+    // --------------------------------------------------------
+    // ДЕЙСТВИЯ БЫТА И ОТДЫХА
+    // --------------------------------------------------------
+    drinkCoffeeAction() {
+        const now = Date.now();
+        if (now - (state.player.lastCoffeeTime || 0) < 4 * 3600 * 1000) {
+            return showToast("Кофеварка остывает, перерыв 4 часа!");
+        }
+
+        state.player.lastCoffeeTime = now;
+        state.player.hunger = Math.min(100, (state.player.hunger || 80) + 15);
+        state.player.mood = Math.min(100, (state.player.mood || 85) + 15);
+
+        if (typeof playSound === 'function') playSound('cash');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof saveState === 'function') saveState();
+
+        showToast("☕ Ароматный кофе выпит! +15% к сытости и бодрости.");
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    playPs5Action() {
+        state.player.mood = 100;
+        state.player.streetCred = (state.player.streetCred || 100) + 5;
+
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof saveState === 'function') saveState();
+
+        showToast("🎮 Катка в гонки на PS5 выиграна! Настроение на максимуме (100%).");
+    },
+
+    openHomeSafePrompt() {
+        if (typeof AppBank !== 'undefined' && typeof AppBank.depositToSafePrompt === 'function') {
+            AppBank.depositToSafePrompt();
+        } else {
+            showToast("Сейф перекупа Valberg защищает ваш резерв.");
+        }
+    },
+
+    checkCctvSecurity() {
+        if (typeof playSound === 'function') playSound('tick');
+        showToast("📹 Камеры активны: периметр чист. Риск угона авто из бокса 0%.");
+    },
+
+    // --------------------------------------------------------
+    // ДЕЙСТВИЯ ДОМАШНЕГО ВЕРСТАКА
+    // --------------------------------------------------------
+    selectWorkbenchCar(idx) {
+        this.selectedWorkbenchCarIdx = parseInt(idx, 10) || 0;
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    washCarWithHose(carIdx) {
+        const car = state.garage?.[carIdx];
+        if (!car) return;
+
+        car.isClean = true;
+        car.isWashed = true;
+
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
+        if (typeof saveState === 'function') saveState();
+        if (typeof renderGarage === 'function') renderGarage();
+
+        showToast(`🚿 «${car.name}» отмыта из шланга во дворе. Кузов сияет!`);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    servicePlugsAtHome(carIdx) {
+        const car = state.garage?.[carIdx];
+        if (!car) return;
+        const cost = 1500;
+        const cash = state.player?.cash || 0;
+
+        if (cash < cost) return showToast("Нужно 1,500 ₽ на комплект свечей и фильтров!");
+
+        state.player.cash -= cost;
+        if (!car.wear) car.wear = { engine: 85, transmission: 85, body: 90 };
+        car.wear.engine = Math.min(100, (car.wear.engine || 85) + 4);
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Замена свечей в боксе: ${car.name}`, cost, false);
+        }
+
+        if (typeof playSound === 'function') playSound('cash');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof renderGarage === 'function') renderGarage();
+
+        showToast(`🔧 Свечи заменены в боксе! Двигатель работает ровнее (+4% ресурса).`);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    addEngineAdditiveAtHome(carIdx) {
+        const car = state.garage?.[carIdx];
+        if (!car) return;
+        const cost = 5000;
+        const cash = state.player?.cash || 0;
+
+        if (cash < cost) return showToast("Нужно 5,000 ₽ на банку присадки в масло!");
+
+        state.player.cash -= cost;
+        car.hasAdditive = true;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Присадка в двигатель: ${car.name}`, cost, false);
+        }
+
+        if (typeof playSound === 'function') playSound('cash');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof renderGarage === 'function') renderGarage();
+
+        showToast(`🧪 Присадка залита! Стук мотора замаскирован для покупателей на рынке.`);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    eliminateSmallDefectAtHome(carIdx) {
+        const car = state.garage?.[carIdx];
+        if (!car) return;
+        const cost = 3500;
+        const cash = state.player?.cash || 0;
+
+        if (cash < cost) return showToast("Нужно 3,500 ₽ на полировочные пасты и круги!");
+
+        state.player.cash -= cost;
+        car.condition = Math.min(100, (car.condition || 80) + 5);
+        car.isPolished = true;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Домашняя полировка: ${car.name}`, cost, false);
+        }
+
+        if (typeof playSound === 'function') playSound('win');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof renderGarage === 'function') renderGarage();
+
+        showToast(`🪛 Царапины заполированы! Состояние кузова поднялось на +5%.`);
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // --------------------------------------------------------
+    // СУБАРЕНДА НЕАКТИВНОГО ЖИЛЬЯ
+    // --------------------------------------------------------
+    toggleSubletHouse(houseId) {
+        this.ensureHousingState();
+        const p = state.player;
+        if (!p) return;
+
+        if (p.housingId === houseId) {
+            return showToast("Нельзя сдать в субаренду жильё, в котором вы сейчас проживаете!");
+        }
+
+        const isSublet = !!p.subletHouses[houseId];
+        const db = this.getHousingDatabase();
+        const houseObj = db.find(h => h.id === houseId);
+        if (!houseObj) return;
+
+        if (isSublet) {
+            delete p.subletHouses[houseId];
+            showToast(`Жильцы съехали из «${houseObj.name}». Слоты гаража возвращены в автопарк.`);
+        } else {
+            p.subletHouses[houseId] = {
+                sinceDay: p.day || 1,
+                dailyRate: houseObj.subletIncome || Math.round((houseObj.rent || 1000) * 0.65)
+            };
+            showToast(`«${houseObj.name}» сдано в субаренду! Приносит +${p.subletHouses[houseId].dailyRate.toLocaleString()} ₽ в день.`);
+        }
+
+        if (typeof playSound === 'function') playSound('tick');
+        if (typeof tgHaptic === 'function') tgHaptic('light');
+        if (typeof saveState === 'function') saveState();
+        if (typeof renderGarage === 'function') renderGarage();
+
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    collectSubletIncome() {
+        this.ensureHousingState();
+        const p = state.player;
+        const amount = p?.subletAccrued || 0;
+        if (amount <= 0) return showToast("В кассе субаренды пока пусто!");
+
+        p.cash = (p.cash || 0) + amount;
+        p.subletAccrued = 0;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Доход от субаренды недвижимости`, amount, true);
+        }
+
+        if (typeof playSound === 'function') playSound('cash');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof saveState === 'function') saveState();
+
+        showToast(`💰 Выручка субаренды получена: +${amount.toLocaleString()} ₽ на баланс!`);
+        this.render(document.getElementById('phoneAppContainer'));
     },
 
     // --------------------------------------------------------
@@ -724,7 +1128,7 @@ const PhoneHousing = {
         if (typeof openVerdictModal === 'function') {
             openVerdictModal(
                 "НОВОСЕЛЬЕ! 🏢",
-                `Поздравляем с покупкой «${target.name}»!\n• Вместимость гаража увеличена: +${slotsGranted} мест\n• Доступен тюнинг и верстак\n• Бонусы куража активируются в полночь`,
+                `Поздравляем с покупкой «${target.name}»!\n• Вместимость гаража увеличена: +${slotsGranted} мест\n• Доступен домашний верстак и субаренда\n• Бонусы куража активируются в полночь`,
                 true,
                 price
             );
@@ -793,6 +1197,11 @@ const PhoneHousing = {
 
         if (!isOwned && !isCurrentRent) {
             return showToast("🔒 Сначала купите или арендуйте это жильё!");
+        }
+
+        // Если переезжаем в сданный дом — снимаем с субаренды
+        if (state.player.subletHouses?.[houseId]) {
+            delete state.player.subletHouses[houseId];
         }
 
         state.player.housingId = houseId;
@@ -869,11 +1278,13 @@ window.getTotalGarageSlots = function() {
     const owned = window.state.player.ownedHouses || ['trailer'];
     const currentId = window.state.player.housingId || 'trailer';
     const isRent = window.state.player.housingType === 'rent';
+    const subletMap = window.state.player.subletHouses || {};
 
     let maxBonus = 0;
 
-    // Считаем максимальные слоты среди всей купленной недвижимости
+    // Считаем максимальные слоты среди всей купленной недвижимости, которая НЕ сдана в субаренду
     owned.forEach(hId => {
+        if (subletMap[hId]) return;
         const obj = db.find(h => h.id === hId);
         if (obj) {
             const s = obj.slots !== undefined ? obj.slots : (obj.slotsBonus || 0);
@@ -902,4 +1313,4 @@ if (document.readyState === 'loading') {
     PhoneHousing.init();
 }
 
-console.log('[🏠 phone-housing v1.4.0] Каталог 14 объектов недвижимости гарантирован и зафиксирован ✓');
+console.log('[🏠 phone-housing v2.0.0] Субаренда, домашний верстак и 14 объектов недвижимости готовы ✓');
