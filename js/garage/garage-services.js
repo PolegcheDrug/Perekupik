@@ -1,24 +1,20 @@
 // ========================================================
-// js/garage-services.js — ТЮНИНГ, ДЕТЕЙЛИНГ И СТРАХОВАНИЕ (v1.3.0)
+// js/garage/garage-services.js — ТЮНИНГ, ДЕТЕЙЛИНГ И СТРАХОВАНИЕ (v1.4.0-balanced)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.3.0:
-//   - insuranceOptions корректно сбрасывается при каждом открытии.
-//   - Ваучер КАСКО из Авто-Маркета бесплатно оформляет полис.
-//   - activeTuningCarIndex / activePreSaleCarIndex сброс в close.
-//   - Защита от двойного клика по покупкам.
-//   - Проверка уже наложенного полиса.
-//   - buyChipStage: не даёт поставить младший Stage после старшего.
+// ⭐ v1.4.0-balanced:
+//   - Экономический баланс: динамическая стоимость детейлинга в зависимости от класса/цены авто.
+//   - Устранение эксплойта +12% полировки: доход сбалансирован, добавлены пороги окупаемости.
+//   - Реалистичная смотка пробега: отметка в истории и риск проверки покупателем.
+//   - Полная совместимость с ModalManager, AudioFx и safeGetCar.
 // ========================================================
 
 let activeTuningCarIndex = null;
 let activePreSaleCarIndex = null;
 let activeTuneTab = 'engine';
 
-// ⭐ v1.3.0: флаги защиты от двойного клика
 let _tuneBuyPending = false;
 let _insuranceBuyPending = false;
 
-// ⭐ v1.3.0: дефолт для страховки, сбрасывается при каждом открытии
 const DEFAULT_INSURANCE_OPTIONS = {
     osago: true,
     totalLoss: false,
@@ -27,6 +23,21 @@ const DEFAULT_INSURANCE_OPTIONS = {
 };
 
 let insuranceOptions = { ...DEFAULT_INSURANCE_OPTIONS };
+
+// Вспомогательный расчёт стоимости детейлинга от базовой цены авто
+function _getServiceCosts(car) {
+    const baseVal = Math.max(50000, car.marketValue || car.basePrice || 100000);
+    const hasPaintShop = (state.businesses || []).some(b => b.id === 'paint_shop' && b.level > 0);
+
+    return {
+        polishCost: Math.max(4000, Math.round(baseVal * 0.035)),
+        interiorCost: Math.max(3500, Math.round(baseVal * 0.025)),
+        paintCost: hasPaintShop ? Math.max(8000, Math.round(baseVal * 0.06)) : Math.max(15000, Math.round(baseVal * 0.10)),
+        chipsCost: Math.max(3000, Math.round(baseVal * 0.02)),
+        additiveCost: Math.max(5000, Math.round(baseVal * 0.03)),
+        odometerCost: Math.max(8000, Math.round(baseVal * 0.04))
+    };
+}
 
 // ========================================================
 // --- СТРАХОВАНИЕ ---
@@ -38,10 +49,8 @@ function openInsuranceModalFromPreview() {
     const car = safeGetCar(window.previewCarIndex);
     if (!car) return;
 
-    // ⭐ v1.3.0: КРИТИЧЕСКИЙ ФИКС — сброс опций между авто
     insuranceOptions = { ...DEFAULT_INSURANCE_OPTIONS };
 
-    // ⭐ v1.3.0: если уже есть полис — предложить продление
     if (car.insurance) {
         const existingType = car.insurance.type === 'comprehensive' ? 'КАСКО' : 'ОСАГО';
         if (!confirm(`На это авто уже оформлен полис ${existingType}.\nОформить новый полис взамен старого?`)) {
@@ -60,30 +69,32 @@ function renderInsuranceContractUI(car) {
     const modal = ensureModal('modalInsurance');
     const cPlate = escapeHtml(car.customPlate || car.plate || "ТРАНЗИТ");
 
-    let totalCash = INSURANCE_CONFIG.baseOsagoCost;
-    let totalStars = INSURANCE_CONFIG.baseStars;
+    const baseOsago = window.INSURANCE_CONFIG?.baseOsagoCost || 6000;
+    const baseStars = window.INSURANCE_CONFIG?.baseStars || 0;
 
-    if (insuranceOptions.theft) {
-        totalCash += INSURANCE_CONFIG.theft.cash;
-        totalStars += INSURANCE_CONFIG.theft.stars;
+    let totalCash = baseOsago;
+    let totalStars = baseStars;
+
+    if (insuranceOptions.theft && window.INSURANCE_CONFIG?.theft) {
+        totalCash += window.INSURANCE_CONFIG.theft.cash || 0;
+        totalStars += window.INSURANCE_CONFIG.theft.stars || 0;
     }
     if (insuranceOptions.totalLoss) {
-        totalCash += INSURANCE_CONFIG.totalLoss.cash;
-        totalStars += INSURANCE_CONFIG.totalLoss.stars;
+        totalCash += window.INSURANCE_CONFIG?.totalLoss?.cash || 22000;
+        totalStars += window.INSURANCE_CONFIG?.totalLoss?.stars || 0;
     }
     if (insuranceOptions.roadside) {
-        totalCash += INSURANCE_CONFIG.roadside.cash;
-        totalStars += INSURANCE_CONFIG.roadside.stars;
+        totalCash += window.INSURANCE_CONFIG?.roadside?.cash || 4500;
+        totalStars += window.INSURANCE_CONFIG?.roadside?.stars || 0;
     }
 
-    // ⭐ v1.3.0: ваучер КАСКО из маркета
     const hasVoucher = !!state.player.hasKasKoVoucher;
     if (hasVoucher) {
         totalCash = 0;
         totalStars = 0;
     }
 
-    const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 2500;
+    const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 25000;
     const starsRubEquiv = totalStars > 0 ? ` (${(totalStars * starRate).toLocaleString()} ₽)` : "";
 
     modal.innerHTML = `
@@ -105,7 +116,7 @@ function renderInsuranceContractUI(car) {
                 <div class="p-2 glass-card selected" style="border-color:var(--green);">
                     <div class="flex-between text-xs mb-1">
                         <b class="color-green">1. Полис ОСАГО (Обязательный)</b>
-                        <span class="tag-badge bg-tag-green">${hasVoucher ? 'БЕСПЛАТНО' : INSURANCE_CONFIG.baseOsagoCost.toLocaleString() + ' ₽'}</span>
+                        <span class="tag-badge bg-tag-green">${hasVoucher ? 'БЕСПЛАТНО' : baseOsago.toLocaleString() + ' ₽'}</span>
                     </div>
                     <div class="sub-label" style="font-size:9px;">Защита от штрафов ДПС (ст. 12.37) и покрытие ущерба чужим авто до 400,000 ₽.</div>
                 </div>
@@ -149,10 +160,8 @@ function renderInsuranceContractUI(car) {
 }
 
 function closeInsuranceModal() {
-    // ⭐ v1.3.0: сброс опций при закрытии
     insuranceOptions = { ...DEFAULT_INSURANCE_OPTIONS };
     _insuranceBuyPending = false;
-
     ModalManager.close('modalInsurance');
 
     if (window.previewCarIndex !== null && window.previewCarIndex !== undefined) {
@@ -178,7 +187,6 @@ function confirmSignInsurancePolicy(totalCash, totalStars) {
     const car = safeGetCar(window.previewCarIndex);
     if (!car) return;
 
-    // ⭐ v1.3.0: ваучер обнуляет цену
     const hasVoucher = !!state.player.hasKasKoVoucher;
     if (hasVoucher) {
         totalCash = 0;
@@ -211,7 +219,6 @@ function confirmSignInsurancePolicy(totalCash, totalStars) {
             state.player.hasKasKoVoucher = false;
         }
 
-        // Логируем транзакцию
         if (typeof logBankTransaction === 'function' && totalCash > 0) {
             logBankTransaction(`Полис страхования: ${car.name}`, totalCash, false);
         }
@@ -278,15 +285,12 @@ function checkUninsuredDriveRisk(car) {
 }
 
 // ========================================================
-// --- ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА ---
+// --- ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (БАЛАНС) ---
 // ========================================================
 function openPreSaleModal(idx) {
-    if (idx === undefined || idx === null) {
-        console.warn("[PreSale] openPreSaleModal без idx");
-        return;
-    }
+    if (idx === undefined || idx === null) return;
 
-    const caps = getPlayerHousingCapabilities();
+    const caps = typeof getPlayerHousingCapabilities === 'function' ? getPlayerHousingCapabilities() : { canDetail: true, canService: true };
     if (!caps.canDetail && !caps.canService) {
         return openNeedCapabilityModal('detail', "Предпродажная подготовка и детейлинг");
     }
@@ -298,6 +302,7 @@ function openPreSaleModal(idx) {
         return;
     }
 
+    const costs = _getServiceCosts(car);
     const modal = ensureModal('modalPreSale');
     const hasPaintShop = (state.businesses || []).some(b => b.id === 'paint_shop' && b.level > 0);
 
@@ -307,66 +312,66 @@ function openPreSaleModal(idx) {
                 ✨ ЦЕНТР ДЕТЕЙЛИНГА & ПРЕДПРОДАЖКИ
             </div>
             <h3 class="font-bold color-cyan mb-1">${escapeHtml(car.name)}</h3>
-            <div class="sub-label mb-3">Повышайте маржинальность и привлекательность для покупателей:</div>
+            <div class="sub-label mb-3">Повышайте маржинальность с учётом затрат:</div>
 
             <div class="space-y-2 mb-3">
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-cyan">1. Абразивная полировка кузова</b>
-                        <div class="sub-label" style="font-size:8.5px;">Глубокий глянец, удаление паутинки (+12% к цене авто).</div>
+                        <div class="sub-label" style="font-size:8.5px;">Глубокий глянец (+6-8% к рыночной оценке).</div>
                     </div>
                     <button onclick="applyPreSaleMod('clean')" class="btn ${car.isPolished ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm btn-auto" ${car.isPolished ? 'disabled' : ''}>
-                        ${car.isPolished ? 'Сделано ✓' : '7,000 ₽'}
+                        ${car.isPolished ? 'Сделано ✓' : costs.polishCost.toLocaleString() + ' ₽'}
                     </button>
                 </div>
 
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-green">2. Химчистка салона с озонацией</b>
-                        <div class="sub-label" style="font-size:8.5px;">Удаление запаха табака, чистка кресел (+25k к цене).</div>
+                        <div class="sub-label" style="font-size:8.5px;">Свежий салон (+5% к спросу и оценке).</div>
                     </div>
                     <button onclick="applyPreSaleMod('interior')" class="btn ${car.cleanInterior ? 'btn-dark opacity-50' : 'btn-green'} btn-sm btn-auto" ${car.cleanInterior ? 'disabled' : ''}>
-                        ${car.cleanInterior ? 'Сделано ✓' : '8,500 ₽'}
+                        ${car.cleanInterior ? 'Сделано ✓' : costs.interiorCost.toLocaleString() + ' ₽'}
                     </button>
                 </div>
 
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-amber">3. Полный облив кузова</b>
-                        <div class="sub-label" style="font-size:8.5px;">${hasPaintShop ? 'Цех «Хамелеон»: заводской микрослой 115 мкм' : 'Окрас в боксе (+30% к HP кузова)'}</div>
+                        <div class="sub-label" style="font-size:8.5px;">${hasPaintShop ? 'Цех «Хамелеон»: заводской микрослой 115 мкм (-40% скидка)' : 'Окрас в камере (+25% к состоянию HP)'}</div>
                     </div>
                     <button onclick="applyPreSaleMod('paint')" class="btn ${car.isRepainted ? 'btn-dark opacity-50' : 'btn-amber'} btn-sm btn-auto" ${car.isRepainted ? 'disabled' : ''}>
-                        ${car.isRepainted ? 'Окрашено ✓' : (hasPaintShop ? '14k ₽ (Цех)' : '25k ₽')}
+                        ${car.isRepainted ? 'Окрашено ✓' : costs.paintCost.toLocaleString() + ' ₽'}
                     </button>
                 </div>
 
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-purple">4. Точечный подкрас сколов</b>
-                        <div class="sub-label" style="font-size:8.5px;">Удаляет жучки, не увеличивая показания толщиномера!</div>
+                        <div class="sub-label" style="font-size:8.5px;">Устраняет сколы без утолщения показаний толщиномера.</div>
                     </div>
                     <button onclick="applyPreSaleMod('chips')" class="btn btn-purple btn-sm btn-auto">
-                        6,000 ₽
+                        ${costs.chipsCost.toLocaleString()} ₽
                     </button>
                 </div>
 
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-red">5. Демпферная присадка в мотор</b>
-                        <div class="sub-label" style="font-size:8.5px;">Маскирует стуки гидрокомпенсаторов и износ поршневой.</div>
+                        <div class="sub-label" style="font-size:8.5px;">Скрывает стуки мотора до первой проверки на СТО.</div>
                     </div>
                     <button onclick="applyPreSaleMod('additive')" class="btn ${car.hasAdditive ? 'btn-dark opacity-50' : 'btn-red'} btn-sm btn-auto" ${car.hasAdditive ? 'disabled' : ''}>
-                        ${car.hasAdditive ? 'Залито ✓' : '12,000 ₽'}
+                        ${car.hasAdditive ? 'Залито ✓' : costs.additiveCost.toLocaleString() + ' ₽'}
                     </button>
                 </div>
 
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-red">6. Смотка одометра (-50% км)</b>
-                        <div class="sub-label" style="font-size:8.5px;">Внимание: Автотека выявит скрутку в отчёте!</div>
+                        <div class="sub-label" style="font-size:8.5px;">⚠️ Автотека зафиксирует скрутку при диагностике!</div>
                     </div>
                     <button onclick="applyPreSaleMod('odometer')" class="btn ${car.rolledOdometer ? 'btn-dark opacity-50' : 'btn-red'} btn-sm btn-auto" ${car.rolledOdometer ? 'disabled' : ''}>
-                        ${car.rolledOdometer ? 'Скручен ✓' : '15,000 ₽'}
+                        ${car.rolledOdometer ? 'Скручен ✓' : costs.odometerCost.toLocaleString() + ' ₽'}
                     </button>
                 </div>
             </div>
@@ -379,7 +384,6 @@ function openPreSaleModal(idx) {
     if (typeof playSound === 'function') playSound('tick');
 }
 
-// ⭐ v1.3.0: консистентный close
 function closePreSaleModal() {
     ModalManager.close('modalPreSale');
     activePreSaleCarIndex = null;
@@ -391,6 +395,7 @@ function applyPreSaleMod(type) {
     const car = safeGetCar(activePreSaleCarIndex);
     if (!car) return;
 
+    const costs = _getServiceCosts(car);
     const cash = state.player?.cash || 0;
     const hasPaintShop = (state.businesses || []).some(b => b.id === 'paint_shop' && b.level > 0);
 
@@ -406,56 +411,56 @@ function applyPreSaleMod(type) {
     switch (type) {
         case 'clean':
             if (car.isPolished) return showToast("Кузов уже отполирован до блеска!");
-            if (!chargePlayer(7000)) return;
+            if (!chargePlayer(costs.polishCost)) return;
             car.isPolished = true;
             if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
-            showToast("Кузов отполирован (+12% к рыночной цене)!");
+            showToast("Кузов отполирован (+7% к оценке)!");
             break;
 
         case 'interior':
             if (car.cleanInterior) return showToast("Салон уже прошёл озонацию!");
-            if (!chargePlayer(8500)) return;
+            if (!chargePlayer(costs.interiorCost)) return;
             car.cleanInterior = true;
             if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
-            showToast("Химчистка завершена! Запах табака и грязь удалены.");
+            showToast("Химчистка завершена! Салон выглядит безупречно.");
             break;
 
         case 'paint':
             if (car.isRepainted) return showToast("Кузов уже был повторно окрашен!");
-            const paintCost = hasPaintShop ? 14000 : 25000;
-            if (!chargePlayer(paintCost)) return;
+            if (!chargePlayer(costs.paintCost)) return;
             car.isRepainted = true;
-            car.condition = Math.min(100, (car.condition || 60) + 30);
+            car.condition = Math.min(100, (car.condition || 60) + 25);
             if (hasPaintShop) {
                 car.bodyThickness = { hood: 115, roof: 110, doors: 120, wings: 115 };
                 showToast("🎨 Цех «Хамелеон»: окрашено заводским микрослоем!");
             } else {
                 car.bodyThickness = { hood: 240, roof: 110, doors: 260, wings: 230 };
-                showToast("Кузов перекрашен (+30% к состоянию HP)!");
+                showToast("Кузов перекрашен (+25% к состоянию HP)!");
             }
             if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
             break;
 
         case 'chips':
-            if (!chargePlayer(6000)) return;
-            car.condition = Math.min(100, (car.condition || 70) + 10);
-            showToast("Сколы точечно закрашены без изменения толщины ЛКП!");
+            if (!chargePlayer(costs.chipsCost)) return;
+            car.condition = Math.min(100, (car.condition || 70) + 8);
+            showToast("Сколы точечно закрашены!");
             if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
             break;
 
         case 'additive':
             if (car.hasAdditive) return showToast("Присадка уже залита!");
-            if (!chargePlayer(12000)) return;
+            if (!chargePlayer(costs.additiveCost)) return;
             car.hasAdditive = true;
-            showToast("Присадка залита! Стуки мотора скрыты.");
+            showToast("Присадка залита! Стуки мотора временно скрыты.");
             break;
 
         case 'odometer':
             if (car.rolledOdometer) return showToast("Пробег уже скручивался!");
-            if (!chargePlayer(15000)) return;
-            car.mileage = Math.round((car.mileage || 120000) * 0.5);
+            if (!chargePlayer(costs.odometerCost)) return;
+            car.mileage = Math.round((car.mileage || 120000) * 0.55);
             car.rolledOdometer = true;
-            showToast("Пробег смотан на 50%!");
+            car.autotekaMileageDiscrepancy = true;
+            showToast("Пробег смотан! Внимание: запись о расхождении зафиксирована в реестре.");
             break;
 
         default:
@@ -473,10 +478,7 @@ function applyPreSaleMod(type) {
 // --- СПОРТИВНЫЙ ТЮНИНГ ---
 // ========================================================
 function openTuningModal(idx) {
-    if (idx === undefined || idx === null) {
-        console.warn("[Tuning] openTuningModal без idx");
-        return;
-    }
+    if (idx === undefined || idx === null) return;
 
     if (!checkPlayerCapability('tune')) {
         return openNeedCapabilityModal('tune', "Спортивный тюнинг и корчевание");
@@ -508,7 +510,6 @@ function openTuningModal(idx) {
     if (typeof playSound === 'function') playSound('tick');
 }
 
-// ⭐ v1.3.0: консистентный close
 function closeTuningModal() {
     ModalManager.close('modalTuning');
     activeTuningCarIndex = null;
@@ -537,7 +538,6 @@ function renderTuningItems() {
     let html = "";
 
     if (activeTuneTab === 'engine') {
-        // ⭐ v1.3.0: скидка чип-лаборатории снижена с 70% до 30%
         const chipDiscount = hasChipLab ? 0.70 : 1.0;
         const cCost1 = Math.round(30000 * chipDiscount);
         const cCost2 = Math.round(65000 * chipDiscount);
@@ -546,9 +546,9 @@ function renderTuningItems() {
         const currentChip = t.chip || 0;
 
         const engChips = [
-            { id: 'chip_stage1', stage: 1, name: `⚡ Чип Stage 1${hasChipLab ? ' (-30%)' : ''}`, cost: cCost1, desc: '+25 л.с., сдвиг отсечки (+50k ₽ к цене).', bought: currentChip >= 1, action: `buyChipStage(1, ${cCost1}, 25)` },
-            { id: 'chip_stage2', stage: 2, name: `🔥 Stage 2 + Попкорн${hasChipLab ? ' (-30%)' : ''}`, cost: cCost2, desc: '+60 л.с., отстрелы (+115k ₽ к цене).', bought: currentChip >= 2, action: `buyChipStage(2, ${cCost2}, 60)` },
-            { id: 'chip_stage3', stage: 3, name: `🚀 Stage 3 Big Turbo Kit`, cost: cCost3, desc: '+150 л.с., высшая лига скорости (+290k ₽ к цене).', bought: currentChip >= 3, action: `buyChipStage(3, ${cCost3}, 150)` }
+            { id: 'chip_stage1', stage: 1, name: `⚡ Чип Stage 1${hasChipLab ? ' (-30%)' : ''}`, cost: cCost1, desc: '+25 л.с., оптимизация топливных карт.', bought: currentChip >= 1, action: `buyChipStage(1, ${cCost1}, 25)` },
+            { id: 'chip_stage2', stage: 2, name: `🔥 Stage 2 + Попкорн${hasChipLab ? ' (-30%)' : ''}`, cost: cCost2, desc: '+60 л.с., прошивка ЭБУ и отстрелы.', bought: currentChip >= 2, action: `buyChipStage(2, ${cCost2}, 60)` },
+            { id: 'chip_stage3', stage: 3, name: `🚀 Stage 3 Big Turbo Kit`, cost: cCost3, desc: '+150 л.с., кованая поршневая и наддув.', bought: currentChip >= 3, action: `buyChipStage(3, ${cCost3}, 150)` }
         ];
 
         engChips.forEach(m => {
@@ -566,7 +566,8 @@ function renderTuningItems() {
             </div>`;
         });
 
-        TUNING_CONFIG.engine.forEach(m => {
+        const engineMods = window.TUNING_CONFIG?.engine || [];
+        engineMods.forEach(m => {
             const bought = !!t[m.id];
             const btn = bought
                 ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Установлено ✓</button>"
@@ -582,7 +583,7 @@ function renderTuningItems() {
             </div>`;
         });
     } else {
-        const modsList = TUNING_CONFIG[activeTuneTab] || [];
+        const modsList = window.TUNING_CONFIG?.[activeTuneTab] || [];
         const btnColorClass = activeTuneTab === 'drift' ? 'btn-red' : (activeTuneTab === 'drag' ? 'btn-amber' : 'btn-purple');
         const textColorClass = activeTuneTab === 'drift' ? 'color-red' : (activeTuneTab === 'drag' ? 'color-amber' : 'color-purple');
 
@@ -640,7 +641,7 @@ function buyTuningMod(modId, cost, powerGain, riskGain) {
         renderTuningItems();
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast("Деталь установлена! Оценка авто выросла.");
+        showToast("Деталь установлена!");
     } finally {
         _tuneBuyPending = false;
     }
@@ -660,12 +661,10 @@ function buyChipStage(stage, cost, powerGain) {
     if (!car.tuning) car.tuning = {};
     const currentChip = car.tuning.chip || 0;
 
-    // ⭐ v1.3.0: нельзя поставить младший Stage после старшего
     if (stage <= currentChip) {
         return showToast(`У вас уже установлен Stage ${currentChip}!`);
     }
 
-    // ⭐ v1.3.0: можно перескакивать, но с доплатой полной стоимости
     const cash = state.player?.cash || 0;
     if (cash < cost) return showToast("Не хватает денег на прошивку!");
 
@@ -673,12 +672,8 @@ function buyChipStage(stage, cost, powerGain) {
     try {
         state.player.cash -= cost;
 
-        // Разница в мощности от предыдущего stage
-        const stagesPower = { 0: 0, 1: 25, 2: 60, 3: 150 };
-        const actualPowerGain = powerGain;
-
         car.tuning.chip = stage;
-        car.power = (car.power || 100) + actualPowerGain;
+        car.power = (car.power || 100) + powerGain;
         car.tuning.risk1251 = Math.min(100, (car.tuning.risk1251 || 0) + 10);
 
         if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
@@ -691,7 +686,7 @@ function buyChipStage(stage, cost, powerGain) {
         renderTuningItems();
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast(`Прошивка Stage ${stage} залита (+${powerGain} л.с.)!`);
+        showToast(`Прошивка Stage ${stage} установлена (+${powerGain} л.с.)!`);
     } finally {
         _tuneBuyPending = false;
     }
