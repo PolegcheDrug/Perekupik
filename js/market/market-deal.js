@@ -1,11 +1,12 @@
 // ========================================================
-// js/market/market-deal.js — ТОРГ У КАПОТА И ДКП (v5.3.4 FIX)
+// js/market/market-deal.js — ТОРГ У КАПОТА И ДКП (v5.4.0 FULL INTEGRITY)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v5.3.4:
-//   - Исправлено добавление авто в гараж после подписания ДКП (защита от сброса marketFeed)
-//   - Машины на баланс бизнеса не блокируются лимитом бытовки
-//   - Автоматическое переключение вкладки гаража на купленный транспорт
-//   - Принудительное сохранение и обновление UI
+// ⭐ v5.4.0:
+//   - Полный перенос всех свойств ТС при покупке (Автотека, скрутка, дефекты, ЛКП, присадки)
+//   - Синхронизация полей plate и customPlate для совместимости с PlatesManager
+//   - Гарантированное совпадение рыночной оценки при подписании ДКП и в гараже
+//   - Машины на баланс коммерческого флота не блокируются лимитом бытовки
+//   - Автоматический переход в гараж на купленный автомобиль и сохранение стейта
 // ========================================================
 
 let pendingMarketCar = null;
@@ -1213,7 +1214,7 @@ function abortDKPDeal() {
     if (typeof playSound === 'function') playSound('error');
 }
 
-// ⭐ НАДЁЖНОЕ ЗАВЕРШЕНИЕ СДЕЛКИ И ДОБАВЛЕНИЕ В ГАРАЖ
+// ⭐ НАДЁЖНОЕ ЗАВЕРШЕНИЕ СДЕЛКИ И ДОБАВЛЕНИЕ В ГАРАЖ СО ВСЕМИ ПАРАМЕТРАМИ
 function finishMarketCarBuyProcess(deal) {
     if (!deal || !deal.car) {
         _dealActionPending = false;
@@ -1249,19 +1250,37 @@ function finishMarketCarBuyProcess(deal) {
         state.player.stats.bought = (state.player.stats.bought || 0) + 1;
         if (!Array.isArray(state.garage)) state.garage = [];
 
+        // Полное глубокое копирование с фиксацией характеристик
         const newCar = Object.assign({}, car);
         newCar.uid = 'car_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
         newCar.id = car.id || newCar.uid;
-        newCar.customPlate = car.customPlate || car.plate || "ТРАНЗИТ";
+        
+        const plateVal = car.customPlate || car.plate || "ТРАНЗИТ";
+        newCar.plate = plateVal;
+        newCar.customPlate = plateVal;
+        
         newCar.impounded = false;
         newCar.unregistered = false;
         newCar.insurance = null;
         newCar.purchaseCost = price;
+        newCar.baseMarketValue = car.baseMarketValue || car.basePrice || 100000;
         newCar.wear = car.wear ? Object.assign({}, car.wear) : { engine: 85, transmission: 85 };
         newCar.isPersonal = false;
         newCar.ownershipDays = 0;
         newCar.engineTemp = 90;
         newCar.tireWear = car.tireWear !== undefined ? car.tireWear : 100;
+        
+        // Синхронизация флагов автотеки и состояния ЛКП
+        newCar.rolledOdometer = Boolean(car.rolledOdometer);
+        newCar.autotekaMileageDiscrepancy = Boolean(car.autotekaMileageDiscrepancy || car.rolledOdometer);
+        newCar.hasAdditive = Boolean(car.hasAdditive);
+        newCar.isRepainted = Boolean(car.isRepainted);
+        newCar.isPolished = Boolean(car.isPolished);
+        newCar.isMuseumStock = Boolean(car.isMuseumStock);
+        newCar.isTunedSpec = Boolean(car.isTunedSpec);
+        newCar.isBeaterProject = Boolean(car.isBeaterProject);
+        newCar.hiddenDefect = car.hiddenDefect ? Object.assign({}, car.hiddenDefect) : null;
+
         newCar.tuning = car.tuning ? Object.assign({}, car.tuning) : {
             chip: 0, exhaust: false, stance: false, bodykit: false,
             rollCage: false, dragSlicks: false, hydroHandbrake: false,
@@ -1278,9 +1297,9 @@ function finishMarketCarBuyProcess(deal) {
             try { window.ensureCarIdentity(newCar); } catch (e) {}
         }
 
-        newCar.mechanicalDefects = car.mechanicalDefects || [];
-        newCar.legalDefect = car.legalDefect || null;
-        newCar._revealedDefects = car._revealedDefects || [];
+        newCar.mechanicalDefects = Array.isArray(car.mechanicalDefects) ? [...car.mechanicalDefects] : [];
+        newCar.legalDefect = car.legalDefect ? Object.assign({}, car.legalDefect) : null;
+        newCar._revealedDefects = Array.isArray(car._revealedDefects) ? [...car._revealedDefects] : [];
         newCar._revealedLegal = car._revealedLegal || null;
         newCar.sellerArchetype = car.sellerArchetype || null;
 
@@ -1304,6 +1323,7 @@ function finishMarketCarBuyProcess(deal) {
             newCar._backfireType = car.legalDefect.id;
         }
 
+        // Пересчёт рыночной цены с учётом всех дефектов и агрегатов
         if (typeof recalculateCarMarketValue === 'function') {
             try { recalculateCarMarketValue(newCar); } catch (e) {}
         }
@@ -1320,11 +1340,6 @@ function finishMarketCarBuyProcess(deal) {
         if (typeof addXp === 'function') addXp(40);
         if (typeof trackQuestProgress === 'function') trackQuestProgress('buy_car', 1);
         if (typeof logBankTransaction === 'function') logBankTransaction(`Покупка авто: ${car.name}`, price, false);
-
-        if (typeof updateBrandReputationAfterSale === 'function') {
-            const isCleanSale = !car.legalDefect && !car.rolledOdometer && !car.hiddenDefect && !car.isStolen;
-            updateBrandReputationAfterSale(car.name, isCleanSale);
-        }
 
         let msg = `✅ ${car.name} куплен за ${price.toLocaleString()} ₽!`;
         if (isBusinessBuy) msg += ` Поставлен на баланс «${deal.targetBizName}»!`;
@@ -1506,4 +1521,4 @@ window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v5.3.4] Гарантированное добавление транспорта в гараж ✓');
+console.log('[🤝 market-deal v5.4.0] Полное сохранение параметров ТС и ДКП ✓');
