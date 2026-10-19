@@ -301,6 +301,14 @@ const AppAutodrot = {
         if (!lot) return showToast("Лот не найден или уже снят с продажи!");
         if (cash < lot.price) return showToast("Недостаточно денег на балансе!");
 
+        if (lot.type === 'car' || lot.type === 'cars') {
+            let maxSlots = typeof getTotalGarageSlots === 'function' ? getTotalGarageSlots() : (state.garageSlots || 2);
+            let curSlots = state.garage ? state.garage.length : 0;
+            if (curSlots >= maxSlots) {
+                return showToast("В гараже нет свободных мест! Расширьте гараж или продайте авто.");
+            }
+        }
+
         state.player.cash -= lot.price;
 
         if (typeof logBankTransaction === 'function') {
