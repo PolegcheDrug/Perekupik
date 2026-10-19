@@ -1,9 +1,17 @@
 // ========================================================
-// js/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.6.5)
+// js/phone/phone-racing.js — STREET UNDERGROUND В PEREKUP OS (v0.8.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// Интерактивные зрелищные заезды:
-// Арена дрифта (восьмёрка с дымом), Драг 402м с ёлкой старта,
-// Стенс-шоу со стравливанием пневмы кузова в пол, шашки по МКАД.
+//
+// ⭐ v0.8.0 (БАЛАНС ИЗНОСА ШИН, МОТОРА И ТРАНСМИССИИ):
+//   - СБАЛАНСИРОВАН ИЗНОС В ДРИФТЕ:
+//       • Зимний дрифт/паркинг (Matsuri): скользкое покрытие, шины -5..8%, мотор +6..9°C.
+//       • RDS Europe (сухой асфальт): шины -9..13%, мотор +8..12°C.
+//       • RDS GP (высшая лига 420+ л.с.): шины -12..16%, мотор +11..15°C.
+//   - ДОБАВЛЕН ИЗНОС В ШАШКАХ ПО МКАД:
+//       • Поток 140 км/ч: шины -3..5%, мотор +6..9°C, износ поршневой -0.4%.
+//       • Прострел 220+ км/ч: шины -6..9%, мотор +11..16°C, износ поршневой -0.9%, трансмиссия -0.8%.
+//   - ПРОВЕРКА ПЕРЕГРЕВА И КОРДА: блокировка шашек при перегреве (>105°C) и износе резины (<15%).
+//   - ИНТЕГРАЦИЯ ТЕНЕВОГО КОНТУРА: учет ориентировок ДПС и защиты «Крыша ГИБДД».
 // ========================================================
 
 const PhoneRacing = {
@@ -81,7 +89,7 @@ const PhoneRacing = {
         let hasCage = !!t.rollCage;
         let hasSeats = !!t.bucketSeats;
         let isOverheated = (car.engineTemp || 90) > 105;
-        let isTiresDead = (car.tireWear !== undefined ? car.tireWear : 100) < 20;
+        let isTiresDead = (car.tireWear !== undefined ? car.tireWear : 100) < 15;
 
         return {
             power,
@@ -132,7 +140,7 @@ const PhoneRacing = {
                     </select>
                 </div>
                 <div class="car-spec-chips-row mb-1">
-                    <div class="car-spec-chip"><i class="fa-solid fa-temperature-half ${tempVal > 105 ? 'color-red' : 'color-green'}"></i> <b>${tempVal}°C</b></div>
+                    <div class="car-spec-chip"><i class="fa-solid fa-temperature-half ${tempVal > 102 ? 'color-red' : 'color-green'}"></i> <b>${tempVal}°C</b></div>
                     <div class="car-spec-chip"><i class="fa-solid fa-circle-notch ${tiresPct < 30 ? 'color-red' : 'color-green'}"></i> <b>${tiresPct}%</b> шины</div>
                     <div class="car-spec-chip"><i class="fa-solid fa-bolt color-amber"></i> <b>${car.power || 100}</b> л.с.</div>
                 </div>
@@ -153,7 +161,7 @@ const PhoneRacing = {
                     </div>
                     <div class="sub-label mb-2" style="font-size:10px;">
                         Регламент: Мин. 75 л.с., заварка и выворот.<br>
-                        ${!spec.matsuriReady ? `<b class="color-red">${spec.matsuriReason}</b>` : `<span class="color-green">Допуск открыт!</span>`}
+                        ${!spec.matsuriReady ? `<b class="color-red">${spec.matsuriReason}</b>` : `<span class="color-green">Допуск открыт! Расход шин: 5-8%</span>`}
                     </div>
                     <button onclick="PhoneRacing.runDriftChallenge('matsuri', 25000)" class="btn btn-cyan btn-sm w-full" ${!spec.matsuriReady ? 'disabled' : ''}>
                         Выехать на спот (Взнос 25k ₽)
@@ -170,7 +178,7 @@ const PhoneRacing = {
                     </div>
                     <div class="sub-label mb-2" style="font-size:10px;">
                         Регламент: Мин. 200 л.с., гидроручник, заварка, выворот.<br>
-                        ${!spec.europeReady ? `<b class="color-red">${spec.europeReason}</b>` : `<span class="color-green">Техком пройден!</span>`}
+                        ${!spec.europeReady ? `<b class="color-red">${spec.europeReason}</b>` : `<span class="color-green">Техком пройден! Расход шин: 9-13%</span>`}
                     </div>
                     <button onclick="PhoneRacing.runDriftChallenge('europe', 80000)" class="btn btn-amber btn-sm w-full" ${!spec.europeReady ? 'disabled' : ''}>
                         Квалификация RDS Europe (Взнос 80k ₽)
@@ -187,7 +195,7 @@ const PhoneRacing = {
                     </div>
                     <div class="sub-label mb-2" style="font-size:10px;">
                         Регламент: Мин. 420 л.с., вварной каркас, ковши, гидроручник.<br>
-                        ${!spec.gpReady ? `<b class="color-red">${spec.gpReason}</b>` : `<span class="color-green">Болид готов к ТОП-32!</span>`}
+                        ${!spec.gpReady ? `<b class="color-red">${spec.gpReason}</b>` : `<span class="color-green">Болид готов к ТОП-32! Расход шин: 12-16%</span>`}
                     </div>
                     <button onclick="PhoneRacing.runDriftChallenge('gp', 250000)" class="btn btn-red btn-sm w-full" ${!spec.gpReady ? 'disabled' : ''}>
                         ТОП-32 RDS GP (Взнос 250k ₽)
@@ -209,6 +217,11 @@ const PhoneRacing = {
         state.player.cash -= cost;
         car.tireWear = 100;
         car.engineTemp = 90;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Замена боевых шин & СТО: ${car.name}`, cost, false);
+        }
+
         saveState();
         updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
@@ -244,11 +257,47 @@ const PhoneRacing = {
         if (!car) return;
 
         state.player.cash -= cost;
-        car.engineTemp = (car.engineTemp || 90) + Math.floor(12 + Math.random() * 8);
-        car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - Math.floor(16 + Math.random() * 10));
-        if (car.wear) {
-            car.wear.transmission = Math.max(10, (car.wear.transmission || 85) - 2.5);
+
+        // Инициализация структуры износа при необходимости
+        if (!car.wear) {
+            car.wear = { engine: 85, transmission: 85, body: 90 };
         }
+
+        // Сбалансированный износ в зависимости от лиги
+        let tireDrop = 0;
+        let heatRise = 0;
+        let engineWear = 0;
+        let transWear = 0;
+
+        if (league === 'matsuri') {
+            // Зима/лед/мокрый паркинг — шины скользят и почти не горят
+            tireDrop = Math.floor(5 + Math.random() * 4); // 5-8%
+            heatRise = Math.floor(6 + Math.random() * 4); // 6-9°C
+            engineWear = 0.5;
+            transWear = 0.7;
+        } else if (league === 'europe') {
+            // Сухой асфальт, средние скорости
+            tireDrop = Math.floor(9 + Math.random() * 5); // 9-13%
+            heatRise = Math.floor(8 + Math.random() * 5); // 8-12°C
+            engineWear = 0.9;
+            transWear = 1.2;
+        } else if (league === 'gp') {
+            // Высшая лига, огромные углы и дым на 420+ л.с.
+            tireDrop = Math.floor(12 + Math.random() * 5); // 12-16%
+            heatRise = Math.floor(11 + Math.random() * 5); // 11-15°C
+            engineWear = 1.3;
+            transWear = 1.6;
+        }
+
+        // Повышенный износ мотора при перегреве (>98°C)
+        if ((car.engineTemp || 90) > 98) {
+            engineWear *= 1.4;
+        }
+
+        car.engineTemp = (car.engineTemp || 90) + heatRise;
+        car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - tireDrop);
+        car.wear.engine = Math.max(10, Number(((car.wear.engine || 85) - engineWear).toFixed(1)));
+        car.wear.transmission = Math.max(10, Number(((car.wear.transmission || 85) - transWear).toFixed(1)));
 
         if (typeof playSound === 'function') playSound('tick');
         if (typeof tgHaptic === 'function') tgHaptic('medium');
@@ -699,6 +748,8 @@ const PhoneRacing = {
         const car = state.garage ? state.garage[carIdx] : null;
         let power = car?.power || 100;
         let maxSpeed = Math.round(Math.min(320, 120 + Math.sqrt(power) * 8.5));
+        let tiresPct = car?.tireWear !== undefined ? car.tireWear : 100;
+        let tempVal = car?.engineTemp || 90;
 
         container.innerHTML = `
             <div class="glass-card mb-2 p-2">
@@ -706,7 +757,12 @@ const PhoneRacing = {
                     <b class="text-xs color-red"><i class="fa-solid fa-car-burst"></i> Шашки в потоке по МКАД</b>
                     <span class="tag-badge bg-tag-red">Макс: ${maxSpeed} км/ч</span>
                 </div>
-                <p class="sub-label mb-2" style="font-size:10px;">Агрессивный прострел в ночном трафике. Чем мощнее двигатель, тем выше шанс оторваться от потока и сорвать банк!</p>
+                <div class="car-spec-chips-row mb-2">
+                    <div class="car-spec-chip"><i class="fa-solid fa-temperature-half ${tempVal > 102 ? 'color-red' : 'color-green'}"></i> <b>${tempVal}°C</b></div>
+                    <div class="car-spec-chip"><i class="fa-solid fa-circle-notch ${tiresPct < 30 ? 'color-red' : 'color-green'}"></i> <b>${tiresPct}%</b> шины</div>
+                    <div class="car-spec-chip"><i class="fa-solid fa-bolt color-amber"></i> <b>${power}</b> л.с.</div>
+                </div>
+                <p class="sub-label mb-2" style="font-size:10px;">Агрессивный прострел в ночном трафике. Высокая скорость сильно греет двигатель и подтачивает шины!</p>
 
                 <div class="grid-2 mb-2">
                     <button onclick="PhoneRacing.startCitySprint('normal', ${maxSpeed})" class="btn btn-dark btn-sm">Поток 140 км/ч (Ставка 50k)</button>
@@ -724,8 +780,44 @@ const PhoneRacing = {
         let cash = state.player?.cash || 0;
         if (cash < bet) return showToast("Не хватает денег на заезд!");
 
+        let carIdx = (typeof getActiveStreetCarIndex === 'function') 
+            ? getActiveStreetCarIndex() 
+            : (state.player.selectedStreetCarIndex || 0);
+        const car = state.garage ? state.garage[carIdx] : null;
+
+        if (!car) return showToast("Автомобиль не найден!");
+        if (car.impounded) return showToast("Автомобиль на штрафстоянке!");
+
+        // Проверка температуры и шин
+        let temp = car.engineTemp || 90;
+        if (temp > 105) return showToast(`⚠️ Мотор перегрет (${temp}°C)! Остудите перед заездом.`);
+        let tires = car.tireWear !== undefined ? car.tireWear : 100;
+        if (tires < 15) return showToast("🚫 Корд наружу! Резина стёрта, замените на СТО.");
+
         state.player.cash -= bet;
-        state.player.consecutiveRaces = (state.player.consecutiveRaces || 0) + 2;
+
+        // Внимание ДПС
+        const hasRoof = (state.player.policeImmunityDays || 0) > 0;
+        if (!hasRoof) {
+            state.player.consecutiveRaces = (state.player.consecutiveRaces || 0) + (mode === 'insane' ? 2 : 1);
+        }
+
+        // Сбалансированный износ в спринте
+        if (!car.wear) {
+            car.wear = { engine: 85, transmission: 85, body: 90 };
+        }
+
+        let tireDrop = mode === 'insane' ? Math.floor(6 + Math.random() * 4) : Math.floor(3 + Math.random() * 3); // 6-9% или 3-5%
+        let tempRise = mode === 'insane' ? Math.floor(11 + Math.random() * 6) : Math.floor(6 + Math.random() * 4); // 11-16°C или 6-9°C
+        let engineWear = mode === 'insane' ? 0.9 : 0.4;
+        let transWear = mode === 'insane' ? 0.8 : 0.3;
+
+        if (temp > 98) engineWear *= 1.4;
+
+        car.tireWear = Math.max(0, tires - tireDrop);
+        car.engineTemp = temp + tempRise;
+        car.wear.engine = Math.max(10, Number(((car.wear.engine || 85) - engineWear).toFixed(1)));
+        car.wear.transmission = Math.max(10, Number(((car.wear.transmission || 85) - transWear).toFixed(1)));
 
         if (typeof playSound === 'function') playSound('tick');
         if (typeof tgHaptic === 'function') tgHaptic('medium');
@@ -762,7 +854,7 @@ const PhoneRacing = {
                 resBox.innerHTML = `
                     <div class="glass-card p-2 text-center" style="border-color:var(--red);">
                         <div class="font-bold text-xs color-red mb-1">🚨 ПЕРЕХВАТ СПЕЦРОТЫ ДПС!</div>
-                        <div class="sub-label mb-2" style="font-size:10px;">Спецбатальон с люстрами заблокировал съезд.<br>Штраф за опасное вождение: -${fine.toLocaleString()} ₽!</div>
+                        <div class="sub-label mb-2" style="font-size:10px;">Спецбатальон с люстрами заблокировал съезд.<br>Штраф за опасное вождение: -${fine.toLocaleString()} ₽!<br>Шины: -${tireDrop}% (остаток: ${car.tireWear}%) | Мотор: +${tempRise}°C</div>
                         <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-danger btn-sm w-full">Оплатить штраф</button>
                     </div>
                 `;
@@ -776,7 +868,7 @@ const PhoneRacing = {
                 resBox.innerHTML = `
                     <div class="glass-card p-2 text-center" style="border-color:var(--green);">
                         <div class="font-bold text-xs color-green mb-1">⚡ ЧИСТЫЙ ПРОСТРЕЛ БЕЗ КАМЕР!</div>
-                        <div class="sub-label mb-2" style="font-size:10px;">Вы оторвались от преследователей на скорости ${maxSpeed} км/ч!<br>Выигрыш: <b class="color-green">+${win.toLocaleString()} ₽</b> (+${mode === 'insane' ? 55 : 25} Респекта)</div>
+                        <div class="sub-label mb-2" style="font-size:10px;">Вы оторвались от преследователей на скорости ${maxSpeed} км/ч!<br>Выигрыш: <b class="color-green">+${win.toLocaleString()} ₽</b> (+${mode === 'insane' ? 55 : 25} Респекта)<br>Шины: -${tireDrop}% (остаток: ${car.tireWear}%) | Мотор: +${tempRise}°C</div>
                         <button onclick="PhoneRacing.renderStreetSubScreen()" class="btn btn-green btn-sm w-full">Забрать кэш</button>
                     </div>
                 `;
