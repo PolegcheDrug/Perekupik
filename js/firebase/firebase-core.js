@@ -1,12 +1,15 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.2.1)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
+// ⭐ v1.3.0 (ИНТЕГРАЦИЯ СО СПЛЭШ-СКРИНОМ ЗАГРУЗКИ):
+//   - Добавлена передача промежуточного прогресса в window.AppLoadingManager
+//     при авторизации Telegram/Firebase и выкачивании сейва из облака.
+//   - Полная синхронизация плавного перехода без рывков.
 // ⭐ v1.2.1:
 //   - Добавлен signInAnonymously как резервный вариант авторизации.
 //     Теперь request.auth != null всегда выполняется даже без внешнего auth-сервера.
 //   - Корректная обработка запуска вне Telegram (браузер / GitHub Pages).
-//
 // ⭐ v1.2.0 (SPRINT 5 — ФИКС «НЕТ СВЯЗИ С СЕРВЕРОМ БИРЖИ»):
 //   - Firestore инициализируется через initializeFirestore()
 //     с experimentalForceLongPolling: true.
@@ -112,6 +115,10 @@ let currentUserProfile = null;
 
 const TelegramAuthManager = {
   async initSession(customServerUrl = null) {
+    if (window.AppLoadingManager) {
+      window.AppLoadingManager.setProgress(78, "Авторизация в облаке...");
+    }
+
     const tgUser = getTelegramUser();
     const url = customServerUrl || DEFAULT_AUTH_SERVER_URL;
     let initData = "";
@@ -138,6 +145,10 @@ const TelegramAuthManager = {
             currentUserProfile = data.user;
             console.log(`[🔐 Auth] Firebase Auth (Custom Token) OK. UID: ${verifiedUserId}`);
             devLogFirestore('Auth Firebase OK', `UID: ${verifiedUserId}`);
+            
+            if (window.AppLoadingManager) {
+              window.AppLoadingManager.setProgress(82, "Сессия подтверждена...");
+            }
             return { success: true, userId: verifiedUserId, user: currentUserProfile };
           }
         }
@@ -185,6 +196,11 @@ const TelegramAuthManager = {
 
       console.log(`[🔐 Auth] Резервный Firebase Auth OK. UID игрока: ${verifiedUserId}, Auth UID: ${anonCredential.user.uid}`);
       devLogFirestore('Auth Fallback OK', `UID: ${verifiedUserId}`);
+
+      if (window.AppLoadingManager) {
+        window.AppLoadingManager.setProgress(82, "Сессия подтверждена...");
+      }
+
       return { success: true, userId: verifiedUserId, user: currentUserProfile };
     } catch (authErr) {
       console.error("[🔐 Auth] Критическая ошибка авторизации Firebase:", authErr);
@@ -341,6 +357,10 @@ const PlayersStorageManager = {
       return null;
     }
 
+    if (window.AppLoadingManager) {
+      window.AppLoadingManager.setProgress(87, "Загрузка гаража и кассы...");
+    }
+
     try {
       const t0 = performance.now();
       const [playerSnap, garageSnap] = await Promise.all([
@@ -353,6 +373,11 @@ const PlayersStorageManager = {
         const pData = playerSnap.exists() ? playerSnap.data() : {};
         const gData = garageSnap.exists() ? garageSnap.data() : {};
         devLogFirestore('pullSave OK', `${targetUid} (${dt}ms, ${(gData.cars || []).length} авто)`);
+        
+        if (window.AppLoadingManager) {
+          window.AppLoadingManager.setProgress(90, "Синхронизация профиля...");
+        }
+
         return {
           player: { ...pData },
           garage: gData.cars || [],
@@ -368,6 +393,9 @@ const PlayersStorageManager = {
       const oldSnap = await getDoc(doc(db, "saves", String(targetUid)));
       if (oldSnap.exists()) {
         devLogFirestore('pullSave (legacy saves/)', `${targetUid}`);
+        if (window.AppLoadingManager) {
+          window.AppLoadingManager.setProgress(90, "Синхронизация профиля...");
+        }
         return oldSnap.data();
       }
       devLogFirestore('pullSave MISS', `${targetUid} — документов нет`);
@@ -539,7 +567,7 @@ window.FB_Core = {
 
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Core v1.2.1] Ядро Firebase загружено. Fallback Auth + Long Polling ✓");
+console.log("[☁️ FB_Core v1.3.0] Ядро Firebase загружено. Fallback Auth + Long Polling + SplashScreen Integration ✓");
 
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
