@@ -1,18 +1,18 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v3.3.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v3.4.0-complete)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.3.0 (РАБОЧИЙ ТОРГ В ТЕЛЕФОНЕ + ИТОГИ С МАРЖОЙ):
-//   - ФИКС: handleNetworkMBuyerHaggle — полноценный интерактивный торг
-//     в приложении «Телефон» (кнопки +3%, +7%, +12% реально меняют сумму).
-//   - ФИКС: Устранено дублирование инпутов и блоков торга.
-//   - ФИКС: finishSalesLotDeal вызывает openCarSoldSuccessModal (выручка
-//     в неоновый циан, чистая прибыль в янтарь с процентом ROI).
-//   - Синхронизация по carUid сохранена в полном объеме.
+// ⭐ v3.4.0 (БАЛАНС + АВТОТЕКА + ДЕЛЬТА ВРЕМЕНИ + ПОЛНЫЙ ТОРГ):
+//   - ФИКС: Учет реального времени (Date.now()) в updateSalesLotTimers: таймеры не виснут при сворачивании игры.
+//   - БАЛАНС: Защита от эксплойта +15% — таймер поиска покупателя увеличивается пропорционально завышению цены.
+//   - ИНТЕРАКТИВ: Проверка Автотеки на смотанный одометр и скрытые дефекты без присадки.
+//   - СОХРАНЕНО: Все оригинальные VIP и базовые архетипы, модальный торг у капота, getOrAssignLotCarImage.
+//   - ФИКС: Интеграция с openCarSoldSuccessModal (выручка в циан, прибыль в янтарь с ROI).
 // ========================================================
 
 let salesLotTimerInterval = null;
 let activeSalesLotHaggleIndex = null;
+let _lastSalesLotTickTimestamp = Date.now();
 
 // --------------------------------------------------------
 // ЗАЩИТНЫЙ ХЕЛПЕР
@@ -317,6 +317,7 @@ function cleanupOrphanedDialogs() {
 function initSalesLotTimer() {
     if (!_isStateReady()) return;
     if (salesLotTimerInterval) clearInterval(salesLotTimerInterval);
+    _lastSalesLotTickTimestamp = Date.now();
     salesLotTimerInterval = setInterval(() => {
         updateSalesLotTimers();
     }, 1000);
@@ -405,11 +406,20 @@ function renderSalesLot() {
         let margin = askingPrice - purchaseCost;
         let marginClass = margin >= 0 ? "color-green" : "color-red";
 
+        // Интеллектуальный расчет базового времени поиска покупателя в зависимости от цены
+        const marketVal = car.marketValue || car.basePrice || 100000;
+        const priceRatio = askingPrice / marketVal;
+        let defaultTimer = 45;
+
+        if (priceRatio > 1.10) defaultTimer = 75; // +10-15% к цене требует больше времени
+        else if (priceRatio > 1.05) defaultTimer = 55;
+        else if (priceRatio < 0.90) defaultTimer = 25; // Быстрый сброс
+
         if (lot.timer === undefined || isNaN(lot.timer)) {
-            lot.timer = (lot.maxTimer && !isNaN(lot.maxTimer)) ? lot.maxTimer : 60;
+            lot.timer = (lot.maxTimer && !isNaN(lot.maxTimer)) ? lot.maxTimer : defaultTimer;
         }
         if (lot.maxTimer === undefined || isNaN(lot.maxTimer)) {
-            lot.maxTimer = 60;
+            lot.maxTimer = defaultTimer;
         }
 
         let remainingSec = Math.max(0, lot.timer);
@@ -636,7 +646,7 @@ function renderBuyerCardActions(lot, idx) {
 }
 
 // --------------------------------------------------------
-// ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ (NPC)
+// ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ (NPC) С ПРОВЕРКАМИ АВТОТЕКИ
 // --------------------------------------------------------
 function generateRandomLotBuyer(car, askingPrice) {
     if (!car) {
@@ -660,14 +670,29 @@ function generateRandomLotBuyer(car, askingPrice) {
         discountRatio = 0.82 + Math.random() * 0.12;
     }
 
-    const rawPrice = askingPrice * discountRatio;
-    const offeredPrice = Math.round(rawPrice / 1000) * 1000;
+    let rawPrice = askingPrice * discountRatio;
 
+    // --- ПРОВЕРКА 1: СКРУТКА ПРОБЕГА В АВТОТЕКЕ ---
+    let autotekaWarning = '';
+    if ((car.rolledOdometer || car.autotekaMileageDiscrepancy) && Math.random() < 0.65) {
+        rawPrice *= 0.82; // -18% штраф за расхождение в базах
+        autotekaWarning = ` «Отчёт Автотеки показал скрутку одометра! Срезаю цену сразу на 18%.»`;
+    }
+
+    // --- ПРОВЕРКА 2: СКРЫТЫЙ ДЕФЕКТ БЕЗ ПРИСАДКИ ---
+    let defectWarning = '';
+    if (car.hiddenDefect && !car.hasAdditive) {
+        const cost = car.hiddenDefect.cost || 15000;
+        rawPrice = Math.max(10000, rawPrice - cost);
+        defectWarning = ` «При первичном осмотре обнаружены стуки/ошибки (${car.hiddenDefect.text || 'дефект'}). Минус ${cost.toLocaleString()} ₽ на сервис!»`;
+    }
+
+    const offeredPrice = Math.round(rawPrice / 1000) * 1000;
     const isOnlineChat = isVIP ? false : (Math.random() < 0.50);
 
-    let initialDialogue = archetype.moodPhrase;
+    let initialDialogue = archetype.moodPhrase + autotekaWarning + defectWarning;
     if (isOnlineChat) {
-        initialDialogue = `«Здравствуйте! Увидел объявление на «${car.name}». За ${offeredPrice.toLocaleString()} ₽ отдадите?»`;
+        initialDialogue = `«Здравствуйте! Увидел объявление на «${car.name}». За ${offeredPrice.toLocaleString()} ₽ отдадите?»` + autotekaWarning + defectWarning;
     }
 
     return {
@@ -1176,6 +1201,10 @@ function updateSalesLotTimers() {
     if (!_isStateReady()) return;
     if (!state.salesLot || state.salesLot.length === 0) return;
 
+    const now = Date.now();
+    const elapsedSeconds = Math.max(1, Math.floor((now - _lastSalesLotTickTimestamp) / 1000));
+    _lastSalesLotTickTimestamp = now;
+
     let needReRender = false;
 
     for (let idx = state.salesLot.length - 1; idx >= 0; idx--) {
@@ -1188,7 +1217,7 @@ function updateSalesLotTimers() {
             if (lot.buyerGenerationPending) continue;
 
             if (lot.timer > 0) {
-                lot.timer -= 1;
+                lot.timer = Math.max(0, lot.timer - elapsedSeconds);
                 const textEl = document.getElementById(`lot_timer_text_${idx}`);
                 const barEl = document.getElementById(`lot_progress_fill_${idx}`);
                 if (textEl) textEl.innerText = `⏳ ${lot.timer}с`;
@@ -1222,7 +1251,7 @@ function updateSalesLotTimers() {
             }
 
             if (lot._buyerTimerActive && lot.buyerTimerLeft > 0) {
-                lot.buyerTimerLeft -= 1;
+                lot.buyerTimerLeft = Math.max(0, lot.buyerTimerLeft - elapsedSeconds);
                 const buyerTimeText = document.getElementById(`lot_buyer_timer_${idx}`);
                 if (buyerTimeText) buyerTimeText.innerText = `⏳ ${lot.buyerTimerLeft}с`;
 
@@ -1356,4 +1385,4 @@ if (document.readyState === 'loading') {
     _startSalesLotTimerWhenReady();
 }
 
-console.log('[🏪 salesLot v3.3.0] Торг в телефоне + окно выручки и маржи ROI ✓');
+console.log('[🏪 salesLot v3.4.0-complete] Полный торг у капота и в телефоне + Автотека + синхронизация Date.now() ✓');
