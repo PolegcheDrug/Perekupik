@@ -1,10 +1,15 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v6.3.0)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v7.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v6.3.0 (ФИКС ОТОБРАЖЕНИЯ ТОЧЕК БИЗНЕСА):
-//   - Встроен автономный fallback базы BUSINESS_DATA при задержках загрузки.
-//   - Объекты бизнеса больше не пропадают со вкладки «Точки».
-//   - Сохранена непрерывная касса по Date.now() и оффлайн-начисление.
+//
+// ⭐ v7.0.0 (B2B ТЕНДЕРЫ, КРИЗИС-МЕНЕДЖМЕНТ И СИНЕРГИЯ):
+//   1. Новая вкладка «Тендеры»: корпоративные контракты для таксопарков,
+//      курьерских служб и ТК с мгновенным авансом и бустом к кассе.
+//   2. Кризисные инциденты при инкассации: проверки налоговой, Роспотребнадзора
+//      и поломки на линии с выбором вариантов решения (кэш, связи, техника).
+//   3. Учёт монобрендовой синергии парка (VAG, LADA, Корея, ГАЗ, КамАЗ).
+//   4. Синхронизация с системой ежедневных квестов (trackQuestProgress).
+//   5. Непрерывное начисление дохода по реальному времени с защитой от сбоев.
 // ========================================================
 
 const PhoneBusiness = {
@@ -17,6 +22,7 @@ const PhoneBusiness = {
     _collectPointPending: false,
     _tickPending: false,
     _upgradePending: false,
+    _tenderPending: false,
 
     get ECONOMIC_CYCLES() { return window.BusinessDataModule?.ECONOMIC_CYCLES || {}; },
     get NETWORK_MILESTONES() { return window.BusinessDataModule?.NETWORK_MILESTONES || []; },
@@ -24,7 +30,12 @@ const PhoneBusiness = {
     get DNA_TRAFFIC() { return window.BusinessDataModule?.DNA_TRAFFIC || []; },
     get DNA_CONDITION() { return window.BusinessDataModule?.DNA_CONDITION || []; },
     get DNA_STAFF() { return window.BusinessDataModule?.DNA_STAFF || []; },
-    get CRISIS_EVENTS() { return window.BusinessDataModule?.CRISIS_EVENTS || []; },
+    get CRISIS_EVENTS() {
+        if (window.BUSINESS_CRISIS_EVENTS && Array.isArray(window.BUSINESS_CRISIS_EVENTS)) {
+            return window.BUSINESS_CRISIS_EVENTS;
+        }
+        return window.BusinessDataModule?.CRISIS_EVENTS || [];
+    },
     get DAILY_BIZ_CHALLENGES() { return window.BusinessDataModule?.DAILY_BIZ_CHALLENGES || []; },
     get workshopUpgrades() { return window.BusinessDataModule?.workshopUpgrades || []; },
     get staffList() { return window.BusinessDataModule?.staffList || []; },
@@ -110,6 +121,7 @@ const PhoneBusiness = {
             if (!window.state) window.state = {};
             if (!window.state.player) window.state.player = {};
             if (!Array.isArray(window.state.businesses)) window.state.businesses = [];
+            if (!Array.isArray(window.state.player.activeTenders)) window.state.player.activeTenders = [];
 
             const baseData = this._getBaseBusinessData();
 
@@ -234,6 +246,7 @@ const PhoneBusiness = {
 
     _generateDailyBizChallenges() {
         const list = this.DAILY_BIZ_CHALLENGES;
+        if (!Array.isArray(list) || list.length === 0) return;
         const shuffled = [...list].sort(() => 0.5 - Math.random());
         window.state.player.dailyBizChallenges = shuffled.slice(0, 3).map(ch => ({
             id: ch.id, text: ch.text, cur: 0, max: ch.target, action: ch.action, reward: ch.reward, xp: ch.xp, done: false
@@ -410,6 +423,15 @@ const PhoneBusiness = {
             total *= (1 + (this._activeBonus.bonusPct || 0) / 100);
         }
 
+        // B2B Тендерный множитель
+        if (Array.isArray(window.state?.player?.activeTenders)) {
+            const curDay = window.state?.player?.day || 1;
+            const activeTnd = window.state.player.activeTenders.find(t => t && t.targetBiz === b.id && t.expiresDay >= curDay);
+            if (activeTnd && activeTnd.incomeMultiplier) {
+                total *= activeTnd.incomeMultiplier;
+            }
+        }
+
         total *= (1 + this._getCorporationBonus());
         total *= this._getEconomicCycleMultiplier();
         total *= (1 + this._getNetworkMilestoneBonus());
@@ -522,20 +544,23 @@ const PhoneBusiness = {
                     </div>
                 ` : ''}
 
-                <div class="biz-tabs-row mb-2">
-                    <button onclick="PhoneBusiness.setTab('points')" class="biz-tab ${tab === 'points' ? 'active' : ''}">
+                <div class="biz-tabs-row mb-2" style="display:grid; grid-template-columns: repeat(6, 1fr); gap:2px;">
+                    <button onclick="PhoneBusiness.setTab('points')" class="biz-tab ${tab === 'points' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
                         <i class="fa-solid fa-store"></i><span>Точки</span>
                     </button>
-                    <button onclick="PhoneBusiness.setTab('workshop')" class="biz-tab ${tab === 'workshop' ? 'active' : ''}">
-                        <i class="fa-solid fa-screwdriver-wrench"></i><span>Цех</span>
-                    </button>
-                    <button onclick="PhoneBusiness.setTab('staff')" class="biz-tab ${tab === 'staff' ? 'active' : ''}">
-                        <i class="fa-solid fa-users"></i><span>Штат</span>
-                    </button>
-                    <button onclick="PhoneBusiness.setTab('fleet')" class="biz-tab ${tab === 'fleet' ? 'active' : ''}">
+                    <button onclick="PhoneBusiness.setTab('fleet')" class="biz-tab ${tab === 'fleet' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
                         <i class="fa-solid fa-truck"></i><span>Парк</span>
                     </button>
-                    <button onclick="PhoneBusiness.setTab('corp')" class="biz-tab ${tab === 'corp' ? 'active' : ''}">
+                    <button onclick="PhoneBusiness.setTab('tenders')" class="biz-tab ${tab === 'tenders' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
+                        <i class="fa-solid fa-file-contract"></i><span>Тендер</span>
+                    </button>
+                    <button onclick="PhoneBusiness.setTab('workshop')" class="biz-tab ${tab === 'workshop' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
+                        <i class="fa-solid fa-screwdriver-wrench"></i><span>Цех</span>
+                    </button>
+                    <button onclick="PhoneBusiness.setTab('staff')" class="biz-tab ${tab === 'staff' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
+                        <i class="fa-solid fa-users"></i><span>Штат</span>
+                    </button>
+                    <button onclick="PhoneBusiness.setTab('corp')" class="biz-tab ${tab === 'corp' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
                         <i class="fa-solid fa-building"></i><span>Корп.</span>
                     </button>
                 </div>
@@ -548,9 +573,10 @@ const PhoneBusiness = {
         if (!content) return;
 
         if (tab === 'points')        this.renderPointsTab(content);
+        else if (tab === 'fleet')    this.renderFleetTab(content);
+        else if (tab === 'tenders')  this.renderTendersTab(content);
         else if (tab === 'workshop') this.renderWorkshopTab(content);
         else if (tab === 'staff')    this.renderStaffTab(content);
-        else if (tab === 'fleet')    this.renderFleetTab(content);
         else if (tab === 'corp')     this.renderCorporationTab(content);
         else                         this.renderPointsTab(content);
     },
@@ -803,6 +829,247 @@ const PhoneBusiness = {
         if (typeof saveState === 'function') saveState();
     },
 
+    // ========================================================
+    // ТЕНДЕРЫ (B2B КОНТРАКТЫ)
+    // ========================================================
+    renderTendersTab(container) {
+        const tenders = window.BUSINESS_TENDERS_CATALOG || [];
+        const curDay = window.state?.player?.day || 1;
+        const activeTenders = window.state?.player?.activeTenders || [];
+
+        let html = `
+            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0,242,254,0.12), #090e18); border-color: var(--cyan);">
+                <div class="flex-between mb-1">
+                    <b class="text-xs color-cyan"><i class="fa-solid fa-file-signature"></i> Корпоративные B2B Тендеры</b>
+                    <span class="tag-badge bg-tag-cyan">Госзакупки</span>
+                </div>
+                <div class="sub-label" style="font-size:9.5px; line-height:1.35;">
+                    Заключайте долгосрочные контракты на обслуживание автопарков! Получайте мгновенный аванс и фиксированный буст к выручке.
+                </div>
+            </div>
+        `;
+
+        if (tenders.length === 0) {
+            html += `<div class="sub-label text-center py-4">Актуальных тендеров пока нет.</div>`;
+            container.innerHTML = html;
+            return;
+        }
+
+        tenders.forEach(tnd => {
+            const activeContract = activeTenders.find(t => t && t.id === tnd.id && t.expiresDay >= curDay);
+            const isSigned = !!activeContract;
+            const daysLeft = isSigned ? Math.max(0, activeContract.expiresDay - curDay) : 0;
+
+            const targetBiz = (window.state?.businesses || []).find(b => b && b.id === tnd.targetBiz);
+            const isBizOwned = targetBiz && targetBiz.level > 0;
+
+            const assignedVehicles = window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(tnd.targetBiz) : [];
+            const req = tnd.requirements || {};
+
+            let satisfiesCount = assignedVehicles.length >= (req.minFleetCount || 1);
+            let satisfiesMreo = true;
+            if (req.requireMreo) {
+                satisfiesMreo = assignedVehicles.filter(c => c && c.commercialRegistered).length >= (req.minFleetCount || 1);
+            }
+            let satisfiesCondition = true;
+            if (req.minCondition) {
+                satisfiesCondition = assignedVehicles.every(c => (c.condition || 100) >= req.minCondition);
+            }
+
+            const canSign = isBizOwned && satisfiesCount && satisfiesMreo && satisfiesCondition && !isSigned;
+
+            html += `
+                <div class="glass-card mb-2 p-2" style="border-left: 3px solid ${isSigned ? 'var(--green)' : (canSign ? 'var(--cyan)' : 'rgba(255,255,255,0.15)')};">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-main" style="font-size:11.5px;">${tnd.title}</b>
+                        <span class="tag-badge ${isSigned ? 'bg-tag-green' : 'bg-tag-amber'}">
+                            ${isSigned ? `АКТИВЕН (${daysLeft} дн.)` : `+${Math.round((tnd.incomeMultiplier - 1) * 100)}% К КАССЕ`}
+                        </span>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">${tnd.desc}</div>
+
+                    <div class="p-2 mb-2" style="background:#050914; border-radius:6px; font-size:9px;">
+                        <div class="flex-between mb-1">
+                            <span>Требуемый бизнес:</span>
+                            <b class="${isBizOwned ? 'color-green' : 'color-red'}">${targetBiz ? targetBiz.name : tnd.targetBiz} ${isBizOwned ? '✓' : '(Не куплен)'}</b>
+                        </div>
+                        <div class="flex-between mb-1">
+                            <span>Машин во флоте:</span>
+                            <b class="${satisfiesCount ? 'color-green' : 'color-amber'}">${assignedVehicles.length} из ${req.minFleetCount || 1} шт.</b>
+                        </div>
+                        ${req.requireMreo ? `
+                            <div class="flex-between mb-1">
+                                <span>Учёт МРЭО на юрлицо:</span>
+                                <b class="${satisfiesMreo ? 'color-green' : 'color-red'}">${satisfiesMreo ? 'Выполнен ✓' : 'Требуется регистрация'}</b>
+                            </div>
+                        ` : ''}
+                        <div class="flex-between">
+                            <span>Аванс при подписании:</span>
+                            <b class="color-green font-bold">+${tnd.advanceRewardCash.toLocaleString()} ₽ & ${tnd.rewardStars} ⭐</b>
+                        </div>
+                    </div>
+
+                    ${isSigned ? `
+                        <button class="btn btn-dark btn-sm w-full opacity-60" disabled>Контракт в исполнении</button>
+                    ` : `
+                        <button onclick="PhoneBusiness.signTenderContract('${tnd.id}')" class="btn ${canSign ? 'btn-green' : 'btn-dark opacity-50'} btn-sm w-full" ${canSign ? '' : 'disabled'}>
+                            ${canSign ? 'Подписать госконтракт ✍️' : 'Условия тендера не выполнены'}
+                        </button>
+                    `}
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    },
+
+    signTenderContract(tenderId) {
+        if (this._tenderPending) return;
+        const tenders = window.BUSINESS_TENDERS_CATALOG || [];
+        const tnd = tenders.find(t => t.id === tenderId);
+        if (!tnd) return;
+
+        this._tenderPending = true;
+        try {
+            const curDay = window.state?.player?.day || 1;
+            if (!Array.isArray(window.state.player.activeTenders)) window.state.player.activeTenders = [];
+
+            window.state.player.activeTenders.push({
+                id: tnd.id,
+                targetBiz: tnd.targetBiz,
+                title: tnd.title,
+                incomeMultiplier: tnd.incomeMultiplier,
+                startedDay: curDay,
+                expiresDay: curDay + (tnd.bonusDurationDays || 5)
+            });
+
+            window.state.player.cash = (window.state.player.cash || 0) + (tnd.advanceRewardCash || 0);
+            window.state.player.stars = (window.state.player.stars || 0) + (tnd.rewardStars || 0);
+
+            if (typeof logBankTransaction === 'function') {
+                logBankTransaction(`Аванс по B2B тендеру: ${tnd.title}`, tnd.advanceRewardCash, true);
+            }
+
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+
+            if (typeof openVerdictModal === 'function') {
+                openVerdictModal(
+                    "ГОСКОНТРАКТ ПОДПИСАН! ✍️",
+                    `Вы выиграли тендер «<b>${tnd.title}</b>»!\nАванс: <b>+${tnd.advanceRewardCash.toLocaleString()} ₽</b> & <b>+${tnd.rewardStars} ⭐</b> зачислен на счёт.\nВыручка предприятия увеличена на <b>+${Math.round((tnd.incomeMultiplier - 1) * 100)}%</b> на ${tnd.bonusDurationDays} дней.`,
+                    true,
+                    tnd.advanceRewardCash
+                );
+            } else {
+                showToast(`✓ Контракт подписан: +${tnd.advanceRewardCash.toLocaleString()} ₽!`);
+            }
+
+            this.render(document.getElementById('phoneAppContainer'));
+        } finally {
+            this._tenderPending = false;
+        }
+    },
+
+    // ========================================================
+    // КРИЗИС-МЕНЕДЖМЕНТ ПРИ СБОРЕ КАССЫ
+    // ========================================================
+    _maybeTriggerCrisisEvent() {
+        const events = this.CRISIS_EVENTS;
+        if (!Array.isArray(events) || events.length === 0) return false;
+
+        const ownedBiz = (window.state?.businesses || []).filter(b => b && b.level > 0);
+        if (ownedBiz.length === 0) return false;
+
+        // 12% шанс кризиса при сборе кассы
+        if (Math.random() > 0.12) return false;
+
+        const rollEv = events[Math.floor(Math.random() * events.length)];
+        this.openCrisisModal(rollEv);
+        return true;
+    },
+
+    openCrisisModal(crisis) {
+        let modal = document.getElementById('modalBizCrisis');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalBizCrisis';
+            modal.className = 'modal-overlay';
+            document.body.appendChild(modal);
+        }
+
+        let optionsHtml = '';
+        (crisis.options || []).forEach((opt, idx) => {
+            optionsHtml += `
+                <button onclick="PhoneBusiness.resolveCrisisAction(${idx}, '${crisis.id}')" class="btn btn-dark btn-sm w-full mb-2 text-left" style="padding: 8px 10px; font-size: 10px; line-height: 1.35;">
+                    <i class="fa-solid fa-chevron-right color-cyan mr-1"></i> ${opt.text}
+                </button>
+            `;
+        });
+
+        modal.innerHTML = `
+            <div class="modal-box text-center" style="max-width: 410px; border-color: var(--amber); background: radial-gradient(circle at 50% 0%, #1c1524 0%, #070a10 85%);">
+                <div class="radar-spinner-ring mb-2" style="border-top-color: var(--amber); border-right-color: var(--red); margin: 0 auto 10px auto;">
+                    <div class="radar-spinner-center" style="font-size:24px;">🚨</div>
+                </div>
+
+                <div class="modal-glow-badge mb-1" style="color:var(--amber); border-color:var(--amber); background:rgba(255,179,0,0.1); display:inline-block;">
+                    ВНЕПЛАНОВАЯ СИТУАЦИЯ
+                </div>
+
+                <h3 class="font-bold mb-1 color-amber" style="font-size:15px;">${crisis.title}</h3>
+                <p class="sub-label mb-3" style="font-size:10.5px; line-height:1.4; color:#cbd5e1; padding: 0 4px;">
+                    ${crisis.desc}
+                </p>
+
+                <div class="space-y-1">
+                    ${optionsHtml}
+                </div>
+            </div>
+        `;
+
+        if (typeof ModalManager !== 'undefined') {
+            ModalManager.open('modalBizCrisis', { closeOthers: true });
+        } else {
+            modal.classList.add('active');
+        }
+        if (window.AudioFx) { window.AudioFx.play('error'); window.AudioFx.haptic('warning'); }
+    },
+
+    resolveCrisisAction(optIdx, crisisId) {
+        const events = this.CRISIS_EVENTS;
+        const crisis = events.find(e => e.id === crisisId);
+        if (!crisis || !crisis.options || !crisis.options[optIdx]) return;
+
+        const opt = crisis.options[optIdx];
+        const p = window.state?.player || {};
+
+        if (opt.costCash && (p.cash || 0) < opt.costCash) {
+            return showToast(`Не хватает ${opt.costCash.toLocaleString()} ₽!`);
+        }
+        if (opt.costConn && (p.connections || 0) < opt.costConn) {
+            return showToast(`Не хватает связей 🤝 с Решалой!`);
+        }
+        if (opt.reqBiz) {
+            const hasBiz = (window.state?.businesses || []).some(b => b.id === opt.reqBiz && b.level > 0);
+            if (!hasBiz) return showToast("У вас нет службы эвакуации!");
+        }
+
+        if (opt.costCash) {
+            p.cash -= opt.costCash;
+            if (typeof logBankTransaction === 'function') logBankTransaction(`Инцидент: ${crisis.title}`, opt.costCash, false);
+        }
+        if (opt.costConn) p.connections -= opt.costConn;
+        if (opt.penaltyMood) p.mood = Math.max(10, (p.mood || 85) - opt.penaltyMood);
+        if (opt.bonusKarma) p.karma = Math.min(100, (p.karma || 50) + opt.bonusKarma);
+
+        if (typeof ModalManager !== 'undefined') ModalManager.close('modalBizCrisis');
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+        showToast("Инцидент благополучно урегулирован!");
+    },
+
     // ЦЕХ
     renderWorkshopTab(container) {
         let html = '<div class="sub-label mb-2 px-1" style="font-size:10px;">Прокачка цеха даёт постоянные процентные бонусы ко всей вашей бизнес-сети:</div>';
@@ -1005,10 +1272,21 @@ const PhoneBusiness = {
             if (total <= 0) return showToast('В кассах пусто!');
 
             window.state.player.cash = (window.state.player.cash || 0) + total;
+
+            if (typeof trackQuestProgress === 'function') {
+                trackQuestProgress('collect_biz', 1);
+            }
+
+            if (typeof logBankTransaction === 'function') {
+                logBankTransaction('Инкассация бизнес-сети', total, true);
+            }
+
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
             if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
             showToast(`💰 Собрано: +${total.toLocaleString()} ₽!`);
+
+            this._maybeTriggerCrisisEvent();
             this.render(document.getElementById('phoneAppContainer'));
         } finally {
             this._collectAllPending = false;
@@ -1027,10 +1305,20 @@ const PhoneBusiness = {
             b.lastTickTimestamp = Date.now();
             window.state.player.cash = (window.state.player.cash || 0) + amount;
 
+            if (typeof trackQuestProgress === 'function') {
+                trackQuestProgress('collect_biz', 1);
+            }
+
+            if (typeof logBankTransaction === 'function') {
+                logBankTransaction(`Касса: ${b.customName || b.name}`, amount, true);
+            }
+
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
             if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
             showToast(`+${amount.toLocaleString()} ₽ из «${b.customName || b.name}»!`);
+
+            this._maybeTriggerCrisisEvent();
             this.render(document.getElementById('phoneAppContainer'));
         } finally {
             this._collectPointPending = false;
@@ -1045,6 +1333,10 @@ const PhoneBusiness = {
 
         window.state.player.cash -= cost;
         b.stock = b.maxStock || 100;
+
+        if (typeof trackQuestProgress === 'function') {
+            trackQuestProgress('supply_stock', 1);
+        }
 
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -1169,6 +1461,11 @@ const PhoneBusiness = {
         const curDay = window.state.player.day || 1;
         this._syncActiveBonus();
         this._tickEconomicCycle();
+
+        // Очистка просроченных тендеров
+        if (Array.isArray(window.state.player.activeTenders)) {
+            window.state.player.activeTenders = window.state.player.activeTenders.filter(t => t && t.expiresDay >= curDay);
+        }
 
         window.state.businesses.forEach(b => {
             if (!b || b.level <= 0) return;
