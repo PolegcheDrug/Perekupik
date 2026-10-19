@@ -1,15 +1,19 @@
 // ========================================================
-// js/app/app-loader.js — ЗАГРУЗЧИК, АВТОРИЗАЦИЯ, HUD (v4.5.0)
+// js/app/app-loader.js — ЗАГРУЗЧИК, АВТОРИЗАЦИЯ, HUD (v4.6.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v4.6.0 (ИНТЕРАКТИВНЫЙ СПЛЭШ-СКРИН & СИНХРОНИЗАЦИЯ ПРОФИЛЯ):
+//   - Внедрена прямая связка с window.AppLoadingManager:
+//       • 78%: Авторизация Telegram и проверка прав доступа.
+//       • 86%: Восстановление прогресса из облака Firestore.
+//       • 96%: Подготовка гаража, HUD и курса валют.
+//       • 100%: Плавный finish() только после отрисовки реального профиля.
+//   - Защита от показа дефолтного шаблона («Перекуп #777» и 150 000 ₽).
 // ⭐ v4.5.0 (ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР):
 //   - Добавлен вызов HudRevolver.init() после дублирования статов.
 //   - Теперь HUD можно листать пальцем с вибрацией.
 //   - Порядок: updateHeaderUI → _cloneStatsRow → HudRevolver.init.
 // ⭐ v4.3.1 (ФИКС ДУБЛИРОВАНИЯ ЗАГРУЗЧИКА):
-//   - УДАЛЕНЫ дублирующие scriptQueue, loadScript, initAllModules,
-//     startGame. Теперь очередью скриптов управляет ТОЛЬКО index.html.
-//   - initApp вызывается из index.html после загрузки всех скриптов.
-//   - Добавлена защита от отсутствия state.player при рендере.
+//   - Очередью скриптов управляет ТОЛЬКО index.html.
 // ========================================================
 
 let _notificationUnsubscribe = null;
@@ -153,6 +157,8 @@ window._processStartParam = _processStartParam;
 // 3. ЭКРАНЫ ОШИБОК
 // ========================================================
 function showAccessDeniedScreen() {
+    if (window.AppLoadingManager) window.AppLoadingManager.finish();
+
     const deniedScreen = document.getElementById('accessDeniedScreen');
     const appShell = document.getElementById('appShell');
     const pcAuth = document.getElementById('pcAuthScreen');
@@ -167,6 +173,8 @@ function showAccessDeniedScreen() {
 }
 
 function showTelegramRequiredScreen() {
+    if (window.AppLoadingManager) window.AppLoadingManager.finish();
+
     if (window.isPcDevMode && window.isPcDevMode()) {
         console.log('[App] DEV-режим активен, экран Telegram НЕ показывается');
         return;
@@ -290,6 +298,10 @@ function checkPlayerOnboarding(onComplete) {
         if (typeof saveState === 'function') saveState();
         if (typeof onComplete === 'function') onComplete();
         return;
+    }
+
+    if (window.AppLoadingManager) {
+        window.AppLoadingManager.finish();
     }
 
     let overlay = document.getElementById('modalPlayerOnboarding');
@@ -419,6 +431,10 @@ async function initTelegramAuthAndStorage(callback) {
     }, 3000);
 
     // ─── ЭТАП 1: Telegram ───
+    if (window.AppLoadingManager) {
+        window.AppLoadingManager.setProgress(78, "Авторизация профиля...");
+    }
+
     let tgUser = null;
     try {
         if (window.Telegram?.WebApp) {
@@ -515,6 +531,10 @@ async function initTelegramAuthAndStorage(callback) {
     }
 
     // ─── ЭТАП 5: Сейв ───
+    if (window.AppLoadingManager) {
+        window.AppLoadingManager.setProgress(86, "Синхронизация гаража и сейвов...");
+    }
+
     const hadLocalSave = typeof loadFromLocalStorage === 'function' ? loadFromLocalStorage() : false;
 
     if (!hadLocalSave && !window.isPcDevMode() && window.FB_Bridge?.Players?.pullSave) {
@@ -607,6 +627,10 @@ function initApp() {
             if (tgScreen) tgScreen.style.display = 'none';
             if (denied) denied.style.display = 'none';
 
+            if (window.AppLoadingManager) {
+                window.AppLoadingManager.setProgress(94, "Подготовка авторынка...");
+            }
+
             if (typeof _syncStarRateToBank === 'function') _syncStarRateToBank();
 
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -694,6 +718,11 @@ function initApp() {
 
             if (typeof switchTab === 'function') switchTab('tabMarket');
 
+            // ⭐ Завершаем показ шкалы загрузки: профиль и интерфейс готовы
+            if (window.AppLoadingManager) {
+                window.AppLoadingManager.finish();
+            }
+
             try {
                 const lastSeen = localStorage.getItem('perekup_last_seen_version');
                 if (lastSeen !== window.CURRENT_GAME_VERSION) {
@@ -713,4 +742,4 @@ window._processStartParam = _processStartParam;
 window.showAccessDeniedScreen = showAccessDeniedScreen;
 window.createOwnerPanelButton = createOwnerPanelButton;
 
-console.log('[💠 app-loader.js v4.5.0] Загрузчик + Авторизация + AccessControl + HUD-Револьвер ✓ (без дублирования scriptQueue)');
+console.log('[💠 app-loader.js v4.6.0] Загрузчик + Авторизация + AccessControl + HUD-Револьвер + SplashScreen ✓');
