@@ -1,12 +1,19 @@
 // ========================================================
-// js/phone/phone-darknet.js — ОБЪЕДИНЁННЫЙ МОДУЛЬ «ТЕНЕВОЙ КОНТУР»
-// Совмещает Радар ДПС, услуги Решалы (Артура) и Контрактные детали.
-// Совместим с вызовами: 'darknet', 'radar', 'reshala'.
+// js/phone/phone-darknet.js — ОБЪЕДИНЁННЫЙ МОДУЛЬ «ТЕНЕВОЙ КОНТУР» (v2.0.0)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v2.0.0 (ОБЛАВЫ 12.5.1 & СКУПЩИК МАШИН БЕЗ ДОКУМЕНТОВ):
+//   - ДОБАВЛЕНО: Скупщик авторазбора (Black Market Fencing) — мгновенный сбыт
+//     угнанных, битых, распилов и корчей с аннулированным учетом 12.5.1.
+//   - ДОБАВЛЕНО: checkCarRaid1251() — честный расчет рисков облавы при выезде
+//     в город с нелегальным тюнингом, прямотоком, заваркой и крадеными деталями.
+//   - ИНТЕГРАЦИЯ: «Крыша ГИБДД» полностью нейтрализует риски облав 12.5.1.
+//   - СОХРАНЕНО: Радар ДПС, услуги Решалы (Артура) и контрактные запчасти.
 // ========================================================
 
 const AppDarknet = {
     mainTab: 'radar',   // 'radar' | 'darknet'
-    subTab: 'services', // 'services' | 'parts'
+    subTab: 'services', // 'services' | 'parts' | 'fencing'
 
     // Точка входа для PhoneManager
     render(container) {
@@ -107,7 +114,7 @@ const AppDarknet = {
                 </div>
 
                 <p class="sub-label mb-2" style="font-size:10px; line-height:1.4;">
-                    При достижении <b>${maxRaces} заездов</b> спецбатальон ДПС проводит рейд на нелегальном споте с конфискацией боевого корча на штрафстоянку.
+                    При достижении <b>${maxRaces} заездов</b> спецбатальон ДПС проводит рейд на нелегальном споте по ст. 12.5.1 КоАП РФ с отправкой корча на штрафстоянку.
                 </p>
 
                 <div class="space-y-2">
@@ -153,7 +160,7 @@ const AppDarknet = {
                     ${discountBadge}
                 </div>
                 <div class="sub-label" style="font-size:10px;">
-                    Анонимный доступ к серым услугам, отмыву документов и контрактным деталям без лишних вопросов.${caps.reshalaDiscountPct > 0 ? ` Действует скидка вашего бокса <b>${caps.reshalaDiscountPct}%</b>!` : ''}
+                    Анонимный доступ к серым услугам, отмыву документов, скупщикам проблемных авто и деталям без номеров.${caps.reshalaDiscountPct > 0 ? ` Действует скидка вашего бокса <b>${caps.reshalaDiscountPct}%</b>!` : ''}
                 </div>
             </div>
 
@@ -162,16 +169,19 @@ const AppDarknet = {
                 <button onclick="AppDarknet.buyPack(5)" class="btn btn-purple btn-sm">5 Связей (850k)</button>
             </div>
 
-            <div class="grid-2 mb-2" style="grid-template-columns: repeat(2, 1fr); gap: 4px;">
-                <button onclick="AppDarknet.switchSubTab('services')" class="btn ${sub === 'services' ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-size:9.5px;">
-                    Услуги Решалы
+            <div class="grid-3 mb-2" style="grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                <button onclick="AppDarknet.switchSubTab('services')" class="btn ${sub === 'services' ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-size:9px; padding:6px 2px;">
+                    Услуги
                 </button>
-                <button onclick="AppDarknet.switchSubTab('parts')" class="btn ${sub === 'parts' ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-size:9.5px;">
-                    Контрактные детали
+                <button onclick="AppDarknet.switchSubTab('parts')" class="btn ${sub === 'parts' ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-size:9px; padding:6px 2px;">
+                    Детали
+                </button>
+                <button onclick="AppDarknet.switchSubTab('fencing')" class="btn ${sub === 'fencing' ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-size:9px; padding:6px 2px;">
+                    Скупка авто
                 </button>
             </div>
 
-            ${sub === 'services' ? this.renderServicesSubTab(immunity, caps) : this.renderStolenPartsSubTab()}
+            ${sub === 'services' ? this.renderServicesSubTab(immunity, caps) : (sub === 'parts' ? this.renderStolenPartsSubTab() : this.renderFencingSubTab())}
         `;
     },
 
@@ -193,7 +203,7 @@ const AppDarknet = {
                     <b class="text-xs">🚨 Крыша ГИБДД (3 дня)</b>
                     <span class="tag-badge bg-tag-amber">${immunity > 0 ? immunity + ' дн.' : 'Иммунитет'}</span>
                 </div>
-                <p class="sub-label my-1" style="font-size:10px;">Защита от облав на заездах 402м и штрафов за просроченный ДКП. Сбрасывает внимание ДПС до 0.</p>
+                <p class="sub-label my-1" style="font-size:10px;">Защита от облав на заездах 402м, рейдов 12.5.1 и штрафов за просроченный ДКП. Сбрасывает внимание ДПС до 0.</p>
                 <button onclick="AppDarknet.buyRoofAction(${roofCost});" class="btn btn-amber btn-sm w-full" ${immunity > 0 ? 'disabled' : ''}>
                     ${immunity > 0 ? 'Крыша активна ✓' : `Оформить (${(roofCost / 1000).toFixed(0)}k ₽ / 45 ⭐)`}
                 </button>
@@ -215,7 +225,7 @@ const AppDarknet = {
                     <b class="text-xs">🔏 Легализация криминала</b>
                     <span class="tag-badge bg-tag-cyan">Чистый VIN</span>
                 </div>
-                <p class="sub-label my-1" style="font-size:10px;">Снимает статус «В розыске» и аннулирование по 12.5.1 с проблемного автомобиля.</p>
+                <p class="sub-label my-1" style="font-size:10px;">Снимает статус «В розыске», запреты регдействий и аннулирование по 12.5.1 с проблемного автомобиля.</p>
                 <button onclick="if(typeof openLegalizeCarModal === 'function') openLegalizeCarModal();" class="btn btn-dark btn-sm w-full">
                     Выбрать авто (${(legalizeCost / 1000).toFixed(0)}k ₽ + 1 🤝)
                 </button>
@@ -257,10 +267,135 @@ const AppDarknet = {
                     <b class="text-xs color-purple"><i class="fa-solid fa-triangle-exclamation"></i> Серый рынок деталей</b>
                     <span class="tag-badge bg-tag-red">Риск техкома</span>
                 </div>
-                <p class="sub-label mb-2" style="font-size:10px;">Детали с распилов по бросовым ценам. Если инспектор на техкоме RDS проверит номера агрегатов, машину могут задержать!</p>
+                <p class="sub-label mb-2" style="font-size:10px;">Детали с распилов по бросовым ценам. Если инспектор на техкоме проверит номера агрегатов, машину могут задержать по 12.5.1!</p>
                 ${html}
             </div>
         `;
+    },
+
+    // ────────────────────────────────────────────────────────
+    // ЭКРАН 3: СКУПЩИК АВТОРАЗБОРА (FENCING)
+    // ────────────────────────────────────────────────────────
+    renderFencingSubTab() {
+        const garage = state.garage || [];
+        const problematicCars = garage.filter(c => c && (c.isStolen || c.legalDefect || c.isAnnulled1251 || c.hasStolenParts || !c.isRegisteredOnPlayer));
+
+        let listHtml = '';
+        if (problematicCars.length === 0) {
+            listHtml = `
+                <div class="sub-label text-center py-4" style="font-size:10px; color:#94a3b8;">
+                    В гараже нет проблемных машин. Скупщик принимает только криминал, распилы, авто без учета и корчи под 12.5.1.
+                </div>
+            `;
+        } else {
+            listHtml = problematicCars.map((car) => {
+                const idx = garage.indexOf(car);
+                const baseVal = car.marketValue || car.purchaseCost || 100000;
+                // Скупщик дает 60% от базы, но платит быстро и без проверок
+                const fenceOffer = Math.round(baseVal * 0.60);
+
+                let reason = 'Без документов';
+                if (car.isStolen) reason = 'В розыске (Угон)';
+                else if (car.isAnnulled1251) reason = 'Аннулирован по 12.5.1';
+                else if (car.legalDefect) reason = 'Юридический запрет';
+                else if (car.hasStolenParts) reason = 'Контрактный агрегат';
+
+                return `
+                    <div class="glass-card mb-2 p-2" style="background:#050811; border-left:3px solid var(--purple);">
+                        <div class="flex-between mb-1">
+                            <div>
+                                <b class="text-xs color-purple">${car.name}</b>
+                                <div class="sub-label color-red" style="font-size:8px;">⚠️ ${reason}</div>
+                            </div>
+                            <div class="text-right">
+                                <span class="sub-label" style="font-size:7.5px;">СКУПКА:</span>
+                                <b class="price-val color-green text-xs">${fenceOffer.toLocaleString()} ₽</b>
+                            </div>
+                        </div>
+                        <button onclick="AppDarknet.sellToFenceAction(${idx}, ${fenceOffer})" class="btn btn-purple btn-sm w-full mt-1" style="font-size:9.5px; padding:5px 0;">
+                            Сдать на разбор без вопросов 🔨
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        return `
+            <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(121, 40, 202, 0.15), #090e18);">
+                <div class="flex-between mb-1">
+                    <b class="text-xs color-purple"><i class="fa-solid fa-screwdriver-wrench"></i> Скупка проблемных авто</b>
+                    <span class="tag-badge bg-tag-purple">Шредер / Разбор</span>
+                </div>
+                <p class="sub-label mb-2" style="font-size:10px;">
+                    Быстрый сбыт битых, угнанных или аннулированных машин. Скупщик забирает машину на агрегаты за 60% рыночной стоимости без ДКП и проверок ГИБДД.
+                </p>
+                ${listHtml}
+            </div>
+        `;
+    },
+
+    sellToFenceAction(garageIndex, offerAmount) {
+        if (!state.garage || !state.garage[garageIndex]) return;
+        const car = state.garage[garageIndex];
+
+        if (!confirm(`Сдать «${car.name}» скупщику на разбор за ${offerAmount.toLocaleString()} ₽? Автомобиль будет утилизирован безвозвратно.`)) {
+            return;
+        }
+
+        state.garage.splice(garageIndex, 1);
+        state.player.cash = (state.player.cash || 0) + offerAmount;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Сбыт авто скупщику: ${car.name}`, offerAmount, true);
+        }
+
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (typeof renderGarage === 'function') renderGarage();
+        if (typeof playSound === 'function') playSound('cash');
+        if (typeof tgHaptic === 'function') tgHaptic('success');
+        if (typeof showToast === 'function') {
+            showToast(`«${car.name}» утилизирован. Получено +${offerAmount.toLocaleString()} ₽ наличными!`, 'success');
+        }
+
+        this.render();
+    },
+
+    // ────────────────────────────────────────────────────────
+    // СИСТЕМА ОБЛАВ И ПРОВЕРОК 12.5.1
+    // ────────────────────────────────────────────────────────
+    checkCarRaid1251(car) {
+        if (!car) return { caught: false };
+
+        const immunity = state.player?.policeImmunityDays || 0;
+        if (immunity > 0) {
+            return { caught: false, reason: 'Крыша активна' };
+        }
+
+        let risk = 5; // базовый риск остановки ДПС
+        const races = state.player?.consecutiveRaces || 0;
+        risk += races * 4;
+
+        if (car.tuning?.chip >= 3) risk += 15;
+        if (car.tuning?.straightPipe) risk += 20;
+        if (car.tuning?.weldedDiff) risk += 15;
+        if (car.tuning?.rollCage) risk += 15;
+        if (car.hasStolenParts) risk += (car.stolenPartsRisk || 20);
+        if (car.isStolen) risk += 40;
+
+        risk = Math.min(85, risk);
+
+        const roll = Math.random() * 100;
+        if (roll < risk) {
+            return {
+                caught: true,
+                riskPct: risk,
+                isSevere: roll < (risk * 0.4),
+                reason: car.hasStolenParts ? 'Контрактные номерные детали' : (car.isStolen ? 'Ориентировка на угон' : '12.5.1 внесение изменений в конструкцию')
+            };
+        }
+
+        return { caught: false, riskPct: risk };
     },
 
     // ────────────────────────────────────────────────────────
@@ -274,7 +409,6 @@ const AppDarknet = {
             return;
         }
 
-        // Запасной автономный обработчик
         let cash = state.player?.cash || 0;
         if (cash < roofCost) {
             if (typeof showToast === 'function') showToast("Не хватает наличных на крышу!");
