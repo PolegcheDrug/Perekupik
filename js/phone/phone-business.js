@@ -1,10 +1,11 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v6.2.1)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v6.2.2-fixed)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v6.2.1:
-//   - Исправлена верстка желтого баннера «Требуется регистрация бизнеса»
-//   - Фиксированная кнопка «Госуслуги» без растяжения и сжатия текста
-//   - Аккуратная сетка вкладок «Цех», «Штат» и «Парк»
+// ⭐ v6.2.2-fixed:
+//   - Исправлена проблема с кассой: добавлен непрерывный расчет по реальному времени (Date.now())
+//   - Защита от потери дохода при сворачивании и закрытии игры
+//   - Гарантированный запуск тикера в Telegram Mini App без привязки к DOMContentLoaded
+//   - Синхронизация кассы и разблокировка кнопки сбора в реальном времени
 // ========================================================
 
 const PhoneBusiness = {
@@ -133,7 +134,8 @@ const PhoneBusiness = {
                     reputation: 0,
                     totalEarned: 0,
                     createdAt: 0,
-                    fleetType: b.fleetType || null
+                    fleetType: b.fleetType || null,
+                    lastTickTimestamp: Date.now()
                 }));
 
                 window.state.businesses = [...window.state.businesses, ...newBusinesses]
@@ -142,15 +144,17 @@ const PhoneBusiness = {
                 if (typeof saveState === 'function') saveState();
             }
 
+            const now = Date.now();
             window.state.businesses.forEach(b => {
                 if (!b) return;
-                if (typeof b.stored !== 'number') b.stored = 0;
-                if (typeof b.stock !== 'number') b.stock = 100;
+                if (typeof b.stored !== 'number' || isNaN(b.stored)) b.stored = 0;
+                if (typeof b.stock !== 'number' || isNaN(b.stock)) b.stock = 100;
                 if (typeof b.maxStock !== 'number') b.maxStock = 100;
                 if (!Array.isArray(b.incomeHistory)) b.incomeHistory = [];
                 if (!b.icon) b.icon = this._iconForBiz(b.id);
                 if (!b.customName) b.customName = b.name;
                 if (b.level > 0 && !b.dna) b.dna = this._generateDNA(b.id);
+                if (!b.lastTickTimestamp || isNaN(b.lastTickTimestamp)) b.lastTickTimestamp = now;
             });
 
             if (!window.state.businessWorkshop) window.state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
@@ -181,6 +185,7 @@ const PhoneBusiness = {
 
             this._checkOfflineCapitalization();
             this._syncActiveBonus();
+            this.startTickLoop();
         } finally {
             this._ensureStateInProgress = false;
         }
@@ -953,6 +958,7 @@ const PhoneBusiness = {
                 b.level = 1;
                 b.stock = 100;
                 b.dna = this._generateDNA(b.id);
+                b.lastTickTimestamp = Date.now();
                 this._trackBizChallenge('new_biz', 1);
             } else {
                 b.level += 1;
@@ -981,6 +987,7 @@ const PhoneBusiness = {
                 if (b && b.level > 0 && b.stored > 0) {
                     total += Math.floor(b.stored);
                     b.stored = 0;
+                    b.lastTickTimestamp = Date.now();
                 }
             });
             if (total <= 0) return showToast('В кассах пусто!');
@@ -1005,6 +1012,7 @@ const PhoneBusiness = {
 
             const amount = Math.floor(b.stored);
             b.stored = 0;
+            b.lastTickTimestamp = Date.now();
             window.state.player.cash = (window.state.player.cash || 0) + amount;
 
             if (typeof saveState === 'function') saveState();
@@ -1094,15 +1102,59 @@ const PhoneBusiness = {
         }
     },
 
+    // ========================================================
+    // НЕПРЕРЫВНОЕ НАЧИСЛЕНИЕ ДОХОДА С УЧЕТОМ РЕАЛЬНОГО ВРЕМЕНИ
+    // ========================================================
     tickIncome() {
         if (!window.state?.businesses) return;
-        this.ensureState();
+        const now = Date.now();
+        let changed = false;
+
         window.state.businesses.forEach(b => {
             if (!b || b.level <= 0) return;
-            if (b.stock > 0) b.stock = Math.max(0, b.stock - 0.15);
-            const bizIncome = this.getBizIncome(b);
-            b.stored = (b.stored || 0) + (bizIncome / 24 / 3600) * 30;
+
+            if (!b.lastTickTimestamp || isNaN(b.lastTickTimestamp)) {
+                b.lastTickTimestamp = now;
+                return;
+            }
+
+            const elapsedSec = (now - b.lastTickTimestamp) / 1000;
+            if (elapsedSec < 1) return;
+
+            // Расход сырья во времени
+            if (b.stock > 0) {
+                b.stock = Math.max(0, b.stock - (0.005 * elapsedSec));
+            }
+
+            // Суточный доход со всеми бонусами (цех, бренд, флот, цикл)
+            const dailyIncome = this.getBizIncomeWithBonuses(b);
+
+            // Базовый расчет: суточный доход делится на 86400 секунд (реальные 24 часа)
+            const incomePerSec = dailyIncome / 86400;
+            const earned = elapsedSec * incomePerSec;
+
+            if (earned > 0) {
+                b.stored = (b.stored || 0) + earned;
+                b.lastTickTimestamp = now;
+                changed = true;
+            }
         });
+
+        // Если интерфейс открыт, синхронизируем UI кассы
+        const accumulated = this.getAccumulatedCash();
+        const accEl = document.querySelector('.biz-summary-value.value-cyan');
+        if (accEl) {
+            accEl.textContent = `${accumulated.toLocaleString()} ₽`;
+        }
+
+        const collectBtn = document.querySelector('.biz-collect-btn');
+        if (collectBtn) {
+            collectBtn.disabled = accumulated <= 0;
+        }
+
+        if (changed && typeof saveState === 'function') {
+            saveState();
+        }
     },
 
     onNewDay() {
@@ -1113,7 +1165,7 @@ const PhoneBusiness = {
 
         window.state.businesses.forEach(b => {
             if (!b || b.level <= 0) return;
-            const dayIncome = Math.round(this.getBizIncome(b));
+            const dayIncome = Math.round(this.getBizIncomeWithBonuses(b));
             if (!Array.isArray(b.incomeHistory)) b.incomeHistory = [];
             b.incomeHistory.push(dayIncome);
             if (b.incomeHistory.length > 7) b.incomeHistory = b.incomeHistory.slice(-7);
@@ -1127,15 +1179,19 @@ const PhoneBusiness = {
 
     startTickLoop() {
         if (this._tickInterval) return;
-        this._tickInterval = setInterval(() => this.tickIncome(), 30000);
+        this.tickIncome();
+        // Тикаем каждые 3 секунды для плавного начисления
+        this._tickInterval = setInterval(() => this.tickIncome(), 3000);
     }
 };
 
 window.PhoneBusiness = PhoneBusiness;
 window.AppBusiness = PhoneBusiness;
 
-if (typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => PhoneBusiness.startTickLoop(), 3000);
-    });
+// Принудительный запуск при загрузке скрипта
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    PhoneBusiness.startTickLoop();
+} else {
+    document.addEventListener('DOMContentLoaded', () => PhoneBusiness.startTickLoop());
 }
+setTimeout(() => PhoneBusiness.startTickLoop(), 1000);
