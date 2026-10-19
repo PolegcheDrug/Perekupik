@@ -1,11 +1,12 @@
 // ========================================================
-// js/market/market-inspection.js — СИСТЕМА ПРОВЕРОК (v2.4.1)
+// js/market/market-inspection.js — СИСТЕМА ПРОВЕРОК (v2.5.0 CONTEXT-AWARE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v2.4.1:
-//   - Замеры толщиномером и сканером OBD2 влияют на торг и аргументы скидки
-//   - Диалоги покупателя и продавца в чате сделки по итогам проверок
-//   - При закрытии толщиномера возврат происходит обратно в окно торга у капота
-//   - Строгий гейт инструментов (OBD и толщиномер недоступны без покупки в магазине)
+// ⭐ v2.5.0:
+//   - Устранён конфликт модалок: при закрытии приборов из гаража возврат идёт в карточку авто,
+//     а с рынка — в торг у капота (modalMarketDeal).
+//   - Замеры толщиномером и сканером OBD2 сразу фиксируются в _revealedDefects для скидки.
+//   - Автотека выявляет записи о скрутке пробега (autotekaMileageDiscrepancy).
+//   - Строгий гейт инструментов и расхода заряда батареи.
 // ========================================================
 
 let activeInspectCarId = null;
@@ -19,6 +20,9 @@ let _inspectionPending = false;
 function _getInspectCar() {
     if (!activeInspectCarId) {
         if (window.pendingMarketCar?.car) return window.pendingMarketCar.car;
+        if (window.previewCarIndex !== null && window.previewCarIndex !== undefined && state.garage?.[window.previewCarIndex]) {
+            return state.garage[window.previewCarIndex];
+        }
         return null;
     }
     if (state.marketFeed) {
@@ -230,7 +234,7 @@ function _renderGaugeInspectionModal(car) {
             </div>
 
             <button onclick="closeGaugeModal()" class="btn btn-cyan w-full font-bold">
-                Готово — к капоту ✓
+                Готово ✓
             </button>
         </div>
     `;
@@ -305,6 +309,10 @@ function _applyGaugeResultsToDeal(car) {
     if (!car.mechanicalDefects) car.mechanicalDefects = [];
     if (!car._revealedDefects) car._revealedDefects = [];
 
+    if (puttyCount > 0 || secondLayerCount > 0) {
+        car.isRepainted = true;
+    }
+
     if (puttyCount > 0) {
         const defectId = 'body_putty_' + puttyCount;
         car.mechanicalDefects = car.mechanicalDefects.filter(d => !d.id.startsWith('body_putty'));
@@ -373,6 +381,10 @@ function _applyGaugeResultsToDeal(car) {
         }
     }
 
+    if (typeof recalculateCarMarketValue === 'function') {
+        recalculateCarMarketValue(car);
+    }
+
     if (typeof saveState === 'function') saveState();
 }
 
@@ -390,21 +402,27 @@ function closeGaugeModal() {
         _applyGaugeResultsToDeal(car);
     }
 
+    const wasFromGarage = window.previewCarIndex !== null && window.previewCarIndex !== undefined && !window.pendingMarketCar;
+
     activeInspectCarId = null;
     if (typeof playSound === 'function') playSound('tick');
 
-    // ⭐ ВОЗВРАТ ОБРАТНО В ОКНО ТОРГА
-    const dealModal = document.getElementById("modalMarketDeal");
-    if (dealModal && (window.pendingMarketCar?.car || car)) {
-        if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
-            ModalManager.open("modalMarketDeal");
-        } else {
-            dealModal.classList.add("active");
-            dealModal.style.display = "flex";
+    if (wasFromGarage) {
+        if (typeof openCarPreviewModal === 'function') {
+            openCarPreviewModal(window.previewCarIndex);
         }
+    } else {
+        const dealModal = document.getElementById("modalMarketDeal");
+        if (dealModal && (window.pendingMarketCar?.car || car)) {
+            if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
+                ModalManager.open("modalMarketDeal");
+            } else {
+                dealModal.classList.add("active");
+                dealModal.style.display = "flex";
+            }
+        }
+        if (typeof renderMarketHaggleControls === 'function') renderMarketHaggleControls();
     }
-
-    if (typeof renderMarketHaggleControls === 'function') renderMarketHaggleControls();
 }
 
 // --------------------------------------------------------
@@ -648,6 +666,10 @@ function _applyOBDResultsToDeal(car) {
         thread.scrollTop = thread.scrollHeight;
     }
 
+    if (typeof recalculateCarMarketValue === 'function') {
+        recalculateCarMarketValue(car);
+    }
+
     if (typeof saveState === 'function') saveState();
 }
 
@@ -666,20 +688,26 @@ function closeOBD2Modal() {
         _applyOBDResultsToDeal(car);
     }
 
+    const wasFromGarage = window.previewCarIndex !== null && window.previewCarIndex !== undefined && !window.pendingMarketCar;
+
     if (typeof playSound === 'function') playSound('tick');
 
-    // ⭐ ВОЗВРАТ ОБРАТНО В ОКНО ТОРГА
-    const dealModal = document.getElementById("modalMarketDeal");
-    if (dealModal && (window.pendingMarketCar?.car || car)) {
-        if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
-            ModalManager.open("modalMarketDeal");
-        } else {
-            dealModal.classList.add("active");
-            dealModal.style.display = "flex";
+    if (wasFromGarage) {
+        if (typeof openCarPreviewModal === 'function') {
+            openCarPreviewModal(window.previewCarIndex);
         }
+    } else {
+        const dealModal = document.getElementById("modalMarketDeal");
+        if (dealModal && (window.pendingMarketCar?.car || car)) {
+            if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
+                ModalManager.open("modalMarketDeal");
+            } else {
+                dealModal.classList.add("active");
+                dealModal.style.display = "flex";
+            }
+        }
+        if (typeof renderMarketHaggleControls === 'function') renderMarketHaggleControls();
     }
-
-    if (typeof renderMarketHaggleControls === 'function') renderMarketHaggleControls();
 }
 
 // --------------------------------------------------------
@@ -1010,9 +1038,12 @@ function closeInspectionResults() {
 // 6. ИНТЕРАКТИВНАЯ АВТОТЕКА
 // --------------------------------------------------------
 function openAutotekaModal(carId) {
-    if (!state.marketFeed) return;
-    const car = state.marketFeed.find(c => c && (String(c.id) === String(carId) || c.id == carId));
+    let car = null;
+    if (state.marketFeed) car = state.marketFeed.find(c => c && (String(c.id) === String(carId) || c.id == carId));
+    if (!car && state.garage) car = state.garage.find(c => c && (String(c.id) === String(carId) || c.id == carId));
+    if (!car && window.pendingMarketCar?.car) car = window.pendingMarketCar.car;
     if (!car) return;
+
     car.viewed = true;
 
     if (!car.autotekaChecked) {
@@ -1096,9 +1127,11 @@ function openAutotekaModal(carId) {
         }
     }
 
+    const isOdometerTampered = Boolean(car.rolledOdometer || car.autotekaMileageDiscrepancy);
+
     let overallScore = 10;
-    if (car.hiddenDefect) overallScore -= 2;
-    if (car.rolledOdometer) overallScore -= 2;
+    if (car.hiddenDefect && !car.hasAdditive) overallScore -= 2;
+    if (isOdometerTampered) overallScore -= 3;
     if (car.isStolen) overallScore -= 4;
     if (legal) overallScore -= 2;
     if (car.isRepainted) overallScore -= 1;
@@ -1178,9 +1211,9 @@ function openAutotekaModal(carId) {
                     <div class="autoteka-section-title"><span>3. ПРОБЕГ И РЕСУРС</span></div>
                     <div class="autoteka-row-compact">
                         <span class="autoteka-label">Пробег:</span>
-                        <b class="autoteka-value ${car.rolledOdometer ? 'color-red' : 'color-amber'}">
+                        <b class="autoteka-value ${isOdometerTampered ? 'color-red' : 'color-amber'}">
                             ${mVal.toLocaleString()} км
-                            ${car.rolledOdometer ? ' <span style="font-size:8px;">[СКРУЧЕН]</span>' : ''}
+                            ${isOdometerTampered ? ' <span class="tag-badge bg-tag-red" style="font-size:7px; padding:1px 4px;">РАСХОЖДЕНИЕ В БАЗАХ</span>' : ''}
                         </b>
                     </div>
                     <div class="autoteka-row-compact">
@@ -1274,4 +1307,4 @@ Object.assign(window, {
     _showInspectionResults
 });
 
-console.log('[🔬 market-inspection v2.4.1] Интерактивный возврат в торг + влияние проверок на чат и скидку ✓');
+console.log('[🔬 market-inspection v2.5.0] Контекстный возврат в окна + Автотека + синхронизация проверок ✓');
