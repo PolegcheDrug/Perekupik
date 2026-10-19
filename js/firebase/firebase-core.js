@@ -1,19 +1,13 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.3.0)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.4.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.3.0 (ИНТЕГРАЦИЯ СО СПЛЭШ-СКРИНОМ ЗАГРУЗКИ):
-//   - Добавлена передача промежуточного прогресса в window.AppLoadingManager
-//     при авторизации Telegram/Firebase и выкачивании сейва из облака.
-//   - Полная синхронизация плавного перехода без рывков.
-// ⭐ v1.2.1:
-//   - Добавлен signInAnonymously как резервный вариант авторизации.
-//     Теперь request.auth != null всегда выполняется даже без внешнего auth-сервера.
-//   - Корректная обработка запуска вне Telegram (браузер / GitHub Pages).
-// ⭐ v1.2.0 (SPRINT 5 — ФИКС «НЕТ СВЯЗИ С СЕРВЕРОМ БИРЖИ»):
-//   - Firestore инициализируется через initializeFirestore()
-//     с experimentalForceLongPolling: true.
-//   - Добавлен enableNetwork(db) при событии 'online'.
+// ⭐ v1.4.0 (АДМИНСКИЙ ВАЙП БД И СБРОС ПРОГРЕССА):
+//   - ДОБАВЛЕНО: FB_Core.Admin (wipeAllGlobal, wipeMarketOnly, resetCurrentPlayerLocal).
+//   - Пакетное удаление (writeBatch) коллекций players, garages, saves, market_lots,
+//     p2p_deals, trade_offers, chat_messages, notifications.
+//   - Устранена ошибка «FB_Core.Admin.wipeAllGlobal недоступен».
+//   - Полная очистка localStorage/sessionStorage и перезапуск клиента при вайпе.
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -128,7 +122,7 @@ const TelegramAuthManager = {
       }
     } catch (e) {}
 
-    // Попытка 1: Авторизация через внешний сервер токенов (если URL задан)
+    // Попытка 1: Авторизация через внешний сервер токенов
     if (url && initData) {
       try {
         const response = await fetch(`${url}/api/auth/telegram`, {
@@ -157,7 +151,7 @@ const TelegramAuthManager = {
       }
     }
 
-    // Попытка 2: Резервная авторизация через signInAnonymously (чтобы request.auth != null работал)
+    // Попытка 2: Резервная авторизация через signInAnonymously
     try {
       let anonCredential;
       if (!auth.currentUser) {
@@ -166,7 +160,6 @@ const TelegramAuthManager = {
         anonCredential = { user: auth.currentUser };
       }
 
-      // Если мы внутри Telegram — используем Telegram ID как целевой идентификатор в игре
       if (tgUser) {
         verifiedUserId = String(tgUser.id);
         const names = [];
@@ -182,7 +175,6 @@ const TelegramAuthManager = {
           authUid: anonCredential.user.uid
         };
       } else {
-        // Игра запущена в обычном браузере (тест/демо)
         verifiedUserId = anonCredential.user.uid;
         currentUserProfile = {
           id: verifiedUserId,
@@ -408,7 +400,112 @@ const PlayersStorageManager = {
 };
 
 // ========================================================
-// 6. CLEANUP MANAGER (TTL)
+// 6. ADMIN MANAGER (ПОЛНЫЙ И ЛОКАЛЬНЫЙ ВАЙП)
+// ========================================================
+const AdminManager = {
+  async _deleteEntireCollection(colName) {
+    let deletedCount = 0;
+    while (true) {
+      const q = query(collection(db, colName), limit(250));
+      const snap = await getDocs(q);
+      if (snap.empty) break;
+
+      const batch = writeBatch(db);
+      snap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      deletedCount += snap.size;
+    }
+    return deletedCount;
+  },
+
+  async wipeMarketOnly() {
+    if (!confirm("⚠️ Вы уверены, что хотите сбросить ВСЕ лоты биржи и активные сделки? (Прогресс игроков сохранится)")) {
+      return false;
+    }
+
+    try {
+      if (typeof showToast === 'function') showToast('Очистка рынка и сделок...');
+      const targetCols = ['market_lots', 'p2p_deals', 'trade_offers', 'chat_messages'];
+      let total = 0;
+      for (const col of targetCols) {
+        total += await this._deleteEntireCollection(col);
+      }
+      devLogFirestore('wipeMarketOnly OK', `Удалено ${total} записей`);
+      if (typeof showToast === 'function') showToast(`✅ Рынок очищен (${total} записей)`, 'success');
+      setTimeout(() => window.location.reload(), 1000);
+      return true;
+    } catch (e) {
+      console.error('[Admin] wipeMarketOnly error:', e);
+      if (typeof showToast === 'function') showToast(`❌ Ошибка сброса: ${e.message}`, 'error');
+      return false;
+    }
+  },
+
+  async wipeAllGlobal() {
+    const confirmation = prompt("🚨 ВНИМАНИЕ: Это удалит ВСЕХ игроков, гаражи, лоты и сбросит БД до заводских настроек!\nВведите «ВАЙП» для подтверждения:");
+    if (confirmation !== "ВАЙП") {
+      if (typeof showToast === 'function') showToast("Сброс отменён");
+      return false;
+    }
+
+    window.__IS_RESETTING__ = true;
+
+    try {
+      if (typeof showToast === 'function') showToast('⏳ Выполняется полный глобальный вайп БД...');
+
+      const allCollections = [
+        'players',
+        'garages',
+        'saves',
+        'market_lots',
+        'p2p_deals',
+        'trade_offers',
+        'chat_messages',
+        'notifications',
+        'clubs',
+        'transactions'
+      ];
+
+      let totalDeleted = 0;
+      for (const col of allCollections) {
+        try {
+          const count = await this._deleteEntireCollection(col);
+          totalDeleted += count;
+          console.log(`[Admin Wipe] Очищена коллекция: ${col} (${count} док.)`);
+        } catch (colErr) {
+          console.warn(`[Admin Wipe] Пропуск коллекции ${col}:`, colErr.message);
+        }
+      }
+
+      // Полная локальная очистка клиента
+      try { localStorage.clear(); } catch (e) {}
+      try { sessionStorage.clear(); } catch (e) {}
+
+      devLogFirestore('wipeAllGlobal OK', `Удалено всего: ${totalDeleted} док.`);
+      alert(`✅ Полный глобальный вайп завершён! Удалено документов: ${totalDeleted}. Перезагрузка...`);
+      window.location.reload();
+      return true;
+    } catch (e) {
+      console.error('[Admin] wipeAllGlobal error:', e);
+      window.__IS_RESETTING__ = false;
+      if (typeof showToast === 'function') showToast(`❌ Ошибка вайпа: ${e.message}`, 'error');
+      return false;
+    }
+  },
+
+  resetCurrentPlayerLocal() {
+    if (!confirm("Сбросить сохранение на этом устройстве и начать карьеру заново?")) {
+      return;
+    }
+    window.__IS_RESETTING__ = true;
+    try { localStorage.clear(); } catch (e) {}
+    try { sessionStorage.clear(); } catch (e) {}
+    window.location.reload();
+  }
+};
+
+// ========================================================
+// 7. CLEANUP MANAGER (TTL)
 // ========================================================
 const CleanupManager = {
   _lastCleanup: 0,
@@ -492,7 +589,7 @@ const CleanupManager = {
 };
 
 // ========================================================
-// 7. FIRESTORE STATS
+// 8. FIRESTORE STATS
 // ========================================================
 async function getFirestoreStats() {
   const stats = {
@@ -528,7 +625,7 @@ async function getFirestoreStats() {
 }
 
 // ========================================================
-// 8. ВОССТАНОВЛЕНИЕ СЕТИ
+// 9. ВОССТАНОВЛЕНИЕ СЕТИ
 // ========================================================
 if (typeof window !== 'undefined') {
   window.addEventListener('online', async () => {
@@ -548,7 +645,7 @@ if (typeof window !== 'undefined') {
 }
 
 // ========================================================
-// 9. ЭКСПОРТ В WINDOW
+// 10. ЭКСПОРТ В WINDOW
 // ========================================================
 window.FB_Core = {
   app,
@@ -557,6 +654,7 @@ window.FB_Core = {
   enabled: true,
   Auth: TelegramAuthManager,
   Players: PlayersStorageManager,
+  Admin: AdminManager,
   Cleanup: CleanupManager,
   getStats: getFirestoreStats,
   getTelegramUser,
@@ -567,7 +665,7 @@ window.FB_Core = {
 
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Core v1.3.0] Ядро Firebase загружено. Fallback Auth + Long Polling + SplashScreen Integration ✓");
+console.log("[☁️ FB_Core v1.4.0] Ядро Firebase загружено. Добавлен AdminManager (вайп БД) ✓");
 
 if (typeof document !== 'undefined') {
   document.addEventListener('DOMContentLoaded', () => {
