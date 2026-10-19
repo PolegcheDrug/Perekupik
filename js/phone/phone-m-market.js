@@ -1,11 +1,13 @@
 // ========================================================
-// js/phone/phone-m-market.js — M+ HUB: БИРЖА (v9.1.7 NPC-TRADE-FIX)
+// js/phone/phone-m-market.js — M+ HUB: БИРЖА И СИНХРОНИЗАЦИЯ ДИАЛОГОВ (v9.5.0 STABLE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.1.7 (NPC-TRADE-FIX):
-//   - ФИКС: startTradeWithSeller теперь различает P2P-лоты игроков
-//     и NPC-лоты. Для P2P-лотов открывает P2P-модалку офферов,
-//     для NPC-лотов — старую модалку торга у капота (initiateBuyMarketCar).
+// ⭐ v9.5.0:
+//   - ДОБАВЛЕНО: cleanupOrphanedDialogs() для удаления «осиротевших» диалогов
+//     после продажи машин, снятия с площадки или закрытия P2P-сделок.
+//   - ДОРАБОТКА: Синхронное удаление диалогов лота при выкупе и отмене P2P-листинга.
+//   - СТАБИЛИЗАЦИЯ: Фильтрация сообщений, автоочистка висяков при рендере чатов.
+//   - СОХРАНЕНО: Разделение торга (P2P-офферы vs торг у капота initiateBuyMarketCar).
 // ========================================================
 
 (function() {
@@ -44,6 +46,117 @@
         
         return "assets/cars/economy/2101/vaz-2101.jpg";
     }
+
+    // ========================================================
+    // 0. ОЧИСТКА ОСИРОТЕВШИХ ДИАЛОГОВ (ORPHANED CLEANUP)
+    // ========================================================
+    window.cleanupOrphanedDialogs = function() {
+        if (!window.state?.player?.phoneMessages || !Array.isArray(window.state.player.phoneMessages)) {
+            return;
+        }
+
+        const messages = window.state.player.phoneMessages;
+        const initialCount = messages.length;
+
+        const activeSalesLotCarUids = new Set();
+        const activeSalesLotIndices = new Set();
+        const salesLotBuyers = new Map();
+
+        if (Array.isArray(window.state?.salesLot)) {
+            window.state.salesLot.forEach((lot, idx) => {
+                if (lot && lot.car) {
+                    const carUid = lot.car.uid || lot.car.id;
+                    if (carUid) activeSalesLotCarUids.add(String(carUid));
+                    activeSalesLotIndices.add(idx);
+
+                    const buyer = lot.currentBuyer || lot.buyer;
+                    if (buyer) {
+                        const buyerKey = buyer.id || buyer.name || `${idx}_buyer`;
+                        salesLotBuyers.set(buyerKey, true);
+                        if (carUid) salesLotBuyers.set(`uid_${carUid}`, true);
+                    }
+                }
+            });
+        }
+
+        const activeP2PLotIds = new Set();
+        if (Array.isArray(window.state?.p2pMarketListings)) {
+            window.state.p2pMarketListings.forEach(l => {
+                if (l && (l.id || l.lot_id)) {
+                    activeP2PLotIds.add(String(l.id || l.lot_id));
+                }
+            });
+        }
+
+        const cleanedMessages = messages.filter(msg => {
+            if (!msg) return false;
+
+            // 1. Системные и дружеские диалоги не трогаем
+            if (msg.category === 'system' || msg.isSystem || msg.category === 'friends') {
+                return true;
+            }
+
+            // 2. Диалоги с покупателями площадки продаж (NPC)
+            if (msg.category === 'buyers') {
+                // Если машина снята с площадки или продана
+                if (msg.carUid && !activeSalesLotCarUids.has(String(msg.carUid))) {
+                    return false;
+                }
+                if (typeof msg.carIndex === 'number' && !activeSalesLotIndices.has(msg.carIndex)) {
+                    return false;
+                }
+
+                // Проверяем, есть ли лот и активен ли покупатель
+                let targetLot = null;
+                if (msg.carUid && Array.isArray(window.state?.salesLot)) {
+                    targetLot = window.state.salesLot.find(l => l && l.car && (String(l.car.uid) === String(msg.carUid) || String(l.car.id) === String(msg.carUid)));
+                }
+                if (!targetLot && typeof msg.carIndex === 'number' && window.state?.salesLot?.[msg.carIndex]) {
+                    targetLot = window.state.salesLot[msg.carIndex];
+                }
+
+                if (!targetLot || !targetLot.car) {
+                    return false;
+                }
+
+                const currentBuyer = targetLot.currentBuyer || targetLot.buyer;
+                if (!currentBuyer) {
+                    return false;
+                }
+
+                return true;
+            }
+
+            // 3. Диалоги P2P-биржи
+            if (msg.category === 'p2p') {
+                if (msg.p2pLotId) {
+                    const lotExists = activeP2PLotIds.has(String(msg.p2pLotId));
+                    if (!lotExists && msg.isClosedDeal) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            return true;
+        });
+
+        if (cleanedMessages.length !== initialCount) {
+            window.state.player.phoneMessages = cleanedMessages;
+
+            if (AppM.activeDialogId) {
+                const stillExists = cleanedMessages.some(m => m.id === AppM.activeDialogId);
+                if (!stillExists) {
+                    AppM.activeDialogId = null;
+                }
+            }
+
+            if (typeof saveState === 'function') saveState();
+            if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.updateUnreadBadge === 'function') {
+                PhoneManager.updateUnreadBadge();
+            }
+        }
+    };
 
     // ========================================================
     // 1. ОБНОВЛЕНИЕ ЛЕНТЫ
@@ -322,7 +435,7 @@
     };
 
     // ========================================================
-    // 4. ⭐ v9.1.7: ТОРГ — РАЗДЕЛЕНИЕ P2P И NPC
+    // 4. ТОРГ — РАЗДЕЛЕНИЕ P2P И NPC
     // ========================================================
     AppM.startTradeWithSeller = function(lotId) {
         if (!lotId) return;
@@ -333,7 +446,6 @@
         );
 
         if (isP2PLot) {
-            // ⭐ Для P2P-лотов используем модалку офферов
             if (typeof window.openP2PDealModal === 'function') {
                 try {
                     window.openP2PDealModal(lotId);
@@ -343,7 +455,7 @@
                 }
             }
 
-            // Fallback на старый чат
+            // Fallback на чат M+
             const lot = (window.state.p2pMarketListings || []).find(l => 
                 l && (String(l.id) === String(lotId) || String(l.lot_id) === String(lotId))
             );
@@ -374,9 +486,8 @@
                 this.openDialog(dialogId);
             }
         } else {
-            // ⭐ Для NPC-лотов используем старую модалку торга у капота
+            // Для NPC-лотов используем модалку торга у капота
             if (typeof window.initiateBuyMarketCar === 'function') {
-                // initiateBuyMarketCar ищет лот в state.marketFeed по id
                 const npcLot = (window.state?.marketFeed || []).find(l => l && String(l.id) === String(lotId));
                 if (npcLot) {
                     window.initiateBuyMarketCar(npcLot.id);
@@ -420,6 +531,7 @@
 
             if (typeof window.buyP2PLotDirect === 'function') {
                 await window.buyP2PLotDirect(lot.id || lot.lot_id || lotId);
+                if (typeof window.cleanupOrphanedDialogs === 'function') window.cleanupOrphanedDialogs();
                 const area = document.getElementById('p2pLotsArea');
                 if (area) area.innerHTML = this.renderP2PLotsHtml(this.marketFilter || 'cars');
                 return;
@@ -466,13 +578,20 @@
                 }
             }
 
+            // Удаляем купленный лот
             window.state.p2pMarketListings = (window.state.p2pMarketListings || []).filter(l =>
                 l && (l.id !== lotId && l.lot_id !== lotId)
             );
 
+            // Очищаем связанные диалоги по лоту
+            if (window.state?.player?.phoneMessages) {
+                window.state.player.phoneMessages = window.state.player.phoneMessages.filter(m => m && m.p2pLotId !== lotId);
+            }
+
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
             if (typeof renderGarage === 'function') renderGarage();
+            if (typeof window.cleanupOrphanedDialogs === 'function') window.cleanupOrphanedDialogs();
 
             if (typeof openVerdictModal === 'function') {
                 openVerdictModal(
@@ -592,6 +711,12 @@
             l && l.id !== lotId && l.lot_id !== lotId
         );
 
+        // Удаляем диалоги торга по снятому лоту
+        if (window.state?.player?.phoneMessages) {
+            window.state.player.phoneMessages = window.state.player.phoneMessages.filter(m => m && m.p2pLotId !== lotId);
+        }
+
+        if (typeof window.cleanupOrphanedDialogs === 'function') window.cleanupOrphanedDialogs();
         if (typeof saveState === 'function') saveState();
         if (typeof showToast === 'function') showToast('✅ Лот снят и возвращён в гараж');
 
@@ -943,5 +1068,19 @@
         }
     };
 
-    console.log('[💱 phone-m-market v9.1.7] Разделение торга: P2P-лоты → модалка офферов, NPC-лоты → торг у капота ✓');
+    // Слушатели событий для автоматической чистки
+    if (window.EventBus) {
+        window.EventBus.on('salesLot:updated', () => {
+            if (typeof window.cleanupOrphanedDialogs === 'function') {
+                window.cleanupOrphanedDialogs();
+            }
+        });
+        window.EventBus.on('p2p:deal_completed', () => {
+            if (typeof window.cleanupOrphanedDialogs === 'function') {
+                window.cleanupOrphanedDialogs();
+            }
+        });
+    }
+
+    console.log('[💱 phone-m-market v9.5.0] Биржа P2P и автоматическая очистка осиротевших диалогов готовы ✓');
 })();
