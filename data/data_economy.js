@@ -1,5 +1,6 @@
 // ========================================================
 // data_economy.js — ЭКОНОМИКА, БИЗНЕСЫ, НЕДВИЖИМОСТЬ И МАРКЕТ
+// ⭐ v2.3.0: СУБАРЕНДА ЖИЛЬЯ, ДОМАШНИЙ ВЕРСТАК И СЛОТЫ АВТОПАРКА
 // ⭐ v2.2.0: СИНХРОНИЗАЦИЯ БАНКА, КРЕДИТОВ И СЛОТОВ ГАРАЖА
 // ⭐ v2.1.1: СТРОГАЯ ФИЛЬТРАЦИЯ ТОЛЬКО КУПЛЕННЫХ БИЗНЕСОВ
 // ========================================================
@@ -158,7 +159,7 @@ const BANK_EXCHANGE_RATES = {
 };
 
 // --------------------------------------------------------
-// 1. НЕДВИЖИМОСТЬ И БОКСЫ ПЕРЕКУПА
+// 1. НЕДВИЖИМОСТЬ, БОКСЫ И СУБАРЕНДА (v2.3.0)
 // --------------------------------------------------------
 const HOUSING_LIST = [
     {
@@ -179,6 +180,7 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
+        subletIncome: 350,
         perk: 'Только ночлег. Доработки и ремонт невозможны.',
         desc: 'Временный строительный вагончик у обочины. Сквозняки, верстака нет. Автомобили стоят под открытым небом.',
         img: 'assets/houses/trailer.jpg',
@@ -202,6 +204,7 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
+        subletIncome: 900,
         perk: '1 машиноместо под навесом. Доступна замена масел и свечей.',
         desc: 'Деревянный навес от дождя. Есть розетка 220V и базовый набор гаечных ключей.',
         img: 'assets/houses/room.jpg',
@@ -225,6 +228,7 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
+        subletIncome: 1500,
         perk: 'Одно машиноместо во дворе. Разрешена замена расходников.',
         desc: 'Комната в спальном районе. Автомобиль стоит под окнами на асфальте.',
         img: 'assets/houses/room.jpg',
@@ -248,6 +252,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 5,
+        subletIncome: 4500,
         perk: 'Смотровая яма, электричество 220V, верстак со слесарными тисками.',
         desc: 'Настоящее логово перекупа! Сухая яма, верстак и диодное освещение. Открывает диагностику и тюнинг.',
         img: 'assets/houses/garage.jpg',
@@ -271,6 +276,7 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
+        subletIncome: 8000,
         perk: 'Уютный сон, быстрое восстановление настроения (+10).',
         desc: 'Своя кухня, душ и спокойный сон. Машина паркуется во дворе под фонарём.',
         img: 'assets/houses/khrusch.jpg',
@@ -294,6 +300,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 10,
+        subletIncome: 12000,
         perk: 'Сварка, полировальный пост, печь на отработке и 3 свободных машиноместа.',
         desc: 'Широкий бокс с печью, верстаком, компрессором и мойкой. Позволяет готовить тачки под ключ.',
         img: 'assets/houses/garage.jpg',
@@ -317,6 +324,7 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: true,
         reshalaDiscountPct: 0,
+        subletIncome: 18000,
         perk: 'Закреплённое парковочное место со шлагбаумом во дворе.',
         desc: 'Кирпичный дом, стеклопакеты, видеонаблюдение за парковкой. Высокий комфорт проживания.',
         img: 'assets/houses/dvushka.jpg',
@@ -340,6 +348,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 20,
+        subletIncome: 32000,
         perk: 'Двухстоечный подъёмник, камера обдува, скидка 20% на услуги Решалы!',
         desc: 'Коммерческий цех в промзоне. Подъёмник, мощная приточка, возможность отмывать VIN дешевле.',
         img: 'assets/houses/workshop.jpg',
@@ -363,6 +372,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 0,
+        subletIncome: 28000,
         perk: 'Подземный теплый паркинг с детейлинг-постом и зарядкой.',
         desc: 'ЖК комфорт-класса. Закрытый двор, охраняемый подземный паркинг, автомойка в цоколе.',
         img: 'assets/houses/treshka.jpg',
@@ -386,6 +396,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 15,
+        subletIncome: 48000,
         perk: 'Свой закрытый двор на 7 авто, тёплый гараж, зона отдыха и барбекю.',
         desc: 'Собственный участок, трёхфазная сеть 380V, смотровая яма и мойка высокого давления.',
         img: 'assets/houses/cottage.jpg',
@@ -409,6 +420,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 0,
+        subletIncome: 60000,
         perk: '+40% настроения каждый день, персональные места на VIP-паркинге.',
         desc: 'Красный кирпич, панорамные окна на набережную, стильный интерьер для отдыха автоолигарха.',
         img: 'assets/houses/loft.jpg',
@@ -432,6 +444,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 25,
+        subletIncome: 160000,
         perk: 'Личный VIP-бокс на -3 этаже Башни с охраной, консьержем и мойкой.',
         desc: 'Панорамный вид с 65 этажа, консьерж-сервис, охраняемый подземный гаражный комплекс.',
         img: 'assets/houses/penthouse.jpg',
@@ -455,6 +468,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 35,
+        subletIncome: 380000,
         perk: 'Свой автосервисный цех, малярная камера, охрана ЧОП, скидка 35% у Решалы!',
         desc: 'Гектар соснового бора, собственный автосервис на 4 поста, малярная камера и ангар для редких лотов.',
         img: 'assets/houses/villa.jpg',
@@ -478,12 +492,51 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 50,
+        subletIncome: 1200000,
         perk: 'Полный иммунитет от проверок ГИБДД, личный пирс для яхт и скидка 50% у Решалы!',
         desc: 'Абсолютная автономия в нейтральных водах. Свой порт, вертолётная площадка и музей для гиперкаров.',
         img: 'assets/houses/island.jpg',
         fallback: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'
     }
 ];
+
+// --------------------------------------------------------
+// 1.1. КОНФИГУРАЦИЯ ДОМАШНЕГО ВЕРСТАКА И БЫТА
+// --------------------------------------------------------
+const HOUSING_WORKBENCH_CONFIG = {
+    washHose: {
+        costCash: 0,
+        desc: "Ручная мойка из шланга во дворе. Бесплатно возвращает блеск кузову."
+    },
+    servicePlugs: {
+        costCash: 1500,
+        engineWearRestorePct: 4,
+        desc: "Замена свечей зажигания и фильтра в боксе. Добавляет +4% ресурса двигателю."
+    },
+    engineAdditive: {
+        costCash: 5000,
+        maskDefects: true,
+        desc: "Фирменная присадка в масло. Маскирует стук мотора для покупателей на рынке."
+    },
+    smallDefectPolish: {
+        costCash: 3500,
+        conditionRestorePct: 5,
+        desc: "Локальная полировка царапин и притирка ЛКП. Поднимает состояние на +5%."
+    }
+};
+
+const HOUSING_LIFESTYLE_CONFIG = {
+    coffee: {
+        cooldownHours: 4,
+        hungerBonus: 15,
+        moodBonus: 15
+    },
+    ps5: {
+        moodBonus: 100,
+        streetCredBonus: 5
+    },
+    cctvRiskReduction: 1.0 // 100% защита от ночных краж и угона
+};
 
 const HOUSING_RANDOM_EVENTS = [
     {
@@ -1173,6 +1226,8 @@ window.WHEEL_CONFIG = WHEEL_CONFIG;
 window.MARKET_ECONOMY_CONFIG = MARKET_ECONOMY_CONFIG;
 window.BANK_EXCHANGE_RATES = BANK_EXCHANGE_RATES;
 window.HOUSING_LIST = HOUSING_LIST;
+window.HOUSING_WORKBENCH_CONFIG = HOUSING_WORKBENCH_CONFIG;
+window.HOUSING_LIFESTYLE_CONFIG = HOUSING_LIFESTYLE_CONFIG;
 window.HOUSING_RANDOM_EVENTS = HOUSING_RANDOM_EVENTS;
 window.BUSINESS_DATA = BUSINESS_DATA;
 window.BUSINESS_UPGRADES_BRANCHES = BUSINESS_UPGRADES_BRANCHES;
