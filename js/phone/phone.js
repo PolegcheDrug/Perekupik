@@ -1,22 +1,15 @@
 // ========================================================
-// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v1.9.3)
+// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v2.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.9.3 (SPRINT 4 — КРИТИЧЕСКИЙ ФИКС ОПЕЧАТКИ):
-//   - accessKeyMap: 'autopoddbor_order' → 'autopodbor_order'
-//     Из-за опечатки лицензия «ПодКлюч» НЕ разблокировала синддикат:
-//     checkAppAccess('syndicate') пытался читать APP_ACCESS_CONFIG
-//     по ключу autopoddbor_order, которого там нет → config = null
-//     → return true (пропускал БЕЗ оплаты лицензии).
-//     Игрок видел синддикат открытым, а кнопка «Оформить лицензию»
-//     не работала (падала в confirmUnlockAppAction по той же причине).
-//   - Добавлены комментарии к accessKeyMap.
-//   - Остальное — 1:1 c v1.9.2
-//
-// ⭐ v1.9.2:
-//   - ДОБАВЛЕНА нативная поддержка appId 'darknet' в switch и accessKeyMap.
-//   - Единая маршрутизация для 'darknet', 'reshala' и 'radar' в AppDarknet.
-//   - Исправлена опечатка расчёта курса звёзд в showAppUnlockPrompt.
+// ⭐ v2.0.0 (ИНТЕГРАЦИЯ УРОВНЕЙ И ПЛАТНЫХ РАЗРЕШЕНИЙ):
+//   - Полная синхронизация accessKeyMap с APP_ACCESS_CONFIG:
+//     Сараи (8 ур.), Контейнеры/Storage Wars (12 ур.), Стрит (6 ур.),
+//     Даркнет/Решала/Радар (16 ур.), Синдикат (20 ур.).
+//   - Двусторонняя синхронизация списков разблокировки:
+//     state.player.unlockedApps <-> state.player.unlockedFeatures.
+//   - Интеграция с AccessControl.FeatureAccess и MoneyManager.
+//   - Сохранены все виджеты, AppShop, AppNotepad и P2P-функционал.
 // ========================================================
 
 const PhoneManager = {
@@ -25,20 +18,20 @@ const PhoneManager = {
     _isInitialized: false,
     _isOpeningApp: false,
 
-    // ⭐ v1.9.3: карта приложений, требующих разблокировки.
-    // Ключ — appId (то, что передаётся в PhoneManager.openApp())
-    // Значение — ключ в APP_ACCESS_CONFIG (data_economy.js)
+    // Карта приложений, требующих проверки уровня и платной лицензии
     accessKeyMap: {
-        'barn':       'barn',               // APP_ACCESS_CONFIG.barn
-        'containers': 'containers',         // APP_ACCESS_CONFIG.containers
-        'syndicate':  'autopodbor_order',   // ⭐ v1.9.3 ФИКС: было 'autopoddbor_order'
-        'street':     'street',             // APP_ACCESS_CONFIG.street
-        'reshala':    'darknet',            // APP_ACCESS_CONFIG.darknet (алиас)
-        'darknet':    'darknet',            // APP_ACCESS_CONFIG.darknet (основной)
-        'radar':      'darknet'             // APP_ACCESS_CONFIG.darknet (алиас)
+        'barn':          'barn',              // APP_ACCESS_CONFIG.barn (8 ур., 800k ₽)
+        'containers':    'containers',        // APP_ACCESS_CONFIG.containers (12 ур., 2.5M ₽ + 10 ⭐)
+        'storage_wars':  'containers',        // APP_ACCESS_CONFIG.containers (12 ур.)
+        'syndicate':     'syndicate',         // APP_ACCESS_CONFIG.syndicate (20 ур., 20M ₽ + 50 ⭐)
+        'street':        'street',            // APP_ACCESS_CONFIG.street (6 ур., 250k ₽ + 15 ⭐)
+        'reshala':       'darknet',           // APP_ACCESS_CONFIG.darknet (16 ур., 6M ₽ + 25 ⭐)
+        'darknet':       'darknet',           // APP_ACCESS_CONFIG.darknet (16 ур., 6M ₽ + 25 ⭐)
+        'radar':         'darknet',           // APP_ACCESS_CONFIG.darknet (16 ур.)
+        'autopodbor':    'autopodbor_order',  // APP_ACCESS_CONFIG.autopodbor_order (5 ур., 350k ₽ + 5 ⭐)
+        'autopodbor_order': 'autopodbor_order'
     },
 
-    // ⭐ обёртка над GameHelpers
     _fmt(val) {
         if (window.GameHelpers && window.GameHelpers.formatMoney) {
             return window.GameHelpers.formatMoney(val);
@@ -114,6 +107,7 @@ const PhoneManager = {
         const p = window.state?.player;
         if (!p) return true;
         if (!p.unlockedApps) p.unlockedApps = [];
+        if (!p.unlockedFeatures) p.unlockedFeatures = [];
 
         const configKey = this.accessKeyMap[appId];
         if (!configKey) return true;
@@ -125,17 +119,22 @@ const PhoneManager = {
         if (!config) return true;
 
         const minLevel = Number(config.minLevel) || 1;
-        const pLvl = p.level || 1;
-        const isUnlocked = p.unlockedApps.includes(configKey);
+        const pLvl = Number(p.level) || 1;
+        const isUnlocked = p.unlockedApps.includes(configKey) || p.unlockedFeatures.includes(configKey);
 
         if (isUnlocked) return true;
 
         if (pLvl < minLevel) {
-            if (typeof window.openLevelGateModal === 'function') {
-                window.openLevelGateModal(config.name || appId, minLevel);
+            if (typeof window.openVerdictModal === 'function') {
+                window.openVerdictModal(
+                    "РАЗДЕЛ ЗАБЛОКИРОВАН 🔒",
+                    `Сервис «<b>${config.name || appId}</b>» станет доступен только с <b>${minLevel} уровня</b>!\nВаш текущий уровень: <b>${pLvl}</b>.\n\nПродавайте автомобили на рынке, устраняйте дефекты и зарабатывайте чистую прибыль, чтобы повысить уровень.`,
+                    false
+                );
             } else if (typeof showToast === 'function') {
-                showToast(`Сервис доступен с ${minLevel} уровня!`);
+                showToast(`🔒 Сервис доступен с ${minLevel} уровня (у вас ${pLvl})!`);
             }
+            if (typeof playSound === 'function') playSound('error');
             return false;
         }
 
@@ -145,9 +144,9 @@ const PhoneManager = {
 
     showAppUnlockPrompt(appId, configKey, config) {
         const p = window.state?.player || {};
-        const cash = p.cash || 0;
-        const stars = p.stars || 0;
-        const tickets = p.expressTickets || 0;
+        const cash = Number(p.cash) || 0;
+        const stars = Number(p.stars) || 0;
+        const tickets = Number(p.expressTickets || p.tickets) || 0;
 
         const costCash = Number(config.costCash) || 0;
         const costStars = Number(config.costStars) || 0;
@@ -244,9 +243,9 @@ const PhoneManager = {
                 return showToast(`❌ ${spendRes.error || 'Недостаточно средств'}`);
             }
         } else {
-            const cash = p.cash || 0;
-            const stars = p.stars || 0;
-            const tickets = p.expressTickets || 0;
+            const cash = Number(p.cash) || 0;
+            const stars = Number(p.stars) || 0;
+            const tickets = Number(p.expressTickets || p.tickets) || 0;
 
             if (cash < costCash)       return showToast("Не хватает рублей для оплаты!");
             if (stars < costStars)     return showToast("Не хватает банкнот ⭐ для оплаты!");
@@ -254,7 +253,10 @@ const PhoneManager = {
 
             if (costCash > 0)     p.cash -= costCash;
             if (costStars > 0)    p.stars -= costStars;
-            if (costTickets > 0)  p.expressTickets -= costTickets;
+            if (costTickets > 0) {
+                if (p.expressTickets !== undefined) p.expressTickets -= costTickets;
+                if (p.tickets !== undefined) p.tickets -= costTickets;
+            }
         }
 
         if (!p.unlockedApps) p.unlockedApps = [];
@@ -262,12 +264,26 @@ const PhoneManager = {
             p.unlockedApps.push(configKey);
         }
 
+        if (!p.unlockedFeatures) p.unlockedFeatures = [];
+        if (!p.unlockedFeatures.includes(configKey)) {
+            p.unlockedFeatures.push(configKey);
+        }
+
         if (typeof ModalManager !== 'undefined') ModalManager.close('modalAppUnlockPrompt');
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
-        showToast(`Сервис «${config.name || appId}» успешно разблокирован!`);
+
+        if (typeof openVerdictModal === 'function') {
+            openVerdictModal(
+                "СЕРВИС РАЗБЛОКИРОВАН! 🔑",
+                `Вы успешно приобрели постоянный доступ к сервису <b>«${config.name || appId}»</b>!\nДобро пожаловать в профессиональную лигу перекупов.`,
+                true
+            );
+        } else {
+            showToast(`Сервис «${config.name || appId}» успешно разблокирован!`);
+        }
 
         this.openApp(appId);
     },
@@ -367,7 +383,7 @@ const PhoneManager = {
                 return;
             }
 
-            // 4. САРАИ
+            // 4. САРАИ (Barn Find)
             if (appId === 'barn') {
                 if (window.AppBarn && typeof window.AppBarn.render === 'function') {
                     try {
@@ -425,7 +441,7 @@ const PhoneManager = {
                     }
                     break;
 
-                // ⭐ ОБЪЕДИНЁННЫЙ МОДУЛЬ «ДАРКНЕТ / РЕШАЛА / РАДАР»
+                // ОБЪЕДИНЁННЫЙ МОДУЛЬ «ДАРКНЕТ / РЕШАЛА / РАДАР»
                 case 'darknet':
                 case 'reshala':
                     if (window.AppDarknet && typeof window.AppDarknet.render === 'function') {
@@ -1328,4 +1344,4 @@ if (document.readyState === 'loading') {
     PhoneManager.init();
 }
 
-console.log('[📱 phone.js v1.9.3] ФИКС: autopoddbor_order → autopodbor_order (синддикат теперь корректно разблокируется) ✓');
+console.log('[📱 phone.js v2.0.0] Интеграция уровней и платных разрешений APP_ACCESS_CONFIG ✓');
