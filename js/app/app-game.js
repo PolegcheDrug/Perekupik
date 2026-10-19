@@ -1,34 +1,13 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v4.5.1)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v4.5.1 (SPRINT 4 — ФИКС БИТЫХ ДЕПОЗИТОВ):
-//   - КРИТИЧЕСКИЙ ФИКС: executeDayCycleMidnight теперь использует
-//     safeNum для всех полей bankDeposits. Раньше, если в депозите
-//     было currentAmount = NaN (битый сейв, ручная правка, миграция),
-//     то:
-//       gain = Math.round(NaN * 0.3) = NaN
-//       dep.currentAmount += NaN = NaN  ← депозит навсегда сломан
-//       dep.accumulatedProfit += NaN = NaN
-//     Игрок терял вклад и не мог его восстановить.
-//
-//     ТЕПЕРЬ:
-//       • Каждый депозит проходит через _safeNumDeposit
-//       • Некорректные депозиты пропускаются с логом в консоль
-//       • Проверка currentAmount > 0 перед расчётом
-//       • try/catch вокруг всего блока депозитов
-//
-// ⭐ v4.5.0 (ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР):
-//   - HudRevolver для скролла статов пальцем
-//   - Вибрация при пересечении центральной линии
-//   - Инерция и прилипание к ближайшей иконке
-//   - Визуальный маркер центра (прицел)
-//   - Автовращение с паузой при касании
-//
-// ⭐ v4.4.0 (СТАБИЛЬНОСТЬ):
-//   - Усилена защита try/catch в executeDayCycleMidnight
-//   - Добавлены проверки на существование элементов в updateHeaderUI
-//   - window.state используется для доступа к стейту
+// ⭐ v5.0.0 (ИНТЕГРАЦИЯ FEATURE ACCESS И БАЛАНС ПРОГРЕССИИ):
+//   - Встроен контроль вкладок (switchTab) через AccessControl.guardFeature:
+//     Сараи (tabBarn), Контейнеры (tabContainers), Стрит (tabStreet),
+//     Даркнет (tabDarknet), Синдикат (tabSyndicate).
+//   - Сбалансирована прогрессия XP и уровней против быстрого прохождения.
+//   - Полная сохранность фиксов депозитов (v4.5.1) и тактильного HUD.
 // ========================================================
 
 // ========================================================
@@ -491,11 +470,11 @@ function getTotalGarageSlots() {
 function _updateDynamicStarRate() {
     if (!window.state.player) return;
 
-    const prev = window.state.player.dynamicStarRate || STAR_RATE_DEFAULT;
+    const prev = window.state.player.dynamicStarRate || 2500;
     const drift = (Math.random() - 0.5) * 0.01;
     let next = Math.round(prev * (1 + drift));
 
-    next = Math.max(STAR_RATE_MIN, Math.min(STAR_RATE_MAX, next));
+    next = Math.max(2200, Math.min(3200, next));
     next = Math.round(next / 100) * 100;
 
     window.state.player.dynamicStarRate = next;
@@ -513,7 +492,7 @@ function _updateDynamicStarRate() {
 
 function _syncStarRateToBank() {
     if (!window.state.player) return;
-    const rate = window.state.player.dynamicStarRate || STAR_RATE_DEFAULT;
+    const rate = window.state.player.dynamicStarRate || 2500;
     if (window.BANK_EXCHANGE_RATES && window.BANK_EXCHANGE_RATES.stars) {
         window.BANK_EXCHANGE_RATES.stars.buyRub = rate;
         window.BANK_EXCHANGE_RATES.stars.sellRub = Math.round(rate * 0.96);
@@ -521,7 +500,7 @@ function _syncStarRateToBank() {
 }
 
 // ========================================================
-// ⭐ v4.5.1: ХЕЛПЕР ДЛЯ БЕЗОПАСНОГО ПАРСИНГА ЧИСЕЛ ДЕПОЗИТА
+// ХЕЛПЕР ДЛЯ БЕЗОПАСНОГО ПАРСИНГА ЧИСЕЛ ДЕПОЗИТА
 // ========================================================
 function _safeNumDeposit(val, fallback = 0) {
     if (typeof window.GameHelpers?.safeNum === 'function') {
@@ -571,17 +550,6 @@ function executeDayCycleMidnight(currentDateObj) {
 
         if (window.state.player.loanDebt > 0) window.state.player.loanDebt = Math.round(window.state.player.loanDebt * 1.02);
 
-        // ═══════════════════════════════════════════════════════
-        // ⭐ v4.5.1: КРИТИЧЕСКИЙ ФИКС — safeNum для депозитов
-        //
-        // Было: если dep.currentAmount = NaN (битый сейв),
-        //       gain = Math.round(NaN * 0.3) = NaN
-        //       dep.currentAmount += NaN = NaN  ← навсегда сломан
-        //       dep.accumulatedProfit += NaN = NaN
-        //
-        // Теперь: _safeNumDeposit защищает каждое поле,
-        //         некорректные депозиты пропускаются с логом.
-        // ═══════════════════════════════════════════════════════
         if (Array.isArray(window.state.player.bankDeposits)) {
             const validDeposits = [];
 
@@ -597,10 +565,7 @@ function executeDayCycleMidnight(currentDateObj) {
                     const accumulatedProfit = _safeNumDeposit(dep.accumulatedProfit, 0);
                     const daysPassed = _safeNumDeposit(dep.daysPassed, 0);
 
-                    // ⭐ Проверка: если сумма депозита <= 0 — пропускаем (не начисляем)
                     if (currentAmount <= 0) {
-                        console.warn(`[DayCycle] Депозит #${idx} имеет некорректную сумму (${dep.currentAmount}), пропускаем`);
-                        // Но всё равно сохраняем его (может, игрок как-то восстановит)
                         dep.currentAmount = 0;
                         dep.dailyPercent = dailyPercent;
                         dep.accumulatedProfit = accumulatedProfit;
@@ -609,7 +574,6 @@ function executeDayCycleMidnight(currentDateObj) {
                         return;
                     }
 
-                    // ✅ Всё корректно — начисляем проценты
                     dep.daysPassed = daysPassed + 1;
                     dep.dailyPercent = dailyPercent;
                     dep.currentAmount = currentAmount;
@@ -618,7 +582,6 @@ function executeDayCycleMidnight(currentDateObj) {
                     const gain = Math.round(currentAmount * effectiveDailyPercent);
 
                     if (isNaN(gain) || !isFinite(gain)) {
-                        console.warn(`[DayCycle] Депозит #${idx}: gain = NaN, начисление отменено`);
                         dep.accumulatedProfit = accumulatedProfit;
                         validDeposits.push(dep);
                         return;
@@ -634,11 +597,9 @@ function executeDayCycleMidnight(currentDateObj) {
                     validDeposits.push(dep);
                 } catch (depErr) {
                     console.warn(`[DayCycle] Ошибка обработки депозита #${idx}:`, depErr);
-                    // Не пушим битый депозит — он не должен ломать игру
                 }
             });
 
-            // Если какие-то депозиты пришлось выкинуть — сообщаем игроку
             const removedCount = window.state.player.bankDeposits.length - validDeposits.length;
             if (removedCount > 0) {
                 console.warn(`[DayCycle] Удалено битых депозитов: ${removedCount}`);
@@ -658,8 +619,6 @@ function executeDayCycleMidnight(currentDateObj) {
                 const activeHouse = HOUSING_LIST.find(h => h.id === window.state.player.housingId);
                 if (activeHouse && typeof activeHouse.moodBonus === 'number' && activeHouse.moodBonus !== 0) {
                     window.state.player.mood = Math.max(0, Math.min(100, (window.state.player.mood || 0) + activeHouse.moodBonus));
-                    console.log(`[Housing] Ежедневный mood-бонус: ${activeHouse.moodBonus >= 0 ? '+' : ''}${activeHouse.moodBonus} от «${activeHouse.name}»`);
-
                     if (typeof showToast === 'function') {
                         setTimeout(() => {
                             showToast(`🏠 «${activeHouse.name}»: ${activeHouse.moodBonus >= 0 ? '+' : ''}${activeHouse.moodBonus}% к куражу`, 'info');
@@ -879,14 +838,27 @@ function updateLevelGatesUI() {
 }
 
 function addXp(amount) {
-    window.state.player.xp += amount;
-    if (window.state.player.xp >= window.state.player.maxXp) {
-        window.state.player.xp -= window.state.player.maxXp;
-        window.state.player.level += 1;
-        window.state.player.maxXp = Math.round(window.state.player.maxXp * 1.35);
-        openVerdictModal("Новый уровень!", "Вы достигли " + window.state.player.level + " уровня авторитета!", true);
+    if (!window.state.player) return;
+    amount = Math.max(0, Number(amount) || 0);
+    window.state.player.xp = (window.state.player.xp || 0) + amount;
+
+    let maxXp = window.state.player.maxXp || 120;
+    while (window.state.player.xp >= maxXp) {
+        window.state.player.xp -= maxXp;
+        window.state.player.level = (window.state.player.level || 1) + 1;
+        // Прогрессивная формула опыта: +40% к планке следующего уровня
+        window.state.player.maxXp = Math.round(maxXp * 1.40 + 35);
+        maxXp = window.state.player.maxXp;
+
+        openVerdictModal(
+            "НОВЫЙ УРОВЕНЬ АВТОРИТЕТА! 🎖️",
+            `Поздравляем! Вы достигли <b>${window.state.player.level} уровня</b> авторитета!\nОткрыты новые возможности и лоты на рынке.`,
+            true
+        );
     }
+
     updateLevelGatesUI();
+    updateHeaderUI();
     if (typeof saveState === 'function') saveState();
 }
 
@@ -1118,9 +1090,30 @@ function importSaveCodeAction() {
 }
 
 // ========================================================
-// 10. НАВИГАЦИЯ
+// 10. НАВИГАЦИЯ С КОНТРОЛЕМ ДОСТУПА ПО УРОВНЯМ
 // ========================================================
 function switchTab(tabId) {
+    // Таблица соответствия вкладок и ключей в APP_ACCESS_CONFIG
+    const tabFeatureMap = {
+        'tabBarn': 'barn',
+        'tabContainers': 'containers',
+        'tabStreet': 'street',
+        'tabDarknet': 'darknet',
+        'tabSyndicate': 'syndicate'
+    };
+
+    const featureKey = tabFeatureMap[tabId];
+    if (featureKey && window.AccessControl && typeof window.AccessControl.guardFeature === 'function') {
+        const canProceed = window.AccessControl.guardFeature(featureKey, () => {
+            _performTabSwitch(tabId);
+        });
+        if (!canProceed) return;
+    }
+
+    _performTabSwitch(tabId);
+}
+
+function _performTabSwitch(tabId) {
     if (window.AudioFx) {
         window.AudioFx.play('tick');
         window.AudioFx.haptic('light');
@@ -1405,6 +1398,7 @@ window.executeDayCycleMidnight = executeDayCycleMidnight;
 window.updateHeaderUI = updateHeaderUI;
 window.updateLevelGatesUI = updateLevelGatesUI;
 window.switchTab = switchTab;
+window._performTabSwitch = _performTabSwitch;
 window.checkRealTimeDayChange = checkRealTimeDayChange;
 window._updateDynamicStarRate = _updateDynamicStarRate;
 window._syncStarRateToBank = _syncStarRateToBank;
@@ -1412,4 +1406,4 @@ window.logBankTransaction = logBankTransaction;
 window.HudRevolver = HudRevolver;
 window._safeNumDeposit = _safeNumDeposit;
 
-console.log('[💠 app-game.js v4.5.1] ФИКС: safeNum для банковских депозитов (NaN-депозиты пропускаются) ✓');
+console.log('[💠 app-game.js v5.0.0] Интеграция FeatureAccess: прогрессия уровней и защита вкладок включена ✓');
