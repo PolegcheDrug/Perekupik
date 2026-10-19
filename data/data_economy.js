@@ -1,12 +1,12 @@
 // ========================================================
 // data_economy.js — ЭКОНОМИКА, БИЗНЕСЫ, НЕДВИЖИМОСТЬ И МАРКЕТ
-// ⭐ v2.0.0: РЕБАЛАНС ЭКОНОМИКИ
+// ⭐ v2.2.0: СИНХРОНИЗАЦИЯ БАНКА, КРЕДИТОВ И СЛОТОВ ГАРАЖА
 // ⭐ v2.1.1: СТРОГАЯ ФИЛЬТРАЦИЯ ТОЛЬКО КУПЛЕННЫХ БИЗНЕСОВ
 // ========================================================
 
 // --------------------------------------------------------
 // 0. СИСТЕМНЫЕ НАСТРОЙКИ ДОСТУПА К ПРИЛОЖЕНИЯМ И МИНИ-ИГРАМ
-// ⭐ v2.0.0: Стоимость в ⭐ пересчитана под курс 1 ⭐ = 2,500 ₽
+// Стоимость в ⭐ пересчитана под курс 1 ⭐ = 2,500 ₽
 // --------------------------------------------------------
 const APP_ACCESS_CONFIG = {
     // Находка в сарае (Barn Find)
@@ -14,7 +14,7 @@ const APP_ACCESS_CONFIG = {
         id: 'tabBarn',
         name: 'Сараи (Barn Find)',
         minLevel: 3,
-        costStars: 50,         // 50 × 2,500 = 125,000 ₽ (было 5M)
+        costStars: 50,         // 50 × 2,500 = 125,000 ₽
         costCash: 0,
         costTickets: 0,
         desc: 'Экспедиции по заброшенным гаражам и деревням в поисках раритетов.',
@@ -80,7 +80,6 @@ const APP_ACCESS_CONFIG = {
 
 // --------------------------------------------------------
 // 0.1. НАСТРОЙКИ ВИЛСПИНА И СУПЕРВИЛСПИНА
-// ⭐ v2.0.0: Стоимость в ⭐ теперь = 100 ⭐ за 250,000 ₽ (было 10M)
 // --------------------------------------------------------
 const WHEEL_CONFIG = {
     regular: {
@@ -129,8 +128,37 @@ const MARKET_ECONOMY_CONFIG = {
 };
 
 // --------------------------------------------------------
+// 0.3. ОФИЦИАЛЬНЫЙ КУРС ОБМЕННИКА БАНКА (v3.5.0)
+// --------------------------------------------------------
+const BANK_EXCHANGE_RATES = {
+    rub: {
+        name: 'Рубли',
+        emoji: '₽',
+        buyRub: 1,
+        sellRub: 1
+    },
+    stars: {
+        name: 'Stars',
+        emoji: '⭐',
+        buyRub: 2500,          // Покупка игроком у банка
+        sellRub: 2400          // Продажа банку (спред 4%)
+    },
+    superSpinTicket: {
+        name: 'Билет «Супер Вилспин»',
+        emoji: '🎟️',
+        buyRub: 150000,
+        sellRub: 144000
+    },
+    tickets: {
+        name: 'Экспресс-талон',
+        emoji: '🎫',
+        buyRub: 25000,
+        sellRub: 24000
+    }
+};
+
+// --------------------------------------------------------
 // 1. НЕДВИЖИМОСТЬ И БОКСЫ ПЕРЕКУПА
-// ⭐ v2.0.0: Цены звёзд адекватны курсу 2,500 ₽.
 // --------------------------------------------------------
 const HOUSING_LIST = [
     {
@@ -142,6 +170,7 @@ const HOUSING_LIST = [
         buyPrice: 350000,
         reqStars: 0,
         slots: 0,
+        slotsBonus: 0,
         moodBonus: -5,
         minLevel: 1,
         canTune: false,
@@ -164,6 +193,7 @@ const HOUSING_LIST = [
         buyPrice: 750000,
         reqStars: 5,           // + 12,500 ₽
         slots: 1,
+        slotsBonus: 1,
         moodBonus: 0,
         minLevel: 2,
         canTune: false,
@@ -186,6 +216,7 @@ const HOUSING_LIST = [
         buyPrice: 1300000,
         reqStars: 8,           // + 20,000 ₽
         slots: 1,
+        slotsBonus: 1,
         moodBonus: 4,
         minLevel: 3,
         canTune: false,
@@ -208,6 +239,7 @@ const HOUSING_LIST = [
         buyPrice: 1500000,
         reqStars: 12,          // + 30,000 ₽
         slots: 2,
+        slotsBonus: 2,
         moodBonus: 8,
         minLevel: 4,
         canTune: true,
@@ -230,6 +262,7 @@ const HOUSING_LIST = [
         buyPrice: 3800000,
         reqStars: 15,          // + 37,500 ₽
         slots: 1,
+        slotsBonus: 1,
         moodBonus: 10,
         minLevel: 5,
         canTune: false,
@@ -252,6 +285,7 @@ const HOUSING_LIST = [
         buyPrice: 2900000,
         reqStars: 20,          // + 50,000 ₽
         slots: 3,
+        slotsBonus: 3,
         moodBonus: 14,
         minLevel: 7,
         canTune: true,
@@ -274,6 +308,7 @@ const HOUSING_LIST = [
         buyPrice: 7500000,
         reqStars: 25,          // + 62,500 ₽
         slots: 2,
+        slotsBonus: 2,
         moodBonus: 18,
         minLevel: 10,
         canTune: false,
@@ -296,6 +331,7 @@ const HOUSING_LIST = [
         buyPrice: 11000000,
         reqStars: 35,          // + 87,500 ₽
         slots: 5,
+        slotsBonus: 5,
         moodBonus: 22,
         minLevel: 15,
         canTune: true,
@@ -318,6 +354,7 @@ const HOUSING_LIST = [
         buyPrice: 15000000,
         reqStars: 40,          // + 100,000 ₽
         slots: 3,
+        slotsBonus: 3,
         moodBonus: 28,
         minLevel: 20,
         canTune: false,
@@ -340,6 +377,7 @@ const HOUSING_LIST = [
         buyPrice: 22000000,
         reqStars: 55,          // + 137,500 ₽
         slots: 7,
+        slotsBonus: 7,
         moodBonus: 35,
         minLevel: 28,
         canTune: true,
@@ -362,6 +400,7 @@ const HOUSING_LIST = [
         buyPrice: 35000000,
         reqStars: 75,          // + 187,500 ₽
         slots: 4,
+        slotsBonus: 4,
         moodBonus: 40,
         minLevel: 35,
         canTune: false,
@@ -384,6 +423,7 @@ const HOUSING_LIST = [
         buyPrice: 140000000,
         reqStars: 110,         // + 275,000 ₽
         slots: 8,
+        slotsBonus: 8,
         moodBonus: 55,
         minLevel: 50,
         canTune: true,
@@ -406,6 +446,7 @@ const HOUSING_LIST = [
         buyPrice: 420000000,
         reqStars: 160,         // + 400,000 ₽
         slots: 18,
+        slotsBonus: 18,
         moodBonus: 85,
         minLevel: 70,
         canTune: true,
@@ -428,6 +469,7 @@ const HOUSING_LIST = [
         buyPrice: 1200000000,
         reqStars: 300,         // + 750,000 ₽
         slots: 35,
+        slotsBonus: 35,
         moodBonus: 100,
         minLevel: 90,
         canTune: true,
@@ -644,7 +686,7 @@ const BUSINESS_FLEET_CATALOG = [
 ];
 
 // --------------------------------------------------------
-// 4. КАТАЛОГ АВТО-МАРКЕТА (4 ПОЛНЫЕ КАТЕГОРИИ)
+// 4. КАТАЛОГ АВТО-МАРКЕТА
 // --------------------------------------------------------
 const SHOP_CATALOG = {
     tools: [
@@ -869,9 +911,33 @@ const DAILY_REWARDS_CONFIG = [
 ];
 
 // --------------------------------------------------------
-// 6. БАНКОВСКИЕ ВКЛАДЫ
+// 6. БАНКОВСКИЕ ДЕПОЗИТЫ, СЛОЖНЫЕ ПРОЦЕНТЫ И КРЕДИТЫ (v3.5.0)
 // --------------------------------------------------------
 const BANK_DEPOSIT_CONFIG = {
+    // Накопительный счет «Автокапитал» со сложными процентами
+    autoCapital: {
+        dailyRate: 0.015,                // 1.5% в день
+        compoundPeriodMs: 60000,         // капитализация от 1 минуты
+        maxOfflineDays: 30,              // ограничение расчета
+        minDeposit: 10000
+    },
+    // Несгораемый депозитный сейф
+    safeDeposit: {
+        annualRate: 0,                   // 0% годовых
+        isProtectedFromDebt: true,       // иммунитет к долгам и арестам
+        isProtectedFromRaids: true
+    },
+    // Кредитный скоринг
+    creditScoring: {
+        baseLimit: 150000,
+        limitPerLevel: 150000,
+        standardDailyRate: 0.02,         // 2% в день
+        overduePenaltyDailyRate: 0.03,   // +3% в день сверху при просрочке
+        gracePeriodHours: 72,            // 3 суток льготный срок
+        maxRating: 5.0,
+        ratingBonusOnRepay: 0.2,
+        ratingPenaltyOnOverduePerDay: 0.15
+    },
     minAmount: 100000,
     maxAmount: 500000000,
     dailyPercent: 0.3,
@@ -1027,16 +1093,9 @@ const MREO_CONFIG = {
 // 10. КАЛЬКУЛЯТОР ДОХОДНОСТИ АВТОПАРКА И СОВМЕСТИМОСТИ
 // ========================================================
 const FLEET_CALCULATOR = {
-    /**
-     * Проверка, подходит ли авто под какой-либо из открытых бизнесов игрока.
-     * @param {Object} car - объект машины с рынка
-     * @param {Array} ownedBusinesses - массив id выкупленных бизнесов игрока
-     * @returns {Object} результат совместимости и теги
-     */
     checkSuitability: function(car, ownedBusinesses = []) {
         if (!car) return { suitable: false, matches: [] };
 
-        // Если у игрока нет открытых бизнесов (массив пустой) — гарантированно ничего не подходит!
         if (!Array.isArray(ownedBusinesses) || ownedBusinesses.length === 0) {
             return { suitable: false, matches: [] };
         }
@@ -1051,20 +1110,16 @@ const FLEET_CALCULATOR = {
         Object.keys(BUSINESS_FLEET_REQUIREMENTS).forEach(bizKey => {
             const req = BUSINESS_FLEET_REQUIREMENTS[bizKey];
 
-            // Строгая проверка: игрок ОБЯЗАН реально владеть этим бизнесом!
             if (!ownedBusinesses.includes(req.bizId)) return;
 
-            // Проверка категории
             const isCategoryAllowed = req.allowedCategories.includes(carCategory);
             const isCategoryForbidden = req.forbiddenCategories && req.forbiddenCategories.includes(carCategory);
 
             if (!isCategoryAllowed || isCategoryForbidden) return;
 
-            // Проверка состояния
             if (req.minCondition && condition < req.minCondition) return;
             if (req.maxCondition && condition > req.maxCondition) return;
 
-            // Проверка на ДТП
             if (req.allowAccidents === false && hasAccidents) return;
 
             matches.push({
@@ -1083,9 +1138,6 @@ const FLEET_CALCULATOR = {
         };
     },
 
-    /**
-     * Расчет суточного дохода машины в коммерческом автопарке
-     */
     calculateCarDailyIncome: function(car, bizType, legalType = 'ip', isRegisteredMREO = true) {
         const req = BUSINESS_FLEET_REQUIREMENTS[bizType];
         if (!req) return { grossIncome: 0, taxDeduction: 0, netIncome: 0 };
@@ -1119,6 +1171,7 @@ const FLEET_CALCULATOR = {
 window.APP_ACCESS_CONFIG = APP_ACCESS_CONFIG;
 window.WHEEL_CONFIG = WHEEL_CONFIG;
 window.MARKET_ECONOMY_CONFIG = MARKET_ECONOMY_CONFIG;
+window.BANK_EXCHANGE_RATES = BANK_EXCHANGE_RATES;
 window.HOUSING_LIST = HOUSING_LIST;
 window.HOUSING_RANDOM_EVENTS = HOUSING_RANDOM_EVENTS;
 window.BUSINESS_DATA = BUSINESS_DATA;
