@@ -1,6 +1,15 @@
 // ========================================================
-// js/street.js — СТРИТ-РЕЙСИНГ, 402М И АВТОМЕРОПРИЯТИЯ (v0.7.0)
-// Интегрировано с модулем «Теневой Контур» (ДПС Радар & Решала)
+// js/street.js — СТРИТ-РЕЙСИНГ, 402М И АВТОМЕРОПРИЯТИЯ (v0.8.0)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v0.8.0 (БАЛАНС РЕСУРСА МОТОРА, ШИН И ИЗНОСА):
+//   - СБАЛАНСИРОВАН ИЗНОС ШИН: Городские шины расходуют 4-6% за заезд,
+//     драг-слики — 7-9% (с учетом зацепа). Букс на отсечке добавляет износ резины.
+//   - СБАЛАНСИРОВАН РЕСУРС МОТОРА: Плавный нагрев (+6..10°C), учет перегрева
+//     (>98°C дает повышенный износ поршневой), расчет урона трансмиссии при ланче.
+//   - ДИФФЕРЕНЦИАЦИЯ МЕРОПРИЯТИЙ: Стенс-выставка больше не сжигает 15% резины
+//     вхолостую; на дрифте горит резина, на 402м греется мотор.
+//   - ИНТЕГРАЦИЯ: Прямая связка с модулем «Теневой Контур» (облавы 12.5.1 и крыша).
 // ========================================================
 
 let currentRaceBet = 25000;
@@ -58,7 +67,7 @@ function renderStreetScreen() {
     let tires = car.tireWear !== undefined ? car.tireWear : 100;
 
     if (hpBadge) {
-        hpBadge.innerHTML = `${carHp} л.с. | <span class="${temp > 105 ? 'color-red' : 'color-green'}">${temp}°C</span> | <span class="${tires < 30 ? 'color-red' : 'color-cyan'}">${tires}% шины</span>`;
+        hpBadge.innerHTML = `${carHp} л.с. | <span class="${temp > 102 ? 'color-red' : 'color-green'}">${temp}°C</span> | <span class="${tires < 30 ? 'color-red' : 'color-cyan'}">${tires}% шины</span>`;
     }
 
     let opts = "";
@@ -142,7 +151,7 @@ function updateTachometerUI() {
 }
 
 // ========================================================
-// ДРАГ-РЕЙСИНГ НА 402 МЕТРА (С КОНТРОЛЕМ ДПС РАДАРА)
+// ДРАГ-РЕЙСИНГ НА 402 МЕТРА (СБАЛАНСИРОВАННЫЙ ИЗНОС)
 // ========================================================
 function launchDragRace() {
     if (!state.player.hasRacingLicense) {
@@ -160,7 +169,7 @@ function launchDragRace() {
 
     let carIdx = getActiveStreetCarIndex();
     if (carIdx === -1) {
-        return showToast("Все автомобили арестованы! Заберите транспорт со штрафстоянке.");
+        return showToast("Все автомобили арестованы! Заберите транспорт со штрафстоянки.");
     }
 
     let car = state.garage[carIdx];
@@ -178,10 +187,10 @@ function launchDragRace() {
 
     // 2. Проверка состояния шин
     let tires = car.tireWear !== undefined ? car.tireWear : 100;
-    if (tires < 20) {
+    if (tires < 15) {
         if (typeof playSound === 'function') playSound('error');
         if (typeof tgHaptic === 'function') tgHaptic('error');
-        return showToast("🚫 Резина стёрта в ноль! Замените комплект на СТО перед заездом.");
+        return showToast("🚫 Корд наружу! Резина стёрта до предела, замените комплект на СТО.");
     }
 
     // Списание ставки
@@ -195,21 +204,40 @@ function launchDragRace() {
         state.player.consecutiveRaces = (state.player.consecutiveRaces || 0) + 1;
     }
 
-    // Износ и нагрев за боевой заезд
-    car.engineTemp = (car.engineTemp || 90) + Math.floor(10 + Math.random() * 8);
-    car.tireWear = Math.max(0, tires - (car.tuning?.dragSlicks ? 12 : 8));
-    if (car.wear) {
-        car.wear.engine = Math.max(10, (car.wear.engine || 85) - 1.5);
-        car.wear.transmission = Math.max(10, (car.wear.transmission || 85) - 2);
+    // Определение качества старта по тахометру
+    let idealStart = currentRpm >= 5500 && currentRpm <= 6800;
+    let cutOff = currentRpm > 7500;
+    let bogged = currentRpm < 4200;
+
+    // --- СБАЛАНСИРОВАННЫЙ РАСЧЕТ ИЗНОСА И ТЕМПЕРАТУРЫ ---
+    // Плавный нагрев мотора: +6..10°C за квотер
+    const heatDelta = Math.floor(6 + Math.random() * 5);
+    car.engineTemp = (car.engineTemp || 90) + heatDelta;
+
+    // Расход шин: базовый 4-6%, драг-слики 7-9% (мягкий компаунд), букс на отсечке +3%
+    let baseTireWear = car.tuning?.dragSlicks ? (7 + Math.floor(Math.random() * 3)) : (4 + Math.floor(Math.random() * 3));
+    if (cutOff) baseTireWear += 3;
+    car.tireWear = Math.max(0, tires - baseTireWear);
+
+    // Износ агрегатов
+    if (!car.wear) {
+        car.wear = { engine: 85, transmission: 85, body: 90 };
     }
+
+    // Мотор страдает сильнее при перегреве (>98°C) и при отсечке
+    let engineWearDelta = 0.5 + Math.random() * 0.4;
+    if (temp > 98) engineWearDelta *= 1.5;
+    if (cutOff) engineWearDelta += 0.8;
+    car.wear.engine = Math.max(10, Number(((car.wear.engine || 85) - engineWearDelta).toFixed(1)));
+
+    // Трансмиссия страдает при резком ланче и особенно при провале оборотов (удар по сцеплению)
+    let transWearDelta = 0.4 + Math.random() * 0.4;
+    if (bogged) transWearDelta += 0.9;
+    car.wear.transmission = Math.max(10, Number(((car.wear.transmission || 85) - transWearDelta).toFixed(1)));
 
     let playerCarEl = document.getElementById('playerRaceCarRunner');
     let rivalCarEl = document.getElementById('rivalRaceCarRunner');
     let statusText = document.getElementById('raceStatusText');
-
-    let idealStart = currentRpm >= 5500 && currentRpm <= 6800;
-    let cutOff = currentRpm > 7500;
-    let bogged = currentRpm < 4200;
 
     let playerPower = car.power || 100;
     
@@ -219,17 +247,22 @@ function launchDragRace() {
 
     if (car.tuning?.dragSlicks) playerPower += 35;
     if (car.tuning?.chip > 0) playerPower *= (1 + car.tuning.chip * 0.08);
+
+    // Влияние износа резины на динамику
+    if (car.tireWear < 35) {
+        playerPower *= 0.88; // Потеря зацепа на лысой резине
+    }
     
     if (idealStart) playerPower += 45;
     else if (cutOff) playerPower -= 35;
     else if (bogged) playerPower -= 25;
 
-    let rivalPower = Math.floor(playerPower * (0.82 + Math.random() * 0.34));
+    let rivalPower = Math.floor(playerPower * (0.84 + Math.random() * 0.32));
 
     if (statusText) {
         if (idealStart) statusText.innerText = "🔥 ИДЕАЛЬНЫЙ ЛАНЧ-СТАРТ! 100% ЗАЦЕП!";
-        else if (cutOff) statusText.innerText = "❌ ОТСЕЧКА И БУКС НА СТАРТЕ!";
-        else if (bogged) statusText.innerText = "⚠️ ПРОВАЛ ОБОРОТОВ ДВИГАТЕЛЯ!";
+        else if (cutOff) statusText.innerText = "❌ ОТСЕЧКА И БУКС! ПЕРЕГРЕВ РЕЗИНЫ!";
+        else if (bogged) statusText.innerText = "⚠️ ПРОВАЛ ОБОРОТОВ! УДАР ПО СЦЕПЛЕНИЮ!";
         else statusText.innerText = "🚦 Заезд 402 метра начался...";
     }
 
@@ -276,7 +309,8 @@ function launchDragRace() {
 
                     saveState();
                     updateHeaderUI();
-                    openVerdictModal("ПОБЕДА НА 402М! 🏁", `Вы обошли соперника на квотере!\nВаше время: ${myTime}с | Соперник: ${rivalTime}с\nВыигрыш: +${winSum.toLocaleString()} ₽ (+20 Респекта)`, true, winSum);
+                    renderStreetScreen();
+                    openVerdictModal("ПОБЕДА НА 402М! 🏁", `Вы обошли соперника на квотере!\nВаше время: ${myTime}с | Соперник: ${rivalTime}с\nВыигрыш: +${winSum.toLocaleString()} ₽ (+20 Респекта)\nШины: -${baseTireWear}% (остаток: ${car.tireWear}%)`, true, winSum);
                 } else {
                     state.player.mood = Math.max(0, (state.player.mood || 80) - 20);
                     state.player.streetCred = Math.max(10, (state.player.streetCred || 100) - 10);
@@ -287,7 +321,8 @@ function launchDragRace() {
 
                     saveState();
                     updateHeaderUI();
-                    openVerdictModal("ПОРАЖЕНИЕ НА 402М 💨", `Соперник оказался быстрее на финише!\nВаше время: ${myTime}с | Соперник: ${rivalTime}с\nСтавка -${currentRaceBet.toLocaleString()} ₽ потеряна.`, false);
+                    renderStreetScreen();
+                    openVerdictModal("ПОРАЖЕНИЕ НА 402М 💨", `Соперник оказался быстрее на финише!\nВаше время: ${myTime}с | Соперник: ${rivalTime}с\nСтавка -${currentRaceBet.toLocaleString()} ₽ потеряна.\nШины: -${baseTireWear}% (остаток: ${car.tireWear}%)`, false);
                 }
 
                 // Проверка внимания ДПС и угрозы облавы
@@ -452,8 +487,27 @@ function participateStreetEvent(eventId) {
         return openVerdictModal("❌ ПРОВАЛ ТЕХКОМИССИИ!", `Инспектор техкома выявил спиленные номера агрегатов на «${car.name}»!\nАвтомобиль задержан по 12.5.1 и отправлен на спецстоянку. Потребуется помощь Решалы!`, false);
     }
 
-    car.engineTemp = (car.engineTemp || 90) + 15;
-    car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - 15);
+    // Дифференцированный износ в зависимости от типа мероприятия:
+    if (ev.type === 'drift') {
+        // На дрифте горит резина и греется мотор
+        car.engineTemp = (car.engineTemp || 90) + 12;
+        car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - 12);
+        if (car.wear) {
+            car.wear.engine = Math.max(10, (car.wear.engine || 85) - 0.8);
+            car.wear.transmission = Math.max(10, (car.wear.transmission || 85) - 1.2);
+        }
+    } else if (ev.type === 'drag') {
+        // На драг-кубке боевой старт
+        car.engineTemp = (car.engineTemp || 90) + 9;
+        car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - 8);
+        if (car.wear) {
+            car.wear.engine = Math.max(10, (car.wear.engine || 85) - 1.0);
+            car.wear.transmission = Math.max(10, (car.wear.transmission || 85) - 1.0);
+        }
+    } else if (ev.type === 'show') {
+        // На стенс-выставке машина стоит на стенде — износ 0%
+        car.engineTemp = Math.max(85, (car.engineTemp || 90) - 5);
+    }
 
     if (ev.rewardCash) state.player.cash = (state.player.cash || 0) + ev.rewardCash;
     if (ev.rewardKarma) state.player.karma = Math.min(100, (state.player.karma || 50) + ev.rewardKarma);
@@ -464,6 +518,8 @@ function participateStreetEvent(eventId) {
     state.player.mood = 100;
     saveState();
     updateHeaderUI();
+    renderStreetScreen();
+
     if (typeof playSound === 'function') playSound('win');
     if (typeof tgHaptic === 'function') tgHaptic('success');
     openVerdictModal("ПОБЕДА В МЕРОПРИЯТИИ! 🏆", `Вы взяли 1-е место в «${ev.name}»! Награда получена.`, true, ev.rewardCash);
