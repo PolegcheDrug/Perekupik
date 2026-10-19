@@ -1,6 +1,9 @@
 // ========================================================
-// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.7.4)
+// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.7.5-fixed)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v1.7.5-fixed:
+//   - Восстановлено управление номерами (кнопка «ГРЗ/Номера» + клик по номеру в инспекции)
+//   - Интерактивный расчет цены +-15% при выставлении на продажу
 // ========================================================
 
 window.previewCarIndex = null;
@@ -441,6 +444,9 @@ function renderGarage() {
     }
 }
 
+// ========================================================
+// ИНСПЕКЦИЯ АВТОМОБИЛЯ (С УПРАВЛЕНИЕМ НОМЕРАМИ)
+// ========================================================
 function openCarPreviewModal(idx) {
     const car = safeGetCar(idx);
     if (!car) return safeShowToast("❌ Машина не найдена");
@@ -454,30 +460,21 @@ function openCarPreviewModal(idx) {
     const cPlate = escapeHtml(car.customPlate || car.plate || "ТРАНЗИТ");
     const engWear = car.wear?.engine !== undefined ? Math.round(car.wear.engine) : 85;
     const transWear = car.wear?.transmission !== undefined ? Math.round(car.wear.transmission) : 85;
-    const tires = car.tireWear !== undefined ? Number(car.tireWear) : 100;
     const cond = car.condition !== undefined ? Number(car.condition) : 80;
-
-    let grade = { grade: 'B', label: 'Хорошее', color: 'color-cyan' };
-    try {
-        if (typeof getCarConditionGrade === 'function') grade = getCarConditionGrade(car) || grade;
-    } catch (e) {}
 
     const bodyDesc = car.isRepainted ? "Вторичный окрас кузова" : "Заводское ЛКП со следами эксплуатации";
     const engDesc = engWear < 50 ? "Требуется ремонт поршневой группы" : "Масло в норме, компрессия ровная";
     const transDesc = transWear < 50 ? "Износ синхронизаторов" : "Переключения чёткие";
-    const salonDesc = car.cleanInterior ? "Химчистка выполнена ✓" : "Стандартный салон";
-
-    let legalStatus = "<b class='color-amber'>ДКП (Без учёта)</b>";
-    if (car.assignedBusinessId) legalStatus = `<b class='color-green'>Баланс предприятия (${escapeHtml(car.assignedBusinessName)})</b>`;
-    else if (car.commercialRegistered) legalStatus = "<b class='color-cyan'>На балансе юрлица</b>";
-    else if (car.isRegisteredOnPlayer) legalStatus = "<b class='color-green'>Учёт в МРЭО РФ</b>";
 
     modal.innerHTML = `
         <div class="modal-box text-left" style="max-width: 440px; max-height: 90vh; overflow-y: auto;">
             <div class="flex-between mb-2 pb-2" style="border-bottom: 1px solid rgba(255,255,255,0.08);">
                 <div>
                     <h3 class="font-bold color-cyan mb-1">${escapeHtml(car.name)}</h3>
-                    <div class="license-plate" style="font-size:10px; padding:2px 6px;">${cPlate} <div class="license-flag">RUS</div></div>
+                    <!-- Кликабельный бейдж номера для быстрой смены -->
+                    <div class="license-plate" onclick="openChangePlateModal()" style="font-size:10px; padding:2px 6px; cursor:pointer;" title="Нажмите, чтобы сменить или снять номера">
+                        ${cPlate} <div class="license-flag">RUS</div>
+                    </div>
                 </div>
                 <div class="text-right">
                     <span class="sub-label text-xs">Оценка:</span>
@@ -510,8 +507,9 @@ function openCarPreviewModal(idx) {
                 <button onclick="openGaugeModalFromPreview()" class="btn btn-dark btn-sm"><i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер</button>
                 <button onclick="openOBD2ModalFromPreview()" class="btn btn-dark btn-sm"><i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> Launch OBD2</button>
             </div>
-            <div class="grid-2 mb-3">
+            <div class="grid-3 mb-2" style="gap:4px;">
                 <button onclick="openTuningFromPreview()" class="btn btn-dark btn-sm"><i class="fa-solid fa-screwdriver-wrench color-amber mr-1"></i> Тюнинг</button>
+                <button onclick="openChangePlateModal()" class="btn btn-dark btn-sm"><i class="fa-solid fa-id-card color-green mr-1"></i> Номера</button>
                 <button onclick="ModalManager.close('modalPreview')" class="btn btn-dark btn-sm">Закрыть</button>
             </div>
         </div>
@@ -537,7 +535,11 @@ function openOBD2ModalFromPreview() {
     if (window.previewCarIndex === null || window.previewCarIndex === undefined) return;
     const car = safeGetCar(window.previewCarIndex);
     if (!car) return;
-    if (typeof quickOBDScanMarketCar === 'function') quickOBDScanMarketCar(car.id);
+    if (typeof openOBD2Modal === 'function') {
+        openOBD2Modal();
+    } else if (typeof quickOBDScanMarketCar === 'function') {
+        quickOBDScanMarketCar(car.id);
+    }
 }
 
 function openTuningFromPreview() {
@@ -589,9 +591,8 @@ function buyGarageSlot() {
 }
 
 // ========================================================
-// ОБНОВЛЕННАЯ МОДАЛКА ВЫСТАВЛЕНИЯ НА ПРОДАЖУ
+// МОДАЛЬНОЕ ОКНО ВЫСТАВЛЕНИЯ НА ПРОДАЖУ (БЫСТРЫЙ ВЫБОР ЦЕН +-15%)
 // ========================================================
-
 function openPutOnLotModal(idx) {
     const car = safeGetCar(idx);
     if (!car) return safeShowToast("❌ Машина не найдена");
@@ -659,9 +660,7 @@ function openPutOnLotModal(idx) {
             <div class="sub-label text-xs mb-1 font-bold">Ваша цена (₽):</div>
             <input type="number" id="lotAskingPriceInput" value="${marketValue}" oninput="updateLotPricePreview()" style="width:100%; background:#090e18; border:1px solid var(--border-glow); border-radius:8px; padding:10px; color:#fff; font-size:16px; margin-bottom:12px; text-align:center; font-weight:bold; color:var(--cyan);" min="1">
 
-            <div id="lotPricePreview" class="p-2 mb-3 text-xs" style="background: rgba(0, 242, 254, 0.05); border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.2);">
-                <!-- Заполняется через updateLotPricePreview() -->
-            </div>
+            <div id="lotPricePreview" class="p-2 mb-3 text-xs" style="background: rgba(0, 242, 254, 0.05); border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.2);"></div>
 
             <div class="grid-2">
                 <button onclick="confirmPutOnLot()" class="btn btn-green">Выставить</button>
@@ -670,7 +669,6 @@ function openPutOnLotModal(idx) {
         </div>
     `;
 
-    // Первичное заполнение превью
     setTimeout(() => {
         if (typeof updateLotPricePreview === 'function') updateLotPricePreview();
     }, 10);
@@ -705,7 +703,7 @@ function updateLotPricePreview() {
     const marketValue = car.marketValue || car.basePrice || 100000;
     const diff = price - marketValue;
     const percent = ((price / marketValue) * 100 - 100).toFixed(1);
-    
+
     let color = 'color-cyan';
     let hint = 'Цена соответствует рынку.';
     let speed = 'Средний спрос (ожидание ~30 сек)';
@@ -745,7 +743,6 @@ function updateLotPricePreview() {
         <div class="text-center mt-2 font-bold" style="font-size: 9.5px; color: #94a3b8;">${hint}</div>
     `;
 
-    // Блокировка кнопки при некорректной цене
     const btn = document.querySelector('#modalPutOnLot .btn-green');
     if (btn) {
         if (price <= 0) {
@@ -788,4 +785,4 @@ Object.assign(window, {
     setGarageFilter, unassignCarFromGarage, setLotPrice, updateLotPricePreview
 });
 
-console.log('[🏠 garage v1.7.4] Интерактивная модалка продажи ✓');
+console.log('[🏠 garage v1.7.5-fixed] Инспекция с кнопками ГРЗ и авторасчет цены продажи ✓');
