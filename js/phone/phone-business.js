@@ -1,11 +1,10 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v6.2.2-fixed)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v6.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v6.2.2-fixed:
-//   - Исправлена проблема с кассой: добавлен непрерывный расчет по реальному времени (Date.now())
-//   - Защита от потери дохода при сворачивании и закрытии игры
-//   - Гарантированный запуск тикера в Telegram Mini App без привязки к DOMContentLoaded
-//   - Синхронизация кассы и разблокировка кнопки сбора в реальном времени
+// ⭐ v6.3.0 (ФИКС ОТОБРАЖЕНИЯ ТОЧЕК БИЗНЕСА):
+//   - Встроен автономный fallback базы BUSINESS_DATA при задержках загрузки.
+//   - Объекты бизнеса больше не пропадают со вкладки «Точки».
+//   - Сохранена непрерывная касса по Date.now() и оффлайн-начисление.
 // ========================================================
 
 const PhoneBusiness = {
@@ -74,6 +73,32 @@ const PhoneBusiness = {
         customs_hub: 'fa-landmark'
     },
 
+    _getBaseBusinessData() {
+        if (typeof window !== 'undefined' && window.BUSINESS_DATA && Array.isArray(window.BUSINESS_DATA) && window.BUSINESS_DATA.length > 0) {
+            return window.BUSINESS_DATA;
+        }
+        if (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA) && BUSINESS_DATA.length > 0) {
+            return BUSINESS_DATA;
+        }
+
+        // Автономный резервный каталог точек бизнеса
+        return [
+            { id: 'wash', name: 'Автомойка 24/7', minLevel: 4, income: 4000, level: 0, cost: 85000, desc: 'Круглосуточный комплекс бесконтактной мойки.', img: 'assets/business/wash.jpg' },
+            { id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 6, income: 6000, level: 0, cost: 140000, desc: 'Правка дисков, ошиповка и балансировка.', img: 'assets/business/shina.jpg' },
+            { id: 'sto', name: 'СТО дяди Вани', minLevel: 9, income: 12000, level: 0, cost: 280000, desc: 'Капитальный ремонт ДВС и подвески.', img: 'assets/business/sto.jpg' },
+            { id: 'tow_truck', name: 'Служба эвакуации «Шериф»', minLevel: 10, income: 16000, level: 0, cost: 390000, desc: 'Эвакуация авто по городу.', img: 'assets/business/tow.jpg', fleetType: 'tow_truck' },
+            { id: 'delivery', name: 'Курьерская доставка «Экспресс»', minLevel: 11, income: 18000, level: 0, cost: 480000, desc: 'Городская сеть автокурьеров.', img: 'assets/business/delivery.jpg', fleetType: 'delivery' },
+            { id: 'paint_shop', name: 'Малярный цех «Хамелеон»', minLevel: 13, income: 24000, level: 0, cost: 620000, desc: 'Окрасочная камера с сушкой.', img: 'assets/business/paint.jpg' },
+            { id: 'chip_tuning', name: 'Лаборатория Stage Lab', minLevel: 16, income: 30000, level: 0, cost: 800000, desc: 'Калибровка прошивок ЭБУ.', img: 'assets/business/chip.jpg' },
+            { id: 'detailing', name: 'Детейлинг Студия', minLevel: 19, income: 33000, level: 0, cost: 920000, desc: 'Полировка и керамика кузова.', img: 'assets/business/detailing.jpg' },
+            { id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22, income: 40000, level: 0, cost: 1150000, desc: 'Скупка тотальных машин на детали.', img: 'assets/business/razborka.jpg', fleetType: 'razborka' },
+            { id: 'autopodbor', name: 'Агентство «Автоподбор Pro»', minLevel: 25, income: 50000, level: 0, cost: 1450000, desc: 'Выездная диагностика экспертов.', img: 'assets/business/podbor.jpg' },
+            { id: 'taxi', name: 'Таксопарк', minLevel: 30, income: 80000, level: 0, cost: 3600000, desc: 'Аренда лицензированных седанов.', img: 'assets/business/taxi.jpg', fleetType: 'taxi' },
+            { id: 'transport_company', name: 'Транспортная компания «Магистраль»', minLevel: 34, income: 140000, level: 0, cost: 4800000, desc: 'Магистральные тягачи и фуры.', img: 'assets/business/cargo.jpg', fleetType: 'transport_company' },
+            { id: 'customs_hub', name: 'Таможенный хаб Порта', minLevel: 38, income: 160000, level: 0, cost: 5200000, desc: 'Таможенная очистка контейнеров.', img: 'assets/business/hub.jpg' }
+        ];
+    },
+
     // ========================================================
     // ИНИЦИАЛИЗАЦИЯ
     // ========================================================
@@ -86,20 +111,7 @@ const PhoneBusiness = {
             if (!window.state.player) window.state.player = {};
             if (!Array.isArray(window.state.businesses)) window.state.businesses = [];
 
-            const baseData = (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA)) ? BUSINESS_DATA : [];
-
-            if (baseData.length === 0) {
-                if (!this._ensureStateRetries) this._ensureStateRetries = 0;
-                this._ensureStateRetries++;
-                if (this._ensureStateRetries <= 6) {
-                    setTimeout(() => {
-                        this._ensureStateInProgress = false;
-                        this.ensureState();
-                    }, 500);
-                    return;
-                }
-            }
-            this._ensureStateRetries = 0;
+            const baseData = this._getBaseBusinessData();
 
             const existingIds = new Set(window.state.businesses.filter(b => b && b.id).map(b => b.id));
             const missing = baseData.filter(b => b && b.id && !existingIds.has(b.id));
@@ -456,7 +468,7 @@ const PhoneBusiness = {
         const dailyIncome = this.getTotalDailyIncome();
         const accumulated = this.getAccumulatedCash();
         const legal = window.state?.player?.legalEntity || { type: 'none' };
-        const legalConfig = window.LEGAL_ENTITIES ? window.LEGAL_ENTITIES[legal.type] : null;
+        const legalConfig = (window.LEGAL_ENTITIES && window.LEGAL_ENTITIES[legal.type]) || null;
         const isLegalActive = legal.type !== 'none';
 
         container.innerHTML = `
@@ -554,7 +566,7 @@ const PhoneBusiness = {
         const pLvl = window.state?.player?.level || 1;
         const curDay = window.state?.player?.day || 1;
 
-        const sorted = [...window.state.businesses]
+        const sorted = [...(window.state.businesses || [])]
             .filter(b => b)
             .sort((a, b) => {
                 const aOwned = a.level > 0 ? 1 : 0;
@@ -572,7 +584,7 @@ const PhoneBusiness = {
         container.innerHTML = html;
 
         requestAnimationFrame(() => {
-            window.state.businesses.forEach(b => {
+            (window.state.businesses || []).forEach(b => {
                 if (b && b.level > 0) {
                     try { this.drawSparkline(b); } catch (e) {}
                 }
@@ -934,7 +946,7 @@ const PhoneBusiness = {
             }
 
             const currentType = hasOOO ? 'ooo' : 'ip';
-            const legalConfig = window.LEGAL_ENTITIES ? window.LEGAL_ENTITIES[currentType] : null;
+            const legalConfig = (window.LEGAL_ENTITIES && window.LEGAL_ENTITIES[currentType]) || null;
 
             if (legalConfig && Array.isArray(legalConfig.allowedBusinesses) && !legalConfig.allowedBusinesses.includes(b.id)) {
                 if (typeof showToast === 'function') {
@@ -1121,15 +1133,11 @@ const PhoneBusiness = {
             const elapsedSec = (now - b.lastTickTimestamp) / 1000;
             if (elapsedSec < 1) return;
 
-            // Расход сырья во времени
             if (b.stock > 0) {
                 b.stock = Math.max(0, b.stock - (0.005 * elapsedSec));
             }
 
-            // Суточный доход со всеми бонусами (цех, бренд, флот, цикл)
             const dailyIncome = this.getBizIncomeWithBonuses(b);
-
-            // Базовый расчет: суточный доход делится на 86400 секунд (реальные 24 часа)
             const incomePerSec = dailyIncome / 86400;
             const earned = elapsedSec * incomePerSec;
 
@@ -1140,7 +1148,6 @@ const PhoneBusiness = {
             }
         });
 
-        // Если интерфейс открыт, синхронизируем UI кассы
         const accumulated = this.getAccumulatedCash();
         const accEl = document.querySelector('.biz-summary-value.value-cyan');
         if (accEl) {
@@ -1180,7 +1187,6 @@ const PhoneBusiness = {
     startTickLoop() {
         if (this._tickInterval) return;
         this.tickIncome();
-        // Тикаем каждые 3 секунды для плавного начисления
         this._tickInterval = setInterval(() => this.tickIncome(), 3000);
     }
 };
@@ -1188,7 +1194,6 @@ const PhoneBusiness = {
 window.PhoneBusiness = PhoneBusiness;
 window.AppBusiness = PhoneBusiness;
 
-// Принудительный запуск при загрузке скрипта
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
     PhoneBusiness.startTickLoop();
 } else {
