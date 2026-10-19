@@ -1,8 +1,9 @@
 // ========================================================
-// data_activities_quests.js — КВЕСТЫ, НАГРАДЫ, ЦЕЛИ (v1.0.0)
+// data_activities_quests.js — КВЕСТЫ, НАГРАДЫ, ЦЕЛИ (v2.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // Изолированный модуль: награды, квесты, цели, покупатели,
-// контракты ПодКлюч, новости рынка, события-претензии.
+// контракты ПодКлюч, новости рынка, события-претензии,
+// B2B тендеры для бизнеса, кризис-менеджмент и недельные испытания.
 // ========================================================
 
 (function() {
@@ -23,17 +24,133 @@
         ];
 
         // --------------------------------------------------------
-        // 2. ЕЖЕДНЕВНЫЕ КВЕСТЫ
+        // 2. ЕЖЕДНЕВНЫЕ КВЕСТЫ (РАСШИРЕННЫЙ ПУЛ)
         // --------------------------------------------------------
         const DAILY_QUESTS_POOL = [
-            { id: "q_inspect",  text: "Осмотреть толщиномером 2 авто на рынке",     target: 2, actionType: "gauge_check",   reward: 40000, rewardXp: 40 },
-            { id: "q_race",     text: "Выиграть заезд 402м в Стрите",               target: 1, actionType: "win_drag",      reward: 60000, rewardXp: 45 },
-            { id: "q_biz",      text: "Собрать кассу с предприятий",                target: 1, actionType: "collect_biz",   reward: 30000, rewardXp: 30 },
-            { id: "q_buy",      text: "Выкупить 1 автомобиль на авторынке",         target: 1, actionType: "buy_car",       reward: 55000, rewardXp: 50 },
-            { id: "q_sell",     text: "Успешно продать 1 авто клиенту у капота",   target: 1, actionType: "sell_car",      reward: 75000, rewardXp: 55 },
-            { id: "q_obd",      text: "Просканировать ЭБУ автомобиля через OBD2",  target: 1, actionType: "obd_scan",      reward: 35000, rewardXp: 35 },
-            { id: "q_presale",  text: "Сделать предпродажный детейлинг авто",       target: 1, actionType: "presale_mod",   reward: 45000, rewardXp: 40 },
-            { id: "q_drift",    text: "Завершить квалификационный заезд в Дрифте", target: 1, actionType: "drift_run",     reward: 50000, rewardXp: 45 }
+            { id: "q_inspect",       text: "Осмотреть толщиномером 2 авто на рынке",      target: 2, actionType: "gauge_check",     reward: 45000,  rewardXp: 40 },
+            { id: "q_race",          text: "Выиграть заезд 402м в Стрите",                target: 1, actionType: "win_drag",        reward: 65000,  rewardXp: 45 },
+            { id: "q_biz",           text: "Собрать кассу с предприятий сети",           target: 1, actionType: "collect_biz",     reward: 35000,  rewardXp: 30 },
+            { id: "q_buy",           text: "Выкупить 1 автомобиль на авторынке",          target: 1, actionType: "buy_car",         reward: 55000,  rewardXp: 50 },
+            { id: "q_sell",          text: "Успешно продать 1 авто клиенту у капота",    target: 1, actionType: "sell_car",        reward: 85000,  rewardXp: 60 },
+            { id: "q_obd",           text: "Просканировать ЭБУ автомобиля через OBD2",   target: 1, actionType: "obd_scan",        reward: 40000,  rewardXp: 35 },
+            { id: "q_presale",       text: "Сделать предпродажный детейлинг или полировку", target: 1, actionType: "presale_mod", reward: 50000, rewardXp: 45 },
+            { id: "q_drift",         text: "Завершить квалификационный заезд в Дрифте",  target: 1, actionType: "drift_run",       reward: 50000,  rewardXp: 45 },
+            { id: "q_fleet_service", text: "Провести ТО коммерческого авто на линии",     target: 1, actionType: "fleet_service",   reward: 60000,  rewardXp: 40 },
+            { id: "q_synergy",       text: "Активировать синергию марок в автопарке",     target: 1, actionType: "fleet_synergy",   reward: 90000,  rewardXp: 65 },
+            { id: "q_stock_supply",  text: "Пополнить сырьевой склад предприятий",        target: 1, actionType: "supply_stock",    reward: 45000,  rewardXp: 35 },
+            { id: "q_hot_deal",      text: "Перехватить срочный выкуп (Hot Deal)",        target: 1, actionType: "intercept_deal",  reward: 70000,  rewardXp: 55 },
+            { id: "q_mreo_reg",      text: "Оформить автомобиль на компанию в МРЭО",      target: 1, actionType: "mreo_register",   reward: 75000,  rewardXp: 50 }
+        ];
+
+        // --------------------------------------------------------
+        // 2.1. НЕДЕЛЬНЫЕ ИСПЫТАНИЯ (WEEKLY CHALLENGES)
+        // --------------------------------------------------------
+        const WEEKLY_CHALLENGES_POOL = [
+            {
+                id: "w_barn_restorer",
+                title: "Перекуп-Реставратор",
+                desc: "Найти раритет в заброшенном сарае, устранить дефекты мотора и кузова и продать с чистой прибылью от 300,000 ₽.",
+                target: 1,
+                actionType: "barn_restore_sale",
+                rewardCash: 350000,
+                rewardStars: 15,
+                rewardXp: 250
+            },
+            {
+                id: "w_fleet_synergy_boss",
+                title: "Сетевой Автомагнат",
+                desc: "Сформировать автопарк из 3+ автомобилей одного концерна (VAG, LADA, Корея или ГАЗ) и собрать полную кассу.",
+                target: 3,
+                actionType: "fleet_mono_brand",
+                rewardCash: 500000,
+                rewardStars: 20,
+                rewardXp: 300
+            },
+            {
+                id: "w_container_profit",
+                title: "Морской Контрабандист",
+                desc: "Выиграть морской контейнер в Порту и реализовать найденный автомобиль без нареканий покупателей.",
+                target: 1,
+                actionType: "port_container_deal",
+                rewardCash: 450000,
+                rewardStars: 18,
+                rewardXp: 280
+            }
+        ];
+
+        // --------------------------------------------------------
+        // 2.2. B2B КОРПОРАТИВНЫЕ ТЕНДЕРЫ ДЛЯ БИЗНЕСА
+        // --------------------------------------------------------
+        const BUSINESS_TENDERS_CATALOG = [
+            {
+                id: "tnd_airport_taxi",
+                targetBiz: "taxi",
+                title: "Госконтракт: Трансфер Аэропорта Шереметьево",
+                desc: "Требуется поставить на линию 3 комфортных седана не старше 2016 года с коммерческим учетом МРЭО.",
+                requirements: { minFleetCount: 3, requiredClasses: ["comfort", "premium"], requireMreo: true },
+                bonusDurationDays: 5,
+                incomeMultiplier: 1.45,
+                advanceRewardCash: 250000,
+                rewardStars: 10
+            },
+            {
+                id: "tnd_retail_delivery",
+                targetBiz: "delivery",
+                title: "Тендер ритейла: Сеть экспресс-гипермаркетов",
+                desc: "Обеспечить логистику 4 легкими фургонами или каблучками в идеальном техническом состоянии (состояние от 75%).",
+                requirements: { minFleetCount: 4, minCondition: 75 },
+                bonusDurationDays: 4,
+                incomeMultiplier: 1.50,
+                advanceRewardCash: 180000,
+                rewardStars: 8
+            },
+            {
+                id: "tnd_cargo_highway",
+                targetBiz: "transport_company",
+                title: "Магистральный подряд: Межгород Москва — Казань",
+                desc: "Контракт на перевозку крупногабаритных грузов. Требуются магистральные тягачи или фургоны грузоподъёмностью от 3.5 тонн.",
+                requirements: { minFleetCount: 2, requiredClasses: ["truck"], requireMreo: true },
+                bonusDurationDays: 7,
+                incomeMultiplier: 1.65,
+                advanceRewardCash: 600000,
+                rewardStars: 25
+            }
+        ];
+
+        // --------------------------------------------------------
+        // 2.3. СЛУЧАЙНЫЕ СОБЫТИЯ-КРИЗИСЫ ПРИ СБОРЕ КАССЫ БИЗНЕСА
+        // --------------------------------------------------------
+        const BUSINESS_CRISIS_EVENTS = [
+            {
+                id: "cr_tax_audit",
+                applicableBusinesses: ["taxi", "transport_company", "sto"],
+                title: "Внеплановая налоговая ревизия",
+                desc: "ФНС запросила путевые листы и кассовые чеки по коммерческому транспорту.",
+                options: [
+                    { text: "Предоставить отчет и уплатить аудит-сбор (-45,000 ₽)", costCash: 45000, penaltyMood: 5 },
+                    { text: "Подключить Решалу через связи (-1 🤝)", costConn: 1, bonusKarma: 2 }
+                ]
+            },
+            {
+                id: "cr_blown_gasket",
+                applicableBusinesses: ["taxi", "delivery"],
+                title: "Пробита прокладка ГБЦ на рейсе",
+                desc: "Автомобиль на линии закипел в пробке на МКАД. Водитель ждёт эвакуатор.",
+                options: [
+                    { text: "Оплатить срочный выезд эвакуатора (-25,000 ₽)", costCash: 25000 },
+                    { text: "Эвакуировать собственной службой эвакуации (Бесплатно)", reqBiz: "tow_truck" }
+                ]
+            },
+            {
+                id: "cr_eco_check",
+                applicableBusinesses: ["wash", "detailing"],
+                title: "Проверка очистных сооружений мойки",
+                desc: "Экологический надзор проверяет септики и сертификаты автошампуня.",
+                options: [
+                    { text: "Оплатить предписание (-30,000 ₽)", costCash: 30000 },
+                    { text: "Показать сертифицированную бочку из Маркета", reqItem: "chem_pack" }
+                ]
+            }
         ];
 
         // --------------------------------------------------------
@@ -338,6 +455,9 @@
         // --------------------------------------------------------
         window.DAILY_REWARDS_CONFIG = DAILY_REWARDS_CONFIG;
         window.DAILY_QUESTS_POOL = DAILY_QUESTS_POOL;
+        window.WEEKLY_CHALLENGES_POOL = WEEKLY_CHALLENGES_POOL;
+        window.BUSINESS_TENDERS_CATALOG = BUSINESS_TENDERS_CATALOG;
+        window.BUSINESS_CRISIS_EVENTS = BUSINESS_CRISIS_EVENTS;
         window.NOTEPAD_CAREER_GOALS = NOTEPAD_CAREER_GOALS;
         window.MARKET_NEWS_EVENTS = MARKET_NEWS_EVENTS;
         window.BUYERS_CATALOG = BUYERS_CATALOG;
@@ -345,7 +465,7 @@
         window.SYNDICATE_CONTRACT_TEMPLATES = SYNDICATE_CONTRACT_TEMPLATES;
         window.BUYER_BACKFIRE_EVENTS = BUYER_BACKFIRE_EVENTS;
 
-        console.log('[📋 data_activities_quests] Загружено:', DAILY_QUESTS_POOL.length, 'квестов,', NOTEPAD_CAREER_GOALS.length, 'целей,', PODKLYUCH_CONTRACT_TEMPLATES.length, 'контрактов ✓');
+        console.log('[📋 data_activities_quests v2.0.0] Загружено: квесты дня, недельные испытания, B2B тендеры и кризисы бизнеса ✓');
 
     } catch (e) {
         console.error('[📋 data_activities_quests] ОШИБКА ЗАГРУЗКИ:', e);
