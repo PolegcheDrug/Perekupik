@@ -1,14 +1,14 @@
 // ========================================================
-// js/app/app-core.js — ЯДРО: STATE, SAVE, MIGRATE (v4.3.1)
+// js/app/app-core.js — ЯДРО: STATE, SAVE, MIGRATE (v4.3.2-stabilized)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v4.3.1 (ФИКС ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ):
-//   - Все глобальные переменные (tgUserId, tgUserData, isPcDevSession)
-//     теперь синхронизируются с window.* для совместимости с app-loader.js
-//   - window.isPcDevMode() читает из window.isPcDevSession
-// ⭐ Часть 1 из 3 (разгрузка app.js)
+// ⭐ v4.3.2-stabilized (СТАБИЛИЗАЦИЯ ЯДРА & ЖИЗНЕННЫЙ ЦИКЛ):
+//   - Защита от гонки сохранений: внедрен интеллектуальный debounce сохранения
+//   - Обработка visibilitychange / pagehide для Telegram WebApp (сохранение при уходе и оффлайн-расчет при возврате)
+//   - Защита от переполнения квоты localStorage (QuotaExceededError) с автоочисткой логов
+//   - Безопасная синхронизация window.state
 // ========================================================
 
-window.CURRENT_GAME_VERSION = "v4.3.1";
+window.CURRENT_GAME_VERSION = "v4.3.2";
 
 const SAVE_VERSION = 14;
 let SAVE_KEY_PREFIX = "perekup_v14_";
@@ -75,6 +75,7 @@ const DEFAULT_STATE = {
         stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0, scandalsAvoided: 0, bestSingleMargin: 0 },
         hunger: 80, mood: 85, loanDebt: 0, taxDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
         lastRealDayTimestamp: Date.now(),
+        lastActiveTimestamp: Date.now(),
         diet: 'shaurma',
         housingId: 'trailer',
         housingType: 'rent',
@@ -326,6 +327,10 @@ function sanitizeState() {
         window.state.player.dynamicStarRateHistory = [];
     }
 
+    if (!window.state.player.lastActiveTimestamp) {
+        window.state.player.lastActiveTimestamp = Date.now();
+    }
+
     if (!window.state.player.paidParking || typeof window.state.player.paidParking !== 'object') {
         window.state.player.paidParking = { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 };
     } else {
@@ -445,7 +450,6 @@ function applyLoadedState(parsed) {
     if (window.PlatesManager && typeof window.PlatesManager.syncLegacyOwnedPlates === 'function') {
         try {
             window.PlatesManager.syncLegacyOwnedPlates();
-            console.log('[App] PlatesManager.syncLegacyOwnedPlates выполнен');
         } catch (e) {
             console.warn('[App] Ошибка PlatesManager.syncLegacyOwnedPlates:', e);
         }
@@ -480,9 +484,10 @@ function loadFromLocalStorage() {
 }
 
 // ========================================================
-// 5. СОХРАНЕНИЕ STATE
+// 5. БЕЗОПАСНОЕ СОХРАНЕНИЕ STATE С ДЕБАУНСОМ
 // ========================================================
 let cloudSaveDebounceTimer = null;
+let localSaveDebounceTimer = null;
 let isCloudStorageAvailable = false;
 const CHUNK_SIZE = 2048;
 
@@ -514,31 +519,55 @@ function saveToTelegramCloud(jsonString, callback) {
     });
 }
 
-function saveState() {
-    if (!window.tgUserId) {
-        console.warn('[Save] saveState заблокирован: нет UID');
-        return;
-    }
+/**
+ * Очистка тяжелых логов при переполнении квоты localStorage
+ */
+function _pruneStateMemory() {
+    try {
+        if (window.state?.player?.bankHistory && window.state.player.bankHistory.length > 15) {
+            window.state.player.bankHistory = window.state.player.bankHistory.slice(0, 15);
+        }
+        if (Array.isArray(window.state?.mEventsFeed) && window.state.mEventsFeed.length > 10) {
+            window.state.mEventsFeed = window.state.mEventsFeed.slice(-10);
+        }
+        if (Array.isArray(window.state?.businesses)) {
+            window.state.businesses.forEach(b => {
+                if (b && Array.isArray(b.incomeHistory) && b.incomeHistory.length > 7) {
+                    b.incomeHistory = b.incomeHistory.slice(-7);
+                }
+            });
+        }
+    } catch(e) {}
+}
 
-    if (String(window.tgUserId).startsWith('guest_') || String(window.tgUserId).startsWith('p_')) {
-        console.warn('[Save] saveState заблокирован: некорректный UID:', window.tgUserId);
-        return;
-    }
-
-    if (window.__IS_RESETTING__) {
-        console.log('[Save] Игнорирую saveState — идёт сброс прогресса.');
-        return;
-    }
+/**
+ * Непосредственная запись в хранилище (вызывается синхронно или через дебаунс)
+ */
+function _performSaveNow() {
+    if (!window.tgUserId) return;
+    if (String(window.tgUserId).startsWith('guest_') || String(window.tgUserId).startsWith('p_')) return;
+    if (window.__IS_RESETTING__) return;
 
     try {
         window.state.__saveVersion = SAVE_VERSION;
+        if (window.state.player) {
+            window.state.player.lastActiveTimestamp = Date.now();
+        }
 
-        const fullJson = JSON.stringify(window.state);
-        localStorage.setItem("perekup_save_" + window.tgUserId, fullJson);
-        localStorage.setItem(SAVE_KEY_PREFIX + window.tgUserId, fullJson);
+        let fullJson = JSON.stringify(window.state);
+
+        try {
+            localStorage.setItem("perekup_save_" + window.tgUserId, fullJson);
+            localStorage.setItem(SAVE_KEY_PREFIX + window.tgUserId, fullJson);
+        } catch (storageErr) {
+            console.warn("[Save] Переполнение localStorage, выполняем очистку кэша:", storageErr);
+            _pruneStateMemory();
+            fullJson = JSON.stringify(window.state);
+            localStorage.setItem("perekup_save_" + window.tgUserId, fullJson);
+            localStorage.setItem(SAVE_KEY_PREFIX + window.tgUserId, fullJson);
+        }
 
         if (window.isPcDevMode && window.isPcDevMode()) {
-            console.log('[Save] DEV-режим: сохранено локально');
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
             return;
         }
@@ -558,7 +587,7 @@ function saveState() {
                         statusEl.className = success ? "tag-badge bg-tag-green" : "tag-badge bg-tag-red";
                     }
                 });
-            }, 1800);
+            }, 2000);
         }
     } catch(e) {
         console.warn("[Save] Ошибка сохранения:", e);
@@ -569,6 +598,65 @@ function saveState() {
     if (window.EventBus) {
         window.EventBus.emit('state:saved', { source: 'saveState' });
     }
+}
+
+/**
+ * Единый метод сохранения с дебаунсом (исключает лаги интерфейса при десятках вызовов)
+ */
+function saveState(immediate = false) {
+    if (immediate) {
+        if (localSaveDebounceTimer) {
+            clearTimeout(localSaveDebounceTimer);
+            localSaveDebounceTimer = null;
+        }
+        _performSaveNow();
+        return;
+    }
+
+    if (localSaveDebounceTimer) clearTimeout(localSaveDebounceTimer);
+    localSaveDebounceTimer = setTimeout(() => {
+        localSaveDebounceTimer = null;
+        _performSaveNow();
+    }, 150);
+}
+
+// ========================================================
+// ОБРАБОТЧИК ЖИЗНЕННОГО ЦИКЛА ВКЛАДКИ (TELEGRAM WEBAPP)
+// ========================================================
+if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            // Приложение свернули: принудительно моментально сохраняем состояние
+            saveState(true);
+        } else if (document.visibilityState === 'visible') {
+            // Приложение развернули: рассчитываем оффлайн-прогресс и проверяем суточный цикл
+            try {
+                if (window.state?.player) {
+                    const now = Date.now();
+                    const lastActive = window.state.player.lastActiveTimestamp || now;
+                    const awaySeconds = Math.max(0, Math.floor((now - lastActive) / 1000));
+
+                    // Если отсутствовали более 15 секунд — даем тики бизнесу и проверяем день
+                    if (awaySeconds >= 15) {
+                        if (typeof checkRealTimeDayChange === 'function') {
+                            checkRealTimeDayChange();
+                        }
+                        if (window.PhoneBusiness && typeof window.PhoneBusiness.tickIncome === 'function') {
+                            window.PhoneBusiness.tickIncome();
+                        }
+                    }
+                    window.state.player.lastActiveTimestamp = now;
+                }
+                if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            } catch (e) {
+                console.warn('[Lifecycle] Ошибка при возврате в приложение:', e);
+            }
+        }
+    });
+
+    window.addEventListener('pagehide', () => {
+        saveState(true);
+    });
 }
 
 // ========================================================
@@ -715,4 +803,4 @@ window.ensureCarIdentity = ensureCarIdentity;
 window.isOwnerUser = _isOwner;
 window.SAVE_VERSION = SAVE_VERSION;
 
-console.log('[💠 app-core.js v4.3.1] State + Save + Migrate + window.tgUserId синхронизирован ✓');
+console.log('[💠 app-core.js v4.3.2-stabilized] Защита сохранений с дебаунсом и lifecycle-менеджером активирована ✓');
