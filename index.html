@@ -11,32 +11,32 @@
 
 <script>
     window.AUTH_SERVER_URL = window.AUTH_SERVER_URL || '';
-    window.__LOADER_VERSION__ = '4.3.4';
+    window.__LOADER_VERSION__ = '4.3.5';
     console.log('[Loader] v' + window.__LOADER_VERSION__ + ' стартует. AUTH_SERVER_URL =', window.AUTH_SERVER_URL || '(не задан, fallback на Telegram ID)');
 </script>
 
 <!-- ═══════════ СТИЛИ ═══════════ -->
-<link rel="stylesheet" href="style.css?v=429">
-<link rel="stylesheet" href="css/base.css?v=429">
-<link rel="stylesheet" href="css/hud.css?v=429">
-<link rel="stylesheet" href="css/market.css?v=429">
-<link rel="stylesheet" href="css/phone.css?v=429">
-<link rel="stylesheet" href="css/m-hub.css?v=429">
-<link rel="stylesheet" href="css/radio.css?v=429">
-<link rel="stylesheet" href="css/modals.css?v=429">
-<link rel="stylesheet" href="css/p2p-deals.css?v=429">
-<link rel="stylesheet" href="css/nav.css?v=429">
+<link rel="stylesheet" href="style.css?v=430">
+<link rel="stylesheet" href="css/base.css?v=430">
+<link rel="stylesheet" href="css/hud.css?v=430">
+<link rel="stylesheet" href="css/market.css?v=430">
+<link rel="stylesheet" href="css/phone.css?v=430">
+<link rel="stylesheet" href="css/m-hub.css?v=430">
+<link rel="stylesheet" href="css/radio.css?v=430">
+<link rel="stylesheet" href="css/modals.css?v=430">
+<link rel="stylesheet" href="css/p2p-deals.css?v=430">
+<link rel="stylesheet" href="css/nav.css?v=430">
 
 <!-- ═══════════ БИБЛИОТЕКИ ═══════════ -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <!-- ═══════════ FIREBASE МОДУЛИ ═══════════ -->
-<script type="module" src="js/firebase/firebase-core.js?v=429"></script>
-<script type="module" src="js/firebase/firebase-market.js?v=429"></script>
-<script type="module" src="js/firebase/firebase-friendships.js?v=429"></script>
-<script type="module" src="js/firebase/firebase-notifications.js?v=429"></script>
-<script type="module" src="js/firebase/firebase-p2p.js?v=429"></script>
+<script type="module" src="js/firebase/firebase-core.js?v=430"></script>
+<script type="module" src="js/firebase/firebase-market.js?v=430"></script>
+<script type="module" src="js/firebase/firebase-friendships.js?v=430"></script>
+<script type="module" src="js/firebase/firebase-notifications.js?v=430"></script>
+<script type="module" src="js/firebase/firebase-p2p.js?v=430"></script>
 </head>
 <body>
 
@@ -93,7 +93,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Если вы играете через Telegram — просто откройте бота заново.</div>
-      <div class="pc-auth-version">v4.3.4 // BUILD 429</div>
+      <div class="pc-auth-version">v4.3.5 // BUILD 430</div>
     </div>
   </div>
 </div>
@@ -118,7 +118,7 @@
     </button>
 
     <div class="pc-auth-footer">
-      <div class="pc-auth-version">v4.3.4 // BUILD 429</div>
+      <div class="pc-auth-version">v4.3.5 // BUILD 430</div>
     </div>
   </div>
 </div>
@@ -150,7 +150,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Инвайт-код выдаёт владелец игры в личном сообщении.</div>
-      <div class="pc-auth-version">v4.3.4 // BUILD 429</div>
+      <div class="pc-auth-version">v4.3.5 // BUILD 430</div>
     </div>
   </div>
 </div>
@@ -705,11 +705,11 @@
 <div id="modalPatchNotes" class="modal-overlay">
   <div class="modal-box" style="max-width: 420px;">
     <div class="flex-between mb-2">
-      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.3.4</div>
+      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.3.5</div>
       <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
     </div>
     <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
-    <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #429</div>
+    <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #430</div>
     <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
       <div class="patch-item"><b>🏢 АВТОБИЗНЕСЫ:</b> модульное разделение бизнес-сети и автопарков.</div>
       <div class="patch-item"><b>🚕 КОММЕРЧЕСКИЙ АВТОПАРК:</b> покупка машин на компанию и привязка к автопаркам.</div>
@@ -1156,7 +1156,7 @@
 
     const PC_DEV_PASSWORD = "perekup2026";
     const PC_AUTH_STORAGE_KEY = "perekup_pc_auth_ok";
-    const CACHE_VER = '429';
+    const CACHE_VER = '430';
     const FIREBASE_READY_TIMEOUT_MS = 8000;
 
     let isPcAuthenticated = false;
