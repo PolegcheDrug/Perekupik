@@ -1,16 +1,14 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ДЕТЕЙЛИНГ И СКРЫТЫЕ СХЕМЫ (v3.5.1-fixed)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ДЕТЕЙЛИНГ И СКРЫТЫЕ СХЕМЫ (v3.6.0-hardcore)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.5.1:
-//   - ФИКС ОБЛОЖКИ: getOrAssignLotCarImage строго сохраняет оригинальное фото
-//     автомобиля из гаража без случайной подмены ракурса на площадке.
-//   - БОНУСЫ ЛОСКА: полировка фар, чернение шин, сухой туман и полировка кузова
-//     повышают привлекательность лота и стартовые предложения покупателей.
-//   - ПРОВЕРКА ШПАКЛЕВКИ: подборщики и дотошные клиенты находят покрас из баллона.
-//   - РИСК СКРУТКИ ПРОБЕГА: покупатели со сканером могут вскрыть смотку по блокам
-//     ABS/АКПП, обрушив репутацию и карму перекупа.
-//   - Полная интеграция таймеров Date.now(), VIP-клиентов и M-диалогов.
+// ⭐ v3.6.0 (ХАРДКОР-БАЛАНС ЭКОНОМИКИ + ЗАЩИТА ОТ ОВЕРПРАЙСА):
+//   - ФИКС ЭКСПЛОЙТА МАРЖИ: покупатели больше НЕ пляшут от дикой цены игрока!
+//     База торга рассчитывается СТРОГО от реальной рыночной оценки (marketValue).
+//   - ЗАЩИТА ОТ ЗАВЫШЕНИЯ: если цена завышена на 30%+, клиент сбивает её до реального
+//     рынка или отказывается от сделки, прекращая мгновенное обогащение.
+//   - СОХРАНЕНО: обложка авто строго из гаража, бонусы детейлинга, риски скрутки,
+//     таймеры Date.now(), VIP-покупатели и чаты M+.
 // ========================================================
 
 let salesLotTimerInterval = null;
@@ -86,7 +84,7 @@ const VIP_BUYER_ARCHETYPES = [
         patience: 6,
         riskTolerance: "low",
         isVIP: true,
-        bonusMultiplier: 1.25,
+        bonusMultiplier: 1.15,
         moodPhrase: "«Добрый день. Услышал о вашей репутации на рынке. Ищу автомобиль в коллекцию — состояние и история важнее цены.»",
         inspectionSkill: "high"
     },
@@ -97,8 +95,8 @@ const VIP_BUYER_ARCHETYPES = [
         patience: 5,
         riskTolerance: "high",
         isVIP: true,
-        bonusMultiplier: 1.40,
-        moodPhrase: "«Здравствуйте. Мне рекомендовали вас как честного продавца. Цена не главное — забираю сегодня.»",
+        bonusMultiplier: 1.25,
+        moodPhrase: "«Здравствуйте. Мне рекомендовали вас как честного продавца. Если машина в идеале — забираю сегодня.»",
         inspectionSkill: "mid"
     },
     {
@@ -108,8 +106,8 @@ const VIP_BUYER_ARCHETYPES = [
         patience: 4,
         riskTolerance: "mid",
         isVIP: true,
-        bonusMultiplier: 1.30,
-        moodPhrase: "«Привет! У меня канал про тачки, хочу снять обзор на ваш лот. Готов заплатить выше рынка за эксклюзив!»",
+        bonusMultiplier: 1.18,
+        moodPhrase: "«Привет! У меня канал про тачки, хочу снять обзор на ваш лот. Готов немного переплатить за живой экземпляр!»",
         inspectionSkill: "low"
     },
     {
@@ -119,8 +117,8 @@ const VIP_BUYER_ARCHETYPES = [
         patience: 5,
         riskTolerance: "low",
         isVIP: true,
-        bonusMultiplier: 1.20,
-        moodPhrase: "«Добрый день. Представляю премиум-салон. Готов выкупить лот по хорошей цене без лишних проверок.»",
+        bonusMultiplier: 1.12,
+        moodPhrase: "«Добрый день. Представляю салон. Готов выкупить лот по адекватной рыночной цене без лишних проверок.»",
         inspectionSkill: "mid"
     }
 ];
@@ -138,7 +136,6 @@ function getOrAssignLotCarImage(car, lot) {
         };
     }
 
-    // Приоритет строго за текущей закреплённой обложкой авто из гаража
     let chosenImg = car.img || car.baseImg || (Array.isArray(car.images) && car.images.length > 0 ? car.images[0] : null) || defaultPlaceholder;
 
     car.baseImg = car.baseImg || chosenImg;
@@ -340,18 +337,28 @@ function renderSalesLot() {
         let margin = askingPrice - purchaseCost;
         let marginClass = margin >= 0 ? "color-green" : "color-red";
 
-        const marketVal = car.marketValue || car.basePrice || 100000;
-        const priceRatio = askingPrice / marketVal;
+        // Честная рыночная оценка авто
+        const marketVal = car.marketValue || car.baseMarketValue || car.basePrice || 100000;
+        const priceRatio = askingPrice / Math.max(1000, marketVal);
         let defaultTimer = 45;
+
+        // Если оверпрайс — время ожидания вырастает многократно
+        if (priceRatio > 1.35) {
+            defaultTimer = 160; // Сильный оверпрайс (+35%+) ищет покупателя очень долго
+        } else if (priceRatio > 1.15) {
+            defaultTimer = 90;
+        } else if (priceRatio > 1.05) {
+            defaultTimer = 55;
+        } else if (priceRatio < 0.90) {
+            defaultTimer = 25; // Слив ниже рынка — моментальный покупатель
+        }
 
         let detailBonusTime = 0;
         if (car.headlightsPolished) detailBonusTime += 6;
         if (car.isPolished) detailBonusTime += 8;
         if (car.odorFree) detailBonusTime += 5;
 
-        if (priceRatio > 1.10) defaultTimer = Math.max(25, 75 - detailBonusTime);
-        else if (priceRatio > 1.05) defaultTimer = Math.max(20, 55 - detailBonusTime);
-        else if (priceRatio < 0.90) defaultTimer = Math.max(12, 25 - detailBonusTime);
+        defaultTimer = Math.max(15, defaultTimer - detailBonusTime);
 
         if (lot.timer === undefined || isNaN(lot.timer)) {
             lot.timer = (lot.maxTimer && !isNaN(lot.maxTimer)) ? lot.maxTimer : defaultTimer;
@@ -398,6 +405,8 @@ function renderSalesLot() {
         const isVIP = lot.currentBuyer && lot.currentBuyer.isVIP;
 
         if (!hasBuyer) {
+            let demandNotice = priceRatio > 1.30 ? `<span class="sub-label color-red block mt-1" style="font-size:8px;">⚠️ Сильно выше рынка (${priceRatio.toFixed(1)}x)! Покупатели неохотно смотрят лот.</span>` : '';
+
             statusBadgeHtml = `<span class="tag-badge bg-tag-cyan"><i class="fa-solid fa-satellite-dish mr-1"></i> СКАНИРОВАНИЕ...</span>`;
             waitSectionHtml = `
                 <div class="mb-2">
@@ -408,6 +417,7 @@ function renderSalesLot() {
                     <div class="lot-progress-track" style="height:8px; background:rgba(255,255,255,0.06); border-radius:4px; overflow:hidden; border:1px solid rgba(0,242,254,0.2);">
                         <div id="lot_progress_fill_${idx}" class="lot-progress-fill" style="width:${progressPct}%; height:100%; background:linear-gradient(90deg, #00f2fe, #4facfe); box-shadow:0 0 10px rgba(0,242,254,0.6); transition:width 0.4s ease;"></div>
                     </div>
+                    ${demandNotice}
                 </div>
 
                 <div class="grid-2 mb-2">
@@ -568,7 +578,7 @@ function renderBuyerCardActions(lot, idx) {
 }
 
 // --------------------------------------------------------
-// ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ С УЧЕТОМ ДЕТЕЙЛИНГА И СХЕМ
+// ⭐ ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ: СТРОГИЙ РАСЧЕТ ОТ РЫНКА (ХАРДКОР)
 // --------------------------------------------------------
 function generateRandomLotBuyer(car, askingPrice) {
     if (!car) car = { name: 'Автомобиль', type: 'economy' };
@@ -581,37 +591,63 @@ function generateRandomLotBuyer(car, askingPrice) {
     const archetypePool = isVIP ? VIP_BUYER_ARCHETYPES : BUYER_ARCHETYPES;
     const archetype = archetypePool[Math.floor(Math.random() * archetypePool.length)];
 
-    let discountRatio = isVIP
-        ? archetype.bonusMultiplier * (0.95 + Math.random() * 0.15)
-        : (0.82 + Math.random() * 0.12);
+    // ⭐ 1. БАЗА РАСЧЕТА — СТРОГО РЕАЛЬНЫЙ РЫНОК (marketValue), А НЕ ЦЕНА ИГРОКА!
+    let marketPrice = Number(car.marketValue || car.baseMarketValue || car.basePrice || 100000);
+    if (marketPrice <= 1000) marketPrice = 50000;
 
+    // Коэффициент адекватности предложения
+    let baseRatio = isVIP
+        ? archetype.bonusMultiplier * (0.95 + Math.random() * 0.10)
+        : (0.84 + Math.random() * 0.10);
+
+    // Бонусы детейлинга добавляют процент К РЫНКУ
     let preSaleRemarks = [];
     if (car.headlightsPolished) {
-        discountRatio += 0.05;
-        preSaleRemarks.push("«Фары светят как новые, резина начернена — сразу видно ухоженную тачку!»");
+        baseRatio += 0.04;
+        preSaleRemarks.push("«Фары горят, резина чистая — глаз радуется!»");
     }
     if (car.isPolished) {
-        discountRatio += 0.07;
-        preSaleRemarks.push("«Кузов горит на солнце, ЛКП отполировано на славу!»");
+        baseRatio += 0.05;
+        preSaleRemarks.push("«ЛКП блестит без паутинки!»");
     }
     if (car.odorFree) {
-        discountRatio += 0.04;
-        preSaleRemarks.push("«В салоне приятно пахнет, никакой табачной вони.»");
+        baseRatio += 0.03;
+        preSaleRemarks.push("«В салоне свежо, табаком не разит.»");
     }
 
-    let rawPrice = askingPrice * discountRatio;
+    // Исходное предложение от реальной рыночной цены
+    let rawPrice = marketPrice * baseRatio;
 
+    // ⭐ 2. ПРОВЕРКА ОВЕРПРАЙСА: СТОП-КРАН ПРИ ЗАВЫШЕННОМ ЦЕННИКЕ
+    const priceRatio = askingPrice / marketPrice;
+    let overpriceNotice = '';
+
+    if (priceRatio > 1.35) {
+        // Игрок завысил цену на 35%+ (например, жигуль за 800к)
+        // Бот с порога срезает предложение до 75-80% от РЕАЛЬНОГО рынка и возмущается
+        rawPrice = marketPrice * (0.75 + Math.random() * 0.08);
+        overpriceNotice = ` «Ты откуда такой ценник (${askingPrice.toLocaleString()} ₽) взял?! На авторынке этой машине красная цена ${marketPrice.toLocaleString()} ₽. Предлагаю по факту!»`;
+    } else if (priceRatio > 1.15) {
+        // Небольшой оверпрайс (на 15-30% выше рынка)
+        rawPrice = Math.min(askingPrice * 0.88, marketPrice * 0.95);
+        overpriceNotice = ` «Цену ты задрал, конечно. По верху рынка отдаешь. Давайте торговаться.»`;
+    } else if (askingPrice <= marketPrice * 0.92) {
+        // Игрок продает ниже рынка — покупатель готов дать близко к цене игрока
+        rawPrice = Math.min(askingPrice, marketPrice * 0.95);
+    }
+
+    // ⭐ 3. ДЕФЕКТЫ И СКРЫТЫЕ КОСЯКИ
     let bondoWarning = '';
     if (car.hasBondoBalloons && (archetype.inspectionSkill === 'high' || archetype.inspectionSkill === 'mid')) {
         rawPrice *= 0.82;
-        bondoWarning = ` «Достал толщиномер: под краской из баллона слой шпакли 400 мкм! Скидывай 18% за колхозный ремонт.»`;
+        bondoWarning = ` «Достал толщиномер: под баллончиком слой шпакли 400 мкм! Срезаю 18% за гаражный подкрас.»`;
     }
 
     let defectWarning = '';
     if (car.hiddenDefect && !car.hasAdditive) {
         const cost = car.hiddenDefect.cost || 15000;
         rawPrice = Math.max(10000, rawPrice - cost);
-        defectWarning = ` «Слышу подозрительные стуки в моторе (${car.hiddenDefect.text || 'дефект'}). Срезаю ${cost.toLocaleString()} ₽ на ремонт!»`;
+        defectWarning = ` «Движок гремит (${car.hiddenDefect.text || 'дефект'}). Скидывай ${cost.toLocaleString()} ₽ на сервис!»`;
     }
 
     let odometerBust = false;
@@ -619,7 +655,7 @@ function generateRandomLotBuyer(car, askingPrice) {
     if (car.rolledOdometer && (archetype.inspectionSkill === 'high' || Math.random() < 0.35)) {
         odometerBust = true;
         rawPrice *= 0.70;
-        odometerBustText = ` «Я подключил Launch: в блоках ABS зафиксирован реальный пробег ${(car.actualMileage || 220000).toLocaleString()} км! Ты одометр скрутил?!»`;
+        odometerBustText = ` «Я подключил Launch: в блоках зафиксирован реальный пробег ${(car.actualMileage || 220000).toLocaleString()} км! Ты одометр скрутил?!»`;
 
         if (state.player?.p2pReputation) {
             state.player.p2pReputation.badReviews = (state.player.p2pReputation.badReviews || 0) + 1;
@@ -634,12 +670,14 @@ function generateRandomLotBuyer(car, askingPrice) {
         state.player.karma = Math.max(0, (state.player.karma || 50) - 8);
     }
 
-    const offeredPrice = Math.round(rawPrice / 1000) * 1000;
+    // Предложение покупателя никогда не превышает цену продавца
+    rawPrice = Math.min(rawPrice, askingPrice);
+    const offeredPrice = Math.max(5000, Math.round(rawPrice / 1000) * 1000);
     const isOnlineChat = isVIP ? false : (Math.random() < 0.50);
 
-    let initialDialogue = archetype.moodPhrase + (preSaleRemarks[0] ? ' ' + preSaleRemarks[0] : '') + bondoWarning + defectWarning + odometerBustText;
+    let initialDialogue = archetype.moodPhrase + (preSaleRemarks[0] ? ' ' + preSaleRemarks[0] : '') + overpriceNotice + bondoWarning + defectWarning + odometerBustText;
     if (isOnlineChat) {
-        initialDialogue = `«Здравствуйте! По объявлению «${car.name}». За ${offeredPrice.toLocaleString()} ₽ отдадите?»` + bondoWarning + defectWarning + odometerBustText;
+        initialDialogue = `«Здравствуйте! По объявлению «${car.name}». За ${offeredPrice.toLocaleString()} ₽ отдадите?»` + overpriceNotice + bondoWarning + defectWarning + odometerBustText;
     }
 
     return {
@@ -853,19 +891,19 @@ function renderLotHoodHaggleModalContent() {
     } else {
         actionButtonsGrid = `
             <div class="grid-3 mb-2" style="gap:4px;">
-                <button onclick="executeModalHaggleStep(4, 12)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                    <div class="font-bold color-green text-xs" style="font-size:9.5px;">+4% НА ДОРОГУ</div>
-                    <div class="sub-label" style="font-size:7.5px;">РИСК: 12%</div>
+                <button onclick="executeModalHaggleStep(3, 15)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                    <div class="font-bold color-green text-xs" style="font-size:9.5px;">+3% НА ДОРОГУ</div>
+                    <div class="sub-label" style="font-size:7.5px;">РИСК: 15%</div>
                 </button>
 
-                <button onclick="executeModalHaggleStep(8, 30)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                    <div class="font-bold color-amber text-xs" style="font-size:9.5px;">+8% ПО ФАКТУ</div>
-                    <div class="sub-label" style="font-size:7.5px;">РИСК: 30%</div>
+                <button onclick="executeModalHaggleStep(6, 35)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                    <div class="font-bold color-amber text-xs" style="font-size:9.5px;">+6% ПО ФАКТУ</div>
+                    <div class="sub-label" style="font-size:7.5px;">РИСК: 35%</div>
                 </button>
 
-                <button onclick="executeModalHaggleStep(15, 60)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
-                    <div class="font-bold color-red text-xs" style="font-size:9.5px;">+15% ЖЕСТКО</div>
-                    <div class="sub-label" style="font-size:7.5px;">РИСК: 60%</div>
+                <button onclick="executeModalHaggleStep(12, 65)" class="btn btn-dark btn-sm text-left" style="padding:6px 6px;">
+                    <div class="font-bold color-red text-xs" style="font-size:9.5px;">+12% ЖЕСТКО</div>
+                    <div class="sub-label" style="font-size:7.5px;">РИСК: 65%</div>
                 </button>
             </div>
         `;
@@ -1320,4 +1358,4 @@ if (document.readyState === 'loading') {
     _startSalesLotTimerWhenReady();
 }
 
-console.log('[🏪 salesLot v3.5.1] Строгое сохранение обложки из гаража + детейлинг-бонусы ✓');
+console.log('[🏪 salesLot v3.6.0-hardcore] Хардкор-баланс цен покупателей + защита от оверпрайса ✓');
