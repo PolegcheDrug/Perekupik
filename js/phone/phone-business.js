@@ -1,5 +1,5 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v9.1.1 STABLE)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v9.1.2 STABLE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ========================================================
 
@@ -590,81 +590,81 @@ const PhoneBusiness = {
 
     render(container) {
         if (!container) return;
-        this.ensureState();
+        try {
+            this.ensureState();
 
-        const tab = this.currentTab;
-        const dailyIncome = this.getTotalDailyIncome();
-        const accumulated = this.getAccumulatedCash();
+            const tab = this.currentTab;
+            const dailyIncome = this.getTotalDailyIncome();
+            const accumulated = this.getAccumulatedCash();
 
-        const legal = window.state?.player?.legalEntity || { type: 'none' };
-        const legalConfig = (window.LEGAL_ENTITIES && window.LEGAL_ENTITIES[legal.type]) || null;
-        const isLegalActive = legal.type && legal.type !== 'none';
-        const legalBadgeText = legalConfig?.tag || (isLegalActive ? String(legal.type).toUpperCase() : 'Физлицо');
+            const legal = window.state?.player?.legalEntity || { type: 'none' };
+            const legalConfig = (window.LEGAL_ENTITIES && window.LEGAL_ENTITIES[legal.type]) || null;
+            const isLegalActive = legal.type && legal.type !== 'none';
+            const legalBadgeText = legalConfig?.tag || (isLegalActive ? String(legal.type).toUpperCase() : 'Физлицо');
 
-        container.innerHTML = `
-            <div class="phone-app-header">
-                <button onclick="${this.selectedBizId ? 'PhoneBusiness.closePointCabinet()' : 'PhoneManager.goHome()'}" class="phone-back-btn">
-                    <i class="fa-solid fa-chevron-left"></i> ${this.selectedBizId ? 'К точкам' : 'Назад'}
-                </button>
-                <div class="phone-app-title color-green">
-                    <i class="fa-solid fa-briefcase mr-1"></i> ${this.selectedBizId ? 'Кабинет точки' : 'Бизнес-Сеть'}
-                </div>
-                <div style="width:40px;"></div>
-            </div>
-
-            <div class="phone-app-body">
-                <div class="biz-summary-bar mb-2">
-                    <div class="biz-summary-cell">
-                        <div class="biz-summary-label">Форма</div>
-                        <div class="biz-summary-value ${isLegalActive ? 'color-cyan' : 'color-amber'}" style="font-size:11px;">
-                            ${legalBadgeText}
-                        </div>
-                    </div>
-                    <div class="biz-summary-cell">
-                        <div class="biz-summary-label">Доход</div>
-                        <div class="biz-summary-value value-green">+${dailyIncome.toLocaleString()} ₽</div>
-                    </div>
-                    <div class="biz-summary-cell">
-                        <div class="biz-summary-label">В кассах</div>
-                        <div class="biz-summary-value value-cyan">${accumulated.toLocaleString()} ₽</div>
-                    </div>
-                    <button onclick="PhoneBusiness.collectAllCash()" class="biz-collect-btn" ${accumulated <= 0 ? 'disabled' : ''} title="Собрать всю кассу">
-                        <i class="fa-solid fa-hand-holding-dollar"></i>
+            container.innerHTML = `
+                <div class="phone-app-header">
+                    <button onclick="${this.selectedBizId ? 'PhoneBusiness.closePointCabinet()' : 'PhoneManager.goHome()'}" class="phone-back-btn">
+                        <i class="fa-solid fa-chevron-left"></i> ${this.selectedBizId ? 'К точкам' : 'Назад'}
                     </button>
+                    <div class="phone-app-title color-green">
+                        <i class="fa-solid fa-briefcase mr-1"></i> ${this.selectedBizId ? 'Кабинет точки' : 'Бизнес-Сеть'}
+                    </div>
+                    <div style="width:40px;"></div>
                 </div>
 
-                ${!isLegalActive ? `
-                    <div class="glass-card mb-2 p-2 flex-between" style="background: rgba(255,179,0,0.08); border-left: 3px solid var(--amber);">
-                        <div>
-                            <b class="text-xs color-amber"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Регистрация бизнеса</b>
-                            <div class="sub-label" style="font-size:8.5px;">Для покупки объектов оформите ИП или ООО.</div>
+                <div class="phone-app-body">
+                    <div class="biz-summary-bar mb-2">
+                        <div class="biz-summary-cell">
+                            <div class="biz-summary-label">Форма</div>
+                            <div class="biz-summary-value ${isLegalActive ? 'color-cyan' : 'color-amber'}" style="font-size:11px;">
+                                ${legalBadgeText}
+                            </div>
                         </div>
-                        <button onclick="if(window.PhoneManager) PhoneManager.openApp('gosuslugi')" class="btn btn-amber btn-sm btn-auto" style="font-size:9.5px; padding:4px 8px;">
-                            Госуслуги →
+                        <div class="biz-summary-cell">
+                            <div class="biz-summary-label">Доход</div>
+                            <div class="biz-summary-value value-green">+${dailyIncome.toLocaleString()} ₽</div>
+                        </div>
+                        <div class="biz-summary-cell">
+                            <div class="biz-summary-label">В кассах</div>
+                            <div class="biz-summary-value value-cyan">${accumulated.toLocaleString()} ₽</div>
+                        </div>
+                        <button onclick="PhoneBusiness.collectAllCash()" class="biz-collect-btn" ${accumulated <= 0 ? 'disabled' : ''} title="Собрать всю кассу">
+                            <i class="fa-solid fa-hand-holding-dollar"></i>
                         </button>
                     </div>
-                ` : ''}
 
-                <div class="biz-tabs-row mb-2" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px;">
-                    <button onclick="PhoneBusiness.setTab('points')" class="biz-tab ${tab === 'points' ? 'active' : ''}">
-                        <i class="fa-solid fa-store"></i><span>Точки</span>
-                    </button>
-                    <button onclick="PhoneBusiness.setTab('tenders')" class="biz-tab ${tab === 'tenders' ? 'active' : ''}">
-                        <i class="fa-solid fa-file-contract"></i><span>Тендеры</span>
-                    </button>
-                    <button onclick="PhoneBusiness.setTab('corp')" class="biz-tab ${tab === 'corp' ? 'active' : ''}">
-                        <i class="fa-solid fa-building"></i><span>Корпорации</span>
-                    </button>
+                    ${!isLegalActive ? `
+                        <div class="glass-card mb-2 p-2 flex-between" style="background: rgba(255,179,0,0.08); border-left: 3px solid var(--amber);">
+                            <div>
+                                <b class="text-xs color-amber"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Регистрация бизнеса</b>
+                                <div class="sub-label" style="font-size:8.5px;">Для покупки объектов оформите ИП или ООО.</div>
+                            </div>
+                            <button onclick="if(window.PhoneManager) PhoneManager.openApp('gosuslugi')" class="btn btn-amber btn-sm btn-auto" style="font-size:9.5px; padding:4px 8px;">
+                                Госуслуги →
+                            </button>
+                        </div>
+                    ` : ''}
+
+                    <div class="biz-tabs-row mb-2" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px;">
+                        <button onclick="PhoneBusiness.setTab('points')" class="biz-tab ${tab === 'points' ? 'active' : ''}">
+                            <i class="fa-solid fa-store"></i><span>Точки</span>
+                        </button>
+                        <button onclick="PhoneBusiness.setTab('tenders')" class="biz-tab ${tab === 'tenders' ? 'active' : ''}">
+                            <i class="fa-solid fa-file-contract"></i><span>Тендеры</span>
+                        </button>
+                        <button onclick="PhoneBusiness.setTab('corp')" class="biz-tab ${tab === 'corp' ? 'active' : ''}">
+                            <i class="fa-solid fa-building"></i><span>Корпорации</span>
+                        </button>
+                    </div>
+
+                    <div id="bizTabContent"></div>
                 </div>
+            `;
 
-                <div id="bizTabContent"></div>
-            </div>
-        `;
+            const content = document.getElementById('bizTabContent');
+            if (!content) return;
 
-        const content = document.getElementById('bizTabContent');
-        if (!content) return;
-
-        try {
             if (this.selectedBizId && tab === 'points') {
                 this.renderPointCabinet(content, this.selectedBizId);
             } else if (tab === 'points') {
@@ -675,12 +675,19 @@ const PhoneBusiness = {
                 this.renderCorporationTab(content);
             }
         } catch (err) {
-            console.error('[PhoneBusiness] Render sub-tab error:', err);
-            content.innerHTML = `
-                <div class="glass-card p-3 text-center">
-                    <b class="text-xs color-red">Ошибка отображения вкладки</b>
-                    <div class="sub-label mt-1" style="font-size:9px;">${err.message || String(err)}</div>
-                    <button onclick="PhoneBusiness.setTab('points')" class="btn btn-dark btn-sm mt-2">Сбросить</button>
+            console.error('[PhoneBusiness] Render error:', err);
+            container.innerHTML = `
+                <div class="phone-app-header">
+                    <button onclick="PhoneManager.goHome()" class="phone-back-btn"><i class="fa-solid fa-chevron-left"></i> Назад</button>
+                    <div class="phone-app-title color-green"><i class="fa-solid fa-briefcase mr-1"></i> Бизнес</div>
+                    <div style="width:40px;"></div>
+                </div>
+                <div class="phone-app-body text-center p-4">
+                    <div class="glass-card p-3">
+                        <b class="text-xs color-red">Ошибка отображения бизнеса</b>
+                        <div class="sub-label mt-2" style="font-size:10px; color:#fca5a5;">${err.message || String(err)}</div>
+                        <button onclick="PhoneBusiness.render(document.getElementById('phoneAppContainer'))" class="btn btn-cyan btn-sm mt-3">Повторить</button>
+                    </div>
                 </div>
             `;
         }
@@ -744,7 +751,7 @@ const PhoneBusiness = {
                 const supportsFleet = Boolean(window.BUSINESS_FLEET_REQUIREMENTS && window.BUSINESS_FLEET_REQUIREMENTS[b.id]);
                 let fleetCount = 0;
                 try {
-                    fleetCount = supportsFleet && window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(b.id).length : 0;
+                    fleetCount = supportsFleet && window.BusinessFleetModule && typeof window.BusinessFleetModule.getAssignedVehicles === 'function' ? (window.BusinessFleetModule.getAssignedVehicles(b.id) || []).length : 0;
                 } catch (e) {
                     fleetCount = 0;
                 }
@@ -845,7 +852,7 @@ const PhoneBusiness = {
         const supportsFleet = Boolean(window.BUSINESS_FLEET_REQUIREMENTS && window.BUSINESS_FLEET_REQUIREMENTS[b.id]);
         let fleetVehicles = [];
         try {
-            fleetVehicles = supportsFleet && window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(b.id) : [];
+            fleetVehicles = supportsFleet && window.BusinessFleetModule && typeof window.BusinessFleetModule.getAssignedVehicles === 'function' ? (window.BusinessFleetModule.getAssignedVehicles(b.id) || []) : [];
         } catch (e) {
             fleetVehicles = [];
         }
@@ -863,6 +870,14 @@ const PhoneBusiness = {
                     const cost = Math.round(upg.baseCost * Math.pow(upg.costMul || 1.8, curLvl));
                     const isUpgMaxed = curLvl >= (upg.maxLevel || 3);
                     const canAfford = (window.state?.player?.cash || 0) >= cost;
+                    const bonusPercent = Number(upg.bonusPct) || 15;
+
+                    let actionBtn = '';
+                    if (isUpgMaxed) {
+                        actionBtn = '<button class="btn btn-dark btn-sm w-full opacity-60" disabled style="font-size:9px; padding:4px;">Максимальный уровень ✓</button>';
+                    } else {
+                        actionBtn = '<button onclick="PhoneBusiness.upgradeIndividualBranch(\'' + b.id + '\', \'' + upg.id + '\')" class="btn ' + (canAfford ? 'btn-cyan' : 'btn-dark opacity-50') + ' btn-sm w-full" ' + (canAfford ? '' : 'disabled') + ' style="font-size:9.5px; padding:6px 8px; font-weight:700;">Улучшить (+' + bonusPercent + '% к кассе) — ' + cost.toLocaleString() + ' ₽</button>';
+                    }
 
                     workshopHtml += `
                         <div class="glass-card mb-2 p-2" style="background:#050914; border-left:3px solid var(--cyan);">
@@ -875,16 +890,7 @@ const PhoneBusiness = {
                                 </span>
                             </div>
                             <div class="sub-label mb-2" style="font-size:9px; line-height:1.3;">${upg.desc}</div>
-
-                            ${isUpgMaxed ? `
-                                <button class="btn btn-dark btn-sm w-full opacity-60" disabled style="font-size:9px; padding:4px;">
-                                    Максимальный уровень ✓
-                                </button>
-                            ` : `
-                                <button onclick="PhoneBusiness.upgradeIndividualBranch('${b.id}', '${upg.id}')" class="btn ${canAfford ? 'btn-cyan' : 'btn-dark opacity-50'} btn-sm w-full" ${canAfford ? '' : 'disabled'} style="font-size:9.5px; padding:6px 8px; font-weight:700;">
-                                    Улучшить (+${upg.bonusPct \vert{}\vert{} 15}\% к кассе) — ${cost.toLocaleString()} ₽
-                                </button>
-                            `}
+                            ${actionBtn}
                         </div>
                     `;
                 });
@@ -1134,7 +1140,7 @@ const PhoneBusiness = {
 
             let assignedVehicles = [];
             try {
-                assignedVehicles = window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(tnd.targetBiz) : [];
+                assignedVehicles = window.BusinessFleetModule && typeof window.BusinessFleetModule.getAssignedVehicles === 'function' ? (window.BusinessFleetModule.getAssignedVehicles(tnd.targetBiz) || []) : [];
             } catch (e) {
                 assignedVehicles = [];
             }
