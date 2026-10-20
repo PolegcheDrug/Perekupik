@@ -1,12 +1,12 @@
 // ========================================================
-// js/m-hub/m-leaderboard.js — ОБЩАЯ СЕТЬ ИГРОКОВ M+ (v3.1.0 FIRESTORE LIVE)
+// js/m-hub/m-leaderboard.js — ОБЩАЯ СЕТЬ ИГРОКОВ M+ (v3.2.0 LIVE & SOCIAL)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.1.0 (ЖИВЫЕ ИГРОКИ ИЗ FIREBASE + СИНХРОНИЗАЦИЯ ПОЛЕЙ):
-//   - Прямой вызов FB_Core.Leaderboard.fetchTop / FB_Bridge.
-//   - Синхронизация полей: netWorth, profit, level, bestCar.
-//   - Снижен порог добавления ботов: живые игроки в приоритете!
-//   - Сохранена вся система дружбы, чатов и вызовов на 402м.
+// ⭐ v3.2.0 (СИНХРОНИЗАЦИЯ ДРУЖБЫ И СТАТУСОВ ЗАЯВОК):
+//   - Полная интеграция с FB_FriendshipsManager (v1.3.0).
+//   - Отображение точных статусов: "Дружить", "Ожидает", "Принять", "Друг".
+//   - Автопринятие встречных заявок без конфликта "Заявка уже отправлена".
+//   - Быстрый переход в шторку реплик или офферов прямо из топа.
 // ========================================================
 
 const MLeaderboardModule = {
@@ -64,7 +64,7 @@ const MLeaderboardModule = {
             console.warn("[MLeaderboard] Ошибка загрузки облачного топа:", e);
         }
 
-        // 2. Добавляем текущего игрока, если его нет в списке
+        // 2. Добавляем текущего игрока
         const myUid = String(window.state?.player?.uid || window.tgUserId || "me");
         const myName = window.state?.player?.name || "Перекуп #777";
         const myLvl = Number(window.state?.player?.level) || 1;
@@ -102,7 +102,7 @@ const MLeaderboardModule = {
             existingMe.level = Math.max(existingMe.level, myLvl);
         }
 
-        // 3. Подмешиваем минимальных ботов ТОЛЬКО если живых игроков на сервере меньше 3
+        // 3. Подмешиваем минимальных ботов, если живых игроков мало
         if (players.length < 3) {
             const seedNames = [
                 { name: "Синдикат_VIP", lvl: 45, car: "Porsche 911 Turbo", profit: 15000000, net: 26000000 },
@@ -138,13 +138,15 @@ const MLeaderboardModule = {
     },
 
     // ====================================================
-    // СТАТУСЫ ДРУЖБЫ
+    // СТАТУСЫ ДРУЖБЫ И ЗАЯВОК (СВЯЗКА С FIREBASE)
     // ====================================================
     async loadFriendshipStatuses() {
         const myUid = String(window.state?.player?.uid || window.tgUserId || "");
         if (!myUid) return;
 
-        if (!window.FB_Bridge?.Friendships?.fetchFriendships) {
+        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships || window.FB_Bridge?.Friendships;
+
+        if (!manager?.fetchFriendships) {
             const localFriends = window.state?.friendsList || [];
             this.friendshipStatuses = {};
             localFriends.forEach(fid => {
@@ -154,7 +156,7 @@ const MLeaderboardModule = {
         }
 
         try {
-            const data = await window.FB_Bridge.Friendships.fetchFriendships(myUid);
+            const data = await manager.fetchFriendships(myUid);
             this.friendshipStatuses = {};
 
             (data.friends || []).forEach(f => {
@@ -163,20 +165,11 @@ const MLeaderboardModule = {
             (data.pending || []).forEach(p => {
                 this.friendshipStatuses[String(p.id)] = 'pending_in';
             });
-            (data.subscribed || []).forEach(s => {
-                this.friendshipStatuses[String(s.id)] = 'subscribed';
+            (data.outgoing || []).forEach(o => {
+                this.friendshipStatuses[String(o.id || o.toUserId)] = 'pending_out';
             });
-
-            if (window.FB_Bridge?.Friendships?.getOutgoingRequests) {
-                try {
-                    const outgoing = await window.FB_Bridge.Friendships.getOutgoingRequests(myUid);
-                    (outgoing || []).forEach(o => {
-                        this.friendshipStatuses[String(o.toUserId)] = 'pending_out';
-                    });
-                } catch (e) {}
-            }
         } catch (e) {
-            console.warn('[MLeaderboard] loadFriendshipStatuses error:', e);
+            console.warn('[MLeaderboard] Ошибка получения статусов дружбы:', e);
         }
     },
 
@@ -226,40 +219,23 @@ const MLeaderboardModule = {
         this._unsubscribeRealtime();
 
         const myUid = String(window.state?.player?.uid || window.tgUserId || "");
-        if (!myUid || !window.RealtimeManager) return;
+        if (!myUid) return;
 
-        try {
-            this._unsubscribeFriendships = window.RealtimeManager.subscribe(
-                'friendships',
-                null,
-                (pending) => {
+        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships;
+        if (manager?.subscribeToFriendships) {
+            try {
+                this._unsubscribeFriendships = manager.subscribeToFriendships(myUid, (pending) => {
                     if (!Array.isArray(pending)) return;
                     pending.forEach(p => {
                         if (p && p.id) this.friendshipStatuses[String(p.id)] = 'pending_in';
                     });
-                    if (window.AppM && window.AppM.activeTab === 'players') {
-                        const box = document.getElementById('mHubSubContentBox');
-                        if (box) this.renderScreen(box);
+                    const box = document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
+                    if (box && window.AppM?.socialSubTab === 'top') {
+                        this._renderUI(box);
                     }
-                }
-            );
-        } catch (e) {}
-
-        try {
-            this._unsubscribeLeaderboard = window.RealtimeManager.subscribe(
-                'leaderboard',
-                null,
-                (leaders) => {
-                    if (!Array.isArray(leaders) || leaders.length === 0) return;
-                    this.fetchPlayersList(true).then(() => {
-                        if (window.AppM && window.AppM.activeTab === 'players') {
-                            const box = document.getElementById('mHubSubContentBox');
-                            if (box) this.renderScreen(box);
-                        }
-                    });
-                }
-            );
-        } catch (e) {}
+                });
+            } catch (e) {}
+        }
     },
 
     _unsubscribeRealtime() {
@@ -285,7 +261,7 @@ const MLeaderboardModule = {
     // ОТРИСОВКА ИНТЕРФЕЙСА
     // ====================================================
     async renderScreen(container) {
-        const target = container || document.getElementById('mHubSubContentBox');
+        const target = container || document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
         if (!target) return;
 
         if (this.cachedPlayers.length > 0) {
@@ -294,7 +270,7 @@ const MLeaderboardModule = {
             target.innerHTML = `
                 <div class="glass-card text-center py-6" style="background:#090e18;">
                     <div class="radar-spinner-ring mb-2" style="margin: 0 auto;"></div>
-                    <div class="sub-label font-bold text-xs color-cyan">Загрузка рейтинга игроков из облака...</div>
+                    <div class="sub-label font-bold text-xs color-cyan">Синхронизация рейтинга перекупов...</div>
                 </div>
             `;
         }
@@ -344,35 +320,36 @@ const MLeaderboardModule = {
             if (isMe) {
                 friendBtn = "";
             } else if (p.isBot) {
-                friendBtn = `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled style="padding:3px 7px; font-size:8.5px;" title="Бот">🤖 Бот</button>`;
+                friendBtn = `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled style="padding:4px 7px; font-size:8.5px;" title="Бот">🤖 БОТ</button>`;
             } else {
                 const status = this.friendshipStatuses[otherUid] || 'none';
+
                 if (status === 'friend') {
                     friendBtn = `
-                        <button onclick="MLeaderboardModule.openFriendChat('${otherUid}', '${this._escapeAttr(p.name)}')" class="btn btn-green btn-sm btn-auto" style="padding:3px 7px; font-size:8.5px;">
-                            <i class="fa-solid fa-comments mr-1"></i> Написать
+                        <button onclick="AppM.openQuickPhrasePicker('${otherUid}', '${this._escapeAttr(p.name)}')" class="btn btn-dark btn-sm btn-auto" style="padding:4px 8px; font-size:8.5px; border-color:var(--green); color:var(--green);">
+                            <i class="fa-solid fa-check mr-1"></i> Друг
                         </button>`;
                 } else if (status === 'pending_out') {
                     friendBtn = `
-                        <button onclick="MLeaderboardModule.cancelFriendRequest('${otherUid}')" class="btn btn-amber btn-sm btn-auto" style="padding:3px 7px; font-size:8.5px;">
+                        <button onclick="MLeaderboardModule.cancelFriendRequest('${otherUid}')" class="btn btn-dark btn-sm btn-auto" style="padding:4px 7px; font-size:8.5px; border-color:var(--amber); color:var(--amber);" title="Нажмите, чтобы отозвать">
                             <i class="fa-solid fa-clock mr-1"></i> Ожидает
                         </button>`;
                 } else if (status === 'pending_in') {
                     friendBtn = `
-                        <button onclick="MLeaderboardModule.acceptFriendRequestFromLeaderboard('${otherUid}', '${this._escapeAttr(p.name)}')" class="btn btn-cyan btn-sm btn-auto" style="padding:3px 7px; font-size:8.5px;">
-                            <i class="fa-solid fa-check mr-1"></i> Принять
+                        <button onclick="MLeaderboardModule.acceptFriendRequestFromLeaderboard('${otherUid}', '${this._escapeAttr(p.name)}')" class="btn btn-cyan btn-sm btn-auto" style="padding:4px 8px; font-size:8.5px;">
+                            <i class="fa-solid fa-handshake mr-1"></i> Принять
                         </button>`;
                 } else {
                     friendBtn = `
-                        <button onclick="MLeaderboardModule.addFriendAction('${otherUid}', '${this._escapeAttr(p.name)}')" class="btn btn-green btn-sm btn-auto" style="padding:3px 7px; font-size:8.5px;">
-                            <i class="fa-solid fa-user-plus mr-1"></i> Дружить
+                        <button onclick="MLeaderboardModule.addFriendAction('${otherUid}', '${this._escapeAttr(p.name)}')" class="btn btn-green btn-sm btn-auto" style="padding:4px 9px; font-size:8.5px;">
+                            <i class="fa-solid fa-user-plus mr-1"></i> ДРУЖИТЬ
                         </button>`;
                 }
             }
 
             let challengeBtn = isMe ? "" : `
-                <button onclick="MLeaderboardModule.challengePlayer('${this._escapeAttr(p.name)}')" class="btn btn-red btn-sm btn-auto" style="padding:3px 7px; font-size:8.5px;" title="Вызов на 402м">
-                    <i class="fa-solid fa-flag-checkered"></i> 402м
+                <button onclick="MLeaderboardModule.challengePlayer('${this._escapeAttr(p.name)}')" class="btn btn-red btn-sm btn-auto" style="padding:4px 7px; font-size:8.5px;" title="Вызов на 402м">
+                    🏁 402М
                 </button>
             `;
 
@@ -384,7 +361,7 @@ const MLeaderboardModule = {
                         <div class="flex-gap" style="align-items:center;">
                             ${statusDot}
                             <b class="text-xs ${p.isMe ? 'color-green' : 'color-cyan'}">${this._escapeHtml(p.name)}</b>
-                            <span class="tag-badge bg-tag-dark" style="font-size:7.5px;">Ур. ${p.level}</span>
+                            <span class="tag-badge bg-tag-dark" style="font-size:7.5px;">УР. ${p.level}</span>
                         </div>
                         <div class="sub-label mt-1" style="font-size:8.5px; color:#cbd5e1;">
                             Болид: <b class="color-amber">${this._escapeHtml(p.car)}</b> • Профит: <b class="color-green">+${Number(p.profit).toLocaleString()} ₽</b>
@@ -396,7 +373,7 @@ const MLeaderboardModule = {
                             <span class="sub-label" style="font-size:7.5px;">АКТИВЫ</span>
                             <div class="price-val color-green" style="font-size:12px;">${Number(p.networth).toLocaleString()} ₽</div>
                         </div>
-                        <div class="flex-gap" style="justify-content:flex-end;">
+                        <div class="flex-gap" style="justify-content:flex-end; gap:4px;">
                             ${friendBtn}
                             ${challengeBtn}
                         </div>
@@ -421,13 +398,13 @@ const MLeaderboardModule = {
 
             <div class="grid-3 mb-2" style="gap:4px;">
                 <button onclick="MLeaderboardModule.setSort('networth')" class="btn ${this.sortBy === 'networth' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 2px;">
-                    💰 По активам
+                    💰 ПО АКТИВАМ
                 </button>
                 <button onclick="MLeaderboardModule.setSort('profit')" class="btn ${this.sortBy === 'profit' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 2px;">
-                    📈 По прибыли
+                    📈 ПО ПРИБЫЛИ
                 </button>
                 <button onclick="MLeaderboardModule.setSort('level')" class="btn ${this.sortBy === 'level' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 2px;">
-                    🎖️ По уровню
+                    🎖️ ПО УРОВНЮ
                 </button>
             </div>
 
@@ -465,19 +442,21 @@ const MLeaderboardModule = {
         }
         this._processedFriendRequests.add(targetUid);
 
+        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships || window.FB_Bridge?.Friendships;
+
         try {
-            if (!window.FB_Bridge?.Friendships?.sendRequest) {
+            if (!manager?.sendRequest) {
                 if (!Array.isArray(window.state.player.friendsList)) window.state.player.friendsList = [];
                 window.state.player.friendsList.push(targetName);
                 this.friendshipStatuses[String(targetUid)] = 'friend';
                 if (typeof window.saveState === 'function') window.saveState();
                 showToast(`🤝 ${targetName} добавлен в друзья!`);
-                this._renderUI(document.getElementById('mHubSubContentBox'));
+                this._renderUI(document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox'));
                 return;
             }
 
-            showToast(`⏳ Отправка заявки ${targetName}...`);
-            const res = await window.FB_Bridge.Friendships.sendRequest(targetUid, targetName);
+            showToast(`⏳ Отправка заявки...`);
+            const res = await manager.sendRequest(targetUid, targetName);
 
             if (res && res.success) {
                 this.friendshipStatuses[String(targetUid)] = res.autoAccepted ? 'friend' : 'pending_out';
@@ -491,32 +470,37 @@ const MLeaderboardModule = {
             setTimeout(() => this._processedFriendRequests.delete(targetUid), 1500);
         }
 
-        this._renderUI(document.getElementById('mHubSubContentBox'));
+        const box = document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
+        if (box) this._renderUI(box);
     },
 
     async cancelFriendRequest(targetUid) {
         if (!targetUid) return;
-        if (!confirm("Отменить заявку в друзья?")) return;
+        if (!confirm("Отозвать заявку в друзья?")) return;
+
+        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships || window.FB_Bridge?.Friendships;
 
         try {
-            if (window.FB_Bridge?.Friendships?.removeFriend) {
-                await window.FB_Bridge.Friendships.removeFriend(targetUid);
+            if (manager?.removeFriend) {
+                await manager.removeFriend(targetUid);
             }
             delete this.friendshipStatuses[String(targetUid)];
-            showToast("✅ Заявка отменена");
+            showToast("Заявка отозвана");
             if (window.AudioFx) window.AudioFx.play('tick');
         } catch (e) {
-            showToast("❌ Ошибка отмены");
+            showToast("❌ Ошибка отмены заявки");
         }
 
-        this._renderUI(document.getElementById('mHubSubContentBox'));
+        const box = document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
+        if (box) this._renderUI(box);
     },
 
     async acceptFriendRequestFromLeaderboard(targetUid, targetName) {
-        if (!targetUid || !window.FB_Bridge?.Friendships?.acceptRequest) return;
+        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships || window.FB_Bridge?.Friendships;
+        if (!targetUid || !manager?.acceptRequest) return;
 
         try {
-            const res = await window.FB_Bridge.Friendships.acceptRequest(targetUid);
+            const res = await manager.acceptRequest(targetUid);
             if (res && res.success) {
                 this.friendshipStatuses[String(targetUid)] = 'friend';
                 if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
@@ -528,17 +512,8 @@ const MLeaderboardModule = {
             console.warn('[MLeaderboard] acceptFriendRequest error:', e);
         }
 
-        this._renderUI(document.getElementById('mHubSubContentBox'));
-    },
-
-    openFriendChat(friendUid, friendName) {
-        if (window.AppM && typeof window.AppM.openChatWithFriend === 'function') {
-            window.AppM.activeTab = 'friends';
-            window.AppM.friendsSubTab = 'friends';
-            window.AppM.openChatWithFriend(friendUid, friendName);
-        } else {
-            showToast("⚠️ Мессенджер недоступен");
-        }
+        const box = document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
+        if (box) this._renderUI(box);
     },
 
     challengePlayer(targetName) {
@@ -575,4 +550,4 @@ const MLeaderboardModule = {
 
 window.MLeaderboardModule = MLeaderboardModule;
 
-console.log('[🏆 m-leaderboard v3.1.0] Живые игроки Firestore + синхронизация полей ✓');
+console.log('[🏆 m-leaderboard v3.2.0] Связка со статусами дружбы + Quick Chat ✓');
