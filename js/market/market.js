@@ -1,17 +1,15 @@
 // ========================================================
-// js/market/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА И МАРКЕТА (v2.0.0)
+// js/market/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v2.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v2.0.0:
-//   - ВОССТАНОВЛЕН РАЗДЕЛ «ТОВАРЫ И ИНСТРУМЕНТЫ» (SHOP_CATALOG)
-//   - Покупка толщиномеров, сканеров, эндоскопов, расходников и лицензий
-//   - Бейджи соответствия бизнесу отображаются ТОЛЬКО после покупки Автотеки
+// ⭐ v2.1.0:
+//   - УДАЛЕНА лишняя кнопка переключения «Автомобили» (чистая лента рынка)
+//   - Умная фильтрация: бейджи соответствия бизнесу отображаются ПОСЛЕ Автотеки
+//     и ТОЛЬКО если у игрока РЕАЛЬНО КУПЛЕН данный бизнес (не засоряет карточку)
 //   - Исправлена работа кнопки «Позвонить» / «Торг» с защитой от всплытия клика
 //   - Полная интеграция с FLEET_CALCULATOR и проверкой автопарков
 // ========================================================
 
-let marketMode = 'cars'; // 'cars' или 'items'
-let marketShopFilter = 'all'; // 'all', 'tools', 'consumables', 'tuningParts', 'homeItems'
 let marketSortOrder = 'asc';
 let activePendingDKPDeal = null;
 
@@ -21,38 +19,6 @@ if (typeof window.__marketRenderToken !== 'number') window.__marketRenderToken =
 
 // Защита от двойного клика по категориям
 if (typeof window._setCategoryPending !== 'boolean') window._setCategoryPending = false;
-
-function switchMarketMode(mode) {
-    marketMode = mode;
-    if (typeof playSound === 'function') playSound('tick');
-    if (typeof tgHaptic === 'function') tgHaptic('light');
-
-    const btnCars = document.getElementById('btnMarketModeCars');
-    const btnItems = document.getElementById('btnMarketModeItems');
-    if (btnCars && btnItems) {
-        btnCars.className = mode === 'cars' ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
-        btnItems.className = mode === 'items' ? 'btn btn-cyan btn-sm' : 'btn btn-dark btn-sm';
-    }
-
-    const catGrid = document.getElementById('marketCatListContainer');
-    const catHeader = document.querySelector('.categories-header-compact');
-    if (mode === 'items') {
-        if (catGrid) catGrid.style.display = 'none';
-        if (catHeader) catHeader.style.display = 'none';
-        renderMarketShopItems();
-    } else {
-        if (catGrid) catGrid.style.display = '';
-        if (catHeader) catHeader.style.display = '';
-        renderMarketFeed();
-    }
-}
-
-function setMarketShopFilter(filter) {
-    marketShopFilter = filter;
-    if (typeof playSound === 'function') playSound('tick');
-    if (typeof tgHaptic === 'function') tgHaptic('light');
-    renderMarketShopItems();
-}
 
 function toggleMarketCategories(forceCollapse = null) {
     const grid = document.getElementById('marketCatListContainer');
@@ -116,9 +82,14 @@ function getCarBusinessSuitability(car, ownedBizIds = []) {
 
     if (window.FLEET_CALCULATOR && typeof window.FLEET_CALCULATOR.checkSuitability === 'function') {
         try {
-            const res = window.FLEET_CALCULATOR.checkSuitability(car, null);
+            const res = window.FLEET_CALCULATOR.checkSuitability(car, ownedBizIds);
             if (res && res.suitable && Array.isArray(res.matches) && res.matches.length > 0) {
-                matches = res.matches;
+                matches = res.matches.map(m => ({
+                    id: m.bizId || m.id,
+                    name: m.name,
+                    icon: m.icon,
+                    badgeColor: m.badgeColor
+                }));
             }
         } catch (e) {
             console.warn('[Market] Ошибка FLEET_CALCULATOR:', e);
@@ -141,15 +112,15 @@ function getCarBusinessSuitability(car, ownedBizIds = []) {
         }
 
         if (cat === 'truck' || trunk >= 450 || name.includes('газель') || name.includes('фургон') || name.includes('porter') || name.includes('transit') || name.includes('largus') || name.includes('caddy')) {
-            matches.push({ id: 'cargo', name: 'Грузоперевозки', icon: 'fa-truck-fast', badgeColor: '#3b82f6' });
+            matches.push({ id: 'transport_company', name: 'Грузоперевозки', icon: 'fa-truck-fast', badgeColor: '#3b82f6' });
         }
 
-        if ((cat === 'comfort' && year >= 2014) || (cat === 'economy' && year >= 2017)) {
-            matches.push({ id: 'carsharing', name: 'Каршеринг', icon: 'fa-car-side', badgeColor: '#06b6d4' });
+        if (name.includes('эвакуатор') || name.includes('газон') || name.includes('платформ')) {
+            matches.push({ id: 'tow_truck', name: 'Эвакуатор', icon: 'fa-truck-pickup', badgeColor: '#e74c3c' });
         }
 
-        if (cat === 'premium' || cat === 'hyper' || pwr >= 260 || name.includes('bmw') || name.includes('mercedes') || name.includes('porsche') || name.includes('audi') || name.includes('lexus')) {
-            matches.push({ id: 'vip', name: 'VIP-прокат', icon: 'fa-crown', badgeColor: '#a855f7' });
+        if (car.condition && Number(car.condition) <= 55) {
+            matches.push({ id: 'razborka', name: 'Разборка', icon: 'fa-wrench', badgeColor: '#9b59b6' });
         }
     }
 
@@ -391,207 +362,9 @@ function promptHiddenPlateAutotekaHint(event) {
 }
 
 // ========================================================
-// РЕНДЕР ТОВАРОВ И ИНСТРУМЕНТОВ (SHOP_CATALOG)
-// ========================================================
-function renderMarketShopItems() {
-    const container = document.getElementById('marketCardContainer');
-    if (!container) return;
-
-    const catalog = window.SHOP_CATALOG || (typeof SHOP_CATALOG !== 'undefined' ? SHOP_CATALOG : null);
-    if (!catalog) {
-        container.innerHTML = `
-            <div class='glass-card text-center py-6 sub-label' style="background:#090e18;">
-                <b class="text-xs color-red">Каталог товаров временно недоступен</b>
-            </div>
-        `;
-        return;
-    }
-
-    const playerTools = state.player?.tools || {};
-    const playerInventory = state.player?.inventory || [];
-    const playerLevel = state.player?.level || 1;
-    const playerStars = state.player?.stars || 0;
-
-    let itemsToRender = [];
-    const f = marketShopFilter;
-
-    if (f === 'all' || f === 'tools') {
-        (catalog.tools || []).forEach(item => itemsToRender.push({ ...item, categoryType: 'tools' }));
-    }
-    if (f === 'all' || f === 'consumables') {
-        (catalog.consumables || []).forEach(item => itemsToRender.push({ ...item, categoryType: 'consumables' }));
-    }
-    if (f === 'all' || f === 'tuningParts') {
-        (catalog.tuningParts || []).forEach(item => itemsToRender.push({ ...item, categoryType: 'tuningParts' }));
-    }
-    if (f === 'all' || f === 'homeItems') {
-        (catalog.homeItems || []).forEach(item => itemsToRender.push({ ...item, categoryType: 'homeItems' }));
-    }
-
-    let filterBarHtml = `
-        <div class="glass-card mb-2 p-2" style="background:#090e18;">
-            <div class="flex-between mb-2">
-                <b class="text-xs color-cyan"><i class="fa-solid fa-toolbox mr-1"></i> Магазин оборудования и расходников</b>
-                <button onclick="switchMarketMode('cars')" class="btn btn-dark btn-sm btn-auto" style="font-size:9.5px; padding:3px 8px;">
-                    <i class="fa-solid fa-car"></i> К машинам
-                </button>
-            </div>
-            <div class="grid-4" style="gap:4px;">
-                <button onclick="setMarketShopFilter('all')" class="btn ${f === 'all' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">Все</button>
-                <button onclick="setMarketShopFilter('tools')" class="btn ${f === 'tools' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">🔧 Приборы</button>
-                <button onclick="setMarketShopFilter('consumables')" class="btn ${f === 'consumables' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">📦 Сырьё</button>
-                <button onclick="setMarketShopFilter('tuningParts')" class="btn ${f === 'tuningParts' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:4px 2px;">📜 Пропуска</button>
-            </div>
-        </div>
-    `;
-
-    let cardsHtml = "";
-    itemsToRender.forEach(item => {
-        let isTool = item.categoryType === 'tools';
-        let isConsumable = item.categoryType === 'consumables';
-        let isTuning = item.categoryType === 'tuningParts';
-        let isHome = item.categoryType === 'homeItems';
-
-        let isOwned = false;
-        let toolUsesLeft = null;
-
-        if (isTool) {
-            let toolState = playerTools[item.id];
-            if (toolState && typeof toolState === 'object') {
-                isOwned = toolState.usesLeft > 0;
-                toolUsesLeft = toolState.usesLeft;
-            } else if (toolState === true || typeof toolState === 'number') {
-                isOwned = true;
-                toolUsesLeft = typeof toolState === 'number' ? toolState : item.maxUses;
-            }
-        } else if (isTuning || isHome) {
-            isOwned = playerInventory.includes(item.id) || (state.player?.ownedPerks && state.player.ownedPerks.includes(item.id));
-        }
-
-        let categoryTag = "Товар";
-        let tagClass = "bg-tag-cyan";
-        if (isTool) { categoryTag = "Инструмент осмотра"; tagClass = "bg-tag-cyan"; }
-        else if (isConsumable) { categoryTag = "Сырьё бизнеса"; tagClass = "bg-tag-green"; }
-        else if (isTuning) { categoryTag = "Лицензия / Документ"; tagClass = "bg-tag-purple"; }
-        else if (isHome) { categoryTag = "Оснащение базы"; tagClass = "bg-tag-amber"; }
-
-        let reqStarsHtml = item.reqStars ? `<span class="tag-badge bg-tag-amber font-bold ml-1">+${item.reqStars} ⭐</span>` : '';
-        let iconHtml = item.icon ? `<i class="fa-solid ${item.icon} mr-1 color-cyan"></i>` : '';
-
-        let buyButtonHtml = "";
-        if (isOwned && !isConsumable) {
-            buyButtonHtml = `
-                <div class="flex-between">
-                    <span class="sub-label text-xs color-green">✓ В инвентаре ${toolUsesLeft !== null ? `(${toolUsesLeft} исп.)` : ''}</span>
-                    <button class="btn btn-dark btn-sm btn-auto opacity-60" disabled style="padding:4px 10px; font-size:9.5px;">Куплено</button>
-                </div>
-            `;
-        } else {
-            buyButtonHtml = `
-                <div class="flex-between">
-                    <div>
-                        <div class="price-val color-green text-xs" style="font-size:13px;">${item.cost.toLocaleString()} ₽</div>
-                        ${item.reqStars ? `<div class="sub-label" style="font-size:8.5px; color:var(--amber);">Требуется: ${item.reqStars} ⭐</div>` : ''}
-                    </div>
-                    <button onclick="buyMarketShopItem('${item.id}', '${item.categoryType}')" class="btn btn-green btn-sm btn-auto" style="padding:5px 12px; font-size:10px; font-weight:700;">
-                        Купить
-                    </button>
-                </div>
-            `;
-        }
-
-        cardsHtml += `
-            <div class="glass-card mb-2 p-2" style="background:#070b14; border-left:3px solid ${isTool ? 'var(--cyan)' : (isConsumable ? 'var(--green)' : 'var(--purple)')};">
-                <div class="flex-between mb-1">
-                    <b class="text-xs color-main" style="font-size:11.5px;">${iconHtml}${item.name}</b>
-                    <div>
-                        <span class="tag-badge ${tagClass}" style="font-size:8px;">${categoryTag}</span>
-                        ${reqStarsHtml}
-                    </div>
-                </div>
-                <div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35;">${item.desc || item.perk || ''}</div>
-                ${buyButtonHtml}
-            </div>
-        `;
-    });
-
-    container.innerHTML = filterBarHtml + (cardsHtml || "<div class='glass-card text-center py-4 sub-label'>Товары не найдены</div>");
-}
-
-function buyMarketShopItem(itemId, categoryType) {
-    const catalog = window.SHOP_CATALOG || (typeof SHOP_CATALOG !== 'undefined' ? SHOP_CATALOG : null);
-    if (!catalog) return showToast("Каталог не загружен");
-
-    let pool = catalog[categoryType] || [];
-    let item = pool.find(i => i.id === itemId);
-    if (!item) return showToast("Предмет не найден");
-
-    let cash = Number(state.player?.cash) || 0;
-    let stars = Number(state.player?.stars) || 0;
-
-    if (cash < item.cost) {
-        if (typeof playSound === 'function') playSound('error');
-        return showToast(`Не хватает денег: нужно ${item.cost.toLocaleString()} ₽!`);
-    }
-
-    if (item.reqStars && stars < item.reqStars) {
-        if (typeof playSound === 'function') playSound('error');
-        return showToast(`Не хватает звёзд: требуется ${item.reqStars} ⭐!`);
-    }
-
-    state.player.cash -= item.cost;
-    if (item.reqStars) state.player.stars -= item.reqStars;
-
-    if (typeof logBankTransaction === 'function') {
-        logBankTransaction(`Покупка товара: ${item.name}`, item.cost, false);
-    }
-
-    if (categoryType === 'tools') {
-        if (!state.player.tools) state.player.tools = {};
-        state.player.tools[item.id] = {
-            id: item.id,
-            name: item.name,
-            maxUses: item.maxUses || 50,
-            usesLeft: item.maxUses || 50
-        };
-    } else if (categoryType === 'consumables') {
-        if (item.targetBiz === 'all') {
-            if (Array.isArray(state.businesses)) {
-                state.businesses.forEach(b => { if (b.level > 0) b.stock = 100; });
-            }
-        } else if (item.targetBiz) {
-            let biz = (state.businesses || []).find(b => b.id === item.targetBiz);
-            if (biz) {
-                biz.stock = Math.min(100, (biz.stock || 0) + (item.value || 30));
-            }
-        }
-    } else {
-        if (!state.player.inventory) state.player.inventory = [];
-        if (!state.player.inventory.includes(item.id)) state.player.inventory.push(item.id);
-    }
-
-    if (typeof saveState === 'function') saveState();
-    if (typeof updateHeaderUI === 'function') updateHeaderUI();
-    if (typeof playSound === 'function') playSound('win');
-    if (typeof tgHaptic === 'function') tgHaptic('success');
-
-    if (typeof openVerdictModal === 'function') {
-        openVerdictModal("ПОКУПКА ОФОРМЛЕНА! 🛍️", `Вы успешно приобрели «${item.name}» за ${item.cost.toLocaleString()} ₽!\nПредмет доступен и активирован в вашем инвентаре.`, true, item.cost);
-    } else {
-        showToast(`✓ Куплено: ${item.name}!`);
-    }
-
-    renderMarketShopItems();
-}
-
-// ========================================================
-// РЕНДЕР ЛЕНТЫ С КЛИКАБЕЛЬНОЙ КАРТОЧКОЙ
+// РЕНДЕР ЛЕНТЫ АВТОРЫНКА
 // ========================================================
 function renderMarketFeed() {
-    if (marketMode === 'items') {
-        return renderMarketShopItems();
-    }
-
     const container = document.getElementById('marketCardContainer');
     if (!container) return;
 
@@ -629,20 +402,8 @@ function renderMarketFeed() {
             `;
         }
 
-        let modeToggleHtml = `
-            <div class="glass-card mb-2 p-1 flex-between" style="background:#090e18;">
-                <button id="btnMarketModeCars" onclick="switchMarketMode('cars')" class="btn ${marketMode === 'cars' ? 'btn-cyan' : 'btn-dark'} btn-sm w-full mr-1" style="font-size:10px; padding:5px 0;">
-                    🚗 Автомобили
-                </button>
-                <button id="btnMarketModeItems" onclick="switchMarketMode('items')" class="btn ${marketMode === 'items' ? 'btn-cyan' : 'btn-dark'} btn-sm w-full" style="font-size:10px; padding:5px 0;">
-                    🔧 Товары и приборы
-                </button>
-            </div>
-        `;
-
         let sortBarHtml = `
             ${seasonBannerHtml}
-            ${modeToggleHtml}
             <div class="glass-card mb-2 p-2 flex-between" style="border-color: rgba(255, 255, 255, 0.08);">
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span class="text-xs sub-label">Сортировка:</span>
@@ -659,15 +420,16 @@ function renderMarketFeed() {
 
         let htmlContent = sortBarHtml;
 
+        // Определяем РЕАЛЬНО КУПЛЕННЫЕ игроком бизнесы (level > 0)
         let ownedBizIds = [];
         if (Array.isArray(state.businesses)) {
             ownedBizIds = state.businesses
-                .filter(b => b && (Number(b.level) > 0 || b.purchased || b.owned))
+                .filter(b => b && Number(b.level) > 0)
                 .map(b => b.id);
         } else if (state.businesses && typeof state.businesses === 'object') {
             ownedBizIds = Object.keys(state.businesses).filter(key => {
                 const b = state.businesses[key];
-                return b && (Number(b.level) > 0 || b.purchased || b.owned || b.unlocked);
+                return b && Number(b.level) > 0;
             });
         }
 
@@ -733,26 +495,27 @@ function renderMarketFeed() {
                 if (isPlateRevealed && pVal > 15000) statusBadgesHtml += "<span class='tag-badge badge-shimmer-gold'>🏷️ БЛАТНОЙ</span>";
                 if (car.isStolen && isPlateRevealed) statusBadgesHtml += "<span class='tag-badge badge-police-strobe'>🚨 РОЗЫСК</span>";
 
-                // ⭐ ОТОБРАЖЕНИЕ ПРИНАДЛЕЖНОСТИ К БИЗНЕСУ ТОЛЬКО ПОСЛЕ АВТОТЕКИ
+                // ⭐ ОТОБРАЖЕНИЕ БЕЙДЖЕЙ БИЗНЕСА ТОЛЬКО ПОСЛЕ АВТОТЕКИ И ТОЛЬКО ДЛЯ КУПЛЕННЫХ БИЗНЕСОВ
                 let bizTopBadgeHtml = "";
-                if (isPlateRevealed) {
-                    const businessMatches = getCarBusinessSuitability(car, ownedBizIds);
-                    if (businessMatches.length > 0) {
-                        car.businessMatches = businessMatches;
+                if (isPlateRevealed && ownedBizIds.length > 0) {
+                    const allMatches = getCarBusinessSuitability(car, ownedBizIds);
+                    // Фильтруем: оставляем ТОЛЬКО те бизнесы, которые есть у игрока
+                    const ownedMatches = allMatches.filter(m => ownedBizIds.includes(m.id));
+
+                    if (ownedMatches.length > 0) {
+                        car.businessMatches = ownedMatches;
 
                         bizTopBadgeHtml = `
                             <div class="biz-fleet-card-badge notranslate" translate="no" style="position:absolute; top:8px; left:8px; z-index:10; background:rgba(9,14,24,0.92); border:1px solid var(--green); color:var(--green); border-radius:6px; padding:3px 7px; font-size:8.5px; font-weight:800; display:flex; align-items:center; gap:4px; box-shadow:0 0 10px rgba(0,230,118,0.35);">
-                                <i class="fa-solid fa-briefcase"></i> ДЛЯ БИЗНЕСА
+                                <i class="fa-solid fa-briefcase"></i> ДЛЯ ВАШЕГО БИЗНЕСА
                             </div>
                         `;
 
-                        businessMatches.forEach(m => {
-                            const isOwned = ownedBizIds.includes(m.id);
-                            const ownedCheck = isOwned ? ' ✓' : '';
+                        ownedMatches.forEach(m => {
                             const badgeColor = m.badgeColor || '#00e676';
                             statusBadgesHtml += `
                                 <span class='tag-badge notranslate' translate='no' title='Подходит для: ${m.name}' style='background:rgba(9,14,24,0.85); color:${badgeColor}; border:1px solid ${badgeColor}; box-shadow:0 0 6px ${badgeColor}; font-weight:700; font-size:8px;'>
-                                    <i class='fa-solid ${m.icon || 'fa-briefcase'}' style='margin-right:3px;'></i>${m.name}${ownedCheck}
+                                    <i class='fa-solid ${m.icon || 'fa-briefcase'}' style='margin-right:3px;'></i>${m.name} ✓
                                 </span>
                             `;
                         });
@@ -924,10 +687,6 @@ function updateMarketTimers() {
 }
 
 Object.assign(window, {
-    switchMarketMode,
-    setMarketShopFilter,
-    renderMarketShopItems,
-    buyMarketShopItem,
     toggleMarketCategories,
     toggleMarketSortOrder,
     openMarketMapMode,
@@ -945,4 +704,4 @@ Object.assign(window, {
     dispatchMarketAction
 });
 
-console.log('[🏪 market v2.0.0] Восстановлен раздел «Товары и приборы» (SHOP_CATALOG) ✓');
+console.log('[🏪 market v2.1.0] Очищен интерфейс от лишней кнопки, иконки бизнеса только под купленные точки ✓');
