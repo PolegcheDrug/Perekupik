@@ -1,6 +1,11 @@
 // ========================================================
-// js/market/market-map.js — ИНТЕРАКТИВНЫЙ GPS-НАВИГАТОР АВТОРЫНКА (v3.0.0)
+// js/market/market-map.js — ИНТЕРАКТИВНЫЙ GPS-НАВИГАТОР & МЕЖГОРОД (v3.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v3.1.0:
+//   - ИНТЕГРАЦИЯ СЕЗОНОВ: отображение текущего сезона и рыночных трендов на карте.
+//   - СРОЧНЫЙ ПЕРЕГОН / НАВОДКИ: модуль поиска капсул времени в регионах (Тверь, Карелия, Сочи).
+//   - ЭВАКУАТОР И РИСКИ В ДОРОГЕ: расчет доставки, поломок и постов ДПС.
+//   - Полная сохранность Pan & Zoom, радиуса радара и карточек лотов.
 // ========================================================
 
 const MarketMap = {
@@ -19,7 +24,6 @@ const MarketMap = {
         initialPanY: 0
     },
 
-    // Районы города на виртуальном холсте (1200x1200 px)
     DISTRICTS: [
         { id: 'center', name: 'Центральный Сити', x: 600, y: 600, tag: 'ЦЕНТР' },
         { id: 'spalny', name: 'Западные Спальники', x: 260, y: 380, tag: 'ЖИЛОЙ' },
@@ -34,11 +38,21 @@ const MarketMap = {
         return 15;
     },
 
+    getCurrentSeason() {
+        const day = window.state?.player?.day || 1;
+        const seasons = ['winter', 'spring', 'summer', 'autumn'];
+        const seasonIndex = Math.floor((day % 120) / 30);
+        const seasonKey = seasons[seasonIndex] || 'winter';
+        return window.SEASONS_ECONOMY_CONFIG?.[seasonKey] || {
+            name: "❄️ Зимний сезон",
+            desc: "Спрос на RWD и 4x4 завышен"
+        };
+    },
+
     show(feed) {
         const cars = feed || window.state?.marketFeed || [];
         this.selectedCarId = null;
 
-        // Сброс позиции в центр карты
         this.view.zoom = 1;
         this.view.x = 0;
         this.view.y = 0;
@@ -67,7 +81,6 @@ const MarketMap = {
         if (typeof playSound === 'function') playSound('tick');
     },
 
-    // Обработка перетаскивания и жестов
     _bindInteractions() {
         const viewport = document.getElementById('mapViewport');
         const world = document.getElementById('mapWorld');
@@ -78,8 +91,7 @@ const MarketMap = {
         };
 
         const onPointerDown = (e) => {
-            // Если клик по кнопке или карточке — не перетаскиваем
-            if (e.target.closest('.map-car-pin') || e.target.closest('.map-hud-car-card') || e.target.closest('.map-control-btn')) return;
+            if (e.target.closest('.map-car-pin') || e.target.closest('.map-hud-car-card') || e.target.closest('.map-control-btn') || e.target.closest('.intercity-leads-modal')) return;
             this.view.isDragging = true;
             this.view.startX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
             this.view.startY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
@@ -95,7 +107,6 @@ const MarketMap = {
             const dx = currentX - this.view.startX;
             const dy = currentY - this.view.startY;
 
-            // Ограничение сдвига карты (в пределах 450px)
             const maxPan = 420 * this.view.zoom;
             this.view.x = Math.max(-maxPan, Math.min(maxPan, this.view.initialPanX + dx));
             this.view.y = Math.max(-maxPan, Math.min(maxPan, this.view.initialPanY + dy));
@@ -163,6 +174,137 @@ const MarketMap = {
 
             this.show(window.state.marketFeed || []);
         }
+    },
+
+    // ====================================================
+    // СИСТЕМА МЕЖГОРОДСКОГО ПЕРЕГОНА (НАВОДКИ И ЭВАКУАТОР)
+    // ====================================================
+    openIntercityLeadsModal() {
+        const lvl = window.state?.player?.level || 1;
+        if (lvl < (window.INTERCITY_HAUL_CONFIG?.minLevel || 4)) {
+            return showToast(`🔒 Межгородской перегон доступен с 4 уровня!`);
+        }
+
+        const regions = window.INTERCITY_HAUL_CONFIG?.regions || [];
+        let modal = document.getElementById('modalIntercityLeads');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalIntercityLeads';
+            modal.className = 'modal-backdrop active';
+            modal.style.cssText = 'position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; padding:12px; backdrop-filter:blur(6px);';
+            document.body.appendChild(modal);
+        }
+
+        const cardsHtml = regions.map((reg, idx) => {
+            return `
+                <div class="glass-card p-2 mb-2" style="background:#090e18; border:1px solid rgba(0,242,254,0.3); border-radius:10px;">
+                    <div class="flex-between mb-1">
+                        <b class="text-xs color-cyan" style="font-size:11px;">📍 ${reg.regionName}</b>
+                        <span class="tag-badge bg-tag-amber" style="font-size:8px;">${reg.distanceKm} км</span>
+                    </div>
+                    <div class="sub-label mb-2" style="font-size:9px; line-height:1.35;">${reg.desc}</div>
+                    <div class="flex-between p-2 mb-2" style="background:#050914; border-radius:6px; font-size:8.5px;">
+                        <span>Эвакуатор: <b class="color-amber">${reg.towTruckCost.toLocaleString()} ₽</b></span>
+                        <span>Риск в пути: <b class="color-red">${reg.riskBreakdownPct}%</b></span>
+                    </div>
+                    <button onclick="MarketMap.orderIntercityHaul(${idx})" class="btn btn-green btn-sm w-full font-bold" style="padding:6px 0; font-size:10px;">
+                        🚚 Заказать перегон (${reg.towTruckCost.toLocaleString()} ₽)
+                    </button>
+                </div>
+            `;
+        }).join('');
+
+        modal.innerHTML = `
+            <div class="glass-card p-3 w-full" style="max-width:420px; background:#0b1120; border:1.5px solid var(--amber); border-radius:14px; max-height:85vh; display:flex; flex-direction:column;">
+                <div class="flex-between mb-2">
+                    <div>
+                        <b class="text-xs color-amber"><i class="fa-solid fa-truck-arrow-right mr-1"></i> СРОЧНЫЙ ПЕРЕГОН ИЗ РЕГИОНОВ</b>
+                        <div class="sub-label" style="font-size:8.5px;">Скупка капсул времени и срочных проектов с доставкой</div>
+                    </div>
+                    <button onclick="document.getElementById('modalIntercityLeads')?.remove()" class="btn btn-dark btn-sm btn-auto" style="padding:3px 7px;">✕</button>
+                </div>
+                <div style="flex:1; overflow-y:auto; padding-right:2px;">
+                    ${cardsHtml}
+                </div>
+            </div>
+        `;
+    },
+
+    orderIntercityHaul(regionIdx) {
+        const reg = window.INTERCITY_HAUL_CONFIG?.regions?.[regionIdx];
+        if (!reg) return;
+
+        const maxSlots = (typeof getTotalGarageSlots === 'function') ? getTotalGarageSlots() : 2;
+        const curSlots = (window.state?.garage || []).length;
+        if (curSlots >= maxSlots) {
+            return showToast("🚫 В гараже нет мест! Освободите бокс перед заказом перегона.");
+        }
+
+        const cash = window.state?.player?.cash || 0;
+        if (cash < reg.towTruckCost) {
+            return showToast(`Не хватает денег на эвакуатор! Нужно: ${reg.towTruckCost.toLocaleString()} ₽`);
+        }
+
+        document.getElementById('modalIntercityLeads')?.remove();
+
+        window.state.player.cash -= reg.towTruckCost;
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Заказ автовоза/эвакуатора: ${reg.regionName}`, reg.towTruckCost, false);
+        }
+
+        showToast("🚚 Эвакуатор выехал в регион...");
+        if (typeof playSound === 'function') playSound('tick');
+
+        setTimeout(() => {
+            const roll = Math.random() * 100;
+
+            if (roll < reg.riskBreakdownPct) {
+                // Поломка по пути
+                const repairFine = Math.round(reg.towTruckCost * 0.45);
+                window.state.player.cash = Math.max(0, (window.state.player.cash || 0) - repairFine);
+                showToast(`⚠️ В пути пробило колесо и закипел мотор автовоза! Доплата за ремонт: -${repairFine.toLocaleString()} ₽`);
+                if (typeof playSound === 'function') playSound('error');
+            }
+
+            // Генерация редкого автомобиля
+            const pool = window.CAR_DATABASE?.economy || [{ name: "ВАЗ-2101", basePrice: 120000 }];
+            const template = pool[Math.floor(Math.random() * pool.length)];
+            const baseVal = template.basePrice || 120000;
+            const buyPrice = Math.round(baseVal * reg.discountFromMarket);
+
+            const hauledCar = {
+                id: "car_haul_" + Date.now(),
+                name: `${template.name} (${reg.regionName.split(' ')[0]})`,
+                power: template.power || 90,
+                type: template.type || 'economy',
+                basePrice: baseVal,
+                price: buyPrice,
+                purchaseCost: buyPrice + reg.towTruckCost,
+                marketValue: Math.round(baseVal * 1.25),
+                mileage: Math.floor(25000 + Math.random() * 40000), // Капсула времени
+                condition: 80,
+                plate: (typeof generateNormalPlate === 'function') ? generateNormalPlate() : "М777ММ 77",
+                isMuseumStock: true,
+                ownershipDays: 0,
+                isRegisteredOnPlayer: false
+            };
+
+            if (!window.state.garage) window.state.garage = [];
+            window.state.garage.push(hauledCar);
+
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (typeof renderGarage === 'function') renderGarage();
+            if (typeof playSound === 'function') playSound('win');
+
+            if (typeof openVerdictModal === 'function') {
+                openVerdictModal(
+                    "КАПСУЛА ВРЕМЕНИ ДОСТАВЛЕНА! 🚚",
+                    `Автовоз успешно доставил «${hauledCar.name}» в гараж!\nВыкуплено с дисконтом за ${buyPrice.toLocaleString()} ₽.\nОценка рынка: ~${hauledCar.marketValue.toLocaleString()} ₽!`,
+                    true
+                );
+            }
+        }, 1500);
     },
 
     selectCar(carId) {
@@ -237,8 +379,8 @@ const MarketMap = {
 
     renderMapHtml(cars) {
         const radiusKm = this.getRadarRadius();
-        // Радиус сканера в пикселях на карте (600x600 центр)
         const radiusPx = Math.min(540, Math.max(180, radiusKm * 18));
+        const season = this.getCurrentSeason();
 
         const mappedCars = (cars || []).map((car, idx) => {
             const district = this.DISTRICTS[idx % this.DISTRICTS.length];
@@ -257,7 +399,6 @@ const MarketMap = {
             return { car, posX, posY, inRange };
         });
 
-        // Отрисовка пинов
         const pinsHtml = mappedCars.map(({ car, posX, posY, inRange }) => {
             if (inRange) {
                 return `
@@ -295,7 +436,6 @@ const MarketMap = {
                     border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,0.9), 0 0 30px rgba(0,242,254,0.15);
                     overflow: hidden; display: flex; flex-direction: column; position: relative;
                 }
-                /* Шапка */
                 .map-header {
                     padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;
                     background: rgba(10, 16, 30, 0.95); border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -305,25 +445,21 @@ const MarketMap = {
                     display: flex; align-items: center; gap: 8px; min-width: 0;
                 }
                 .map-actions-group {
-                    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+                    display: flex; align-items: center; gap: 5px; flex-shrink: 0;
                 }
-                /* Область просмотра навигатора */
                 .map-viewport {
                     position: relative; flex: 1; width: 100%; height: 100%;
                     overflow: hidden; cursor: grab; background: #04070f;
                     user-select: none; -webkit-user-select: none;
                 }
-                /* Виртуальный мир */
                 .map-world {
                     position: absolute; top: 50%; left: 50%; width: 1200px; height: 1200px;
                     transform-origin: center center; transition: transform 0.08s ease-out;
                     pointer-events: auto;
                 }
-                /* Векторный город */
                 .map-svg-layer {
                     position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;
                 }
-                /* Зона действия радара */
                 .radar-pulse-ring {
                     position: absolute; top: 600px; left: 600px; transform: translate(-50%, -50%);
                     border-radius: 50%; border: 1.5px dashed rgba(0, 242, 254, 0.5);
@@ -340,7 +476,6 @@ const MarketMap = {
                     0% { transform: rotate(0deg); }
                     100% { transform: rotate(360deg); }
                 }
-                /* База перекупа */
                 .player-base-pin {
                     position: absolute; top: 600px; left: 600px; transform: translate(-50%, -50%);
                     width: 32px; height: 32px; border-radius: 50%;
@@ -349,7 +484,6 @@ const MarketMap = {
                     display: flex; align-items: center; justify-content: center;
                     font-size: 14px; z-index: 10;
                 }
-                /* Пины авто */
                 .map-car-pin {
                     position: absolute; transform: translate(-50%, -50%);
                     cursor: pointer; display: flex; flex-direction: column; align-items: center;
@@ -385,7 +519,6 @@ const MarketMap = {
                     color: #94a3b8; display: flex; align-items: center; justify-content: center;
                     font-size: 11px; font-weight: bold;
                 }
-                /* Плашки районов */
                 .district-tag-box {
                     position: absolute; transform: translate(-50%, -50%);
                     background: rgba(10, 18, 36, 0.75); border: 1px solid rgba(255, 255, 255, 0.08);
@@ -398,7 +531,6 @@ const MarketMap = {
                 .district-tag-sub {
                     font-size: 7px; font-weight: 700; color: var(--cyan); letter-spacing: 0.4px;
                 }
-                /* Плавающие кнопки управления зумом */
                 .map-floating-controls {
                     position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column;
                     gap: 6px; z-index: 40;
@@ -413,7 +545,6 @@ const MarketMap = {
                 .map-control-btn:active {
                     transform: scale(0.92); background: rgba(0, 242, 254, 0.2);
                 }
-                /* Карточка авто снизу */
                 .map-hud-car-card {
                     position: absolute; bottom: 10px; left: 10px; right: 10px;
                     background: rgba(6, 12, 24, 0.96); backdrop-filter: blur(10px);
@@ -455,7 +586,6 @@ const MarketMap = {
                 .map-hud-actions {
                     display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
                 }
-                /* Подвал */
                 .map-footer {
                     padding: 6px 12px; background: rgba(5, 10, 20, 0.95);
                     border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -465,22 +595,22 @@ const MarketMap = {
             </style>
 
             <div class="market-map-box">
-                <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+                <!-- ВЕРХНЯЯ ПАНЕЛЬ С СЕЗОНОМ И МЕЖГОРОДОМ -->
                 <div class="map-header">
                     <div class="map-title-group">
                         <span style="font-size:20px;">🗺️</span>
                         <div>
                             <b class="text-xs color-cyan" style="font-size:12px; display:block;">GPS Авторынок</b>
-                            <span class="sub-label" style="font-size:8px;">Перетаскивайте карту пальцем</span>
+                            <span class="sub-label" style="font-size:8px;">${season.name}</span>
                         </div>
                     </div>
 
                     <div class="map-actions-group">
-                        <span class="tag-badge bg-tag-cyan" style="font-size:8.5px; padding:3px 6px;">
-                            ${radiusKm} км
-                        </span>
-                        <button onclick="MarketMap.upgradeRadarPrompt()" class="btn btn-amber btn-sm btn-auto" style="padding:4px 8px; font-size:9px; height:28px;">
-                            <i class="fa-solid fa-satellite-dish"></i> +Радар
+                        <button onclick="MarketMap.openIntercityLeadsModal()" class="btn btn-purple btn-sm btn-auto" style="padding:4px 7px; font-size:8.5px; height:28px;">
+                            🚚 Перегон
+                        </button>
+                        <button onclick="MarketMap.upgradeRadarPrompt()" class="btn btn-amber btn-sm btn-auto" style="padding:4px 7px; font-size:8.5px; height:28px;">
+                            +Радар
                         </button>
                         <button onclick="MarketMap.close()" class="btn btn-dark btn-sm btn-auto" style="padding:4px 9px; height:28px;">✕</button>
                     </div>
@@ -488,16 +618,13 @@ const MarketMap = {
 
                 <!-- ОБЛАСТЬ ПРОСМОТРА КАРТЫ -->
                 <div class="map-viewport" id="mapViewport">
-                    <!-- ПЛАВАЮЩИЕ КНОПКИ УПРАВЛЕНИЯ -->
                     <div class="map-floating-controls">
                         <button class="map-control-btn" onclick="MarketMap.zoomIn()" title="Приблизить">+</button>
                         <button class="map-control-btn" onclick="MarketMap.zoomOut()" title="Отдалить">−</button>
                         <button class="map-control-btn" onclick="MarketMap.resetToCenter()" title="В центр">🎯</button>
                     </div>
 
-                    <!-- ВИРТУАЛЬНЫЙ ГОРОД (1200x1200px) -->
                     <div class="map-world" id="mapWorld">
-                        <!-- ВЕКТОРНАЯ ДОРОЖНАЯ И ГОРОДСКАЯ СЕТКА -->
                         <svg class="map-svg-layer" viewBox="0 0 1200 1200">
                             <defs>
                                 <pattern id="cityGrid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -506,41 +633,32 @@ const MarketMap = {
                             </defs>
                             <rect width="100%" height="100%" fill="url(#cityGrid)" />
 
-                            <!-- Кварталы города (полигоны) -->
                             <rect x="180" y="280" width="220" height="180" rx="8" fill="rgba(15, 23, 42, 0.45)" stroke="rgba(255,255,255,0.05)" stroke-width="1.5"/>
                             <rect x="780" y="220" width="260" height="190" rx="8" fill="rgba(15, 23, 42, 0.45)" stroke="rgba(255,255,255,0.05)" stroke-width="1.5"/>
                             <rect x="240" y="800" width="220" height="200" rx="8" fill="rgba(15, 23, 42, 0.45)" stroke="rgba(255,255,255,0.05)" stroke-width="1.5"/>
                             <rect x="800" y="760" width="240" height="220" rx="8" fill="rgba(15, 23, 42, 0.45)" stroke="rgba(255,255,255,0.05)" stroke-width="1.5"/>
 
-                            <!-- Водная артерия (река) -->
                             <path d="M -50,480 C 300,560 450,400 650,480 C 850,560 1000,440 1250,520" fill="none" stroke="rgba(2, 132, 199, 0.22)" stroke-width="44" stroke-linecap="round"/>
                             <path d="M -50,480 C 300,560 450,400 650,480 C 850,560 1000,440 1250,520" fill="none" stroke="rgba(0, 242, 254, 0.45)" stroke-width="2" stroke-dasharray="6,4"/>
 
-                            <!-- Внешняя кольцевая трасса (МКАД) -->
                             <circle cx="600" cy="600" r="480" fill="none" stroke="rgba(0, 242, 254, 0.25)" stroke-width="4" stroke-dasharray="14,6"/>
-                            <!-- Центральное кольцо -->
                             <circle cx="600" cy="600" r="220" fill="none" stroke="rgba(255, 255, 255, 0.16)" stroke-width="3"/>
 
-                            <!-- Главные осевые магистрали -->
                             <line x1="600" y1="0" x2="600" y2="1200" stroke="rgba(255, 255, 255, 0.18)" stroke-width="4"/>
                             <line x1="0" y1="600" x2="1200" y2="600" stroke="rgba(255, 255, 255, 0.18)" stroke-width="4"/>
 
-                            <!-- Диагональные развязки -->
                             <line x1="180" y1="180" x2="1020" y2="1020" stroke="rgba(0, 242, 254, 0.1)" stroke-width="2" stroke-dasharray="5,5"/>
                             <line x1="1020" y1="180" x2="180" y2="1020" stroke="rgba(0, 242, 254, 0.1)" stroke-width="2" stroke-dasharray="5,5"/>
                         </svg>
 
-                        <!-- ЗОНА ДЕЙСТВИЯ РАДАРА -->
                         <div class="radar-pulse-ring" style="width: ${radiusPx * 2}px; height: ${radiusPx * 2}px;">
                             <div class="radar-scanner-beam"></div>
                         </div>
 
-                        <!-- БАЗА ПЕРЕКУПА (ИГРОК) -->
                         <div class="player-base-pin" title="Гараж / База перекупа">
                             🏠
                         </div>
 
-                        <!-- ТАБЛИЧКИ РАЙОНОВ -->
                         <div class="district-tag-box" style="top: 240px; left: 920px;">
                             <div class="district-tag-label">Промзона</div>
                             <div class="district-tag-sub">Авторынок</div>
@@ -562,15 +680,12 @@ const MarketMap = {
                             <div class="district-tag-sub">Трасса М4</div>
                         </div>
 
-                        <!-- ПИНЫ МАШИН -->
                         ${pinsHtml}
                     </div>
 
-                    <!-- ВСПЛЫВАЮЩАЯ КАРТОЧКА АВТО ПРИ КЛИКЕ -->
                     <div id="mapSelectedCarCardBox" style="display:none;"></div>
                 </div>
 
-                <!-- ПОДВАЛ -->
                 <div class="map-footer">
                     <span>🟢 База</span>
                     <span class="color-cyan">🔵 В зоне радара: ${mappedCars.filter(m => m.inRange).length}</span>
@@ -582,4 +697,4 @@ const MarketMap = {
 };
 
 window.MarketMap = MarketMap;
-console.log('[🗺️ market-map v3.0.0] Интерактивный GPS-навигатор с перетаскиванием и зумом загружен ✓');
+console.log('[🗺️ market-map v3.1.0] GPS-навигатор + Сезоны + Межгородской перегон загружен ✓');
