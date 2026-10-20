@@ -1,13 +1,11 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.4.0)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.5.0 CLOUD-FIRST & WIPE EPOCH)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.4.0 (АДМИНСКИЙ ВАЙП БД И СБРОС ПРОГРЕССА):
-//   - ДОБАВЛЕНО: FB_Core.Admin (wipeAllGlobal, wipeMarketOnly, resetCurrentPlayerLocal).
-//   - Пакетное удаление (writeBatch) коллекций players, garages, saves, market_lots,
-//     p2p_deals, trade_offers, chat_messages, notifications.
-//   - Устранена ошибка «FB_Core.Admin.wipeAllGlobal недоступен».
-//   - Полная очистка localStorage/sessionStorage и перезапуск клиента при вайпе.
+// ⭐ v1.5.0:
+//   - Внедрена система serverEpoch для управляемого вайпа через DEV.
+//   - Публикация реальных игроков в коллекцию leaderboard.
+//   - Защита от воскрешения сейвов из localStorage после вайпа.
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -30,7 +28,8 @@ import {
   where,
   limit,
   writeBatch,
-  Timestamp
+  Timestamp,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ========================================================
@@ -53,7 +52,7 @@ const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
 });
 
-console.log('[🔥 Firebase Core] Firestore инициализирован с experimentalForceLongPolling: true');
+console.log('[🔥 Firebase Core] Firestore инициализирован (v1.5.0)');
 
 const DEFAULT_AUTH_SERVER_URL = window.AUTH_SERVER_URL || null;
 
@@ -122,7 +121,7 @@ const TelegramAuthManager = {
       }
     } catch (e) {}
 
-    // Попытка 1: Авторизация через внешний сервер токенов
+    // 1. Авторизация через сервер
     if (url && initData) {
       try {
         const response = await fetch(`${url}/api/auth/telegram`, {
@@ -137,12 +136,7 @@ const TelegramAuthManager = {
             const userCredential = await signInWithCustomToken(auth, data.customToken);
             verifiedUserId = userCredential.user.uid;
             currentUserProfile = data.user;
-            console.log(`[🔐 Auth] Firebase Auth (Custom Token) OK. UID: ${verifiedUserId}`);
             devLogFirestore('Auth Firebase OK', `UID: ${verifiedUserId}`);
-            
-            if (window.AppLoadingManager) {
-              window.AppLoadingManager.setProgress(82, "Сессия подтверждена...");
-            }
             return { success: true, userId: verifiedUserId, user: currentUserProfile };
           }
         }
@@ -151,7 +145,7 @@ const TelegramAuthManager = {
       }
     }
 
-    // Попытка 2: Резервная авторизация через signInAnonymously
+    // 2. Резервная авторизация (Anonymous)
     try {
       let anonCredential;
       if (!auth.currentUser) {
@@ -186,13 +180,7 @@ const TelegramAuthManager = {
         };
       }
 
-      console.log(`[🔐 Auth] Резервный Firebase Auth OK. UID игрока: ${verifiedUserId}, Auth UID: ${anonCredential.user.uid}`);
       devLogFirestore('Auth Fallback OK', `UID: ${verifiedUserId}`);
-
-      if (window.AppLoadingManager) {
-        window.AppLoadingManager.setProgress(82, "Сессия подтверждена...");
-      }
-
       return { success: true, userId: verifiedUserId, user: currentUserProfile };
     } catch (authErr) {
       console.error("[🔐 Auth] Критическая ошибка авторизации Firebase:", authErr);
@@ -221,31 +209,123 @@ const TelegramAuthManager = {
         isTelegram: true
       };
     }
-    console.log('[🔐 Auth] Force verifiedUserId:', verifiedUserId);
   }
 };
 
 // ========================================================
-// 5. PLAYERS STORAGE MANAGER
+// 5. SYSTEM & EPOCH MANAGER (УПРАВЛЯЕМЫЙ ВАЙП)
+// ========================================================
+const SystemConfigManager = {
+  async getServerEpoch() {
+    try {
+      const snap = await getDoc(doc(db, "system", "server_config"));
+      if (snap.exists()) {
+        return Number(snap.data().serverEpoch) || 1;
+      }
+      // Если документа еще нет, создаем начальную эпоху
+      await setDoc(doc(db, "system", "server_config"), { serverEpoch: 1, updatedAt: Date.now() }, { merge: true });
+      return 1;
+    } catch (e) {
+      console.warn('[System] Ошибка чтения serverEpoch:', e);
+      return 1;
+    }
+  },
+
+  async triggerGlobalWipe() {
+    try {
+      const currentEpoch = await this.getServerEpoch();
+      const newEpoch = currentEpoch + 1;
+      await setDoc(doc(db, "system", "server_config"), { 
+        serverEpoch: newEpoch, 
+        lastWipedAt: Date.now(),
+        wipedBy: verifiedUserId || 'owner'
+      }, { merge: true });
+
+      // Очищаем рынок и P2P
+      await AdminManager.wipeMarketOnly(true);
+
+      console.log(`[Wipe] 🚨 Глобальная эпоха сервера повышена до: ${newEpoch}`);
+      devLogFirestore('triggerGlobalWipe OK', `Новая эпоха: ${newEpoch}`);
+      return newEpoch;
+    } catch (e) {
+      console.error('[Wipe] Ошибка запуска вайпа:', e);
+      throw e;
+    }
+  }
+};
+
+// ========================================================
+// 6. LEADERBOARD MANAGER (РЕАЛЬНЫЕ ИГРОКИ)
+// ========================================================
+const LeaderboardManager = {
+  async publishEntry(userId, gameState) {
+    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
+    if (!targetUid || !gameState?.player) return;
+
+    try {
+      const p = gameState.player;
+      let totalAssets = Number(p.cash) || 0;
+      (gameState.garage || []).forEach(c => {
+        totalAssets += Number(c.price || c.basePrice || 0);
+      });
+      (gameState.businesses || []).forEach(b => {
+        if (b && b.level > 0) totalAssets += Number(b.cost || 0);
+      });
+
+      const leaderData = {
+        uid: String(targetUid),
+        name: p.name || "Перекуп",
+        avatar: p.avatarUrl || null,
+        level: Number(p.level) || 1,
+        netWorth: Math.round(totalAssets),
+        profit: Number(p.stats?.totalNetProfit) || 0,
+        bestCar: gameState.garage?.[0]?.name || "Пешком",
+        updatedAt: Date.now()
+      };
+
+      await setDoc(doc(db, "leaderboard", String(targetUid)), leaderData, { merge: true });
+    } catch (e) {
+      console.warn('[Leaderboard] Ошибка публикации:', e);
+    }
+  },
+
+  async fetchTop(sortBy = 'netWorth', count = 30) {
+    try {
+      const q = query(
+        collection(db, "leaderboard"),
+        orderBy(sortBy, "desc"),
+        limit(count)
+      );
+      const snap = await getDocs(q);
+      const players = [];
+      snap.forEach(d => players.push(d.data()));
+      return players;
+    } catch (e) {
+      console.warn('[Leaderboard] Ошибка получения лидеров:', e);
+      return [];
+    }
+  }
+};
+
+// ========================================================
+// 7. PLAYERS STORAGE MANAGER
 // ========================================================
 let saveDebounceTimer = null;
 let lastSavedHash = "";
 
 const PlayersStorageManager = {
   pushSave(userId, gameState) {
-    if (window.__IS_RESETTING__) {
-      devLogFirestore('pushSave ЗАБЛОКИРОВАН', 'идёт сброс прогресса');
-      return;
-    }
+    if (window.__IS_RESETTING__) return;
 
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    if (!targetUid) {
-      devLogFirestore('pushSave BLOCKED', 'нет userId');
-      return;
-    }
+    if (!targetUid) return;
+
+    // Публикуем в лидерборд при сохранениях
+    LeaderboardManager.publishEntry(targetUid, gameState);
 
     const playerDoc = {
       telegram_id: String(targetUid),
+      serverEpoch: Number(gameState.player?.serverEpoch) || 1,
       name: gameState.player?.name || "Перекуп",
       avatar: gameState.player?.avatarUrl || null,
       level: gameState.player?.level || 1,
@@ -276,6 +356,7 @@ const PlayersStorageManager = {
       ownedHouses: gameState.player?.ownedHouses || [],
       housingId: gameState.player?.housingId || 'trailer',
       stats: gameState.player?.stats || {},
+      foundedCorporations: gameState.player?.foundedCorporations || [],
       onboardingDone: gameState.player?.onboardingDone === true,
       updatedAt: Date.now()
     };
@@ -292,31 +373,27 @@ const PlayersStorageManager = {
       updatedAt: Date.now()
     };
 
-    const currentHash = `${playerDoc.cash}_${playerDoc.level}_${garageDoc.cars.length}_${playerDoc.club?.id || 'none'}_${playerDoc.onboardingDone}_${garageDoc.warehouse.cars.length}_${garageDoc.paidParking.cars.length}_${garageDoc.platesInventory.length}`;
+    const currentHash = `${playerDoc.cash}_${playerDoc.level}_${garageDoc.cars.length}_${playerDoc.onboardingDone}_${garageDoc.businesses.length}`;
     if (currentHash === lastSavedHash) return;
 
     clearTimeout(saveDebounceTimer);
     saveDebounceTimer = setTimeout(async () => {
       try {
-        if (window.__IS_RESETTING__) {
-          devLogFirestore('pushSave ОТМЕНЁН', 'сброс начался во время дебаунса');
-          return;
-        }
+        if (window.__IS_RESETTING__) return;
 
-        const t0 = performance.now();
         await Promise.all([
           setDoc(doc(db, "players", String(targetUid)), playerDoc, { merge: true }),
           setDoc(doc(db, "garages", String(targetUid)), garageDoc, { merge: true })
         ]);
-        const dt = Math.round(performance.now() - t0);
         lastSavedHash = currentHash;
-        console.log(`[☁️ Firestore] Синхронизировано: ${targetUid}`);
-        devLogFirestore('pushSave OK', `players/garages → ${targetUid} (${dt}ms)`);
+        console.log(`[☁️ Firestore] Синхронизировано в облако: ${targetUid}`);
       } catch (e) {
-        console.warn("[☁️ Firestore] Ошибка записи:", e);
-        devLogFirestore('pushSave ERROR', e.message || String(e));
+        console.warn("[☁️ Firestore] Ошибка записи в облако, сохраняем в fallback localStorage:", e);
+        try {
+          localStorage.setItem('perekup_save_' + targetUid, JSON.stringify(gameState));
+        } catch(lsErr) {}
       }
-    }, 3500);
+    }, 3000);
   },
 
   async pushSaveForce(userId, gameState) {
@@ -326,6 +403,7 @@ const PlayersStorageManager = {
     try {
       const minimalDoc = {
         telegram_id: String(targetUid),
+        serverEpoch: Number(gameState.player?.serverEpoch) || 1,
         name: gameState.player?.name || "Перекуп",
         level: gameState.player?.level || 1,
         cash: gameState.player?.cash || 0,
@@ -334,41 +412,26 @@ const PlayersStorageManager = {
         updatedAt: Date.now()
       };
       await setDoc(doc(db, "players", String(targetUid)), minimalDoc, { merge: true });
-      devLogFirestore('pushSaveForce OK', `players/${targetUid}`);
+      LeaderboardManager.publishEntry(targetUid, gameState);
       return true;
     } catch (e) {
-      devLogFirestore('pushSaveForce ERROR', e.message || String(e));
       return false;
     }
   },
 
   async pullSave(userId) {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    if (!targetUid) {
-      devLogFirestore('pullSave BLOCKED', 'нет userId');
-      return null;
-    }
-
-    if (window.AppLoadingManager) {
-      window.AppLoadingManager.setProgress(87, "Загрузка гаража и кассы...");
-    }
+    if (!targetUid) return null;
 
     try {
-      const t0 = performance.now();
       const [playerSnap, garageSnap] = await Promise.all([
         getDoc(doc(db, "players", String(targetUid))),
         getDoc(doc(db, "garages", String(targetUid)))
       ]);
-      const dt = Math.round(performance.now() - t0);
 
       if (playerSnap.exists() || garageSnap.exists()) {
         const pData = playerSnap.exists() ? playerSnap.data() : {};
         const gData = garageSnap.exists() ? garageSnap.data() : {};
-        devLogFirestore('pullSave OK', `${targetUid} (${dt}ms, ${(gData.cars || []).length} авто)`);
-        
-        if (window.AppLoadingManager) {
-          window.AppLoadingManager.setProgress(90, "Синхронизация профиля...");
-        }
 
         return {
           player: { ...pData },
@@ -381,26 +444,15 @@ const PlayersStorageManager = {
           paidParking: gData.paidParking || { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 }
         };
       }
-
-      const oldSnap = await getDoc(doc(db, "saves", String(targetUid)));
-      if (oldSnap.exists()) {
-        devLogFirestore('pullSave (legacy saves/)', `${targetUid}`);
-        if (window.AppLoadingManager) {
-          window.AppLoadingManager.setProgress(90, "Синхронизация профиля...");
-        }
-        return oldSnap.data();
-      }
-      devLogFirestore('pullSave MISS', `${targetUid} — документов нет`);
     } catch (e) {
-      console.warn("[☁️ Firestore] Ошибка загрузки:", e);
-      devLogFirestore('pullSave ERROR', e.message || String(e));
+      console.warn("[☁️ Firestore] Ошибка загрузки облачного сейва:", e);
     }
     return null;
   }
 };
 
 // ========================================================
-// 6. ADMIN MANAGER (ПОЛНЫЙ И ЛОКАЛЬНЫЙ ВАЙП)
+// 8. ADMIN MANAGER
 // ========================================================
 const AdminManager = {
   async _deleteEntireCollection(colName) {
@@ -418,94 +470,59 @@ const AdminManager = {
     return deletedCount;
   },
 
-  async wipeMarketOnly() {
-    if (!confirm("⚠️ Вы уверены, что хотите сбросить ВСЕ лоты биржи и активные сделки? (Прогресс игроков сохранится)")) {
-      return false;
-    }
+  async wipeMarketOnly(silent = false) {
+    if (!silent && !confirm("Очистить все лоты авторынка и P2P?")) return false;
 
     try {
-      if (typeof showToast === 'function') showToast('Очистка рынка и сделок...');
       const targetCols = ['market_lots', 'p2p_deals', 'trade_offers', 'chat_messages'];
       let total = 0;
       for (const col of targetCols) {
         total += await this._deleteEntireCollection(col);
       }
-      devLogFirestore('wipeMarketOnly OK', `Удалено ${total} записей`);
-      if (typeof showToast === 'function') showToast(`✅ Рынок очищен (${total} записей)`, 'success');
-      setTimeout(() => window.location.reload(), 1000);
+      if (!silent) showToast(`Рынок очищен (${total} лотов)`, 'success');
       return true;
     } catch (e) {
-      console.error('[Admin] wipeMarketOnly error:', e);
-      if (typeof showToast === 'function') showToast(`❌ Ошибка сброса: ${e.message}`, 'error');
+      if (!silent) showToast(`Ошибка: ${e.message}`, 'error');
       return false;
     }
   },
 
   async wipeAllGlobal() {
-    const confirmation = prompt("🚨 ВНИМАНИЕ: Это удалит ВСЕХ игроков, гаражи, лоты и сбросит БД до заводских настроек!\nВведите «ВАЙП» для подтверждения:");
+    const confirmation = prompt("🚨 ВНИМАНИЕ: Это проведёт глобальный ВАЙП сервера!\nВсе игроки начнут заново с 1 уровня.\nВведите «ВАЙП» для подтверждения:");
     if (confirmation !== "ВАЙП") {
-      if (typeof showToast === 'function') showToast("Сброс отменён");
+      if (typeof showToast === 'function') showToast("Вайп отменён");
       return false;
     }
 
-    window.__IS_RESETTING__ = true;
-
     try {
-      if (typeof showToast === 'function') showToast('⏳ Выполняется полный глобальный вайп БД...');
+      if (typeof showToast === 'function') showToast('⏳ Запуск глобального вайпа...');
+      
+      // Повышаем эпоху сервера (это автоматически сбросит всех игроков при следующем входе)
+      const newEpoch = await SystemConfigManager.triggerGlobalWipe();
 
-      const allCollections = [
-        'players',
-        'garages',
-        'saves',
-        'market_lots',
-        'p2p_deals',
-        'trade_offers',
-        'chat_messages',
-        'notifications',
-        'clubs',
-        'transactions'
-      ];
+      // Очищаем локальные данные на текущем устройстве
+      try { localStorage.clear(); } catch(e) {}
+      try { sessionStorage.clear(); } catch(e) {}
 
-      let totalDeleted = 0;
-      for (const col of allCollections) {
-        try {
-          const count = await this._deleteEntireCollection(col);
-          totalDeleted += count;
-          console.log(`[Admin Wipe] Очищена коллекция: ${col} (${count} док.)`);
-        } catch (colErr) {
-          console.warn(`[Admin Wipe] Пропуск коллекции ${col}:`, colErr.message);
-        }
-      }
-
-      // Полная локальная очистка клиента
-      try { localStorage.clear(); } catch (e) {}
-      try { sessionStorage.clear(); } catch (e) {}
-
-      devLogFirestore('wipeAllGlobal OK', `Удалено всего: ${totalDeleted} док.`);
-      alert(`✅ Полный глобальный вайп завершён! Удалено документов: ${totalDeleted}. Перезагрузка...`);
+      alert(`✅ Глобальный вайп успешно проведён! Начата эпоха #${newEpoch}. Игра будет перезагружена.`);
       window.location.reload();
       return true;
     } catch (e) {
-      console.error('[Admin] wipeAllGlobal error:', e);
-      window.__IS_RESETTING__ = false;
-      if (typeof showToast === 'function') showToast(`❌ Ошибка вайпа: ${e.message}`, 'error');
+      alert(`Ошибка вайпа: ${e.message}`);
       return false;
     }
   },
 
   resetCurrentPlayerLocal() {
-    if (!confirm("Сбросить сохранение на этом устройстве и начать карьеру заново?")) {
-      return;
-    }
-    window.__IS_RESETTING__ = true;
-    try { localStorage.clear(); } catch (e) {}
-    try { sessionStorage.clear(); } catch (e) {}
+    if (!confirm("Сбросить сохранение на этом телефоне?")) return;
+    try { localStorage.clear(); } catch(e) {}
+    try { sessionStorage.clear(); } catch(e) {}
     window.location.reload();
   }
 };
 
 // ========================================================
-// 7. CLEANUP MANAGER (TTL)
+// 9. CLEANUP MANAGER (TTL)
 // ========================================================
 const CleanupManager = {
   _lastCleanup: 0,
@@ -514,138 +531,28 @@ const CleanupManager = {
   async runCleanup(force = false) {
     const now = Date.now();
     if (!force && now - this._lastCleanup < this._cleanupInterval) {
-      return { success: true, skipped: true, results: {}, total: 0, errors: 0 };
+      return { success: true, skipped: true };
     }
     this._lastCleanup = now;
 
-    const results = {
-      chat_messages: { ok: 0, error: null },
-      notifications: { ok: 0, error: null },
-      market_lots: { ok: 0, error: null },
-      transactions: { ok: 0, error: null },
-      trade_offers: { ok: 0, error: null }
-    };
-
-    const collectionsToClean = [
-      'chat_messages',
-      'notifications',
-      'market_lots',
-      'transactions',
-      'trade_offers'
-    ];
-
-    let totalDeleted = 0;
-    let errorCount = 0;
-
+    const collectionsToClean = ['chat_messages', 'notifications', 'market_lots', 'transactions', 'trade_offers'];
     for (const colName of collectionsToClean) {
       try {
-        const q = query(
-          collection(db, colName),
-          where("expireAt", "<=", now),
-          limit(100)
-        );
+        const q = query(collection(db, colName), where("expireAt", "<=", now), limit(100));
         const snap = await getDocs(q);
-
-        if (snap.empty) {
-          results[colName].ok = 0;
-          continue;
-        }
+        if (snap.empty) continue;
 
         const batch = writeBatch(db);
-        let deleted = 0;
-        snap.forEach(d => {
-          batch.delete(d.ref);
-          deleted++;
-        });
-
+        snap.forEach(d => batch.delete(d.ref));
         await batch.commit();
-        results[colName].ok = deleted;
-        totalDeleted += deleted;
-      } catch (colErr) {
-        const errMsg = colErr?.code || colErr?.message || String(colErr);
-        results[colName].error = errMsg;
-        errorCount++;
-      }
+      } catch (colErr) {}
     }
-
-    const summary = Object.entries(results)
-      .map(([k, v]) => v.error ? `${k}:ERR` : `${k}:${v.ok}`)
-      .join(', ');
-
-    if (totalDeleted > 0 || errorCount > 0) {
-      devLogFirestore(
-        'cleanupExpiredData',
-        `${summary} | total=${totalDeleted}, errors=${errorCount}`
-      );
-    }
-
-    return {
-      success: errorCount === 0 || totalDeleted > 0,
-      results,
-      total: totalDeleted,
-      errors: errorCount
-    };
+    return { success: true };
   }
 };
 
 // ========================================================
-// 8. FIRESTORE STATS
-// ========================================================
-async function getFirestoreStats() {
-  const stats = {
-    market_lots: 0,
-    chat_messages: 0,
-    notifications: 0,
-    clubs: 0,
-    transactions: 0,
-    registered_plates: 0,
-    cars_catalog: 0,
-    leaderboard: 0,
-    trade_offers: 0,
-    friendships: 0,
-    street_events: 0,
-    storage_wars_lobbies: 0
-  };
-
-  try {
-    for (const colName in stats) {
-      try {
-        const q = query(collection(db, colName), limit(1));
-        const snap = await getDocs(q);
-        stats[colName] = snap.empty ? 0 : "есть данные";
-      } catch (e) {
-        stats[colName] = "ошибка";
-      }
-    }
-  } catch (e) {
-    console.warn('[Stats] Ошибка:', e);
-  }
-
-  return stats;
-}
-
-// ========================================================
-// 9. ВОССТАНОВЛЕНИЕ СЕТИ
-// ========================================================
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', async () => {
-    console.log('[🔥 Firebase Core] Онлайн восстановлен — enableNetwork()');
-    try {
-      await enableNetwork(db);
-      devLogFirestore('enableNetwork OK', 'сеть восстановлена');
-    } catch (e) {
-      console.warn('[🔥 Firebase Core] enableNetwork error:', e);
-    }
-  });
-
-  window.addEventListener('offline', () => {
-    console.log('[🔥 Firebase Core] Сеть потеряна — Firestore переходит в offline');
-    devLogFirestore('offline', 'сеть потеряна');
-  });
-}
-
-// ========================================================
-// 10. ЭКСПОРТ В WINDOW
+// 10. ЭКСПОРТ В WINDOW И BRIDGE
 // ========================================================
 window.FB_Core = {
   app,
@@ -655,22 +562,21 @@ window.FB_Core = {
   Auth: TelegramAuthManager,
   Players: PlayersStorageManager,
   Admin: AdminManager,
+  System: SystemConfigManager,
+  Leaderboard: LeaderboardManager,
   Cleanup: CleanupManager,
-  getStats: getFirestoreStats,
   getTelegramUser,
   devLogFirestore,
   TTL_CONFIG,
   LIMITS
 };
 
+// Экспортируем в FB_Bridge для удобной связи модулей
+if (!window.FB_Bridge) window.FB_Bridge = {};
+window.FB_Bridge.Players = PlayersStorageManager;
+window.FB_Bridge.System = SystemConfigManager;
+window.FB_Bridge.Leaderboard = LeaderboardManager;
+window.FB_Bridge.Auth = TelegramAuthManager;
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Core v1.4.0] Ядро Firebase загружено. Добавлен AdminManager (вайп БД) ✓");
-
-if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-      CleanupManager.runCleanup().catch(e => console.warn('[Cleanup] Автозапуск ошибка:', e));
-    }, 5000);
-  });
-}
+console.log("[☁️ FB_Core v1.5.0] Ядро Firebase загружено. Система эпох и Leaderboard активны ✓");
