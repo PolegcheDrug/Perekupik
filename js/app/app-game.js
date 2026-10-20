@@ -1,14 +1,12 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.2.0)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.2.0 (ВОССТАНОВЛЕНИЕ ЕЖЕДНЕВНОГО БОНУСА И ХАРДКОР-ФИКС):
-//   1. Восстановлена модалка и логика календаря: openDailyBonusModal()
-//      и claimDailyReward() с выдачей наград (кэш, Stars, топливо, талоны).
-//   2. Золотая пульсирующая подсветка кнопки «Бонус», когда подарок готов к сбору.
-//   3. Универсальные методы openModal/closeModal для совместимости разметки.
-//   4. Налоговый цикл каждые 7 дней, пеня +5%/день и аукцион ФССП за 50% цены.
-//   5. Тактильный HUD-револьвер, роллеры чисел и безопасные депозиты.
+// ⭐ v5.3.0 (ТАКТИЛЬНЫЙ СВАЙП-HUD, ЗОЛОТОЙ УРОВЕНЬ & АВТОСКРОЛЛ КАТЕГОРИЙ):
+//   1. Полноценный свободный свайп пальцем вправо/влево ленты статов с инерцией.
+//   2. Яркая золотая неоновая плашка уровня с короной (больше не серая).
+//   3. Слушатель скролла ленты рынка для умного автосворачивания категорий.
+//   4. Сохранены ежедневные награды, налоги ФССП, безопасные депозиты и роллеры.
 // ========================================================
 
 // ========================================================
@@ -301,7 +299,6 @@ function claimDailyReward() {
         tokens.push({ icon: '🎖️', title: 'Опыт авторитета', value: `+${r.xp} XP`, rarity: 'token-cyan' });
     }
 
-    // Фиксация даты и шага стрика
     window.state.player.lastDailyBonusDay = curDay;
     window.state.player.dailyBonusStreak = (streak + 1) % 7;
     window.state.player.streakDay = window.state.player.dailyBonusStreak;
@@ -931,7 +928,19 @@ function updateHeaderUI() {
         setTxt('fuelAmount', fuel);
         setTxt('ticketsAmount', tck + "/" + mTck);
         setTxt('playerName', pName);
-        setTxt('playerLvl', "Ур. " + lvl);
+        
+        // ⭐ ЯРКАЯ ЗОЛОТАЯ ИКОНКА УРОВНЯ
+        const lvlBtn = document.querySelector('.stat-pill.stat-pill-level');
+        if (lvlBtn) {
+            lvlBtn.innerHTML = `<i class="fa-solid fa-crown" style="color:#ffe600; filter:drop-shadow(0 0 6px #ffd700); margin-right:4px;"></i> <span id="playerLvl" style="font-weight:900; color:#ffd700;">Ур. ${lvl}</span>`;
+            lvlBtn.style.background = "linear-gradient(135deg, rgba(255, 215, 0, 0.28), rgba(255, 140, 0, 0.16))";
+            lvlBtn.style.border = "1.5px solid #ffd700";
+            lvlBtn.style.boxShadow = "0 0 12px rgba(255, 215, 0, 0.55), inset 0 0 6px rgba(255, 215, 0, 0.25)";
+            lvlBtn.style.color = "#ffd700";
+        } else {
+            setTxt('playerLvl', "Ур. " + lvl);
+        }
+
         setTxt('connectionsText', conn);
         setTxt('karmaText', karma);
 
@@ -1338,219 +1347,148 @@ function _performTabSwitch(tabId) {
 }
 
 // ========================================================
-// 12. ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР
+// 12. ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР (СВАЙП ПАЛЬЦЕМ + МЫШЬ + ИНЕРЦИЯ)
 // ========================================================
 const HudRevolver = {
-    container: null,
-    row: null,
-    currentX: 0,
-    targetX: 0,
-    isDragging: false,
-    isSnapping: false,
+    scrollEl: null,
+    isDown: false,
     startX: 0,
-    startY: 0,
-    hasMoved: false,
-    lastCenteredPill: null,
-    autoScrollSpeed: -0.5,
-    isAutoScrolling: true,
-    dragThreshold: 5,
-    idleTimeout: null,
-    _rafId: null,
-    _isInitialized: false,
+    scrollLeft: 0,
+    velX: 0,
+    momentumID: null,
+    _isBound: false,
 
     init() {
-        this.container = document.querySelector('.user-stats-scroll');
-        this.row = document.getElementById('userStatsRow');
-        if (!this.container || !this.row || this._isInitialized) return;
-        this._isInitialized = true;
+        this.scrollEl = document.querySelector('.user-stats-scroll');
+        if (!this.scrollEl || this._isBound) return;
+        this._isBound = true;
 
-        this.row.style.animation = 'none';
-        this.row.style.width = 'max-content';
-        this.row.style.display = 'flex';
-        this.row.style.willChange = 'transform';
-        this.container.style.cursor = 'grab';
+        const slider = this.scrollEl;
 
-        if (!document.getElementById('hud-revolver-marker')) {
-            const style = document.createElement('style');
-            style.id = 'hud-revolver-marker';
-            style.innerHTML = `
-                .user-stats-scroll::after {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    bottom: 0;
-                    left: 50%;
-                    width: 2px;
-                    background: rgba(0, 242, 254, 0.6);
-                    transform: translateX(-50%);
-                    pointer-events: none;
-                    box-shadow: 0 0 10px var(--cyan);
-                    z-index: 10;
-                    border-radius: 2px;
-                }
-            `;
-            document.head.appendChild(style);
-        }
+        // Включаем нативную горизонтальную прокрутку
+        slider.style.overflowX = 'auto';
+        slider.style.overflowY = 'hidden';
+        slider.style.webkitOverflowScrolling = 'touch';
+        slider.style.touchAction = 'pan-x';
+        slider.style.cursor = 'grab';
 
-        this.bindEvents();
-        this.startAutoScroll();
-    },
+        // Мышь (ПК-режим)
+        slider.addEventListener('mousedown', (e) => {
+            this.isDown = true;
+            slider.style.cursor = 'grabbing';
+            this.startX = e.pageX - slider.offsetLeft;
+            this.scrollLeft = slider.scrollLeft;
+            cancelAnimationFrame(this.momentumID);
+        });
 
-    bindEvents() {
-        this.container.addEventListener('pointerdown', (e) => this.onPointerDown(e));
-        window.addEventListener('pointermove', (e) => this.onPointerMove(e));
-        window.addEventListener('pointerup', (e) => this.onPointerUp(e));
-        window.addEventListener('pointercancel', (e) => this.onPointerUp(e));
-    },
+        window.addEventListener('mouseup', () => {
+            if (!this.isDown) return;
+            this.isDown = false;
+            slider.style.cursor = 'grab';
+            this.beginMomentum();
+        });
 
-    onPointerDown(e) {
-        if (e.button !== undefined && e.button !== 0) return;
-        this.isDragging = true;
-        this.isSnapping = false;
-        this.hasMoved = false;
-        this.startX = e.clientX;
-        this.startY = e.clientY;
-        this.currentX = this.targetX;
-        this.stopAutoScroll();
-        if (this.idleTimeout) clearTimeout(this.idleTimeout);
-        this.container.style.cursor = 'grabbing';
-    },
+        slider.addEventListener('mousemove', (e) => {
+            if (!this.isDown) return;
+            e.preventDefault();
+            const x = e.pageX - slider.offsetLeft;
+            const walk = (x - this.startX) * 1.4;
+            const prev = slider.scrollLeft;
+            slider.scrollLeft = this.scrollLeft - walk;
+            this.velX = slider.scrollLeft - prev;
+        });
 
-    onPointerMove(e) {
-        if (!this.isDragging) return;
-        const dx = e.clientX - this.startX;
-        const dy = e.clientY - this.startY;
+        // Тач-свайп (смартфон / Telegram Mini App)
+        let touchStartX = 0;
+        let lastTouchTime = 0;
 
-        if (Math.abs(dx) > this.dragThreshold || Math.abs(dy) > this.dragThreshold) {
-            this.hasMoved = true;
-            if (e.cancelable) e.preventDefault();
-        }
+        slider.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].pageX;
+            lastTouchTime = Date.now();
+            cancelAnimationFrame(this.momentumID);
+        }, { passive: true });
 
-        if (this.hasMoved) {
-            this.targetX = this.currentX + dx;
-            this.updateTransform();
-        }
-    },
+        slider.addEventListener('touchmove', (e) => {
+            const touchX = e.touches[0].pageX;
+            this.velX = touchStartX - touchX;
+            touchStartX = touchX;
+        }, { passive: true });
 
-    onPointerUp(e) {
-        if (!this.isDragging) return;
-        this.isDragging = false;
-        this.container.style.cursor = 'grab';
-
-        if (this.hasMoved) {
-            this.snapToNearest();
-            this.idleTimeout = setTimeout(() => this.startAutoScroll(), 3000);
-        } else {
-            this.startAutoScroll();
-        }
-    },
-
-    updateTransform() {
-        this.row.style.transform = `translateX(${this.targetX}px)`;
-        this.checkCenterHaptic();
-    },
-
-    checkCenterHaptic() {
-        if (!this.container || !this.row) return;
-        const rect = this.container.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const pills = this.row.querySelectorAll('.stat-pill');
-        
-        let closestPill = null;
-        let minDistance = Infinity;
-
-        pills.forEach(pill => {
-            const pillRect = pill.getBoundingClientRect();
-            const pillCenterX = pillRect.left + pillRect.width / 2;
-            const dist = Math.abs(pillCenterX - centerX);
-            if (dist < minDistance) {
-                minDistance = dist;
-                closestPill = pill;
+        slider.addEventListener('touchend', () => {
+            this.beginMomentum();
+            if (window.AudioFx && typeof window.AudioFx.haptic === 'function') {
+                window.AudioFx.haptic('light');
+            } else if (typeof window.tgHaptic === 'function') {
+                window.tgHaptic('light');
             }
         });
 
-        if (closestPill && this.lastCenteredPill !== closestPill) {
-            this.lastCenteredPill = closestPill;
-            if ((this.isDragging || this.isSnapping) && minDistance < 25) {
-                if (window.AudioFx && typeof window.AudioFx.haptic === 'function') {
-                    window.AudioFx.haptic('light');
-                } else if (typeof window.tgHaptic === 'function') {
-                    window.tgHaptic('light');
-                }
-            }
-        }
+        console.log('[HUD] Свайп-лента статов готова к прокрутке ✓');
     },
 
-    snapToNearest() {
-        this.isSnapping = true;
-        const rect = this.container.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const pills = this.row.querySelectorAll('.stat-pill');
-        
-        let closestPill = null;
-        let minDistance = Infinity;
-
-        pills.forEach(pill => {
-            const pillRect = pill.getBoundingClientRect();
-            const pillCenterX = pillRect.left + pillRect.width / 2;
-            const dist = Math.abs(pillCenterX - centerX);
-            if (dist < minDistance) {
-                minDistance = dist;
-                closestPill = pill;
-            }
-        });
-
-        if (closestPill) {
-            const pillRect = closestPill.getBoundingClientRect();
-            const pillCenterX = pillRect.left + pillRect.width / 2;
-            const diff = centerX - pillCenterX;
-            this.targetX += diff;
-
-            this.row.style.transition = 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            this.row.style.transform = `translateX(${this.targetX}px)`;
-            
-            setTimeout(() => {
-                this.row.style.transition = 'none';
-                this.isSnapping = false;
-            }, 300);
-        } else {
-            this.isSnapping = false;
-        }
-    },
-
-    startAutoScroll() {
-        if (this.isAutoScrolling) return;
-        this.isAutoScrolling = true;
-        this.row.style.transition = 'none';
-
+    beginMomentum() {
+        cancelAnimationFrame(this.momentumID);
         const loop = () => {
-            if (!this.isAutoScrolling) return;
-            if (!this.isDragging) {
-                this.targetX += this.autoScrollSpeed;
-                
-                const halfWidth = this.row.scrollWidth / 2;
-                if (Math.abs(this.targetX) >= halfWidth) {
-                    this.targetX += halfWidth;
-                }
-
-                this.updateTransform();
+            if (this.scrollEl && Math.abs(this.velX) > 0.4) {
+                this.scrollEl.scrollLeft += this.velX;
+                this.velX *= 0.94; // Плавное затухание скорости
+                this.momentumID = requestAnimationFrame(loop);
             }
-            this._rafId = requestAnimationFrame(loop);
         };
-        this._rafId = requestAnimationFrame(loop);
-    },
-
-    stopAutoScroll() {
-        this.isAutoScrolling = false;
-        if (this._rafId) {
-            cancelAnimationFrame(this._rafId);
-            this._rafId = null;
-        }
+        this.momentumID = requestAnimationFrame(loop);
     }
 };
 
 // ========================================================
-// 13. ЭКСПОРТ В ГЛОБАЛЬНЫЙ КОНТЕКСТ
+// 13. СЛУШАТЕЛЬ СКРОЛЛА ЛЕНТЫ ДЛЯ АВТОСВОРАЧИВАНИЯ КАТЕГОРИЙ
+// ========================================================
+function initMarketScrollListener() {
+    const mainContent = document.querySelector('.main-content') || window;
+    let lastScrollTop = 0;
+
+    const onScroll = () => {
+        const curScroll = mainContent.scrollTop !== undefined ? mainContent.scrollTop : window.scrollY;
+
+        // Если открыта вкладка Рынка
+        const marketTab = document.getElementById('tabMarket');
+        if (!marketTab || !marketTab.classList.contains('active')) return;
+
+        // Возврат в самый верх ленты -> автоматически раскрываем
+        if (curScroll <= 15) {
+            if (typeof window.collapseMarketCategories === 'function') {
+                window.collapseMarketCategories(false);
+            }
+        } 
+        // Листаем вниз -> автоматически компактно сворачиваем
+        else if (curScroll > lastScrollTop && curScroll > 60) {
+            if (typeof window.collapseMarketCategories === 'function') {
+                window.collapseMarketCategories(true);
+            }
+        }
+
+        lastScrollTop = Math.max(0, curScroll);
+    };
+
+    if (mainContent.addEventListener) {
+        mainContent.addEventListener('scroll', onScroll, { passive: true });
+    }
+}
+
+// Запуск при старте
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        HudRevolver.init();
+        initMarketScrollListener();
+    });
+} else {
+    setTimeout(() => {
+        HudRevolver.init();
+        initMarketScrollListener();
+    }, 150);
+}
+
+// ========================================================
+// 14. ЭКСПОРТ В ГЛОБАЛЬНЫЙ КОНТЕКСТ
 // ========================================================
 window.openDailyBonusModal = openDailyBonusModal;
 window.claimDailyReward = claimDailyReward;
@@ -1589,5 +1527,6 @@ window._syncStarRateToBank = _syncStarRateToBank;
 window.logBankTransaction = logBankTransaction;
 window.HudRevolver = HudRevolver;
 window._safeNumDeposit = _safeNumDeposit;
+window.initMarketScrollListener = initMarketScrollListener;
 
-console.log('[💠 app-game.js v5.2.0] Ежедневный календарь наград восстановлен ✓');
+console.log('[💠 app-game.js v5.3.0] Свайп статов, золотой уровень и автоскролл активированы ✓');
