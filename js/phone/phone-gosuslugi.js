@@ -1,12 +1,14 @@
 // ========================================================
-// js/phone/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v2.2.1)
+// js/phone/phone-gosuslugi.js — ПРИЛОЖЕНИЕ «ГОСУСЛУГИ / МРЭО» (v2.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v2.2.1 (ФИКС ОПЛАТЫ НАЛОГОВ И НАЧИСЛЕНИЙ):
-//   - Добавлен отсутствовавший метод payTaxes().
-//   - Исправлено бесконечное задвоение налога при каждом открытии вкладки.
-//   - Добавлено корректное логирование в банк и сброс налогового долга.
-//   - Встроен автономный fallback для LEGAL_ENTITIES (ИП и ООО).
-//   - Полная синхронизация со стейтом игрока и бизнес-сетью.
+// ⭐ v2.3.0 (РЕАЛИСТИЧНАЯ НАЛОГОВАЯ СИСТЕМА И АРЕСТЫ ФССП):
+//   - Полный фикс бесконечной оплаты: после оплаты статус сбрасывается в 0
+//     и блокируется повторное начисление до следующего налогового периода.
+//   - Налоговый период на 7 игровых дней с таймером дедлайна.
+//   - Начисление пени (+5% в день) при просрочке уплаты.
+//   - Арест ФССП при просрочке 3+ дней (запрет регдействий в МРЭО и продаж).
+//   - Уведомление о конфискации имущества приставами за 50% цены при 7+ днях.
+//   - Автономный fallback для LEGAL_ENTITIES (ИП и ООО).
 // ========================================================
 
 const AppGosuslugi = {
@@ -67,6 +69,13 @@ const AppGosuslugi = {
         }
     },
 
+    /**
+     * Проверка: находится ли игрок под налоговым арестом ФССП
+     */
+    isUnderTaxArrest() {
+        return Boolean(state.player?.taxArrest || (state.player?.taxOverdueDays && state.player.taxOverdueDays >= 3));
+    },
+
     render(container) {
         if (!container) return;
         this._syncLegalState();
@@ -75,6 +84,8 @@ const AppGosuslugi = {
 
         if (state.player.trafficFines === undefined) state.player.trafficFines = 0;
         if (state.player.taxDebt === undefined) state.player.taxDebt = 0;
+        if (state.player.taxPenalty === undefined) state.player.taxPenalty = 0;
+        if (state.player.taxOverdueDays === undefined) state.player.taxOverdueDays = 0;
 
         container.innerHTML = `
             <div class="phone-app-header">
@@ -162,74 +173,113 @@ const AppGosuslugi = {
     },
 
     // ========================================================
-    // 2. НАЛОГИ
+    // 2. НАЛОГИ (С ИСПРАВЛЕННОЙ СИСТЕМОЙ ПЕРИОДОВ И АРЕСТОВ)
     // ========================================================
     renderTaxesTab() {
-        let calculatedPowerTax = 0;
-        if (state.garage && Array.isArray(state.garage)) {
-            state.garage.forEach(c => {
-                let p = Number(c.power) || 100;
-                if (p > 250) {
-                    calculatedPowerTax += (p - 250) * 150;
-                }
-            });
+        const curDay = Number(state.player?.day) || 1;
+        const taxDebt = Number(state.player?.taxDebt) || 0;
+        const penalty = Number(state.player?.taxPenalty) || 0;
+        const totalToPay = taxDebt + penalty;
+        const overdueDays = Number(state.player?.taxOverdueDays) || 0;
+        const dueDay = Number(state.player?.taxDueDay) || (curDay + 7);
+        const daysLeft = Math.max(0, dueDay - curDay);
+
+        const isArrested = Boolean(state.player?.taxArrest || overdueDays >= 3);
+        const isBailiffAuctionRisk = overdueDays >= 7;
+
+        // Баннер предупреждений приставов
+        let alertBanner = '';
+        if (isBailiffAuctionRisk) {
+            alertBanner = `
+                <div class="p-2 mb-2" style="background:rgba(220,38,38,0.2); border:1px solid var(--red); border-radius:8px;">
+                    <b class="text-xs color-red"><i class="fa-solid fa-triangle-exclamation"></i> ДЕЛО ПЕРЕДАНО ПРИСТАВАМ (ФССП)!</b>
+                    <div class="sub-label mt-1" style="font-size:9px; color:#fca5a5; line-height:1.35;">
+                        Просрочка более 7 дней! Автомобили из вашего гаража будут выставлены на принудительный аукцион за 50% рыночной стоимости в счёт погашения долга!
+                    </div>
+                </div>
+            `;
+        } else if (isArrested) {
+            alertBanner = `
+                <div class="p-2 mb-2" style="background:rgba(255,179,0,0.15); border:1px solid var(--amber); border-radius:8px;">
+                    <b class="text-xs color-amber"><i class="fa-solid fa-lock"></i> НАЛОЖЕН АРЕСТ ФССП / ГИБДД!</b>
+                    <div class="sub-label mt-1" style="font-size:9px; color:#fde68a; line-height:1.35;">
+                        Действует запрет на регистрационные действия! Вы не можете продавать автомобили клиентам и ставить машины на коммерческий учёт до полной оплаты долга.
+                    </div>
+                </div>
+            `;
         }
-        
-        let existingDebt = Number(state.player.taxDebt) || 0;
-        let totalTax = existingDebt + calculatedPowerTax;
 
         return `
-            <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(255, 179, 0, 0.15), #090e18);">
-                <div class="font-bold text-xs color-amber mb-1">ТРАНСПОРТНЫЙ НАЛОГ НА МОЩНЫЕ АВТО</div>
-                <div class="price-val color-amber my-1" style="font-size:26px;">${totalTax.toLocaleString()} ₽</div>
-                <div class="sub-label" style="font-size:10px;">Налог на роскошь и спортивные моторы (>250 л.с.).</div>
+            ${alertBanner}
+            <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, ${totalToPay > 0 ? (isArrested ? 'rgba(220,38,38,0.2)' : 'rgba(255,179,0,0.15)') : 'rgba(0,230,118,0.12)'}, #090e18);">
+                <div class="font-bold text-xs ${totalToPay > 0 ? (isArrested ? 'color-red' : 'color-amber') : 'color-green'} mb-1">
+                    ${totalToPay > 0 ? (overdueDays > 0 ? 'НАЛОГОВАЯ ЗАДОЛЖЕННОСТЬ (ПРОСРОЧЕНО)' : 'ТЕКУЩИЙ ТРАНСПОРТНЫЙ НАЛОГ') : 'НАЛОГИ ПОЛНОСТЬЮ ОПЛАЧЕНЫ'}
+                </div>
+                <div class="price-val ${totalToPay > 0 ? (isArrested ? 'color-red' : 'color-amber') : 'color-green'} my-1" style="font-size:26px;">
+                    ${totalToPay > 0 ? `${totalToPay.toLocaleString()} ₽` : '0 ₽'}
+                </div>
+                <div class="sub-label" style="font-size:10px;">
+                    ${totalToPay > 0 
+                        ? (overdueDays > 0 ? `Просрочка: ${overdueDays} дн. (начисляется пеня +5%/день)` : `Срок уплаты: осталось ${daysLeft} дн. (до ${dueDay} дня)`)
+                        : `Следующее начисление транспортного налога: через ${Math.max(1, (Number(state.player?.taxPaidUntilDay) || (curDay + 7)) - curDay)} дн.`}
+                </div>
             </div>
 
             <div class="glass-card p-2">
-                <b class="text-xs color-cyan mb-2 block">🏛️ Налоговая задолженность:</b>
-                ${totalTax > 0 ? `
-                    <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid rgba(255,179,0,0.3);">
+                <b class="text-xs color-cyan mb-2 block"><i class="fa-solid fa-file-invoice-dollar"></i> Детализация сборов ФНС:</b>
+                ${totalToPay > 0 ? `
+                    <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; border:1px solid ${isArrested ? 'rgba(220,38,38,0.4)' : 'rgba(255,179,0,0.3)'};">
                         <div class="flex-between mb-1">
-                            <b class="text-xs color-amber">Федеральная налоговая служба</b>
-                            <span class="tag-badge bg-tag-amber">К уплате</span>
+                            <b class="text-xs color-amber">Федеральная налоговая служба РФ</b>
+                            <span class="tag-badge ${overdueDays > 0 ? 'bg-tag-red' : 'bg-tag-amber'}">
+                                ${overdueDays > 0 ? `ПРОСРОЧЕНО (+${overdueDays}д)` : 'К УПЛАТЕ'}
+                            </span>
                         </div>
-                        <div class="sub-label mb-2" style="font-size:9.5px;">Начислено за мощные автомобили в автопарке: <b>${totalTax.toLocaleString()} ₽</b></div>
-                        <button onclick="AppGosuslugi.payTaxes()" class="btn btn-green btn-sm w-full">Оплатить налог (${totalTax.toLocaleString()} ₽)</button>
+                        <div class="sub-label mb-1" style="font-size:9.5px;">Базовый налог на мощность: <b>${taxDebt.toLocaleString()} ₽</b></div>${penalty > 0 ? `<div class="sub-label mb-2 color-red" style="font-size:9.5px;">Начисленная пеня ФССП: <b>+${penalty.toLocaleString()} ₽</b></div>` : ''}
+                        <button onclick="AppGosuslugi.payTaxes()" class="btn btn-green btn-sm w-full">
+                            Оплатить налог и снять ограничения (${totalToPay.toLocaleString()} ₽)
+                        </button>
                     </div>
                 ` : `
-                    <div class="sub-label text-center py-4">Все налоговые сборы полностью уплачены.</div>
+                    <div class="p-3 text-center" style="background:#090e18; border-radius:8px;">
+                        <i class="fa-solid fa-circle-check color-green mb-1" style="font-size:24px;"></i>
+                        <b class="text-xs color-green block mb-1">Все налоги оплачены вовремя!</b>
+                        <div class="sub-label" style="font-size:9.5px;">Аресты и запреты на регистрационные действия отсутствуют. Вы чисты перед законом.</div>
+                    </div>
                 `}
             </div>
         `;
     },
 
     payTaxes() {
-        let calculatedPowerTax = 0;
-        if (state.garage && Array.isArray(state.garage)) {
-            state.garage.forEach(c => {
-                let p = Number(c.power) || 100;
-                if (p > 250) {
-                    calculatedPowerTax += (p - 250) * 150;
-                }
-            });
-        }
-        let totalTax = (Number(state.player?.taxDebt) || 0) + calculatedPowerTax;
+        const taxDebt = Number(state.player?.taxDebt) || 0;
+        const penalty = Number(state.player?.taxPenalty) || 0;
+        const totalToPay = taxDebt + penalty;
 
-        if (totalTax <= 0) {
-            return showToast("У вас нет налоговой задолженности!");
+        if (totalToPay <= 0) {
+            return showToast("У вас нет неоплаченных налогов!");
         }
 
         let cash = Number(state.player?.cash) || 0;
-        if (cash < totalTax) {
+        if (cash < totalToPay) {
             if (typeof playSound === 'function') playSound('error');
-            return showToast(`Не хватает денег для оплаты налога: требуется ${totalTax.toLocaleString()} ₽!`);
+            return showToast(`Не хватает денег для оплаты: требуется ${totalToPay.toLocaleString()} ₽!`);
         }
 
-        state.player.cash -= totalTax;
+        // Списание средств
+        state.player.cash -= totalToPay;
+
+        // Фиксация полной оплаты и установка следующего периода
+        const curDay = Number(state.player?.day) || 1;
         state.player.taxDebt = 0;
+        state.player.taxPenalty = 0;
+        state.player.taxOverdueDays = 0;
+        state.player.taxArrest = false;
+        state.player.taxPaidUntilDay = curDay + 7;
+        state.player.taxDueDay = curDay + 7;
 
         if (typeof logBankTransaction === 'function') {
-            logBankTransaction("Уплата транспортного налога в ФНС", totalTax, false);
+            logBankTransaction("Погашение налоговой задолженности и пеней ФНС", totalToPay, false);
         }
 
         if (typeof saveState === 'function') saveState();
@@ -239,10 +289,10 @@ const AppGosuslugi = {
 
         if (typeof openVerdictModal === 'function') {
             openVerdictModal(
-                "НАЛОГ УСПЕШНО ОПЛАЧЕН! 🏛️",
-                `Задолженность перед Федеральной налоговой службой в размере <b>${totalTax.toLocaleString()} ₽</b> полностью погашена!\nАресты с регистрационных действий сняты.`,
+                "НАЛОГИ ПОЛНОСТЬЮ ПОГАШЕНЫ! 🏛️",
+                `Задолженность в размере <b>${totalToPay.toLocaleString()} ₽</b> успешно оплачена в ФНС!\nВсе ограничения и запреты на регистрационные действия сняты.`,
                 true,
-                totalTax
+                totalToPay
             );
         } else {
             showToast("✓ Налоги успешно уплачены!");
@@ -443,6 +493,20 @@ const AppGosuslugi = {
             `;
         }
 
+        // Проверка ареста ФССП
+        if (this.isUnderTaxArrest()) {
+            return `
+                <div class="glass-card p-3 text-center" style="border:1px solid var(--red); background:rgba(220,38,38,0.1);">
+                    <i class="fa-solid fa-handcuffs color-red mb-2" style="font-size:32px;"></i>
+                    <b class="text-xs color-red block mb-1">РЕГИСТРАЦИОННЫЕ ДЕЙСТВИЯ ЗАПРЕЩЕНЫ ФССП</b>
+                    <div class="sub-label mb-3" style="font-size:10px; color:#fca5a5;">
+                        Из-за просрочки по налогам на ваш профиль наложен судебный арест. Постановка новых автомобилей на учёт заблокирована до погашения задолженности!
+                    </div>
+                    <button onclick="AppGosuslugi.switchTab('taxes')" class="btn btn-red btn-sm">Оплатить налоги в ФНС</button>
+                </div>
+            `;
+        }
+
         const fee = window.MREO_CONFIG?.commercialRegFee || 8500;
         const garage = state.garage || [];
 
@@ -498,6 +562,11 @@ const AppGosuslugi = {
     },
 
     registerCommercialCar(carIdx) {
+        if (this.isUnderTaxArrest()) {
+            if (typeof playSound === 'function') playSound('error');
+            return showToast("❌ Действует арест ФССП! Регистрационные действия заблокированы.");
+        }
+
         const fee = window.MREO_CONFIG?.commercialRegFee || 8500;
         const player = state.player;
         const car = state.garage ? state.garage[carIdx] : null;
@@ -509,6 +578,10 @@ const AppGosuslugi = {
         car.commercialRegistered = true;
         car.registeredCompany = player.legalEntity?.companyName || 'ООО Компания';
         car.registrationDate = new Date().toLocaleDateString('ru-RU');
+
+        if (typeof trackQuestProgress === 'function') {
+            trackQuestProgress('mreo_register', 1);
+        }
 
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -695,4 +768,4 @@ const AppGosuslugi = {
 
 window.AppGosuslugi = AppGosuslugi;
 
-console.log('[🏛 phone-gosuslugi v2.2.1] Загружен: Оплата налогов и штрафов исправлена ✓');
+console.log('[🏛 phone-gosuslugi v2.3.0] Загружен: Реалистичная налоговая система ФНС и аресты ФССП ✓');
