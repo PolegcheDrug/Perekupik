@@ -1,12 +1,15 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.3.0)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.4.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.3.0 (ТАКТИЛЬНЫЙ СВАЙП-HUD, ЗОЛОТОЙ УРОВЕНЬ & АВТОСКРОЛЛ КАТЕГОРИЙ):
-//   1. Полноценный свободный свайп пальцем вправо/влево ленты статов с инерцией.
-//   2. Яркая золотая неоновая плашка уровня с короной (больше не серая).
-//   3. Слушатель скролла ленты рынка для умного автосворачивания категорий.
-//   4. Сохранены ежедневные награды, налоги ФССП, безопасные депозиты и роллеры.
+// ⭐ v5.4.0 (БЕСКОНЕЧНЫЙ ТАКТИЛЬНЫЙ HUD 360° + ЗОЛОТОЙ УРОВЕНЬ):
+//   1. Бесконечная бесшовная карусель плашек статов без застреваний и упоров.
+//   2. Мягкий и плавный свайп пальцем с инерцией и виброоткликом в Telegram.
+//   3. Яркая неоновая золотая плашка уровня с короной (stat-pill-level).
+//   4. Автосворачивание категорий рынка при скролле вниз и открытие вверху.
+//   5. Восстановлен ежедневный бонус: календарь на 7 дней и claimDailyReward().
+//   6. Полная сохранность циклов налогов ФССП, пени +5%/д, аукционов за 50%,
+//      сложных процентов по депозитам, квестов и сейвов без сокращений.
 // ========================================================
 
 // ========================================================
@@ -1347,32 +1350,47 @@ function _performTabSwitch(tabId) {
 }
 
 // ========================================================
-// 12. ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР (СВАЙП ПАЛЬЦЕМ + МЫШЬ + ИНЕРЦИЯ)
+// 12. ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР (БЕСКОНЕЧНЫЙ ЦИКЛ 360° + ТАЧ)
 // ========================================================
 const HudRevolver = {
-    scrollEl: null,
+    container: null,
+    row: null,
     isDown: false,
     startX: 0,
     scrollLeft: 0,
     velX: 0,
     momentumID: null,
     _isBound: false,
+    singleSetWidth: 0,
 
     init() {
-        this.scrollEl = document.querySelector('.user-stats-scroll');
-        if (!this.scrollEl || this._isBound) return;
+        this.container = document.querySelector('.user-stats-scroll');
+        this.row = document.getElementById('userStatsRow');
+        if (!this.container || !this.row || this._isBound) return;
         this._isBound = true;
 
-        const slider = this.scrollEl;
+        const slider = this.container;
 
-        // Включаем нативную горизонтальную прокрутку
-        slider.style.overflowX = 'auto';
+        slider.style.overflowX = 'scroll';
         slider.style.overflowY = 'hidden';
         slider.style.webkitOverflowScrolling = 'touch';
         slider.style.touchAction = 'pan-x';
         slider.style.cursor = 'grab';
+        slider.style.scrollbarWidth = 'none';
 
-        // Мышь (ПК-режим)
+        // Создаем бесконечную карусель (клонируем плашки 2 раза)
+        if (!this.row.dataset.cloned) {
+            this.row.dataset.cloned = "true";
+            const originalHTML = this.row.innerHTML;
+            this.row.innerHTML = originalHTML + originalHTML + originalHTML;
+        }
+
+        requestAnimationFrame(() => {
+            this.singleSetWidth = this.row.scrollWidth / 3;
+            slider.scrollLeft = this.singleSetWidth;
+        });
+
+        // Мышь (ПК)
         slider.addEventListener('mousedown', (e) => {
             this.isDown = true;
             slider.style.cursor = 'grabbing';
@@ -1392,26 +1410,29 @@ const HudRevolver = {
             if (!this.isDown) return;
             e.preventDefault();
             const x = e.pageX - slider.offsetLeft;
-            const walk = (x - this.startX) * 1.4;
-            const prev = slider.scrollLeft;
+            const walk = (x - this.startX) * 1.8;
             slider.scrollLeft = this.scrollLeft - walk;
-            this.velX = slider.scrollLeft - prev;
+            this.checkLoop();
         });
 
-        // Тач-свайп (смартфон / Telegram Mini App)
+        // Тач-свайп (смартфон / Telegram)
         let touchStartX = 0;
-        let lastTouchTime = 0;
+        let lastX = 0;
 
         slider.addEventListener('touchstart', (e) => {
             touchStartX = e.touches[0].pageX;
-            lastTouchTime = Date.now();
+            lastX = touchStartX;
+            this.velX = 0;
             cancelAnimationFrame(this.momentumID);
         }, { passive: true });
 
         slider.addEventListener('touchmove', (e) => {
-            const touchX = e.touches[0].pageX;
-            this.velX = touchStartX - touchX;
-            touchStartX = touchX;
+            const currentX = e.touches[0].pageX;
+            const delta = lastX - currentX;
+            slider.scrollLeft += delta * 1.2;
+            this.velX = delta;
+            lastX = currentX;
+            this.checkLoop();
         }, { passive: true });
 
         slider.addEventListener('touchend', () => {
@@ -1423,15 +1444,31 @@ const HudRevolver = {
             }
         });
 
-        console.log('[HUD] Свайп-лента статов готова к прокрутке ✓');
+        slider.addEventListener('scroll', () => {
+            this.checkLoop();
+        }, { passive: true });
+
+        console.log('[HUD] Бесконечная карусель статов активирована ✓');
+    },
+
+    checkLoop() {
+        if (!this.container || !this.singleSetWidth) return;
+        const cur = this.container.scrollLeft;
+
+        if (cur <= 10) {
+            this.container.scrollLeft += this.singleSetWidth;
+        } else if (cur >= this.singleSetWidth * 2) {
+            this.container.scrollLeft -= this.singleSetWidth;
+        }
     },
 
     beginMomentum() {
         cancelAnimationFrame(this.momentumID);
         const loop = () => {
-            if (this.scrollEl && Math.abs(this.velX) > 0.4) {
-                this.scrollEl.scrollLeft += this.velX;
-                this.velX *= 0.94; // Плавное затухание скорости
+            if (this.container && Math.abs(this.velX) > 0.3) {
+                this.container.scrollLeft += this.velX;
+                this.velX *= 0.92;
+                this.checkLoop();
                 this.momentumID = requestAnimationFrame(loop);
             }
         };
@@ -1449,18 +1486,14 @@ function initMarketScrollListener() {
     const onScroll = () => {
         const curScroll = mainContent.scrollTop !== undefined ? mainContent.scrollTop : window.scrollY;
 
-        // Если открыта вкладка Рынка
         const marketTab = document.getElementById('tabMarket');
         if (!marketTab || !marketTab.classList.contains('active')) return;
 
-        // Возврат в самый верх ленты -> автоматически раскрываем
         if (curScroll <= 15) {
             if (typeof window.collapseMarketCategories === 'function') {
                 window.collapseMarketCategories(false);
             }
-        } 
-        // Листаем вниз -> автоматически компактно сворачиваем
-        else if (curScroll > lastScrollTop && curScroll > 60) {
+        } else if (curScroll > lastScrollTop && curScroll > 60) {
             if (typeof window.collapseMarketCategories === 'function') {
                 window.collapseMarketCategories(true);
             }
@@ -1529,4 +1562,4 @@ window.HudRevolver = HudRevolver;
 window._safeNumDeposit = _safeNumDeposit;
 window.initMarketScrollListener = initMarketScrollListener;
 
-console.log('[💠 app-game.js v5.3.0] Свайп статов, золотой уровень и автоскролл активированы ✓');
+console.log('[💠 app-game.js v5.4.0] Бесконечный свайп 360°, автоскролл и золотой уровень активированы ✓');
