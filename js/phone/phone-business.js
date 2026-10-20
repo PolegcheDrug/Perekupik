@@ -1,6 +1,11 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v9.1.2 STABLE)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v9.2.0 STABLE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+//
+// ⭐ v9.2.0:
+//   1. Полноценная система корпораций и отраслевых холдингов.
+//   2. Интерактивная вкладка «Корпорации» с прогрессом и учреждением.
+//   3. Устранена ошибка одинаковых id — синергия считается по отраслям.
 // ========================================================
 
 const PhoneBusiness = {
@@ -17,6 +22,7 @@ const PhoneBusiness = {
     _upgradePending: false,
     _tenderPending: false,
     _individualUpgradePending: false,
+    _corpActionPending: false,
 
     get ECONOMIC_CYCLES() { return window.BusinessDataModule?.ECONOMIC_CYCLES || {}; },
     get NETWORK_MILESTONES() {
@@ -54,6 +60,60 @@ const PhoneBusiness = {
         const raw = window.BusinessDataModule?.achievements;
         return Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
     },
+
+    // ========================================================
+    // КАТАЛОГ ОТРАСЛЕВЫХ КОРПОРАЦИЙ И ХОЛДИНГОВ
+    // ========================================================
+    CORPORATE_SECTORS: [
+        {
+            id: 'corp_service',
+            name: 'Холдинг «АвтоСервис Групп»',
+            icon: 'fa-screwdriver-wrench',
+            tag: 'СЕРВИС И ТЮНИНГ',
+            desc: 'Синергия автосервисов, шиномонтажей, малярных и детейлинг-цехов. Единые оптовые закупки и перенаправление клиентов.',
+            bizIds: ['wash', 'shina', 'sto', 'paint_shop', 'chip_tuning', 'detailing'],
+            minPoints: 3,
+            minLevel: 1,
+            bonusPct: 25,
+            charterCost: 500000
+        },
+        {
+            id: 'corp_transport',
+            name: 'Синдикат «Транс-Логистик»',
+            icon: 'fa-truck-fast',
+            tag: 'ПЕРЕВОЗКИ И ФЛОТ',
+            desc: 'Единый диспетчерский центр таксопарка, курьерской доставки, службы эвакуации и дальнобойных тягачей.',
+            bizIds: ['tow_truck', 'delivery', 'taxi', 'transport_company'],
+            minPoints: 3,
+            minLevel: 1,
+            bonusPct: 30,
+            charterCost: 800000
+        },
+        {
+            id: 'corp_trade',
+            name: 'Альянс «ВнешТорг & Импорт»',
+            icon: 'fa-boxes-packing',
+            tag: 'ДИЛЕРЫ И ТАМОЖНЯ',
+            desc: 'Прямые поставки контрактных авто и распилов из Порта на авторазборку и в автоподбор в обход посредников.',
+            bizIds: ['razborka', 'autopodbor', 'customs_hub'],
+            minPoints: 2,
+            minLevel: 1,
+            bonusPct: 30,
+            charterCost: 1200000
+        },
+        {
+            id: 'corp_monopoly',
+            name: 'Мега-Концерн «Perekup Global»',
+            icon: 'fa-crown',
+            tag: 'МОНОПОЛИЯ РЕГИОНА',
+            desc: 'Генеральный монопольный синдикат. Полный контроль над автомобильным рынком, сервисами и логистикой.',
+            bizIds: ['wash', 'shina', 'sto', 'tow_truck', 'delivery', 'paint_shop', 'chip_tuning', 'detailing', 'razborka', 'autopodbor', 'taxi', 'transport_company', 'customs_hub'],
+            minPoints: 8,
+            minLevel: 2,
+            bonusPct: 40,
+            charterCost: 3000000
+        }
+    ],
 
     _defaultIndividualUpgrades: {
         wash: [
@@ -188,6 +248,7 @@ const PhoneBusiness = {
             if (!window.state.player) window.state.player = {};
             if (!Array.isArray(window.state.businesses)) window.state.businesses = [];
             if (!Array.isArray(window.state.player.activeTenders)) window.state.player.activeTenders = [];
+            if (!Array.isArray(window.state.player.foundedCorporations)) window.state.player.foundedCorporations = [];
 
             const baseData = this._getBaseBusinessData();
             const existingIds = new Set(window.state.businesses.filter(b => b && b.id).map(b => b.id));
@@ -539,7 +600,7 @@ const PhoneBusiness = {
             }
         }
 
-        total *= (1 + this._getCorporationBonus());
+        total *= (1 + this._getCorporationBonus(b.id));
         total *= this._getEconomicCycleMultiplier();
         total *= (1 + this._getNetworkMilestoneBonus());
         total *= (1 + this._getDiversityBonus());
@@ -561,20 +622,22 @@ const PhoneBusiness = {
         return Math.round(total);
     },
 
-    _getCorporationBonus() {
-        if (!Array.isArray(window.state?.businesses)) return 0;
-        const groups = {};
-        window.state.businesses.forEach(b => {
-            if (!b || b.level < 3) return;
-            const rawId = String(b.id || '');
-            const key = rawId.replace(/\d+/g, '').trim() || rawId || '_default';
-            groups[key] = (groups[key] || 0) + 1;
+    // Расчет корпоративного бонуса (отраслевой + общехолдинговый)
+    _getCorporationBonus(bizId = null) {
+        const founded = window.state?.player?.foundedCorporations || [];
+        if (!Array.isArray(founded) || founded.length === 0) return 0;
+
+        let totalBonus = 0;
+        this.CORPORATE_SECTORS.forEach(sec => {
+            if (founded.includes(sec.id)) {
+                // Если указан конкретный бизнес, проверяем его принадлежность к отрасли
+                if (!bizId || sec.bizIds.includes(bizId) || sec.id === 'corp_monopoly') {
+                    totalBonus += (sec.bonusPct / 100);
+                }
+            }
         });
-        let bonus = 0;
-        for (const key in groups) {
-            if (groups[key] >= 3) bonus += 0.40;
-        }
-        return Math.min(bonus, 1.20);
+
+        return Math.min(totalBonus, 1.50);
     },
 
     getAccumulatedCash() {
@@ -588,6 +651,9 @@ const PhoneBusiness = {
         return total;
     },
 
+    // ========================================================
+    // ГЛАВНЫЙ РЕНДЕР
+    // ========================================================
     render(container) {
         if (!container) return;
         try {
@@ -601,6 +667,8 @@ const PhoneBusiness = {
             const legalConfig = (window.LEGAL_ENTITIES && window.LEGAL_ENTITIES[legal.type]) || null;
             const isLegalActive = legal.type && legal.type !== 'none';
             const legalBadgeText = legalConfig?.tag || (isLegalActive ? String(legal.type).toUpperCase() : 'Физлицо');
+
+            const foundedCount = (window.state?.player?.foundedCorporations || []).length;
 
             container.innerHTML = `
                 <div class="phone-app-header">
@@ -654,7 +722,7 @@ const PhoneBusiness = {
                             <i class="fa-solid fa-file-contract"></i><span>Тендеры</span>
                         </button>
                         <button onclick="PhoneBusiness.setTab('corp')" class="biz-tab ${tab === 'corp' ? 'active' : ''}">
-                            <i class="fa-solid fa-building"></i><span>Корпорации</span>
+                            <i class="fa-solid fa-building"></i><span>Корпорации ${foundedCount > 0 ? `(${foundedCount})` : ''}</span>
                         </button>
                     </div>
 
@@ -725,6 +793,9 @@ const PhoneBusiness = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
+    // ========================================================
+    // 1. ДАШБОРД ТОЧЕК
+    // ========================================================
     renderPointsTab(container) {
         const pLvl = window.state?.player?.level || 1;
         const businesses = window.state.businesses || [];
@@ -839,6 +910,156 @@ const PhoneBusiness = {
         `;
     },
 
+    // ========================================================
+    // 2. ИНТЕРАКТИВНЫЙ КАБИНЕТ КОРПОРАЦИЙ (ВАРИАНТ А)
+    // ========================================================
+    renderCorporationTab(container) {
+        const businesses = window.state?.businesses || [];
+        const founded = window.state?.player?.foundedCorporations || [];
+        const cash = Number(window.state?.player?.cash) || 0;
+
+        let totalCorpSynergyPct = 0;
+        this.CORPORATE_SECTORS.forEach(sec => {
+            if (founded.includes(sec.id)) totalCorpSynergyPct += sec.bonusPct;
+        });
+
+        let sectorsHtml = '';
+        this.CORPORATE_SECTORS.forEach(sec => {
+            const isFounded = founded.includes(sec.id);
+
+            // Считаем точки в этой отрасли
+            const sectorBizList = businesses.filter(b => sec.bizIds.includes(b.id));
+            const ownedInSector = sectorBizList.filter(b => b.level >= sec.minLevel);
+            const count = ownedInSector.length;
+            const target = sec.minPoints;
+            const isProgressComplete = count >= target;
+            const canAfford = cash >= sec.charterCost;
+            const canFound = isProgressComplete && canAfford && !isFounded;
+
+            sectorsHtml += `
+                <div class="glass-card mb-3 p-3" style="background:#090e18; border-left: 3px solid ${isFounded ? 'var(--green)' : (isProgressComplete ? 'var(--cyan)' : 'rgba(255,255,255,0.15)')};">
+                    <div class="flex-between mb-1">
+                        <div class="flex-gap" style="align-items:center;">
+                            <div style="font-size:18px; color:${isFounded ? 'var(--green)' : 'var(--cyan)'};">
+                                <i class="fa-solid ${sec.icon}"></i>
+                            </div>
+                            <div>
+                                <b class="text-xs color-main" style="font-size:12px;">${sec.name}</b>
+                                <div class="sub-label" style="font-size:8px; color:#94a3b8;">${sec.tag}</div>
+                            </div>
+                        </div>
+                        <span class="tag-badge ${isFounded ? 'bg-tag-green' : (isProgressComplete ? 'bg-tag-cyan' : 'bg-tag-dark')}" style="font-size:8px;">
+                            ${isFounded ? 'УЧРЕЖДЕНА ✓' : (isProgressComplete ? 'ГОТОВА К ЗАПУСКУ' : 'В ПРОЦЕССЕ')}
+                        </span>
+                    </div>
+
+                    <div class="sub-label my-2" style="font-size:9.5px; line-height:1.35; color:#cbd5e1;">
+                        ${sec.desc}
+                    </div>
+
+                    <div class="p-2 mb-2" style="background:#050914; border-radius:8px; border:1px solid rgba(255,255,255,0.06); font-size:9px;">
+                        <div class="flex-between mb-1">
+                            <span>Готовых объектов:</span>
+                            <b class="${isProgressComplete ? 'color-green' : 'color-amber'}">${count} из ${target} шт. (Ур. ${sec.minLevel}+)</b>
+                        </div>
+                        <div class="flex-between mb-1">
+                            <span>Бонус к выручке:</span>
+                            <b class="color-green font-bold">+${sec.bonusPct}%</b>
+                        </div>
+                        <div class="flex-between">
+                            <span>Уставной капитал:</span>
+                            <b class="${canAfford || isFounded ? 'color-cyan' : 'color-red'} font-bold">${sec.charterCost.toLocaleString()} ₽</b>
+                        </div>
+                    </div>
+
+                    ${isFounded ? `
+                        <button class="btn btn-dark btn-sm w-full opacity-70" disabled style="font-size:10px;">
+                            <i class="fa-solid fa-circle-check color-green mr-1"></i> Синдикат действует (+${sec.bonusPct}% к кассе)
+                        </button>
+                    ` : `
+                        <button onclick="PhoneBusiness.foundCorporationAction('${sec.id}')" class="btn ${canFound ? 'btn-green' : 'btn-dark opacity-50'} btn-sm w-full" ${canFound ? '' : 'disabled'} style="font-size:10px; font-weight:800;">
+                            ${isProgressComplete 
+                                ? (canAfford ? `Учредить корпорацию (${sec.charterCost.toLocaleString()} ₽)` : `Не хватает ${(sec.charterCost - cash).toLocaleString()} ₽`)
+                                : `Требуется ещё ${target - count} объекта Ур. ${sec.minLevel}+`
+                            }
+                        </button>
+                    `}
+                </div>
+            `;
+        });
+
+        container.innerHTML = `
+            <div class="glass-card mb-3 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0,242,254,0.15), #090e18); border-color:var(--cyan);">
+                <div style="font-size:26px; margin-bottom:4px;">🏛️</div>
+                <b class="text-xs color-cyan" style="font-size:13px;">КОРПОРАТИВНЫЙ ХОЛДИНГ ПЕРЕКУПА</b>
+                <div class="sub-label mt-1 mb-2" style="font-size:9.5px;">
+                    Объединяйте ваши предприятия в отраслевые союзы для получения колоссального бонуса к ежедневной прибыли.
+                </div>
+                <div class="flex-between p-2" style="background:#050914; border-radius:8px; border:1px solid rgba(0,242,254,0.25);">
+                    <span class="text-xs">Активный бонус синергии:</span>
+                    <b class="color-green" style="font-size:14px;">+${totalCorpSynergyPct}%</b>
+                </div>
+            </div>
+
+            ${sectorsHtml}
+        `;
+    },
+
+    foundCorporationAction(sectorId) {
+        if (this._corpActionPending) return;
+        this.ensureState();
+
+        const sec = this.CORPORATE_SECTORS.find(s => s.id === sectorId);
+        if (!sec) return;
+
+        const founded = window.state?.player?.foundedCorporations || [];
+        if (founded.includes(sec.id)) return showToast("Корпорация уже учреждена!");
+
+        const businesses = window.state?.businesses || [];
+        const sectorBizList = businesses.filter(b => sec.bizIds.includes(b.id));
+        const ownedInSector = sectorBizList.filter(b => b.level >= sec.minLevel);
+
+        if (ownedInSector.length < sec.minPoints) {
+            return showToast(`Нужно минимум ${sec.minPoints} объекта Ур. ${sec.minLevel}+!`);
+        }
+
+        const cash = Number(window.state?.player?.cash) || 0;
+        if (cash < sec.charterCost) {
+            return showToast(`Не хватает ${sec.charterCost.toLocaleString()} ₽ на уставной капитал!`);
+        }
+
+        this._corpActionPending = true;
+        try {
+            window.state.player.cash -= sec.charterCost;
+            window.state.player.foundedCorporations.push(sec.id);
+
+            if (typeof logBankTransaction === 'function') {
+                logBankTransaction(`Учреждение: ${sec.name}`, sec.charterCost, false);
+            }
+
+            if (typeof saveState === 'function') saveState();
+            if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+
+            if (typeof openVerdictModal === 'function') {
+                openVerdictModal(
+                    "КОРПОРАЦИЯ УЧРЕЖДЕНА! 🏛️",
+                    `Поздравляем! Вы создали <b>«${sec.name}»</b>!\nСинергия предприятий активирована: <b>+${sec.bonusPct}%</b> постоянной надбавки к выручке!`,
+                    true
+                );
+            } else {
+                showToast(`🎉 «${sec.name}» успешно создана! +${sec.bonusPct}% к выручке!`);
+            }
+
+            this.render(document.getElementById('phoneAppContainer'));
+        } finally {
+            this._corpActionPending = false;
+        }
+    },
+
+    // ========================================================
+    // 3. КАБИНЕТ УПРАВЛЕНИЯ ТОЧКОЙ
+    // ========================================================
     renderPointCabinet(container, bizId) {
         const b = (window.state.businesses || []).find(x => x && x.id === bizId);
         if (!b) return this.closePointCabinet();
@@ -1251,17 +1472,9 @@ const PhoneBusiness = {
         }
     },
 
-    renderCorporationTab(container) {
-        container.innerHTML = `
-            <div class="glass-card p-3 text-center">
-                <b class="text-xs color-green block mb-1"><i class="fa-solid fa-building"></i> Корпорации</b>
-                <div class="sub-label" style="font-size:9.5px;">
-                    Владейте 3+ точками одного типа уровня 3+, чтобы объединить их в корпорацию и получать +40% к выручке.
-                </div>
-            </div>
-        `;
-    },
-
+    // ========================================================
+    // ДЕЙСТВИЯ, КАССА И КРИЗИСЫ
+    // ========================================================
     _maybeTriggerCrisisEvent() {
         const events = this.CRISIS_EVENTS;
         if (!Array.isArray(events) || events.length === 0) return false;
