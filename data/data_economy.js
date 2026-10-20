@@ -1,6 +1,11 @@
 // ========================================================
-// data_economy.js — ЭКОНОМИКА, БИЗНЕСЫ, СЕЗОНЫ, ПЕРЕГОН И БАНК (v3.7.0 COMPLETE)
+// data_economy.js — ЭКОНОМИКА, БИЗНЕСЫ, СЕЗОНЫ, ПЕРЕГОН И БАНК (v3.8.0 REBALANCED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v3.8.0 (ХАРДКОР-БАЛАНС НАГРАД И ВИЛСПИНА):
+//   - ПЕРЕБАЛАНСИРОВКА ВИЛСПИНА: исключён ранний фарм миллионов и иномарок на 1-2 уровне.
+//   - РЕАЛИСТИЧНАЯ МАРЖА: прибыль снижена до честных 8-15%, заработок требует детейлинга и ремонта.
+//   - СОХРАНЕНО НА 100%: все 14 объектов жилья, мебель, верстак, 13 бизнесов со всеми ветками
+//     улучшений, персонал, автопарки МРЭО, сезоны и перегон.
 // ========================================================
 
 // --------------------------------------------------------
@@ -71,7 +76,7 @@ const APP_ACCESS_CONFIG = {
 };
 
 // --------------------------------------------------------
-// 0.1. НАСТРОЙКИ ВИЛСПИНА И СУПЕРВИЛСПИНА
+// 0.1. НАСТРОЙКИ ВИЛСПИНА И СУПЕРВИЛСПИНА (ХАРДКОР-БАЛАНС)
 // --------------------------------------------------------
 const WHEEL_CONFIG = {
     regular: {
@@ -79,13 +84,13 @@ const WHEEL_CONFIG = {
         costTickets: 1,
         canFreeDaily: true,
         dropTable: [
-            { type: 'cash', value: 15000, label: '15,000 ₽', weight: 30 },
-            { type: 'cash', value: 35000, label: '35,000 ₽', weight: 25 },
-            { type: 'cash', value: 75000, label: '75,000 ₽', weight: 15 },
-            { type: 'stars', value: 5, label: '5 ⭐ (12,500 ₽)', weight: 12 },
-            { type: 'fuel', value: 50, label: '50 л бензина', weight: 10 },
-            { type: 'tickets', value: 2, label: '2 🎫 Билета', weight: 6 },
-            { type: 'car', tier: 'budget', label: 'ВАЗ-2107 (Сток)', weight: 2 }
+            { type: 'cash', value: 8000, label: '8,000 ₽', weight: 35 },
+            { type: 'cash', value: 18000, label: '18,000 ₽', weight: 25 },
+            { type: 'cash', value: 40000, label: '40,000 ₽', weight: 14 },
+            { type: 'stars', value: 2, label: '2 ⭐ (5,000 ₽)', weight: 10 },
+            { type: 'fuel', value: 35, label: '35 л бензина', weight: 10 },
+            { type: 'tickets', value: 1, label: '1 🎫 Билет', weight: 5 },
+            { type: 'car', tier: 'budget', label: 'ВАЗ-2101 «Копейка»', weight: 1 }
         ]
     },
     superWheel: {
@@ -94,27 +99,27 @@ const WHEEL_CONFIG = {
         costTickets: 5,
         canFreeDaily: false,
         dropTable: [
-            { type: 'cash', value: 500000, label: '500,000 ₽', weight: 28 },
-            { type: 'cash', value: 1200000, label: '1,200,000 ₽', weight: 20 },
-            { type: 'cash', value: 3000000, label: '3,000,000 ₽', weight: 10 },
-            { type: 'stars', value: 50, label: '50 ⭐ (125,000 ₽)', weight: 15 },
-            { type: 'tickets', value: 10, label: '10 🎫 Билетов', weight: 12 },
-            { type: 'tool', id: 'obd_launch', label: 'Планшет Launch Pro', weight: 8 },
-            { type: 'car', tier: 'rare', label: 'BMW E34 525i (Идеал)', weight: 5 },
-            { type: 'car', tier: 'exclusive', label: 'Toyota Mark II Tourer V', weight: 2 }
+            { type: 'cash', value: 250000, label: '250,000 ₽', weight: 30 },
+            { type: 'cash', value: 600000, label: '600,000 ₽', weight: 22 },
+            { type: 'cash', value: 1500000, label: '1,500,000 ₽', weight: 12 },
+            { type: 'stars', value: 30, label: '30 ⭐ (75,000 ₽)', weight: 15 },
+            { type: 'tickets', value: 5, label: '5 🎫 Билетов', weight: 10 },
+            { type: 'tool', id: 'obd_launch', label: 'Планшет Launch Pro', weight: 7 },
+            { type: 'car', tier: 'rare', label: 'BMW E34 525i (Идеал)', weight: 3 },
+            { type: 'car', tier: 'exclusive', label: 'Toyota Mark II Tourer V', weight: 1 }
         ]
     }
 };
 
 // --------------------------------------------------------
-// 0.2. ЭКОНОМИЧЕСКИЙ БАЛАНС МАРКЕТА И ТОРГА
+// 0.2. ЭКОНОМИЧЕСКИЙ БАЛАНС МАРКЕТА И ТОРГА (БАЛАНС 2026)
 // --------------------------------------------------------
 const MARKET_ECONOMY_CONFIG = {
-    cleanProfitMargin: 0.14,
-    washedPolishedMargin: 0.22,
-    fullRestoredMargin: 0.38,
-    bargainMinPct: 0.05,
-    bargainMaxPct: 0.24,
+    cleanProfitMargin: 0.08,        // 8% чистая перепродажа стока
+    washedPolishedMargin: 0.15,    // 15% с детейлингом и полировкой
+    fullRestoredMargin: 0.25,      // 25% при устранении всех скрытых дефектов
+    bargainMinPct: 0.03,
+    bargainMaxPct: 0.14,
     urgentSaleChance: 0.08,
     hiddenDefectChance: 0.28
 };
@@ -1060,16 +1065,16 @@ const SHOP_CATALOG = {
 const HOUSING_INTERIOR_CATALOG = SHOP_CATALOG.homeItems;
 
 // --------------------------------------------------------
-// 5. ЕЖЕДНЕВНЫЕ НАГРАДЫ
+// 5. ЕЖЕДНЕВНЫЕ НАГРАДЫ (БАЛАНС 7 ДНЕЙ)
 // --------------------------------------------------------
 const DAILY_REWARDS_CONFIG = [
-    { day: 1, title: "+25k ₽ & 15 ⛽", reward: { cash: 25000, fuel: 15 } },
-    { day: 2, title: "+50k ₽ & 1 🤝 & Талон Штрафстоянки", reward: { cash: 50000, connections: 1, freeImpoundPasses: 1 } },
-    { day: 3, title: "+90k ₽ & 10 ⭐ (25k ₽) & +100 XP", reward: { cash: 90000, stars: 10, xp: 100 } },
-    { day: 4, title: "+150k ₽ & 2 🤝", reward: { cash: 150000, connections: 2 } },
-    { day: 5, title: "+250k ₽ & 20 ⭐ (50k ₽) & Сканер Launch", reward: { cash: 250000, stars: 20, tool: "obd_launch" } },
-    { day: 6, title: "+400k ₽ & Полный Бак & +250 XP", reward: { cash: 400000, fuel: 100, xp: 250 } },
-    { day: 7, title: "+750k ₽ & 30 ⭐ (75k ₽) & Номер Х777ХХ 77", reward: { cash: 750000, stars: 30, specialPlate: "Х777ХХ 77" } }
+    { day: 1, title: "+12k ₽ & 15 ⛽", reward: { cash: 12000, fuel: 15 } },
+    { day: 2, title: "+25k ₽ & 1 🤝 & Талон Штрафстоянки", reward: { cash: 25000, connections: 1, freeImpoundPasses: 1 } },
+    { day: 3, title: "+45k ₽ & 3 ⭐ (7.5k ₽) & +70 XP", reward: { cash: 45000, stars: 3, xp: 70 } },
+    { day: 4, title: "+75k ₽ & 1 🤝", reward: { cash: 75000, connections: 1 } },
+    { day: 5, title: "+120k ₽ & 5 ⭐ (12.5k ₽) & Сканер ELM327", reward: { cash: 120000, stars: 5, tool: "obd" } },
+    { day: 6, title: "+180k ₽ & Полный Бак & +150 XP", reward: { cash: 180000, fuel: 100, xp: 150 } },
+    { day: 7, title: "+350k ₽ & 10 ⭐ (25k ₽) & Номер Х777ХХ 77", reward: { cash: 350000, stars: 10, specialPlate: "Х777ХХ 77" } }
 ];
 
 // --------------------------------------------------------
@@ -1077,10 +1082,10 @@ const DAILY_REWARDS_CONFIG = [
 // --------------------------------------------------------
 const BANK_DEPOSIT_CONFIG = {
     autoCapital: {
-        dailyRate: 0.015,
+        dailyRate: 0.008,               // 0.8% в день (вместо 1.5%)
         compoundPeriodMs: 60000,
         maxOfflineDays: 30,
-        minDeposit: 10000
+        minDeposit: 15000
     },
     safeDeposit: {
         annualRate: 0,
@@ -1088,23 +1093,23 @@ const BANK_DEPOSIT_CONFIG = {
         isProtectedFromRaids: true
     },
     creditScoring: {
-        baseLimit: 150000,
-        limitPerLevel: 150000,
-        standardDailyRate: 0.02,
-        overduePenaltyDailyRate: 0.03,
+        baseLimit: 80000,
+        limitPerLevel: 60000,
+        standardDailyRate: 0.025,
+        overduePenaltyDailyRate: 0.04,
         gracePeriodHours: 72,
         maxRating: 5.0,
         ratingBonusOnRepay: 0.2,
         ratingPenaltyOnOverduePerDay: 0.15
     },
-    minAmount: 100000,
+    minAmount: 50000,
     maxAmount: 500000000,
-    dailyPercent: 0.3,
+    dailyPercent: 0.2,
     terms: [
-        { days: 7,   label: "1 неделя",   dailyPercent: 0.2, autoCompound: false },
-        { days: 30,  label: "1 месяц",    dailyPercent: 0.3, autoCompound: false },
-        { days: 90,  label: "3 месяца",   dailyPercent: 0.5, autoCompound: true },
-        { days: 365, label: "1 год",      dailyPercent: 0.8, autoCompound: true }
+        { days: 7,   label: "1 неделя",   dailyPercent: 0.15, autoCompound: false },
+        { days: 30,  label: "1 месяц",    dailyPercent: 0.22, autoCompound: false },
+        { days: 90,  label: "3 месяца",   dailyPercent: 0.35, autoCompound: true },
+        { days: 365, label: "1 год",      dailyPercent: 0.55, autoCompound: true }
     ],
     earlyWithdrawPenaltyPct: 30
 };
@@ -1334,4 +1339,4 @@ window.BUSINESS_FLEET_REQUIREMENTS = BUSINESS_FLEET_REQUIREMENTS;
 window.MREO_CONFIG = MREO_CONFIG;
 window.FLEET_CALCULATOR = FLEET_CALCULATOR;
 
-console.log('[📈 data_economy v3.7.0 COMPLETE] Полная экономика, сезоны, верстак, бизнесы и перегон сохранены ✓');
+console.log('[📈 data_economy v3.8.0 REBALANCED] Хардкорный баланс наград, честные призы колеса и реалистичная маржа ✓');
