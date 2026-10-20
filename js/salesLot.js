@@ -1,8 +1,10 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ДЕТЕЙЛИНГ И СКРЫТЫЕ СХЕМЫ (v3.5.0)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ДЕТЕЙЛИНГ И СКРЫТЫЕ СХЕМЫ (v3.5.1-fixed)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.5.0 (ПЕРЕКУП-ДЕТЕЙЛИНГ, СМОТКА ПРОБЕГА И РИСКИ):
+// ⭐ v3.5.1:
+//   - ФИКС ОБЛОЖКИ: getOrAssignLotCarImage строго сохраняет оригинальное фото
+//     автомобиля из гаража без случайной подмены ракурса на площадке.
 //   - БОНУСЫ ЛОСКА: полировка фар, чернение шин, сухой туман и полировка кузова
 //     повышают привлекательность лота и стартовые предложения покупателей.
 //   - ПРОВЕРКА ШПАКЛЕВКИ: подборщики и дотошные клиенты находят покрас из баллона.
@@ -123,6 +125,9 @@ const VIP_BUYER_ARCHETYPES = [
     }
 ];
 
+// ========================================================
+// СОХРАНЕНИЕ ОРИГИНАЛЬНОЙ ОБЛОЖКИ ИЗ ГАРАЖА
+// ========================================================
 function getOrAssignLotCarImage(car, lot) {
     const defaultPlaceholder = "assets/cars/economy/2101/vaz-2101.jpg";
     if (!car) {
@@ -133,58 +138,19 @@ function getOrAssignLotCarImage(car, lot) {
         };
     }
 
-    let catalogCar = null;
-    if (typeof window.BARN_CARS_DATABASE !== 'undefined' && Array.isArray(window.BARN_CARS_DATABASE)) {
-        catalogCar = window.BARN_CARS_DATABASE.find(b => b && (b.id === car.id || b.name === car.name));
-    }
-    if (!catalogCar && typeof window.CARS_DATABASE !== 'undefined' && Array.isArray(window.CARS_DATABASE)) {
-        catalogCar = window.CARS_DATABASE.find(c => c && (c.id === car.id || c.name === car.name));
-    }
+    // Приоритет строго за текущей закреплённой обложкой авто из гаража
+    let chosenImg = car.img || car.baseImg || (Array.isArray(car.images) && car.images.length > 0 ? car.images[0] : null) || defaultPlaceholder;
 
-    let baseImg = car.baseImg || (catalogCar ? catalogCar.img : null) || car.img || defaultPlaceholder;
-    car.baseImg = baseImg;
-
-    let universalFallback = car.fallback || (catalogCar ? catalogCar.fallback : '') || defaultPlaceholder;
-
-    if (car.assignedLotImg) {
-        return {
-            src: car.assignedLotImg,
-            baseFallback: baseImg,
-            fallback: universalFallback
-        };
-    }
-
-    let pool = [];
-
-    if (Array.isArray(car.images) && car.images.length > 0) {
-        pool = [...car.images];
-    } else if (catalogCar && Array.isArray(catalogCar.images) && catalogCar.images.length > 0) {
-        pool = [...catalogCar.images];
-    } else if (baseImg) {
-        pool.push(baseImg);
-        const match = baseImg.match(/\.(jpg|jpeg|png|webp)$/i);
-        if (match) {
-            const ext = match[0];
-            const basePath = baseImg.slice(0, -ext.length);
-            for (let i = 1; i <= 3; i++) {
-                pool.push(`${basePath}_${i}${ext}`);
-            }
-        }
-    }
-
-    let chosenImg = baseImg;
-    if (pool.length > 0) {
-        const randIdx = Math.floor(Math.random() * pool.length);
-        chosenImg = pool[randIdx];
-    }
-
+    car.baseImg = car.baseImg || chosenImg;
     car.assignedLotImg = chosenImg;
     car.img = chosenImg;
     if (lot) lot.lockedImg = chosenImg;
 
+    let universalFallback = car.fallback || defaultPlaceholder;
+
     return {
         src: chosenImg,
-        baseFallback: baseImg,
+        baseFallback: chosenImg,
         fallback: universalFallback
     };
 }
@@ -378,7 +344,6 @@ function renderSalesLot() {
         const priceRatio = askingPrice / marketVal;
         let defaultTimer = 45;
 
-        // Если машина отполирована и фары горят — покупатели реагируют быстрее!
         let detailBonusTime = 0;
         if (car.headlightsPolished) detailBonusTime += 6;
         if (car.isPolished) detailBonusTime += 8;
@@ -473,7 +438,6 @@ function renderSalesLot() {
         let shieldIconClass = condVal >= 80 ? 'spec-tile-icon-shield' : (condVal >= 50 ? 'spec-tile-icon-shield-mid' : 'spec-tile-icon-shield-low');
         let condColorClass = condVal >= 80 ? 'color-green' : (condVal >= 50 ? 'color-amber' : 'color-red');
 
-        // Бейджи детейлинга на карточке лота
         let detailingBadges = [];
         if (car.headlightsPolished) detailingBadges.push(`<span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">✨ ФАРЫ/ШИНЫ</span>`);
         if (car.isPolished) detailingBadges.push(`<span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">💎 ПОЛИРОВКА</span>`);
@@ -621,7 +585,6 @@ function generateRandomLotBuyer(car, askingPrice) {
         ? archetype.bonusMultiplier * (0.95 + Math.random() * 0.15)
         : (0.82 + Math.random() * 0.12);
 
-    // БОНУСЫ ПРЕДПРОДАЖКИ (ЛОСК)
     let preSaleRemarks = [];
     if (car.headlightsPolished) {
         discountRatio += 0.05;
@@ -638,14 +601,12 @@ function generateRandomLotBuyer(car, askingPrice) {
 
     let rawPrice = askingPrice * discountRatio;
 
-    // ПРОВЕРКА 1: ШПАКЛЯ ИЗ БАЛЛОНА (ВЫЯВЛЕНИЕ ТОЛЩИНОМЕРОМ)
     let bondoWarning = '';
     if (car.hasBondoBalloons && (archetype.inspectionSkill === 'high' || archetype.inspectionSkill === 'mid')) {
-        rawPrice *= 0.82; // -18% штраф за шпаклю под баллончиком
+        rawPrice *= 0.82;
         bondoWarning = ` «Достал толщиномер: под краской из баллона слой шпакли 400 мкм! Скидывай 18% за колхозный ремонт.»`;
     }
 
-    // ПРОВЕРКА 2: СКРЫТЫЙ ДЕФЕКТ БЕЗ ПРИСАДКИ
     let defectWarning = '';
     if (car.hiddenDefect && !car.hasAdditive) {
         const cost = car.hiddenDefect.cost || 15000;
@@ -653,15 +614,13 @@ function generateRandomLotBuyer(car, askingPrice) {
         defectWarning = ` «Слышу подозрительные стуки в моторе (${car.hiddenDefect.text || 'дефект'}). Срезаю ${cost.toLocaleString()} ₽ на ремонт!»`;
     }
 
-    // ПРОВЕРКА 3: СКРУТКА ПРОБЕГА СО СКАНЕРОМ (РИСК И СКАХАНДАЛ)
     let odometerBust = false;
     let odometerBustText = '';
     if (car.rolledOdometer && (archetype.inspectionSkill === 'high' || Math.random() < 0.35)) {
         odometerBust = true;
-        rawPrice *= 0.70; // -30% штраф
+        rawPrice *= 0.70;
         odometerBustText = ` «Я подключил Launch: в блоках ABS зафиксирован реальный пробег ${(car.actualMileage || 220000).toLocaleString()} км! Ты одометр скрутил?!»`;
 
-        // Штраф репутации и кармы перекупа за обман
         if (state.player?.p2pReputation) {
             state.player.p2pReputation.badReviews = (state.player.p2pReputation.badReviews || 0) + 1;
             state.player.p2pReputation.rating = Math.max(1.0, state.player.p2pReputation.rating - 0.3);
@@ -1361,4 +1320,4 @@ if (document.readyState === 'loading') {
     _startSalesLotTimerWhenReady();
 }
 
-console.log('[🏪 salesLot v3.5.0] Детейлинг-бонусы, вскрытие шпаклевки и риск скрутки одометра ✓');
+console.log('[🏪 salesLot v3.5.1] Строгое сохранение обложки из гаража + детейлинг-бонусы ✓');
