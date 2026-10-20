@@ -1,19 +1,17 @@
 // ========================================================
-// js/firebase-friendships.js — СИСТЕМА ДРУЗЕЙ (v1.2.0)
+// js/firebase/firebase-friendships.js — СИСТЕМА ДРУЗЕЙ & СОЦИАЛА (v1.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.2.0 (СПРИНТ 2 — ДРУЗЬЯ И PUSH):
-//   - ДОБАВЛЕНО: getOutgoingRequests(userId) — список исходящих
-//     pending-заявок. Нужен m-leaderboard.js для отображения
-//     статуса "Ожидает" на кнопке.
-//   - ФИКС: subscribeToFriendships без составных индексов.
-//   - ФИКС: fetchFriendships защищён от permission-denied.
-//   - ФИКС: sendRequest при отказе автопринятия возвращает
-//     детальную ошибку.
-//   - ФИКС: removeFriend переводит в 'declined' (мягкое удаление).
-//   - Все публичные API сохранены.
-//
-// ВАЖНО: файл — ES-модуль (import).
+// ⭐ v1.3.0 (СОЦИУМ: ДРУЗЬЯ, ЗАГОТОВКИ ФРАЗ, P2P ОФФЕРЫ):
+//   - ПОЛНЫЙ ФИКС ВЗАИМНОГО ДОБАВЛЕНИЯ: если есть встречная заявка,
+//     она мгновенно переводится в статус 'accepted' без конфликта дублей.
+//   - ХРАНЕНИЕ МЕТАДАННЫХ: сохраняются аватары, никнеймы, уровни
+//     и машины игроков для быстрого рендера карточек друзей.
+//   - БЫСТРЫЕ ФРАЗЫ (sendQuickPhrase): мгновенная отправка заготовок
+//     с пушем и записью в документ дружбы/уведомлений.
+//   - ИНТЕГРАЦИЯ С ОФФЕРАМИ (sendDirectOffer): отправка предложения
+//     покупки авто напрямую другу.
+//   - ПОДПИСКИ REALTIME: подписка на список друзей и входящие заявки.
 // ========================================================
 
 import {
@@ -33,7 +31,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 // ========================================================
-// 1. ИМПОРТ ЯДРА (db, auth, хелперы)
+// 1. ИМПОРТ ЯДРА
 // ========================================================
 const FB_Core = window.FB_Core;
 if (!FB_Core) {
@@ -42,57 +40,56 @@ if (!FB_Core) {
 }
 
 const db = FB_Core.db;
-const devLogFirestore = FB_Core.devLogFirestore;
-const TTL_CONFIG = FB_Core.TTL_CONFIG;
-const LIMITS = FB_Core.LIMITS;
+const devLogFirestore = FB_Core.devLogFirestore || console.log;
+const TTL_CONFIG = FB_Core.TTL_CONFIG || { friendships: 30 * 86400000, notifications: 7 * 86400000 };
+const LIMITS = FB_Core.LIMITS || { maxFriendshipsPerUser: 100 };
 
 // ========================================================
-// 2. ХЕЛПЕР: получить текущий профиль игрока
+// 2. ХЕЛПЕР: получить актуальный профиль игрока со всеми статами
 // ========================================================
 function getCurrentPlayerProfile() {
   const authProfile = FB_Core.Auth?.getUserProfile?.();
-  if (authProfile && authProfile.id) return authProfile;
+  const player = window.state?.player || {};
+  const currentCar = window.state?.garage?.[0] || null;
+
+  let id = authProfile?.id || FB_Core.Auth?.getVerifiedUserId?.() || player.uid;
+  let name = authProfile?.name || player.name || "Перекуп";
+  let photoUrl = authProfile?.photoUrl || null;
+  let isTelegram = false;
 
   const tgUser = FB_Core.getTelegramUser?.();
   if (tgUser && tgUser.id) {
+    id = String(tgUser.id);
     const names = [];
     if (tgUser.first_name) names.push(tgUser.first_name);
     if (tgUser.last_name) names.push(tgUser.last_name);
-
-    return {
-      id: String(tgUser.id),
-      name: names.join(" ").trim() || (tgUser.username ? "@" + tgUser.username : "Перекуп #" + tgUser.id),
-      username: tgUser.username || "",
-      photoUrl: tgUser.photo_url || null,
-      isTelegram: true
-    };
+    name = names.join(" ").trim() || (tgUser.username ? "@" + tgUser.username : "Перекуп #" + tgUser.id);
+    photoUrl = tgUser.photo_url || photoUrl;
+    isTelegram = true;
   }
 
-  if (window.state?.player?.uid) {
-    return {
-      id: String(window.state.player.uid),
-      name: window.state.player.name || "Перекуп",
-      username: "",
-      photoUrl: null,
-      isTelegram: false
-    };
-  }
+  if (!id) return null;
 
-  return null;
+  return {
+    id: String(id),
+    name: name,
+    username: tgUser?.username || "",
+    photoUrl: photoUrl,
+    level: Number(player.level) || 1,
+    balance: Number(player.balance) || 0,
+    carName: currentCar ? (currentCar.name || currentCar.title || "Пешком") : "Пешком",
+    isTelegram: isTelegram
+  };
 }
 
 // ========================================================
-// 3. ХЕЛПЕР: построить pairId (порядок не важен)
+// 3. ХЕЛПЕР: детерминированный Pair ID
 // ========================================================
 function _buildPairId(uid1, uid2) {
   if (!uid1 || !uid2) return null;
   return [String(uid1), String(uid2)].sort().join("_");
 }
 
-// ========================================================
-// 4. ХЕЛПЕР: клиентская фильтрация + сортировка
-// (используется вместо составных индексов Firestore)
-// ========================================================
 function _filterAndSortDocs(items, opts = {}) {
   if (!Array.isArray(items)) return [];
   const now = Date.now();
@@ -117,155 +114,151 @@ function _filterAndSortDocs(items, opts = {}) {
 }
 
 // ========================================================
-// 5. FRIENDSHIPS MANAGER
+// 4. FRIENDSHIPS & SOCIAL MANAGER
 // ========================================================
 const FriendshipsManager = {
   _listeners: [],
 
   /**
    * Отправить заявку в друзья.
-   * Если встречная заявка уже существует — автоматически принимаем её.
+   * Если вторая сторона уже отправила заявку — мгновенное взаимное автопринятие.
    */
-  async sendRequest(toUserId, toUserName) {
-    const profile = getCurrentPlayerProfile();
-    if (!profile?.id) return { success: false, error: "Нет профиля" };
+  async sendRequest(toUserId, toUserName = "Перекуп") {
+    const me = getCurrentPlayerProfile();
+    if (!me?.id) return { success: false, error: "Требуется авторизация" };
 
-    if (String(toUserId) === String(profile.id)) {
-      return { success: false, error: "Нельзя добавить себя" };
-    }
-
-    if (!toUserId) {
-      return { success: false, error: "Некорректный получатель" };
+    const targetId = String(toUserId);
+    if (targetId === String(me.id)) {
+      return { success: false, error: "Нельзя добавить самого себя" };
     }
 
     try {
-      const pairId = _buildPairId(String(profile.id), String(toUserId));
-      if (!pairId) return { success: false, error: "Ошибка пары" };
+      const pairId = _buildPairId(me.id, targetId);
+      if (!pairId) return { success: false, error: "Ошибка формирования пары" };
 
       const friendRef = doc(db, "friendships", pairId);
-      const existing = await getDoc(friendRef);
+      const snap = await getDoc(friendRef);
 
-      if (existing.exists()) {
-        const data = existing.data();
+      if (snap.exists()) {
+        const data = snap.data();
 
-        // Уже друзья
+        // 1. Уже друзья
         if (data.status === 'accepted') {
-          return { success: false, error: "Уже друзья" };
+          return { success: true, alreadyFriends: true, message: "Вы уже друзья!" };
         }
 
-        // Уже отправлена исходящая заявка
-        if (data.status === 'pending' && String(data.fromUserId) === String(profile.id)) {
-          return { success: false, error: "Заявка уже отправлена" };
+        // 2. Мы уже отправляли запрос ранее, ждем
+        if (data.status === 'pending' && String(data.fromUserId) === String(me.id)) {
+          return { success: false, error: "Заявка уже отправлена и ожидает ответа" };
         }
 
-        // ⭐ ВСТРЕЧНАЯ ЗАЯВКА — сразу принимаем
-        if (data.status === 'pending' && String(data.fromUserId) === String(toUserId)) {
-          devLogFirestore('Friendships: встречная заявка, автопринятие', pairId);
-          const autoRes = await this.acceptRequest(toUserId);
-          if (!autoRes || !autoRes.success) {
-            return {
-              success: false,
-              error: autoRes?.error || "Не удалось принять встречную заявку"
-            };
-          }
-          return { success: true, autoAccepted: true };
+        // 3. ⭐ ВСТРЕЧНАЯ ЗАЯВКА (он уже отправил нам) -> Мгновенное взаимное принятие
+        if (data.status === 'pending' && String(data.fromUserId) === targetId) {
+          devLogFirestore('Friendships: встречный запрос обнаружен -> автопринятие', pairId);
+
+          await updateDoc(friendRef, {
+            status: 'accepted',
+            acceptedAt: Date.now(),
+            // обновляем статы обоих участников
+            [`profiles.${me.id}`]: me,
+            updatedAt: Date.now()
+          });
+
+          // Шлем уведомление партнеру, что дружба подтверждена
+          await this._sendSystemNotification({
+            toUser: targetId,
+            type: "friend_accepted",
+            title: "🤝 Заявка принята!",
+            text: `${me.name} принял вашу заявку в друзья. Теперь вы можете общаться и совершать сделки!`,
+            fromUserId: me.id,
+            fromUserName: me.name
+          });
+
+          return { success: true, autoAccepted: true, message: "Вы теперь друзья!" };
         }
 
-        // Отклонённая/subscribed — позволяем отправить снова
-        if (data.status === 'declined' || data.status === 'subscribed') {
-          await setDoc(friendRef, {
-            pairId,
-            fromUserId: String(profile.id),
-            fromUserName: profile.name || "Перекуп",
-            toUserId: String(toUserId),
-            toUserName: toUserName || "Перекуп",
-            status: 'pending',
-            createdAt: Date.now(),
-            expireAt: Date.now() + TTL_CONFIG.friendships
-          }, { merge: true });
-        } else {
-          return { success: false, error: "Заявка уже существует" };
-        }
-      } else {
-        // Создаём новую
+        // 4. Если ранее была отклонена/удалена — возобновляем
         await setDoc(friendRef, {
           pairId,
-          fromUserId: String(profile.id),
-          fromUserName: profile.name || "Перекуп",
-          toUserId: String(toUserId),
-          toUserName: toUserName || "Перекуп",
+          fromUserId: me.id,
+          fromUserName: me.name,
+          toUserId: targetId,
+          toUserName: toUserName,
           status: 'pending',
+          profiles: {
+            [me.id]: me,
+            [targetId]: { id: targetId, name: toUserName }
+          },
+          createdAt: Date.now(),
+          expireAt: Date.now() + TTL_CONFIG.friendships
+        }, { merge: true });
+
+      } else {
+        // Создаем новую заявку с нуля
+        await setDoc(friendRef, {
+          pairId,
+          fromUserId: me.id,
+          fromUserName: me.name,
+          toUserId: targetId,
+          toUserName: toUserName,
+          status: 'pending',
+          profiles: {
+            [me.id]: me,
+            [targetId]: { id: targetId, name: toUserName }
+          },
           createdAt: Date.now(),
           expireAt: Date.now() + TTL_CONFIG.friendships
         });
       }
 
-      // Уведомление получателю
-      const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
-      await setDoc(notifRef, {
-        toUser: String(toUserId),
+      // Создаем push-уведомление для адресата
+      await this._sendSystemNotification({
+        toUser: targetId,
         type: "friend_request",
         title: "👋 Заявка в друзья!",
-        text: `${profile.name} хочет добавить вас в друзья.`,
-        fromUserId: String(profile.id),
-        fromUserName: profile.name || "Перекуп",
-        read: false,
-        claimed: false,
-        timestamp: Date.now(),
-        expireAt: Date.now() + TTL_CONFIG.notifications
+        text: `${me.name} хочет добавить вас в друзья.`,
+        fromUserId: me.id,
+        fromUserName: me.name
       });
 
-      devLogFirestore('Friendships.sendRequest OK', pairId);
-      return { success: true };
+      devLogFirestore('Friendships.sendRequest: успешно отправлено', pairId);
+      return { success: true, message: "Заявка отправлена" };
     } catch (e) {
       const errMsg = e?.code || e?.message || String(e);
       devLogFirestore('Friendships.sendRequest ERROR', errMsg);
-      if (errMsg.includes('permission-denied')) {
-        return { success: false, error: "Доступ к friendships запрещён (проверьте Firestore Rules)" };
-      }
       return { success: false, error: errMsg };
     }
   },
 
   /**
-   * Принять входящую заявку.
+   * Принять входящую заявку от игрока.
    */
   async acceptRequest(fromUserId) {
-    const profile = getCurrentPlayerProfile();
-    if (!profile?.id) return { success: false, error: "Нет профиля" };
+    const me = getCurrentPlayerProfile();
+    if (!me?.id) return { success: false, error: "Нет профиля" };
 
     try {
-      const pairId = _buildPairId(String(profile.id), String(fromUserId));
-      if (!pairId) return { success: false, error: "Ошибка пары" };
-
+      const pairId = _buildPairId(me.id, fromUserId);
       const friendRef = doc(db, "friendships", pairId);
 
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(friendRef);
-        if (!snap.exists()) throw new Error("Заявка не найдена");
-        const data = snap.data();
-        if (data.status !== 'pending') throw new Error("Заявка уже обработана");
-        if (String(data.fromUserId) !== String(fromUserId)) throw new Error("Это не встречная заявка");
+      const snap = await getDoc(friendRef);
+      if (!snap.exists()) return { success: false, error: "Заявка не найдена" };
 
-        tx.update(friendRef, {
-          status: 'accepted',
-          acceptedAt: Date.now()
-        });
+      await updateDoc(friendRef, {
+        status: 'accepted',
+        acceptedAt: Date.now(),
+        [`profiles.${me.id}`]: me,
+        updatedAt: Date.now()
       });
 
-      // Уведомление отправителю
-      const notifRef = doc(db, "notifications", "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6));
-      await setDoc(notifRef, {
+      // Уведомление инициатору заявки
+      await this._sendSystemNotification({
         toUser: String(fromUserId),
         type: "friend_accepted",
         title: "✅ Заявка принята!",
-        text: `${profile.name} принял вашу заявку в друзья.`,
-        fromUserId: String(profile.id),
-        fromUserName: profile.name || "Перекуп",
-        read: false,
-        claimed: false,
-        timestamp: Date.now(),
-        expireAt: Date.now() + TTL_CONFIG.notifications
+        text: `${me.name} принял вашу заявку в друзья.`,
+        fromUserId: me.id,
+        fromUserName: me.name
       });
 
       devLogFirestore('Friendships.accept OK', pairId);
@@ -278,29 +271,20 @@ const FriendshipsManager = {
   },
 
   /**
-   * Отклонить входящую заявку (переводит в 'subscribed').
+   * Отклонить входящую заявку.
    */
   async declineRequest(fromUserId) {
-    const profile = getCurrentPlayerProfile();
-    if (!profile?.id) return { success: false, error: "Нет профиля" };
+    const me = getCurrentPlayerProfile();
+    if (!me?.id) return { success: false, error: "Нет профиля" };
 
     try {
-      const pairId = _buildPairId(String(profile.id), String(fromUserId));
-      if (!pairId) return { success: false, error: "Ошибка пары" };
-
+      const pairId = _buildPairId(me.id, fromUserId);
       const friendRef = doc(db, "friendships", pairId);
 
-      await runTransaction(db, async (tx) => {
-        const snap = await tx.get(friendRef);
-        if (!snap.exists()) throw new Error("Заявка не найдена");
-        const data = snap.data();
-        if (data.status !== 'pending') throw new Error("Заявка уже обработана");
-        if (String(data.fromUserId) !== String(fromUserId)) throw new Error("Это не встречная заявка");
-
-        tx.update(friendRef, {
-          status: 'subscribed',
-          declinedAt: Date.now()
-        });
+      await updateDoc(friendRef, {
+        status: 'declined',
+        declinedAt: Date.now(),
+        updatedAt: Date.now()
       });
 
       devLogFirestore('Friendships.decline OK', pairId);
@@ -313,31 +297,20 @@ const FriendshipsManager = {
   },
 
   /**
-   * Удалить из друзей (мягкое удаление — статус 'declined').
+   * Удалить пользователя из списка друзей.
    */
   async removeFriend(friendUserId) {
-    const profile = getCurrentPlayerProfile();
-    if (!profile?.id) return { success: false, error: "Нет профиля" };
+    const me = getCurrentPlayerProfile();
+    if (!me?.id) return { success: false, error: "Нет профиля" };
 
     try {
-      const pairId = _buildPairId(String(profile.id), String(friendUserId));
-      if (!pairId) return { success: false, error: "Ошибка пары" };
-
+      const pairId = _buildPairId(me.id, friendUserId);
       const friendRef = doc(db, "friendships", pairId);
-      const snap = await getDoc(friendRef);
-
-      if (!snap.exists()) {
-        return { success: false, error: "Связь не найдена" };
-      }
-
-      const data = snap.data();
-      if (data.status !== 'accepted') {
-        return { success: false, error: "Вы не друзья" };
-      }
 
       await updateDoc(friendRef, {
-        status: 'declined',
-        removedAt: Date.now()
+        status: 'removed',
+        removedAt: Date.now(),
+        updatedAt: Date.now()
       });
 
       devLogFirestore('Friendships.removeFriend OK', pairId);
@@ -350,11 +323,97 @@ const FriendshipsManager = {
   },
 
   /**
-   * Получить: друзей, входящие заявки, подписчиков.
+   * Отправить заготовленную фразу другу (Quick Chat).
+   */
+  async sendQuickPhrase(friendUserId, phraseText) {
+    const me = getCurrentPlayerProfile();
+    if (!me?.id) return { success: false, error: "Нет профиля" };
+    if (!phraseText || !phraseText.trim()) return { success: false, error: "Пустая фраза" };
+
+    try {
+      const pairId = _buildPairId(me.id, friendUserId);
+      const friendRef = doc(db, "friendships", pairId);
+
+      // Записываем последнюю фразу прямо в диалог дружбы
+      await updateDoc(friendRef, {
+        lastMessage: {
+          fromUserId: me.id,
+          fromUserName: me.name,
+          text: phraseText.trim(),
+          timestamp: Date.now()
+        },
+        updatedAt: Date.now()
+      });
+
+      // Отправляем пуш-уведомление с репликой
+      await this._sendSystemNotification({
+        toUser: String(friendUserId),
+        type: "chat_phrase",
+        title: `💬 Сообщение от ${me.name}`,
+        text: `"${phraseText.trim()}"`,
+        fromUserId: me.id,
+        fromUserName: me.name
+      });
+
+      return { success: true };
+    } catch (e) {
+      console.warn('[Friendship] Ошибка отправки фразы:', e);
+      return { success: false, error: e?.message || String(e) };
+    }
+  },
+
+  /**
+   * Сделать прямое предложение авто другу (P2P Оффер).
+   */
+  async sendDirectCarOffer(friendUserId, carData, offerPrice) {
+    const me = getCurrentPlayerProfile();
+    if (!me?.id) return { success: false, error: "Нет профиля" };
+    if (!carData || !offerPrice || offerPrice <= 0) {
+      return { success: false, error: "Некорректные данные автомобиля или цены" };
+    }
+
+    try {
+      const offerId = "offer_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+      const offerRef = doc(db, "p2p_offers", offerId);
+
+      const payload = {
+        offerId,
+        sellerId: me.id,
+        sellerName: me.name,
+        buyerId: String(friendUserId),
+        car: carData,
+        price: Number(offerPrice),
+        status: "pending", // pending | accepted | rejected | expired
+        createdAt: Date.now(),
+        expireAt: Date.now() + (24 * 3600 * 1000) // 24 часа
+      };
+
+      await setDoc(offerRef, payload);
+
+      // Шлем уведомление покупателю
+      await this._sendSystemNotification({
+        toUser: String(friendUserId),
+        type: "p2p_offer",
+        title: "🚗 Предложение авто от друга!",
+        text: `${me.name} предлагает вам ${carData.name || "автомобиль"} за ${Number(offerPrice).toLocaleString('ru-RU')} ₽`,
+        fromUserId: me.id,
+        fromUserName: me.name,
+        offerId: offerId
+      });
+
+      return { success: true, offerId };
+    } catch (e) {
+      console.warn('[Friendship] Ошибка создания оффера:', e);
+      return { success: false, error: e?.message || String(e) };
+    }
+  },
+
+  /**
+   * Получить полный срез: друзья, входящие заявки, исходящие заявки.
    */
   async fetchFriendships(userId) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
-    if (!targetUid) return { friends: [], pending: [], subscribed: [] };
+    if (!targetUid) return { friends: [], pending: [], outgoing: [] };
 
     try {
       const [asFromSnap, asToSnap] = await Promise.all([
@@ -372,107 +431,106 @@ const FriendshipsManager = {
 
       const friends = [];
       const pending = [];
-      const subscribed = [];
+      const outgoing = [];
       const now = Date.now();
 
-      // Обработка исходящих (я — fromUserId)
+      // Мои исходящие
       asFromSnap.forEach(d => {
         const data = d.data();
         if (data.expireAt && data.expireAt < now) return;
 
+        const partnerProfile = data.profiles?.[data.toUserId] || {};
+
         if (data.status === 'accepted') {
           friends.push({
             id: data.toUserId,
-            name: data.toUserName || "Перекуп",
-            status: 'accepted'
+            name: partnerProfile.name || data.toUserName || "Перекуп",
+            level: partnerProfile.level || 1,
+            carName: partnerProfile.carName || "В гараже",
+            lastMessage: data.lastMessage || null,
+            acceptedAt: data.acceptedAt || data.createdAt
+          });
+        } else if (data.status === 'pending') {
+          outgoing.push({
+            id: data.toUserId,
+            name: partnerProfile.name || data.toUserName || "Перекуп",
+            createdAt: data.createdAt
           });
         }
       });
 
-      // Обработка входящих (я — toUserId)
+      // Входящие ко мне
       asToSnap.forEach(d => {
         const data = d.data();
         if (data.expireAt && data.expireAt < now) return;
+
+        const partnerProfile = data.profiles?.[data.fromUserId] || {};
 
         if (data.status === 'accepted') {
           if (!friends.some(f => String(f.id) === String(data.fromUserId))) {
             friends.push({
               id: data.fromUserId,
-              name: data.fromUserName || "Перекуп",
-              status: 'accepted'
+              name: partnerProfile.name || data.fromUserName || "Перекуп",
+              level: partnerProfile.level || 1,
+              carName: partnerProfile.carName || "В гараже",
+              lastMessage: data.lastMessage || null,
+              acceptedAt: data.acceptedAt || data.createdAt
             });
           }
         } else if (data.status === 'pending') {
           pending.push({
             id: data.fromUserId,
-            name: data.fromUserName || "Перекуп",
+            name: partnerProfile.name || data.fromUserName || "Перекуп",
+            level: partnerProfile.level || 1,
+            carName: partnerProfile.carName || "В гараже",
             createdAt: data.createdAt,
             pairId: d.id
           });
-        } else if (data.status === 'subscribed') {
-          subscribed.push({
-            id: data.fromUserId,
-            name: data.fromUserName || "Перекуп"
-          });
         }
       });
 
-      return { friends, pending, subscribed };
+      return { friends, pending, outgoing };
     } catch (e) {
-      const errMsg = e?.code || e?.message || String(e);
-      if (errMsg.includes('permission-denied')) {
-        console.warn('[Friendship] fetch: permission-denied (проверьте Firestore Rules)');
-      } else {
-        console.warn('[Friendship] fetch error:', errMsg);
-      }
-      return { friends: [], pending: [], subscribed: [] };
+      console.warn('[Friendship] Ошибка выборки fetchFriendships:', e);
+      return { friends: [], pending: [], outgoing: [] };
     }
   },
 
   /**
-   * ⭐ v1.2.0: ИСХОДЯЩИЕ ЗАЯВКИ (для отображения "Ожидает" в топе).
-   * Возвращает массив { id, name, status: 'pending_out' }.
+   * Исходящие заявки (для кнопок "Ожидает" в таблице лидеров).
    */
   async getOutgoingRequests(userId) {
-    const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
-    if (!targetUid) return [];
+    const res = await this.fetchFriendships(userId);
+    return res.outgoing || [];
+  },
 
+  /**
+   * Служебная отправка уведомления.
+   */
+  async _sendSystemNotification(notifData) {
     try {
-      const q = query(
-        collection(db, "friendships"),
-        where("fromUserId", "==", String(targetUid)),
-        limit(50)
-      );
-      const snap = await getDocs(q);
-      const result = [];
-      const now = Date.now();
-
-      snap.forEach(d => {
-        const data = d.data();
-        if (data.expireAt && data.expireAt < now) return;
-        if (data.status === 'pending') {
-          result.push({
-            id: data.toUserId,
-            name: data.toUserName || "Перекуп",
-            status: 'pending_out'
-          });
-        }
+      const notifId = "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
+      const notifRef = doc(db, "notifications", notifId);
+      await setDoc(notifRef, {
+        toUser: String(notifData.toUser),
+        type: notifData.type || "system",
+        title: notifData.title || "Уведомление",
+        text: notifData.text || "",
+        fromUserId: String(notifData.fromUserId || ""),
+        fromUserName: notifData.fromUserName || "Перекуп",
+        offerId: notifData.offerId || null,
+        read: false,
+        claimed: false,
+        timestamp: Date.now(),
+        expireAt: Date.now() + TTL_CONFIG.notifications
       });
-
-      return result;
-    } catch (e) {
-      const errMsg = e?.code || e?.message || String(e);
-      if (errMsg.includes('permission-denied')) {
-        console.warn('[Friendship] getOutgoingRequests: permission-denied');
-      } else {
-        console.warn('[Friendship] getOutgoingRequests error:', errMsg);
-      }
-      return [];
+    } catch (err) {
+      console.warn('[Friendship] Не удалось отправить push-нотификацию:', err);
     }
   },
 
   /**
-   * Real-time подписка на ВХОДЯЩИЕ заявки.
+   * Слушатель входящих заявок в реальном времени.
    */
   subscribeToFriendships(userId, callback) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
@@ -506,13 +564,6 @@ const FriendshipsManager = {
         });
 
         try { callback(pending); } catch (e) { console.warn('[Friendship] callback error:', e); }
-      }, (error) => {
-        const errMsg = error?.code || error?.message || String(error);
-        if (errMsg.includes('permission-denied')) {
-          console.warn('[Friendship] subscribeToFriendships: permission-denied');
-        } else {
-          console.warn('[Friendship] subscribe error:', errMsg);
-        }
       });
 
       this._listeners.push(unsubscribe);
@@ -523,9 +574,6 @@ const FriendshipsManager = {
     }
   },
 
-  /**
-   * Отписаться от всех подписок.
-   */
   unsubscribeAll() {
     this._listeners.forEach(unsub => {
       try { unsub(); } catch (e) {}
@@ -535,13 +583,11 @@ const FriendshipsManager = {
 };
 
 // ========================================================
-// 6. ЭКСПОРТ В WINDOW
+// 5. ЭКСПОРТ
 // ========================================================
 window.FB_Friendships = {
   Friendships: FriendshipsManager
 };
-
-// Алиасы для совместимости со старым кодом
 window.FB_FriendshipsManager = FriendshipsManager;
 
-console.log('[👥 FB_Friendships v1.2.0] Друзья + getOutgoingRequests + защита от permission-denied ✓');
+console.log('[👥 FB_Friendships v1.3.0] Дружба, Автопринятие, Заготовки фраз и Офферы готовы ✓');
