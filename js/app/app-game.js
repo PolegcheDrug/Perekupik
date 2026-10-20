@@ -1,15 +1,14 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.1.0)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.1.0 (РЕАЛИСТИЧНЫЕ НАЛОГИ, ПЕНИ И АУКЦИОН ФССП ЗА 50% ЦЕНЫ):
-//   1. Налоговый цикл каждые 7 дней с проверкой просрочки.
-//   2. Пеня +5% в день при просрочке уплаты транспортного налога.
-//   3. Арест ФССП при просрочке 3+ дней (запрет регдействий и продажи авто).
-//   4. Конфискация и принудительная продажа авто приставами за 50% цены
-//      в счет погашения долга при просрочке 7+ дней.
-//   5. Встроен контроль вкладок (switchTab) через AccessControl.guardFeature.
-//   6. Сохранены безопасные депозиты (v4.5.1), тактильный HUD и роллеры.
+// ⭐ v5.2.0 (ВОССТАНОВЛЕНИЕ ЕЖЕДНЕВНОГО БОНУСА И ХАРДКОР-ФИКС):
+//   1. Восстановлена модалка и логика календаря: openDailyBonusModal()
+//      и claimDailyReward() с выдачей наград (кэш, Stars, топливо, талоны).
+//   2. Золотая пульсирующая подсветка кнопки «Бонус», когда подарок готов к сбору.
+//   3. Универсальные методы openModal/closeModal для совместимости разметки.
+//   4. Налоговый цикл каждые 7 дней, пеня +5%/день и аукцион ФССП за 50% цены.
+//   5. Тактильный HUD-револьвер, роллеры чисел и безопасные депозиты.
 // ========================================================
 
 // ========================================================
@@ -123,8 +122,212 @@ function logBankTransaction(title, amount, isIncome) {
     }
 }
 
+// Универсальные модальные хелперы
+function openModal(id) {
+    if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
+        ModalManager.open(id);
+    } else {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('active');
+    }
+}
+
+function closeModal(id) {
+    if (typeof ModalManager !== 'undefined' && typeof ModalManager.close === 'function') {
+        ModalManager.close(id);
+    } else {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('active');
+    }
+}
+
 // ========================================================
-// 2. ВЕРДИКТ-МОДАЛКА
+// 2. ЕЖЕДНЕВНЫЙ БОНУС (КАЛЕНДАРЬ НАГРАД)
+// ========================================================
+const DEFAULT_DAILY_CALENDAR = [
+    { day: 1, title: "День 1", icon: "💰", rewardText: "35,000 ₽", subText: "+25 XP", cash: 35000, xp: 25 },
+    { day: 2, title: "День 2", icon: "⛽", rewardText: "50,000 ₽", subText: "+35 ⛽ Топливо", cash: 50000, fuel: 35, xp: 35 },
+    { day: 3, title: "День 3", icon: "🎟️", rewardText: "65,000 ₽", subText: "+5 🎟️ Талонов", cash: 65000, tickets: 5, xp: 45 },
+    { day: 4, title: "День 4", icon: "💵", rewardText: "80,000 ₽", subText: "+5 ⭐ Stars", cash: 80000, stars: 5, xp: 55 },
+    { day: 5, title: "День 5", icon: "🤝", rewardText: "100,000 ₽", subText: "+1 🤝 Связь МРЭО", cash: 100000, connections: 1, xp: 65 },
+    { day: 6, title: "День 6", icon: "🛠️", rewardText: "140,000 ₽", subText: "+10 ⭐ Stars", cash: 140000, stars: 10, xp: 80 },
+    { day: 7, title: "День 7", icon: "🎰", rewardText: "250,000 ₽", subText: "1 🎟️ ВИЛСПИН + 15 ⭐", cash: 250000, superSpinTickets: 1, stars: 15, xp: 120 }
+];
+
+function getDailyRewardsList() {
+    if (typeof DAILY_REWARDS_CONFIG !== 'undefined' && Array.isArray(DAILY_REWARDS_CONFIG) && DAILY_REWARDS_CONFIG.length > 0) {
+        return DAILY_REWARDS_CONFIG;
+    }
+    if (typeof DAILY_REWARDS !== 'undefined' && Array.isArray(DAILY_REWARDS) && DAILY_REWARDS.length > 0) {
+        return DAILY_REWARDS;
+    }
+    return DEFAULT_DAILY_CALENDAR;
+}
+
+function getDailyBonusState() {
+    if (!window.state.player) window.state.player = {};
+    const curDay = window.state.player.day || 1;
+    const lastClaimDay = window.state.player.lastDailyBonusDay || 0;
+    const canClaim = lastClaimDay < curDay;
+
+    let streak = window.state.player.dailyBonusStreak;
+    if (typeof streak !== 'number' || isNaN(streak) || streak < 0) {
+        streak = window.state.player.streakDay || 0;
+    }
+    streak = streak % 7;
+
+    return { curDay, lastClaimDay, canClaim, streak };
+}
+
+function openDailyBonusModal() {
+    renderDailyBonusGrid();
+    openModal('modalDailyBonus');
+    if (window.AudioFx) {
+        window.AudioFx.play('tick');
+        window.AudioFx.haptic('light');
+    }
+}
+
+function renderDailyBonusGrid() {
+    const box = document.getElementById('dailyBonusGrid');
+    if (!box) return;
+
+    const { canClaim, streak } = getDailyBonusState();
+    const rewards = getDailyRewardsList();
+
+    let html = `<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px;">`;
+
+    rewards.forEach((item, idx) => {
+        const dayNum = idx + 1;
+        const isCurrent = (idx === streak);
+        const isClaimed = idx < streak || (isCurrent && !canClaim);
+        const isDay7 = (idx === 6);
+
+        let cardBg = "background:#090e18; border:1px solid rgba(255,255,255,0.08);";
+        let statusBadge = "";
+        let badgeColor = "var(--cyan)";
+
+        if (isClaimed) {
+            cardBg = "background:rgba(0, 230, 118, 0.08); border:1px solid rgba(0, 230, 118, 0.4); opacity:0.75;";
+            statusBadge = `<div style="position:absolute; top:3px; right:5px; font-size:10px; color:var(--green); font-weight:bold;">✓</div>`;
+        } else if (isCurrent && canClaim) {
+            cardBg = "background:radial-gradient(circle, rgba(255,215,0,0.18), #090e18); border:1.5px solid #ffd700; box-shadow:0 0 12px rgba(255,215,0,0.35);";
+            badgeColor = "#ffd700";
+            statusBadge = `<div style="position:absolute; top:3px; right:5px; font-size:8px; color:#ffd700; font-weight:bold;">ГОТОВО</div>`;
+        }
+
+        const gridCol = isDay7 ? 'grid-column: span 2;' : '';
+        const icon = item.icon || (isDay7 ? '🎰' : '🎁');
+        const textVal = item.rewardText || item.title || (item.cash ? `${item.cash.toLocaleString()} ₽` : 'Бонус');
+
+        html += `
+            <div style="${cardBg} ${gridCol} border-radius:10px; padding:8px 4px; text-align:center; position:relative;">
+                ${statusBadge}
+                <div class="sub-label font-bold" style="font-size:8.5px; color:${badgeColor}; text-transform:uppercase;">День ${dayNum}</div>
+                <div style="font-size:24px; margin:2px 0;">${icon}</div>
+                <b class="text-xs color-green block" style="font-size:10px; line-height:1.2;">${textVal}</b>
+                ${item.subText ? `<div class="sub-label" style="font-size:8px; color:#94a3b8; margin-top:2px;">${item.subText}</div>` : ''}
+            </div>
+        `;
+    });
+
+    html += `</div>`;
+    box.innerHTML = html;
+
+    const btn = document.getElementById('btnClaimDaily');
+    if (btn) {
+        if (canClaim) {
+            btn.className = "btn btn-green w-full font-bold mb-2";
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.style.cursor = "pointer";
+            btn.innerHTML = `<i class="fa-solid fa-gift mr-1"></i> Забрать награду (${rewards[streak]?.rewardText || 'Бонус'})!`;
+        } else {
+            btn.className = "btn btn-dark w-full font-bold mb-2";
+            btn.disabled = true;
+            btn.style.opacity = "0.55";
+            btn.style.cursor = "not-allowed";
+            btn.innerHTML = `✓ Награда за сегодня уже получена (Ждите 00:00)`;
+        }
+    }
+}
+
+function claimDailyReward() {
+    const { canClaim, streak, curDay } = getDailyBonusState();
+    if (!canClaim) {
+        showToast("Вы уже забрали подарок сегодня! Следующий будет доступен завтра.", "warning");
+        return;
+    }
+
+    const rewards = getDailyRewardsList();
+    const r = rewards[streak] || rewards[0];
+    let tokens = [];
+
+    const cashVal = r.cash || r.amount || 0;
+    if (cashVal > 0) {
+        window.state.player.cash = (window.state.player.cash || 0) + cashVal;
+        logBankTransaction(`Ежедневный подарок: День ${streak + 1}`, cashVal, true);
+        tokens.push({ icon: '💰', title: 'Денежные средства', value: `+${cashVal.toLocaleString()} ₽`, rarity: 'token-green' });
+    }
+
+    if (r.stars && r.stars > 0) {
+        window.state.player.stars = (window.state.player.stars || 0) + r.stars;
+        tokens.push({ icon: '💵', title: 'Неоновые банкноты', value: `+${r.stars} ⭐`, rarity: 'token-amber' });
+    }
+
+    if (r.fuel && r.fuel > 0) {
+        window.state.player.fuel = Math.min(100, (window.state.player.fuel || 0) + r.fuel);
+        tokens.push({ icon: '⛽', title: 'Топливо в бак', value: `+${r.fuel} ⛽`, rarity: 'token-cyan' });
+    }
+
+    if (r.tickets && r.tickets > 0) {
+        const maxTck = window.state.player.maxExpressTickets || 25;
+        window.state.player.expressTickets = Math.min(maxTck, (window.state.player.expressTickets || 0) + r.tickets);
+        tokens.push({ icon: '🎟️', title: 'Экспресс-пропуска', value: `+${r.tickets} 🎟️`, rarity: 'token-purple' });
+    }
+
+    if (r.connections && r.connections > 0) {
+        window.state.player.connections = (window.state.player.connections || 0) + r.connections;
+        tokens.push({ icon: '🤝', title: 'Связи в МРЭО', value: `+${r.connections} 🤝`, rarity: 'token-purple' });
+    }
+
+    if (r.superSpinTickets && r.superSpinTickets > 0) {
+        window.state.player.superSpinTickets = (window.state.player.superSpinTickets || 0) + r.superSpinTickets;
+        tokens.push({ icon: '🎰', title: 'Билет Вилспина', value: `+${r.superSpinTickets} 🎟️`, rarity: 'token-amber' });
+    }
+
+    if (r.xp && r.xp > 0) {
+        addXp(r.xp);
+        tokens.push({ icon: '🎖️', title: 'Опыт авторитета', value: `+${r.xp} XP`, rarity: 'token-cyan' });
+    }
+
+    // Фиксация даты и шага стрика
+    window.state.player.lastDailyBonusDay = curDay;
+    window.state.player.dailyBonusStreak = (streak + 1) % 7;
+    window.state.player.streakDay = window.state.player.dailyBonusStreak;
+
+    if (typeof saveState === 'function') saveState();
+    updateHeaderUI();
+
+    if (window.AudioFx) {
+        window.AudioFx.play('win');
+        window.AudioFx.haptic('success');
+    }
+
+    renderDailyBonusGrid();
+
+    openVerdictModal(
+        `ЕЖЕДНЕВНЫЙ БОНУС (ДЕНЬ ${streak + 1})! 🎁`,
+        `Поздравляем! Награда за день ${streak + 1} успешно зачислена на ваш аккаунт!\nВозвращайтесь завтра за следующим бонусом.`,
+        true,
+        cashVal > 0 ? cashVal : null,
+        null,
+        tokens
+    );
+}
+
+// ========================================================
+// 3. ВЕРДИКТ-МОДАЛКА
 // ========================================================
 function renderPrizeTokensHTML(items) {
     if (!Array.isArray(items) || items.length === 0) return "";
@@ -245,17 +448,17 @@ function openLevelGateModal(appName, reqLevel, customDesc = null) {
                 </div>
             </div>
             <div class="space-y-2">
-                <button onclick="ModalManager.close('modalLevelGate'); switchTab('tabMarket');" class="btn btn-cyan btn-sm w-full font-bold">
+                <button onclick="closeModal('modalLevelGate'); switchTab('tabMarket');" class="btn btn-cyan btn-sm w-full font-bold">
                     <i class="fa-solid fa-store mr-1"></i> На авторынок (Качать опыт)
                 </button>
-                <button onclick="ModalManager.close('modalLevelGate')" class="btn btn-dark btn-sm w-full">
+                <button onclick="closeModal('modalLevelGate')" class="btn btn-dark btn-sm w-full">
                     Понятно
                 </button>
             </div>
         </div>
     `;
 
-    ModalManager.open('modalLevelGate', { closeOthers: true });
+    openModal('modalLevelGate');
 }
 
 function openVerdictModal(title, text, isSuccess, amount, profit, customTokens = null) {
@@ -318,23 +521,27 @@ function openVerdictModal(title, text, isSuccess, amount, profit, customTokens =
         }
     }
 
-    ModalManager.open('modalDealVerdict');
+    openModal('modalDealVerdict');
 }
 
 function openPatchNotesModal() {
-    ModalManager.open('modalPatchNotes');
+    if (typeof openPatchnotesModal === 'function') {
+        openPatchnotesModal();
+    } else {
+        openModal('modalPatchNotes');
+    }
     if (window.AudioFx) window.AudioFx.play('tick');
 }
 
 function dismissPatchNotesModal() {
-    ModalManager.close('modalPatchNotes');
+    closeModal('modalPatchNotes');
     try {
-        localStorage.setItem('perekup_last_seen_version', window.CURRENT_GAME_VERSION);
+        localStorage.setItem('perekup_last_seen_version', window.CURRENT_GAME_VERSION || '4.4.0');
     } catch(e) {}
 }
 
 // ========================================================
-// 3. ЯЗЫК
+// 4. ЯЗЫК
 // ========================================================
 function toggleGameLanguage() {
     setGameLanguage(window.state.lang === 'ru' ? 'en' : 'ru');
@@ -369,7 +576,7 @@ function applyLanguageToDOM() {
 }
 
 // ========================================================
-// 4. ЗАДАНИЯ И ВЕХИ
+// 5. ЗАДАНИЯ И ВЕХИ
 // ========================================================
 function trackQuestProgress(actionType, count = 1) {
     if (!window.state.player || !Array.isArray(window.state.player.dailyQuests)) return;
@@ -432,7 +639,7 @@ function refreshDailyQuestsList() {
 }
 
 // ========================================================
-// 5. СЛОТЫ ГАРАЖА
+// 6. СЛОТЫ ГАРАЖА И РЕСУРСЫ
 // ========================================================
 function getMarketRefreshCost() {
     let lvl = window.state.player?.level || 1;
@@ -467,7 +674,7 @@ function getTotalGarageSlots() {
 }
 
 // ========================================================
-// 6. КУРС STARS (динамический)
+// 7. КУРС STARS И ДЕПОЗИТЫ
 // ========================================================
 function _updateDynamicStarRate() {
     if (!window.state.player) return;
@@ -488,8 +695,6 @@ function _updateDynamicStarRate() {
     if (window.state.player.dynamicStarRateHistory.length > 30) {
         window.state.player.dynamicStarRateHistory = window.state.player.dynamicStarRateHistory.slice(-30);
     }
-
-    console.log(`[Stars] Динамический курс: ${next.toLocaleString()} ₽ (было ${prev.toLocaleString()})`);
 }
 
 function _syncStarRateToBank() {
@@ -501,9 +706,6 @@ function _syncStarRateToBank() {
     }
 }
 
-// ========================================================
-// ХЕЛПЕР ДЛЯ БЕЗОПАСНОГО ПАРСИНГА ЧИСЕЛ ДЕПОЗИТА
-// ========================================================
 function _safeNumDeposit(val, fallback = 0) {
     if (typeof window.GameHelpers?.safeNum === 'function') {
         return window.GameHelpers.safeNum(val, fallback);
@@ -513,7 +715,7 @@ function _safeNumDeposit(val, fallback = 0) {
 }
 
 // ========================================================
-// 7. СУТОЧНЫЙ ЦИКЛ, НАЛОГИ И АУКЦИОН ФССП
+// 8. СУТОЧНЫЙ ЦИКЛ, НАЛОГИ И АУКЦИОН ФССП
 // ========================================================
 function checkRealTimeDayChange() {
     const now = new Date();
@@ -539,14 +741,11 @@ function executeDayCycleMidnight(currentDateObj) {
         _updateDynamicStarRate();
         _syncStarRateToBank();
 
-        // ═══════════════════════════════════════════════════════
-        // ⭐ НАЛОГОВЫЙ ЦИКЛ, ПЕНИ И АУКЦИОН ПРИСТАВОВ (ФССП)
-        // ═══════════════════════════════════════════════════════
+        // НАЛОГОВЫЙ ЦИКЛ, ПЕНИ И АУКЦИОН ФССП
         if (!window.state.player.taxDueDay) {
             window.state.player.taxDueDay = curDay + 7;
         }
 
-        // Если подошёл новый 7-дневный налоговый период и долгов не было — рассчитываем налог
         if (curDay >= window.state.player.taxDueDay && (!window.state.player.taxDebt || window.state.player.taxDebt <= 0)) {
             let powerTax = 0;
             if (Array.isArray(window.state.garage)) {
@@ -569,36 +768,27 @@ function executeDayCycleMidnight(currentDateObj) {
             }
         }
 
-        // Проверка просрочки налога
         if (window.state.player.taxDebt > 0 && curDay > window.state.player.taxDueDay) {
             window.state.player.taxOverdueDays = (window.state.player.taxOverdueDays || 0) + 1;
             const overdue = window.state.player.taxOverdueDays;
 
-            // Начисление пени +5% в день от суммы налога
             const dailyPenalty = Math.round(window.state.player.taxDebt * 0.05);
             window.state.player.taxPenalty = (window.state.player.taxPenalty || 0) + dailyPenalty;
 
-            // Просрочка 3+ дней: арест регистрационных действий
             if (overdue >= 3 && !window.state.player.taxArrest) {
                 window.state.player.taxArrest = true;
                 setTimeout(() => {
-                    if (typeof openVerdictModal === 'function') {
-                        openVerdictModal(
-                            "НАЛОЖЕН АРЕСТ ФССП / ГИБДД! 🚨",
-                            `Задолженность по налогам просрочена на ${overdue} дней!\nФедеральная служба судебных приставов наложила запрет на регистрационные действия.\nПродажа автомобилей и постановка на коммерческий учёт заблокированы до полной оплаты!`,
-                            false
-                        );
-                    } else {
-                        showToast("🚨 Наложен запрет на регистрационные действия (ФССП)!", 'error');
-                    }
+                    openVerdictModal(
+                        "НАЛОЖЕН АРЕСТ ФССП / ГИБДД! 🚨",
+                        `Задолженность по налогам просрочена на ${overdue} дней!\nФССП наложила запрет на регистрационные действия.\nПродажа авто и постановка на коммерческий учёт заблокированы!`,
+                        false
+                    );
                 }, 3000);
             }
 
-            // Просрочка 7+ дней: ПРИНУДИТЕЛЬНАЯ ПРОДАЖА ПРИСТАВАМИ ЗА 50% РЫНКА
             if (overdue >= 7) {
                 const totalDebt = (window.state.player.taxDebt || 0) + (window.state.player.taxPenalty || 0);
 
-                // Если есть деньги на балансе — списываем со счета
                 if ((window.state.player.cash || 0) >= totalDebt) {
                     window.state.player.cash -= totalDebt;
                     window.state.player.taxDebt = 0;
@@ -611,14 +801,12 @@ function executeDayCycleMidnight(currentDateObj) {
                         showToast(`⚖️ Приставы списали налоговый долг: -${totalDebt.toLocaleString()} ₽`, 'warning');
                     }, 3500);
                 } else if (Array.isArray(window.state.garage) && window.state.garage.length > 0) {
-                    // Иначе продаём подходящее авто из гаража за 50% рыночной цены
                     let carIdx = window.state.garage.findIndex(c => !c.assignedBusinessId);
                     if (carIdx === -1) carIdx = 0;
 
                     const confiscatedCar = window.state.garage.splice(carIdx, 1)[0];
                     const marketVal = Number(confiscatedCar.marketValue || confiscatedCar.basePrice || 300000);
                     const bailiffAuctionPrice = Math.round(marketVal * 0.50);
-
                     const remainingAfterDebt = bailiffAuctionPrice - totalDebt;
 
                     window.state.player.taxDebt = 0;
@@ -633,44 +821,26 @@ function executeDayCycleMidnight(currentDateObj) {
                     }
 
                     setTimeout(() => {
-                        if (typeof openVerdictModal === 'function') {
-                            openVerdictModal(
-                                "АВТОМОБИЛЬ ПРОДАН ПРИСТАВАМИ! ⚖️",
-                                `В связи с длительной неуплатой налогов (просрочка ${overdue} дней) автомобиль «<b>${confiscatedCar.name}</b>» был изъят и продан на торгах ФССП за 50% рыночной стоимости (${bailiffAuctionPrice.toLocaleString()} ₽) в счёт погашения долга (${totalDebt.toLocaleString()} ₽).\n${remainingAfterDebt > 0 ? `Остаток средств (+${remainingAfterDebt.toLocaleString()} ₽) возвращён на ваш счёт.` : ''}\nАрест с регистрационных действий снят.`,
-                                false,
-                                remainingAfterDebt > 0 ? remainingAfterDebt : 0
-                            );
-                        } else {
-                            showToast(`⚖️ «${confiscatedCar.name}» продан приставами за полцены в счёт долга!`, 'error');
-                        }
+                        openVerdictModal(
+                            "АВТОМОБИЛЬ ПРОДАН ПРИСТАВАМИ! ⚖️",
+                            `В связи с просрочкой налогов на ${overdue} дней авто «<b>${confiscatedCar.name}</b>» реализовано на торгах за 50% цены (${bailiffAuctionPrice.toLocaleString()} ₽) в счёт долга (${totalDebt.toLocaleString()} ₽).\n${remainingAfterDebt > 0 ? `Остаток (+${remainingAfterDebt.toLocaleString()} ₽) возвращён на счёт.` : ''}\nАрест снят.`,
+                            false,
+                            remainingAfterDebt > 0 ? remainingAfterDebt : 0
+                        );
                     }, 4000);
                 }
             }
         }
 
-        window.state.player.streakDay = (window.state.player.streakDay || 0) + 1;
-        if (window.state.player.streakDay >= 7) {
-            window.state.player.streakDay = 0;
-            window.state.player.superSpinTickets = (window.state.player.superSpinTickets || 0) + 1;
-            if (typeof showToast === 'function') {
-                setTimeout(() => showToast("🎟️ 7-дневный стрик! +1 билет СуперВилспина", 'success'), 3200);
-            }
-            if (typeof logBankTransaction === 'function') {
-                logBankTransaction("Бонус за 7-дневный стрик: +1 билет", 0, true);
-            }
+        if (window.state.player.loanDebt > 0) {
+            window.state.player.loanDebt = Math.round(window.state.player.loanDebt * 1.02);
         }
-
-        if (window.state.player.loanDebt > 0) window.state.player.loanDebt = Math.round(window.state.player.loanDebt * 1.02);
 
         if (Array.isArray(window.state.player.bankDeposits)) {
             const validDeposits = [];
-
             window.state.player.bankDeposits.forEach((dep, idx) => {
                 try {
-                    if (!dep || typeof dep !== 'object') {
-                        return;
-                    }
-
+                    if (!dep || typeof dep !== 'object') return;
                     const currentAmount = _safeNumDeposit(dep.currentAmount, 0);
                     const dailyPercent = _safeNumDeposit(dep.dailyPercent, 0.3);
                     const accumulatedProfit = _safeNumDeposit(dep.accumulatedProfit, 0);
@@ -707,115 +877,36 @@ function executeDayCycleMidnight(currentDateObj) {
 
                     validDeposits.push(dep);
                 } catch (depErr) {
-                    console.warn(`[DayCycle] Ошибка обработки депозита #${idx}:`, depErr);
+                    console.warn(`[DayCycle] Ошибка депозита #${idx}:`, depErr);
                 }
             });
-
             window.state.player.bankDeposits = validDeposits;
         }
 
         window.state.player.hunger = Math.max(10, (window.state.player.hunger || 80) - 25);
         window.state.player.mood = Math.max(10, (window.state.player.mood || 85) - 15);
 
-        try {
-            if (typeof HOUSING_LIST !== 'undefined' && Array.isArray(HOUSING_LIST) && window.state.player?.housingId) {
-                const activeHouse = HOUSING_LIST.find(h => h.id === window.state.player.housingId);
-                if (activeHouse && typeof activeHouse.moodBonus === 'number' && activeHouse.moodBonus !== 0) {
-                    window.state.player.mood = Math.max(0, Math.min(100, (window.state.player.mood || 0) + activeHouse.moodBonus));
-                    if (typeof showToast === 'function') {
-                        setTimeout(() => {
-                            showToast(`🏠 «${activeHouse.name}»: ${activeHouse.moodBonus >= 0 ? '+' : ''}${activeHouse.moodBonus}% к куражу`, 'info');
-                        }, 2200);
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('[Housing] Ошибка применения mood-бонуса:', e);
-        }
-
         if (typeof refreshDailyQuestsList === 'function') refreshDailyQuestsList();
 
         try {
             if (window.PhoneBusiness && typeof window.PhoneBusiness.onNewDay === 'function') {
                 window.PhoneBusiness.onNewDay();
-                if (typeof window.PhoneBusiness.checkAchievements === 'function') {
-                    window.PhoneBusiness.checkAchievements();
-                }
-            }
-        } catch (e) {
-            console.error('[DayCycle] Ошибка бизнеса:', e);
-        }
-
-        try {
-            if (Array.isArray(window.state.garage)) {
-                window.state.garage.forEach((car, idx) => {
-                    if (!car || !car._backfireDay || car._backfireResolved) return;
-                    if (curDay >= car._backfireDay) {
-                        car._backfireResolved = true;
-                        setTimeout(() => {
-                            if (typeof _triggerBuyerBackfire === 'function') _triggerBuyerBackfire(car, idx);
-                        }, 800 + Math.random() * 1500);
-                    }
-                });
             }
         } catch (e) {}
-
-        try {
-            if (window.state.player.housingType === 'rent' && window.state.player.housingRentDue > 0) {
-                if (curDay >= window.state.player.housingRentDue) {
-                    const db = (typeof HOUSING_LIST !== 'undefined') ? HOUSING_LIST : [];
-                    const activeHouse = db.find(h => h.id === window.state.player.housingId);
-                    if (activeHouse) {
-                        const rent = activeHouse.rent || 0;
-                        if ((window.state.player.cash || 0) >= rent) {
-                            window.state.player.cash -= rent;
-                            window.state.player.housingRentDue = curDay + 1;
-                            if (typeof logBankTransaction === 'function') {
-                                logBankTransaction(`Аренда жилья: ${activeHouse.name}`, rent, false);
-                            }
-                            if (typeof showToast === 'function') {
-                                setTimeout(() => showToast(`🏠 Списана аренда жилья: -${rent.toLocaleString()} ₽`, 'info'), 2800);
-                            }
-                        } else {
-                            window.state.player.housingId = 'trailer';
-                            window.state.player.housingType = 'own';
-                            if (typeof showToast === 'function') {
-                                setTimeout(() => showToast("⚠️ Не хватило денег на аренду! Вы переехали в бытовку.", 'warning'), 2800);
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn('[Housing] Ошибка списания аренды:', e);
-        }
-
-        try {
-            if (window.AppPost && typeof window.AppPost.chargeDailyParking === 'function') {
-                const parkingResult = window.AppPost.chargeDailyParking();
-                if (parkingResult.charged > 0) {
-                    setTimeout(() => {
-                        showToast(`🅿️ Списано за парковку: -${parkingResult.charged.toLocaleString()} ₽`, 'info');
-                    }, 3500);
-                }
-            }
-        } catch (e) {
-            console.warn('[Parking] Ошибка ежедневного списания:', e);
-        }
 
         if (typeof saveState === 'function') saveState();
         updateHeaderUI();
 
-        if (typeof showToast === 'function') showToast("🌙 Наступил новый день!", 'info');
+        if (typeof showToast === 'function') showToast("🌙 Наступил новый день! Ежедневный подарок обновлен 🎁", 'info');
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
     } catch (err) {
-        console.error('[DayCycle] Критическая ошибка:', err);
+        console.error('[DayCycle] Ошибка смены дня:', err);
     }
 }
 
 // ========================================================
-// 8. HUD
+// 9. HUD И ОБНОВЛЕНИЕ ИНТЕРФЕЙСА
 // ========================================================
 function updateHeaderUI() {
     try {
@@ -877,6 +968,19 @@ function updateHeaderUI() {
         let hasWorkshop = typeof checkPlayerCapability === 'function' ? checkPlayerCapability('tune') : false;
         setTxt('garageHeaderSlots', hasWorkshop ? `${gLen}/${totalSlots}` : `${gLen}/${totalSlots} ⛺`);
 
+        // Неоновая подсветка кнопки «Бонус», если подарок доступен
+        const bonusBtn = document.querySelector('.hud-btn.btn-bonus');
+        if (bonusBtn) {
+            const { canClaim } = getDailyBonusState();
+            if (canClaim) {
+                bonusBtn.style.borderColor = "#ffd700";
+                bonusBtn.style.boxShadow = "0 0 12px rgba(255, 215, 0, 0.55)";
+            } else {
+                bonusBtn.style.borderColor = "";
+                bonusBtn.style.boxShadow = "";
+            }
+        }
+
         if (window.ThemeManager) window.ThemeManager.applyTheme();
         if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.updateUnreadBadge === 'function') PhoneManager.updateUnreadBadge();
     } catch (e) {
@@ -926,7 +1030,7 @@ function addXp(amount) {
 
         openVerdictModal(
             "НОВЫЙ УРОВЕНЬ АВТОРИТЕТА! 🎖️",
-            `Поздравляем! Вы достигли <b>${window.state.player.level} уровня</b> авторитета!\nОткрыты новые возможности и лоты на рынке.`,
+            `Поздравляем! Вы достигли <b>${window.state.player.level} уровня</b> авторитета!\nОткрыты новые возможности и классы авто на авторынке.`,
             true
         );
     }
@@ -1011,9 +1115,6 @@ function renderProfileAnalytics() {
                 <button onclick="AccessControl.openOwnerPanel()" class="btn btn-amber w-full font-bold" style="font-size:11px;">
                     👑 Открыть Owner-панель управления доступом
                 </button>
-                <div class="sub-label text-center mt-1" style="font-size:9px; color:#ffd700;">
-                    Инвайт-коды, список игроков, баны
-                </div>
             </div>
         ` : '';
 
@@ -1035,7 +1136,7 @@ function renderProfileAnalytics() {
                         🎨 Скин & Эффекты
                     </button>
                     <button onclick="openPatchNotesModal()" class="btn btn-dark btn-sm btn-auto" style="font-size:10px;">
-                        <i class="fa-solid fa-bolt color-amber"></i> Патчноут ${window.CURRENT_GAME_VERSION}
+                        <i class="fa-solid fa-bolt color-amber"></i> Патчноут ${window.CURRENT_GAME_VERSION || 'v4.4.0'}
                     </button>
                 </div>
             </div>
@@ -1092,18 +1193,23 @@ function renderProfileAnalytics() {
         `;
     } catch (e) {
         console.warn('[Profile] Ошибка рендера:', e);
-        container.innerHTML = `
-            <div class="glass-card p-3 text-center" style="border-color: var(--red);">
-                <b class="color-red text-xs">Ошибка загрузки профиля</b>
-                <div class="sub-label mt-1" style="font-size:9.5px;">${String(e.message || e).substring(0, 100)}</div>
-            </div>
-        `;
     }
 }
 
 // ========================================================
-// 9. CLOUD / SAVE MANAGER
+// 10. CLOUD / SAVE MANAGER / RESET
 // ========================================================
+function resetGameData() {
+    if (!confirm("⚠️ Вы уверены, что хотите сбросить весь прогресс перекупа? Это действие необратимо!")) return;
+    try {
+        localStorage.clear();
+        sessionStorage.clear();
+        location.reload();
+    } catch(e) {
+        location.reload();
+    }
+}
+
 function syncCloudStorageManual() {
     if (window.isPcDevMode && window.isPcDevMode()) {
         return showToast("DEV-режим: сохранение только локально", 'info');
@@ -1122,7 +1228,7 @@ function openSaveManagerModal() {
         try { area.value = btoa(unescape(encodeURIComponent(JSON.stringify(window.state)))); }
         catch(e) { area.value = JSON.stringify(window.state); }
     }
-    ModalManager.open('modalSaveManager');
+    openModal('modalSaveManager');
     if (window.AudioFx) window.AudioFx.play('tick');
 }
 
@@ -1155,7 +1261,7 @@ function importSaveCodeAction() {
         if (!parsed.player) throw new Error();
         if (typeof applyLoadedState === 'function') applyLoadedState(parsed);
         if (typeof saveState === 'function') saveState();
-        ModalManager.close('modalSaveManager');
+        closeModal('modalSaveManager');
         location.reload();
     } catch(err) {
         if (window.AudioFx) window.AudioFx.haptic('error');
@@ -1164,7 +1270,7 @@ function importSaveCodeAction() {
 }
 
 // ========================================================
-// 10. НАВИГАЦИЯ С КОНТРОЛЕМ ДОСТУПА ПО УРОВНЯМ
+// 11. НАВИГАЦИЯ С КОНТРОЛЕМ ДОСТУПА ПО УРОВНЯМ
 // ========================================================
 function switchTab(tabId) {
     const tabFeatureMap = {
@@ -1232,7 +1338,7 @@ function _performTabSwitch(tabId) {
 }
 
 // ========================================================
-// 11. ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР (v4.5.0)
+// 12. ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР
 // ========================================================
 const HudRevolver = {
     container: null,
@@ -1288,7 +1394,6 @@ const HudRevolver = {
 
         this.bindEvents();
         this.startAutoScroll();
-        console.log('[HUD Revolver] Тактильный скролл инициализирован ✓');
     },
 
     bindEvents() {
@@ -1445,8 +1550,14 @@ const HudRevolver = {
 };
 
 // ========================================================
-// 12. ЭКСПОРТ
+// 13. ЭКСПОРТ В ГЛОБАЛЬНЫЙ КОНТЕКСТ
 // ========================================================
+window.openDailyBonusModal = openDailyBonusModal;
+window.claimDailyReward = claimDailyReward;
+window.renderDailyBonusGrid = renderDailyBonusGrid;
+window.getDailyBonusState = getDailyBonusState;
+window.openModal = openModal;
+window.closeModal = closeModal;
 window.animateNumberRoll = animateNumberRoll;
 window.showToast = showToast;
 window.openVerdictModal = openVerdictModal;
@@ -1479,4 +1590,4 @@ window.logBankTransaction = logBankTransaction;
 window.HudRevolver = HudRevolver;
 window._safeNumDeposit = _safeNumDeposit;
 
-console.log('[💠 app-game.js v5.1.0] Налоги, пени +5%/д, аресты ФССП и автопродажа за 50% цены активированы ✓');
+console.log('[💠 app-game.js v5.2.0] Ежедневный календарь наград восстановлен ✓');
