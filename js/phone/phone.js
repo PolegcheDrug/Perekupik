@@ -1,14 +1,12 @@
 // ========================================================
-// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v2.0.0)
+// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v2.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v2.0.0 (ИНТЕГРАЦИЯ УРОВНЕЙ И ПЛАТНЫХ РАЗРЕШЕНИЙ):
-//   - Полная синхронизация accessKeyMap с APP_ACCESS_CONFIG:
-//     Сараи (8 ур.), Контейнеры/Storage Wars (12 ур.), Стрит (6 ур.),
-//     Даркнет/Решала/Радар (16 ур.), Синдикат (20 ур.).
-//   - Двусторонняя синхронизация списков разблокировки:
-//     state.player.unlockedApps <-> state.player.unlockedFeatures.
-//   - Интеграция с AccessControl.FeatureAccess и MoneyManager.
+// ⭐ v2.1.0 (ФИКС ОТОБРАЖЕНИЯ ТОВАРОВ В АВТО-МАРКЕТЕ):
+//   - Встроен автономный надежный DEFAULT_SHOP_CATALOG в AppShop.
+//   - Товары (приборы, сырье, документы, мебель) гарантированно
+//     отображаются во всех 4-х вкладках без рассинхрона модулей.
+//   - Полная интеграция уровней и платных разрешений APP_ACCESS_CONFIG.
 //   - Сохранены все виджеты, AppShop, AppNotepad и P2P-функционал.
 // ========================================================
 
@@ -309,7 +307,6 @@ const PhoneManager = {
     // --------------------------------------------------------
     openApp(appId) {
         if (this._isOpeningApp) {
-            console.log("[Phone] openApp проигнорирован — предыдущий вызов ещё не завершён");
             return;
         }
 
@@ -872,9 +869,227 @@ const PhoneManager = {
 
 // ========================================================
 // АВТОНОМНЫЙ АВТО-МАРКЕТ (AppShop)
+// Встроен надежный автономный DEFAULT_SHOP_CATALOG
 // ========================================================
+const DEFAULT_SHOP_CATALOG = {
+    tools: [
+        {
+            id: "gauge",
+            name: "Магнитный толщиномер ЛКП (Базовый)",
+            cost: 25000,
+            reqStars: 0,
+            maxUses: 60,
+            serviceCost: 2500,
+            desc: "Замеряет шпаклёвку и вторичные окрасы кузова. Ресурс: 60 замеров.",
+            icon: "fa-ruler-combined"
+        },
+        {
+            id: "gauge_pro",
+            name: "Ультразвуковой толщиномер Pro (Цветмет)",
+            cost: 65000,
+            reqStars: 4,
+            maxUses: 100,
+            serviceCost: 6000,
+            desc: "Высокая точность до 1 мкм. Различает алюминий и цинк. Ресурс: 100 замеров.",
+            icon: "fa-microchip"
+        },
+        {
+            id: "obd",
+            name: "Автосканер ELM327 Bluetooth v1.5",
+            cost: 45000,
+            reqStars: 2,
+            maxUses: 50,
+            serviceCost: 4000,
+            desc: "Базовый сканер для чтения и сброса кодов ошибок DTC в ЭБУ мотора. Ресурс: 50 сканов.",
+            icon: "fa-laptop-code"
+        },
+        {
+            id: "obd_launch",
+            name: "Диагностический планшет Launch Pro Pad",
+            cost: 160000,
+            reqStars: 8,
+            maxUses: 80,
+            serviceCost: 12000,
+            desc: "Профессиональный комбайн! Обязателен для сервиса «ПодКлюч» и глубокого анализа АКПП. Ресурс: 80 циклов.",
+            icon: "fa-tablet-screen-button"
+        },
+        {
+            id: "endoscope",
+            name: "HD Видеоэндоскоп мотора с поворотной камерой",
+            cost: 85000,
+            reqStars: 4,
+            maxUses: 40,
+            serviceCost: 7500,
+            desc: "Осмотр цилиндров на задиры и нагар. Обязателен для контрактов «ПодКлюч» и досмотра контейнеров. Ресурс: 40 осмотров.",
+            icon: "fa-video"
+        },
+        {
+            id: "compressor",
+            name: "Профессиональный компрессометр с переходниками",
+            cost: 38000,
+            reqStars: 2,
+            maxUses: 50,
+            serviceCost: 3500,
+            desc: "Замер компрессии цилиндров ДВС. Позволяет выявлять износ колец и клапанов. Ресурс: 50 замеров.",
+            icon: "fa-gauge-high"
+        },
+        {
+            id: "battery_tester",
+            name: "Цифровая нагрузочная вилка АКБ",
+            cost: 20000,
+            reqStars: 0,
+            maxUses: 60,
+            serviceCost: 1800,
+            desc: "Проверка реальной емкости и пускового тока аккумулятора у капота. Ресурс: 60 проверок.",
+            icon: "fa-car-battery"
+        }
+    ],
+    consumables: [
+        {
+            id: "oil_pack",
+            name: "Партия синтетического масла 5W-40 и фильтров",
+            cost: 25000,
+            reqStars: 0,
+            value: 30,
+            targetBiz: "sto",
+            desc: "+30% сырья на СТО дяди Вани. Обеспечивает бесперебойную работу подъемников."
+        },
+        {
+            id: "chem_pack",
+            name: "Бочка автошампуня и нано-керамики (200л)",
+            cost: 45000,
+            reqStars: 1,
+            value: 50,
+            targetBiz: "wash",
+            desc: "+50% сырья для Автомойки и Детейлинг студии. Защищает кузов и придает зеркальный блеск."
+        },
+        {
+            id: "tires_stock",
+            name: "Партия спортивной резины и жгутов для шиномонтажа",
+            cost: 35000,
+            reqStars: 1,
+            value: 40,
+            targetBiz: "shina",
+            desc: "+40% сырья на Шиномонтаж «У Алика». Устраняет дефицит расходников при сезонном буме."
+        },
+        {
+            id: "brake_pack",
+            name: "Оптовая партия контрактных запчастей и суппортов",
+            cost: 55000,
+            reqStars: 2,
+            value: 50,
+            targetBiz: "razborka",
+            desc: "+50% запаса деталей на Авторазборку. Повышает доходность контрактов."
+        },
+        {
+            id: "paint_barrel",
+            name: "Комплект автоэмалей, грунта и лака «Хамелеон»",
+            cost: 65000,
+            reqStars: 2,
+            value: 50,
+            targetBiz: "paint_shop",
+            desc: "+50% сырья в Малярный цех. Позволяет красить авто заводским микронным слоем."
+        },
+        {
+            id: "full_stock",
+            name: "Генеральный оптовый запас (100% на все точки)",
+            cost: 140000,
+            reqStars: 5,
+            value: 100,
+            targetBiz: "all",
+            desc: "Мгновенно заполняет склады всех выкупленных предприятий до 100%!"
+        }
+    ],
+    tuningParts: [
+        {
+            id: "raf_license",
+            name: "Гоночная Лицензия пилота РАФ (Категория Д)",
+            cost: 85000,
+            reqStars: 15,
+            desc: "Официальный регламентный допуск пилота к ночным заездам на 402м в Стрите.",
+            icon: "fa-id-card"
+        },
+        {
+            id: "insurance_osago",
+            name: "Генеральный полис «КАСКО / Анти-Угон»",
+            cost: 45000,
+            reqStars: 5,
+            desc: "100% защита от случайных повреждений на парковке, автоподстав и ночных угонов.",
+            icon: "fa-shield-halved"
+        },
+        {
+            id: "gps_tracker",
+            name: "Скрытый поисковый GPS/ГЛОНАСС маяк",
+            cost: 30000,
+            reqStars: 3,
+            desc: "Позволяет моментально вернуть угнанную машину без взяток полиции и Решале.",
+            icon: "fa-satellite-dish"
+        },
+        {
+            id: "customs_pass",
+            name: "Таможенный пропуск в свободную зону Порта",
+            cost: 60000,
+            reqStars: 6,
+            desc: "Снижает пошлины на вскрытие японских и европейских контейнеров на 15%.",
+            icon: "fa-passport"
+        }
+    ],
+    homeItems: [
+        {
+            id: "home_ps5",
+            name: "Игровая консоль PlayStation 5",
+            cost: 75000,
+            reqStars: 5,
+            perk: "+25% настроения и куража каждый день в полночь",
+            icon: "fa-gamepad"
+        },
+        {
+            id: "home_leather_sofa",
+            name: "Кожаный диван в клиентскую зону",
+            cost: 120000,
+            reqStars: 8,
+            perk: "+15% к восстановлению сил после смотровой ямы",
+            icon: "fa-couch"
+        },
+        {
+            id: "home_garage_lift",
+            name: "Гидравлический автоподъёмник (4 тонны)",
+            cost: 320000,
+            reqStars: 20,
+            perk: "Ускоряет устранение скрытых дефектов авто на 50% и поднимает статус бокса",
+            icon: "fa-elevator"
+        },
+        {
+            id: "home_safe_valberg",
+            name: "Огнеупорный сейф перекупа Valberg",
+            cost: 180000,
+            reqStars: 10,
+            perk: "100% защита заначки наличных от налоговых проверок и уличных облав",
+            icon: "fa-vault"
+        },
+        {
+            id: "home_cctv",
+            name: "Система видеонаблюдения периметра 4K",
+            cost: 140000,
+            reqStars: 8,
+            perk: "Снижает шанс ночного угона авто из гаража или двора до 0%",
+            icon: "fa-video"
+        }
+    ]
+};
+
 const AppShop = {
     activeCategory: 'tools',
+
+    getCatalog() {
+        if (window.SHOP_CATALOG && Array.isArray(window.SHOP_CATALOG.tools) && window.SHOP_CATALOG.tools.length > 0) {
+            return window.SHOP_CATALOG;
+        }
+        if (typeof SHOP_CATALOG !== 'undefined' && Array.isArray(SHOP_CATALOG.tools) && SHOP_CATALOG.tools.length > 0) {
+            return SHOP_CATALOG;
+        }
+        return DEFAULT_SHOP_CATALOG;
+    },
 
     render(container) {
         if (!container) return;
@@ -921,7 +1136,7 @@ const AppShop = {
         const box = document.getElementById('shopItemsContainer');
         if (!box) return;
 
-        const catalog = (typeof SHOP_CATALOG !== 'undefined') ? SHOP_CATALOG : {};
+        const catalog = this.getCatalog();
         const cat = this.activeCategory;
         const starRate = window.BANK_EXCHANGE_RATES?.stars?.buyRub || 2500;
         const p = window.state?.player || {};
@@ -1092,7 +1307,7 @@ const AppShop = {
         if (!p.toolsWear) p.toolsWear = {};
 
         p.tools[toolId] = true;
-        const catalogTools = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.tools) ? SHOP_CATALOG.tools : [];
+        const catalogTools = this.getCatalog().tools || [];
         const tObj = catalogTools.find(t => t.id === toolId);
         p.toolsWear[toolId] = tObj ? tObj.maxUses : 50;
 
@@ -1116,7 +1331,7 @@ const AppShop = {
             p.cash -= cost;
         }
 
-        const catalogTools = (typeof SHOP_CATALOG !== 'undefined' && SHOP_CATALOG.tools) ? SHOP_CATALOG.tools : [];
+        const catalogTools = this.getCatalog().tools || [];
         const tObj = catalogTools.find(t => t.id === toolId);
         if (!p.toolsWear) p.toolsWear = {};
         p.toolsWear[toolId] = tObj ? tObj.maxUses : 50;
@@ -1344,4 +1559,4 @@ if (document.readyState === 'loading') {
     PhoneManager.init();
 }
 
-console.log('[📱 phone.js v2.0.0] Интеграция уровней и платных разрешений APP_ACCESS_CONFIG ✓');
+console.log('[📱 phone.js v2.1.0] Товары Авто-Маркета восстановлены на 100% ✓');
