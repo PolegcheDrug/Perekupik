@@ -1,13 +1,14 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ & МОДАЛЬНЫЙ ТОРГ У КАПОТА (v3.4.0-complete)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ДЕТЕЙЛИНГ И СКРЫТЫЕ СХЕМЫ (v3.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.4.0 (БАЛАНС + АВТОТЕКА + ДЕЛЬТА ВРЕМЕНИ + ПОЛНЫЙ ТОРГ):
-//   - ФИКС: Учет реального времени (Date.now()) в updateSalesLotTimers: таймеры не виснут при сворачивании игры.
-//   - БАЛАНС: Защита от эксплойта +15% — таймер поиска покупателя увеличивается пропорционально завышению цены.
-//   - ИНТЕРАКТИВ: Проверка Автотеки на смотанный одометр и скрытые дефекты без присадки.
-//   - СОХРАНЕНО: Все оригинальные VIP и базовые архетипы, модальный торг у капота, getOrAssignLotCarImage.
-//   - ФИКС: Интеграция с openCarSoldSuccessModal (выручка в циан, прибыль в янтарь с ROI).
+// ⭐ v3.5.0 (ПЕРЕКУП-ДЕТЕЙЛИНГ, СМОТКА ПРОБЕГА И РИСКИ):
+//   - БОНУСЫ ЛОСКА: полировка фар, чернение шин, сухой туман и полировка кузова
+//     повышают привлекательность лота и стартовые предложения покупателей.
+//   - ПРОВЕРКА ШПАКЛЕВКИ: подборщики и дотошные клиенты находят покрас из баллона.
+//   - РИСК СКРУТКИ ПРОБЕГА: покупатели со сканером могут вскрыть смотку по блокам
+//     ABS/АКПП, обрушив репутацию и карму перекупа.
+//   - Полная интеграция таймеров Date.now(), VIP-клиентов и M-диалогов.
 // ========================================================
 
 let salesLotTimerInterval = null;
@@ -122,9 +123,6 @@ const VIP_BUYER_ARCHETYPES = [
     }
 ];
 
-// ========================================================
-// ВЫБОР И ЗАКРЕПЛЕНИЕ ОБЛОЖКИ ДЛЯ РАЗНООБРАЗИЯ
-// ========================================================
 function getOrAssignLotCarImage(car, lot) {
     const defaultPlaceholder = "assets/cars/economy/2101/vaz-2101.jpg";
     if (!car) {
@@ -191,9 +189,6 @@ function getOrAssignLotCarImage(car, lot) {
     };
 }
 
-// ========================================================
-// ХЕЛПЕРЫ СИНХРОНИЗАЦИИ M+ ДИАЛОГОВ С ЛОТАМИ
-// ========================================================
 function removeDialogByCarIndex(idx) {
     if (!_isStateReady()) return false;
     if (!Array.isArray(state.player.phoneMessages)) return false;
@@ -232,9 +227,7 @@ function removeDialogByCarIndex(idx) {
                     const container = document.getElementById('phoneAppContainer');
                     if (container) window.AppM.render(container);
                 }
-            } catch (e) {
-                console.warn('[SalesLot] Ошибка закрытия AppM диалога:', e);
-            }
+            } catch (e) {}
         }
     }
 
@@ -311,9 +304,6 @@ function cleanupOrphanedDialogs() {
     return removed;
 }
 
-// ========================================================
-// ТАЙМЕР ПЛОЩАДКИ ПРОДАЖ
-// ========================================================
 function initSalesLotTimer() {
     if (!_isStateReady()) return;
     if (salesLotTimerInterval) clearInterval(salesLotTimerInterval);
@@ -329,27 +319,6 @@ function _startSalesLotTimerWhenReady() {
         return;
     }
 
-    if (typeof window.EventBus !== 'undefined' && typeof window.EventBus.on === 'function') {
-        try {
-            let _handled = false;
-            const handler = function () {
-                if (_handled) return;
-                _handled = true;
-                initSalesLotTimer();
-            };
-            window.EventBus.on('state:loaded', handler);
-            setTimeout(() => {
-                if (!_handled && _isStateReady()) {
-                    _handled = true;
-                    initSalesLotTimer();
-                }
-            }, 500);
-            return;
-        } catch (e) {
-            console.warn('[SalesLot] EventBus.on state:loaded упал:', e);
-        }
-    }
-
     let attempts = 0;
     const check = setInterval(() => {
         attempts++;
@@ -358,7 +327,6 @@ function _startSalesLotTimerWhenReady() {
             initSalesLotTimer();
         } else if (attempts > 100) {
             clearInterval(check);
-            console.warn('[SalesLot] state так и не загрузился за 10с — таймер не запущен');
         }
     }, 100);
 }
@@ -406,14 +374,19 @@ function renderSalesLot() {
         let margin = askingPrice - purchaseCost;
         let marginClass = margin >= 0 ? "color-green" : "color-red";
 
-        // Интеллектуальный расчет базового времени поиска покупателя в зависимости от цены
         const marketVal = car.marketValue || car.basePrice || 100000;
         const priceRatio = askingPrice / marketVal;
         let defaultTimer = 45;
 
-        if (priceRatio > 1.10) defaultTimer = 75; // +10-15% к цене требует больше времени
-        else if (priceRatio > 1.05) defaultTimer = 55;
-        else if (priceRatio < 0.90) defaultTimer = 25; // Быстрый сброс
+        // Если машина отполирована и фары горят — покупатели реагируют быстрее!
+        let detailBonusTime = 0;
+        if (car.headlightsPolished) detailBonusTime += 6;
+        if (car.isPolished) detailBonusTime += 8;
+        if (car.odorFree) detailBonusTime += 5;
+
+        if (priceRatio > 1.10) defaultTimer = Math.max(25, 75 - detailBonusTime);
+        else if (priceRatio > 1.05) defaultTimer = Math.max(20, 55 - detailBonusTime);
+        else if (priceRatio < 0.90) defaultTimer = Math.max(12, 25 - detailBonusTime);
 
         if (lot.timer === undefined || isNaN(lot.timer)) {
             lot.timer = (lot.maxTimer && !isNaN(lot.maxTimer)) ? lot.maxTimer : defaultTimer;
@@ -438,7 +411,6 @@ function renderSalesLot() {
                 hasBuyer = true;
                 syncBuyerToMNetwork(lot, idx);
             } catch (e) {
-                console.error('[SalesLot] Ошибка генерации покупателя (render):', e);
                 lot.timer = 30;
                 lot.maxTimer = 30;
                 hasBuyer = false;
@@ -498,19 +470,17 @@ function renderSalesLot() {
 
         let plateText = car.customPlate || car.plate || "ТРАНЗИТ";
         let condVal = car.condition || 85;
-        let shieldIconClass = condVal >= 80
-            ? 'spec-tile-icon-shield'
-            : (condVal >= 50 ? 'spec-tile-icon-shield-mid' : 'spec-tile-icon-shield-low');
-        let condColorClass = condVal >= 80
-            ? 'color-green'
-            : (condVal >= 50 ? 'color-amber' : 'color-red');
+        let shieldIconClass = condVal >= 80 ? 'spec-tile-icon-shield' : (condVal >= 50 ? 'spec-tile-icon-shield-mid' : 'spec-tile-icon-shield-low');
+        let condColorClass = condVal >= 80 ? 'color-green' : (condVal >= 50 ? 'color-amber' : 'color-red');
 
-        const vipGlow = isVIP
-            ? 'border: 1.5px solid var(--amber) !important; animation: vipPulse 2s infinite alternate;'
-            : '';
+        // Бейджи детейлинга на карточке лота
+        let detailingBadges = [];
+        if (car.headlightsPolished) detailingBadges.push(`<span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">✨ ФАРЫ/ШИНЫ</span>`);
+        if (car.isPolished) detailingBadges.push(`<span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">💎 ПОЛИРОВКА</span>`);
+        if (car.odorFree) detailingBadges.push(`<span class="tag-badge bg-tag-green" style="font-size:7.5px;">💨 СУХОЙ ТУМАН</span>`);
 
         html += `
-            <div class="glass-card mb-3 ${hasBuyer ? 'card-glow-deal' : ''}" id="sales_lot_card_${idx}" data-lot-idx="${idx}" style="${vipGlow}">
+            <div class="glass-card mb-3 ${hasBuyer ? 'card-glow-deal' : ''}" id="sales_lot_card_${idx}" data-lot-idx="${idx}" style="${isVIP ? 'border: 1.5px solid var(--amber) !important;' : ''}">
                 <div class="car-img-wrap mb-2">
                     <img ${carImgAttrs} class="car-img">
                 </div>
@@ -524,6 +494,7 @@ function renderSalesLot() {
                         <div class="mt-1 flex-gap" style="align-items:center;">
                             <span class="license-plate" style="font-size:9.5px; padding:2px 6px;">${plateText} <span class="license-flag">RUS</span></span>
                             <span class="tag-badge bg-tag-green">НА ПЛОЩАДКЕ</span>
+                            ${detailingBadges.join(' ')}
                         </div>
                     </div>
 
@@ -538,9 +509,7 @@ function renderSalesLot() {
 
                 <div class="car-specs-grid-volumetric mb-2">
                     <div class="spec-tile-3d-col">
-                        <div class="spec-tile-icon-wrap spec-tile-icon-power">
-                            <i class="fa-solid fa-bolt"></i>
-                        </div>
+                        <div class="spec-tile-icon-wrap spec-tile-icon-power"><i class="fa-solid fa-bolt"></i></div>
                         <div class="spec-tile-col-data">
                             <span class="spec-tile-col-label">Мощность</span>
                             <b class="color-amber">${car.power || 100} л.с.</b>
@@ -548,9 +517,7 @@ function renderSalesLot() {
                     </div>
 
                     <div class="spec-tile-3d-col">
-                        <div class="spec-tile-icon-wrap spec-tile-icon-road">
-                            <i class="fa-solid fa-road"></i>
-                        </div>
+                        <div class="spec-tile-icon-wrap spec-tile-icon-road"><i class="fa-solid fa-road"></i></div>
                         <div class="spec-tile-col-data">
                             <span class="spec-tile-col-label">Пробег</span>
                             <b class="color-cyan">${(car.mileage || 85000).toLocaleString()} км</b>
@@ -558,9 +525,7 @@ function renderSalesLot() {
                     </div>
 
                     <div class="spec-tile-3d-col">
-                        <div class="spec-tile-icon-wrap ${shieldIconClass}">
-                            <i class="fa-solid fa-shield"></i>
-                        </div>
+                        <div class="spec-tile-icon-wrap ${shieldIconClass}"><i class="fa-solid fa-shield"></i></div>
                         <div class="spec-tile-col-data">
                             <span class="spec-tile-col-label">Кузов</span>
                             <b class="${condColorClass}">${condVal}%</b>
@@ -585,9 +550,6 @@ function renderSalesLot() {
     container.innerHTML = html;
 }
 
-// --------------------------------------------------------
-// КНОПКИ ДЕЙСТВИЙ НА КАРТОЧКЕ ЛОТА
-// --------------------------------------------------------
 function renderBuyerCardActions(lot, idx) {
     const buyer = lot.currentBuyer || lot.buyer;
     if (!buyer) return "";
@@ -598,17 +560,13 @@ function renderBuyerCardActions(lot, idx) {
     const isOnlineChat = buyer.dealType === 'chat';
     const isVIP = !!buyer.isVIP;
 
-    const vipBadgeHtml = isVIP
-        ? `<span class="tag-badge bg-tag-amber" style="font-size:7.5px;"><i class="fa-solid fa-crown"></i> VIP</span>`
-        : '';
-
     return `
-        <div class="p-2 mb-2" style="background:#060a14; border-radius:12px; border:1px solid ${isVIP ? 'rgba(255,179,0,0.6)' : 'rgba(0, 242, 254, 0.3)'}; box-shadow: ${isVIP ? '0 0 15px rgba(255,179,0,0.2)' : 'none'};">
+        <div class="p-2 mb-2" style="background:#060a14; border-radius:12px; border:1px solid ${isVIP ? 'rgba(255,179,0,0.6)' : 'rgba(0, 242, 254, 0.3)'};">
             <div class="flex-between mb-2">
                 <div class="flex-gap" style="align-items:center;">
                     <span style="font-size:24px;">${buyer.avatar}</span>
                     <div>
-                        <b class="text-xs ${isVIP ? 'color-amber' : 'color-cyan'}" style="font-size:12px;">${buyer.name} ${vipBadgeHtml}</b>
+                        <b class="text-xs ${isVIP ? 'color-amber' : 'color-cyan'}" style="font-size:12px;">${buyer.name} ${isVIP ? '👑' : ''}</b>
                         <div class="sub-label" style="font-size:8.5px;">
                             ${isVIP ? '👑 По сарафанному радио • ' : (isOnlineChat ? '📩 Написал в телефон • ' : '🚗 Стоит у капота • ')}
                             <span class="color-amber">⏳ ${lot.buyerTimerLeft || 120}с</span>
@@ -633,7 +591,7 @@ function renderBuyerCardActions(lot, idx) {
                         <i class="fa-solid fa-comment-dots mr-1"></i> ОТКРЫТЬ ДИАЛОГ 💬
                     </button>
                 ` : `
-                    <button onclick="openLotHoodHaggleModal(${idx})" class="btn ${isVIP ? 'btn-amber' : 'btn-amber'} btn-sm font-bold" style="padding:8px 0; font-size:11px;">
+                    <button onclick="openLotHoodHaggleModal(${idx})" class="btn btn-amber btn-sm font-bold" style="padding:8px 0; font-size:11px;">
                         <i class="fa-solid fa-comments-dollar mr-1"></i> ТОРГ У КАПОТА 🗣️
                     </button>
                 `}
@@ -646,53 +604,83 @@ function renderBuyerCardActions(lot, idx) {
 }
 
 // --------------------------------------------------------
-// ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ (NPC) С ПРОВЕРКАМИ АВТОТЕКИ
+// ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ С УЧЕТОМ ДЕТЕЙЛИНГА И СХЕМ
 // --------------------------------------------------------
 function generateRandomLotBuyer(car, askingPrice) {
-    if (!car) {
-        car = { name: 'Автомобиль', type: 'economy' };
-    }
+    if (!car) car = { name: 'Автомобиль', type: 'economy' };
     if (!askingPrice || askingPrice <= 0) askingPrice = 100000;
 
     const karma = state.player?.karma || 50;
     const connections = state.player?.connections || 0;
-    const vipUnlocked = karma > 80 && connections > 5;
-
-    const isVIP = vipUnlocked && Math.random() < 0.20;
+    const isVIP = (karma > 80 && connections > 5) && Math.random() < 0.20;
 
     const archetypePool = isVIP ? VIP_BUYER_ARCHETYPES : BUYER_ARCHETYPES;
     const archetype = archetypePool[Math.floor(Math.random() * archetypePool.length)];
 
-    let discountRatio;
-    if (isVIP) {
-        discountRatio = archetype.bonusMultiplier * (0.95 + Math.random() * 0.15);
-    } else {
-        discountRatio = 0.82 + Math.random() * 0.12;
+    let discountRatio = isVIP
+        ? archetype.bonusMultiplier * (0.95 + Math.random() * 0.15)
+        : (0.82 + Math.random() * 0.12);
+
+    // БОНУСЫ ПРЕДПРОДАЖКИ (ЛОСК)
+    let preSaleRemarks = [];
+    if (car.headlightsPolished) {
+        discountRatio += 0.05;
+        preSaleRemarks.push("«Фары светят как новые, резина начернена — сразу видно ухоженную тачку!»");
+    }
+    if (car.isPolished) {
+        discountRatio += 0.07;
+        preSaleRemarks.push("«Кузов горит на солнце, ЛКП отполировано на славу!»");
+    }
+    if (car.odorFree) {
+        discountRatio += 0.04;
+        preSaleRemarks.push("«В салоне приятно пахнет, никакой табачной вони.»");
     }
 
     let rawPrice = askingPrice * discountRatio;
 
-    // --- ПРОВЕРКА 1: СКРУТКА ПРОБЕГА В АВТОТЕКЕ ---
-    let autotekaWarning = '';
-    if ((car.rolledOdometer || car.autotekaMileageDiscrepancy) && Math.random() < 0.65) {
-        rawPrice *= 0.82; // -18% штраф за расхождение в базах
-        autotekaWarning = ` «Отчёт Автотеки показал скрутку одометра! Срезаю цену сразу на 18%.»`;
+    // ПРОВЕРКА 1: ШПАКЛЯ ИЗ БАЛЛОНА (ВЫЯВЛЕНИЕ ТОЛЩИНОМЕРОМ)
+    let bondoWarning = '';
+    if (car.hasBondoBalloons && (archetype.inspectionSkill === 'high' || archetype.inspectionSkill === 'mid')) {
+        rawPrice *= 0.82; // -18% штраф за шпаклю под баллончиком
+        bondoWarning = ` «Достал толщиномер: под краской из баллона слой шпакли 400 мкм! Скидывай 18% за колхозный ремонт.»`;
     }
 
-    // --- ПРОВЕРКА 2: СКРЫТЫЙ ДЕФЕКТ БЕЗ ПРИСАДКИ ---
+    // ПРОВЕРКА 2: СКРЫТЫЙ ДЕФЕКТ БЕЗ ПРИСАДКИ
     let defectWarning = '';
     if (car.hiddenDefect && !car.hasAdditive) {
         const cost = car.hiddenDefect.cost || 15000;
         rawPrice = Math.max(10000, rawPrice - cost);
-        defectWarning = ` «При первичном осмотре обнаружены стуки/ошибки (${car.hiddenDefect.text || 'дефект'}). Минус ${cost.toLocaleString()} ₽ на сервис!»`;
+        defectWarning = ` «Слышу подозрительные стуки в моторе (${car.hiddenDefect.text || 'дефект'}). Срезаю ${cost.toLocaleString()} ₽ на ремонт!»`;
+    }
+
+    // ПРОВЕРКА 3: СКРУТКА ПРОБЕГА СО СКАНЕРОМ (РИСК И СКАХАНДАЛ)
+    let odometerBust = false;
+    let odometerBustText = '';
+    if (car.rolledOdometer && (archetype.inspectionSkill === 'high' || Math.random() < 0.35)) {
+        odometerBust = true;
+        rawPrice *= 0.70; // -30% штраф
+        odometerBustText = ` «Я подключил Launch: в блоках ABS зафиксирован реальный пробег ${(car.actualMileage || 220000).toLocaleString()} км! Ты одометр скрутил?!»`;
+
+        // Штраф репутации и кармы перекупа за обман
+        if (state.player?.p2pReputation) {
+            state.player.p2pReputation.badReviews = (state.player.p2pReputation.badReviews || 0) + 1;
+            state.player.p2pReputation.rating = Math.max(1.0, state.player.p2pReputation.rating - 0.3);
+            if (!state.player.p2pReputation.reviewsLog) state.player.p2pReputation.reviewsLog = [];
+            state.player.p2pReputation.reviewsLog.unshift({
+                buyerName: archetype.name,
+                stars: 1,
+                text: `Смотал пробег на ${car.name}! В блоках вскрылась скрутка. Обманщик!`
+            });
+        }
+        state.player.karma = Math.max(0, (state.player.karma || 50) - 8);
     }
 
     const offeredPrice = Math.round(rawPrice / 1000) * 1000;
     const isOnlineChat = isVIP ? false : (Math.random() < 0.50);
 
-    let initialDialogue = archetype.moodPhrase + autotekaWarning + defectWarning;
+    let initialDialogue = archetype.moodPhrase + (preSaleRemarks[0] ? ' ' + preSaleRemarks[0] : '') + bondoWarning + defectWarning + odometerBustText;
     if (isOnlineChat) {
-        initialDialogue = `«Здравствуйте! Увидел объявление на «${car.name}». За ${offeredPrice.toLocaleString()} ₽ отдадите?»` + autotekaWarning + defectWarning;
+        initialDialogue = `«Здравствуйте! По объявлению «${car.name}». За ${offeredPrice.toLocaleString()} ₽ отдадите?»` + bondoWarning + defectWarning + odometerBustText;
     }
 
     return {
@@ -710,6 +698,7 @@ function generateRandomLotBuyer(car, askingPrice) {
         lastReply: initialDialogue,
         dealType: isOnlineChat ? "chat" : "hood",
         isVIP: isVIP,
+        odometerBusted: odometerBust,
         dialogHistory: [
             { from: 'them', text: initialDialogue }
         ],
@@ -717,9 +706,6 @@ function generateRandomLotBuyer(car, askingPrice) {
     };
 }
 
-// --------------------------------------------------------
-// СИНХРОНИЗАЦИЯ ПОКУПАТЕЛЯ С ТЕЛЕФОНОМ (M-ЧАТ)
-// --------------------------------------------------------
 function syncBuyerToMNetwork(lot, idx) {
     if (!lot || !lot.buyer || lot.buyer.dealType !== 'chat') return;
     if (!_isStateReady()) return;
@@ -772,9 +758,6 @@ function syncBuyerToMNetwork(lot, idx) {
     }
 }
 
-// ========================================================
-// ИНТЕРАКТИВНЫЙ ТОРГ В ТЕЛЕФОНЕ (M-ЧАТ)
-// ========================================================
 window.handleNetworkMBuyerHaggle = function(dialogId, percent, risk) {
     if (!_isStateReady()) return;
     const msg = (state.player?.phoneMessages || []).find(m => m && m.id === dialogId);
@@ -800,7 +783,6 @@ window.handleNetworkMBuyerHaggle = function(dialogId, percent, risk) {
 
     if (!msg.chatHistory) msg.chatHistory = [];
 
-    // Реплика игрока
     msg.chatHistory.push({
         from: 'me',
         text: `«За ${currentPrice.toLocaleString()} ₽ не отдам. Добавь хотя бы +${raiseAmount.toLocaleString()} ₽, и по рукам!»`
@@ -845,9 +827,6 @@ window.handleNetworkMBuyerHaggle = function(dialogId, percent, risk) {
     }
 };
 
-// ========================================================
-// МОДАЛЬНОЕ ОКНО ТОРГА У КАПОТА
-// ========================================================
 function openLotHoodHaggleModal(idx) {
     if (!_isStateReady()) return;
     const lot = state.salesLot[idx];
@@ -936,7 +915,7 @@ function renderLotHoodHaggleModalContent() {
     const vipBanner = isVIP ? `
         <div class="p-2 mb-2 text-center" style="background:linear-gradient(90deg,rgba(255,215,0,0.15),rgba(255,179,0,0.08)); border-radius:10px; border:1px solid var(--amber);">
             <b class="text-xs color-amber"><i class="fa-solid fa-crown mr-1"></i> VIP-КЛИЕНТ ПО САРАФАННОМУ РАДИО</b>
-            <div class="sub-label mt-1" style="font-size:8.5px; color:#fef3c7;">Этот клиент пришёл по рекомендации. Он не торгуется, но платит выше рынка!</div>
+            <div class="sub-label mt-1" style="font-size:8.5px; color:#fef3c7;">Этот клиент пришёл по рекомендации. Он платит щедро, если авто в порядке!</div>
         </div>
     ` : '';
 
@@ -1000,7 +979,6 @@ function executeModalHaggleStep(percent, failRisk) {
     const lot = state.salesLot[activeSalesLotHaggleIndex];
     if (!lot || !lot.buyer) return;
 
-    const car = lot.car || lot;
     const buyer = lot.buyer;
     const isVIP = !!buyer.isVIP;
 
@@ -1129,7 +1107,6 @@ function finishSalesLotDeal(idx, price, profit, costPrice = 0) {
         if (typeof playSound === 'function') playSound('win');
         if (typeof tgHaptic === 'function') tgHaptic('success');
 
-        // Вызов окна с раздельной выручкой и маржой ROI
         if (typeof window.openCarSoldSuccessModal === 'function') {
             window.openCarSoldSuccessModal(car.name, price, profit, realCost);
         } else if (typeof openVerdictModal === 'function') {
@@ -1237,7 +1214,6 @@ function updateSalesLotTimers() {
                     syncBuyerToMNetwork(lot, idx);
                     needReRender = true;
                 } catch (e) {
-                    console.error('[SalesLot] Ошибка генерации покупателя (timer):', e);
                     lot.timer = 30;
                     lot.maxTimer = 30;
                     needReRender = true;
@@ -1385,4 +1361,4 @@ if (document.readyState === 'loading') {
     _startSalesLotTimerWhenReady();
 }
 
-console.log('[🏪 salesLot v3.4.0-complete] Полный торг у капота и в телефоне + Автотека + синхронизация Date.now() ✓');
+console.log('[🏪 salesLot v3.5.0] Детейлинг-бонусы, вскрытие шпаклевки и риск скрутки одометра ✓');
