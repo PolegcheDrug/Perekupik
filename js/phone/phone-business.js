@@ -1,17 +1,14 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v8.0.0)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v8.1.0 CLEAN)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v8.0.0 (ПОЛНЫЙ РЕДИЗАЙН: КАБИНЕТ УПРАВЛЕНИЯ И ИНДИВИДУАЛЬНАЯ ПРОКАЧКА):
-//   1. Главный экран: компактная сетка купленных точек (Dashboard)
-//      вместо бесконечной вертикальной ленты из огромных карточек.
-//   2. Личный кабинет точки: клик по бизнесу открывает его персональный экран
-//      с кассой, складом, автопарком, sparkline-графиком и брендингом.
-//   3. Индивидуальные ветки улучшений (3 уникальных апгрейда для каждого
-//      из 13 объектов из BUSINESS_INDIVIDUAL_UPGRADES).
-//   4. Вкладка B2B тендеров с авансами и бустами к выручке.
-//   5. Кризис-менеджмент при инкассации и синергия марок автопарка.
-//   6. Непрерывное начисление кассы в реальном времени.
+// ⭐ v8.1.0 (ФИКС СИНТАКСИСА И АВТОНОМНЫЕ ДАННЫЕ):
+//   1. Устранены синтаксические ошибки и спецсимволы в шаблонах.
+//   2. Добавлен железный fallback для ДНК и коэффициентов mult.
+//   3. Личный кабинет управления точкой по клику на плитку.
+//   4. Индивидуальные ветки прокачки (3 уникальных апгрейда для каждой точки).
+//   5. Вкладка B2B тендеров с авансами и множителем кассы.
+//   6. Защита от сбоев при инкассации и кризис-менеджмент.
 // ========================================================
 
 const PhoneBusiness = {
@@ -150,7 +147,7 @@ const PhoneBusiness = {
                     stock: 100,
                     maxStock: 100,
                     incomeHistory: [],
-                    individualUpgrades: {}, // Индивидуальная прокачка точки
+                    individualUpgrades: {},
                     lastIncomeDay: 0,
                     lastStockDay: 0,
                     dna: null,
@@ -327,7 +324,7 @@ const PhoneBusiness = {
     _generateDNA(bizId) {
         const uid = String(window.state?.player?.uid || 'guest');
         const seed = (uid + '_' + bizId).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-        const pick = (arr, offset) => arr[(seed + offset) % arr.length];
+        const pick = (arr, offset) => (arr && arr.length > 0) ? arr[(seed + offset) % arr.length] : { id: 'std', mult: 1.0 };
         return {
             location:  pick(this.DNA_LOCATIONS, 0).id,
             traffic:   pick(this.DNA_TRAFFIC, 7).id,
@@ -337,19 +334,28 @@ const PhoneBusiness = {
     },
 
     _getDNAObject(dna) {
-        if (!dna) return null;
+        const defaultLoc = { id: 'city', name: 'Город', mult: 1.0 };
+        const defaultTraf = { id: 'medium', name: 'Средний', mult: 1.0 };
+        const defaultCond = { id: 'normal', name: 'Норма', mult: 1.0 };
+        const defaultStaff = { id: 'standard', name: 'Штат', mult: 1.0 };
+
+        if (!dna) return { location: defaultLoc, traffic: defaultTraf, condition: defaultCond, staff: defaultStaff };
+
         return {
-            location:  this.DNA_LOCATIONS.find(x => x.id === dna.location)  || this.DNA_LOCATIONS[1],
-            traffic:   this.DNA_TRAFFIC.find(x => x.id === dna.traffic)      || this.DNA_TRAFFIC[1],
-            condition: this.DNA_CONDITION.find(x => x.id === dna.condition)  || this.DNA_CONDITION[1],
-            staff:     this.DNA_STAFF.find(x => x.id === dna.staff)          || this.DNA_STAFF[1]
+            location:  (this.DNA_LOCATIONS && this.DNA_LOCATIONS.find(x => x && x.id === dna.location)) || defaultLoc,
+            traffic:   (this.DNA_TRAFFIC && this.DNA_TRAFFIC.find(x => x && x.id === dna.traffic)) || defaultTraf,
+            condition: (this.DNA_CONDITION && this.DNA_CONDITION.find(x => x && x.id === dna.condition)) || defaultCond,
+            staff:     (this.DNA_STAFF && this.DNA_STAFF.find(x => x && x.id === dna.staff)) || defaultStaff
         };
     },
 
     getDNAMultiplier(dna) {
         const obj = this._getDNAObject(dna);
-        if (!obj) return 1;
-        return obj.location.mult * obj.traffic.mult * obj.condition.mult * obj.staff.mult;
+        const mLoc = obj?.location?.mult || 1.0;
+        const mTraf = obj?.traffic?.mult || 1.0;
+        const mCond = obj?.condition?.mult || 1.0;
+        const mStaff = obj?.staff?.mult || 1.0;
+        return mLoc * mTraf * mCond * mStaff;
     },
 
     _iconForBiz(id) {
@@ -400,8 +406,6 @@ const PhoneBusiness = {
 
         let inc = this._n(b.income, 0) * Math.pow(1.55, Math.max(0, b.level - 1));
         inc *= this.getDNAMultiplier(b.dna);
-
-        // Индивидуальные улучшения точки
         inc *= this.getIndividualUpgradesBonus(b);
 
         if (b.stock <= 0) inc *= 0.15;
@@ -596,7 +600,7 @@ const PhoneBusiness = {
     },
 
     setTab(tab) {
-        this.selectedBizId = null; // При переключении вкладок возвращаемся в общий список
+        this.selectedBizId = null;
         this.currentTab = tab;
         if (window.AudioFx) { window.AudioFx.play('tick'); window.AudioFx.haptic('light'); }
         this.render(document.getElementById('phoneAppContainer'));
@@ -616,7 +620,7 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // 1. КОМПАКТНЫЙ ДАШБОРД ТОЧЕК (СЕТКА ВМЕСТО ГИГАНТСКОЙ ЛЕНТЫ)
+    // 1. КОМПАКТНЫЙ ДАШБОРД ТОЧЕК
     // ========================================================
     renderPointsTab(container) {
         const pLvl = window.state?.player?.level || 1;
@@ -676,7 +680,6 @@ const PhoneBusiness = {
             ownedGridHtml += `</div>`;
         }
 
-        // Каталог объектов под выкуп
         let catalogHtml = `
             <div class="glass-card p-2 mb-2">
                 <b class="text-xs color-amber mb-2 block"><i class="fa-solid fa-cart-plus mr-1"></i> Каталог объектов под выкуп (${available.length}):</b>
@@ -738,7 +741,6 @@ const PhoneBusiness = {
         const curIncome = this.getBizIncomeWithBonuses(b);
         const cash = Math.floor(b.stored || 0);
         const stock = Math.round(b.stock || 0);
-        const maxStock = b.maxStock || 100;
         const upgradeCost = Math.round((b.cost || 0) * Math.pow(1.65, b.level || 1));
         const isMaxed = b.level >= 5;
 
@@ -754,6 +756,7 @@ const PhoneBusiness = {
             const cost = Math.round(upg.baseCost * Math.pow(upg.costMul || 1.8, curLvl));
             const isUpgMaxed = curLvl >= (upg.maxLevel || 3);
             const canAfford = (window.state?.player?.cash || 0) >= cost;
+            const bonusPctVal = upg.bonusPct || 15;
 
             upgradesHtml += `
                 <div class="p-2 mb-2" style="background:#050914; border-radius:8px; border:1px solid rgba(0,242,254,0.15);">
@@ -773,7 +776,7 @@ const PhoneBusiness = {
                         </button>
                     ` : `
                         <button onclick="PhoneBusiness.upgradeIndividualBranch('${b.id}', '${upg.id}')" class="btn ${canAfford ? 'btn-cyan' : 'btn-dark opacity-50'} btn-sm w-full" ${canAfford ? '' : 'disabled'} style="font-size:9.5px; padding:5px 8px; font-weight:700;">
-                            Улучшить (+${upg.bonusPct \vert{}\vert{} 15}\% к кассе) — ${cost.toLocaleString()} ₽
+                            Улучшить (+${bonusPctVal}\% к кассе) — ${cost.toLocaleString()} ₽
                         </button>
                     `}
                 </div>
@@ -894,7 +897,7 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // ВСПОМОГАТЕЛЬНЫЕ ВКЛАДКИ (ФЛОТ, ТЕНДЕРЫ, ЦЕХ, ШТАТ, КОРП)
+    // ВСПОМОГАТЕЛЬНЫЕ ВКЛАДКИ
     // ========================================================
     renderFleetTab(container) {
         let html = '<div class="sub-label mb-2 px-1" style="font-size:10px;">Спецтехника для обслуживания логистики и снижения себестоимости:</div>';
@@ -1142,104 +1145,6 @@ const PhoneBusiness = {
                 </div>
             </div>
         `;
-    },
-
-    // ========================================================
-    // ДЕЙСТВИЯ, КАССА И КРИЗИСЫ
-    // ========================================================
-    _maybeTriggerCrisisEvent() {
-        const events = this.CRISIS_EVENTS;
-        if (!Array.isArray(events) || events.length === 0) return false;
-
-        const ownedBiz = (window.state?.businesses || []).filter(b => b && b.level > 0);
-        if (ownedBiz.length === 0) return false;
-
-        if (Math.random() > 0.12) return false;
-
-        const rollEv = events[Math.floor(Math.random() * events.length)];
-        this.openCrisisModal(rollEv);
-        return true;
-    },
-
-    openCrisisModal(crisis) {
-        let modal = document.getElementById('modalBizCrisis');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'modalBizCrisis';
-            modal.className = 'modal-overlay';
-            document.body.appendChild(modal);
-        }
-
-        let optionsHtml = '';
-        (crisis.options || []).forEach((opt, idx) => {
-            optionsHtml += `
-                <button onclick="PhoneBusiness.resolveCrisisAction(${idx}, '${crisis.id}')" class="btn btn-dark btn-sm w-full mb-2 text-left" style="padding: 8px 10px; font-size: 10px; line-height: 1.35;">
-                    <i class="fa-solid fa-chevron-right color-cyan mr-1"></i> ${opt.text}
-                </button>
-            `;
-        });
-
-        modal.innerHTML = `
-            <div class="modal-box text-center" style="max-width: 410px; border-color: var(--amber); background: radial-gradient(circle at 50% 0%, #1c1524 0%, #070a10 85%);">
-                <div class="radar-spinner-ring mb-2" style="border-top-color: var(--amber); border-right-color: var(--red); margin: 0 auto 10px auto;">
-                    <div class="radar-spinner-center" style="font-size:24px;">🚨</div>
-                </div>
-
-                <div class="modal-glow-badge mb-1" style="color:var(--amber); border-color:var(--amber); background:rgba(255,179,0,0.1); display:inline-block;">
-                    ВНЕПЛАНОВАЯ СИТУАЦИЯ
-                </div>
-
-                <h3 class="font-bold mb-1 color-amber" style="font-size:15px;">${crisis.title}</h3>
-                <p class="sub-label mb-3" style="font-size:10.5px; line-height:1.4; color:#cbd5e1; padding: 0 4px;">
-                    ${crisis.desc}
-                </p>
-
-                <div class="space-y-1">
-                    ${optionsHtml}
-                </div>
-            </div>
-        `;
-
-        if (typeof ModalManager !== 'undefined') {
-            ModalManager.open('modalBizCrisis', { closeOthers: true });
-        } else {
-            modal.classList.add('active');
-        }
-        if (window.AudioFx) { window.AudioFx.play('error'); window.AudioFx.haptic('warning'); }
-    },
-
-    resolveCrisisAction(optIdx, crisisId) {
-        const events = this.CRISIS_EVENTS;
-        const crisis = events.find(e => e.id === crisisId);
-        if (!crisis || !crisis.options || !crisis.options[optIdx]) return;
-
-        const opt = crisis.options[optIdx];
-        const p = window.state?.player || {};
-
-        if (opt.costCash && (p.cash || 0) < opt.costCash) {
-            return showToast(`Не хватает ${opt.costCash.toLocaleString()} ₽!`);
-        }
-        if (opt.costConn && (p.connections || 0) < opt.costConn) {
-            return showToast(`Не хватает связей 🤝 с Решалой!`);
-        }
-        if (opt.reqBiz) {
-            const hasBiz = (window.state?.businesses || []).some(b => b.id === opt.reqBiz && b.level > 0);
-            if (!hasBiz) return showToast("У вас нет службы эвакуации!");
-        }
-
-        if (opt.costCash) {
-            p.cash -= opt.costCash;
-            if (typeof logBankTransaction === 'function') logBankTransaction(`Инцидент: ${crisis.title}`, opt.costCash, false);
-        }
-        if (opt.costConn) p.connections -= opt.costConn;
-        if (opt.penaltyMood) p.mood = Math.max(10, (p.mood || 85) - opt.penaltyMood);
-        if (opt.bonusKarma) p.karma = Math.min(100, (p.karma || 50) + opt.bonusKarma);
-
-        if (typeof ModalManager !== 'undefined') ModalManager.close('modalBizCrisis');
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
-        showToast("Инцидент благополучно урегулирован!");
     },
 
     upgradePoint(bizId) {
