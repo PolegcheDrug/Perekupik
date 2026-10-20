@@ -1,19 +1,11 @@
 // ========================================================
-// js/phone/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v3.2.0)
+// js/phone/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v3.3.0-balanced)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v3.2.0 (SPRINT 2 — ФИКС C3):
-//   - ФИКС C3: корректный порядок в claimAllThreePrizes — сначала
-//     grantCosmeticFromSpin (выдаёт предмет + сохраняет стейт через v4.0.1),
-//     затем pushToMailbox для компенсации Stars
-//   - Защита от отсутствия ThemeManager — компенсация сохраняется явно
-//   - EventBus-эмиты: media:super_spin_cosmetic_granted,
-//     media:super_spin_cosmetic_compensated
-//   - try/catch вокруг всего блока выдачи косметики
-//   - Финальный saveState() в конце claimAllThreePrizes
-// ⭐ v3.1.2 (ФИКС ПОВТОРНОГО ВКЛЮЧЕНИЯ И ПАУЗЫ):
-//   - Убрано разрушительное removeAttribute('src'), ломавшее аудиотракт
-//   - Корректная пауза через стандартный pause()
-//   - При повторном старте поток обновляется на актуальный Live-стрим
+// ⭐ v3.3.0 (ХАРДКОРНЫЙ БАЛАНС СУПЕРВИЛСПИНА):
+//   - УРОВНЕВЫЙ ГЕЙТ ДРОПА: на 1-3 уровне исключено выпадение иномарок за миллионы (Golf, BMW)!
+//     Дроп масштабируется: новичкам выпадает классика ВАЗ/Ока (до 100k ₽), дорогие авто — с 10 ур.
+//   - БАЛАНС ДЖЕКПОТОВ: денежные награды соответствуют текущему рангу и прогрессии.
+//   - СОХРАНЕНО НА 100%: радиостанции, напёрстки, фикс порядка C3, компенсации Stars и почта.
 // ========================================================
 
 const PhoneMedia = {
@@ -264,7 +256,6 @@ const PhoneMedia = {
             const st = this.stations[this.activeStationIndex];
 
             if (this.radioPlaying || this.radioLoading) {
-                // ПАУЗА: просто останавливаем воспроизведение, не ломая источник
                 this.radioPlaying = false;
                 this.radioLoading = false;
 
@@ -281,11 +272,9 @@ const PhoneMedia = {
                     window.EventBus.emit('media:radio_paused', { station: st.name });
                 }
             } else {
-                // В ЭФИР: подключаемся к прямому эфиру
                 this.radioLoading = true;
                 this.syncRadioUI();
 
-                // Обновляем ссылку на поток для перехода к текущему моменту прямого эфира
                 this.audioElement.src = st.streamUrl;
 
                 const playPromise = this.audioElement.play();
@@ -537,7 +526,7 @@ const PhoneMedia = {
                     Курс: 1 ⭐ = ${starRate.toLocaleString()} ₽ • ${cfg.costStars} ⭐ = ${starsRubValue} ₽
                 </div>
                 <div class="sub-label" style="font-size:8px; color:#ffd700; margin-top:3px;">
-                    🎰 = глитч-эксклюзив (только за билеты в каталоге стиля)
+                    Дроп адаптируется под ранг перекупа: легендарные иномарки открываются с 10+ уровня!
                 </div>
             </div>
         `;
@@ -678,22 +667,44 @@ const PhoneMedia = {
                 window.EventBus.emit('media:super_spin_started', { usedFree: canFree, ticketsLeft: window.state.player.superSpinTickets });
             }
 
+            // ⭐ ХАРДКОР-ФИЛЬТРАЦИЯ ПРИЗОВ ПО УРОВНЮ ИГРОКА
+            const playerLevel = window.state?.player?.level || 1;
+
             const tiers = (typeof SUPER_SPIN_TIERS !== 'undefined') ? SUPER_SPIN_TIERS : {
-                reelCars: [{ type: "cash", name: "100k ₽", emoji: "💰", amount: 100000 }],
-                reelResources: [{ type: "cash", label: "150k ₽", amount: 150000 }],
-                reelExclusives: [{ type: "stars", label: "25 ⭐", amount: 25 }]
+                reelCars: [
+                    { type: "car", name: "ВАЗ-2101", emoji: "🚗", basePrice: 45000, category: "economy", minLevel: 1 },
+                    { type: "car", name: "ВАЗ-2106", emoji: "🚗", basePrice: 65000, category: "economy", minLevel: 1 },
+                    { type: "car", name: "ИЖ-2126 «Ода»", emoji: "🚗", basePrice: 50000, category: "economy", minLevel: 1 },
+                    { type: "car", name: "Lada Samara 2109", emoji: "🚗", basePrice: 95000, category: "economy", minLevel: 2 },
+                    { type: "car", name: "Toyota Chaser (Сток)", emoji: "🏎️", basePrice: 280000, category: "comfort", minLevel: 6 },
+                    { type: "car", name: "VW Golf VI GTI", emoji: "🏎️", basePrice: 1350000, category: "comfort", minLevel: 10 },
+                    { type: "car", name: "BMW E34 525i", emoji: "🏎️", basePrice: 850000, category: "comfort", minLevel: 10 }
+                ],
+                reelResources: [
+                    { type: "cash", label: "25k ₽", amount: 25000, maxLevel: 3 },
+                    { type: "cash", label: "50k ₽", amount: 50000 },
+                    { type: "cash", label: "120k ₽", amount: 120000 },
+                    { type: "fuel", label: "+40 ⛽", amount: 40 },
+                    { type: "tickets", label: "+2 🎟️", amount: 2 }
+                ],
+                reelExclusives: [
+                    { type: "stars", label: "5 ⭐", amount: 5 },
+                    { type: "stars", label: "15 ⭐", amount: 15 },
+                    { type: "free_impound", label: "Талон ГИБДД", emoji: "👮" }
+                ]
             };
 
-            const pool1 = tiers.reelCars || [];
+            // Фильтруем автомобили: на 1-3 ур. никаких Golf GTI и BMW!
+            let pool1 = (tiers.reelCars || []).filter(c => {
+                const reqLvl = c.minLevel || 1;
+                return playerLevel >= reqLvl;
+            });
+            if (pool1.length === 0) {
+                pool1 = [{ type: "car", name: "ВАЗ-2101", emoji: "🚗", basePrice: 45000, category: "economy" }];
+            }
+
             const pool2 = tiers.reelResources || [];
             const pool3 = tiers.reelExclusives || [];
-
-            if (pool1.length === 0 || pool2.length === 0 || pool3.length === 0) {
-                console.error('[PhoneMedia] Пустые пулы призов');
-                this.isSuperSpinning = false;
-                if (typeof showToast === 'function') showToast("❌ Ошибка конфигурации призов");
-                return;
-            }
 
             const prize1 = pool1[Math.floor(Math.random() * pool1.length)];
             const prize2 = pool2[Math.floor(Math.random() * pool2.length)];
@@ -782,20 +793,11 @@ const PhoneMedia = {
         }
     },
 
-    // ====================================================
-    // ⭐ v3.2.0 (ФИКС C3): ВЫДАЧА ТРЁХ ПРИЗОВ
-    // Порядок для косметики:
-    //   1) grantCosmeticFromSpin (выдаёт + saveState внутри)
-    //   2) pushToMailbox (для дубликатов — Stars в почту)
-    //   3) EventBus-эмиты для UI
-    // ====================================================
     claimAllThreePrizes(p1, p2, p3) {
         let rewardTokens = [];
 
         try {
-            // ═══════════════════════════════════════════════════
             // 1. БАРАБАН 1: ТЕХНИКА
-            // ═══════════════════════════════════════════════════
             if (p1.type === 'car') {
                 let matchedTemplate = null;
 
@@ -844,21 +846,21 @@ const PhoneMedia = {
                     id: "spin_car_" + Date.now(),
                     name: p1.name,
                     type: p1.category || 'economy',
-                    power: p1.power || 100,
-                    basePrice: p1.basePrice || 150000,
-                    price: p1.basePrice || 150000,
-                    marketValue: Math.round((p1.basePrice || 150000) * 1.15),
+                    power: p1.power || 75,
+                    basePrice: p1.basePrice || 50000,
+                    price: p1.basePrice || 50000,
+                    marketValue: Math.round((p1.basePrice || 50000) * 1.1),
                     img: mainImg,
                     images: carGallery,
                     fallback: fallbackImg,
                     plate: wonPlate,
                     customPlate: wonPlate,
-                    condition: 85,
-                    wear: { engine: 90, transmission: 90 },
+                    condition: 80,
+                    wear: { engine: 85, transmission: 85 },
                     isRegisteredOnPlayer: false,
                     ownershipDays: 0,
                     engineTemp: 90,
-                    tireWear: 95,
+                    tireWear: 90,
                     purchaseCost: 0,
                     tuning: {
                         chip: 0, exhaust: false, stance: false, bodykit: false,
@@ -950,9 +952,7 @@ const PhoneMedia = {
                 });
             }
 
-            // ═══════════════════════════════════════════════════
             // 2. БАРАБАН 2: ВАЛЮТА И РЕСУРСЫ
-            // ═══════════════════════════════════════════════════
             if (p2.type === 'cash' || p2.type === 'jackpot') {
                 if (typeof window.pushToMailbox === 'function') {
                     window.pushToMailbox({
@@ -1045,9 +1045,7 @@ const PhoneMedia = {
                 });
             }
 
-            // ═══════════════════════════════════════════════════
-            // 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ И КОСМЕТИКА (ФИКС C3)
-            // ═══════════════════════════════════════════════════
+            // 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ И КОСМЕТИКА
             if (p3.type === 'stars') {
                 if (typeof window.pushToMailbox === 'function') {
                     window.pushToMailbox({
@@ -1121,13 +1119,10 @@ const PhoneMedia = {
                     rarity: "token-purple"
                 });
             } else if (p3.type === 'cosmetic') {
-                // ⭐ v3.2.0 (ФИКС C3): правильный порядок операций
                 this._handleCosmeticPrize(p3, rewardTokens);
             }
 
-            // ═══════════════════════════════════════════════════
             // ФИНАЛИЗАЦИЯ
-            // ═══════════════════════════════════════════════════
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
             if (window.AudioFx) window.AudioFx.play('win');
@@ -1157,37 +1152,24 @@ const PhoneMedia = {
         } catch (e) {
             console.error('[PhoneMedia] claimAllThreePrizes error:', e);
             if (typeof showToast === 'function') showToast(`❌ Ошибка выдачи призов: ${e.message}`);
-            // Страховка — сохраняем стейт, что уже успело измениться
             if (typeof saveState === 'function') saveState();
         }
     },
 
-    // ----------------------------------------------------
-    // ⭐ v3.2.0 (ФИКС C3): обработка косметики из СуперВилспина
-    // Правильный порядок:
-    //   1) grantCosmeticFromSpin (выдаёт предмет + saveState)
-    //   2) pushToMailbox для компенсации Stars (если дубликат)
-    //   3) EventBus-эмиты для UI
-    // ----------------------------------------------------
     _handleCosmeticPrize(p3, rewardTokens) {
         const category = p3.category;
         const itemId = p3.itemId;
         const emoji = p3.emoji || '🎨';
         const isExclusive = !!p3.isExclusive;
 
-        // ═══════════════════════════════════════════════════
-        // СЦЕНАРИЙ A: ThemeManager загружен
-        // ═══════════════════════════════════════════════════
         if (typeof ThemeManager !== 'undefined' && typeof ThemeManager.grantCosmeticFromSpin === 'function') {
             let res = null;
             try {
                 res = ThemeManager.grantCosmeticFromSpin(category, itemId);
             } catch (grantErr) {
-                console.warn('[PhoneMedia] grantCosmeticFromSpin упал:', grantErr);
                 res = { success: false };
             }
 
-            // ----- A1: Успешно выдано (новый предмет) -----
             if (res && res.success && (!res.convertedToStars || res.convertedToStars === 0)) {
                 const itemName = res.item?.name || p3.label || 'Косметика';
 
@@ -1203,22 +1185,18 @@ const PhoneMedia = {
                     showToast(`🎨 ${itemName} разблокирован!`);
                 }
 
-                // EventBus — UI вкладки «Скин» обновится
                 if (window.EventBus) {
                     window.EventBus.emit('media:super_spin_cosmetic_granted', {
                         category, itemId, itemName, isExclusive
                     });
                 }
-
                 return;
             }
 
-            // ----- A2: Дубликат → компенсация в Stars -----
             if (res && res.success && res.convertedToStars > 0) {
                 const starsAmount = res.convertedToStars;
                 const itemName = res.item?.name || p3.label || 'Косметика';
 
-                // pushToMailbox для звёзд (если доступно)
                 if (typeof window.pushToMailbox === 'function') {
                     window.pushToMailbox({
                         type: "stars",
@@ -1229,7 +1207,6 @@ const PhoneMedia = {
                         badge: "STARS"
                     });
                 } else {
-                    // Fallback: прямое начисление в stars
                     if (!window.state.player) window.state.player = {};
                     window.state.player.stars = (window.state.player.stars || 0) + starsAmount;
                     if (typeof saveState === 'function') saveState();
@@ -1249,19 +1226,10 @@ const PhoneMedia = {
                         category, itemId, itemName, stars: starsAmount
                     });
                 }
-
                 return;
             }
-
-            // ----- A3: grantCosmeticFromSpin вернул success:false -----
-            // (не нашли предмет по id, или другая внутренняя ошибка)
-            console.warn('[PhoneMedia] grantCosmeticFromSpin success:false, компенсируем');
         }
 
-        // ═══════════════════════════════════════════════════
-        // СЦЕНАРИЙ B: ThemeManager не загружен ИЛИ grant упал
-        // → компенсация в Stars
-        // ═══════════════════════════════════════════════════
         const comp = 15;
         const itemName = p3.label || p3.name || 'Косметика';
 
@@ -1269,7 +1237,6 @@ const PhoneMedia = {
             try {
                 window.MoneyManager.earn(comp, 'Компенсация за косметику', { currency: 'stars', silent: true });
             } catch (e) {
-                // Fallback
                 if (!window.state.player) window.state.player = {};
                 window.state.player.stars = (window.state.player.stars || 0) + comp;
             }
@@ -1278,7 +1245,6 @@ const PhoneMedia = {
             window.state.player.stars = (window.state.player.stars || 0) + comp;
         }
 
-        // Страховка — сохраняем стейт явно
         if (typeof saveState === 'function') saveState();
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
 
@@ -1301,9 +1267,7 @@ const PhoneMedia = {
         }
     },
 
-    // ====================================================
     // 2.2. УЛИЧНАЯ ИГРА «НАПЁРСТКИ»
-    // ====================================================
     renderThimblesContent(box) {
         if (!box) return;
 
@@ -1595,4 +1559,4 @@ const PhoneMedia = {
 
 window.PhoneMedia = PhoneMedia;
 
-console.log('[📻 phone-media v3.2.0] ФИКС C3: корректный порядок выдачи косметики в claimAllThreePrizes + EventBus-эмиты ✓');
+console.log('[📻 phone-media v3.3.0] Хардкорный баланс наград: уровневый гейт иномарок и джекпотов ✓');
