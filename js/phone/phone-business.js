@@ -1,19 +1,22 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v8.1.0 CLEAN)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v9.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v8.1.0 (ФИКС СИНТАКСИСА И АВТОНОМНЫЕ ДАННЫЕ):
-//   1. Устранены синтаксические ошибки и спецсимволы в шаблонах.
-//   2. Добавлен железный fallback для ДНК и коэффициентов mult.
-//   3. Личный кабинет управления точкой по клику на плитку.
-//   4. Индивидуальные ветки прокачки (3 уникальных апгрейда для каждой точки).
-//   5. Вкладка B2B тендеров с авансами и множителем кассы.
-//   6. Защита от сбоев при инкассации и кризис-менеджмент.
+// ⭐ v9.0.0 (АВТОНОМНЫЙ ЦЕХ, ШТАТ И ПАРК ДЛЯ КАЖДОГО БИЗНЕСА):
+//   1. Убраны общие глобальные вкладки Цех/Штат/Парк из шапки.
+//   2. В каждом бизнесе — свой личный кабинет с переключателем:
+//      [Обзор] [Цех точки] [Штат точки] [Автопарк].
+//   3. У каждой точки индивидуальный цех (3 ветки уникального оборудования),
+//      индивидуальный штат сотрудников и индивидуальный автопарк.
+//   4. Встроенный автономный каталог апгрейдов и специалистов:
+//      блоки никогда не будут пустыми.
+//   5. B2B тендеры, кризис-менеджмент и непрерывная касса по реальному времени.
 // ========================================================
 
 const PhoneBusiness = {
     currentTab: 'points',
-    selectedBizId: null, // ID точки, открытой в личном кабинете
+    selectedBizId: null,      // ID выбранной точки
+    cabinetSubTab: 'overview', // 'overview', 'workshop', 'staff', 'fleet'
     _tickInterval: null,
     _activeBonus: null,
     _ensureStateInProgress: false,
@@ -38,30 +41,94 @@ const PhoneBusiness = {
         return window.BusinessDataModule?.CRISIS_EVENTS || [];
     },
     get DAILY_BIZ_CHALLENGES() { return window.BusinessDataModule?.DAILY_BIZ_CHALLENGES || []; },
-    get workshopUpgrades() { return window.BusinessDataModule?.workshopUpgrades || []; },
-    get staffList() { return window.BusinessDataModule?.staffList || []; },
-    get fleetVehicles() { return window.BusinessDataModule?.fleetVehicles || []; },
     get achievements() { return window.BusinessDataModule?.achievements || []; },
 
-    _fallbackCoverSkins: window.BusinessDataModule?.fallbackCoverSkins || [],
-    _fallbackStickers: window.BusinessDataModule?.fallbackStickers || [],
-
-    _getCoverSkins() {
-        if (typeof window.BUSINESS_COVER_SKINS !== 'undefined' && Array.isArray(window.BUSINESS_COVER_SKINS) && window.BUSINESS_COVER_SKINS.length > 0) {
-            return window.BUSINESS_COVER_SKINS;
-        }
-        return window.BusinessDataModule?.fallbackCoverSkins || this._fallbackCoverSkins;
+    // ========================================================
+    // АВТОНОМНЫЙ КАТАЛОГ ИНДИВИДУАЛЬНОГО ОБОРУДОВАНИЯ (ЦЕХ ТОЧКИ)
+    // ========================================================
+    _defaultIndividualUpgrades: {
+        wash: [
+            { id: 'w_pressure', name: 'Пеногенераторы Tornado', desc: '+15% к скорости обслуживания и чеку', baseCost: 35000, costMul: 1.7, maxLevel: 3, bonusPct: 15, icon: 'fa-shower' },
+            { id: 'w_osmosis',  name: 'Осмотическая сушка',       desc: '+20% к кассе и защита ЛКП от разводов', baseCost: 55000, costMul: 1.8, maxLevel: 3, bonusPct: 20, icon: 'fa-wind' },
+            { id: 'w_cafe',     name: 'Клиентский кофе-бар',      desc: '+25% пассивной выручки с посетителей',  baseCost: 75000, costMul: 1.9, maxLevel: 3, bonusPct: 25, icon: 'fa-mug-hot' }
+        ],
+        shina: [
+            { id: 'sh_straight', name: 'Станок правки дисков',    desc: '+15% к среднему чеку шиномонтажа',       baseCost: 45000, costMul: 1.7, maxLevel: 3, bonusPct: 15, icon: 'fa-compact-disc' },
+            { id: 'sh_auto',     name: 'Автостенд низкого профиля',desc: '+20% выручки с тюнинг-проектов',        baseCost: 70000, costMul: 1.8, maxLevel: 3, bonusPct: 20, icon: 'fa-gauge-high' },
+            { id: 'sh_hotel',    name: 'Отель хранения шин',       desc: '+25% пассивной сезонной прибыли',       baseCost: 95000, costMul: 1.9, maxLevel: 3, bonusPct: 25, icon: 'fa-warehouse' }
+        ],
+        sto: [
+            { id: 'sto_lifts',  name: 'Гидравлические подъёмники', desc: '+20% к пропускной способности авто',   baseCost: 85000, costMul: 1.75, maxLevel: 3, bonusPct: 20, icon: 'fa-elevator' },
+            { id: 'sto_3d',     name: '3D Стенд сход-развала',    desc: '+25% к выручке со слесарных работ',      baseCost: 120000, costMul: 1.85, maxLevel: 3, bonusPct: 25, icon: 'fa-crosshairs' },
+            { id: 'sto_parts',  name: 'Склад оригинальных узлов', desc: '+30% к доходу, дешевле ремонт авто парка',baseCost: 160000, costMul: 1.9, maxLevel: 3, bonusPct: 30, icon: 'fa-boxes-packing' }
+        ],
+        tow_truck: [
+            { id: 'tow_winch',  name: 'Тяговая гидролебёдка 8т',  desc: '+18% к стоимости сложных эвакуаций',     baseCost: 90000, costMul: 1.75, maxLevel: 3, bonusPct: 18, icon: 'fa-anchor' },
+            { id: 'tow_double', name: 'Сдвоенная кабина экипажа', desc: '+22% выручки за дальние рейсы по области',baseCost: 135000, costMul: 1.85, maxLevel: 3, bonusPct: 22, icon: 'fa-people-group' },
+            { id: 'tow_contract',name: 'Контракт спецстоянки ГИБДД',desc: '+35% постоянного потока заказов',     baseCost: 190000, costMul: 1.95, maxLevel: 3, bonusPct: 35, icon: 'fa-shield-halved' }
+        ],
+        delivery: [
+            { id: 'del_thermo', name: 'Изотермические термобоксы',desc: '+15% к доставкам ресторанных заказов',   baseCost: 75000, costMul: 1.7, maxLevel: 3, bonusPct: 15, icon: 'fa-box' },
+            { id: 'del_gps',    name: 'GPS-маршрутизатор трафика',desc: '+25% скорости развоза и экономия бензина',baseCost: 110000, costMul: 1.8, maxLevel: 3, bonusPct: 25, icon: 'fa-map-location-dot' },
+            { id: 'del_moto',   name: 'Экспресс-мотопарк доставки',desc: '+30% к общей кассе курьерской сети',    baseCost: 165000, costMul: 1.9, maxLevel: 3, bonusPct: 30, icon: 'fa-motorcycle' }
+        ],
+        paint_shop: [
+            { id: 'pnt_infra',  name: 'Инфракрасная сушилка',     desc: '+20% к скорости окраса кузова',         baseCost: 110000, costMul: 1.75, maxLevel: 3, bonusPct: 20, icon: 'fa-fire' },
+            { id: 'pnt_lab',    name: 'Спектрофотометр красок',   desc: '+25% к чеку за 100% попадание в цвет',   baseCost: 150000, costMul: 1.85, maxLevel: 3, bonusPct: 25, icon: 'fa-palette' },
+            { id: 'pnt_booth',  name: 'Камера с очисткой «Антипыль»',desc: '+35% к стоимости премиальных обливов',baseCost: 220000, costMul: 1.95, maxLevel: 3, bonusPct: 35, icon: 'fa-spray-can' }
+        ],
+        chip_tuning: [
+            { id: 'chp_dyno',   name: '4WD Диностенд нагрузок',   desc: '+25% к чеку за замеры мощности',         baseCost: 140000, costMul: 1.8, maxLevel: 3, bonusPct: 25, icon: 'fa-tachograph-digital' },
+            { id: 'chp_flash',  name: 'Программатор ECU Master',  desc: '+30% к выручке со Stage 2 и Stage 3',    baseCost: 190000, costMul: 1.85, maxLevel: 3, bonusPct: 30, icon: 'fa-laptop-code' },
+            { id: 'chp_maps',   name: 'Калибровки спортивных прошивок',desc: '+35% заказов от уличных гонщиков',   baseCost: 260000, costMul: 1.95, maxLevel: 3, bonusPct: 35, icon: 'fa-bolt' }
+        ],
+        detailing: [
+            { id: 'dtl_ceramic',name: 'Керамика 9H Diamond Pro',  desc: '+20% к чеку защитных покрытий',          baseCost: 130000, costMul: 1.75, maxLevel: 3, bonusPct: 20, icon: 'fa-gem' },
+            { id: 'dtl_tornad', name: 'Пневмохимчистка Tornador', desc: '+25% к скорости чистки интерьера',      baseCost: 175000, costMul: 1.85, maxLevel: 3, bonusPct: 25, icon: 'fa-soap' },
+            { id: 'dtl_light',  name: 'Бестеневой диодный туннель',desc: '+35% к баллам на автошоу и кассе',      baseCost: 240000, costMul: 1.95, maxLevel: 3, bonusPct: 35, icon: 'fa-lightbulb' }
+        ],
+        razborka: [
+            { id: 'rzb_plasma', name: 'Промышленный плазморез',   desc: '+20% к выходу контрактного металла',    baseCost: 150000, costMul: 1.75, maxLevel: 3, bonusPct: 20, icon: 'fa-scissors' },
+            { id: 'rzb_racks',  name: 'Многоярусный склад агрегатов',desc: '+25% к вместимости и продаже моторов',baseCost: 210000, costMul: 1.85, maxLevel: 3, bonusPct: 25, icon: 'fa-cubes-stacked' },
+            { id: 'rzb_online', name: 'Маркетплейс б/у запчастей',desc: '+35% оптовой выручки по регионам',       baseCost: 290000, costMul: 1.95, maxLevel: 3, bonusPct: 35, icon: 'fa-globe' }
+        ],
+        autopodbor: [
+            { id: 'pod_launch', name: 'Планшеты Launch Pro для штата',desc: '+20% к точности выездных отчётов',  baseCost: 180000, costMul: 1.75, maxLevel: 3, bonusPct: 20, icon: 'fa-tablet-screen-button' },
+            { id: 'pod_ultraz', name: 'Ультразвуковые толщиномеры',desc: '+25% доверия клиентов при проверке',  baseCost: 250000, costMul: 1.85, maxLevel: 3, bonusPct: 25, icon: 'fa-microchip' },
+            { id: 'pod_crm',    name: 'CRM-система автоподбора',  desc: '+40% потока богатых заказчиков',         baseCost: 350000, costMul: 1.95, maxLevel: 3, bonusPct: 40, icon: 'fa-network-wired' }
+        ],
+        taxi: [
+            { id: 'tx_priority',name: 'Золотой статус в агрегаторе',desc: '+25% потока заказов без простоя',     baseCost: 280000, costMul: 1.8, maxLevel: 3, bonusPct: 25, icon: 'fa-ranking-star' },
+            { id: 'tx_service', name: 'Собственная ремзона парка', desc: '+30% к чистой прибыли, дешевле ТО',    baseCost: 420000, costMul: 1.85, maxLevel: 3, bonusPct: 30, icon: 'fa-wrench' },
+            { id: 'tx_ads',     name: 'Светодиодные медиа-боксы', desc: '+40% пассивной выручки с рекламы',      baseCost: 650000, costMul: 1.95, maxLevel: 3, bonusPct: 40, icon: 'fa-tv' }
+        ],
+        transport_company: [
+            { id: 'tc_glonass', name: 'Спутниковый конвой ГЛОНАСС',desc: '+25% к логистике дальних перевозок',   baseCost: 450000, costMul: 1.8, maxLevel: 3, bonusPct: 25, icon: 'fa-satellite' },
+            { id: 'tc_cards',   name: 'Корпоративные топливные карты',desc: '+30% к чистой прибыли со скидкой на ДТ',baseCost: 650000, costMul: 1.85, maxLevel: 3, bonusPct: 30, icon: 'fa-gas-pump' },
+            { id: 'tc_hub',     name: 'Кросс-докинг терминал 24/7',desc: '+45% к выручке магистральных тягачей', baseCost: 950000, costMul: 1.95, maxLevel: 3, bonusPct: 45, icon: 'fa-truck-moving' }
+        ],
+        customs_hub: [
+            { id: 'hub_crane',  name: 'Козловой контейнерный кран',desc: '+30% к скорости перегрузки карго',      baseCost: 550000, costMul: 1.8, maxLevel: 3, bonusPct: 30, icon: 'fa-arrows-split-up-and-left' },
+            { id: 'hub_green',  name: 'Зелёный таможенный коридор',desc: '+35% к пошлинам и легализации VIN',    baseCost: 800000, costMul: 1.85, maxLevel: 3, bonusPct: 35, icon: 'fa-passport' },
+            { id: 'hub_bonded', name: 'Охраняемый таможенный СВХ',desc: '+50% к доходу с партий контейнеров',     baseCost: 1200000, costMul: 1.95, maxLevel: 3, bonusPct: 50, icon: 'fa-building-shield' }
+        ]
     },
 
-    _getOwnerStickers() {
-        if (typeof window.BUSINESS_VIP_STICKERS !== 'undefined' && Array.isArray(window.BUSINESS_VIP_STICKERS) && window.BUSINESS_VIP_STICKERS.length > 0) {
-            return window.BUSINESS_VIP_STICKERS;
-        }
-        return window.BusinessDataModule?.fallbackStickers || this._fallbackStickers;
-    },
+    // ========================================================
+    // АВТОНОМНЫЙ КАТАЛОГ СПЕЦИАЛИСТОВ (ШТАТ ТОЧКИ)
+    // ========================================================
+    pointStaffCatalog: [
+        { id: 'manager',  name: 'Управляющий точки',    salary: 15000, bonusPct: 15, desc: '+15% к выручке, контроль кассы и порядка', icon: 'fa-user-tie' },
+        { id: 'master',   name: 'Старший мастер смены', salary: 10000, bonusPct: 10, desc: '+10% к кассе, экономит 25% сырья на складе', icon: 'fa-wrench' },
+        { id: 'security', name: 'Охранный пост ЧОП',    salary: 6000,  bonusPct: 5,  desc: 'Защита точки от ночных краж сырья и проверок', icon: 'fa-shield-halved' }
+    ],
 
-    get COVER_SKINS() { return this._getCoverSkins(); },
-    get OWNER_STICKERS() { return this._getOwnerStickers(); },
+    _getIndividualUpgrades(bizId) {
+        if (window.BUSINESS_INDIVIDUAL_UPGRADES && window.BUSINESS_INDIVIDUAL_UPGRADES[bizId]) {
+            return window.BUSINESS_INDIVIDUAL_UPGRADES[bizId];
+        }
+        return this._defaultIndividualUpgrades[bizId] || [];
+    },
 
     _n(val, fb = 0) {
         if (window.GameHelpers && window.GameHelpers.safeNum) return window.GameHelpers.safeNum(val, fb);
@@ -147,7 +214,8 @@ const PhoneBusiness = {
                     stock: 100,
                     maxStock: 100,
                     incomeHistory: [],
-                    individualUpgrades: {},
+                    workshop: {},   // Индивидуальный цех точки
+                    staff: {},      // Индивидуальный штат точки
                     lastIncomeDay: 0,
                     lastStockDay: 0,
                     dna: null,
@@ -175,16 +243,14 @@ const PhoneBusiness = {
                 if (typeof b.stock !== 'number' || isNaN(b.stock)) b.stock = 100;
                 if (typeof b.maxStock !== 'number') b.maxStock = 100;
                 if (!Array.isArray(b.incomeHistory)) b.incomeHistory = [];
-                if (!b.individualUpgrades || typeof b.individualUpgrades !== 'object') b.individualUpgrades = {};
+                if (!b.workshop || typeof b.workshop !== 'object') b.workshop = {};
+                if (!b.staff || typeof b.staff !== 'object') b.staff = {};
                 if (!b.icon) b.icon = this._iconForBiz(b.id);
                 if (!b.customName) b.customName = b.name;
                 if (b.level > 0 && !b.dna) b.dna = this._generateDNA(b.id);
                 if (!b.lastTickTimestamp || isNaN(b.lastTickTimestamp)) b.lastTickTimestamp = now;
             });
 
-            if (!window.state.businessWorkshop) window.state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
-            if (!window.state.businessStaff) window.state.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
-            if (!Array.isArray(window.state.businessFleet)) window.state.businessFleet = [];
             if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
 
             if (!window.state.player.legalEntity) {
@@ -379,22 +445,34 @@ const PhoneBusiness = {
         return window.state.businesses.filter(b => b && b.level > 0).length;
     },
 
-    getWorkshopBonus(branch) {
-        return window.state?.businessWorkshop?.[branch] || 0;
-    },
-
     /**
-     * Расчет бонуса от персональных улучшений конкретной точки
+     * Бонус от персонального цеха конкретной точки
      */
-    getIndividualUpgradesBonus(b) {
-        if (!b || !b.individualUpgrades) return 1.0;
-        const catalog = window.BUSINESS_INDIVIDUAL_UPGRADES?.[b.id] || [];
+    getPointWorkshopBonus(b) {
+        if (!b || !b.workshop) return 1.0;
+        const catalog = this._getIndividualUpgrades(b.id);
         let bonusSum = 0;
 
         catalog.forEach(upg => {
-            const curLvl = Number(b.individualUpgrades[upg.id]) || 0;
+            const curLvl = Number(b.workshop[upg.id]) || 0;
             if (curLvl > 0) {
                 bonusSum += (curLvl * (upg.bonusPct || 15));
+            }
+        });
+
+        return 1 + (bonusSum / 100);
+    },
+
+    /**
+     * Бонус от персонального штата конкретной точки
+     */
+    getPointStaffBonus(b) {
+        if (!b || !b.staff) return 1.0;
+        let bonusSum = 0;
+
+        this.pointStaffCatalog.forEach(st => {
+            if (b.staff[st.id]) {
+                bonusSum += (st.bonusPct || 10);
             }
         });
 
@@ -406,7 +484,10 @@ const PhoneBusiness = {
 
         let inc = this._n(b.income, 0) * Math.pow(1.55, Math.max(0, b.level - 1));
         inc *= this.getDNAMultiplier(b.dna);
-        inc *= this.getIndividualUpgradesBonus(b);
+
+        // Индивидуальные улучшения цеха и штата точки
+        inc *= this.getPointWorkshopBonus(b);
+        inc *= this.getPointStaffBonus(b);
 
         if (b.stock <= 0) inc *= 0.15;
 
@@ -421,6 +502,7 @@ const PhoneBusiness = {
         const repBonus = Math.min(20, (b.reputation || 0) * 0.2);
         inc *= (1 + repBonus / 100);
 
+        // Доход привязанного к точке автопарка
         if (window.BusinessFleetModule) {
             const fleetIncome = window.BusinessFleetModule.calculateFleetIncomeForBiz(b.id);
             inc += fleetIncome.net;
@@ -434,16 +516,13 @@ const PhoneBusiness = {
         if (base <= 0) return 0;
 
         let total = base;
-        total *= (1 + this.getWorkshopBonus('equipment') * 0.15);
-        total *= (1 + this.getWorkshopBonus('brand') * 0.20);
-
-        if ((window.state?.businessStaff?.accountant || 0) > 0) total *= 1.08;
 
         this._syncActiveBonus();
         if (this._activeBonus && this._activeBonus.expiresDay >= (window.state?.player?.day || 1)) {
             total *= (1 + (this._activeBonus.bonusPct || 0) / 100);
         }
 
+        // B2B тендерный контракт
         if (Array.isArray(window.state?.player?.activeTenders)) {
             const curDay = window.state?.player?.day || 1;
             const activeTnd = window.state.player.activeTenders.find(t => t && t.targetBiz === b.id && t.expiresDay >= curDay);
@@ -514,7 +593,7 @@ const PhoneBusiness = {
                     <i class="fa-solid fa-chevron-left"></i> ${this.selectedBizId ? 'К точкам' : 'Назад'}
                 </button>
                 <div class="phone-app-title color-green">
-                    <i class="fa-solid fa-briefcase mr-1"></i> ${this.selectedBizId ? 'Управление точкой' : 'Бизнес-Сеть'}
+                    <i class="fa-solid fa-briefcase mr-1"></i> ${this.selectedBizId ? 'Кабинет точки' : 'Бизнес-Сеть'}
                 </div>
                 <div style="width:40px;"></div>
             </div>
@@ -553,25 +632,16 @@ const PhoneBusiness = {
                     </div>
                 ` : ''}
 
-                <!-- ПАНЕЛЬ ВКЛАДОК -->
-                <div class="biz-tabs-row mb-2" style="display:grid; grid-template-columns: repeat(6, 1fr); gap:2px;">
-                    <button onclick="PhoneBusiness.setTab('points')" class="biz-tab ${tab === 'points' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
+                <!-- ЛАКОНИЧНАЯ ПАНЕЛЬ ХОЛДИНГА (БЕЗ ОБЩИХ ЦЕХОВ И ШТАТОВ) -->
+                <div class="biz-tabs-row mb-2" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px;">
+                    <button onclick="PhoneBusiness.setTab('points')" class="biz-tab ${tab === 'points' ? 'active' : ''}">
                         <i class="fa-solid fa-store"></i><span>Точки</span>
                     </button>
-                    <button onclick="PhoneBusiness.setTab('fleet')" class="biz-tab ${tab === 'fleet' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
-                        <i class="fa-solid fa-truck"></i><span>Парк</span>
+                    <button onclick="PhoneBusiness.setTab('tenders')" class="biz-tab ${tab === 'tenders' ? 'active' : ''}">
+                        <i class="fa-solid fa-file-contract"></i><span>Тендеры</span>
                     </button>
-                    <button onclick="PhoneBusiness.setTab('tenders')" class="biz-tab ${tab === 'tenders' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
-                        <i class="fa-solid fa-file-contract"></i><span>Тендер</span>
-                    </button>
-                    <button onclick="PhoneBusiness.setTab('workshop')" class="biz-tab ${tab === 'workshop' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
-                        <i class="fa-solid fa-screwdriver-wrench"></i><span>Цех</span>
-                    </button>
-                    <button onclick="PhoneBusiness.setTab('staff')" class="biz-tab ${tab === 'staff' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
-                        <i class="fa-solid fa-users"></i><span>Штат</span>
-                    </button>
-                    <button onclick="PhoneBusiness.setTab('corp')" class="biz-tab ${tab === 'corp' ? 'active' : ''}" style="padding:4px 1px; font-size:8.5px;">
-                        <i class="fa-solid fa-building"></i><span>Корп.</span>
+                    <button onclick="PhoneBusiness.setTab('corp')" class="biz-tab ${tab === 'corp' ? 'active' : ''}">
+                        <i class="fa-solid fa-building"></i><span>Корпорации</span>
                     </button>
                 </div>
 
@@ -586,14 +656,8 @@ const PhoneBusiness = {
             this.renderPointCabinet(content, this.selectedBizId);
         } else if (tab === 'points') {
             this.renderPointsTab(content);
-        } else if (tab === 'fleet') {
-            this.renderFleetTab(content);
         } else if (tab === 'tenders') {
             this.renderTendersTab(content);
-        } else if (tab === 'workshop') {
-            this.renderWorkshopTab(content);
-        } else if (tab === 'staff') {
-            this.renderStaffTab(content);
         } else if (tab === 'corp') {
             this.renderCorporationTab(content);
         }
@@ -608,9 +672,19 @@ const PhoneBusiness = {
 
     openPointCabinet(bizId) {
         this.selectedBizId = bizId;
+        this.cabinetSubTab = 'overview';
         this.currentTab = 'points';
         if (window.AudioFx) { window.AudioFx.play('tick'); window.AudioFx.haptic('light'); }
         this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    setCabinetSubTab(subTab) {
+        this.cabinetSubTab = subTab;
+        if (window.AudioFx) { window.AudioFx.play('tick'); window.AudioFx.haptic('light'); }
+        const content = document.getElementById('bizTabContent');
+        if (content && this.selectedBizId) {
+            this.renderPointCabinet(content, this.selectedBizId);
+        }
     },
 
     closePointCabinet() {
@@ -747,115 +821,187 @@ const PhoneBusiness = {
         const supportsFleet = Boolean(window.BUSINESS_FLEET_REQUIREMENTS && window.BUSINESS_FLEET_REQUIREMENTS[b.id]);
         const fleetVehicles = supportsFleet && window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(b.id) : [];
 
-        // Индивидуальные улучшения точки
-        const indUpgrades = window.BUSINESS_INDIVIDUAL_UPGRADES?.[b.id] || [];
-        let upgradesHtml = '';
+        const sub = this.cabinetSubTab || 'overview';
 
-        indUpgrades.forEach(upg => {
-            const curLvl = Number(b.individualUpgrades?.[upg.id]) || 0;
-            const cost = Math.round(upg.baseCost * Math.pow(upg.costMul || 1.8, curLvl));
-            const isUpgMaxed = curLvl >= (upg.maxLevel || 3);
-            const canAfford = (window.state?.player?.cash || 0) >= cost;
-            const bonusPctVal = upg.bonusPct || 15;
+        // ─── 1. ПОДРАЗДЕЛ: ЦЕХ ТОЧКИ (ИНДИВИДУАЛЬНОЕ ОБОРУДОВАНИЕ) ───
+        let workshopHtml = '';
+        if (sub === 'workshop') {
+            const indUpgrades = this._getIndividualUpgrades(b.id);
+            if (indUpgrades.length === 0) {
+                workshopHtml = `<div class="sub-label text-center py-4">Для этого объекта модернизация оборудования не предусмотрена.</div>`;
+            } else {
+                indUpgrades.forEach(upg => {
+                    const curLvl = Number(b.workshop?.[upg.id]) || 0;
+                    const cost = Math.round(upg.baseCost * Math.pow(upg.costMul || 1.8, curLvl));
+                    const isUpgMaxed = curLvl >= (upg.maxLevel || 3);
+                    const canAfford = (window.state?.player?.cash || 0) >= cost;
 
-            upgradesHtml += `
-                <div class="p-2 mb-2" style="background:#050914; border-radius:8px; border:1px solid rgba(0,242,254,0.15);">
-                    <div class="flex-between mb-1">
-                        <b class="text-xs color-cyan" style="font-size:11px;">
-                            <i class="fa-solid ${upg.icon || 'fa-bolt'} mr-1"></i> ${upg.name}
-                        </b>
-                        <span class="tag-badge ${isUpgMaxed ? 'bg-tag-green' : 'bg-tag-cyan'}" style="font-size:7.5px;">
-                            ${curLvl}/${upg.maxLevel || 3} УР
-                        </span>
-                    </div>
-                    <div class="sub-label mb-2" style="font-size:9px; line-height:1.3;">${upg.desc}</div>
+                    workshopHtml += `
+                        <div class="glass-card mb-2 p-2" style="background:#050914; border-left:3px solid var(--cyan);">
+                            <div class="flex-between mb-1">
+                                <b class="text-xs color-cyan" style="font-size:11px;">
+                                    <i class="fa-solid ${upg.icon || 'fa-bolt'} mr-1"></i> ${upg.name}
+                                </b>
+                                <span class="tag-badge ${isUpgMaxed ? 'bg-tag-green' : 'bg-tag-cyan'}" style="font-size:7.5px;">
+                                    ${curLvl}/${upg.maxLevel || 3} УР
+                                </span>
+                            </div>
+                            <div class="sub-label mb-2" style="font-size:9px; line-height:1.3;">${upg.desc}</div>
 
-                    ${isUpgMaxed ? `
-                        <button class="btn btn-dark btn-sm w-full opacity-60" disabled style="font-size:9px; padding:3px;">
-                            Максимальный уровень ✓
-                        </button>
-                    ` : `
-                        <button onclick="PhoneBusiness.upgradeIndividualBranch('${b.id}', '${upg.id}')" class="btn ${canAfford ? 'btn-cyan' : 'btn-dark opacity-50'} btn-sm w-full" ${canAfford ? '' : 'disabled'} style="font-size:9.5px; padding:5px 8px; font-weight:700;">
-                            Улучшить (+${bonusPctVal}\% к кассе) — ${cost.toLocaleString()} ₽
-                        </button>
-                    `}
-                </div>
-            `;
-        });
+                            ${isUpgMaxed ? `
+                                <button class="btn btn-dark btn-sm w-full opacity-60" disabled style="font-size:9px; padding:4px;">
+                                    Максимальный уровень ✓
+                                </button>
+                            ` : `
+                                <button onclick="PhoneBusiness.upgradeIndividualBranch('${b.id}', '${upg.id}')" class="btn ${canAfford ? 'btn-cyan' : 'btn-dark opacity-50'} btn-sm w-full" ${canAfford ? '' : 'disabled'} style="font-size:9.5px; padding:6px 8px; font-weight:700;">
+                                    Улучшить (+${upg.bonusPct \vert{}\vert{} 15}\% к кассе) — ${cost.toLocaleString()} ₽
+                                </button>
+                            `}
+                        </div>
+                    `;
+                });
+            }
+        }
 
-        container.innerHTML = `
-            <!-- ШАПКА ОБЪЕКТА -->
-            <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0,230,118,0.15), #090e18); border-color:var(--green);">
-                <div class="flex-between mb-1">
-                    <div class="flex-gap" style="align-items:center;">
-                        <div style="font-size:20px; color:var(--green);">${this._iconForBiz(b.id)}</div>
-                        <div class="text-left">
-                            <b class="text-xs color-green" style="font-size:13px;">${b.customName || b.name}</b>
-                            <div class="sub-label" style="font-size:9px;">Уровень объекта: <b>${b.level}</b> из 5</div>
+        // ─── 2. ПОДРАЗДЕЛ: ШТАТ ТОЧКИ (ПЕРСОНАЛЬНЫЕ СОТРУДНИКИ) ───
+        let staffHtml = '';
+        if (sub === 'staff') {
+            this.pointStaffCatalog.forEach(st => {
+                const isHired = Boolean(b.staff?.[st.id]);
+                const canAfford = (window.state?.player?.cash || 0) >= st.salary;
+
+                staffHtml += `
+                    <div class="glass-card mb-2 p-2 flex-between" style="background:#050914; border-left:3px solid var(--purple);">
+                        <div style="flex:1; min-width:0; margin-right:8px;">
+                            <div class="flex-between mb-1">
+                                <b class="text-xs color-purple" style="font-size:11px;">
+                                    <i class="fa-solid ${st.icon} mr-1"></i> ${st.name}
+                                </b>
+                                <span class="tag-badge ${isHired ? 'bg-tag-green' : 'bg-tag-dark'}" style="font-size:7.5px;">
+                                    ${isHired ? 'В ШТАТЕ ✓' : 'НЕ НАНЯТ'}
+                                </span>
+                            </div>
+                            <div class="sub-label" style="font-size:9px; line-height:1.25;">${st.desc}</div>
+                            <div class="sub-label mt-1" style="font-size:8.5px; color:#c084fc;">
+                                Оклад: <b>${st.salary.toLocaleString()} ₽/мес</b>
+                            </div>
+                        </div>
+
+                        <div>
+                            ${isHired ? `
+                                <button class="btn btn-dark btn-sm opacity-60" disabled style="font-size:9px; padding:5px 8px;">Работает</button>
+                            ` : `
+                                <button onclick="BusinessFleetModule.hirePointStaff('${b.id}', '${st.id}')" class="btn ${canAfford ? 'btn-purple' : 'btn-dark opacity-50'} btn-sm btn-auto" ${canAfford ? '' : 'disabled'} style="font-size:9.5px; padding:6px 10px; font-weight:700;">
+                                    Нанять
+                                </button>
+                            `}
                         </div>
                     </div>
-                    <button onclick="PhoneBusiness.openCustomizeModal('${b.id}')" class="btn btn-dark btn-sm btn-auto" style="font-size:9px; padding:3px 8px;">
+                `;
+            });
+        }
+
+        // ─── 3. ПОДРАЗДЕЛ: АВТОПАРК ТОЧКИ ───
+        let fleetHtml = '';
+        if (sub === 'fleet') {
+            if (!supportsFleet) {
+                fleetHtml = `<div class="sub-label text-center py-4">Этот вид бизнеса не использует коммерческий автопарк.</div>`;
+            } else {
+                fleetHtml = `
+                    <div class="glass-card mb-2 p-2 text-center" style="background:#090e18;">
+                        <b class="text-xs color-amber block mb-1">Автопарк точки: ${fleetVehicles.length} авто на балансе</b>
+                        <div class="sub-label mb-2" style="font-size:9px;">Машины приносят ежедневную выручку и синергию марок.</div>
+                        <button onclick="BusinessFleetModule.renderFleetManagerModal('${b.id}')" class="btn btn-amber btn-sm w-full font-bold">
+                            <i class="fa-solid fa-truck-ramp-box mr-1"></i> Открыть диспетчерскую автопарка
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // ─── 4. ПОДРАЗДЕЛ: ОБЗОР (КАССА, СЫРЬЕ, ГРАФИК) ───
+        let overviewHtml = '';
+        if (sub === 'overview') {
+            overviewHtml = `
+                <!-- КАССА И СЫРЬЕ -->
+                <div class="grid-2 mb-2" style="gap:6px;">
+                    <div class="glass-card p-2 text-center" style="background:#090e18;">
+                        <div class="sub-label" style="font-size:9px;">Накоплено в кассе:</div>
+                        <div class="price-val color-amber my-1" style="font-size:16px;">${cash.toLocaleString()} ₽</div>
+                        <button onclick="PhoneBusiness.collectPointCash('${b.id}')" class="btn btn-green btn-sm w-full" ${cash <= 0 ? 'disabled' : ''} style="font-size:9px; padding:4px;">
+                            Снять кассу
+                        </button>
+                    </div>
+
+                    <div class="glass-card p-2 text-center" style="background:#090e18;">
+                        <div class="sub-label" style="font-size:9px;">Склад сырья (${stock}%):</div>
+                        <div class="rp-bar-bg my-1" style="height:6px;">
+                            <div class="rp-bar-fill fill-hunger" style="width:${Math.min(100, stock)}%;"></div>
+                        </div>
+                        <button onclick="PhoneBusiness.buySupplies('${b.id}')" class="btn btn-cyan btn-sm w-full" style="font-size:9px; padding:4px;">
+                            Заказ сырья (15k ₽)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ГРАФИК ДОХОДНОСТИ ЗА 7 ДНЕЙ -->
+                <div class="glass-card mb-2 p-2">
+                    ${this.renderSparkline(b)}
+                </div>
+
+                <!-- КНОПКА ГЕНЕРАЛЬНОГО АПГРЕЙДА ТОЧКИ -->
+                ${!isMaxed ? `
+                    <button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn btn-green btn-sm w-full mb-2" style="font-size:10px; font-weight:700;">
+                        Повысить уровень объекта до ${b.level + 1} (${upgradeCost.toLocaleString()} ₽)
+                    </button>
+                ` : '<div class="glass-card p-2 text-center text-xs color-green mb-2">Объект развит до максимального 5 уровня ✓</div>'}
+            `;
+        }
+
+        container.innerHTML = `
+            <!-- КАРТОЧКА ОБЪЕКТА -->
+            <div class="glass-card mb-2 p-2 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0,230,118,0.15), #090e18); border-color:var(--green);">
+                <div class="flex-between mb-1">
+                    <div class="flex-gap" style="align-items:center;">
+                        <div style="font-size:18px; color:var(--green);">${this._iconForBiz(b.id)}</div>
+                        <div class="text-left">
+                            <b class="text-xs color-green" style="font-size:12px;">${b.customName || b.name}</b>
+                            <div class="sub-label" style="font-size:8.5px;">Доход: <b>+${curIncome.toLocaleString()} ₽/д</b> • Ур. ${b.level}/5</div>
+                        </div>
+                    </div>
+                    <button onclick="PhoneBusiness.openCustomizeModal('${b.id}')" class="btn btn-dark btn-sm btn-auto" style="font-size:8.5px; padding:3px 7px;">
                         <i class="fa-solid fa-pen"></i> Бренд
                     </button>
                 </div>
             </div>
 
-            <!-- КАССА И СЫРЬЕ -->
-            <div class="grid-2 mb-2" style="gap:6px;">
-                <div class="glass-card p-2 text-center" style="background:#090e18;">
-                    <div class="sub-label" style="font-size:9px;">Накоплено в кассе:</div>
-                    <div class="price-val color-amber my-1" style="font-size:16px;">${cash.toLocaleString()} ₽</div>
-                    <button onclick="PhoneBusiness.collectPointCash('${b.id}')" class="btn btn-green btn-sm w-full" ${cash <= 0 ? 'disabled' : ''} style="font-size:9px; padding:4px;">
-                        Снять кассу
-                    </button>
-                </div>
-
-                <div class="glass-card p-2 text-center" style="background:#090e18;">
-                    <div class="sub-label" style="font-size:9px;">Склад сырья (${stock}%):</div>
-                    <div class="rp-bar-bg my-1" style="height:6px;">
-                        <div class="rp-bar-fill fill-hunger" style="width:${Math.min(100, stock)}%;"></div>
-                    </div>
-                    <button onclick="PhoneBusiness.buySupplies('${b.id}')" class="btn btn-cyan btn-sm w-full" style="font-size:9px; padding:4px;">
-                        Заказ сырья (15k ₽)
-                    </button>
-                </div>
-            </div>
-
-            <!-- ГРАФИК ДОХОДНОСТИ ЗА 7 ДНЕЙ -->
-            <div class="glass-card mb-2 p-2">
-                ${this.renderSparkline(b)}
-            </div>
-
-            <!-- АВТОПАРК ТОЧКИ (ЕСЛИ ПОДДЕРЖИВАЕТСЯ) -->
-            ${supportsFleet ? `
-                <div class="glass-card mb-2 p-2" style="border-left:3px solid var(--amber);">
-                    <div class="flex-between mb-1">
-                        <b class="text-xs color-amber"><i class="fa-solid fa-car"></i> Автопарк точки (${fleetVehicles.length} авто)</b>
-                        <button onclick="BusinessFleetModule.renderFleetManagerModal('${b.id}')" class="btn btn-amber btn-sm btn-auto" style="font-size:9px; padding:3px 8px;">
-                            Управление парком →
-                        </button>
-                    </div>
-                    <div class="sub-label" style="font-size:9px;">Машины приносят пассивную прибыль и получают синергию марок.</div>
-                </div>
-            ` : ''}
-
-            <!-- ПЕРСОНАЛЬНЫЕ АПГРЕЙДЫ ТОЧКИ -->
-            <div class="glass-card mb-2 p-2">
-                <b class="text-xs color-cyan mb-2 block"><i class="fa-solid fa-chart-line mr-1"></i> Индивидуальные улучшения объекта:</b>
-                ${upgradesHtml}
-            </div>
-
-            <!-- КНОПКА ГЕНЕРАЛЬНОГО АПГРЕЙДА ТОЧКИ -->
-            ${!isMaxed ? `
-                <button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn btn-green btn-sm w-full mb-3" style="font-size:10px; font-weight:700;">
-                    Повысить уровень объекта до ${b.level + 1} (${upgradeCost.toLocaleString()} ₽)
+            <!-- НАВИГАЦИЯ ВНУТРИ ТОЧКИ -->
+            <div class="grid-4 mb-2" style="grid-template-columns: repeat(4, 1fr); gap:3px;">
+                <button onclick="PhoneBusiness.setCabinetSubTab('overview')" class="btn ${sub === 'overview' ? 'btn-green' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 1px;">
+                    <i class="fa-solid fa-chart-pie"></i> Обзор
                 </button>
-            ` : ''}
+                <button onclick="PhoneBusiness.setCabinetSubTab('workshop')" class="btn ${sub === 'workshop' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 1px;">
+                    <i class="fa-solid fa-screwdriver-wrench"></i> Цех точки
+                </button>
+                <button onclick="PhoneBusiness.setCabinetSubTab('staff')" class="btn ${sub === 'staff' ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 1px;">
+                    <i class="fa-solid fa-users"></i> Штат
+                </button>
+                <button onclick="PhoneBusiness.setCabinetSubTab('fleet')" class="btn ${sub === 'fleet' ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 1px;" ${!supportsFleet ? 'disabled opacity-50' : ''}>
+                    <i class="fa-solid fa-truck"></i> Парк
+                </button>
+            </div>
+
+            ${overviewHtml}
+            ${workshopHtml}
+            ${staffHtml}
+            ${fleetHtml}
         `;
 
-        requestAnimationFrame(() => {
-            try { this.drawSparkline(b); } catch (e) {}
-        });
+        if (sub === 'overview') {
+            requestAnimationFrame(() => {
+                try { this.drawSparkline(b); } catch (e) {}
+            });
+        }
     },
 
     upgradeIndividualBranch(bizId, branchId) {
@@ -863,12 +1009,12 @@ const PhoneBusiness = {
         const b = (window.state.businesses || []).find(x => x && x.id === bizId);
         if (!b) return;
 
-        const indUpgrades = window.BUSINESS_INDIVIDUAL_UPGRADES?.[bizId] || [];
+        const indUpgrades = this._getIndividualUpgrades(bizId);
         const upg = indUpgrades.find(u => u.id === branchId);
         if (!upg) return;
 
-        if (!b.individualUpgrades) b.individualUpgrades = {};
-        const curLvl = Number(b.individualUpgrades[branchId]) || 0;
+        if (!b.workshop) b.workshop = {};
+        const curLvl = Number(b.workshop[branchId]) || 0;
         if (curLvl >= (upg.maxLevel || 3)) return showToast("Достигнут максимум прокачки!");
 
         const cost = Math.round(upg.baseCost * Math.pow(upg.costMul || 1.8, curLvl));
@@ -879,10 +1025,10 @@ const PhoneBusiness = {
         this._individualUpgradePending = true;
         try {
             window.state.player.cash -= cost;
-            b.individualUpgrades[branchId] = curLvl + 1;
+            b.workshop[branchId] = curLvl + 1;
 
             if (typeof logBankTransaction === 'function') {
-                logBankTransaction(`Улучшение точки ${b.customName || b.name}: ${upg.name}`, cost, false);
+                logBankTransaction(`Цех точки ${b.customName || b.name}: ${upg.name}`, cost, false);
             }
 
             if (typeof saveState === 'function') saveState();
@@ -897,38 +1043,8 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // ВСПОМОГАТЕЛЬНЫЕ ВКЛАДКИ
+    // ВСПОМОГАТЕЛЬНЫЕ ВКЛАДКИ (ТЕНДЕРЫ, КОРП)
     // ========================================================
-    renderFleetTab(container) {
-        let html = '<div class="sub-label mb-2 px-1" style="font-size:10px;">Спецтехника для обслуживания логистики и снижения себестоимости:</div>';
-        this.fleetVehicles.forEach(v => {
-            const isOwned = (window.state?.businessFleet || []).includes(v.id);
-            html += `
-                <div class="glass-card mb-2" style="background:linear-gradient(135deg, rgba(13,20,36,0.95), rgba(9,14,24,0.98)); border:1px solid rgba(255,179,0,0.2); border-radius:12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-                    <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
-                        <div style="width:38px; height:38px; border-radius:10px; background:rgba(255,179,0,0.12); border:1px solid rgba(255,179,0,0.3); display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--amber); flex-shrink:0;">
-                            <i class="fa-solid ${v.fa}"></i>
-                        </div>
-                        <div style="flex:1; min-width:0;">
-                            <b style="font-size:11.5px; color:#fff; display:block; margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.name}</b>
-                            <div class="sub-label" style="font-size:9px; color:#94a3b8; line-height:1.25;">${v.bonus}</div>
-                        </div>
-                    </div>
-                    <div style="flex-shrink:0;">
-                        ${isOwned ? `
-                            <span class="tag-badge bg-tag-green font-bold" style="padding:6px 12px; font-size:9.5px; border-radius:8px; display:inline-block;">В ПАРКЕ ✓</span>
-                        ` : `
-                            <button onclick="PhoneBusiness.buyFleetVehicle('${v.id}')" class="btn btn-amber btn-sm" style="width:auto !important; min-width:115px; padding:7px 12px; font-size:10px; font-weight:700; white-space:nowrap; border-radius:8px; box-shadow:0 0 10px rgba(255,179,0,0.25);">
-                                Купить (${v.cost.toLocaleString()} ₽)
-                            </button>
-                        `}
-                    </div>
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-    },
-
     renderTendersTab(container) {
         const tenders = window.BUSINESS_TENDERS_CATALOG || [];
         const curDay = window.state?.player?.day || 1;
@@ -1068,74 +1184,6 @@ const PhoneBusiness = {
         }
     },
 
-    renderWorkshopTab(container) {
-        let html = '<div class="sub-label mb-2 px-1" style="font-size:10px;">Глобальная прокачка цеха даёт постоянные бонусы ко всей вашей бизнес-сети:</div>';
-        this.workshopUpgrades.forEach(u => {
-            const curLvl = window.state?.businessWorkshop?.[u.id] || 0;
-            const cost = Math.round(u.baseCost * Math.pow(u.costMul, curLvl));
-            const isMax = curLvl >= u.maxLevel;
-            
-            html += `
-                <div class="glass-card mb-2" style="background:linear-gradient(135deg, rgba(13,20,36,0.95), rgba(9,14,24,0.98)); border:1px solid rgba(0,242,254,0.18); border-radius:12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-                    <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
-                        <div style="width:38px; height:38px; border-radius:10px; background:rgba(0,242,254,0.1); border:1px solid rgba(0,242,254,0.25); display:flex; align-items:center; justify-content:center; font-size:16px; color:var(--cyan); flex-shrink:0;">
-                            <i class="fa-solid ${u.fa}"></i>
-                        </div>
-                        <div style="flex:1; min-width:0;">
-                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-                                <b style="font-size:11.5px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${u.name}</b>
-                                <span class="tag-badge ${isMax ? 'bg-tag-amber' : 'bg-tag-cyan'}" style="font-size:7.5px; padding:1px 5px;">${curLvl}/${u.maxLevel} УР</span>
-                            </div>
-                            <div class="sub-label" style="font-size:9px; color:#94a3b8; line-height:1.25;">${u.desc}</div>
-                        </div>
-                    </div>
-                    <div style="flex-shrink:0;">
-                        ${!isMax ? `
-                            <button onclick="PhoneBusiness.upgradeWorkshop('${u.id}')" class="btn btn-cyan btn-sm" style="width:auto !important; min-width:115px; padding:7px 12px; font-size:10px; font-weight:700; white-space:nowrap; border-radius:8px; box-shadow:0 0 10px rgba(0,242,254,0.25);">
-                                +1 ур. (${cost.toLocaleString()} ₽)
-                            </button>
-                        ` : `
-                            <span class="tag-badge bg-tag-amber font-bold" style="padding:6px 10px; font-size:9.5px; border-radius:8px; display:inline-block;">МАКС. УР. ✓</span>
-                        `}
-                    </div>
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-    },
-
-    renderStaffTab(container) {
-        let html = '<div class="sub-label mb-2 px-1" style="font-size:10px;">Найм специалистов для снижения расходов и автоматизации:</div>';
-        this.staffList.forEach(s => {
-            const hired = window.state?.businessStaff?.[s.id] || 0;
-            const isFull = hired >= s.maxHired;
-            
-            html += `
-                <div class="glass-card mb-2" style="background:linear-gradient(135deg, rgba(13,20,36,0.95), rgba(9,14,24,0.98)); border:1px solid rgba(192,132,252,0.2); border-radius:12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-                    <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
-                        <div style="width:38px; height:38px; border-radius:10px; background:rgba(192,132,252,0.12); border:1px solid rgba(192,132,252,0.3); display:flex; align-items:center; justify-content:center; font-size:16px; color:#c084fc; flex-shrink:0;">
-                            <i class="fa-solid ${s.fa}"></i>
-                        </div>
-                        <div style="flex:1; min-width:0;">
-                            <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
-                                <b style="font-size:11.5px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.name}</b>
-                                <span class="tag-badge bg-tag-purple" style="font-size:7.5px; padding:1px 5px;">${hired}/${s.maxHired}</span>
-                            </div>
-                            <div class="sub-label" style="font-size:9px; color:#c084fc; font-weight:600; margin-bottom:1px;">${s.perk}</div>
-                            <div class="sub-label" style="font-size:8.5px; color:#64748b;">Оклад: ${s.salary.toLocaleString()} ₽/мес</div>
-                        </div>
-                    </div>
-                    <div style="flex-shrink:0;">
-                        <button onclick="PhoneBusiness.hireStaff('${s.id}')" class="btn btn-purple btn-sm" ${isFull ? 'disabled' : ''} style="width:auto !important; min-width:110px; padding:7px 12px; font-size:10px; font-weight:700; white-space:nowrap; border-radius:8px; ${isFull ? 'opacity:0.5;' : 'box-shadow:0 0 10px rgba(192,132,252,0.25);'}">
-                            ${isFull ? 'Штат полон' : `Нанять (${(s.salary/1000).toFixed(0)}k ₽)`}
-                        </button>
-                    </div>
-                </div>
-            `;
-        });
-        container.innerHTML = html;
-    },
-
     renderCorporationTab(container) {
         container.innerHTML = `
             <div class="glass-card p-3 text-center">
@@ -1145,6 +1193,104 @@ const PhoneBusiness = {
                 </div>
             </div>
         `;
+    },
+
+    // ========================================================
+    // ДЕЙСТВИЯ, КАССА И КРИЗИСЫ
+    // ========================================================
+    _maybeTriggerCrisisEvent() {
+        const events = this.CRISIS_EVENTS;
+        if (!Array.isArray(events) || events.length === 0) return false;
+
+        const ownedBiz = (window.state?.businesses || []).filter(b => b && b.level > 0);
+        if (ownedBiz.length === 0) return false;
+
+        if (Math.random() > 0.12) return false;
+
+        const rollEv = events[Math.floor(Math.random() * events.length)];
+        this.openCrisisModal(rollEv);
+        return true;
+    },
+
+    openCrisisModal(crisis) {
+        let modal = document.getElementById('modalBizCrisis');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalBizCrisis';
+            modal.className = 'modal-overlay';
+            document.body.appendChild(modal);
+        }
+
+        let optionsHtml = '';
+        (crisis.options || []).forEach((opt, idx) => {
+            optionsHtml += `
+                <button onclick="PhoneBusiness.resolveCrisisAction(${idx}, '${crisis.id}')" class="btn btn-dark btn-sm w-full mb-2 text-left" style="padding: 8px 10px; font-size: 10px; line-height: 1.35;">
+                    <i class="fa-solid fa-chevron-right color-cyan mr-1"></i> ${opt.text}
+                </button>
+            `;
+        });
+
+        modal.innerHTML = `
+            <div class="modal-box text-center" style="max-width: 410px; border-color: var(--amber); background: radial-gradient(circle at 50% 0%, #1c1524 0%, #070a10 85%);">
+                <div class="radar-spinner-ring mb-2" style="border-top-color: var(--amber); border-right-color: var(--red); margin: 0 auto 10px auto;">
+                    <div class="radar-spinner-center" style="font-size:24px;">🚨</div>
+                </div>
+
+                <div class="modal-glow-badge mb-1" style="color:var(--amber); border-color:var(--amber); background:rgba(255,179,0,0.1); display:inline-block;">
+                    ВНЕПЛАНОВАЯ СИТУАЦИЯ
+                </div>
+
+                <h3 class="font-bold mb-1 color-amber" style="font-size:15px;">${crisis.title}</h3>
+                <p class="sub-label mb-3" style="font-size:10.5px; line-height:1.4; color:#cbd5e1; padding: 0 4px;">
+                    ${crisis.desc}
+                </p>
+
+                <div class="space-y-1">
+                    ${optionsHtml}
+                </div>
+            </div>
+        `;
+
+        if (typeof ModalManager !== 'undefined') {
+            ModalManager.open('modalBizCrisis', { closeOthers: true });
+        } else {
+            modal.classList.add('active');
+        }
+        if (window.AudioFx) { window.AudioFx.play('error'); window.AudioFx.haptic('warning'); }
+    },
+
+    resolveCrisisAction(optIdx, crisisId) {
+        const events = this.CRISIS_EVENTS;
+        const crisis = events.find(e => e.id === crisisId);
+        if (!crisis || !crisis.options || !crisis.options[optIdx]) return;
+
+        const opt = crisis.options[optIdx];
+        const p = window.state?.player || {};
+
+        if (opt.costCash && (p.cash || 0) < opt.costCash) {
+            return showToast(`Не хватает ${opt.costCash.toLocaleString()} ₽!`);
+        }
+        if (opt.costConn && (p.connections || 0) < opt.costConn) {
+            return showToast(`Не хватает связей 🤝 с Решалой!`);
+        }
+        if (opt.reqBiz) {
+            const hasBiz = (window.state?.businesses || []).some(b => b.id === opt.reqBiz && b.level > 0);
+            if (!hasBiz) return showToast("У вас нет службы эвакуации!");
+        }
+
+        if (opt.costCash) {
+            p.cash -= opt.costCash;
+            if (typeof logBankTransaction === 'function') logBankTransaction(`Инцидент: ${crisis.title}`, opt.costCash, false);
+        }
+        if (opt.costConn) p.connections -= opt.costConn;
+        if (opt.penaltyMood) p.mood = Math.max(10, (p.mood || 85) - opt.penaltyMood);
+        if (opt.bonusKarma) p.karma = Math.min(100, (p.karma || 50) + opt.bonusKarma);
+
+        if (typeof ModalManager !== 'undefined') ModalManager.close('modalBizCrisis');
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+        showToast("Инцидент благополучно урегулирован!");
     },
 
     upgradePoint(bizId) {
@@ -1303,55 +1449,6 @@ const PhoneBusiness = {
         if (typeof updateHeaderUI === 'function') updateHeaderUI();
         if (window.AudioFx) window.AudioFx.play('tick');
         showToast(`Сырьё пополнено до 100%`);
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    upgradeWorkshop(branch) {
-        const u = this.workshopUpgrades.find(x => x.id === branch);
-        if (!u) return;
-        const curLvl = window.state?.businessWorkshop?.[branch] || 0;
-        const cost = Math.round(u.baseCost * Math.pow(u.costMul, curLvl));
-        if ((window.state?.player?.cash || 0) < cost) return showToast(`Нужно ${cost.toLocaleString()} ₽!`);
-
-        window.state.player.cash -= cost;
-        window.state.businessWorkshop[branch] = curLvl + 1;
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('win');
-        showToast(`🛠 ${u.name}: ур. ${curLvl + 1}!`);
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    hireStaff(staffId) {
-        const s = this.staffList.find(x => x.id === staffId);
-        if (!s) return;
-        const hired = window.state?.businessStaff?.[staffId] || 0;
-        if (hired >= s.maxHired) return;
-        if ((window.state?.player?.cash || 0) < s.salary) return showToast(`Нужно ${s.salary.toLocaleString()} ₽!`);
-
-        window.state.player.cash -= s.salary;
-        window.state.businessStaff[staffId] = hired + 1;
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('win');
-        showToast(`👤 Нанят: ${s.name}`);
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    buyFleetVehicle(vehId) {
-        const v = this.fleetVehicles.find(x => x.id === vehId);
-        if (!v) return;
-        if ((window.state?.player?.cash || 0) < v.cost) return showToast(`Нужно ${v.cost.toLocaleString()} ₽!`);
-
-        window.state.player.cash -= v.cost;
-        window.state.businessFleet.push(vehId);
-
-        if (typeof saveState === 'function') saveState();
-        if (typeof updateHeaderUI === 'function') updateHeaderUI();
-        if (window.AudioFx) window.AudioFx.play('win');
-        showToast(`🚚 Куплено: ${v.name}`);
         this.render(document.getElementById('phoneAppContainer'));
     },
 
