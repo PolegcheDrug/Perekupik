@@ -1,12 +1,11 @@
 // ========================================================
-// js/m-hub/m-leaderboard.js — ОБЩАЯ СЕТЬ ИГРОКОВ M+ (v3.2.0 LIVE & SOCIAL)
+// js/m-hub/m-leaderboard.js — ОБЩАЯ СЕТЬ ИГРОКОВ M+ (v3.3.0 SAFE-NAV & CHAT)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.2.0 (СИНХРОНИЗАЦИЯ ДРУЖБЫ И СТАТУСОВ ЗАЯВОК):
-//   - Полная интеграция с FB_FriendshipsManager (v1.3.0).
-//   - Отображение точных статусов: "Дружить", "Ожидает", "Принять", "Друг".
-//   - Автопринятие встречных заявок без конфликта "Заявка уже отправлена".
-//   - Быстрый переход в шторку реплик или офферов прямо из топа.
+// ⭐ v3.3.0:
+//   - ФИКС НАВИГАЦИИ: рендер топа изолирован и больше НЕ затирает верхние табы социума.
+//   - ПЕРЕХОД В ЧАТ: клик по кнопке "Друг" сразу открывает экран переписки с быстрым чатом и офферами.
+//   - СОХРАНЕНО: живые игроки из Firestore, сортировки, пагинация и вызовы на 402м.
 // ========================================================
 
 const MLeaderboardModule = {
@@ -22,6 +21,16 @@ const MLeaderboardModule = {
     _unsubscribeFriendships: null,
     _unsubscribeLeaderboard: null,
 
+    // Вспомогательный селектор: всегда рендеримся только во внутренний контентный бокс
+    _getTargetContainer(passedContainer) {
+        if (passedContainer && passedContainer.id !== 'phoneAppContainer' && passedContainer.id !== 'autodrotScreenContent') {
+            return passedContainer;
+        }
+        return document.getElementById('mSocialContentBox') || 
+               document.getElementById('mHubSubContentBox') || 
+               passedContainer;
+    },
+
     // ====================================================
     // ЗАГРУЗКА СПИСКА ИГРОКОВ ИЗ FIRESTORE
     // ====================================================
@@ -33,7 +42,6 @@ const MLeaderboardModule = {
         this.isLoading = true;
         let players = [];
 
-        // 1. Читаем реальных игроков из Firebase
         try {
             let sortField = 'netWorth';
             if (this.sortBy === 'profit') sortField = 'profit';
@@ -64,7 +72,6 @@ const MLeaderboardModule = {
             console.warn("[MLeaderboard] Ошибка загрузки облачного топа:", e);
         }
 
-        // 2. Добавляем текущего игрока
         const myUid = String(window.state?.player?.uid || window.tgUserId || "me");
         const myName = window.state?.player?.name || "Перекуп #777";
         const myLvl = Number(window.state?.player?.level) || 1;
@@ -102,7 +109,6 @@ const MLeaderboardModule = {
             existingMe.level = Math.max(existingMe.level, myLvl);
         }
 
-        // 3. Подмешиваем минимальных ботов, если живых игроков мало
         if (players.length < 3) {
             const seedNames = [
                 { name: "Синдикат_VIP", lvl: 45, car: "Porsche 911 Turbo", profit: 15000000, net: 26000000 },
@@ -229,9 +235,9 @@ const MLeaderboardModule = {
                     pending.forEach(p => {
                         if (p && p.id) this.friendshipStatuses[String(p.id)] = 'pending_in';
                     });
-                    const box = document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
-                    if (box && window.AppM?.socialSubTab === 'top') {
-                        this._renderUI(box);
+                    const target = this._getTargetContainer();
+                    if (target && window.AppM?.socialSubTab === 'top') {
+                        this._renderUI(target);
                     }
                 });
             } catch (e) {}
@@ -258,10 +264,10 @@ const MLeaderboardModule = {
     },
 
     // ====================================================
-    // ОТРИСОВКА ИНТЕРФЕЙСА
+    // ОТРИСОВКА ИНТЕРФЕЙСА (БЕЗОПАСНАЯ ДЛЯ НАВИГАЦИИ)
     // ====================================================
     async renderScreen(container) {
-        const target = container || document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
+        const target = this._getTargetContainer(container);
         if (!target) return;
 
         if (this.cachedPlayers.length > 0) {
@@ -282,6 +288,8 @@ const MLeaderboardModule = {
     },
 
     _renderUI(target) {
+        if (!target) return;
+
         const sorted = this.getSortedPlayers();
         const totalPlayers = sorted.length;
         const totalPages = Math.ceil(totalPlayers / this.pageSize) || 1;
@@ -325,9 +333,10 @@ const MLeaderboardModule = {
                 const status = this.friendshipStatuses[otherUid] || 'none';
 
                 if (status === 'friend') {
+                    // Клик сразу открывает полноценный чат с этим другом
                     friendBtn = `
-                        <button onclick="AppM.openQuickPhrasePicker('${otherUid}', '${this._escapeAttr(p.name)}')" class="btn btn-dark btn-sm btn-auto" style="padding:4px 8px; font-size:8.5px; border-color:var(--green); color:var(--green);">
-                            <i class="fa-solid fa-check mr-1"></i> Друг
+                        <button onclick="AppM.openFriendChat('${otherUid}', '${this._escapeAttr(p.name)}')" class="btn btn-dark btn-sm btn-auto" style="padding:4px 8px; font-size:8.5px; border-color:var(--green); color:var(--green);">
+                            <i class="fa-solid fa-comments mr-1"></i> Чат
                         </button>`;
                 } else if (status === 'pending_out') {
                     friendBtn = `
@@ -451,7 +460,7 @@ const MLeaderboardModule = {
                 this.friendshipStatuses[String(targetUid)] = 'friend';
                 if (typeof window.saveState === 'function') window.saveState();
                 showToast(`🤝 ${targetName} добавлен в друзья!`);
-                this._renderUI(document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox'));
+                this._renderUI(this._getTargetContainer());
                 return;
             }
 
@@ -470,8 +479,7 @@ const MLeaderboardModule = {
             setTimeout(() => this._processedFriendRequests.delete(targetUid), 1500);
         }
 
-        const box = document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
-        if (box) this._renderUI(box);
+        this._renderUI(this._getTargetContainer());
     },
 
     async cancelFriendRequest(targetUid) {
@@ -491,8 +499,7 @@ const MLeaderboardModule = {
             showToast("❌ Ошибка отмены заявки");
         }
 
-        const box = document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
-        if (box) this._renderUI(box);
+        this._renderUI(this._getTargetContainer());
     },
 
     async acceptFriendRequestFromLeaderboard(targetUid, targetName) {
@@ -512,8 +519,7 @@ const MLeaderboardModule = {
             console.warn('[MLeaderboard] acceptFriendRequest error:', e);
         }
 
-        const box = document.getElementById('mHubSubContentBox') || document.getElementById('mSocialContentBox');
-        if (box) this._renderUI(box);
+        this._renderUI(this._getTargetContainer());
     },
 
     challengePlayer(targetName) {
@@ -550,4 +556,4 @@ const MLeaderboardModule = {
 
 window.MLeaderboardModule = MLeaderboardModule;
 
-console.log('[🏆 m-leaderboard v3.2.0] Связка со статусами дружбы + Quick Chat ✓');
+console.log('[🏆 m-leaderboard v3.3.0] Безопасная навигация без затирания табов + Прямой вход в чат ✓');
