@@ -1,19 +1,12 @@
 // ========================================================
-// js/app/app-loader.js — ЗАГРУЗЧИК, АВТОРИЗАЦИЯ, HUD (v4.6.0)
+// js/app/app-loader.js — ЗАГРУЗЧИК, АВТОРИЗАЦИЯ, HUD (v4.7.0 CLOUD-FIRST)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v4.6.0 (ИНТЕРАКТИВНЫЙ СПЛЭШ-СКРИН & СИНХРОНИЗАЦИЯ ПРОФИЛЯ):
-//   - Внедрена прямая связка с window.AppLoadingManager:
-//       • 78%: Авторизация Telegram и проверка прав доступа.
-//       • 86%: Восстановление прогресса из облака Firestore.
-//       • 96%: Подготовка гаража, HUD и курса валют.
-//       • 100%: Плавный finish() только после отрисовки реального профиля.
-//   - Защита от показа дефолтного шаблона («Перекуп #777» и 150 000 ₽).
-// ⭐ v4.5.0 (ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР):
-//   - Добавлен вызов HudRevolver.init() после дублирования статов.
-//   - Теперь HUD можно листать пальцем с вибрацией.
-//   - Порядок: updateHeaderUI → _cloneStatsRow → HudRevolver.init.
-// ⭐ v4.3.1 (ФИКС ДУБЛИРОВАНИЯ ЗАГРУЗЧИКА):
-//   - Очередью скриптов управляет ТОЛЬКО index.html.
+// ⭐ v4.7.0 (СИСТЕМА CLOUD-FIRST & УПРАВЛЯЕМЫЙ ГЛОБАЛЬНЫЙ ВАЙП):
+//   - Реверс приоритета: при наличии сети данные ВСЕГДА берутся из Firebase Firestore.
+//   - LocalStorage используется строго как оффлайн-кэш на случай обрыва связи.
+//   - Проверка глобального server_epoch: при вайпе через DEV-приложение
+//     прогресс игрока автоматически обнуляется без ручной чистки кэша на телефоне.
+//   - Публикация данных в Leaderboard Firestore при загрузке и сохранении.
 // ========================================================
 
 let _notificationUnsubscribe = null;
@@ -245,7 +238,7 @@ function updateOnlineStatus(online) {
         banner.classList.toggle('visible', !online);
     }
     if (!online && typeof showToast === 'function') {
-        showToast('⚠️ Потеряно соединение с сетью', 'warning');
+        showToast('⚠️ Потеряно соединение с сетью. Данные сохраняются локально.', 'warning');
     }
 }
 
@@ -407,14 +400,14 @@ function _cloneStatsRow() {
         });
 
         row.dataset.cloned = '1';
-        console.log('[App] ✅ Stats-row клонирован для marquee (всего элементов:', row.children.length, ')');
+        console.log('[App] ✅ Stats-row клонирован для marquee');
     } catch (e) {
         console.warn('[App] Ошибка клонирования stats-row:', e);
     }
 }
 
 // ========================================================
-// 8. ИНИЦИАЛИЗАЦИЯ С ACCESS CONTROL
+// 8. CLOUD-FIRST АВТОРИЗАЦИЯ, ВАЙП И ЗАГРУЗКА СОСТОЯНИЯ
 // ========================================================
 async function initTelegramAuthAndStorage(callback) {
     let callbackCalled = false;
@@ -426,9 +419,9 @@ async function initTelegramAuthAndStorage(callback) {
     };
 
     const watchdogTimer = setTimeout(() => {
-        console.warn("[App] Watchdog инициализации сработал.");
+        console.warn("[App] Watchdog инициализации сработал (таймаут сети).");
         safeCallback();
-    }, 3000);
+    }, 4500);
 
     // ─── ЭТАП 1: Telegram ───
     if (window.AppLoadingManager) {
@@ -493,15 +486,6 @@ async function initTelegramAuthAndStorage(callback) {
                 console.warn('[App] ❌ Доступ запрещён:', accessRes?.reason || 'unknown');
                 clearTimeout(watchdogTimer);
                 showAccessDeniedScreen();
-
-                const reason = accessRes?.reason || '';
-                let msg = 'Требуется приглашение';
-                let type = 'warning';
-                if (reason === 'banned') { msg = '🚫 Вы забанены владельцем игры'; type = 'error'; }
-                else if (reason === 'not_whitelisted') { msg = '🔒 Игра доступна только по приглашению'; type = 'warning'; }
-                else if (reason === 'offline_no_cache') { msg = '⚠️ Нет сети и нет сохранённого доступа'; type = 'warning'; }
-
-                setTimeout(() => { if (typeof showToast === 'function') showToast(msg, type); }, 500);
                 return;
             }
 
@@ -509,18 +493,15 @@ async function initTelegramAuthAndStorage(callback) {
             if (accessRes.isOwner) {
                 console.log('[App] 👑 Владелец игры обнаружен');
             }
-        } else {
-            console.warn('[App] ⚠️ AccessControl не загружен — пропускаем проверку');
         }
     } catch (e) {
-        console.warn('[App] Ошибка AccessControl, продолжаем (fallback):', e);
+        console.warn('[App] Ошибка AccessControl, продолжаем:', e);
     }
 
     // ─── ЭТАП 4: Firebase Auth ───
     if (window.FB_Bridge?.Auth) {
         try {
-            const authRes = await window.FB_Bridge.Auth.initSession();
-            console.log('[Auth] initSession результат:', authRes);
+            await window.FB_Bridge.Auth.initSession();
         } catch (e) {
             console.warn('[Auth] initSession упал:', e);
         }
@@ -530,23 +511,85 @@ async function initTelegramAuthAndStorage(callback) {
         window.FB_Bridge.Auth._forceVerifiedUserId(window.tgUserId);
     }
 
-    // ─── ЭТАП 5: Сейв ───
+    // ─── ЭТАП 5: CLOUD-FIRST ЗАГРУЗКА И ПРОВЕРКА ВАЙПА ───
     if (window.AppLoadingManager) {
-        window.AppLoadingManager.setProgress(86, "Синхронизация гаража и сейвов...");
+        window.AppLoadingManager.setProgress(86, "Синхронизация с сервером...");
     }
 
-    const hadLocalSave = typeof loadFromLocalStorage === 'function' ? loadFromLocalStorage() : false;
+    let loadedFromCloud = false;
 
-    if (!hadLocalSave && !window.isPcDevMode() && window.FB_Bridge?.Players?.pullSave) {
+    if (!window.isPcDevMode() && window.FB_Bridge?.Players?.pullSave) {
         try {
+            // 1. Получаем глобальный server_epoch из Firebase (проверка глобального вайпа)
+            let serverWipeEpoch = 1;
+            if (window.FB_Bridge?.System?.getServerEpoch) {
+                try {
+                    serverWipeEpoch = await window.FB_Bridge.System.getServerEpoch();
+                } catch (e) {}
+            }
+
+            // 2. Читаем облачный сейв
             const cloudSave = await window.FB_Bridge.Players.pullSave(window.tgUserId);
-            if (cloudSave && typeof applyLoadedState === 'function') {
-                applyLoadedState(cloudSave);
-                console.log("[Cloud] Прогресс восстановлен из Firestore");
-                showToast("☁️ Прогресс синхронизирован из облака!", 'success');
+
+            if (cloudSave) {
+                const playerEpoch = Number(cloudSave.player?.serverEpoch || cloudSave.serverEpoch || 0);
+
+                // Если администратор сделал вайп на сервере:
+                if (serverWipeEpoch > playerEpoch) {
+                    console.warn(`[Wipe] ⚠️ Обнаружен глобальный вайп сервера (Server: ${serverWipeEpoch}, Player: ${playerEpoch}). Обнуляем профиль.`);
+                    
+                    // Очищаем локальное хранилище
+                    try { localStorage.removeItem('perekup_save_' + window.tgUserId); } catch(e) {}
+                    try { localStorage.removeItem('perekup_save_guest'); } catch(e) {}
+
+                    // Сбрасываем стейт к дефолту и проставляем новую эпоху
+                    if (typeof resetStateToDefault === 'function') {
+                        resetStateToDefault();
+                    } else if (window.state?.player) {
+                        window.state.player.cash = 150000;
+                        window.state.player.level = 1;
+                        window.state.player.xp = 0;
+                        window.state.garage = [];
+                        window.state.businesses = [];
+                    }
+
+                    window.state.player.serverEpoch = serverWipeEpoch;
+                    
+                    // Перезаписываем облако чистым профилем
+                    if (window.FB_Bridge?.Players?.pushSaveForce) {
+                        await window.FB_Bridge.Players.pushSaveForce(window.tgUserId, window.state);
+                    }
+
+                    showToast("🚨 На сервере начался новый сезон! Прогресс обновлён.", "warning");
+                    loadedFromCloud = true;
+                } else {
+                    // Вайпа не было — накатываем актуальный облачный сейв
+                    if (typeof applyLoadedState === 'function') {
+                        applyLoadedState(cloudSave);
+                        window.state.player.serverEpoch = serverWipeEpoch;
+                        console.log("[Cloud] ✅ Прогресс успешно развернут из Firestore");
+                        loadedFromCloud = true;
+                    }
+                }
+            } else {
+                console.log("[Cloud] Новый игрок (документ в облаке отсутствует). Создаем облачный профиль.");
+                if (typeof resetStateToDefault === 'function') resetStateToDefault();
+                if (window.state?.player) window.state.player.serverEpoch = serverWipeEpoch;
+                if (window.FB_Bridge?.Players?.pushSaveForce) {
+                    await window.FB_Bridge.Players.pushSaveForce(window.tgUserId, window.state);
+                }
+                loadedFromCloud = true;
             }
         } catch (e) {
-            console.warn("[Cloud] Ошибка pullSave:", e);
+            console.warn("[Cloud] Сбой сетевого обращения к Firestore:", e);
+        }
+    }
+
+    // Если сеть недоступна — используем аварийный fallback на localStorage
+    if (!loadedFromCloud) {
+        console.warn("[Storage] Сеть недоступна, аварийная загрузка из LocalStorage...");
+        if (typeof loadFromLocalStorage === 'function') {
+            loadFromLocalStorage();
         }
     }
 
@@ -574,7 +617,7 @@ async function initTelegramAuthAndStorage(callback) {
         window.state.player.uid = String(window.tgUserId);
     }
 
-    // ─── ЭТАП 7: Owner — все приложения ───
+    // ─── ЭТАП 7: Owner — разблокировка всех сервисов ───
     if (window.isOwnerUser && window.isOwnerUser() && window.state && window.state.player) {
         if (!Array.isArray(window.state.player.unlockedApps)) window.state.player.unlockedApps = [];
         const allApps = ['barn', 'containers', 'autopodbor_order', 'street', 'darknet'];
@@ -583,10 +626,17 @@ async function initTelegramAuthAndStorage(callback) {
                 window.state.player.unlockedApps.push(app);
             }
         });
-        console.log('[App] 👑 Owner получил все приложения:', allApps);
+        console.log('[App] 👑 Owner получил все сервисы:', allApps);
     }
 
-    // ─── ЭТАП 8: Каталог машин из Firestore ───
+    // ─── ЭТАП 8: Публикация в таблицу лидеров ───
+    if (window.FB_Bridge?.Leaderboard?.publishEntry && !window.isPcDevMode()) {
+        try {
+            window.FB_Bridge.Leaderboard.publishEntry(window.tgUserId, window.state);
+        } catch(e) {}
+    }
+
+    // ─── ЭТАП 9: Каталог машин ───
     if (window.FB_Bridge?.CarsCatalog && !window.isPcDevMode()) {
         try { await window.FB_Bridge.CarsCatalog.seedDefaultCarsCatalog(); } catch (e) {}
     }
@@ -596,7 +646,7 @@ async function initTelegramAuthAndStorage(callback) {
 }
 
 // ========================================================
-// 9. СТАРТ
+// 9. СТАРТ И ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСА
 // ========================================================
 function initApp() {
     if (window.isPcDevMode && window.isPcDevMode()) {
@@ -641,7 +691,6 @@ function initApp() {
 
             _cloneStatsRow();
             
-            // ⭐ v4.5.0: Инициализация тактильного револьвера HUD
             if (window.HudRevolver) {
                 setTimeout(() => window.HudRevolver.init(), 100);
             }
@@ -659,11 +708,7 @@ function initApp() {
                         if (window.state.businesses && window.state.businesses.length > 0) {
                             console.log('[App] ✅ Бизнесы инициализированы:', window.state.businesses.length);
                             if (typeof saveState === 'function') saveState();
-                        } else {
-                            console.warn('[App] ❌ BUSINESS_DATA не загружен или пустой');
                         }
-                    } else {
-                        console.warn('[App] ❌ PhoneBusiness не загружен');
                     }
                 } catch (e) {
                     console.error('[App] Ошибка PhoneBusiness.ensureState:', e);
@@ -673,21 +718,10 @@ function initApp() {
             setTimeout(() => {
                 try {
                     const hasCars = window.CAR_DATABASE && Object.values(window.CAR_DATABASE).some(arr => Array.isArray(arr) && arr.length > 0);
-                    console.log('[App] 🚗 Диагностика CAR_DATABASE:',
-                        hasCars ? 'OK' : 'ПУСТО',
-                        'economy:', window.CAR_DATABASE?.economy?.length || 0,
-                        'comfort:', window.CAR_DATABASE?.comfort?.length || 0
-                    );
-
                     if (hasCars) {
                         if (typeof populateMarketFeed === 'function' && (!window.state.marketFeed || window.state.marketFeed.length === 0)) {
-                            console.log('[App] ⚡ Принудительный populateMarketFeed');
                             populateMarketFeed();
-                        } else if (window.state.marketFeed && window.state.marketFeed.length > 0) {
-                            console.log('[App] ✅ Лента рынка уже заполнена:', window.state.marketFeed.length, 'лотов');
                         }
-                    } else {
-                        console.error('[App] ❌ CAR_DATABASE пустой! Проверьте пути data/cars/*.js');
                     }
                 } catch (e) {
                     console.error('[App] Ошибка populateMarketFeed:', e);
@@ -710,7 +744,6 @@ function initApp() {
                         try { _notificationUnsubscribe(); } catch (e) {}
                     }
                     _notificationUnsubscribe = window.NotificationCenter.subscribe();
-                    console.log('[App] NotificationCenter подписка активна');
                 } catch (e) {
                     console.warn('[App] NotificationCenter init error:', e);
                 }
@@ -718,7 +751,6 @@ function initApp() {
 
             if (typeof switchTab === 'function') switchTab('tabMarket');
 
-            // ⭐ Завершаем показ шкалы загрузки: профиль и интерфейс готовы
             if (window.AppLoadingManager) {
                 window.AppLoadingManager.finish();
             }
@@ -742,4 +774,4 @@ window._processStartParam = _processStartParam;
 window.showAccessDeniedScreen = showAccessDeniedScreen;
 window.createOwnerPanelButton = createOwnerPanelButton;
 
-console.log('[💠 app-loader.js v4.6.0] Загрузчик + Авторизация + AccessControl + HUD-Револьвер + SplashScreen ✓');
+console.log('[💠 app-loader.js v4.7.0] Cloud-First + Вайп по server_epoch + Leaderboard ✓');
