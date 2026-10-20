@@ -1,13 +1,12 @@
 // ========================================================
-// js/market/market-generator.js — ГЕНЕРАТОР ЛОТОВ (v2.4.0 BALANCED)
+// js/market/market-generator.js — ГЕНЕРАТОР ЛОТОВ (v2.5.0 DEEP DIAGNOSTIC & AUTOTEKA)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v2.4.0:
-//   - Синхронизация оценки: marketValue лота сразу рассчитывается через recalculateCarMarketValue,
-//     устраняя падение цены после покупки при попадании в гараж.
-//   - Исправлена логика ЛКП: толщина >180 мкм корректно выставляет флаг isRepainted.
-//   - Скрученный пробег синхронизирован с autotekaMileageDiscrepancy.
-//   - Расширен детектор брендов для репутации (Ока, ВАЗ-классика).
-//   - Полная интеграция сезонных событий, Даркнета и P2P-лотов.
+// ⭐ v2.5.0:
+//   - ДОБАВЛЕНЫ ПАРАМЕТРЫ ТЕСТ-ДРАЙВА У КАПОТА: цвет выхлопного дыма (масложор, антифриз),
+//     шумы холодного пуска (гидрики, цепь, вкладыши), поведение КПП (пинки, хруст).
+//   - ГЛУБОКАЯ АВТОТЕКА: расчеты страховых ремонтов, история работы в такси/каршеринге,
+//     залоги МФО, ограничения ФССП, реальные фиксации пробега по базам ТО (ЕАИСТО).
+//   - Сохранена полная совместимость с оценкой гаража, ЛКП, P2P и сезонными событиями.
 // ========================================================
 
 const PLATE_LETTERS = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х'];
@@ -26,7 +25,7 @@ const CATEGORY_META = {
     yacht:    { name: "ЯХТЫ",          title: "Морской сегмент",          capital: "от 15 000 000 ₽", desc: "Элитная морская техника для настоящих автоолигархов." }
 };
 
-// ⭐ v2.3.0: БАЗОВАЯ РЕПУТАЦИЯ БРЕНДОВ (1.0 = нейтрально)
+// БАЗОВАЯ РЕПУТАЦИЯ БРЕНДОВ
 const BRAND_BASE_REPUTATION = {
     'bmw': 1.0, 'mercedes': 1.0, 'audi': 1.0, 'vw': 1.0, 'porsche': 1.0,
     'toyota': 1.0, 'nissan': 1.0, 'honda': 1.0, 'mazda': 1.0, 'subaru': 1.0,
@@ -35,7 +34,7 @@ const BRAND_BASE_REPUTATION = {
     'default': 1.0
 };
 
-// ⭐ v2.3.0: СЕЗОННЫЕ СОБЫТИЯ
+// СЕЗОННЫЕ СОБЫТИЯ
 const SEASONAL_EVENTS = [
     {
         id: 'new_year',
@@ -71,23 +70,19 @@ const SEASONAL_EVENTS = [
     }
 ];
 
-// ========================================================
 // 8 АРХЕТИПОВ ПРОДАВЦОВ
-// ========================================================
 const SELLER_ARCHETYPES = [
     { id: 'honest_grandpa', name: 'Честный дед', avatar: '👴', riskTolerance: 'low', hideDefectChance: 0.10, priceMultiplier: 0.92, patience: 6, revealDefects: true, desc: 'Ездил только летом, все косяки расскажет как есть.' },
     { id: 'cunning_perekup', name: 'Перекуп-хитрюга', avatar: '🧔', riskTolerance: 'high', hideDefectChance: 0.75, priceMultiplier: 1.08, patience: 3, revealDefects: false, desc: 'Скрывает 75% дефектов, торгуется жёстко.' },
-    { id: 'panicker', name: 'Паникёр', avatar: '😰', riskTolerance: 'low', hideDefectChance: 0.55, priceMultiplier: 0.62, patience: 2, revealDefects: false, desc: 'Продаёт срочно за долги. Скидка огромная, но 1 скрытый косяк почти гарантирован.' },
+    { id: 'panicker', name: 'Паникёр', avatar: '😰', riskTolerance: 'low', hideDefectChance: 0.55, priceMultiplier: 0.62, patience: 2, revealDefects: false, desc: 'Продаёт срочно за долги. Скидка огромная, но скрытый косяк почти гарантирован.' },
     { id: 'collector', name: 'Коллекционер', avatar: '🤵', riskTolerance: 'low', hideDefectChance: 0.15, priceMultiplier: 1.35, patience: 5, revealDefects: true, desc: 'Эксклюзивные тачки, знает цену. Торг минимальный.' },
-    { id: 'criminal', name: 'Уголовник', avatar: '🕶️', riskTolerance: 'high', hideDefectChance: 0.60, priceMultiplier: 0.75, patience: 4, revealDefects: false, desc: 'Каждый второй лот — криминал. Риск попасть в облаву.' },
+    { id: 'criminal', name: 'Уголовник', avatar: '🕶️', riskTolerance: 'high', hideDefectChance: 0.60, priceMultiplier: 0.75, patience: 4, revealDefects: false, desc: 'Каждый второй лот — криминал или распил. Риск облавы.' },
     { id: 'blogger', name: 'Блогер', avatar: '📱', riskTolerance: 'mid', hideDefectChance: 0.40, priceMultiplier: 1.20, patience: 4, revealDefects: false, desc: 'Распиаренные тачки, +20% к цене, но можно сторговать.' },
-    { id: 'pensioner', name: 'Пенсионер', avatar: '👵', riskTolerance: 'low', hideDefectChance: 0.35, priceMultiplier: 0.85, patience: 5, revealDefects: false, desc: 'Дешёво, но 100% скрутка пробега. Сканер обязателен.' },
-    { id: 'autopodbor', name: 'Автоподборщик', avatar: '🕵️', riskTolerance: 'mid', hideDefectChance: 0.30, priceMultiplier: 1.12, patience: 5, revealDefects: false, desc: 'Продаёт как «проверенное», но 30% скрытых дефектов всё равно есть.' }
+    { id: 'pensioner', name: 'Пенсионер', avatar: '👵', riskTolerance: 'low', hideDefectChance: 0.35, priceMultiplier: 0.85, patience: 5, revealDefects: false, desc: 'Дешёво, но часто крутит одометр. Сканер обязателен.' },
+    { id: 'autopodbor', name: 'Автоподборщик', avatar: '🕵️', riskTolerance: 'mid', hideDefectChance: 0.30, priceMultiplier: 1.12, patience: 5, revealDefects: false, desc: 'Продаёт как «проверенное», но скрытые нюансы всё равно есть.' }
 ];
 
-// ========================================================
 // РАЙОНЫ ГОРОДА
-// ========================================================
 const MARKET_DISTRICTS = [
     { id: 'center',     name: 'Центральный р-н',           x: 50, y: 50, radius: 12, streets: ['ул. Ленина', 'пр. Мира', 'ул. Тверская'] },
     { id: 'sleep',      name: 'Спальные микрорайоны',      x: 28, y: 35, radius: 16, streets: ['ул. Космонавтов', 'пр. Победы', 'ул. Южная'] },
@@ -115,9 +110,6 @@ function getCategoryFallback(type) {
     return "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=600&q=80";
 }
 
-// ========================================================
-// ГЕНЕРАЦИЯ ГОСНОМЕРОВ
-// ========================================================
 function generateRawNormalPlate() {
     const l1 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
     const l2 = PLATE_LETTERS[Math.floor(Math.random() * PLATE_LETTERS.length)];
@@ -175,9 +167,6 @@ function refreshPlateCatalog() {
     }
 }
 
-// ========================================================
-// РЕПУТАЦИЯ БРЕНДА
-// ========================================================
 function _ensureBrandReputation() {
     if (!window.state) window.state = {};
     if (!window.state.brandReputation) {
@@ -188,9 +177,6 @@ function _ensureBrandReputation() {
     }
 }
 
-/**
- * Определяет бренд по названию машины с улучшенным распознаванием отечественных авто.
- */
 function _detectBrand(carName) {
     if (!carName) return 'default';
     const lower = String(carName).toLowerCase();
@@ -234,14 +220,9 @@ function updateBrandReputationAfterSale(carName, isCleanSale) {
     }
 
     window.state.brandReputation[brand] = parseFloat(current.toFixed(2));
-    console.log(`[Reputation] Бренд ${brand.toUpperCase()}: ${window.state.brandReputation[brand]}`);
-
     if (typeof saveState === 'function') saveState();
 }
 
-// ========================================================
-// СЕЗОННЫЕ СОБЫТИЯ
-// ========================================================
 function _ensureGlobalEvent() {
     if (!window.state) window.state = {};
     if (window.state.globalEvent && window.state.globalEvent.isActive && window.state.globalEvent.daysLeft > 0) {
@@ -260,7 +241,6 @@ function _ensureGlobalEvent() {
         daysLeft: ev.durationDays,
         startedAt: Date.now()
     };
-    console.log(`[Event] Активировано сезонное событие: ${ev.name}`);
 }
 
 function getSeasonMultiplier(carType) {
@@ -333,7 +313,7 @@ function getUnlockedCategoriesForMarket() {
 }
 
 // ========================================================
-// ГЕНЕРАЦИЯ ДЕФЕКТОВ
+// ГЕНЕРАЦИЯ ДЕФЕКТОВ, АВТОТЕКИ И ТЕСТ-ДРАЙВА (v2.5.0)
 // ========================================================
 function generateCarDefects(car, seller, isBeaterProject) {
     const result = {
@@ -343,12 +323,12 @@ function generateCarDefects(car, seller, isBeaterProject) {
         inspectionStatus: {
             visual: false, gauge: false, obd: false,
             endoscope: false, compression: false,
-            autoteka: false, autotekaPro: false, expert: false
+            autoteka: false, autotekaPro: false, expert: false,
+            coldStart: false, testDrive: false
         }
     };
 
     if (typeof MECHANICAL_DEFECTS === 'undefined' || !Array.isArray(MECHANICAL_DEFECTS)) {
-        console.warn('[Market] MECHANICAL_DEFECTS не найден — fallback на OBD_ERRORS');
         if (typeof OBD_ERRORS !== 'undefined' && Array.isArray(OBD_ERRORS) && OBD_ERRORS.length > 0) {
             const defectChance = isBeaterProject ? 0.85 : 0.28;
             if (Math.random() < defectChance) {
@@ -428,11 +408,13 @@ function generateCarDefects(car, seller, isBeaterProject) {
             }
         });
 
+        // ЮРИДИЧЕСКИЕ ДЕФЕКТЫ (Базы ГИБДД, ФССП, Банки)
         if (typeof LEGAL_DEFECTS !== 'undefined' && Array.isArray(LEGAL_DEFECTS)) {
-            let legalChance = 0.20;
-            if (seller && seller.id === 'criminal') legalChance = 0.65;
-            if (seller && seller.id === 'honest_grandpa') legalChance = 0.05;
-            if (isBeaterProject) legalChance += 0.10;
+            let legalChance = 0.22;
+            if (seller && seller.id === 'criminal') legalChance = 0.70;
+            if (seller && seller.id === 'panicker') legalChance = 0.50;
+            if (seller && seller.id === 'honest_grandpa') legalChance = 0.04;
+            if (isBeaterProject) legalChance += 0.15;
 
             if (Math.random() < legalChance) {
                 const legalPool = LEGAL_DEFECTS.filter(d => Math.random() < d.probability * 3);
@@ -458,26 +440,17 @@ async function populateMarketFeed() {
     _ensureGlobalEvent();
 
     const isDev = (typeof window.isPcDevMode === 'function') ? window.isPcDevMode() : false;
-    if (isDev) console.log('[Market] DEV-режим: генерация локальная, без Firestore');
 
     if (!isDev) {
         try {
             if (window.FB_Bridge && window.FB_Bridge.CarsCatalog) {
                 await window.FB_Bridge.CarsCatalog.fetchCloudCars();
             }
-        } catch (e) {
-            console.warn("[Market] Ошибка Cloud Cars (не критично):", e);
-        }
+        } catch (e) {}
     }
 
     if (typeof CAR_DATABASE === 'undefined' || !CAR_DATABASE || typeof CAR_DATABASE !== 'object') {
         console.error('[Market] ❌ CAR_DATABASE не загружен!');
-        return;
-    }
-
-    const totalCars = Object.keys(CAR_DATABASE).reduce((sum, k) => sum + (Array.isArray(CAR_DATABASE[k]) ? CAR_DATABASE[k].length : 0), 0);
-    if (totalCars === 0) {
-        console.error('[Market] ❌ CAR_DATABASE пустой');
         return;
     }
 
@@ -493,11 +466,8 @@ async function populateMarketFeed() {
         } else {
             pool = (CAR_DATABASE[cat] && CAR_DATABASE[cat].length > 0) ? CAR_DATABASE[cat] : (CAR_DATABASE.economy || []);
         }
-        if (!pool || pool.length === 0) {
-            pool = CAR_DATABASE.economy || [];
-        }
+        if (!pool || pool.length === 0) pool = CAR_DATABASE.economy || [];
     } catch (e) {
-        console.error('[Market] Ошибка выбора пула:', e);
         pool = CAR_DATABASE.economy || [];
     }
 
@@ -510,7 +480,7 @@ async function populateMarketFeed() {
     state.marketFeed = [];
     state.marketFeedVersion = (state.marketFeedVersion || 0) + 1;
 
-    // Интеграция P2P-лотов игроков
+    // Интеграция P2P лотов игроков
     try {
         if (state.p2pMarketListings && state.p2pMarketListings.length > 0) {
             state.p2pMarketListings.forEach(p2pLot => {
@@ -523,7 +493,6 @@ async function populateMarketFeed() {
                             id: p2pLot.id || ("p2p_feed_" + Date.now()),
                             isP2PUserListing: true,
                             sellerPlayerName: p2pLot.sellerName || "Игрок P2P",
-                            sellerNickEffectClass: p2pLot.sellerNickEffect || "nick-fx-lightning",
                             name: p2pLot.name,
                             power: p2pCarData.power || 100,
                             type: carType,
@@ -541,11 +510,8 @@ async function populateMarketFeed() {
                             plate: p2pCarData.plate || "О777ОО 77",
                             isStolen: false, isMuseumStock: false, isTunedSpec: true, isBeaterProject: false,
                             autotekaChecked: true,
-                            cooldownUntil: 0,
                             hagglePatience: 4, maxHagglePatience: 4,
-                            sellerArchetype: "calm",
                             dealType: "p2p",
-                            unavailable: false,
                             sellerNote: `«Автомобиль выставлен игроком ${p2pLot.sellerName || 'на P2P бирже'}.»`,
                             sellerMoodIcon: "💼",
                             condition: p2pCarData.condition || 85,
@@ -554,15 +520,14 @@ async function populateMarketFeed() {
                             bodyThickness: p2pCarData.bodyThickness || { hood: 110, roof: 100, doors: 115, wings: 110 },
                             districtId: p2pGeo.districtId, districtName: p2pGeo.districtName,
                             address: p2pGeo.address, mapX: p2pGeo.mapX, mapY: p2pGeo.mapY,
+                            exhaustSmoke: "clean", engineNoise: "quiet", gearboxBehavior: "smooth",
                             mechanicalDefects: [], legalDefect: null, inspectionStatus: {}
                         });
                     }
                 }
             });
         }
-    } catch (e) {
-        console.warn('[Market] Ошибка P2P лотов:', e);
-    }
+    } catch (e) {}
 
     const feedCount = Math.min(12, Math.max(8, shuffledPool.length));
 
@@ -572,9 +537,6 @@ async function populateMarketFeed() {
             newsEvents = MARKET_NEWS_EVENTS;
         }
     } catch (e) {}
-
-    let generatedCount = 0;
-    let errorCount = 0;
 
     for (let i = 0; i < feedCount; i++) {
         try {
@@ -587,7 +549,7 @@ async function populateMarketFeed() {
             let isMuseumStock = false, isTunedSpec = false, isBeaterProject = false, isUrgentDeal = false;
 
             const hasAutopodbor = (state.businesses || []).some(b => b.id === 'autopodbor' && b.level > 0);
-            const econConfig = window.MARKET_ECONOMY_CONFIG || { urgentSaleChance: 0.08, hiddenDefectChance: 0.28 };
+            const econConfig = window.MARKET_ECONOMY_CONFIG || { urgentSaleChance: 0.08 };
             let urgentThreshold = hasAutopodbor ? 0.22 : (econConfig.urgentSaleChance || 0.08);
 
             if (Math.random() < urgentThreshold) {
@@ -618,7 +580,6 @@ async function populateMarketFeed() {
             let baseP = template.basePrice ? template.basePrice : 100000;
             let tType = template.type ? template.type : cat;
 
-            // Репутация бренда + сезонный ивент
             const brandReputation = getBrandReputation(template.name);
             const seasonMult = getSeasonMultiplier(tType);
 
@@ -638,21 +599,29 @@ async function populateMarketFeed() {
             let rawImg = "";
             let carGallery = [];
             if (Array.isArray(template.images) && template.images.length > 0) {
-                const randImgIdx = Math.floor(Math.random() * template.images.length);
-                rawImg = template.images[randImgIdx];
+                rawImg = template.images[Math.floor(Math.random() * template.images.length)];
                 carGallery = [...template.images];
             } else {
                 rawImg = template.img || "assets/cars/economy/2101/vaz-2101.jpg";
                 carGallery = [rawImg];
             }
-            let cFallback = template.fallback || getCategoryFallback(tType);
 
             let cCond = isMuseumStock ? Math.floor(92 + Math.random() * 8) : (isBeaterProject ? Math.floor(35 + Math.random() * 20) : Math.floor(65 + Math.random() * 25));
             let isThickDoors = isBeaterProject ? 380 : (isMuseumStock ? 105 : (Math.random() > 0.4 ? 240 : 115));
             let isThickHood  = isBeaterProject ? 340 : (isMuseumStock ? 110 : (Math.random() > 0.5 ? 260 : 110));
             let engWear   = isMuseumStock ? 95 : (isBeaterProject ? Math.floor(25 + Math.random() * 25) : Math.floor(70 + Math.random() * 25));
             let transWear = isMuseumStock ? 95 : (isBeaterProject ? Math.floor(30 + Math.random() * 25) : Math.floor(75 + Math.random() * 20));
-            let mileageVal = isMuseumStock ? Math.floor(18000 + Math.random() * 25000) : (isBeaterProject ? Math.floor(180000 + Math.random() * 70000) : Math.floor(65000 + Math.random() * 60000));
+            
+            // Пробег на одометре vs Реальный пробег
+            let actualMileage = isMuseumStock 
+                ? Math.floor(18000 + Math.random() * 25000) 
+                : (isBeaterProject ? Math.floor(280000 + Math.random() * 150000) : Math.floor(110000 + Math.random() * 90000));
+            
+            const isRolledOdo = seller.id === 'pensioner' || (isBeaterProject && Math.random() < 0.65) || (Math.random() < 0.25);
+            let displayedMileage = actualMileage;
+            if (isRolledOdo) {
+                displayedMileage = Math.max(45000, Math.round(actualMileage * (0.35 + Math.random() * 0.25)));
+            }
 
             const firstNames = ["Игорь", "Сергей", "Владимир", "Алексей", "Дмитрий", "Андрей", "Михаил", "Максим"];
             const lastNames  = ["Петров", "Кузнецов", "Смирнов", "Морозов", "Васильев", "Новиков", "Фёдоров"];
@@ -683,39 +652,112 @@ async function populateMarketFeed() {
             const carForDefects = { condition: cCond, type: tType };
             const defectsResult = generateCarDefects(carForDefects, seller, isBeaterProject);
 
-            let cName = template.name ? template.name : "Техника";
-            let cPower = template.power ? template.power : 100;
+            // ====================================================
+            // СИМПТОМЫ ДЛЯ ТЕСТ-ДРАЙВА И ХОЛОДНОГО ПУСКА (v2.5.0)
+            // ====================================================
+            let exhaustSmoke = "clean"; // clean | blue | white | black
+            let engineNoise = "quiet";  // quiet | lifters | timing_chain | rod_knock
+            let gearboxBehavior = "smooth"; // smooth | kick_2nd | sync_crunch | clutch_slip
 
-            let isBlackMarketCandidate = false;
-            if (defectsResult.legalDefect) {
-                isBlackMarketCandidate = true;
-            } else if (isBeaterProject && Math.random() < 0.35) {
-                isBlackMarketCandidate = true;
+            if (engWear < 40 || (isBeaterProject && Math.random() < 0.5)) {
+                exhaustSmoke = Math.random() < 0.7 ? "blue" : "white";
+                engineNoise = Math.random() < 0.6 ? "rod_knock" : "lifters";
+            } else if (engWear < 65) {
+                if (Math.random() < 0.4) exhaustSmoke = "blue";
+                if (Math.random() < 0.5) engineNoise = "timing_chain";
             }
 
-            const isRolledOdo = seller.id === 'pensioner' || (isBeaterProject && Math.random() < 0.45);
+            if (transWear < 45 || (isBeaterProject && Math.random() < 0.45)) {
+                gearboxBehavior = Math.random() < 0.6 ? "kick_2nd" : "sync_crunch";
+            } else if (transWear < 70 && Math.random() < 0.35) {
+                gearboxBehavior = "clutch_slip";
+            }
+
+            // ====================================================
+            // ПОЛНАЯ АВТОТЕКА PRO (ОТЧЕТЫ, ДТП, ТАКСИ, ЗАЛОГИ)
+            // ====================================================
+            const vinCode = "XTA" + Math.floor(10000000000000 + Math.random() * 90000000000000);
+            const isTaxiCar = (defectsResult.legalDefect?.id === 'legal_taxi_former') || (isBeaterProject && Math.random() < 0.3);
+            const isPledged = (defectsResult.legalDefect?.id === 'legal_pledge') || (seller.id === 'panicker' && Math.random() < 0.45);
+            const isFsspRestricted = (defectsResult.legalDefect?.id === 'legal_fssp') || (defectsResult.legalDefect?.id === 'legal_arrest');
+            const isCutFrame = (isBeaterProject && Math.random() < 0.25) || (seller.id === 'criminal' && Math.random() < 0.35);
+
+            // Страховые расчеты и ДТП
+            let insuranceCalculations = [];
+            let accidentRecords = [];
+
+            if (isBeaterProject || cCond < 50 || isThickDoors > 300) {
+                accidentRecords.push({
+                    date: "14.04.2024",
+                    type: "Столкновение двух ТС",
+                    damageZone: "Передняя часть, правый борт",
+                    isTotalLoss: isCutFrame
+                });
+                insuranceCalculations.push({
+                    date: "28.04.2024",
+                    sum: Math.round(baseVal * (isCutFrame ? 0.95 : 0.45)),
+                    works: isCutFrame ? "Замена лонжерона, стапельные работы, окрас вкруг" : "Замена бампера, крыла, вытяжка двери"
+                });
+            }
+
+            // Фиксации техосмотров
+            let eistoInspections = [
+                { date: "12.05.2021", mileage: Math.round(actualMileage * 0.35) },
+                { date: "20.06.2023", mileage: Math.round(actualMileage * 0.70) },
+                { date: "15.01.2025", mileage: actualMileage }
+            ];
+
+            const autotekaReport = {
+                vin: vinCode,
+                actualMileage,
+                displayedMileage,
+                isRolledOdo,
+                isTaxi: isTaxiCar,
+                isPledged,
+                pledgeOrg: isPledged ? "ООО МКК «БыстроДеньги»" : "Нет залогов",
+                hasFsspRestrictions: isFsspRestricted,
+                fsspSum: isFsspRestricted ? Math.round(45000 + Math.random() * 120000) : 0,
+                isCutFrame,
+                accidents: accidentRecords,
+                repairCalculations: insuranceCalculations,
+                inspections: eistoInspections,
+                checked: false
+            };
+
             const isRepaintedCar = isBeaterProject || isThickDoors > 180 || isThickHood > 180;
 
             const lotObject = {
-                id: carId, name: cName, power: cPower, type: tType,
+                id: carId, 
+                name: template.name || "Техника", 
+                power: template.power || 100, 
+                type: tType,
                 drivetrain: template.drivetrain || 'rwd',
-                basePrice: baseP, mileage: mileageVal, price: sellerPrice,
+                basePrice: baseP, 
+                mileage: displayedMileage, 
+                actualMileage: actualMileage,
+                price: sellerPrice,
                 originalAskingPrice: sellerPrice,
                 baseMarketValue: baseVal,
-                marketValue: baseVal, // пересчитается ниже
-                img: rawImg, images: carGallery, fallback: cFallback,
+                marketValue: baseVal,
+                img: rawImg, images: carGallery, fallback: template.fallback || getCategoryFallback(tType),
                 plate: genPlate,
                 isStolen: Math.random() < (isBeaterProject ? 0.16 : (isUrgentDeal ? 0.08 : 0.03)),
                 isMuseumStock, isTunedSpec, isBeaterProject, isUrgentDeal,
-                isBlackMarketCandidate,
+                isBlackMarketCandidate: isCutFrame || isFsspRestricted || isPledged,
                 sellerArchetype: seller.id,
                 sellerNote: seller.desc, sellerMoodIcon: seller.avatar,
                 hagglePatience: maxPatience, maxHagglePatience: maxPatience,
                 dealType, unavailable: false,
+                
+                // Дефекты и симптомы
                 hiddenDefect: defectsResult.hiddenDefect,
                 mechanicalDefects: defectsResult.mechanicalDefects,
                 legalDefect: defectsResult.legalDefect,
                 inspectionStatus: defectsResult.inspectionStatus,
+                exhaustSmoke, 
+                engineNoise, 
+                gearboxBehavior,
+
                 condition: cCond, insurance: null, tuning: carTuning,
                 wear: { engine: engWear, transmission: transWear },
                 bodyThickness: { hood: isThickHood, roof: 100, doors: isThickDoors, wings: 110 },
@@ -730,58 +772,39 @@ async function populateMarketFeed() {
                 viewed: false,
                 districtId: carGeo.districtId, districtName: carGeo.districtName,
                 address: carGeo.address, mapX: carGeo.mapX, mapY: carGeo.mapY,
+
+                // ПТС и Автотека
                 ptsData: {
                     ownerName, ownerAvatar,
-                    ownersCount: isMuseumStock ? 1 : (isBeaterProject ? 5 : 2),
+                    ownersCount: isMuseumStock ? 1 : (isBeaterProject ? 6 : 2),
                     ownershipYears: isMuseumStock ? 8 : 2,
-                    vin: "XTA" + Math.floor(10000000000000 + Math.random() * 90000000000000),
-                    ptsType: isBeaterProject ? "Дубликат ПТС ⚠️" : "Электронный (ЭПТС) ✓",
-                    pledgeBank: "Залогов нет ✓",
-                    fsspRestrictions: "Ограничений нет ✓",
-                    taxiCheck: "В такси не использовалась ✓"
-                }
+                    vin: vinCode,
+                    ptsType: (isCutFrame || isBeaterProject) ? "Дубликат ПТС ⚠️" : "Электронный (ЭПТС) ✓",
+                    pledgeBank: isPledged ? "В залоге у МФО ❌" : "Залогов нет ✓",
+                    fsspRestrictions: isFsspRestricted ? "Запрет регдействий ФССП ❌" : "Ограничений нет ✓",
+                    taxiCheck: isTaxiCar ? "Работала в такси ⚠️" : "В такси не использовалась ✓"
+                },
+                autotekaReport: autotekaReport
             };
-
-            if (defectsResult.legalDefect) {
-                const ld = defectsResult.legalDefect;
-                if (ld.id === 'legal_pledge') lotObject.ptsData.pledgeBank = "В залоге у банка ❌";
-                if (ld.id === 'legal_fssp') lotObject.ptsData.fsspRestrictions = "Запрет ФССП ❌";
-                if (ld.id === 'legal_arrest') lotObject.ptsData.fsspRestrictions = "Арест приставов ❌";
-                if (ld.id === 'legal_taxi_former') lotObject.ptsData.taxiCheck = "Работала в такси ⚠️";
-                if (ld.id === 'legal_pts_duplicate') lotObject.ptsData.ptsType = "Дубликат ПТС ⚠️";
-            }
 
             if (typeof window.ensureCarIdentity === 'function') window.ensureCarIdentity(lotObject);
 
-            // Синхронизируем честную рыночную оценку с функцией гаража
             if (typeof recalculateCarMarketValue === 'function') {
                 lotObject.marketValue = recalculateCarMarketValue(lotObject);
             }
 
             state.marketFeed.push(lotObject);
-            generatedCount++;
 
         } catch (lotError) {
-            errorCount++;
             console.error('[Market] Ошибка генерации лота #' + i + ':', lotError);
         }
     }
 
-    console.log('[Market] populateMarketFeed → generated ' + generatedCount + ' lots, errors: ' + errorCount);
+    try { if (typeof sortCurrentMarketFeed === 'function') sortCurrentMarketFeed(); } catch (e) {}
+    try { if (typeof saveState === 'function') saveState(); } catch (e) {}
+    try { if (typeof renderMarketFeed === 'function') renderMarketFeed(); } catch (e) {}
 
-    try {
-        if (typeof sortCurrentMarketFeed === 'function') sortCurrentMarketFeed();
-    } catch (e) {}
-
-    try {
-        if (typeof saveState === 'function') saveState();
-    } catch (e) {}
-
-    try {
-        if (typeof renderMarketFeed === 'function') renderMarketFeed();
-    } catch (e) {}
-
-    console.log('[Market] populateMarketFeed → END');
+    console.log('[Market] populateMarketFeed → END (сгенерировано с Автотекой и симптомами пуска)');
 }
 
 // ========================================================
@@ -812,4 +835,4 @@ Object.assign(window, {
     _ensureGlobalEvent
 });
 
-console.log('[🏪 market-generator v2.4.0] Синхронизация реальной оценки рынка + фикс ЛКП и Автотеки ✓');
+console.log('[🏪 market-generator v2.5.0] Глубокая диагностика, симптомы пуска и Автотека PRO готовы ✓');
