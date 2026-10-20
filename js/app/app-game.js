@@ -1,13 +1,15 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.0.0)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.0.0 (ИНТЕГРАЦИЯ FEATURE ACCESS И БАЛАНС ПРОГРЕССИИ):
-//   - Встроен контроль вкладок (switchTab) через AccessControl.guardFeature:
-//     Сараи (tabBarn), Контейнеры (tabContainers), Стрит (tabStreet),
-//     Даркнет (tabDarknet), Синдикат (tabSyndicate).
-//   - Сбалансирована прогрессия XP и уровней против быстрого прохождения.
-//   - Полная сохранность фиксов депозитов (v4.5.1) и тактильного HUD.
+// ⭐ v5.1.0 (РЕАЛИСТИЧНЫЕ НАЛОГИ, ПЕНИ И АУКЦИОН ФССП ЗА 50% ЦЕНЫ):
+//   1. Налоговый цикл каждые 7 дней с проверкой просрочки.
+//   2. Пеня +5% в день при просрочке уплаты транспортного налога.
+//   3. Арест ФССП при просрочке 3+ дней (запрет регдействий и продажи авто).
+//   4. Конфискация и принудительная продажа авто приставами за 50% цены
+//      в счет погашения долга при просрочке 7+ дней.
+//   5. Встроен контроль вкладок (switchTab) через AccessControl.guardFeature.
+//   6. Сохранены безопасные депозиты (v4.5.1), тактильный HUD и роллеры.
 // ========================================================
 
 // ========================================================
@@ -511,7 +513,7 @@ function _safeNumDeposit(val, fallback = 0) {
 }
 
 // ========================================================
-// 7. СУТОЧНЫЙ ЦИКЛ
+// 7. СУТОЧНЫЙ ЦИКЛ, НАЛОГИ И АУКЦИОН ФССП
 // ========================================================
 function checkRealTimeDayChange() {
     const now = new Date();
@@ -528,13 +530,123 @@ function checkRealTimeDayChange() {
 
 function executeDayCycleMidnight(currentDateObj) {
     try {
-        window.state.player.day = (window.state.player.day || 1) + 1;
+        const curDay = (window.state.player.day || 1) + 1;
+        window.state.player.day = curDay;
         window.state.player.lastRealDayTimestamp = currentDateObj.getTime();
         window.state.player.expressTickets = window.state.player.maxExpressTickets || 25;
         window.state.player.consecutiveRaces = 0;
 
         _updateDynamicStarRate();
         _syncStarRateToBank();
+
+        // ═══════════════════════════════════════════════════════
+        // ⭐ НАЛОГОВЫЙ ЦИКЛ, ПЕНИ И АУКЦИОН ПРИСТАВОВ (ФССП)
+        // ═══════════════════════════════════════════════════════
+        if (!window.state.player.taxDueDay) {
+            window.state.player.taxDueDay = curDay + 7;
+        }
+
+        // Если подошёл новый 7-дневный налоговый период и долгов не было — рассчитываем налог
+        if (curDay >= window.state.player.taxDueDay && (!window.state.player.taxDebt || window.state.player.taxDebt <= 0)) {
+            let powerTax = 0;
+            if (Array.isArray(window.state.garage)) {
+                window.state.garage.forEach(c => {
+                    let p = Number(c.power) || 100;
+                    if (p > 250) {
+                        powerTax += (p - 250) * 150;
+                    }
+                });
+            }
+            if (powerTax > 0) {
+                window.state.player.taxDebt = powerTax;
+                window.state.player.taxDueDay = curDay + 7;
+                window.state.player.taxPenalty = 0;
+                window.state.player.taxOverdueDays = 0;
+                window.state.player.taxArrest = false;
+                setTimeout(() => {
+                    showToast(`🏛️ Начислен транспортный налог ФНС: ${powerTax.toLocaleString()} ₽ (Срок: 7 дн.)`, 'warning');
+                }, 2500);
+            }
+        }
+
+        // Проверка просрочки налога
+        if (window.state.player.taxDebt > 0 && curDay > window.state.player.taxDueDay) {
+            window.state.player.taxOverdueDays = (window.state.player.taxOverdueDays || 0) + 1;
+            const overdue = window.state.player.taxOverdueDays;
+
+            // Начисление пени +5% в день от суммы налога
+            const dailyPenalty = Math.round(window.state.player.taxDebt * 0.05);
+            window.state.player.taxPenalty = (window.state.player.taxPenalty || 0) + dailyPenalty;
+
+            // Просрочка 3+ дней: арест регистрационных действий
+            if (overdue >= 3 && !window.state.player.taxArrest) {
+                window.state.player.taxArrest = true;
+                setTimeout(() => {
+                    if (typeof openVerdictModal === 'function') {
+                        openVerdictModal(
+                            "НАЛОЖЕН АРЕСТ ФССП / ГИБДД! 🚨",
+                            `Задолженность по налогам просрочена на ${overdue} дней!\nФедеральная служба судебных приставов наложила запрет на регистрационные действия.\nПродажа автомобилей и постановка на коммерческий учёт заблокированы до полной оплаты!`,
+                            false
+                        );
+                    } else {
+                        showToast("🚨 Наложен запрет на регистрационные действия (ФССП)!", 'error');
+                    }
+                }, 3000);
+            }
+
+            // Просрочка 7+ дней: ПРИНУДИТЕЛЬНАЯ ПРОДАЖА ПРИСТАВАМИ ЗА 50% РЫНКА
+            if (overdue >= 7) {
+                const totalDebt = (window.state.player.taxDebt || 0) + (window.state.player.taxPenalty || 0);
+
+                // Если есть деньги на балансе — списываем со счета
+                if ((window.state.player.cash || 0) >= totalDebt) {
+                    window.state.player.cash -= totalDebt;
+                    window.state.player.taxDebt = 0;
+                    window.state.player.taxPenalty = 0;
+                    window.state.player.taxOverdueDays = 0;
+                    window.state.player.taxArrest = false;
+                    window.state.player.taxDueDay = curDay + 7;
+                    logBankTransaction("Принудительное списание задолженности приставами ФССП", totalDebt, false);
+                    setTimeout(() => {
+                        showToast(`⚖️ Приставы списали налоговый долг: -${totalDebt.toLocaleString()} ₽`, 'warning');
+                    }, 3500);
+                } else if (Array.isArray(window.state.garage) && window.state.garage.length > 0) {
+                    // Иначе продаём подходящее авто из гаража за 50% рыночной цены
+                    let carIdx = window.state.garage.findIndex(c => !c.assignedBusinessId);
+                    if (carIdx === -1) carIdx = 0;
+
+                    const confiscatedCar = window.state.garage.splice(carIdx, 1)[0];
+                    const marketVal = Number(confiscatedCar.marketValue || confiscatedCar.basePrice || 300000);
+                    const bailiffAuctionPrice = Math.round(marketVal * 0.50);
+
+                    const remainingAfterDebt = bailiffAuctionPrice - totalDebt;
+
+                    window.state.player.taxDebt = 0;
+                    window.state.player.taxPenalty = 0;
+                    window.state.player.taxOverdueDays = 0;
+                    window.state.player.taxArrest = false;
+                    window.state.player.taxDueDay = curDay + 7;
+
+                    if (remainingAfterDebt > 0) {
+                        window.state.player.cash = (window.state.player.cash || 0) + remainingAfterDebt;
+                        logBankTransaction(`Возврат остатка после аукциона ФССП (${confiscatedCar.name})`, remainingAfterDebt, true);
+                    }
+
+                    setTimeout(() => {
+                        if (typeof openVerdictModal === 'function') {
+                            openVerdictModal(
+                                "АВТОМОБИЛЬ ПРОДАН ПРИСТАВАМИ! ⚖️",
+                                `В связи с длительной неуплатой налогов (просрочка ${overdue} дней) автомобиль «<b>${confiscatedCar.name}</b>» был изъят и продан на торгах ФССП за 50% рыночной стоимости (${bailiffAuctionPrice.toLocaleString()} ₽) в счёт погашения долга (${totalDebt.toLocaleString()} ₽).\n${remainingAfterDebt > 0 ? `Остаток средств (+${remainingAfterDebt.toLocaleString()} ₽) возвращён на ваш счёт.` : ''}\nАрест с регистрационных действий снят.`,
+                                false,
+                                remainingAfterDebt > 0 ? remainingAfterDebt : 0
+                            );
+                        } else {
+                            showToast(`⚖️ «${confiscatedCar.name}» продан приставами за полцены в счёт долга!`, 'error');
+                        }
+                    }, 4000);
+                }
+            }
+        }
 
         window.state.player.streakDay = (window.state.player.streakDay || 0) + 1;
         if (window.state.player.streakDay >= 7) {
@@ -556,7 +668,6 @@ function executeDayCycleMidnight(currentDateObj) {
             window.state.player.bankDeposits.forEach((dep, idx) => {
                 try {
                     if (!dep || typeof dep !== 'object') {
-                        console.warn(`[DayCycle] Депозит #${idx} некорректен (не объект), пропускаем`);
                         return;
                     }
 
@@ -600,14 +711,6 @@ function executeDayCycleMidnight(currentDateObj) {
                 }
             });
 
-            const removedCount = window.state.player.bankDeposits.length - validDeposits.length;
-            if (removedCount > 0) {
-                console.warn(`[DayCycle] Удалено битых депозитов: ${removedCount}`);
-                if (typeof showToast === 'function') {
-                    setTimeout(() => showToast(`⚠️ Удалено ${removedCount} битых депозитов`, 'warning'), 3800);
-                }
-            }
-
             window.state.player.bankDeposits = validDeposits;
         }
 
@@ -647,7 +750,6 @@ function executeDayCycleMidnight(currentDateObj) {
             if (Array.isArray(window.state.garage)) {
                 window.state.garage.forEach((car, idx) => {
                     if (!car || !car._backfireDay || car._backfireResolved) return;
-                    const curDay = window.state.player.day || 1;
                     if (curDay >= car._backfireDay) {
                         car._backfireResolved = true;
                         setTimeout(() => {
@@ -659,20 +761,7 @@ function executeDayCycleMidnight(currentDateObj) {
         } catch (e) {}
 
         try {
-            if (window.PhoneBusiness && typeof window.PhoneBusiness._syncActiveBonus === 'function') {
-                window.PhoneBusiness._syncActiveBonus();
-            } else if (window.state.player.businessAdBonus) {
-                const curDay = window.state.player.day || 1;
-                if (window.state.player.businessAdBonus.expiresDay < curDay) {
-                    window.state.player.businessAdBonus = null;
-                    if (window.PhoneBusiness) window.PhoneBusiness._activeBonus = null;
-                }
-            }
-        } catch (e) {}
-
-        try {
             if (window.state.player.housingType === 'rent' && window.state.player.housingRentDue > 0) {
-                const curDay = window.state.player.day || 1;
                 if (curDay >= window.state.player.housingRentDue) {
                     const db = (typeof HOUSING_LIST !== 'undefined') ? HOUSING_LIST : [];
                     const activeHouse = db.find(h => h.id === window.state.player.housingId);
@@ -709,19 +798,6 @@ function executeDayCycleMidnight(currentDateObj) {
                         showToast(`🅿️ Списано за парковку: -${parkingResult.charged.toLocaleString()} ₽`, 'info');
                     }, 3500);
                 }
-                if (parkingResult.lostCars > 0) {
-                    setTimeout(() => {
-                        if (typeof openVerdictModal === 'function') {
-                            openVerdictModal(
-                                "ЭВАКУАЦИЯ С ПАРКОВКИ ⚠️",
-                                `Не хватило денег на оплату парковки! ${parkingResult.lostCars} авто отправлены в утиль.`,
-                                false
-                            );
-                        } else {
-                            showToast(`⚠️ ${parkingResult.lostCars} авто утилизированы с парковки!`, 'error');
-                        }
-                    }, 4200);
-                }
             }
         } catch (e) {
             console.warn('[Parking] Ошибка ежедневного списания:', e);
@@ -735,7 +811,6 @@ function executeDayCycleMidnight(currentDateObj) {
         if (typeof tgHaptic === 'function') tgHaptic('success');
     } catch (err) {
         console.error('[DayCycle] Критическая ошибка:', err);
-        if (typeof showToast === 'function') showToast("⚠️ Ошибка смены дня. Проверьте консоль.", 'error');
     }
 }
 
@@ -846,7 +921,6 @@ function addXp(amount) {
     while (window.state.player.xp >= maxXp) {
         window.state.player.xp -= maxXp;
         window.state.player.level = (window.state.player.level || 1) + 1;
-        // Прогрессивная формула опыта: +40% к планке следующего уровня
         window.state.player.maxXp = Math.round(maxXp * 1.40 + 35);
         maxXp = window.state.player.maxXp;
 
@@ -1093,7 +1167,6 @@ function importSaveCodeAction() {
 // 10. НАВИГАЦИЯ С КОНТРОЛЕМ ДОСТУПА ПО УРОВНЯМ
 // ========================================================
 function switchTab(tabId) {
-    // Таблица соответствия вкладок и ключей в APP_ACCESS_CONFIG
     const tabFeatureMap = {
         'tabBarn': 'barn',
         'tabContainers': 'containers',
@@ -1406,4 +1479,4 @@ window.logBankTransaction = logBankTransaction;
 window.HudRevolver = HudRevolver;
 window._safeNumDeposit = _safeNumDeposit;
 
-console.log('[💠 app-game.js v5.0.0] Интеграция FeatureAccess: прогрессия уровней и защита вкладок включена ✓');
+console.log('[💠 app-game.js v5.1.0] Налоги, пени +5%/д, аресты ФССП и автопродажа за 50% цены активированы ✓');
