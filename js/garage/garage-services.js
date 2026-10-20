@@ -1,11 +1,11 @@
 // ========================================================
-// js/garage/garage-services.js — ТЮНИНГ, ДЕТЕЙЛИНГ И СТРАХОВАНИЕ (v1.4.0-balanced)
+// js/garage/garage-services.js — ТЮНИНГ, ДЕТЕЙЛИНГ И СТРАХОВАНИЕ (v1.5.0-balanced)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.4.0-balanced:
-//   - Экономический баланс: динамическая стоимость детейлинга в зависимости от класса/цены авто.
-//   - Устранение эксплойта +12% полировки: доход сбалансирован, добавлены пороги окупаемости.
-//   - Реалистичная смотка пробега: отметка в истории и риск проверки покупателем.
-//   - Полная совместимость с ModalManager, AudioFx и safeGetCar.
+// ⭐ v1.5.0-balanced:
+//   - ДОБАВЛЕНА ПЕРЕКУП-ПРЕДПРОДАЖКА: полировка фар, чернение резины, сухой туман (удаление табака),
+//     бюджетный подкрас из баллончика со шпаклей для скрытия ржавчины.
+//   - СМОТКА ПРОБЕГА С РИСКОМ: расчет процента риска раскрытия сканером на площадке.
+//   - ПОЛНЫЙ БАЛАНС: динамические цены, учет бизнесов и совместимость с автотекой.
 // ========================================================
 
 let activeTuningCarIndex = null;
@@ -31,11 +31,14 @@ function _getServiceCosts(car) {
 
     return {
         polishCost: Math.max(4000, Math.round(baseVal * 0.035)),
+        headlightCost: Math.max(1200, Math.round(baseVal * 0.012)),
         interiorCost: Math.max(3500, Math.round(baseVal * 0.025)),
+        fogOdorCost: Math.max(2200, Math.round(baseVal * 0.018)),
+        sprayCanCost: Math.max(3200, Math.round(baseVal * 0.022)),
         paintCost: hasPaintShop ? Math.max(8000, Math.round(baseVal * 0.06)) : Math.max(15000, Math.round(baseVal * 0.10)),
-        chipsCost: Math.max(3000, Math.round(baseVal * 0.02)),
-        additiveCost: Math.max(5000, Math.round(baseVal * 0.03)),
-        odometerCost: Math.max(8000, Math.round(baseVal * 0.04))
+        chipsCost: Math.max(2800, Math.round(baseVal * 0.02)),
+        additiveCost: Math.max(4500, Math.round(baseVal * 0.028)),
+        odometerCost: Math.max(7500, Math.round(baseVal * 0.038))
     };
 }
 
@@ -285,7 +288,7 @@ function checkUninsuredDriveRisk(car) {
 }
 
 // ========================================================
-// --- ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (БАЛАНС) ---
+// --- ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (v1.5.0) ---
 // ========================================================
 function openPreSaleModal(idx) {
     if (idx === undefined || idx === null) return;
@@ -307,68 +310,96 @@ function openPreSaleModal(idx) {
     const hasPaintShop = (state.businesses || []).some(b => b.id === 'paint_shop' && b.level > 0);
 
     modal.innerHTML = `
-        <div class="modal-box text-left" style="max-width: 440px;">
+        <div class="modal-box text-left" style="max-width: 450px; max-height:88vh; display:flex; flex-direction:column;">
             <div class="modal-glow-badge mb-1" style="color:var(--amber); border-color:rgba(255,179,0,0.4);">
-                ✨ ЦЕНТР ДЕТЕЙЛИНГА & ПРЕДПРОДАЖКИ
+                ✨ ПЕРЕКУП-ДЕТЕЙЛИНГ & ЛОСК
             </div>
             <h3 class="font-bold color-cyan mb-1">${escapeHtml(car.name)}</h3>
-            <div class="sub-label mb-3">Повышайте маржинальность с учётом затрат:</div>
+            <div class="sub-label mb-2">Наводим марафет для наценки (+15–30% к чеку):</div>
 
-            <div class="space-y-2 mb-3">
+            <div class="space-y-2 mb-3" style="flex:1; overflow-y:auto; padding-right:2px;">
+                <!-- 1. ПОЛИРОВКА ФАР И РЕЗИНА -->
                 <div class="glass-card p-2 flex-between">
                     <div>
-                        <b class="text-xs color-cyan">1. Абразивная полировка кузова</b>
-                        <div class="sub-label" style="font-size:8.5px;">Глубокий глянец (+6-8% к рыночной оценке).</div>
+                        <b class="text-xs color-cyan">1. Полировка фар + чернение шин</b>
+                        <div class="sub-label" style="font-size:8.5px;">Снимает мутность оптики, блеск резины (+5% к оценке).</div>
+                    </div>
+                    <button onclick="applyPreSaleMod('headlights')" class="btn ${car.headlightsPolished ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm btn-auto" ${car.headlightsPolished ? 'disabled' : ''}>
+                        ${car.headlightsPolished ? 'Сделано ✓' : costs.headlightCost.toLocaleString() + ' ₽'}
+                    </button>
+                </div>
+
+                <!-- 2. АБРАЗИВНАЯ ПОЛИРОВКА -->
+                <div class="glass-card p-2 flex-between">
+                    <div>
+                        <b class="text-xs color-cyan">2. Абразивная полировка кузова</b>
+                        <div class="sub-label" style="font-size:8.5px;">Глубокий глянец, скрывает мелкую паутинку (+7% к оценке).</div>
                     </div>
                     <button onclick="applyPreSaleMod('clean')" class="btn ${car.isPolished ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm btn-auto" ${car.isPolished ? 'disabled' : ''}>
                         ${car.isPolished ? 'Сделано ✓' : costs.polishCost.toLocaleString() + ' ₽'}
                     </button>
                 </div>
 
+                <!-- 3. СУХОЙ ТУМАН (ТАБАК / СЫРОСТЬ) -->
                 <div class="glass-card p-2 flex-between">
                     <div>
-                        <b class="text-xs color-green">2. Химчистка салона с озонацией</b>
-                        <div class="sub-label" style="font-size:8.5px;">Свежий салон (+5% к спросу и оценке).</div>
+                        <b class="text-xs color-green">3. Сухой туман «Антитабак»</b>
+                        <div class="sub-label" style="font-size:8.5px;">Удаляет вонь курева и запах сырости утопленника (+4% к спросу).</div>
+                    </div>
+                    <button onclick="applyPreSaleMod('fog_odor')" class="btn ${car.odorFree ? 'btn-dark opacity-50' : 'btn-green'} btn-sm btn-auto" ${car.odorFree ? 'disabled' : ''}>
+                        ${car.odorFree ? 'Свежо ✓' : costs.fogOdorCost.toLocaleString() + ' ₽'}
+                    </button>
+                </div>
+
+                <!-- 4. ХИМЧИСТКА САЛОНА -->
+                <div class="glass-card p-2 flex-between">
+                    <div>
+                        <b class="text-xs color-green">4. Комплексная химчистка салона</b>
+                        <div class="sub-label" style="font-size:8.5px;">Очистка сидений и торпедо (+6% к оценке авто).</div>
                     </div>
                     <button onclick="applyPreSaleMod('interior')" class="btn ${car.cleanInterior ? 'btn-dark opacity-50' : 'btn-green'} btn-sm btn-auto" ${car.cleanInterior ? 'disabled' : ''}>
                         ${car.cleanInterior ? 'Сделано ✓' : costs.interiorCost.toLocaleString() + ' ₽'}
                     </button>
                 </div>
 
+                <!-- 5. ПОДКРАС БАЛЛОНЧИКОМ + ШПАКЛЯ -->
                 <div class="glass-card p-2 flex-between">
                     <div>
-                        <b class="text-xs color-amber">3. Полный облив кузова</b>
-                        <div class="sub-label" style="font-size:8.5px;">${hasPaintShop ? 'Цех «Хамелеон»: заводской микрослой 115 мкм (-40% скидка)' : 'Окрас в камере (+25% к состоянию HP)'}</div>
+                        <b class="text-xs color-amber">5. Замазка шпаклей + баллончик</b>
+                        <div class="sub-label" style="font-size:8.5px;">Маскирует ржавые дыры и сколы (+14% HP, толщиномер покажет 380+ мкм).</div>
+                    </div>
+                    <button onclick="applyPreSaleMod('spray_can')" class="btn ${car.hasBondoBalloons ? 'btn-dark opacity-50' : 'btn-amber'} btn-sm btn-auto" ${car.hasBondoBalloons ? 'disabled' : ''}>
+                        ${car.hasBondoBalloons ? 'Замазано ✓' : costs.sprayCanCost.toLocaleString() + ' ₽'}
+                    </button>
+                </div>
+
+                <!-- 6. ПОЛНЫЙ ОБЛИВ В КАМЕРЕ -->
+                <div class="glass-card p-2 flex-between">
+                    <div>
+                        <b class="text-xs color-amber">6. Полный облив кузова</b>
+                        <div class="sub-label" style="font-size:8.5px;">${hasPaintShop ? 'Цех «Хамелеон»: заводской микрослой 115 мкм (-40% скидка)' : 'Окрас в камере (+25% к HP)'}</div>
                     </div>
                     <button onclick="applyPreSaleMod('paint')" class="btn ${car.isRepainted ? 'btn-dark opacity-50' : 'btn-amber'} btn-sm btn-auto" ${car.isRepainted ? 'disabled' : ''}>
                         ${car.isRepainted ? 'Окрашено ✓' : costs.paintCost.toLocaleString() + ' ₽'}
                     </button>
                 </div>
 
+                <!-- 7. ПРИСАДКА АНТИСТУК -->
                 <div class="glass-card p-2 flex-between">
                     <div>
-                        <b class="text-xs color-purple">4. Точечный подкрас сколов</b>
-                        <div class="sub-label" style="font-size:8.5px;">Устраняет сколы без утолщения показаний толщиномера.</div>
-                    </div>
-                    <button onclick="applyPreSaleMod('chips')" class="btn btn-purple btn-sm btn-auto">
-                        ${costs.chipsCost.toLocaleString()} ₽
-                    </button>
-                </div>
-
-                <div class="glass-card p-2 flex-between">
-                    <div>
-                        <b class="text-xs color-red">5. Демпферная присадка в мотор</b>
-                        <div class="sub-label" style="font-size:8.5px;">Скрывает стуки мотора до первой проверки на СТО.</div>
+                        <b class="text-xs color-red">7. Загущающая присадка «Антистук»</b>
+                        <div class="sub-label" style="font-size:8.5px;">Временно гасит звон гидриков и цепи до первой проверки.</div>
                     </div>
                     <button onclick="applyPreSaleMod('additive')" class="btn ${car.hasAdditive ? 'btn-dark opacity-50' : 'btn-red'} btn-sm btn-auto" ${car.hasAdditive ? 'disabled' : ''}>
                         ${car.hasAdditive ? 'Залито ✓' : costs.additiveCost.toLocaleString() + ' ₽'}
                     </button>
                 </div>
 
+                <!-- 8. СМОТКА ОДОМЕТРА ЧЕРЕЗ СКАНЕР -->
                 <div class="glass-card p-2 flex-between">
                     <div>
-                        <b class="text-xs color-red">6. Смотка одометра (-50% км)</b>
-                        <div class="sub-label" style="font-size:8.5px;">⚠️ Автотека зафиксирует скрутку при диагностике!</div>
+                        <b class="text-xs color-red">8. Скрутка одометра сканером</b>
+                        <div class="sub-label" style="font-size:8.5px;">Сматывает -70 000 км. ⚠️ Риск: дотошный покупатель со сканером вызовет полицию!</div>
                     </div>
                     <button onclick="applyPreSaleMod('odometer')" class="btn ${car.rolledOdometer ? 'btn-dark opacity-50' : 'btn-red'} btn-sm btn-auto" ${car.rolledOdometer ? 'disabled' : ''}>
                         ${car.rolledOdometer ? 'Скручен ✓' : costs.odometerCost.toLocaleString() + ' ₽'}
@@ -409,6 +440,14 @@ function applyPreSaleMod(type) {
     };
 
     switch (type) {
+        case 'headlights':
+            if (car.headlightsPolished) return showToast("Фары уже отполированы, резина начернена!");
+            if (!chargePlayer(costs.headlightCost)) return;
+            car.headlightsPolished = true;
+            if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
+            showToast("✨ Фары прозрачные, резина черная как с салона (+5% к оценке)!");
+            break;
+
         case 'clean':
             if (car.isPolished) return showToast("Кузов уже отполирован до блеска!");
             if (!chargePlayer(costs.polishCost)) return;
@@ -417,25 +456,47 @@ function applyPreSaleMod(type) {
             showToast("Кузов отполирован (+7% к оценке)!");
             break;
 
+        case 'fog_odor':
+            if (car.odorFree) return showToast("Салон уже обработан озоном и сухим туманом!");
+            if (!chargePlayer(costs.fogOdorCost)) return;
+            car.odorFree = true;
+            if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
+            showToast("💨 Сухой туман устранил вонь табака и сырости (+4% к оценке)!");
+            break;
+
         case 'interior':
-            if (car.cleanInterior) return showToast("Салон уже прошёл озонацию!");
+            if (car.cleanInterior) return showToast("Салон уже прошёл химчистку!");
             if (!chargePlayer(costs.interiorCost)) return;
             car.cleanInterior = true;
             if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
-            showToast("Химчистка завершена! Салон выглядит безупречно.");
+            showToast("Химчистка завершена! Салон выглядит безупречно (+6%).");
+            break;
+
+        case 'spray_can':
+            if (car.hasBondoBalloons) return showToast("Ржавчина уже замазана шпаклевкой и переходом!");
+            if (!chargePlayer(costs.sprayCanCost)) return;
+            car.hasBondoBalloons = true;
+            car.isRepainted = true;
+            car.condition = Math.min(100, (car.condition || 50) + 14);
+            if (!car.bodyThickness) car.bodyThickness = { hood: 110, roof: 100, doors: 115, wings: 110 };
+            car.bodyThickness.doors = Math.max(car.bodyThickness.doors, 380);
+            car.bodyThickness.wings = Math.max(car.bodyThickness.wings, 420);
+            if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
+            showToast("🪣 Ржавые дыры замазаны шпаклей и подкрашены из баллона (+14% HP)!");
             break;
 
         case 'paint':
-            if (car.isRepainted) return showToast("Кузов уже был повторно окрашен!");
+            if (car.isRepainted && !car.hasBondoBalloons) return showToast("Кузов уже был повторно окрашен в камере!");
             if (!chargePlayer(costs.paintCost)) return;
             car.isRepainted = true;
+            car.hasBondoBalloons = false;
             car.condition = Math.min(100, (car.condition || 60) + 25);
             if (hasPaintShop) {
                 car.bodyThickness = { hood: 115, roof: 110, doors: 120, wings: 115 };
                 showToast("🎨 Цех «Хамелеон»: окрашено заводским микрослоем!");
             } else {
                 car.bodyThickness = { hood: 240, roof: 110, doors: 260, wings: 230 };
-                showToast("Кузов перекрашен (+25% к состоянию HP)!");
+                showToast("Кузов перекрашен в камере (+25% к состоянию HP)!");
             }
             if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
             break;
@@ -451,16 +512,24 @@ function applyPreSaleMod(type) {
             if (car.hasAdditive) return showToast("Присадка уже залита!");
             if (!chargePlayer(costs.additiveCost)) return;
             car.hasAdditive = true;
-            showToast("Присадка залита! Стуки мотора временно скрыты.");
+            if (car.engineNoise && car.engineNoise !== 'quiet') car.tempHiddenNoise = car.engineNoise;
+            car.engineNoise = 'quiet';
+            showToast("🧪 Присадка залита! Стуки мотора временно заглушены.");
             break;
 
         case 'odometer':
-            if (car.rolledOdometer) return showToast("Пробег уже скручивался!");
+            if (car.rolledOdometer) return showToast("Одометр на этой машине уже скручивался!");
             if (!chargePlayer(costs.odometerCost)) return;
-            car.mileage = Math.round((car.mileage || 120000) * 0.55);
+            
+            const currentOdo = car.mileage || 140000;
+            car.actualMileage = car.actualMileage || currentOdo;
+            car.mileage = Math.max(38000, Math.round(currentOdo * 0.52));
             car.rolledOdometer = true;
             car.autotekaMileageDiscrepancy = true;
-            showToast("Пробег смотан! Внимание: запись о расхождении зафиксирована в реестре.");
+            car.odometerRiskPct = 35; // 35% шанс, что покупатель на площадке проверит блоки сканером
+
+            if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
+            showToast(`📉 Пробег смотан до ${car.mileage.toLocaleString()} км! Внимание: риск скандала на площадке 35%!`);
             break;
 
         default:
