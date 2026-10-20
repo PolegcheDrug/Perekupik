@@ -1,13 +1,12 @@
 // ========================================================
-// js/market/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v2.1.0)
+// js/market/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v2.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v2.1.0:
-//   - УДАЛЕНА лишняя кнопка переключения «Автомобили» (чистая лента рынка)
-//   - Умная фильтрация: бейджи соответствия бизнесу отображаются ПОСЛЕ Автотеки
-//     и ТОЛЬКО если у игрока РЕАЛЬНО КУПЛЕН данный бизнес (не засоряет карточку)
-//   - Исправлена работа кнопки «Позвонить» / «Торг» с защитой от всплытия клика
-//   - Полная интеграция с FLEET_CALCULATOR и проверкой автопарков
+// ⭐ v2.2.0 (АВТОМАТИЧЕСКОЕ УЛЬТРАКОМПАКТНОЕ СВОРАЧИВАНИЕ КАТЕГОРИЙ):
+//   1. Умное авто-сворачивание при скролле ленты вниз и открытие в самом верху.
+//   2. Ультракомпактный режим: скрывает сетку и инфоблок, превращая шапку в аккуратную плашку.
+//   3. Умная фильтрация соответствия бизнесу только для реально купленных точек.
+//   4. Защита от спама звуками при скролле и полная совместимость с Автотекой и ДКП.
 // ========================================================
 
 let marketSortOrder = 'asc';
@@ -20,24 +19,51 @@ if (typeof window.__marketRenderToken !== 'number') window.__marketRenderToken =
 // Защита от двойного клика по категориям
 if (typeof window._setCategoryPending !== 'boolean') window._setCategoryPending = false;
 
-function toggleMarketCategories(forceCollapse = null) {
+// ========================================================
+// УПРАВЛЕНИЕ СВОРАЧИВАНИЕМ КАТЕГОРИЙ (РУЧНОЕ И АВТОМАТИЧЕСКОЕ)
+// ========================================================
+function toggleMarketCategories(forceCollapse = null, isSilent = false) {
+    const card = document.querySelector('.market-filter-card');
     const grid = document.getElementById('marketCatListContainer');
+    const banner = document.getElementById('catInfoBanner');
     const btnIcon = document.querySelector('#btnToggleMarketGrid i') || document.querySelector('.categories-toggle-btn i');
     if (!grid) return;
     
-    const shouldCollapse = forceCollapse !== null ? forceCollapse : !grid.classList.contains('collapsed');
+    const isCurrentlyCollapsed = grid.classList.contains('collapsed') || grid.style.display === 'none';
+    const shouldCollapse = forceCollapse !== null ? forceCollapse : !isCurrentlyCollapsed;
 
     if (shouldCollapse) {
         grid.classList.add('collapsed');
+        grid.style.display = 'none';
+        if (banner) banner.style.display = 'none';
+        if (card) {
+            card.classList.add('is-compact-header');
+            card.style.marginBottom = '6px';
+            card.style.padding = '8px 12px';
+        }
         if (btnIcon) btnIcon.className = "fa-solid fa-chevron-down";
         localStorage.setItem('market_cat_collapsed', 'true');
     } else {
         grid.classList.remove('collapsed');
+        grid.style.display = 'grid';
+        if (banner) banner.style.display = 'block';
+        if (card) {
+            card.classList.remove('is-compact-header');
+            card.style.marginBottom = '';
+            card.style.padding = '';
+        }
         if (btnIcon) btnIcon.className = "fa-solid fa-chevron-up";
         localStorage.setItem('market_cat_collapsed', 'false');
     }
 
-    if (typeof playSound === 'function') playSound('tick');
+    if (!isSilent && typeof playSound === 'function') {
+        playSound('tick');
+    }
+}
+
+// Прямой метод для автовызова из скролл-листенера
+function collapseMarketCategories(shouldCollapse) {
+    toggleMarketCategories(shouldCollapse, true);
 }
 
 function toggleMarketSortOrder() {
@@ -98,10 +124,8 @@ function getCarBusinessSuitability(car, ownedBizIds = []) {
 
     if (matches.length === 0) {
         const cat = String(car.category || car.type || '').toLowerCase();
-        const pwr = Number(car.power) || 0;
         const trunk = Number(car.trunkVolume) || 0;
         const name = String(car.name || '').toLowerCase();
-        const year = Number(car.year) || 2012;
 
         if (cat === 'economy' || cat === 'comfort' || name.includes('solaris') || name.includes('rio') || name.includes('logan') || name.includes('camry') || name.includes('octavia') || name.includes('vesta') || name.includes('granta')) {
             matches.push({ id: 'taxi', name: 'Такси', icon: 'fa-taxi', badgeColor: '#f59e0b' });
@@ -242,7 +266,8 @@ async function setCategory(cat) {
         const btn = document.getElementById("catBtn-" + cat);
         if (btn) btn.classList.add('active');
 
-        toggleMarketCategories(true);
+        // Компактно сворачиваем сетку после выбора
+        toggleMarketCategories(true, true);
 
         const meta = (typeof CATEGORY_META !== 'undefined' && CATEGORY_META[cat]) ? CATEGORY_META[cat] : { name: 'Рынок', title: 'Общий рынок', capital: '—', desc: '' };
         if (typeof setTxt === 'function') {
@@ -317,7 +342,7 @@ async function refreshMarketFeedManual() {
         state.player.cash -= cost;
         state.player.fuel -= 5;
 
-        toggleMarketCategories(true);
+        toggleMarketCategories(true, true);
         if (typeof saveState === 'function') saveState();
 
         const container = document.getElementById('marketCardContainer');
@@ -420,7 +445,7 @@ function renderMarketFeed() {
 
         let htmlContent = sortBarHtml;
 
-        // Определяем РЕАЛЬНО КУПЛЕННЫЕ игроком бизнесы (level > 0)
+        // Определяем РЕАЛЬНО КУПЛЕННЫЕ игроком бизнесы
         let ownedBizIds = [];
         if (Array.isArray(state.businesses)) {
             ownedBizIds = state.businesses
@@ -495,11 +520,9 @@ function renderMarketFeed() {
                 if (isPlateRevealed && pVal > 15000) statusBadgesHtml += "<span class='tag-badge badge-shimmer-gold'>🏷️ БЛАТНОЙ</span>";
                 if (car.isStolen && isPlateRevealed) statusBadgesHtml += "<span class='tag-badge badge-police-strobe'>🚨 РОЗЫСК</span>";
 
-                // ⭐ ОТОБРАЖЕНИЕ БЕЙДЖЕЙ БИЗНЕСА ТОЛЬКО ПОСЛЕ АВТОТЕКИ И ТОЛЬКО ДЛЯ КУПЛЕННЫХ БИЗНЕСОВ
                 let bizTopBadgeHtml = "";
                 if (isPlateRevealed && ownedBizIds.length > 0) {
                     const allMatches = getCarBusinessSuitability(car, ownedBizIds);
-                    // Фильтруем: оставляем ТОЛЬКО те бизнесы, которые есть у игрока
                     const ownedMatches = allMatches.filter(m => ownedBizIds.includes(m.id));
 
                     if (ownedMatches.length > 0) {
@@ -688,6 +711,7 @@ function updateMarketTimers() {
 
 Object.assign(window, {
     toggleMarketCategories,
+    collapseMarketCategories,
     toggleMarketSortOrder,
     openMarketMapMode,
     sortCurrentMarketFeed,
@@ -704,4 +728,4 @@ Object.assign(window, {
     dispatchMarketAction
 });
 
-console.log('[🏪 market v2.1.0] Очищен интерфейс от лишней кнопки, иконки бизнеса только под купленные точки ✓');
+console.log('[🏪 market v2.2.0] Ультракомпактное сворачивание категорий + авто-скролл активированы ✓');
