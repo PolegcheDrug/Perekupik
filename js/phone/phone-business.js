@@ -1,20 +1,12 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v9.1.0 STABLE)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v9.1.1 STABLE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-//
-// ⭐ v9.1.0 (ЖЕЛЕЗНАЯ СТАБИЛЬНОСТЬ И АВТОНОМИЯ КАЖДОЙ ТОЧКИ):
-//   1. Устранён сбой legal.type.toUpperCase() — 100% защита от краша.
-//   2. У каждой точки СВОЙ ЦЕХ (3 ветки уникального оборудования),
-//      СВОЙ ШТАТ сотрудников (управляющий, мастер, охрана) и СВОЙ АВТОПАРК.
-//   3. В шапке холдинга оставлены только общие разделы: [Точки] [Тендеры] [Корпорации].
-//   4. Внутри кабинета каждой точки переключатели: [Обзор] [Цех точки] [Штат] [Парк].
-//   5. Встроенные каталоги апгрейдов и специалистов исключают пустые блоки.
 // ========================================================
 
 const PhoneBusiness = {
     currentTab: 'points',
     selectedBizId: null,
-    cabinetSubTab: 'overview', // 'overview', 'workshop', 'staff', 'fleet'
+    cabinetSubTab: 'overview',
     _tickInterval: null,
     _activeBonus: null,
     _ensureStateInProgress: false,
@@ -27,23 +19,42 @@ const PhoneBusiness = {
     _individualUpgradePending: false,
 
     get ECONOMIC_CYCLES() { return window.BusinessDataModule?.ECONOMIC_CYCLES || {}; },
-    get NETWORK_MILESTONES() { return window.BusinessDataModule?.NETWORK_MILESTONES || []; },
-    get DNA_LOCATIONS() { return window.BusinessDataModule?.DNA_LOCATIONS || []; },
-    get DNA_TRAFFIC() { return window.BusinessDataModule?.DNA_TRAFFIC || []; },
-    get DNA_CONDITION() { return window.BusinessDataModule?.DNA_CONDITION || []; },
-    get DNA_STAFF() { return window.BusinessDataModule?.DNA_STAFF || []; },
+    get NETWORK_MILESTONES() {
+        const raw = window.BusinessDataModule?.NETWORK_MILESTONES;
+        return Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+    },
+    get DNA_LOCATIONS() {
+        const raw = window.BusinessDataModule?.DNA_LOCATIONS;
+        return Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+    },
+    get DNA_TRAFFIC() {
+        const raw = window.BusinessDataModule?.DNA_TRAFFIC;
+        return Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+    },
+    get DNA_CONDITION() {
+        const raw = window.BusinessDataModule?.DNA_CONDITION;
+        return Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+    },
+    get DNA_STAFF() {
+        const raw = window.BusinessDataModule?.DNA_STAFF;
+        return Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+    },
     get CRISIS_EVENTS() {
         if (window.BUSINESS_CRISIS_EVENTS && Array.isArray(window.BUSINESS_CRISIS_EVENTS)) {
             return window.BUSINESS_CRISIS_EVENTS;
         }
-        return window.BusinessDataModule?.CRISIS_EVENTS || [];
+        const raw = window.BusinessDataModule?.CRISIS_EVENTS;
+        return Array.isArray(raw) ? raw : [];
     },
-    get DAILY_BIZ_CHALLENGES() { return window.BusinessDataModule?.DAILY_BIZ_CHALLENGES || []; },
-    get achievements() { return window.BusinessDataModule?.achievements || []; },
+    get DAILY_BIZ_CHALLENGES() {
+        const raw = window.BusinessDataModule?.DAILY_BIZ_CHALLENGES;
+        return Array.isArray(raw) ? raw : [];
+    },
+    get achievements() {
+        const raw = window.BusinessDataModule?.achievements;
+        return Array.isArray(raw) ? raw : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+    },
 
-    // ========================================================
-    // КАТАЛОГ ОБОРУДОВАНИЯ (ИНДИВИДУАЛЬНЫЙ ЦЕХ ДЛЯ КАЖДОЙ ТОЧКИ)
-    // ========================================================
     _defaultIndividualUpgrades: {
         wash: [
             { id: 'w_pressure', name: 'Пеногенераторы Tornado', desc: '+15% к скорости обслуживания и чеку', baseCost: 35000, costMul: 1.7, maxLevel: 3, bonusPct: 15, icon: 'fa-shower' },
@@ -112,9 +123,6 @@ const PhoneBusiness = {
         ]
     },
 
-    // ========================================================
-    // КАТАЛОГ ПЕРСОНАЛЬНОГО ШТАТА ТОЧКИ
-    // ========================================================
     pointStaffCatalog: [
         { id: 'manager',  name: 'Управляющий филиала',  salary: 15000, bonusPct: 15, desc: '+15% к выручке, контроль кассы и порядка', icon: 'fa-user-tie' },
         { id: 'master',   name: 'Старший мастер смены', salary: 10000, bonusPct: 10, desc: '+10% к кассе, экономит 25% сырья на складе', icon: 'fa-wrench' },
@@ -154,10 +162,6 @@ const PhoneBusiness = {
         if (typeof window !== 'undefined' && window.BUSINESS_DATA && Array.isArray(window.BUSINESS_DATA) && window.BUSINESS_DATA.length > 0) {
             return window.BUSINESS_DATA;
         }
-        if (typeof BUSINESS_DATA !== 'undefined' && Array.isArray(BUSINESS_DATA) && BUSINESS_DATA.length > 0) {
-            return BUSINESS_DATA;
-        }
-
         return [
             { id: 'wash', name: 'Автомойка 24/7', minLevel: 4, income: 4000, level: 0, cost: 85000, desc: 'Круглосуточный комплекс бесконтактной мойки.', img: 'assets/business/wash.jpg' },
             { id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 6, income: 6000, level: 0, cost: 140000, desc: 'Правка дисков, ошиповка и балансировка.', img: 'assets/business/shina.jpg' },
@@ -175,9 +179,6 @@ const PhoneBusiness = {
         ];
     },
 
-    // ========================================================
-    // ИНИЦИАЛИЗАЦИЯ И НОРМАЛИЗАЦИЯ ДАННЫХ
-    // ========================================================
     ensureState() {
         if (this._ensureStateInProgress) return;
         this._ensureStateInProgress = true;
@@ -212,8 +213,8 @@ const PhoneBusiness = {
                     stock: 100,
                     maxStock: 100,
                     incomeHistory: [],
-                    workshop: {}, // Индивидуальный цех
-                    staff: {},    // Индивидуальный штат
+                    workshop: {},
+                    staff: {},
                     lastIncomeDay: 0,
                     lastStockDay: 0,
                     dna: null,
@@ -251,7 +252,6 @@ const PhoneBusiness = {
 
             if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
 
-            // 100% безопасная нормализация legalEntity
             let legalType = 'none';
             if (typeof window.state.player.legalEntity === 'string') {
                 legalType = window.state.player.legalEntity;
@@ -291,7 +291,8 @@ const PhoneBusiness = {
         if (roll < 0.25) cycleId = 'boom';
         else if (roll < 0.55) cycleId = 'bust';
 
-        const cycle = { ...(this.ECONOMIC_CYCLES[cycleId] || { incomeMul: 1.0, name: 'Стабильный рынок' }) };
+        const cycles = this.ECONOMIC_CYCLES || {};
+        const cycle = { ...(cycles[cycleId] || { incomeMul: 1.0, name: 'Стабильный рынок' }) };
         cycle.daysLeft = Math.floor(2 + Math.random() * 4);
         cycle.startedDay = window.state?.player?.day || 1;
         return cycle;
@@ -302,14 +303,14 @@ const PhoneBusiness = {
         if (!cycle) return 1.0;
         const curDay = window.state?.player?.day || 1;
         const elapsed = curDay - (cycle.startedDay || curDay);
-        if (elapsed >= cycle.daysLeft) return 1.0;
+        if (elapsed >= (cycle.daysLeft || 3)) return 1.0;
         return cycle.incomeMul || 1.0;
     },
 
     _tickEconomicCycle() {
         const curDay = window.state?.player?.day || 1;
         const cycle = window.state?.player?.economicCycle;
-        if (!cycle || (curDay - (cycle.startedDay || curDay)) >= cycle.daysLeft) {
+        if (!cycle || (curDay - (cycle.startedDay || curDay)) >= (cycle.daysLeft || 3)) {
             window.state.player.economicCycle = this._generateEconomicCycle();
         }
     },
@@ -374,9 +375,11 @@ const PhoneBusiness = {
     _getNetworkMilestoneBonus() {
         const owned = this.countOwned();
         let bonus = 0;
-        const milestones = this.NETWORK_MILESTONES || [];
-        for (const m of milestones) {
-            if (owned >= m.count) bonus = m.incomeBonus;
+        const milestones = this.NETWORK_MILESTONES;
+        if (Array.isArray(milestones)) {
+            for (const m of milestones) {
+                if (m && owned >= (m.count || 0)) bonus = m.incomeBonus || 0;
+            }
         }
         return bonus;
     },
@@ -394,7 +397,7 @@ const PhoneBusiness = {
     _generateDNA(bizId) {
         const uid = String(window.state?.player?.uid || 'guest');
         const seed = (uid + '_' + bizId).split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-        const pick = (arr, offset) => (arr && arr.length > 0) ? arr[(seed + offset) % arr.length] : { id: 'std', mult: 1.0 };
+        const pick = (arr, offset) => (Array.isArray(arr) && arr.length > 0) ? arr[(seed + offset) % arr.length] : { id: 'std', mult: 1.0 };
         return {
             location:  pick(this.DNA_LOCATIONS, 0).id,
             traffic:   pick(this.DNA_TRAFFIC, 7).id,
@@ -411,11 +414,16 @@ const PhoneBusiness = {
 
         if (!dna) return { location: defaultLoc, traffic: defaultTraf, condition: defaultCond, staff: defaultStaff };
 
+        const locs = this.DNA_LOCATIONS;
+        const trafs = this.DNA_TRAFFIC;
+        const conds = this.DNA_CONDITION;
+        const staffs = this.DNA_STAFF;
+
         return {
-            location:  (this.DNA_LOCATIONS && this.DNA_LOCATIONS.find(x => x && x.id === dna.location)) || defaultLoc,
-            traffic:   (this.DNA_TRAFFIC && this.DNA_TRAFFIC.find(x => x && x.id === dna.traffic)) || defaultTraf,
-            condition: (this.DNA_CONDITION && this.DNA_CONDITION.find(x => x && x.id === dna.condition)) || defaultCond,
-            staff:     (this.DNA_STAFF && this.DNA_STAFF.find(x => x && x.id === dna.staff)) || defaultStaff
+            location:  (Array.isArray(locs) && locs.find(x => x && x.id === dna.location)) || defaultLoc,
+            traffic:   (Array.isArray(trafs) && trafs.find(x => x && x.id === dna.traffic)) || defaultTraf,
+            condition: (Array.isArray(conds) && conds.find(x => x && x.id === dna.condition)) || defaultCond,
+            staff:     (Array.isArray(staffs) && staffs.find(x => x && x.id === dna.staff)) || defaultStaff
         };
     },
 
@@ -498,7 +506,6 @@ const PhoneBusiness = {
         const repBonus = Math.min(20, (b.reputation || 0) * 0.2);
         inc *= (1 + repBonus / 100);
 
-        // Индивидуальный автопарк точки
         if (window.BusinessFleetModule && typeof window.BusinessFleetModule.calculateFleetIncomeForBiz === 'function') {
             try {
                 const fleetIncome = window.BusinessFleetModule.calculateFleetIncomeForBiz(b.id);
@@ -581,9 +588,6 @@ const PhoneBusiness = {
         return total;
     },
 
-    // ========================================================
-    // ГЛАВНЫЙ РЕНДЕР ПРИЛОЖЕНИЯ
-    // ========================================================
     render(container) {
         if (!container) return;
         this.ensureState();
@@ -609,7 +613,6 @@ const PhoneBusiness = {
             </div>
 
             <div class="phone-app-body">
-                <!-- ВЕРХНИЙ ДАШБОРД ХОЛДИНГА -->
                 <div class="biz-summary-bar mb-2">
                     <div class="biz-summary-cell">
                         <div class="biz-summary-label">Форма</div>
@@ -642,7 +645,6 @@ const PhoneBusiness = {
                     </div>
                 ` : ''}
 
-                <!-- ПАНЕЛЬ ХОЛДИНГА -->
                 <div class="biz-tabs-row mb-2" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px;">
                     <button onclick="PhoneBusiness.setTab('points')" class="biz-tab ${tab === 'points' ? 'active' : ''}">
                         <i class="fa-solid fa-store"></i><span>Точки</span>
@@ -662,14 +664,25 @@ const PhoneBusiness = {
         const content = document.getElementById('bizTabContent');
         if (!content) return;
 
-        if (this.selectedBizId && tab === 'points') {
-            this.renderPointCabinet(content, this.selectedBizId);
-        } else if (tab === 'points') {
-            this.renderPointsTab(content);
-        } else if (tab === 'tenders') {
-            this.renderTendersTab(content);
-        } else if (tab === 'corp') {
-            this.renderCorporationTab(content);
+        try {
+            if (this.selectedBizId && tab === 'points') {
+                this.renderPointCabinet(content, this.selectedBizId);
+            } else if (tab === 'points') {
+                this.renderPointsTab(content);
+            } else if (tab === 'tenders') {
+                this.renderTendersTab(content);
+            } else if (tab === 'corp') {
+                this.renderCorporationTab(content);
+            }
+        } catch (err) {
+            console.error('[PhoneBusiness] Render sub-tab error:', err);
+            content.innerHTML = `
+                <div class="glass-card p-3 text-center">
+                    <b class="text-xs color-red">Ошибка отображения вкладки</b>
+                    <div class="sub-label mt-1" style="font-size:9px;">${err.message || String(err)}</div>
+                    <button onclick="PhoneBusiness.setTab('points')" class="btn btn-dark btn-sm mt-2">Сбросить</button>
+                </div>
+            `;
         }
     },
 
@@ -705,9 +718,6 @@ const PhoneBusiness = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // ========================================================
-    // 1. ДАШБОРД ТОЧЕК
-    // ========================================================
     renderPointsTab(container) {
         const pLvl = window.state?.player?.level || 1;
         const businesses = window.state.businesses || [];
@@ -822,9 +832,6 @@ const PhoneBusiness = {
         `;
     },
 
-    // ========================================================
-    // 2. ПЕРСОНАЛЬНЫЙ КАБИНЕТ УПРАВЛЕНИЯ ТОЧКОЙ
-    // ========================================================
     renderPointCabinet(container, bizId) {
         const b = (window.state.businesses || []).find(x => x && x.id === bizId);
         if (!b) return this.closePointCabinet();
@@ -845,7 +852,6 @@ const PhoneBusiness = {
 
         const sub = this.cabinetSubTab || 'overview';
 
-        // ─── 1. ЦЕХ ТОЧКИ (ИНДИВИДУАЛЬНОЕ ОБОРУДОВАНИЕ) ───
         let workshopHtml = '';
         if (sub === 'workshop') {
             const indUpgrades = this._getIndividualUpgrades(b.id);
@@ -885,7 +891,6 @@ const PhoneBusiness = {
             }
         }
 
-        // ─── 2. ШТАТ ТОЧКИ (ИНДИВИДУАЛЬНЫЕ СОТРУДНИКИ) ───
         let staffHtml = '';
         if (sub === 'staff') {
             this.pointStaffCatalog.forEach(st => {
@@ -923,7 +928,6 @@ const PhoneBusiness = {
             });
         }
 
-        // ─── 3. АВТОПАРК ТОЧКИ ───
         let fleetHtml = '';
         if (sub === 'fleet') {
             if (!supportsFleet) {
@@ -941,11 +945,9 @@ const PhoneBusiness = {
             }
         }
 
-        // ─── 4. ОБЗОР (КАССА, СЫРЬЕ, ГРАФИК) ───
         let overviewHtml = '';
         if (sub === 'overview') {
             overviewHtml = `
-                <!-- КАССА И СЫРЬЕ -->
                 <div class="grid-2 mb-2" style="gap:6px;">
                     <div class="glass-card p-2 text-center" style="background:#090e18;">
                         <div class="sub-label" style="font-size:9px;">Накоплено в кассе:</div>
@@ -966,12 +968,10 @@ const PhoneBusiness = {
                     </div>
                 </div>
 
-                <!-- ГРАФИК ДОХОДНОСТИ ЗА 7 ДНЕЙ -->
                 <div class="glass-card mb-2 p-2">
                     ${this.renderSparkline(b)}
                 </div>
 
-                <!-- КНОПКА ГЕНЕРАЛЬНОГО АПГРЕЙДА ТОЧКИ -->
                 ${!isMaxed ? `
                     <button onclick="PhoneBusiness.upgradePoint('${b.id}')" class="btn btn-green btn-sm w-full mb-2" style="font-size:10px; font-weight:700;">
                         Повысить уровень объекта до ${b.level + 1} (${upgradeCost.toLocaleString()} ₽)
@@ -981,7 +981,6 @@ const PhoneBusiness = {
         }
 
         container.innerHTML = `
-            <!-- КАРТОЧКА ОБЪЕКТА -->
             <div class="glass-card mb-2 p-2 text-center" style="background: radial-gradient(circle at 50% 0%, rgba(0,230,118,0.15), #090e18); border-color:var(--green);">
                 <div class="flex-between mb-1">
                     <div class="flex-gap" style="align-items:center;">
@@ -997,7 +996,6 @@ const PhoneBusiness = {
                 </div>
             </div>
 
-            <!-- НАВИГАЦИЯ ВНУТРИ ТОЧКИ -->
             <div class="grid-4 mb-2" style="grid-template-columns: repeat(4, 1fr); gap:3px;">
                 <button onclick="PhoneBusiness.setCabinetSubTab('overview')" class="btn ${sub === 'overview' ? 'btn-green' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 1px;">
                     <i class="fa-solid fa-chart-pie"></i> Обзор
@@ -1103,9 +1101,6 @@ const PhoneBusiness = {
         }
     },
 
-    // ========================================================
-    // ВСПОМОГАТЕЛЬНЫЕ ВКЛАДКИ (ТЕНДЕРЫ, КОРП)
-    // ========================================================
     renderTendersTab(container) {
         const tenders = window.BUSINESS_TENDERS_CATALOG || [];
         const curDay = window.state?.player?.day || 1;
@@ -1261,9 +1256,6 @@ const PhoneBusiness = {
         `;
     },
 
-    // ========================================================
-    // ДЕЙСТВИЯ, КАССА И КРИЗИСЫ
-    // ========================================================
     _maybeTriggerCrisisEvent() {
         const events = this.CRISIS_EVENTS;
         if (!Array.isArray(events) || events.length === 0) return false;
@@ -1545,6 +1537,7 @@ const PhoneBusiness = {
     },
 
     drawSparkline(biz) {
+        if (!biz) return;
         const canvas = document.getElementById(`bizSpark_${biz.id}`);
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -1571,14 +1564,16 @@ const PhoneBusiness = {
     },
 
     renderAchievementsBlock() {
-        const unlocked = window.state?.player?.businessAchievements || [];
-        const achList = this.achievements || [];
+        const unlocked = Array.isArray(window.state?.player?.businessAchievements) ? window.state.player.businessAchievements : [];
+        const achRaw = this.achievements;
+        const achList = Array.isArray(achRaw) ? achRaw : (achRaw && typeof achRaw === 'object' ? Object.values(achRaw) : []);
         const html = achList.map(a => {
+            if (!a) return '';
             const isDone = unlocked.includes(a.id);
             return `
                 <div class="p-2 mb-1 flex-between" style="background:#050914; border-radius:6px;">
                     <div>
-                        <b class="text-xs ${isDone ? 'color-green' : 'color-main'}">${a.title}</b>
+                        <b class="text-xs ${isDone ? 'color-green' : 'color-main'}">${a.title || 'Достижение'}</b>
                         <div class="sub-label" style="font-size:8px;">${a.desc || ''}</div>
                     </div>
                     ${isDone ? '<span class="tag-badge bg-tag-green">✓</span>' : '<span class="tag-badge bg-tag-dark"><i class="fa-solid fa-lock"></i></span>'}
@@ -1599,7 +1594,7 @@ const PhoneBusiness = {
         if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
         const achList = this.achievements || [];
         achList.forEach(a => {
-            if (window.state.player.businessAchievements.includes(a.id)) return;
+            if (!a || window.state.player.businessAchievements.includes(a.id)) return;
             try {
                 if (a.cond && a.cond()) {
                     window.state.player.businessAchievements.push(a.id);
@@ -1611,9 +1606,6 @@ const PhoneBusiness = {
         if (typeof saveState === 'function') saveState();
     },
 
-    // ========================================================
-    // НЕПРЕРЫВНОЕ НАЧИСЛЕНИЕ ДОХОДА С УЧЕТОМ РЕАЛЬНОГО ВРЕМЕНИ
-    // ========================================================
     tickIncome() {
         if (!window.state?.businesses) return;
         const now = Date.now();
