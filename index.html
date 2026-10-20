@@ -11,7 +11,7 @@
 
 <script>
     window.AUTH_SERVER_URL = window.AUTH_SERVER_URL || '';
-    window.__LOADER_VERSION__ = '4.3.6';
+    window.__LOADER_VERSION__ = '4.4.0';
     console.log('[Loader] v' + window.__LOADER_VERSION__ + ' стартует. AUTH_SERVER_URL =', window.AUTH_SERVER_URL || '(не задан, fallback на Telegram ID)');
 </script>
 
@@ -93,7 +93,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Если вы играете через Telegram — просто откройте бота заново.</div>
-      <div class="pc-auth-version">v4.3.6 // BUILD 432</div>
+      <div class="pc-auth-version">v4.4.0 // BUILD 432</div>
     </div>
   </div>
 </div>
@@ -118,7 +118,7 @@
     </button>
 
     <div class="pc-auth-footer">
-      <div class="pc-auth-version">v4.3.6 // BUILD 432</div>
+      <div class="pc-auth-version">v4.4.0 // BUILD 432</div>
     </div>
   </div>
 </div>
@@ -150,7 +150,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Инвайт-код выдаёт владелец игры в личном сообщении.</div>
-      <div class="pc-auth-version">v4.3.6 // BUILD 432</div>
+      <div class="pc-auth-version">v4.4.0 // BUILD 432</div>
     </div>
   </div>
 </div>
@@ -705,16 +705,17 @@
 <div id="modalPatchNotes" class="modal-overlay">
   <div class="modal-box" style="max-width: 420px;">
     <div class="flex-between mb-2">
-      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.3.6</div>
+      <div class="modal-glow-badge"><i class="fa-solid fa-bolt"></i> ОБНОВЛЕНИЕ v4.4.0</div>
       <button onclick="dismissPatchNotesModal()" class="btn btn-dark btn-auto btn-sm">✕</button>
     </div>
     <div class="sub-label mb-1 color-amber font-bold">Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль</div>
     <div class="sub-label mb-2 color-green" style="font-size:10.5px;">Сборка #432</div>
     <div class="space-y-2 mb-3 text-xs" style="background:#090e18; border-radius:10px; padding:10px; border:1px solid var(--border-glass);">
-      <div class="patch-item"><b>🏢 АВТОБИЗНЕСЫ:</b> модульное разделение бизнес-сети и автопарков.</div>
-      <div class="patch-item"><b>🚕 КОММЕРЧЕСКИЙ АВТОПАРК:</b> покупка машин на компанию и привязка к автопаркам.</div>
-      <div class="patch-item"><b>🔍 АВТОТЕКА:</b> проверка пригодности автомобилей для открытых предприятий игрока.</div>
-      <div class="patch-item"><b>🏪 ПЛОЩАДКА:</b> интерактивное выставление цены с анализом спроса.</div>
+      <div class="patch-item"><b>👥 СОЦИУМ И ЧАТЫ:</b> личная переписка с друзьями, быстрые фразы и карточки прямой продажи авто.</div>
+      <div class="patch-item"><b>🔍 АВТОТЕКА PRO & ТЕСТ-ДРАЙВ:</b> проверка холодного пуска ДВС, прогон КПП и базы техосмотра ЕАИСТО.</div>
+      <div class="patch-item"><b>⚖️ ХАРДКОР-БАЛАНС:</b> покупатели торгуются от реального рынка авто, устранены оверпрайсы и легкий фарм миллионов.</div>
+      <div class="patch-item"><b>✨ ДЕТЕЙЛИНГ & СХЕМЫ:</b> полировка фар, сухой туман, подкрас баллончиком и риск скрутки одометра.</div>
+      <div class="patch-item"><b>❄️ СЕЗОНЫ & ПЕРЕГОН:</b> сезонный спрос (дрифт зимой / мото летом) и наводки на капсулы времени.</div>
     </div>
     <button onclick="dismissPatchNotesModal()" class="btn btn-cyan w-full">В игру!</button>
   </div>
@@ -1362,6 +1363,7 @@
         'data/data_core.js',
         'data/data_economy.js',
         'data/data_profile.js',
+        'data/data_patchnotes.js',
         'js/data-defects.js',
         'data/data_cars_fallbacks.js',
         'data/data_cars_helpers.js',
