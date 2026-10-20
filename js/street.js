@@ -1,15 +1,11 @@
 // ========================================================
-// js/street.js — СТРИТ-РЕЙСИНГ, 402М И АВТОМЕРОПРИЯТИЯ (v0.8.0)
+// js/street.js — СТРИТ-РЕЙСИНГ, ТЕХНАДЗОР 12.5.1 И МЕРОПРИЯТИЯ (v0.9.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v0.8.0 (БАЛАНС РЕСУРСА МОТОРА, ШИН И ИЗНОСА):
-//   - СБАЛАНСИРОВАН ИЗНОС ШИН: Городские шины расходуют 4-6% за заезд,
-//     драг-слики — 7-9% (с учетом зацепа). Букс на отсечке добавляет износ резины.
-//   - СБАЛАНСИРОВАН РЕСУРС МОТОРА: Плавный нагрев (+6..10°C), учет перегрева
-//     (>98°C дает повышенный износ поршневой), расчет урона трансмиссии при ланче.
-//   - ДИФФЕРЕНЦИАЦИЯ МЕРОПРИЯТИЙ: Стенс-выставка больше не сжигает 15% резины
-//     вхолостую; на дрифте горит резина, на 402м греется мотор.
-//   - ИНТЕГРАЦИЯ: Прямая связка с модулем «Теневой Контур» (облавы 12.5.1 и крыша).
+// ⭐ v0.9.0 (ТЕХНАДЗОР ГИБДД И СТАТЬЯ 12.5.1):
+//   - ПРОВЕРКА ТЕХНАДЗОРА: учет накопленного риска tuning.risk1251 (заварка, выхлоп, каркас).
+//   - МОДАЛКА ЗАДЕРЖАНИЯ: взятка инспектору, звонок Решале или аннулирование учета в МРЭО.
+//   - СОХРАНЕНО: расчет износа шин, нагрев ДВС, ланч-старт и участие в мероприятиях.
 // ========================================================
 
 let currentRaceBet = 25000;
@@ -26,14 +22,12 @@ window.tachoRpm = currentRpm;
 function getActiveStreetCarIndex() {
     if (!state.garage || state.garage.length === 0) return -1;
     
-    // 1. Приоритет личного авто
     let personalIdx = state.garage.findIndex(c => c && c.isPersonal && !c.impounded);
     if (personalIdx !== -1) {
         state.player.selectedStreetCarIndex = personalIdx;
         return personalIdx;
     }
 
-    // 2. Текущий выбранный индекс
     let selIdx = state.player.selectedStreetCarIndex || 0;
     if (selIdx >= state.garage.length || !state.garage[selIdx] || state.garage[selIdx].impounded) {
         let firstAvailable = state.garage.findIndex(c => c && !c.impounded);
@@ -65,9 +59,10 @@ function renderStreetScreen() {
     let carHp = car.power || 100;
     let temp = car.engineTemp || 90;
     let tires = car.tireWear !== undefined ? car.tireWear : 100;
+    let risk1251 = car.tuning?.risk1251 || 0;
 
     if (hpBadge) {
-        hpBadge.innerHTML = `${carHp} л.с. | <span class="${temp > 102 ? 'color-red' : 'color-green'}">${temp}°C</span> | <span class="${tires < 30 ? 'color-red' : 'color-cyan'}">${tires}% шины</span>`;
+        hpBadge.innerHTML = `${carHp} л.с. | <span class="${temp > 102 ? 'color-red' : 'color-green'}">${temp}°C</span> | <span class="${tires < 30 ? 'color-red' : 'color-cyan'}">${tires}% шины</span> | <span class="${risk1251 > 30 ? 'color-red' : 'color-amber'}">⚠️ ${risk1251}% риск</span>`;
     }
 
     let opts = "";
@@ -151,7 +146,7 @@ function updateTachometerUI() {
 }
 
 // ========================================================
-// ДРАГ-РЕЙСИНГ НА 402 МЕТРА (СБАЛАНСИРОВАННЫЙ ИЗНОС)
+// ДРАГ-РЕЙСИНГ НА 402 МЕТРА
 // ========================================================
 function launchDragRace() {
     if (!state.player.hasRacingLicense) {
@@ -177,7 +172,6 @@ function launchDragRace() {
         return showToast("Автомобиль на штрафстоянке ГИБДД!");
     }
 
-    // 1. Проверка перегрева двигателя
     let temp = car.engineTemp || 90;
     if (temp > 105) {
         if (typeof playSound === 'function') playSound('error');
@@ -185,7 +179,6 @@ function launchDragRace() {
         return showToast("⚠️ Перегрев мотора (" + temp + "°C)! Остудите болид перед стартом.");
     }
 
-    // 2. Проверка состояния шин
     let tires = car.tireWear !== undefined ? car.tireWear : 100;
     if (tires < 15) {
         if (typeof playSound === 'function') playSound('error');
@@ -193,10 +186,13 @@ function launchDragRace() {
         return showToast("🚫 Корд наружу! Резина стёрта до предела, замените комплект на СТО.");
     }
 
-    // Списание ставки
+    // Проверка риска Технадзора (12.5.1) перед заездом
+    if (_triggerTechInspectionRaid(car, carIdx)) {
+        return;
+    }
+
     state.player.cash -= currentRaceBet;
 
-    // Внимание ДПС: если активна «Крыша», внимание не растёт
     const hasRoof = (state.player.policeImmunityDays || 0) > 0;
     if (hasRoof) {
         state.player.consecutiveRaces = 0;
@@ -204,33 +200,26 @@ function launchDragRace() {
         state.player.consecutiveRaces = (state.player.consecutiveRaces || 0) + 1;
     }
 
-    // Определение качества старта по тахометру
     let idealStart = currentRpm >= 5500 && currentRpm <= 6800;
     let cutOff = currentRpm > 7500;
     let bogged = currentRpm < 4200;
 
-    // --- СБАЛАНСИРОВАННЫЙ РАСЧЕТ ИЗНОСА И ТЕМПЕРАТУРЫ ---
-    // Плавный нагрев мотора: +6..10°C за квотер
     const heatDelta = Math.floor(6 + Math.random() * 5);
     car.engineTemp = (car.engineTemp || 90) + heatDelta;
 
-    // Расход шин: базовый 4-6%, драг-слики 7-9% (мягкий компаунд), букс на отсечке +3%
     let baseTireWear = car.tuning?.dragSlicks ? (7 + Math.floor(Math.random() * 3)) : (4 + Math.floor(Math.random() * 3));
     if (cutOff) baseTireWear += 3;
     car.tireWear = Math.max(0, tires - baseTireWear);
 
-    // Износ агрегатов
     if (!car.wear) {
         car.wear = { engine: 85, transmission: 85, body: 90 };
     }
 
-    // Мотор страдает сильнее при перегреве (>98°C) и при отсечке
     let engineWearDelta = 0.5 + Math.random() * 0.4;
     if (temp > 98) engineWearDelta *= 1.5;
     if (cutOff) engineWearDelta += 0.8;
     car.wear.engine = Math.max(10, Number(((car.wear.engine || 85) - engineWearDelta).toFixed(1)));
 
-    // Трансмиссия страдает при резком ланче и особенно при провале оборотов (удар по сцеплению)
     let transWearDelta = 0.4 + Math.random() * 0.4;
     if (bogged) transWearDelta += 0.9;
     car.wear.transmission = Math.max(10, Number(((car.wear.transmission || 85) - transWearDelta).toFixed(1)));
@@ -240,7 +229,6 @@ function launchDragRace() {
     let statusText = document.getElementById('raceStatusText');
 
     let playerPower = car.power || 100;
-    
     let drive = car.drivetrain || 'rwd';
     if (drive === 'awd') playerPower *= 1.15;
     else if (drive === 'fwd') playerPower *= 0.92;
@@ -248,9 +236,8 @@ function launchDragRace() {
     if (car.tuning?.dragSlicks) playerPower += 35;
     if (car.tuning?.chip > 0) playerPower *= (1 + car.tuning.chip * 0.08);
 
-    // Влияние износа резины на динамику
     if (car.tireWear < 35) {
-        playerPower *= 0.88; // Потеря зацепа на лысой резине
+        playerPower *= 0.88;
     }
     
     if (idealStart) playerPower += 45;
@@ -325,27 +312,116 @@ function launchDragRace() {
                     openVerdictModal("ПОРАЖЕНИЕ НА 402М 💨", `Соперник оказался быстрее на финише!\nВаше время: ${myTime}с | Соперник: ${rivalTime}с\nСтавка -${currentRaceBet.toLocaleString()} ₽ потеряна.\nШины: -${baseTireWear}% (остаток: ${car.tireWear}%)`, false);
                 }
 
-                // Проверка внимания ДПС и угрозы облавы
                 checkPoliceRaid(carIdx);
             }, 600);
         }
     }, 60);
 }
 
-// ────────────────────────────────────────────────────────
-// ЛОГИКА ОБЛАВЫ И ВНИМАНИЯ ДПС
-// ────────────────────────────────────────────────────────
+// ========================================================
+// ТЕХНАДЗОР ГИБДД И СТАТЬЯ 12.5.1 КОАП РФ (v0.9.0)
+// ========================================================
+function _triggerTechInspectionRaid(car, carIdx) {
+    if (!car) return false;
+    const hasRoof = (state.player.policeImmunityDays || 0) > 0;
+    if (hasRoof) return false;
+
+    const risk = car.tuning?.risk1251 || 0;
+    if (risk <= 0) return false;
+
+    const roll = Math.random() * 100;
+    if (roll >= risk) return false;
+
+    // Срабатывание проверки Технадзора
+    let bribeCost = Math.round(risk * 1200);
+    let modal = document.getElementById('modalTechRaid');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalTechRaid';
+        modal.className = 'modal-backdrop active';
+        modal.style.cssText = 'position:fixed; inset:0; z-index:10001; background:rgba(0,0,0,0.88); display:flex; align-items:center; justify-content:center; padding:14px; backdrop-filter:blur(6px);';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="glass-card p-3 w-full text-center" style="max-width:400px; background:#0c1222; border:2px solid var(--red); border-radius:14px;">
+            <div style="font-size:36px; margin-bottom:6px;">🚨</div>
+            <div class="modal-glow-badge mb-1" style="color:var(--red); border-color:var(--red);">
+                ТЕХНАДЗОР ГИБДД (СТ. 12.5.1)
+            </div>
+            <b class="text-xs color-cyan block mb-2">${car.name} (Риск: ${risk}%)</b>
+            <div class="sub-label mb-3" style="font-size:9.5px; line-height:1.4;">
+                Ваш болид остановлен спецротой Технадзора! Выявлены изменения конструкции: спиленные пружины, громкий выхлоп или заварка редуктора.
+            </div>
+
+            <div class="space-y-2">
+                <button onclick="resolveTechInspection(${carIdx}, 'bribe', ${bribeCost})" class="btn btn-amber btn-sm w-full font-bold">
+                    💵 Договориться на месте (${bribeCost.toLocaleString()} ₽)
+                </button>
+                <button onclick="resolveTechInspection(${carIdx}, 'reshala', 1)" class="btn btn-purple btn-sm w-full">
+                    🤝 Решить через Решалу (1 связь)
+                </button>
+                <button onclick="resolveTechInspection(${carIdx}, 'protocol', 0)" class="btn btn-danger btn-sm w-full">
+                    📝 Протокол и аннулирование учета
+                </button>
+            </div>
+        </div>
+    `;
+
+    if (typeof playSound === 'function') playSound('error');
+    if (typeof tgHaptic === 'function') tgHaptic('error');
+    return true;
+}
+
+function resolveTechInspection(carIdx, action, cost) {
+    const car = state.garage[carIdx];
+    const modal = document.getElementById('modalTechRaid');
+    if (modal) modal.remove();
+
+    if (action === 'bribe') {
+        const cash = state.player.cash || 0;
+        if (cash < cost) {
+            showToast("Не хватает денег на взятку инспектору! Составляется протокол.");
+            return resolveTechInspection(carIdx, 'protocol', 0);
+        }
+        state.player.cash -= cost;
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Откуп от Технадзора 12.5.1: ${car.name}`, cost, false);
+        }
+        showToast("💸 Вопрос решён на месте. Будьте осторожнее в городе!");
+        if (typeof playSound === 'function') playSound('win');
+    } else if (action === 'reshala') {
+        if ((state.player.connections || 0) < 1) {
+            showToast("Нет свободных связей у Решалы!");
+            return resolveTechInspection(carIdx, 'protocol', 0);
+        }
+        state.player.connections -= 1;
+        showToast("🤝 Звонок другу спас от штрафстоянки (-1 связь)!");
+        if (typeof playSound === 'function') playSound('win');
+    } else if (action === 'protocol') {
+        if (car) {
+            car.isRegisteredOnPlayer = false; // Аннулирование учета МРЭО
+            car.impounded = true;             // Эвакуация на штрафстоянку
+        }
+        showToast("🚫 Учёт аннулирован! Машина отправлена на спецстоянку.");
+        if (typeof playSound === 'function') playSound('error');
+    }
+
+    saveState();
+    updateHeaderUI();
+    renderStreetScreen();
+    if (typeof renderGarage === 'function') renderGarage();
+}
+
 function checkPoliceRaid(carIdx) {
     let raids = state.player.consecutiveRaces || 0;
     let maxRaids = state.player.maxRacesBeforeRaid || 12;
 
-    // Крыша активна — облавы нет
     if ((state.player.policeImmunityDays || 0) > 0) {
         if (raids > 0) state.player.consecutiveRaces = 0;
         return;
     }
 
-    // 1. Предупреждение о критической угрозе
     if (raids === maxRaids - 2 || raids === maxRaids - 1) {
         if (typeof playSound === 'function') playSound('warn');
         if (typeof tgHaptic === 'function') tgHaptic('warning');
@@ -353,7 +429,6 @@ function checkPoliceRaid(carIdx) {
         return;
     }
 
-    // 2. Срабатывание облавы при 12/12
     if (raids >= maxRaids) {
         state.player.consecutiveRaces = 0;
         let car = state.garage[carIdx];
@@ -369,7 +444,6 @@ function checkPoliceRaid(carIdx) {
         if (typeof renderGarage === 'function') renderGarage();
         renderStreetScreen();
         
-        // Открытие модалки штрафстоянки или системный алерт
         if (typeof openImpoundLotModal === 'function') {
             openImpoundLotModal(carIdx);
         } else if (typeof openModal === 'function' && document.getElementById('modalImpoundLot')) {
@@ -476,7 +550,6 @@ function participateStreetEvent(eventId) {
         return showToast("Автомобиль не прошел техкомиссию регламента!");
     }
 
-    // Проверка риска контрабанды/краденых деталей Даркнета на техкоме
     if (car.hasStolenParts && Math.random() * 100 < (car.stolenPartsRisk || 20)) {
         car.impounded = true;
         if (typeof playSound === 'function') playSound('error');
@@ -487,9 +560,7 @@ function participateStreetEvent(eventId) {
         return openVerdictModal("❌ ПРОВАЛ ТЕХКОМИССИИ!", `Инспектор техкома выявил спиленные номера агрегатов на «${car.name}»!\nАвтомобиль задержан по 12.5.1 и отправлен на спецстоянку. Потребуется помощь Решалы!`, false);
     }
 
-    // Дифференцированный износ в зависимости от типа мероприятия:
     if (ev.type === 'drift') {
-        // На дрифте горит резина и греется мотор
         car.engineTemp = (car.engineTemp || 90) + 12;
         car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - 12);
         if (car.wear) {
@@ -497,7 +568,6 @@ function participateStreetEvent(eventId) {
             car.wear.transmission = Math.max(10, (car.wear.transmission || 85) - 1.2);
         }
     } else if (ev.type === 'drag') {
-        // На драг-кубке боевой старт
         car.engineTemp = (car.engineTemp || 90) + 9;
         car.tireWear = Math.max(0, (car.tireWear !== undefined ? car.tireWear : 100) - 8);
         if (car.wear) {
@@ -505,7 +575,6 @@ function participateStreetEvent(eventId) {
             car.wear.transmission = Math.max(10, (car.wear.transmission || 85) - 1.0);
         }
     } else if (ev.type === 'show') {
-        // На стенс-выставке машина стоит на стенде — износ 0%
         car.engineTemp = Math.max(85, (car.engineTemp || 90) - 5);
     }
 
@@ -537,3 +606,5 @@ window.launchDragRace = launchDragRace;
 window.checkPoliceRaid = checkPoliceRaid;
 window.renderStreetEvents = renderStreetEvents;
 window.participateStreetEvent = participateStreetEvent;
+window._triggerTechInspectionRaid = _triggerTechInspectionRaid;
+window.resolveTechInspection = resolveTechInspection;
