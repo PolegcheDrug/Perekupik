@@ -1,9 +1,12 @@
 // ========================================================
-// js/phone/phone-m-social.js — M+ HUB: СОЦИУМ И ПРОФИЛЬ (v9.0.0)
+// js/phone/phone-m-social.js — M+ HUB: СОЦИУМ, ДРУЗЬЯ И СДЕЛКИ (v9.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.0.0 (РАЗГРУЗКА phone-m.js на 3 файла):
-//   - Часть 3 из 3: социум, друзья, профиль, синхронизация NPC
+// ⭐ v9.2.0:
+//   - ПОЛНОЦЕННЫЙ ЭКРАН ДРУЗЕЙ: табы "Мои друзья", "Входящие", "Исходящие".
+//   - ВЗАИМНОЕ ДОБАВЛЕНИЕ: кнопки Принять/Отклонить с Firestore-синхронизацией.
+//   - БЫСТРЫЕ ФРАЗЫ (Quick Chat): всплывающее меню с перекупскими фразами.
+//   - ПРЯМАЯ ПРОДАЖА АВТО ДРУГУ: модальное окно выбора авто из гаража с ценой.
 // ========================================================
 
 (function() {
@@ -15,6 +18,24 @@
     }
 
     const AppM = window.AppM;
+
+    // Внутреннее состояние вкладок друзей
+    AppM._friendsSubTab = AppM._friendsSubTab || 'list'; // 'list' | 'incoming' | 'outgoing'
+    AppM._cachedSocialData = { friends: [], pending: [], outgoing: [] };
+
+    // Набор перекупских фраз для быстрого общения
+    const QUICK_CHAT_PHRASES = [
+        { cat: "Приветствия", text: "Салам пополам! Как торговля? 🤝" },
+        { cat: "Приветствия", text: "Здорово! Есть свежий завоз в гараже? 🚗" },
+        { cat: "Статус", text: "Коплю на новый проект, пока на мели 📉" },
+        { cat: "Статус", text: "Снял куш на перепродаже, обмываю! 🍾" },
+        { cat: "Подколы", text: "Не бит, не крашен, дедушка за хлебом ездил! 😂" },
+        { cat: "Подколы", text: "Там шпакли на полмашины, скидывай цену! 🪣" },
+        { cat: "Подколы", text: "Пушка-гонка, уважение за сборку! 🚀" },
+        { cat: "Деловые", text: "Глянь, что я выкатил на продажу 👀" },
+        { cat: "Деловые", text: "Ищу бодрый корч под дрифт, есть варианты? 🏁" },
+        { cat: "Деловые", text: "Срочно нужны деньги, отдам авто ниже рынка! ⚡" }
+    ];
 
     // ========================================================
     // СОЦИУМ — объединённый хаб
@@ -56,41 +77,33 @@
 
         try {
             if (sub === 'feed') {
-                if (window.MEventsModule) {
-                    if (typeof window.MEventsModule.onTabOpen === 'function') window.MEventsModule.onTabOpen();
-                    if (typeof window.MEventsModule.renderScreen === 'function') {
-                        window.MEventsModule.renderScreen(box);
-                    } else {
-                        box.innerHTML = `<div class="glass-card text-center py-4 sub-label">Лента временно недоступна</div>`;
-                    }
+                if (window.MEventsModule?.renderScreen) {
+                    window.MEventsModule.onTabOpen?.();
+                    window.MEventsModule.renderScreen(box);
                 } else {
-                    box.innerHTML = `<div class="glass-card text-center py-4 sub-label">MEventsModule не загружен</div>`;
+                    box.innerHTML = `<div class="glass-card text-center py-4 sub-label">Лента временно недоступна</div>`;
                 }
             } else if (sub === 'top') {
-                if (window.MLeaderboardModule) {
-                    if (typeof window.MLeaderboardModule.onTabOpen === 'function') window.MLeaderboardModule.onTabOpen();
-                    if (typeof window.MLeaderboardModule.renderScreen === 'function') {
-                        window.MLeaderboardModule.renderScreen(box);
-                    }
+                if (window.MLeaderboardModule?.renderScreen) {
+                    window.MLeaderboardModule.onTabOpen?.();
+                    window.MLeaderboardModule.renderScreen(box);
                 } else {
-                    box.innerHTML = `<div class="glass-card text-center py-4 sub-label">MLeaderboardModule не загружен</div>`;
+                    box.innerHTML = `<div class="glass-card text-center py-4 sub-label">Рейтинг загружается...</div>`;
                 }
             } else if (sub === 'friends') {
                 this._renderFriendsScreen(box);
             } else if (sub === 'clubs') {
-                if (window.MClubsModule) {
-                    if (typeof window.MClubsModule.onTabOpen === 'function') window.MClubsModule.onTabOpen();
-                    if (typeof window.MClubsModule.renderScreen === 'function') {
-                        window.MClubsModule.renderScreen(box);
-                    }
+                if (window.MClubsModule?.renderScreen) {
+                    window.MClubsModule.onTabOpen?.();
+                    window.MClubsModule.renderScreen(box);
                 } else {
-                    box.innerHTML = `<div class="glass-card text-center py-4 sub-label">MClubsModule не загружен</div>`;
+                    box.innerHTML = `<div class="glass-card text-center py-4 sub-label">Клубы временно недоступны</div>`;
                 }
             }
         } catch (e) {
             console.error('[AppM] Ошибка рендера социума:', e);
             box.innerHTML = `<div class="glass-card p-3 text-center" style="border-color: var(--red);">
-                <b class="color-red text-xs">Ошибка</b>
+                <b class="color-red text-xs">Ошибка загрузки модуля</b>
                 <div class="sub-label mt-1" style="font-size:9px;">${String(e.message || e).substring(0, 120)}</div>
             </div>`;
         }
@@ -103,135 +116,352 @@
     };
 
     // ========================================================
-    // ДРУЗЬЯ
+    // ДРУЗЬЯ — ОБНОВЛЕННЫЙ ИНТЕРФЕЙС
     // ========================================================
-    AppM._renderFriendsScreen = function(box) {
+    AppM._renderFriendsScreen = async function(box) {
         if (!box) return;
 
-        const friendsList = window.state?.friendsList || [];
-        const pendingReqs = window.state?.player?.pendingFriendRequests || [];
+        box.innerHTML = `
+            <div class="sub-label text-center py-6">
+                <i class="fa-solid fa-spinner fa-spin color-green" style="font-size:22px;"></i>
+                <div class="mt-2 text-xs">Загрузка контактов синдиката...</div>
+            </div>
+        `;
 
-        // Нормализация: если friendsList содержит строки — превращаем в объекты
-        const normalizedFriends = friendsList.map(f => {
-            if (typeof f === 'string') {
-                return { id: f, name: f };
+        // Загрузка данных из облака через Firebase
+        if (window.FB_FriendshipsManager?.fetchFriendships) {
+            try {
+                const data = await window.FB_FriendshipsManager.fetchFriendships();
+                this._cachedSocialData = data || { friends: [], pending: [], outgoing: [] };
+            } catch (err) {
+                console.warn('[Social] Не удалось обновить из облака:', err);
             }
-            return f;
-        });
+        }
+
+        const friends = this._cachedSocialData.friends || [];
+        const incoming = this._cachedSocialData.pending || [];
+        const outgoing = this._cachedSocialData.outgoing || [];
+        const fTab = this._friendsSubTab || 'list';
 
         box.innerHTML = `
             <div class="glass-card mb-2 p-2" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.14), #090e18); border-color: var(--green);">
                 <div class="flex-between mb-1">
-                    <b class="text-xs color-green"><i class="fa-solid fa-user-plus mr-1"></i> Друзья</b>
-                    <span class="tag-badge bg-tag-green">${normalizedFriends.length}</span>
+                    <b class="text-xs color-green"><i class="fa-solid fa-handshake mr-1"></i> Сообщество друзей</b>
+                    <span class="tag-badge bg-tag-green">В сети: ${friends.length}</span>
                 </div>
-                <div class="sub-label mb-2" style="font-size:8.5px;">Ищите друзей в разделе «Топ» → кнопка «Дружить»</div>
+                <div class="sub-label" style="font-size:8.5px;">Обменивайтесь репликами и продавайте авто без комиссии биржи</div>
             </div>
 
-            ${pendingReqs.length > 0 ? `
-                <div class="glass-card mb-2 p-2" style="border-color: var(--amber);">
-                    <b class="text-xs color-amber mb-2 block">📩 Входящие заявки (${pendingReqs.length})</b>${pendingReqs.map(req => `
-                        <div class="flex-between p-2 mb-1" style="background:#050914; border-radius:8px;">
-                            <div>
-                                <b class="text-xs">${this._escapeHtml(req.name || 'Игрок')}</b>
-                            </div>
-                            <div class="flex-gap">
-                                <button onclick="AppM._acceptFriend('${req.id}')" class="btn btn-green btn-sm btn-auto" style="font-size:8px; padding:3px 8px;">✓</button>
-                                <button onclick="AppM._declineFriend('${req.id}')" class="btn btn-dark btn-sm btn-auto" style="font-size:8px; padding:3px 8px;">✕</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : ''}
+            <div class="grid-3 mb-2" style="grid-template-columns: 1.2fr 1fr 1fr; gap: 4px;">
+                <button onclick="AppM.switchFriendsSubTab('list')" class="btn ${fTab === 'list' ? 'btn-green' : 'btn-dark'} btn-sm" style="font-size:9px; padding:5px 2px;">
+                    👥 Друзья (${friends.length})
+                </button>
+                <button onclick="AppM.switchFriendsSubTab('incoming')" class="btn ${fTab === 'incoming' ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:9px; padding:5px 2px;">
+                    📬 Входящие ${incoming.length > 0 ? `<b class="color-red">(${incoming.length})</b>` : ''}
+                </button>
+                <button onclick="AppM.switchFriendsSubTab('outgoing')" class="btn ${fTab === 'outgoing' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-size:9px; padding:5px 2px;">
+                    ⏳ Запросы (${outgoing.length})
+                </button>
+            </div>
 
-            ${normalizedFriends.length === 0 ? `
+            <div id="friendsSubContent"></div>
+        `;
+
+        const subContainer = document.getElementById('friendsSubContent');
+        if (!subContainer) return;
+
+        if (fTab === 'list') {
+            this._renderFriendsListTab(subContainer, friends);
+        } else if (fTab === 'incoming') {
+            this._renderIncomingTab(subContainer, incoming);
+        } else if (fTab === 'outgoing') {
+            this._renderOutgoingTab(subContainer, outgoing);
+        }
+    };
+
+    AppM.switchFriendsSubTab = function(tab) {
+        this._friendsSubTab = tab;
+        if (typeof playSound === 'function') playSound('tick');
+        const box = document.getElementById('mSocialContentBox');
+        if (box) this._renderFriendsScreen(box);
+    };
+
+    // 1. Список подтвержденных друзей
+    AppM._renderFriendsListTab = function(container, friends) {
+        if (!friends || friends.length === 0) {
+            container.innerHTML = `
                 <div class="glass-card text-center sub-label py-6" style="background:#090e18;">
                     <i class="fa-solid fa-user-group color-green mb-2" style="font-size:26px;"></i>
-                    <div>У вас пока нет друзей</div>
+                    <div class="font-bold text-xs mb-1">Список друзей пуст</div>
+                    <div style="font-size:9px;">Перейдите во вкладку «Топ», чтобы отправить заявки другим перекупам.</div>
                 </div>
-            ` : `
-                <div class="space-y-1">
-                    ${normalizedFriends.map(f => {
-                        const friendId = f.id || '';
-                        const friendName = f.name || 'Друг';
-                        if (!friendId) return '';
-                        return `
-                            <div class="glass-card p-2 flex-between">
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="space-y-1">
+                ${friends.map(f => {
+                    const friendId = f.id;
+                    const friendName = this._escapeHtml(f.name || 'Перекуп');
+                    const carTitle = this._escapeHtml(f.carName || 'Пешком');
+                    const lastMsg = f.lastMessage ? `
+                        <div class="sub-label mt-1" style="font-size:8.5px; color:#38bdf8; background:rgba(56,189,248,0.08); padding:2px 6px; border-radius:4px; max-width:90%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                            💬 «${this._escapeHtml(f.lastMessage.text)}»
+                        </div>
+                    ` : '';
+
+                    return `
+                        <div class="glass-card p-2 mb-1" style="border-left: 3px solid var(--green);">
+                            <div class="flex-between mb-1">
                                 <div>
-                                    <b class="text-xs color-green">${this._escapeHtml(friendName)}</b>
-                                    <div class="sub-label" style="font-size:8.5px;">ID: ${this._escapeHtml(friendId)}</div>
+                                    <b class="text-xs color-green">${friendName}</b>
+                                    <span class="tag-badge bg-tag-cyan" style="font-size:7.5px; padding:1px 4px;">Ур. ${f.level || 1}</span>
+                                    <div class="sub-label" style="font-size:8.5px;">Авто: <b>${carTitle}</b></div>
                                 </div>
-                                <button onclick="AppM._chatWithFriend('${friendId}', '${this._escapeAttr(friendName)}')" 
-                                        class="btn btn-cyan btn-sm btn-auto" style="font-size:9px; padding:4px 10px;">
-                                    💬 Написать
+                                <button onclick="AppM.removeFriendConfirm('${friendId}', '${this._escapeAttr(f.name)}')" class="btn btn-dark btn-sm btn-auto" style="padding:2px 6px; font-size:8px; opacity:0.6;">✕</button>
+                            </div>
+                            ${lastMsg}
+                            <div class="grid-2 mt-2" style="gap:4px;">
+                                <button onclick="AppM.openQuickPhrasePicker('${friendId}', '${this._escapeAttr(f.name)}')" class="btn btn-cyan btn-sm btn-auto" style="font-size:9px; padding:4px 6px;">
+                                    💬 Фраза
+                                </button>
+                                <button onclick="AppM.openDirectOfferModal('${friendId}', '${this._escapeAttr(f.name)}')" class="btn btn-green btn-sm btn-auto" style="font-size:9px; padding:4px 6px;">
+                                    🤝 Продать авто
                                 </button>
                             </div>
-                        `;
-                    }).join('')}
-                </div>
-            `}
+                        </div>
+                    `;
+                }).join('')}
+            </div>
         `;
     };
 
+    // 2. Входящие заявки
+    AppM._renderIncomingTab = function(container, incoming) {
+        if (!incoming || incoming.length === 0) {
+            container.innerHTML = `
+                <div class="glass-card text-center sub-label py-6" style="background:#090e18;">
+                    <i class="fa-solid fa-envelope-open color-amber mb-2" style="font-size:24px;"></i>
+                    <div class="text-xs">Новых входящих заявок нет</div>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="space-y-1">
+                ${incoming.map(req => `
+                    <div class="glass-card p-2 flex-between mb-1" style="border-left: 3px solid var(--amber);">
+                        <div>
+                            <b class="text-xs">${this._escapeHtml(req.name || 'Игрок')}</b>
+                            <div class="sub-label" style="font-size:8.5px;">Хочет добавиться к вам в друзья</div>
+                        </div>
+                        <div class="flex-gap">
+                            <button onclick="AppM._acceptFriend('${req.id}')" class="btn btn-green btn-sm btn-auto" style="font-size:9px; padding:4px 9px;">Принять</button>
+                            <button onclick="AppM._declineFriend('${req.id}')" class="btn btn-dark btn-sm btn-auto" style="font-size:9px; padding:4px 7px;">✕</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    };
+
+    // 3. Исходящие запросы
+    AppM._renderOutgoingTab = function(container, outgoing) {
+        if (!outgoing || outgoing.length === 0) {
+            container.innerHTML = `
+                <div class="glass-card text-center sub-label py-6" style="background:#090e18;">
+                    <i class="fa-solid fa-paper-plane color-cyan mb-2" style="font-size:24px;"></i>
+                    <div class="text-xs">Вы не отправляли заявок, ожидающих ответа</div>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="space-y-1">
+                ${outgoing.map(req => `
+                    <div class="glass-card p-2 flex-between mb-1">
+                        <div>
+                            <b class="text-xs color-cyan">${this._escapeHtml(req.name || 'Игрок')}</b>
+                            <div class="sub-label" style="font-size:8.5px;">Заявка ожидает подтверждения игроком</div>
+                        </div>
+                        <span class="tag-badge bg-tag-cyan" style="font-size:8px;">Ожидание</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    };
+
+    // ========================================================
+    // ДЕЙСТВИЯ: ПРИНЯТЬ, ОТКЛОНИТЬ, УДАЛИТЬ
+    // ========================================================
     AppM._acceptFriend = async function(fromUserId) {
-        if (!window.FB_Bridge?.Friendships?.acceptRequest) return showToast('⚠️ Модуль друзей недоступен');
-        const res = await window.FB_Bridge.Friendships.acceptRequest(fromUserId);
+        if (!window.FB_FriendshipsManager?.acceptRequest) return showToast('⚠️ Модуль недоступен');
+        showToast('⏳ Принятие заявки...');
+        const res = await window.FB_FriendshipsManager.acceptRequest(fromUserId);
         if (res && res.success) {
-            showToast('✅ Заявка принята');
-            window.state.player.pendingFriendRequests = (window.state.player.pendingFriendRequests || []).filter(p => p.id !== fromUserId);
-            if (typeof saveState === 'function') saveState();
-            this._refreshCurrentScreen();
+            showToast('✅ Вы теперь друзья!');
+            if (typeof playSound === 'function') playSound('win');
+            this._renderFriendsScreen(document.getElementById('mSocialContentBox'));
         } else {
             showToast(`❌ ${res?.error || 'Ошибка'}`);
         }
     };
 
     AppM._declineFriend = async function(fromUserId) {
-        if (!window.FB_Bridge?.Friendships?.declineRequest) return;
-        const res = await window.FB_Bridge.Friendships.declineRequest(fromUserId);
+        if (!window.FB_FriendshipsManager?.declineRequest) return;
+        const res = await window.FB_FriendshipsManager.declineRequest(fromUserId);
         if (res && res.success) {
             showToast('Заявка отклонена');
-            window.state.player.pendingFriendRequests = (window.state.player.pendingFriendRequests || []).filter(p => p.id !== fromUserId);
-            if (typeof saveState === 'function') saveState();
-            this._refreshCurrentScreen();
+            this._renderFriendsScreen(document.getElementById('mSocialContentBox'));
         }
     };
 
-    AppM._chatWithFriend = function(friendId, friendName) {
-        if (!friendId) return showToast('⚠️ Некорректный ID друга');
-        if (!window.state.player) window.state.player = {};
-        if (!window.state.player.phoneMessages) window.state.player.phoneMessages = [];
-
-        const myUid = String(window.state.player?.uid || window.tgUserId || 'me');
-        const dialogId = `dlg_friend_${[myUid, String(friendId)].sort().join('_')}`;
-
-        let dialog = window.state.player.phoneMessages.find(m => m.id === dialogId);
-        if (!dialog) {
-            dialog = {
-                id: dialogId,
-                dialogId: dialogId,
-                category: 'friends',
-                friendUserId: String(friendId),
-                friendName: friendName,
-                sender: friendName,
-                time: 'Сейчас',
-                unread: false,
-                viewed: true,
-                createdAt: Date.now(),
-                chatHistory: []
-            };
-            window.state.player.phoneMessages.unshift(dialog);
-            if (typeof saveState === 'function') saveState();
+    AppM.removeFriendConfirm = async function(friendId, friendName) {
+        if (!confirm(`Удалить перекупа «${friendName}» из списка друзей?`)) return;
+        if (!window.FB_FriendshipsManager?.removeFriend) return;
+        
+        const res = await window.FB_FriendshipsManager.removeFriend(friendId);
+        if (res && res.success) {
+            showToast('Удалено из друзей');
+            this._renderFriendsScreen(document.getElementById('mSocialContentBox'));
         } else {
-            // Обновляем на случай, если имя изменилось
-            dialog.friendUserId = String(friendId);
-            dialog.friendName = friendName;
-            dialog.sender = friendName;
+            showToast(`Ошибка: ${res?.error || 'Не удалось удалить'}`);
+        }
+    };
+
+    // ========================================================
+    // БЫСТРЫЕ ФРАЗЫ (QUICK CHAT)
+    // ========================================================
+    AppM.openQuickPhrasePicker = function(friendId, friendName) {
+        const modal = document.createElement('div');
+        modal.id = 'modalQuickPhrasePicker';
+        modal.className = 'modal-backdrop active';
+        modal.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.85); display:flex; align-items:flex-end; justify-content:center; backdrop-filter:blur(4px);';
+
+        const chipsHtml = QUICK_CHAT_PHRASES.map((p, idx) => `
+            <button onclick="AppM.sendPhraseToFriend('${friendId}', ${idx})" class="btn btn-dark btn-sm text-left w-full mb-1" style="justify-content:flex-start; font-size:10.5px; padding:7px 10px; border-radius:8px;">
+                <span style="opacity:0.6; font-size:9px; margin-right:6px;">[${p.cat}]</span> ${p.text}
+            </button>
+        `).join('');
+
+        modal.innerHTML = `
+            <div class="glass-card p-3 w-full" style="max-width:440px; border-radius:18px 18px 0 0; background:#0b1120; border-top:2px solid var(--cyan); max-height:80vh; display:flex; flex-direction:column;">
+                <div class="flex-between mb-2">
+                    <div>
+                        <b class="text-xs color-cyan"><i class="fa-solid fa-comment-dots mr-1"></i> Сообщение для ${this._escapeHtml(friendName)}</b>
+                        <div class="sub-label" style="font-size:8.5px;">Выберите заготовленную перекупскую фразу</div>
+                    </div>
+                    <button onclick="document.getElementById('modalQuickPhrasePicker')?.remove()" class="btn btn-dark btn-sm btn-auto" style="padding:4px 8px;">✕</button>
+                </div>
+                <div style="overflow-y:auto; flex:1; padding-right:2px;">
+                    ${chipsHtml}
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+    };
+
+    AppM.sendPhraseToFriend = async function(friendId, phraseIdx) {
+        const phrase = QUICK_CHAT_PHRASES[phraseIdx]?.text;
+        if (!phrase) return;
+
+        document.getElementById('modalQuickPhrasePicker')?.remove();
+
+        if (window.FB_FriendshipsManager?.sendQuickPhrase) {
+            showToast('Отправка реплики...');
+            const res = await window.FB_FriendshipsManager.sendQuickPhrase(friendId, phrase);
+            if (res && res.success) {
+                showToast('💬 Реплика доставлена!');
+                if (typeof playSound === 'function') playSound('tick');
+                this._renderFriendsScreen(document.getElementById('mSocialContentBox'));
+            } else {
+                showToast(`❌ Ошибка: ${res?.error || 'Не удалось отправить'}`);
+            }
+        }
+    };
+
+    // ========================================================
+    // ПРЯМАЯ ПРОДАЖА АВТОМОБИЛЯ ДРУГУ (P2P ОФФЕР)
+    // ========================================================
+    AppM.openDirectOfferModal = function(friendId, friendName) {
+        const garage = window.state?.garage || [];
+        if (garage.length === 0) {
+            return showToast('В вашем гараже нет машин для продажи!');
         }
 
-        this.activeTab = 'chats';
-        this.activeDialogId = dialogId;
-        this.render(document.getElementById('phoneAppContainer'));
+        const modal = document.createElement('div');
+        modal.id = 'modalDirectOfferFriend';
+        modal.className = 'modal-backdrop active';
+        modal.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.85); display:flex; align-items:center; justify-content:center; padding:15px; backdrop-filter:blur(4px);';
+
+        const carOptions = garage.map((c, i) => `
+            <option value="${i}">${c.name} (${c.power || 100} л.с. | ${c.plate || 'ТРАНЗИТ'})</option>
+        `).join('');
+
+        modal.innerHTML = `
+            <div class="glass-card p-3 w-full" style="max-width:380px; border-radius:14px; background:#0b1120; border:1px solid var(--green);">
+                <div class="flex-between mb-2">
+                    <b class="text-xs color-green"><i class="fa-solid fa-car-side mr-1"></i> Продать авто: ${this._escapeHtml(friendName)}</b>
+                    <button onclick="document.getElementById('modalDirectOfferFriend')?.remove()" class="btn btn-dark btn-sm btn-auto" style="padding:3px 7px;">✕</button>
+                </div>
+                <div class="sub-label mb-2" style="font-size:9px;">Предложение появится у друга в уведомлениях. При покупке деньги поступят на ваш баланс.</div>
+
+                <div class="mb-2">
+                    <label class="sub-label block mb-1" style="font-size:9px;">Выберите автомобиль:</label>
+                    <select id="directOfferCarSelect" class="input-field" style="width:100%; font-size:11px; padding:6px;" onchange="AppM._onDirectCarSelected(this.value)">
+                        ${carOptions}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="sub-label block mb-1" style="font-size:9px;">Цена предложения (₽):</label>
+                    <input type="number" id="directOfferPriceInput" class="input-field font-bold color-green" style="width:100%; font-size:13px; padding:6px;" value="${garage[0]?.marketValue || garage[0]?.price || 150000}">
+                </div>
+
+                <div class="grid-2" style="gap:6px;">
+                    <button onclick="document.getElementById('modalDirectOfferFriend')?.remove()" class="btn btn-dark btn-sm">Отмена</button>
+                    <button onclick="AppM.confirmDirectOffer('${friendId}')" class="btn btn-green btn-sm">Отправить оффер</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+    };
+
+    AppM._onDirectCarSelected = function(idx) {
+        const car = window.state?.garage?.[parseInt(idx, 10)];
+        const priceInput = document.getElementById('directOfferPriceInput');
+        if (car && priceInput) {
+            priceInput.value = car.marketValue || car.price || 150000;
+        }
+    };
+
+    AppM.confirmDirectOffer = async function(friendId) {
+        const select = document.getElementById('directOfferCarSelect');
+        const priceInput = document.getElementById('directOfferPriceInput');
+        const carIdx = parseInt(select?.value, 10);
+        const price = parseInt(priceInput?.value, 10);
+
+        if (isNaN(carIdx) || !window.state?.garage?.[carIdx]) return showToast('Выберите автомобиль!');
+        if (isNaN(price) || price < 5000) return showToast('Укажите корректную сумму продажи!');
+
+        const car = window.state.garage[carIdx];
+
+        if (window.FB_FriendshipsManager?.sendDirectCarOffer) {
+            showToast('Отправка оффера другу...');
+            const res = await window.FB_FriendshipsManager.sendDirectCarOffer(friendId, car, price);
+            if (res && res.success) {
+                document.getElementById('modalDirectOfferFriend')?.remove();
+                showToast('🤝 Оффер успешно отправлен!');
+                if (typeof playSound === 'function') playSound('win');
+            } else {
+                showToast(`❌ Ошибка: ${res?.error || 'Не удалось отправить'}`);
+            }
+        }
     };
 
     // ========================================================
@@ -308,62 +538,8 @@
                     </button>
                 </div>
             </div>
-
-            <div class="glass-card p-2">
-                <b class="text-xs color-amber mb-2 block"><i class="fa-solid fa-users mr-1"></i> Социальное</b>
-                <div class="grid-2" style="gap:6px;">
-                    <button onclick="AppM.switchMainTab('social'); AppM.setSocialSubTab('top');" class="btn btn-purple btn-sm" style="font-size:9px;">
-                        <i class="fa-solid fa-trophy mr-1"></i> Топ игроков
-                    </button>
-                    <button onclick="AppM.switchMainTab('social'); AppM.setSocialSubTab('clubs');" class="btn btn-purple btn-sm" style="font-size:9px;">
-                        <i class="fa-solid fa-shield-halved mr-1"></i> Клубы
-                    </button>
-                </div>
-            </div>
         `;
     };
 
-    // ========================================================
-    // СИНХРОНИЗАЦИЯ NPC-ПОКУПАТЕЛЕЙ С M+ ЧАТОМ
-    // ========================================================
-    AppM.syncSalesLotBuyersToMessages = function() {
-        if (!window.state.player) window.state.player = {};
-        if (!window.state.player.phoneMessages) window.state.player.phoneMessages = [];
-        if (!window.state.salesLot || window.state.salesLot.length === 0) return;
-
-        window.state.salesLot.forEach((slot, slotIdx) => {
-            const buyer = slot.currentBuyer || slot.buyer;
-            if (slot && buyer && slot.car && buyer.dealType === 'chat') {
-                const safeCarName = String(slot.car.name || 'car').replace(/[^a-zа-я0-9]/gi, '_');
-                const dialogId = `dlg_buyer_slot_${slotIdx}_${safeCarName}`;
-                let exists = window.state.player.phoneMessages.find(m => m.id === dialogId);
-
-                const asking = slot.askingPrice || slot.car.price;
-                const offer = buyer.currentOffer || buyer.offeredPrice || Math.round(asking * 0.85);
-
-                if (!exists) {
-                    window.state.player.phoneMessages.unshift({
-                        id: dialogId,
-                        dialogId: dialogId,
-                        category: 'buyers',
-                        sender: `${buyer.avatar || '🧢'} ${buyer.name || 'Покупатель'}`,
-                        time: 'Сейчас',
-                        unread: true,
-                        viewed: false,
-                        carIndex: slotIdx,
-                        carUid: slot.car.uid || slot.car.id || null,
-                        carData: slot.car,
-                        askingPrice: asking,
-                        offerPrice: offer,
-                        preview: buyer.lastReply || `Готов забрать за ${Number(offer).toLocaleString()} ₽!`,
-                        chatHistory: [
-                            { from: 'them', text: `Здравствуйте! Пишу по объявлению на «${slot.car.name}». Готов забрать за ${Number(offer).toLocaleString()} ₽!` }
-                        ]
-                    });
-                }
-            }
-        });
-    };
-
-    console.log('[👥 phone-m-social v9.0.0] Социум + Друзья + Профиль + синхронизация NPC ✓');
+    console.log('[👥 phone-m-social v9.2.0] Социум + Взаимная дружба + Быстрые фразы + P2P Офферы ✓');
 })();
