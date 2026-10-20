@@ -1,21 +1,19 @@
 // ========================================================
-// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v9.0.0)
+// js/phone/phone-business.js — БИЗНЕС-СЕТЬ ПЕРЕКУПА (v9.1.0 STABLE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.0.0 (АВТОНОМНЫЙ ЦЕХ, ШТАТ И ПАРК ДЛЯ КАЖДОГО БИЗНЕСА):
-//   1. Убраны общие глобальные вкладки Цех/Штат/Парк из шапки.
-//   2. В каждом бизнесе — свой личный кабинет с переключателем:
-//      [Обзор] [Цех точки] [Штат точки] [Автопарк].
-//   3. У каждой точки индивидуальный цех (3 ветки уникального оборудования),
-//      индивидуальный штат сотрудников и индивидуальный автопарк.
-//   4. Встроенный автономный каталог апгрейдов и специалистов:
-//      блоки никогда не будут пустыми.
-//   5. B2B тендеры, кризис-менеджмент и непрерывная касса по реальному времени.
+// ⭐ v9.1.0 (ЖЕЛЕЗНАЯ СТАБИЛЬНОСТЬ И АВТОНОМИЯ КАЖДОЙ ТОЧКИ):
+//   1. Устранён сбой legal.type.toUpperCase() — 100% защита от краша.
+//   2. У каждой точки СВОЙ ЦЕХ (3 ветки уникального оборудования),
+//      СВОЙ ШТАТ сотрудников (управляющий, мастер, охрана) и СВОЙ АВТОПАРК.
+//   3. В шапке холдинга оставлены только общие разделы: [Точки] [Тендеры] [Корпорации].
+//   4. Внутри кабинета каждой точки переключатели: [Обзор] [Цех точки] [Штат] [Парк].
+//   5. Встроенные каталоги апгрейдов и специалистов исключают пустые блоки.
 // ========================================================
 
 const PhoneBusiness = {
     currentTab: 'points',
-    selectedBizId: null,      // ID выбранной точки
+    selectedBizId: null,
     cabinetSubTab: 'overview', // 'overview', 'workshop', 'staff', 'fleet'
     _tickInterval: null,
     _activeBonus: null,
@@ -44,7 +42,7 @@ const PhoneBusiness = {
     get achievements() { return window.BusinessDataModule?.achievements || []; },
 
     // ========================================================
-    // АВТОНОМНЫЙ КАТАЛОГ ИНДИВИДУАЛЬНОГО ОБОРУДОВАНИЯ (ЦЕХ ТОЧКИ)
+    // КАТАЛОГ ОБОРУДОВАНИЯ (ИНДИВИДУАЛЬНЫЙ ЦЕХ ДЛЯ КАЖДОЙ ТОЧКИ)
     // ========================================================
     _defaultIndividualUpgrades: {
         wash: [
@@ -115,12 +113,12 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // АВТОНОМНЫЙ КАТАЛОГ СПЕЦИАЛИСТОВ (ШТАТ ТОЧКИ)
+    // КАТАЛОГ ПЕРСОНАЛЬНОГО ШТАТА ТОЧКИ
     // ========================================================
     pointStaffCatalog: [
-        { id: 'manager',  name: 'Управляющий точки',    salary: 15000, bonusPct: 15, desc: '+15% к выручке, контроль кассы и порядка', icon: 'fa-user-tie' },
+        { id: 'manager',  name: 'Управляющий филиала',  salary: 15000, bonusPct: 15, desc: '+15% к выручке, контроль кассы и порядка', icon: 'fa-user-tie' },
         { id: 'master',   name: 'Старший мастер смены', salary: 10000, bonusPct: 10, desc: '+10% к кассе, экономит 25% сырья на складе', icon: 'fa-wrench' },
-        { id: 'security', name: 'Охранный пост ЧОП',    salary: 6000,  bonusPct: 5,  desc: 'Защита точки от ночных краж сырья и проверок', icon: 'fa-shield-halved' }
+        { id: 'security', name: 'Охранный пост ЧОП',    salary: 6000,  bonusPct: 5,  desc: 'Защита объекта от ночных краж сырья и проверок', icon: 'fa-shield-halved' }
     ],
 
     _getIndividualUpgrades(bizId) {
@@ -178,7 +176,7 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // ИНИЦИАЛИЗАЦИЯ
+    // ИНИЦИАЛИЗАЦИЯ И НОРМАЛИЗАЦИЯ ДАННЫХ
     // ========================================================
     ensureState() {
         if (this._ensureStateInProgress) return;
@@ -214,8 +212,8 @@ const PhoneBusiness = {
                     stock: 100,
                     maxStock: 100,
                     incomeHistory: [],
-                    workshop: {},   // Индивидуальный цех точки
-                    staff: {},      // Индивидуальный штат точки
+                    workshop: {}, // Индивидуальный цех
+                    staff: {},    // Индивидуальный штат
                     lastIncomeDay: 0,
                     lastStockDay: 0,
                     dna: null,
@@ -243,8 +241,8 @@ const PhoneBusiness = {
                 if (typeof b.stock !== 'number' || isNaN(b.stock)) b.stock = 100;
                 if (typeof b.maxStock !== 'number') b.maxStock = 100;
                 if (!Array.isArray(b.incomeHistory)) b.incomeHistory = [];
-                if (!b.workshop || typeof b.workshop !== 'object') b.workshop = {};
-                if (!b.staff || typeof b.staff !== 'object') b.staff = {};
+                if (!b.workshop || typeof b.workshop !== 'object' || Array.isArray(b.workshop)) b.workshop = {};
+                if (!b.staff || typeof b.staff !== 'object' || Array.isArray(b.staff)) b.staff = {};
                 if (!b.icon) b.icon = this._iconForBiz(b.id);
                 if (!b.customName) b.customName = b.name;
                 if (b.level > 0 && !b.dna) b.dna = this._generateDNA(b.id);
@@ -253,19 +251,24 @@ const PhoneBusiness = {
 
             if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
 
-            if (!window.state.player.legalEntity) {
-                const docs = window.state.player.documents || {};
-                let inferredType = 'none';
-                if (docs.oooRegistered || window.state.player.hasOOO) inferredType = 'ooo';
-                else if (docs.ipRegistered || window.state.player.hasIP || window.state.player.businessRegistered) inferredType = 'ip';
-
-                window.state.player.legalEntity = {
-                    type: inferredType,
-                    inn: docs.inn || window.state.player.inn || null,
-                    ogrn: null,
-                    companyName: null
-                };
+            // 100% безопасная нормализация legalEntity
+            let legalType = 'none';
+            if (typeof window.state.player.legalEntity === 'string') {
+                legalType = window.state.player.legalEntity;
+            } else if (window.state.player.legalEntity && typeof window.state.player.legalEntity === 'object') {
+                legalType = window.state.player.legalEntity.type || 'none';
+            } else {
+                const docs = window.state?.player?.documents || {};
+                if (docs.oooRegistered || window.state?.player?.hasOOO) legalType = 'ooo';
+                else if (docs.ipRegistered || window.state?.player?.hasIP || window.state?.player?.businessRegistered) legalType = 'ip';
             }
+
+            window.state.player.legalEntity = {
+                type: String(legalType || 'none').toLowerCase(),
+                inn: window.state?.player?.inn || null,
+                ogrn: null,
+                companyName: null
+            };
 
             if (!window.state.player.economicCycle) {
                 window.state.player.economicCycle = this._generateEconomicCycle();
@@ -371,7 +374,8 @@ const PhoneBusiness = {
     _getNetworkMilestoneBonus() {
         const owned = this.countOwned();
         let bonus = 0;
-        for (const m of this.NETWORK_MILESTONES) {
+        const milestones = this.NETWORK_MILESTONES || [];
+        for (const m of milestones) {
             if (owned >= m.count) bonus = m.incomeBonus;
         }
         return bonus;
@@ -445,11 +449,8 @@ const PhoneBusiness = {
         return window.state.businesses.filter(b => b && b.level > 0).length;
     },
 
-    /**
-     * Бонус от персонального цеха конкретной точки
-     */
     getPointWorkshopBonus(b) {
-        if (!b || !b.workshop) return 1.0;
+        if (!b || !b.workshop || typeof b.workshop !== 'object') return 1.0;
         const catalog = this._getIndividualUpgrades(b.id);
         let bonusSum = 0;
 
@@ -463,11 +464,8 @@ const PhoneBusiness = {
         return 1 + (bonusSum / 100);
     },
 
-    /**
-     * Бонус от персонального штата конкретной точки
-     */
     getPointStaffBonus(b) {
-        if (!b || !b.staff) return 1.0;
+        if (!b || !b.staff || typeof b.staff !== 'object') return 1.0;
         let bonusSum = 0;
 
         this.pointStaffCatalog.forEach(st => {
@@ -484,8 +482,6 @@ const PhoneBusiness = {
 
         let inc = this._n(b.income, 0) * Math.pow(1.55, Math.max(0, b.level - 1));
         inc *= this.getDNAMultiplier(b.dna);
-
-        // Индивидуальные улучшения цеха и штата точки
         inc *= this.getPointWorkshopBonus(b);
         inc *= this.getPointStaffBonus(b);
 
@@ -502,10 +498,16 @@ const PhoneBusiness = {
         const repBonus = Math.min(20, (b.reputation || 0) * 0.2);
         inc *= (1 + repBonus / 100);
 
-        // Доход привязанного к точке автопарка
-        if (window.BusinessFleetModule) {
-            const fleetIncome = window.BusinessFleetModule.calculateFleetIncomeForBiz(b.id);
-            inc += fleetIncome.net;
+        // Индивидуальный автопарк точки
+        if (window.BusinessFleetModule && typeof window.BusinessFleetModule.calculateFleetIncomeForBiz === 'function') {
+            try {
+                const fleetIncome = window.BusinessFleetModule.calculateFleetIncomeForBiz(b.id);
+                if (fleetIncome && typeof fleetIncome.net === 'number' && !isNaN(fleetIncome.net)) {
+                    inc += fleetIncome.net;
+                }
+            } catch (e) {
+                console.warn('[PhoneBusiness] Fleet income error:', e);
+            }
         }
 
         return Math.round(inc);
@@ -522,7 +524,6 @@ const PhoneBusiness = {
             total *= (1 + (this._activeBonus.bonusPct || 0) / 100);
         }
 
-        // B2B тендерный контракт
         if (Array.isArray(window.state?.player?.activeTenders)) {
             const curDay = window.state?.player?.day || 1;
             const activeTnd = window.state.player.activeTenders.find(t => t && t.targetBiz === b.id && t.expiresDay >= curDay);
@@ -543,7 +544,12 @@ const PhoneBusiness = {
         if (!Array.isArray(window.state?.businesses)) return 0;
         let total = 0;
         window.state.businesses.forEach(b => {
-            if (b && b.level > 0) total += this.getBizIncomeWithBonuses(b);
+            try {
+                if (b && b.level > 0) {
+                    const inc = this.getBizIncomeWithBonuses(b);
+                    if (typeof inc === 'number' && !isNaN(inc)) total += inc;
+                }
+            } catch (e) {}
         });
         return Math.round(total);
     },
@@ -568,7 +574,9 @@ const PhoneBusiness = {
         if (!Array.isArray(window.state?.businesses)) return 0;
         let total = 0;
         window.state.businesses.forEach(b => {
-            if (b && b.level > 0) total += Math.floor(b.stored || 0);
+            if (b && b.level > 0 && typeof b.stored === 'number' && !isNaN(b.stored)) {
+                total += Math.floor(b.stored);
+            }
         });
         return total;
     },
@@ -583,9 +591,11 @@ const PhoneBusiness = {
         const tab = this.currentTab;
         const dailyIncome = this.getTotalDailyIncome();
         const accumulated = this.getAccumulatedCash();
+
         const legal = window.state?.player?.legalEntity || { type: 'none' };
         const legalConfig = (window.LEGAL_ENTITIES && window.LEGAL_ENTITIES[legal.type]) || null;
-        const isLegalActive = legal.type !== 'none';
+        const isLegalActive = legal.type && legal.type !== 'none';
+        const legalBadgeText = legalConfig?.tag || (isLegalActive ? String(legal.type).toUpperCase() : 'Физлицо');
 
         container.innerHTML = `
             <div class="phone-app-header">
@@ -604,7 +614,7 @@ const PhoneBusiness = {
                     <div class="biz-summary-cell">
                         <div class="biz-summary-label">Форма</div>
                         <div class="biz-summary-value ${isLegalActive ? 'color-cyan' : 'color-amber'}" style="font-size:11px;">
-                            ${(legalConfig && legalConfig.tag) ? legalConfig.tag : (isLegalActive ? legal.type.toUpperCase() : 'Физлицо')}
+                            ${legalBadgeText}
                         </div>
                     </div>
                     <div class="biz-summary-cell">
@@ -632,7 +642,7 @@ const PhoneBusiness = {
                     </div>
                 ` : ''}
 
-                <!-- ЛАКОНИЧНАЯ ПАНЕЛЬ ХОЛДИНГА (БЕЗ ОБЩИХ ЦЕХОВ И ШТАТОВ) -->
+                <!-- ПАНЕЛЬ ХОЛДИНГА -->
                 <div class="biz-tabs-row mb-2" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:4px;">
                     <button onclick="PhoneBusiness.setTab('points')" class="biz-tab ${tab === 'points' ? 'active' : ''}">
                         <i class="fa-solid fa-store"></i><span>Точки</span>
@@ -684,6 +694,8 @@ const PhoneBusiness = {
         const content = document.getElementById('bizTabContent');
         if (content && this.selectedBizId) {
             this.renderPointCabinet(content, this.selectedBizId);
+        } else {
+            this.render(document.getElementById('phoneAppContainer'));
         }
     },
 
@@ -694,7 +706,7 @@ const PhoneBusiness = {
     },
 
     // ========================================================
-    // 1. КОМПАКТНЫЙ ДАШБОРД ТОЧЕК
+    // 1. ДАШБОРД ТОЧЕК
     // ========================================================
     renderPointsTab(container) {
         const pLvl = window.state?.player?.level || 1;
@@ -720,7 +732,12 @@ const PhoneBusiness = {
                 const isLowStock = stock < 30;
 
                 const supportsFleet = Boolean(window.BUSINESS_FLEET_REQUIREMENTS && window.BUSINESS_FLEET_REQUIREMENTS[b.id]);
-                const fleetCount = supportsFleet && window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(b.id).length : 0;
+                let fleetCount = 0;
+                try {
+                    fleetCount = supportsFleet && window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(b.id).length : 0;
+                } catch (e) {
+                    fleetCount = 0;
+                }
 
                 ownedGridHtml += `
                     <div onclick="PhoneBusiness.openPointCabinet('${b.id}')" class="glass-card p-2" style="background:#090e18; border-left:3px solid var(--green); cursor:pointer; transition:transform 0.15s ease;">
@@ -819,11 +836,16 @@ const PhoneBusiness = {
         const isMaxed = b.level >= 5;
 
         const supportsFleet = Boolean(window.BUSINESS_FLEET_REQUIREMENTS && window.BUSINESS_FLEET_REQUIREMENTS[b.id]);
-        const fleetVehicles = supportsFleet && window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(b.id) : [];
+        let fleetVehicles = [];
+        try {
+            fleetVehicles = supportsFleet && window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(b.id) : [];
+        } catch (e) {
+            fleetVehicles = [];
+        }
 
         const sub = this.cabinetSubTab || 'overview';
 
-        // ─── 1. ПОДРАЗДЕЛ: ЦЕХ ТОЧКИ (ИНДИВИДУАЛЬНОЕ ОБОРУДОВАНИЕ) ───
+        // ─── 1. ЦЕХ ТОЧКИ (ИНДИВИДУАЛЬНОЕ ОБОРУДОВАНИЕ) ───
         let workshopHtml = '';
         if (sub === 'workshop') {
             const indUpgrades = this._getIndividualUpgrades(b.id);
@@ -863,7 +885,7 @@ const PhoneBusiness = {
             }
         }
 
-        // ─── 2. ПОДРАЗДЕЛ: ШТАТ ТОЧКИ (ПЕРСОНАЛЬНЫЕ СОТРУДНИКИ) ───
+        // ─── 2. ШТАТ ТОЧКИ (ИНДИВИДУАЛЬНЫЕ СОТРУДНИКИ) ───
         let staffHtml = '';
         if (sub === 'staff') {
             this.pointStaffCatalog.forEach(st => {
@@ -891,7 +913,7 @@ const PhoneBusiness = {
                             ${isHired ? `
                                 <button class="btn btn-dark btn-sm opacity-60" disabled style="font-size:9px; padding:5px 8px;">Работает</button>
                             ` : `
-                                <button onclick="BusinessFleetModule.hirePointStaff('${b.id}', '${st.id}')" class="btn ${canAfford ? 'btn-purple' : 'btn-dark opacity-50'} btn-sm btn-auto" ${canAfford ? '' : 'disabled'} style="font-size:9.5px; padding:6px 10px; font-weight:700;">
+                                <button onclick="PhoneBusiness.hirePointStaff('${b.id}', '${st.id}')" class="btn ${canAfford ? 'btn-purple' : 'btn-dark opacity-50'} btn-sm btn-auto" ${canAfford ? '' : 'disabled'} style="font-size:9.5px; padding:6px 10px; font-weight:700;">
                                     Нанять
                                 </button>
                             `}
@@ -901,7 +923,7 @@ const PhoneBusiness = {
             });
         }
 
-        // ─── 3. ПОДРАЗДЕЛ: АВТОПАРК ТОЧКИ ───
+        // ─── 3. АВТОПАРК ТОЧКИ ───
         let fleetHtml = '';
         if (sub === 'fleet') {
             if (!supportsFleet) {
@@ -919,7 +941,7 @@ const PhoneBusiness = {
             }
         }
 
-        // ─── 4. ПОДРАЗДЕЛ: ОБЗОР (КАССА, СЫРЬЕ, ГРАФИК) ───
+        // ─── 4. ОБЗОР (КАССА, СЫРЬЕ, ГРАФИК) ───
         let overviewHtml = '';
         if (sub === 'overview') {
             overviewHtml = `
@@ -986,7 +1008,7 @@ const PhoneBusiness = {
                 <button onclick="PhoneBusiness.setCabinetSubTab('staff')" class="btn ${sub === 'staff' ? 'btn-purple' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 1px;">
                     <i class="fa-solid fa-users"></i> Штат
                 </button>
-                <button onclick="PhoneBusiness.setCabinetSubTab('fleet')" class="btn ${sub === 'fleet' ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 1px;" ${!supportsFleet ? 'disabled opacity-50' : ''}>
+                <button onclick="PhoneBusiness.setCabinetSubTab('fleet')" class="btn ${sub === 'fleet' ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:5px 1px;" ${!supportsFleet ? 'disabled' : ''}>
                     <i class="fa-solid fa-truck"></i> Парк
                 </button>
             </div>
@@ -1013,7 +1035,7 @@ const PhoneBusiness = {
         const upg = indUpgrades.find(u => u.id === branchId);
         if (!upg) return;
 
-        if (!b.workshop) b.workshop = {};
+        if (!b.workshop || typeof b.workshop !== 'object' || Array.isArray(b.workshop)) b.workshop = {};
         const curLvl = Number(b.workshop[branchId]) || 0;
         if (curLvl >= (upg.maxLevel || 3)) return showToast("Достигнут максимум прокачки!");
 
@@ -1036,9 +1058,48 @@ const PhoneBusiness = {
             if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
             showToast(`✓ Улучшено: «${upg.name}» (Ур. ${curLvl + 1})!`);
 
-            this.render(document.getElementById('phoneAppContainer'));
+            const content = document.getElementById('bizTabContent');
+            if (content && this.selectedBizId) {
+                this.renderPointCabinet(content, this.selectedBizId);
+            } else {
+                this.render(document.getElementById('phoneAppContainer'));
+            }
         } finally {
             this._individualUpgradePending = false;
+        }
+    },
+
+    hirePointStaff(bizId, staffId) {
+        const b = (window.state?.businesses || []).find(x => x && x.id === bizId);
+        if (!b) return;
+
+        const st = this.pointStaffCatalog.find(s => s.id === staffId);
+        if (!st) return;
+
+        if (!b.staff || typeof b.staff !== 'object' || Array.isArray(b.staff)) b.staff = {};
+        if (b.staff[staffId]) return showToast("Специалист уже работает на этом объекте!");
+
+        const cost = st.salary;
+        const cash = Number(window.state?.player?.cash) || 0;
+        if (cash < cost) return showToast(`Не хватает ${cost.toLocaleString()} ₽ на первый оклад!`);
+
+        window.state.player.cash -= cost;
+        b.staff[staffId] = true;
+
+        if (typeof logBankTransaction === 'function') {
+            logBankTransaction(`Найм: ${st.name} в «${b.customName || b.name}»`, cost, false);
+        }
+
+        if (typeof saveState === 'function') saveState();
+        if (typeof updateHeaderUI === 'function') updateHeaderUI();
+        if (window.AudioFx) { window.AudioFx.play('win'); window.AudioFx.haptic('success'); }
+        showToast(`✅ ${st.name} принят на работу в «${b.customName || b.name}»!`);
+
+        const content = document.getElementById('bizTabContent');
+        if (content && this.selectedBizId) {
+            this.renderPointCabinet(content, this.selectedBizId);
+        } else {
+            this.render(document.getElementById('phoneAppContainer'));
         }
     },
 
@@ -1076,9 +1137,14 @@ const PhoneBusiness = {
             const targetBiz = (window.state?.businesses || []).find(b => b && b.id === tnd.targetBiz);
             const isBizOwned = targetBiz && targetBiz.level > 0;
 
-            const assignedVehicles = window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(tnd.targetBiz) : [];
-            const req = tnd.requirements || {};
+            let assignedVehicles = [];
+            try {
+                assignedVehicles = window.BusinessFleetModule ? window.BusinessFleetModule.getAssignedVehicles(tnd.targetBiz) : [];
+            } catch (e) {
+                assignedVehicles = [];
+            }
 
+            const req = tnd.requirements || {};
             let satisfiesCount = assignedVehicles.length >= (req.minFleetCount || 1);
             let satisfiesMreo = true;
             if (req.requireMreo) {
@@ -1506,7 +1572,8 @@ const PhoneBusiness = {
 
     renderAchievementsBlock() {
         const unlocked = window.state?.player?.businessAchievements || [];
-        const html = this.achievements.map(a => {
+        const achList = this.achievements || [];
+        const html = achList.map(a => {
             const isDone = unlocked.includes(a.id);
             return `
                 <div class="p-2 mb-1 flex-between" style="background:#050914; border-radius:6px;">
@@ -1530,7 +1597,8 @@ const PhoneBusiness = {
     checkAchievements() {
         if (!window.state?.player) return;
         if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
-        this.achievements.forEach(a => {
+        const achList = this.achievements || [];
+        achList.forEach(a => {
             if (window.state.player.businessAchievements.includes(a.id)) return;
             try {
                 if (a.cond && a.cond()) {
