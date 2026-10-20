@@ -1,12 +1,11 @@
 // ========================================================
-// js/market/market-deal.js — ТОРГ У КАПОТА И ДКП (v5.4.0 FULL INTEGRITY)
+// js/market/market-deal.js — ТОРГ У КАПОТА И ДКП (v5.5.0 DEEP INSPECTION & MREO GATE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v5.4.0:
-//   - Полный перенос всех свойств ТС при покупке (Автотека, скрутка, дефекты, ЛКП, присадки)
-//   - Синхронизация полей plate и customPlate для совместимости с PlatesManager
-//   - Гарантированное совпадение рыночной оценки при подписании ДКП и в гараже
-//   - Машины на баланс коммерческого флота не блокируются лимитом бытовки
-//   - Автоматический переход в гараж на купленный автомобиль и сохранение стейта
+// ⭐ v5.5.0:
+//   - ИНТЕГРАЦИЯ ТЕСТ-ДРАЙВА: кнопка прямого запуска осмотра у капота (звук ДВС, дым, КПП).
+//   - БЛОКИРОВКА МРЭО ПРИ ЗАПРЕТАХ: автомобили с ограничениями ФССП, залогами и распилами
+//     нельзя поставить на официальный учет (доступен только ДКП перекупа или Даркнет/разборка).
+//   - ПОЛНЫЙ ПЕРЕНОС ДАННЫХ: autotekaReport, симптомы дымности/шумов ДВС и реальный пробег.
 // ========================================================
 
 let pendingMarketCar = null;
@@ -31,7 +30,7 @@ window.__getDKPState = function() {
 window.__resetDKPFlags = function() {
     _dealActionPending = false;
     window.__DKP_PENDING__ = false;
-    const overlays = ['modalBuyCall', 'modalMarketDeal', 'modalRegistrationChoice', 'modalDKP', 'modalBackfire'];
+    const overlays = ['modalBuyCall', 'modalMarketDeal', 'modalRegistrationChoice', 'modalDKP', 'modalBackfire', 'modalTestDrive'];
     overlays.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
@@ -42,7 +41,7 @@ window.__resetDKPFlags = function() {
 };
 
 function _forceCloseAllDealModals() {
-    const list = ['modalBuyCall', 'modalMarketDeal', 'modalRegistrationChoice', 'modalDKP', 'modalBackfire'];
+    const list = ['modalBuyCall', 'modalMarketDeal', 'modalRegistrationChoice', 'modalDKP', 'modalBackfire', 'modalTestDrive'];
     list.forEach(id => {
         if (typeof ModalManager !== 'undefined' && typeof ModalManager.close === 'function') {
             try { ModalManager.close(id); } catch (e) {}
@@ -308,37 +307,10 @@ function openMarketDeal(carId) {
 
 function startMarketTestDrive(carId) {
     if (!pendingMarketCar || !pendingMarketCar.car) return;
-    const car = pendingMarketCar.car;
-    const thread = document.getElementById("dealChatThread");
-
-    if (typeof playSound === 'function') playSound('tick');
-    if (typeof tgHaptic === 'function') tgHaptic('medium');
-
-    car.testDriven = true;
-    let driveResults = [];
-
-    if (car.wear?.engine < 45) driveResults.push("Двигатель троит при нажатии в пол, ощущается потеря тяги.");
-    else driveResults.push("Мотор крутится бодро, провалов и сизого дыма нет.");
-
-    if (car.wear?.transmission < 50) driveResults.push("Коробка хрустит при включении второй передачи.");
-    else driveResults.push("Сцепление схватывает чётко, передачи включаются плавно.");
-
-    if (car.bodyThickness?.doors > 200 || car.bodyThickness?.hood > 200) driveResults.push("На кочках в салоне поскрипывает кузов.");
-
-    if (thread) {
-        thread.innerHTML += `
-            <div class="chat-msg msg-player">«Давай сделаем тестовый заезд вокруг квартала.»</div>
-            <div class="chat-msg msg-seller">«Без проблем, садись за руль!»</div>
-            <div class="chat-msg msg-seller" style="border-left-color: var(--cyan);">
-                <b>📋 Итоги тест-драйва:</b><br>
-                ${driveResults.map(r => `• ${r}`).join('<br>')}
-            </div>`;
-        thread.scrollTop = thread.scrollHeight;
+    const targetId = carId || pendingMarketCar.car.id;
+    if (typeof openTestDriveModal === 'function') {
+        openTestDriveModal(targetId);
     }
-
-    if (typeof showToast === 'function') showToast("Тест-драйв проведён!");
-    renderMarketHaggleControls();
-    if (typeof saveState === 'function') saveState();
 }
 
 function renderMarketHaggleControls() {
@@ -432,8 +404,8 @@ function renderMarketHaggleControls() {
             </button>`;
     }
     toolsButtonsHtml += `
-        <button onclick="startMarketTestDrive('${car.id}')" class="btn ${car.testDriven ? 'btn-dark opacity-50' : 'btn-cyan'} btn-sm">
-            <i class="fa-solid fa-gauge-high mr-1"></i> ${car.testDriven ? 'Прокатились ✓' : 'Тест-драйв'}
+        <button onclick="startMarketTestDrive('${car.id}')" class="btn ${car.inspectionStatus?.testDrive ? 'btn-dark' : 'btn-cyan'} btn-sm">
+            <i class="fa-solid fa-gauge-high mr-1"></i> ${car.inspectionStatus?.testDrive ? 'Тест-драйв ✓' : 'Тест-драйв'}
         </button>`;
 
     const gridCols = (hasGauge && hasScanner) ? 'grid-3' : ((hasGauge || hasScanner) ? 'grid-2' : 'grid-1');
@@ -798,8 +770,24 @@ function openRegistrationChoiceModal(deal) {
         document.body.appendChild(modal);
     }
 
+    // 🔒 ПРОВЕРКА ЮРИДИЧЕСКИХ ОГРАНИЧЕНИЙ ДЛЯ МРЭО (v5.5.0)
+    const hasLegalBlocker = Boolean(
+        (car.legalDefect && !car._legalResolved && ['legal_fssp', 'legal_arrest', 'legal_pledge', 'legal_pts_duplicate'].includes(car.legalDefect.id)) ||
+        car.isStolen ||
+        car.autotekaReport?.hasFsspRestrictions ||
+        car.autotekaReport?.isPledged ||
+        car.autotekaReport?.isCutFrame
+    );
+
     let bizOptionsHtml = '';
-    if (!hasLegal) {
+    if (hasLegalBlocker) {
+        bizOptionsHtml = `
+            <div class="p-2 mb-2" style="background:rgba(220,38,38,0.12); border-radius:8px; border:1px solid var(--red);">
+                <b class="text-xs color-red"><i class="fa-solid fa-ban mr-1"></i> Запрет коммерческого учёта</b>
+                <div class="sub-label mt-1" style="font-size:8.5px; color:#fca5a5;">Автомобиль имеет залог, ограничения ФССП или статус распила! Постановка на баланс юрлица невозможна.</div>
+            </div>
+        `;
+    } else if (!hasLegal) {
         bizOptionsHtml = `
             <div class="p-2 mb-2" style="background:#090e18; border-radius:8px; opacity:0.85; border:1px dashed rgba(255,179,0,0.3);">
                 <b class="text-xs color-amber"><i class="fa-solid fa-lock"></i> Покупка на юрлицо заблокирована</b>
@@ -873,16 +861,23 @@ function openRegistrationChoiceModal(deal) {
                     <span class="tag-badge ${isPersonalFull ? 'bg-tag-red' : 'bg-tag-cyan'}" style="font-size:7.5px;">Мест: ${personalSlots}/${maxSlots}</span>
                 </div>
                 <div class="sub-label mb-2" style="font-size:8.5px;">Для личной езды, гаражного тюнинга или перепродажи.</div>
+
+                ${hasLegalBlocker ? `
+                    <div class="p-1 mb-2 color-red font-bold" style="font-size:8.5px; background:rgba(220,38,38,0.12); border-radius:6px; border:1px solid var(--red);">
+                        ⚠️ Внимание: У машины есть запрет приставов / залог! МРЭО откажет в регистрации.
+                    </div>
+                ` : ''}
+
                 ${isPersonalFull ? `
                     <div class="p-1 text-center color-red font-bold" style="font-size:9px; background:rgba(255,51,102,0.1); border-radius:6px;">
                         🚫 Личные боксы заняты (${personalSlots}/${maxSlots}). Расширьте гараж или оформите на бизнес!
                     </div>
                 ` : `
                     <div class="grid-2" style="gap:6px;">
-                        <button onclick="confirmRegistrationChoice('personal_mreo')" class="btn btn-green btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700;">
-                            С учетом МРЭО (2,850 ₽)
+                        <button onclick="${hasLegalBlocker ? "showToast('❌ МРЭО отказало в регистрации из-за запретов/залога!')" : "confirmRegistrationChoice('personal_mreo')"}" class="btn ${hasLegalBlocker ? 'btn-dark opacity-50' : 'btn-green'} btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700;">
+                            ${hasLegalBlocker ? '🚫 МРЭО Запрещено' : 'С учетом МРЭО (2,850 ₽)'}
                         </button>
-                        <button onclick="confirmRegistrationChoice('personal_dkp')" class="btn btn-dark btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700;">
+                        <button onclick="confirmRegistrationChoice('personal_dkp')" class="btn btn-dark btn-sm" style="font-size:9px; padding:6px 4px; font-weight:700; border-color:var(--amber); color:var(--amber);">
                             Только ДКП (Перекуп)
                         </button>
                     </div>
@@ -1214,7 +1209,7 @@ function abortDKPDeal() {
     if (typeof playSound === 'function') playSound('error');
 }
 
-// ⭐ НАДЁЖНОЕ ЗАВЕРШЕНИЕ СДЕЛКИ И ДОБАВЛЕНИЕ В ГАРАЖ СО ВСЕМИ ПАРАМЕТРАМИ
+// ⭐ НАДЁЖНОЕ ЗАВЕРШЕНИЕ СДЕЛКИ И ДОБАВЛЕНИЕ В ГАРАЖ СО ВСЕМИ ПАРАМЕТРАМИ (v5.5.0)
 function finishMarketCarBuyProcess(deal) {
     if (!deal || !deal.car) {
         _dealActionPending = false;
@@ -1270,7 +1265,8 @@ function finishMarketCarBuyProcess(deal) {
         newCar.engineTemp = 90;
         newCar.tireWear = car.tireWear !== undefined ? car.tireWear : 100;
         
-        // Синхронизация флагов автотеки и состояния ЛКП
+        // Синхронизация флагов автотеки, симптомов и ЛКП
+        newCar.actualMileage = car.actualMileage || car.mileage || 85000;
         newCar.rolledOdometer = Boolean(car.rolledOdometer);
         newCar.autotekaMileageDiscrepancy = Boolean(car.autotekaMileageDiscrepancy || car.rolledOdometer);
         newCar.hasAdditive = Boolean(car.hasAdditive);
@@ -1280,6 +1276,13 @@ function finishMarketCarBuyProcess(deal) {
         newCar.isTunedSpec = Boolean(car.isTunedSpec);
         newCar.isBeaterProject = Boolean(car.isBeaterProject);
         newCar.hiddenDefect = car.hiddenDefect ? Object.assign({}, car.hiddenDefect) : null;
+
+        // Симптомы тест-драйва и Автотека PRO
+        newCar.exhaustSmoke = car.exhaustSmoke || "clean";
+        newCar.engineNoise = car.engineNoise || "quiet";
+        newCar.gearboxBehavior = car.gearboxBehavior || "smooth";
+        newCar.autotekaReport = car.autotekaReport ? Object.assign({}, car.autotekaReport) : null;
+        newCar.ptsData = car.ptsData ? Object.assign({}, car.ptsData) : null;
 
         newCar.tuning = car.tuning ? Object.assign({}, car.tuning) : {
             chip: 0, exhaust: false, stance: false, bodykit: false,
@@ -1323,7 +1326,6 @@ function finishMarketCarBuyProcess(deal) {
             newCar._backfireType = car.legalDefect.id;
         }
 
-        // Пересчёт рыночной цены с учётом всех дефектов и агрегатов
         if (typeof recalculateCarMarketValue === 'function') {
             try { recalculateCarMarketValue(newCar); } catch (e) {}
         }
@@ -1521,4 +1523,4 @@ window.getPendingMarketCar = () => pendingMarketCar;
 window.resetPendingMarketCar = () => { pendingMarketCar = null; _dealActionPending = false; window.__DKP_PENDING__ = false; };
 window.resetDKPPending = () => { window.__DKP_PENDING__ = false; _activeDKPDeal = null; _dealActionPending = false; };
 
-console.log('[🤝 market-deal v5.4.0] Полное сохранение параметров ТС и ДКП ✓');
+console.log('[🤝 market-deal v5.5.0] Тест-драйв у капота + блок МРЭО при запретах ✓');
