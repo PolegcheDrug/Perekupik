@@ -1,30 +1,21 @@
 // ========================================================
-// js/phone/phone-m-core.js — M+ HUB: ЯДРО И ЧАТЫ (v9.4.0 DIRECT-NPC-HAGGLE)
+// js/phone/phone-m-core.js — M+ MESSENGER & DEALS (v10.0.0 REDESIGN)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v9.4.0 (DIRECT-NPC-HAGGLE & DEAL FIX):
-//   - ФИКС: chatHaggle теперь автономно и гарантированно рассчитывает надбавку
-//     к buyer.currentOffer и lot.buyer.currentOffer без зависимости от модалок.
-//   - ФИКС: Цена в карточке авто и на кнопке «Согласиться» обновляется синхронно.
-//   - ФИКС: acceptNPCBuyer передает реальную согласованную цену торга в сделку.
-//   - УБРАН: Ненужный текстовый инпут ввода со стрелкой для NPC-покупателей.
+// ⭐ v10.0.0 (3-TAB CLEAN ARCHITECTURE):
+//   - Полная переработка UI: переход на чистую 3-секционную структуру (Чаты / Сделки / Профиль).
+//   - Ликвидировано нагромождение кнопок и вложенных вкладок (Биржа перенесена в Рынок, Социум — в Жизнь).
+//   - Чаты организованы единым потоком со стикерами-индикаторами типов сделок.
+//   - Полное сохранение алгоритмов прямого торга (NPC-Haggle v9.4.0) и P2P-синхронизации.
 // ========================================================
 
 if (typeof window.BUSINESS_TITLE_STYLES === 'undefined') window.BUSINESS_TITLE_STYLES = [];
 if (typeof window.BUSINESS_CARD_ANIMATIONS === 'undefined') window.BUSINESS_CARD_ANIMATIONS = [];
 
 const AppM = {
-    activeTab: 'chats',
-    socialSubTab: 'feed',
-    chatFilter: 'all',
-    marketFilter: 'cars',
-    selectedListingType: 'cars',
-    selectedItemIndex: null,
-    _currentModalItems: [],
+    activeTab: 'chats',      // 'chats' | 'deals' | 'me'
+    chatFilter: 'all',       // 'all' | 'deals' | 'personal'
     activeDialogId: null,
-    _buyPending: false,
-    _publishPending: false,
-    _refreshPending: false,
     _friendChatUnsubscribe: null,
 
     init() {
@@ -80,6 +71,27 @@ const AppM = {
         } catch (e) {}
     },
 
+    _getUnreadCount() {
+        return (window.state?.player?.phoneMessages || []).filter(m => m && m.unread).length;
+    },
+
+    _getActiveDealsCount() {
+        const msgs = window.state?.player?.phoneMessages || [];
+        const p2pDeals = msgs.filter(m => m && (m.category === 'p2p' || m.category === 'buyers') && m.unread).length;
+        const liveLots = (window.state?.salesLot || []).filter(l => l && l.buyer).length;
+        return p2pDeals + liveLots;
+    },
+
+    _escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    },
+
     render(container) {
         if (!container) return;
 
@@ -92,76 +104,183 @@ const AppM = {
         const unreadCount = this._getUnreadCount();
         const activeDeals = this._getActiveDealsCount();
 
-        const headerActionBtn = curTab === 'market' ? `
-            <div class="flex-gap" style="align-items:center;">
-                <button onclick="AppM.refreshMarketFeed()" class="btn btn-dark btn-auto btn-sm" style="padding:4px 9px;" title="Обновить ленту">
-                    <i class="fa-solid fa-arrows-rotate"></i>
-                </button>
-                <button onclick="AppM.openCreateListingModal()" class="btn btn-green btn-auto btn-sm" style="padding:4px 12px; font-size:9.5px; font-weight:900; box-shadow: 0 0 10px rgba(0,230,118,0.5); animation: btnPulseGlow 2s infinite alternate;">
-                    <i class="fa-solid fa-plus mr-1"></i> ПРОДАТЬ
-                </button>
-            </div>
-        ` : `<div style="width:40px;"></div>`;
-
         container.innerHTML = `
             <style>
-                @keyframes btnPulseGlow {
-                    0% { box-shadow: 0 0 5px rgba(0,230,118,0.3); }
-                    100% { box-shadow: 0 0 15px rgba(0,230,118,0.8); }
+                .m-app-shell {
+                    display: flex;
+                    flex-direction: column;
+                    height: 100%;
+                    background: #050811;
+                    color: #e2e8f0;
+                    font-family: inherit;
+                    overflow: hidden;
                 }
-                @keyframes radarSpin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
+                .m-clean-tabs {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr 1fr;
+                    background: rgba(15, 23, 42, 0.85);
+                    border: 1px solid rgba(0, 242, 254, 0.15);
+                    border-radius: 12px;
+                    padding: 3px;
+                    gap: 4px;
+                    margin-bottom: 8px;
+                    backdrop-filter: blur(10px);
                 }
-                @keyframes msgPulse {
-                    0% { border-color: rgba(0,242,254,0.3); }
-                    50% { border-color: rgba(0,242,254,1); box-shadow: 0 0 15px rgba(0,242,254,0.4); }
-                    100% { border-color: rgba(0,242,254,0.3); }
+                .m-clean-tab-btn {
+                    position: relative;
+                    background: transparent;
+                    border: none;
+                    outline: none;
+                    color: #94a3b8;
+                    font-size: 10px;
+                    font-weight: 800;
+                    padding: 7px 4px;
+                    border-radius: 9px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 5px;
+                    transition: all 0.2s ease;
+                }
+                .m-clean-tab-btn.active {
+                    background: linear-gradient(135deg, rgba(0,242,254,0.18), rgba(121,40,202,0.22));
+                    color: #00f2fe;
+                    border: 1px solid rgba(0, 242, 254, 0.4);
+                    box-shadow: 0 0 12px rgba(0,242,254,0.2);
+                }
+                .m-badge-pill {
+                    background: #ff3366;
+                    color: #fff;
+                    font-size: 8px;
+                    font-weight: 900;
+                    padding: 1px 5px;
+                    border-radius: 10px;
+                    line-height: 1.1;
+                }
+                .m-badge-pill-cyan {
+                    background: #00f2fe;
+                    color: #000;
+                }
+                .m-dialog-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 9px 10px;
+                    background: rgba(13, 20, 36, 0.65);
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    border-radius: 12px;
+                    margin-bottom: 7px;
+                    cursor: pointer;
+                    transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+                }
+                .m-dialog-item:hover, .m-dialog-item:active {
+                    transform: translateY(-1px);
+                    background: rgba(18, 28, 51, 0.9);
+                    border-color: rgba(0, 242, 254, 0.3);
+                }
+                .m-dialog-item.unread {
+                    border-left: 3px solid #00f2fe;
+                    background: linear-gradient(90deg, rgba(0,242,254,0.08), rgba(13, 20, 36, 0.85));
+                }
+                .m-dialog-avatar {
+                    position: relative;
+                    width: 44px;
+                    height: 44px;
+                    min-width: 44px;
+                    border-radius: 10px;
+                    overflow: hidden;
+                    background: #000;
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                }
+                .m-dialog-avatar img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+                .m-sticker {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
+                    font-size: 7.5px;
+                    font-weight: 800;
+                    text-transform: uppercase;
+                    letter-spacing: 0.3px;
+                    padding: 2px 6px;
+                    border-radius: 6px;
+                }
+                .m-sticker-buyer { background: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.3); }
+                .m-sticker-p2p { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+                .m-sticker-friend { background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.3); }
+                .m-sticker-system { background: rgba(255, 179, 0, 0.15); color: #ffb300; border: 1px solid rgba(255, 179, 0, 0.3); }
+                .m-pill-chip {
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid rgba(255, 255, 255, 0.08);
+                    color: #94a3b8;
+                    border-radius: 20px;
+                    padding: 3px 9px;
+                    font-size: 8.5px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    transition: all 0.15s;
+                }
+                .m-pill-chip.active {
+                    background: rgba(0, 242, 254, 0.15);
+                    border-color: #00f2fe;
+                    color: #00f2fe;
+                }
+                @keyframes pulseSlow {
+                    0% { transform: scale(1); opacity: 1; }
+                    50% { transform: scale(1.08); opacity: 0.7; }
+                    100% { transform: scale(1); opacity: 1; }
                 }
             </style>
 
-            <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.4); padding: 6px 10px;">
-                <button onclick="PhoneManager.goHome()" class="phone-back-btn">
-                    <i class="fa-solid fa-chevron-left"></i> Меню
-                </button>
-                <div class="phone-app-title color-cyan" style="display:flex; align-items:center; gap:6px;">
-                    <span class="m-network-logo" style="background: linear-gradient(135deg, #00f2fe, #7928ca); padding: 2px 7px; border-radius: 6px; font-weight: 900; color: #000; font-size: 11px;">M+</span>
-                    <span style="font-size:12px; font-weight:900; letter-spacing:0.4px;">PRO HUB</span>
-                </div>
-                ${headerActionBtn}
-            </div>
-
-            <div class="phone-app-body" style="padding: 6px 8px;">
-                <div class="mplus-nav-scroll-bar mb-2">
-                    <button onclick="AppM.switchMainTab('chats')" class="m-nav-pill ${curTab === 'chats' ? 'active' : ''}">
-                        <i class="fa-solid fa-comments"></i> ЧАТЫ ${unreadCount > 0 ? `<span class="m-pill-badge">${unreadCount}</span>` : ''}
+            <div class="m-app-shell">
+                <div class="phone-app-header" style="border-bottom-color: rgba(0, 242, 254, 0.25); padding: 7px 10px;">
+                    <button onclick="PhoneManager.goHome()" class="phone-back-btn">
+                        <i class="fa-solid fa-chevron-left"></i> Меню
                     </button>
-                    <button onclick="AppM.switchMainTab('market')" class="m-nav-pill ${curTab === 'market' ? 'active' : ''}">
-                        <i class="fa-solid fa-globe"></i> БИРЖА
-                    </button>
-                    <button onclick="AppM.switchMainTab('social')" class="m-nav-pill ${curTab === 'social' ? 'active' : ''}">
-                        <i class="fa-solid fa-users"></i> СОЦИУМ ${activeDeals > 0 ? `<span class="m-pill-badge">${activeDeals}</span>` : ''}
-                    </button>
-                    <button onclick="AppM.switchMainTab('me')" class="m-nav-pill ${curTab === 'me' ? 'active' : ''}">
-                        <i class="fa-solid fa-user"></i> Я
-                    </button>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="background: linear-gradient(135deg, #00f2fe, #7928ca); padding: 2px 7px; border-radius: 6px; font-weight: 900; color: #000; font-size: 11px;">M+</span>
+                        <span style="font-size:12px; font-weight:900; letter-spacing:0.5px; color:#f1f5f9;">СВЯЗЬ</span>
+                    </div>
+                    <div style="width: 44px; text-align: right;">
+                        <span style="font-size: 8px; color: #00e676; font-weight: 800;"><i class="fa-solid fa-circle" style="font-size:6px;"></i> ON</span>
+                    </div>
                 </div>
 
-                <div id="mHubSubContentBox" style="min-height: 300px;"></div>
+                <div class="phone-app-body" style="padding: 7px 8px; flex:1; display:flex; flex-direction:column; overflow-y:auto;">
+                    <!-- 3 ГЛАВНЫХ РАЗДЕЛА БЕЗ НАГРОМОЖДЕНИЯ -->
+                    <div class="m-clean-tabs">
+                        <button onclick="AppM.switchMainTab('chats')" class="m-clean-tab-btn ${curTab === 'chats' ? 'active' : ''}">
+                            <i class="fa-solid fa-comment-dots"></i> ЧАТЫ
+                            ${unreadCount > 0 ? `<span class="m-badge-pill">${unreadCount}</span>` : ''}
+                        </button>
+                        <button onclick="AppM.switchMainTab('deals')" class="m-clean-tab-btn ${curTab === 'deals' ? 'active' : ''}">
+                            <i class="fa-solid fa-bolt"></i> СДЕЛКИ
+                            ${activeDeals > 0 ? `<span class="m-badge-pill m-badge-pill-cyan">${activeDeals}</span>` : ''}
+                        </button>
+                        <button onclick="AppM.switchMainTab('me')" class="m-clean-tab-btn ${curTab === 'me' ? 'active' : ''}">
+                            <i class="fa-solid fa-id-badge"></i> ПРОФИЛЬ
+                        </button>
+                    </div>
+
+                    <div id="mHubMainArea" style="flex:1;"></div>
+                </div>
             </div>
         `;
 
-        const subBox = document.getElementById('mHubSubContentBox');
-        if (!subBox) return;
+        const area = document.getElementById('mHubMainArea');
+        if (!area) return;
 
         try {
-            if (curTab === 'chats')       this.renderChatsScreen(subBox);
-            else if (curTab === 'market') this.renderMarketScreen(subBox);
-            else if (curTab === 'social') this.renderSocialHubScreen(subBox);
-            else if (curTab === 'me')     this.renderProfileScreen(subBox);
+            if (curTab === 'chats') this.renderChatsScreen(area);
+            else if (curTab === 'deals') this.renderDealsScreen(area);
+            else if (curTab === 'me') this.renderResellerProfile(area);
         } catch (e) {
             console.error('[AppM] Ошибка рендера таба', curTab, e);
-            subBox.innerHTML = `
+            area.innerHTML = `
                 <div class="glass-card p-3 text-center" style="border-color: var(--red);">
                     <b class="color-red text-xs">Ошибка рендера</b>
                     <div class="sub-label mt-1" style="font-size:9.5px;">${String(e.message || e).substring(0, 150)}</div>
@@ -178,91 +297,28 @@ const AppM = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    _getUnreadCount() {
-        return (window.state?.player?.phoneMessages || []).filter(m => m && m.unread).length;
-    },
-
-    _getActiveDealsCount() {
-        const messages = window.state?.player?.phoneMessages || [];
-        return messages.filter(m => m && m.category === 'p2p' && m.unread).length;
-    },
-
-    _escapeHtml(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    },
-
-    _escapeAttr(str) {
-        if (!str) return '';
-        return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    },
-
+    // ========================================================
+    // 1. РАЗДЕЛ «ЧАТЫ»: ЕДИНЫЙ ПОТОК СО СТИКЕРАМИ
+    // ========================================================
     renderChatsScreen(container) {
         if (!container) return;
 
         this.syncSalesLotBuyersToMessages();
-
         if (typeof window.cleanupOrphanedDialogs === 'function') {
             try { window.cleanupOrphanedDialogs(); } catch (e) {}
         }
 
-        const filtered = this._getFilteredDialogs();
-
-        const allMsgs = window.state?.player?.phoneMessages || [];
-        const counts = {
-            all: allMsgs.length,
-            p2p: allMsgs.filter(m => m && m.category === 'p2p').length,
-            buyers: allMsgs.filter(m => m && m.category === 'buyers').length,
-            system: allMsgs.filter(m => m && (m.category === 'system' || m.isSystem)).length,
-            friends: allMsgs.filter(m => m && m.category === 'friends').length
-        };
-
-        const curFilter = this.chatFilter;
-
-        container.innerHTML = `
-            <div class="mplus-nav-scroll-bar mb-2">
-                <button onclick="AppM.setChatFilter('all')" class="m-nav-pill ${curFilter === 'all' ? 'active' : ''}">
-                    <i class="fa-solid fa-list-ul"></i> Все (${counts.all})
-                </button>
-                <button onclick="AppM.setChatFilter('p2p')" class="m-nav-pill ${curFilter === 'p2p' ? 'active' : ''}">
-                    <i class="fa-solid fa-handshake"></i> Торг P2P (${counts.p2p})
-                </button>
-                <button onclick="AppM.setChatFilter('buyers')" class="m-nav-pill ${curFilter === 'buyers' ? 'active' : ''}">
-                    <i class="fa-solid fa-user-tag"></i> Покупатели (${counts.buyers})
-                </button>
-                <button onclick="AppM.setChatFilter('system')" class="m-nav-pill ${curFilter === 'system' ? 'active' : ''}">
-                    <i class="fa-solid fa-newspaper"></i> Система (${counts.system})
-                </button>
-            </div>
-
-            <div id="mDialogsListContainer">
-                ${this._renderDialogsListHtml(filtered)}
-            </div>
-        `;
-    },
-
-    setChatFilter(filter) {
-        this.chatFilter = filter;
-        if (typeof playSound === 'function') playSound('tick');
-        this.render(document.getElementById('phoneAppContainer'));
-    },
-
-    _getFilteredDialogs() {
         const all = window.state?.player?.phoneMessages || [];
         const f = this.chatFilter;
 
         let filtered = all;
-        if (f === 'p2p') filtered = all.filter(m => m && m.category === 'p2p');
-        else if (f === 'buyers') filtered = all.filter(m => m && m.category === 'buyers');
-        else if (f === 'system') filtered = all.filter(m => m && (m.category === 'system' || m.isSystem));
-        else if (f === 'friends') filtered = all.filter(m => m && m.category === 'friends');
+        if (f === 'deals') {
+            filtered = all.filter(m => m && (m.category === 'p2p' || m.category === 'buyers'));
+        } else if (f === 'personal') {
+            filtered = all.filter(m => m && (m.category === 'friends' || m.category === 'system' || m.isSystem));
+        }
 
-        return [...filtered].sort((a, b) => {
+        const sorted = [...filtered].sort((a, b) => {
             if (!a || !b) return 0;
             const aUnread = a.unread ? 1 : 0;
             const bUnread = b.unread ? 1 : 0;
@@ -271,36 +327,59 @@ const AppM = {
             const bTs = b.lastMessageAt || b.createdAt || 0;
             return bTs - aTs;
         });
+
+        const counts = {
+            all: all.length,
+            deals: all.filter(m => m && (m.category === 'p2p' || m.category === 'buyers')).length,
+            personal: all.filter(m => m && (m.category === 'friends' || m.category === 'system' || m.isSystem)).length
+        };
+
+        container.innerHTML = `
+            <!-- Быстрые микро-чипсы (вместо многоэтажных рядов кнопок) -->
+            <div style="display:flex; gap:5px; margin-bottom:8px; overflow-x:auto; padding-bottom:2px;">
+                <button onclick="AppM.setFilter('all')" class="m-pill-chip ${f === 'all' ? 'active' : ''}">
+                    Все (${counts.all})
+                </button>
+                <button onclick="AppM.setFilter('deals')" class="m-pill-chip ${f === 'deals' ? 'active' : ''}">
+                    🤝 Сделки & Покупатели (${counts.deals})
+                </button>
+                <button onclick="AppM.setFilter('personal')" class="m-pill-chip ${f === 'personal' ? 'active' : ''}">
+                    💬 Личные & Инфо (${counts.personal})
+                </button>
+            </div>
+
+            <div id="mDialogsFlow">
+                ${sorted.length === 0 ? this._renderEmptyChatsState() : sorted.map(m => this._buildDialogItem(m)).join('')}
+            </div>
+        `;
     },
 
-    _renderDialogsListHtml(dialogs) {
-        if (!dialogs || dialogs.length === 0) {
-            return `
-                <div class="glass-card text-center sub-label py-6" style="background:#090e18; border: 1px dashed rgba(0,242,254,0.2);">
-                    <div style="position:relative; width:60px; height:60px; margin:0 auto 15px auto;">
-                        <div style="position:absolute; inset:0; border:2px solid rgba(0,242,254,0.2); border-radius:50%;"></div>
-                        <div style="position:absolute; inset:0; border-top:2px solid var(--cyan); border-radius:50%; animation: radarSpin 2s linear infinite;"></div>
-                        <i class="fa-solid fa-satellite-dish" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); font-size:20px; color:var(--cyan);"></i>
-                    </div>
-                    <div class="font-bold color-cyan" style="font-size:12px;">Эфир пуст</div>
-                    <div class="text-xs mt-1" style="font-size:9px; color:#94a3b8;">
-                        ${this.chatFilter === 'p2p' ? 'Откройте Биржу и напишите продавцу' : 
-                          this.chatFilter === 'buyers' ? 'Выставьте авто на площадку продаж' :
-                          this.chatFilter === 'system' ? 'Системных уведомлений пока нет' :
-                          'Начните переписку — биржа, площадка или друзья'}
-                    </div>
+    setFilter(filter) {
+        this.chatFilter = filter;
+        if (typeof playSound === 'function') playSound('tick');
+        const area = document.getElementById('mHubMainArea');
+        if (area) this.renderChatsScreen(area);
+    },
+
+    _renderEmptyChatsState() {
+        return `
+            <div style="text-align:center; padding: 36px 16px; background: rgba(13,20,36,0.4); border-radius:14px; border:1px dashed rgba(0,242,254,0.2); margin-top:10px;">
+                <div style="width:48px; height:48px; margin:0 auto 12px auto; border-radius:50%; background:rgba(0,242,254,0.08); display:flex; align-items:center; justify-content:center; border:1px solid rgba(0,242,254,0.3); animation:pulseSlow 2.5s infinite;">
+                    <i class="fa-solid fa-satellite-dish" style="color:#00f2fe; font-size:20px;"></i>
                 </div>
-            `;
-        }
-
-        return dialogs.map(m => this._buildDialogCard(m)).join('');
+                <div style="font-weight:800; font-size:12px; color:#f1f5f9;">В эфире пока тихо</div>
+                <div style="font-size:9px; color:#94a3b8; margin-top:4px; max-width:220px; margin-left:auto; margin-right:auto; line-height:1.4;">
+                    Выставьте машину на продажу на авторынке или отправьте встречный оффер игроку
+                </div>
+            </div>
+        `;
     },
 
-    _buildDialogCard(m) {
+    _buildDialogItem(m) {
         if (!m) return '';
 
         const history = m.chatHistory || [];
-        const lastMsg = history.length > 0 ? history[history.length - 1].text : (m.preview || '');
+        const lastMsg = history.length > 0 ? history[history.length - 1].text : (m.preview || 'Нет сообщений');
         const isUnread = !!m.unread;
         const category = m.category || 'unknown';
         const isSystem = category === 'system' || m.isSystem;
@@ -310,84 +389,243 @@ const AppM = {
         const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(carData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
 
+        // Формирование стикера типа чата
+        let sticker = '';
         if (isSystem) {
-            return `
-                <div class="glass-card mb-2 p-3" style="border-left: 3px solid var(--amber); background: linear-gradient(135deg, rgba(255,179,0,0.08), #090e18);">
-                    <div class="flex-between mb-2">
-                        <div class="flex-gap" style="align-items:center;">
-                            <span style="font-size:18px; filter:drop-shadow(0 0 5px var(--amber));">📰</span>
-                            <b class="text-xs color-amber" style="font-size:11.5px;">${this._escapeHtml(m.sender || 'Система')}</b>
-                        </div>
-                        <span class="tag-badge bg-tag-amber" style="font-size:7.5px;">УВЕДОМЛЕНИЕ</span>
-                    </div>
-                    <div class="sub-label mb-2" style="font-size:10px; line-height:1.4; color:#f1f5f9;">
-                        ${this._escapeHtml(lastMsg)}
-                    </div>
-                    <button onclick="AppM.deleteDialog('${m.id}')" class="btn btn-dark btn-sm w-full" style="font-size:9px; padding:5px;">
-                        <i class="fa-solid fa-check mr-1"></i> Ознакомлен
-                    </button>
-                </div>
-            `;
-        }
-
-        let categoryBadge = '';
-        if (category === 'p2p') {
-            const role = m.p2pRole === 'seller' ? 'ВЫ — ПРОДАВЕЦ' : 'ВЫ — ПОКУПАТЕЛЬ';
-            const roleColor = m.p2pRole === 'seller' ? 'var(--amber)' : 'var(--cyan)';
-            categoryBadge = `<span class="tag-badge" style="background:rgba(${m.p2pRole === 'seller' ? '255,179,0' : '0,242,254'},0.15); color:${roleColor}; font-size:7.5px;">${role}</span>`;
+            sticker = `<span class="m-sticker m-sticker-system"><i class="fa-solid fa-bell"></i> ИНФО</span>`;
         } else if (category === 'buyers') {
-            categoryBadge = `<span class="tag-badge bg-tag-green" style="font-size:7.5px;">ПОКУПАТЕЛЬ NPC</span>`;
-        } else if (category === 'friends') {
-            categoryBadge = `<span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">ДРУГ</span>`;
+            sticker = `<span class="m-sticker m-sticker-buyer"><i class="fa-solid fa-tag"></i> ПОКУПАТЕЛЬ</span>`;
+        } else if (category === 'p2p') {
+            const role = m.p2pRole === 'seller' ? 'ПРОДАЖА P2P' : 'ПОКУПКА P2P';
+            sticker = `<span class="m-sticker m-sticker-p2p"><i class="fa-solid fa-handshake"></i> ${role}</span>`;
+        } else {
+            sticker = `<span class="m-sticker m-sticker-friend"><i class="fa-solid fa-user"></i> КОНТАКТ</span>`;
         }
 
-        const unreadBadge = isUnread
-            ? `<span class="tag-badge bg-tag-red" style="font-weight:900; font-size:7.5px;"><span class="led-dot led-red"></span> НОВОЕ</span>`
-            : '';
+        let priceBadge = '';
+        const price = m.offerPrice || m.askingPrice;
+        if (price) {
+            priceBadge = `<span style="font-size:9.5px; font-weight:800; color:#00e676;">${Number(price).toLocaleString()} ₽</span>`;
+        }
 
-        let priceText = '';
-        if (m.askingPrice) priceText = `${Number(m.askingPrice).toLocaleString()} ₽`;
-        else if (m.offerPrice) priceText = `${Number(m.offerPrice).toLocaleString()} ₽`;
+        const avatarContent = isSystem
+            ? `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#1e293b; color:#ffb300; font-size:18px;"><i class="fa-solid fa-newspaper"></i></div>`
+            : `<img src="${carImg}" onerror="this.onerror=null; this.src='${fallbackImg}';">`;
 
         return `
-            <div onclick="AppM.openDialog('${m.id}')" 
-                 class="glass-card mb-2 p-2 cursor-pointer ${isUnread ? 'card-glow-deal' : ''}" 
-                 style="border-left: 3px solid ${isUnread ? 'var(--cyan)' : 'rgba(255,255,255,0.1)'}; background: #090e18; ${isUnread ? 'animation: msgPulse 2s infinite alternate;' : ''}">
-                
-                <div class="car-img-wrap mb-2" style="height:100px; position:relative; border-radius:10px; overflow:hidden;">
-                    <img src="${carImg}" class="car-img" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
-                    <div class="badge-tag badge-br" style="bottom:4px; right:4px;">${unreadBadge}</div>
-                    ${categoryBadge ? `<div class="badge-tag badge-tl" style="top:4px; left:4px;">${categoryBadge}</div>` : ''}
+            <div onclick="AppM.openDialog('${m.id}')" class="m-dialog-item ${isUnread ? 'unread' : ''}">
+                <div class="m-dialog-avatar">
+                    ${avatarContent}
+                    ${isUnread ? `<span style="position:absolute; top:2px; right:2px; width:7px; height:7px; background:#00f2fe; border-radius:50%; box-shadow:0 0 6px #00f2fe;"></span>` : ''}
                 </div>
 
-                <div class="flex-between mb-1">
-                    <div style="min-width:0; flex:1;">
-                        <b class="text-xs color-cyan" style="font-size:11.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
-                            ${this._escapeHtml(carData.name || 'Диалог')}
-                        </b>
-                        <div class="sub-label" style="font-size:8.5px;">${this._escapeHtml(m.sender || 'Собеседник')}</div>
+                <div style="flex:1; min-width:0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                        <span style="font-weight:800; font-size:11px; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;">
+                            ${this._escapeHtml(carData.name || m.sender || 'Диалог')}
+                        </span>
+                        ${sticker}
                     </div>
-                    ${priceText ? `
-                        <div class="text-right" style="flex-shrink:0;">
-                            <span class="sub-label" style="font-size:7.5px;">${category === 'p2p' ? 'ЦЕНА' : 'ПРЕДЛОЖЕНИЕ'}</span>
-                            <div class="price-val text-xs color-green" style="font-size:12px;">${priceText}</div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                        <span style="font-size:9px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;">
+                            ${this._escapeHtml(lastMsg)}
+                        </span>
+                        ${priceBadge}
+                    </div>
+                </div>
+
+                <button onclick="event.stopPropagation(); AppM.deleteDialog('${m.id}')" 
+                        style="background:none; border:none; color:#475569; padding:4px 6px; cursor:pointer; font-size:11px;" 
+                        title="Удалить диалог">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        `;
+    },
+
+    // ========================================================
+    // 2. РАЗДЕЛ «СДЕЛКИ»: АКТИВНЫЙ ТОРГ И ОФФЕРЫ В 1 КЛИК
+    // ========================================================
+    renderDealsScreen(container) {
+        if (!container) return;
+
+        const lotsWithBuyers = (window.state?.salesLot || []).filter(l => l && l.buyer);
+        const p2pMessages = (window.state?.player?.phoneMessages || []).filter(m => m && m.category === 'p2p');
+
+        container.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <div>
+                    <b style="font-size:11.5px; color:#f1f5f9;">Оперативные сделки</b>
+                    <div style="font-size:8.5px; color:#94a3b8;">Покупатели у капота и предложения от игроков</div>
+                </div>
+                <span class="m-sticker m-sticker-buyer">${lotsWithBuyers.length + p2pMessages.length} АКТИВНО</span>
+            </div>
+
+            <!-- ПОКУПАТЕЛИ С ПЛОЩАДКИ ПРОДАЖ -->
+            <div class="mb-3">
+                <div style="font-size:9.5px; font-weight:800; color:#00e676; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.3px;">
+                    <i class="fa-solid fa-car-on mr-1"></i> На площадке (${lotsWithBuyers.length})
+                </div>
+                ${lotsWithBuyers.length === 0 ? `
+                    <div style="padding:12px; background:rgba(255,255,255,0.02); border-radius:10px; border:1px solid rgba(255,255,255,0.05); font-size:9px; color:#64748b; text-align:center;">
+                        Сейчас на площадке нет ожидающих клиентов.
+                    </div>
+                ` : lotsWithBuyers.map((lot, idx) => this._renderQuickLotDealCard(lot, idx)).join('')}
+            </div>
+
+            <!-- ПРЕДЛОЖЕНИЯ P2P -->
+            <div>
+                <div style="font-size:9.5px; font-weight:800; color:#c084fc; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.3px;">
+                    <i class="fa-solid fa-handshake mr-1"></i> Встречный торг P2P (${p2pMessages.length})
+                </div>
+                ${p2pMessages.length === 0 ? `
+                    <div style="padding:12px; background:rgba(255,255,255,0.02); border-radius:10px; border:1px solid rgba(255,255,255,0.05); font-size:9px; color:#64748b; text-align:center;">
+                        Нет открытых P2P предложений.
+                    </div>
+                ` : p2pMessages.map(m => this._renderQuickP2PDealCard(m)).join('')}
+            </div>
+        `;
+    },
+
+    _renderQuickLotDealCard(lot, idx) {
+        const car = lot.car || {};
+        const buyer = lot.buyer || lot.currentBuyer || {};
+        const offer = buyer.currentOffer || buyer.offeredPrice || lot.askingPrice || 0;
+        const rawImg = car.img || "assets/cars/economy/2101/vaz-2101.jpg";
+        const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
+
+        return `
+            <div class="glass-card mb-2 p-2" style="background:#090e18; border:1px solid rgba(0,230,118,0.3); border-radius:11px;">
+                <div style="display:flex; gap:9px; align-items:center;">
+                    <img src="${carImg}" style="width:58px; height:40px; object-fit:cover; border-radius:7px; border:1px solid rgba(255,255,255,0.1);">
+                    <div style="flex:1; min-width:0;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <b style="font-size:10.5px; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                ${this._escapeHtml(car.name || 'Автомобиль')}
+                            </b>
+                            <span style="font-size:10.5px; font-weight:900; color:#00e676;">${Number(offer).toLocaleString()} ₽</span>
                         </div>
-                    ` : ''}
+                        <div style="font-size:8.5px; color:#94a3b8; margin-top:2px;">
+                            Клиент: <b style="color:#e2e8f0;">${this._escapeHtml(buyer.name || 'Покупатель')}</b>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="seller-dialog-bubble my-1" style="border-left: 3px solid var(--cyan); background: rgba(0, 242, 254, 0.04); padding: 5px 9px; border-radius: 6px;">
-                    <span class="sub-label" style="font-size:9px; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">
-                        ${this._escapeHtml(lastMsg) || 'Начните переписку...'}
-                    </span>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-top:8px;">
+                    <button onclick="AppM.openDialogForCarIndex(${idx})" class="btn btn-green btn-sm" style="font-size:9px; padding:6px 0; font-weight:800;">
+                        <i class="fa-solid fa-comments mr-1"></i> ТОРГОВАТЬСЯ
+                    </button>
+                    <button onclick="AppM.acceptLotBuyerDirect(${idx})" class="btn btn-dark btn-sm" style="font-size:9px; padding:6px 0;">
+                        <i class="fa-solid fa-check mr-1"></i> ПРИНЯТЬ
+                    </button>
                 </div>
+            </div>
+        `;
+    },
 
-                <div class="grid-2 mt-1" style="gap:4px;">
-                    <button onclick="event.stopPropagation(); AppM.openDialog('${m.id}')" class="btn btn-cyan btn-sm" style="font-size:9px; padding:5px 0;">
-                        <i class="fa-solid fa-comments mr-1"></i> ОТКРЫТЬ
+    _renderQuickP2PDealCard(m) {
+        const car = m.carData || {};
+        const price = m.offerPrice || m.askingPrice || 0;
+
+        return `
+            <div class="glass-card mb-2 p-2" style="background:#090e18; border:1px solid rgba(168,85,247,0.3); border-radius:11px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <b style="font-size:10.5px; color:#c084fc;">${this._escapeHtml(car.name || 'P2P Авто')}</b>
+                    <span style="font-size:10.5px; font-weight:900; color:#00e676;">${Number(price).toLocaleString()} ₽</span>
+                </div>
+                <div style="font-size:8.5px; color:#94a3b8; margin-bottom:7px;">
+                    Собеседник: <b style="color:#e2e8f0;">${this._escapeHtml(m.sender || 'Игрок')}</b>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
+                    <button onclick="AppM.openDialog('${m.id}')" class="btn btn-cyan btn-sm" style="font-size:9px; padding:6px 0; font-weight:800;">
+                        <i class="fa-solid fa-comments mr-1"></i> В ЧАТ
                     </button>
-                    <button onclick="event.stopPropagation(); AppM.deleteDialog('${m.id}')" class="btn btn-dark btn-sm" style="font-size:9px; padding:5px 0;">
-                        <i class="fa-solid fa-trash"></i> УДАЛИТЬ
+                    <button onclick="AppM.openDealForDialog('${m.id}')" class="btn btn-dark btn-sm" style="font-size:9px; padding:6px 0;">
+                        <i class="fa-solid fa-file-contract mr-1"></i> ДОГОВОР
                     </button>
+                </div>
+            </div>
+        `;
+    },
+
+    openDialogForCarIndex(idx) {
+        const lot = window.state?.salesLot?.[idx];
+        if (!lot) return;
+        const msg = (window.state?.player?.phoneMessages || []).find(m => 
+            m && (m.carUid === lot.car?.uid || m.carIndex === idx)
+        );
+        if (msg) {
+            this.openDialog(msg.id);
+        } else {
+            this.switchMainTab('chats');
+        }
+    },
+
+    acceptLotBuyerDirect(lotIndex) {
+        const slot = window.state?.salesLot?.[lotIndex];
+        if (!slot) return showToast?.('⚠️ Лот не найден');
+
+        const buyer = slot.currentBuyer || slot.buyer;
+        const finalPrice = buyer?.currentOffer || buyer?.offeredPrice || slot.askingPrice || 100000;
+        const purchaseCost = (slot.car?.purchaseCost) || Math.round(finalPrice * 0.75);
+        const profit = finalPrice - purchaseCost;
+
+        if (typeof finishSalesLotDeal === 'function') {
+            finishSalesLotDeal(lotIndex, finalPrice, profit, purchaseCost);
+        } else if (typeof acceptLotBuyerDeal === 'function') {
+            acceptLotBuyerDeal(lotIndex);
+        }
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // ========================================================
+    // 3. РАЗДЕЛ «ПРОФИЛЬ»: АВТОРИТЕТ И СТАТИСТИКА ПЕРЕКУПА
+    // ========================================================
+    renderResellerProfile(container) {
+        if (!container) return;
+
+        const player = window.state?.player || {};
+        const name = player.name || 'Taktoje';
+        const level = player.level || 1;
+        const karma = player.karma || 50;
+        const dealsCount = player.completedDeals || 0;
+        const repStatus = karma > 70 ? 'Честный перекуп' : (karma < 30 ? 'Скрутчик со стажем' : 'Бывалый торгаш');
+        const repColor = karma > 70 ? '#00e676' : (karma < 30 ? '#ff3366' : '#ffb300');
+
+        container.innerHTML = `
+            <div class="glass-card p-3 mb-3" style="background:#090e18; border:1px solid rgba(0,242,254,0.3); border-radius:14px; text-align:center;">
+                <div style="width:56px; height:56px; border-radius:50%; margin:0 auto 8px auto; border:2px solid #00f2fe; padding:2px; background:#000;">
+                    <div style="width:100%; height:100%; border-radius:50%; background:linear-gradient(135deg, #00f2fe, #7928ca); display:flex; align-items:center; justify-content:center; color:#000; font-size:22px; font-weight:900;">
+                        ${name.charAt(0).toUpperCase()}
+                    </div>
+                </div>
+                <b style="font-size:13px; color:#f1f5f9; display:block;">${this._escapeHtml(name)}</b>
+                <div style="display:inline-block; margin-top:4px; font-size:8.5px; font-weight:800; color:${repColor}; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:20px; border:1px solid ${repColor}40;">
+                    ${repStatus}
+                </div>
+            </div>
+
+            <div class="grid-2 mb-3" style="gap:6px;">
+                <div class="glass-card p-2 text-center" style="background:#090e18; border-radius:10px;">
+                    <div style="font-size:8px; color:#94a3b8;">УРОВЕНЬ</div>
+                    <b style="font-size:14px; color:#00f2fe;">${level}</b>
+                </div>
+                <div class="glass-card p-2 text-center" style="background:#090e18; border-radius:10px;">
+                    <div style="font-size:8px; color:#94a3b8;">КАРМА ТОРГА</div>
+                    <b style="font-size:14px; color:${repColor};">${karma}/100</b>
+                </div>
+            </div>
+
+            <div class="glass-card p-3" style="background:#090e18; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
+                <div style="font-size:10px; font-weight:800; color:#f1f5f9; margin-bottom:8px;">СТАТУС СВЯЗИ</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:9px; color:#94a3b8; margin-bottom:6px;">
+                    <span>Канал приема офферов</span>
+                    <span style="color:#00e676; font-weight:800;">ОТКРЫТ</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:9px; color:#94a3b8;">
+                    <span>Шифрование диалогов</span>
+                    <span style="color:#00f2fe; font-weight:800;">АКТИВНО</span>
                 </div>
             </div>
         `;
@@ -470,12 +708,12 @@ const AppM = {
                     <div class="phone-app-title text-xs font-bold" style="font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                         ${this._escapeHtml(msg.sender || 'Продавец')}
                     </div>
-                    <div class="sub-label color-green" style="font-size:8px;">● P2P Биржа</div>
+                    <div class="sub-label color-green" style="font-size:8px;">● P2P Торг</div>
                 </div>
                 <div style="width:40px;"></div>
             </div>
 
-            <div class="phone-app-body" style="display:flex; flex-direction:column; gap:8px; padding:6px;">
+            <div class="phone-app-body" style="display:flex; flex-direction:column; gap:8px; padding:6px; flex:1;">
                 <div class="glass-card p-2" style="border: 1.5px solid var(--cyan); background: #060a14; margin-bottom: 0;">
                     <div class="deal-car-preview-card" style="height:56px; min-height:56px; padding:4px 8px;">
                         <img src="${carImg}" class="deal-car-thumb" style="width:68px; height:46px; min-width:68px; object-fit:cover;" onerror="this.onerror=null; this.src='${fallbackImg}';">
@@ -546,7 +784,7 @@ const AppM = {
     },
 
     // ========================================================
-    // ⭐ v9.4.0: ЧАТ С NPC-ПОКУПАТЕЛЕМ С ПЛОЩАДКИ
+    // ТОРГ С NPC-ПОКУПАТЕЛЕМ (DIRECT HAGGLE)
     // ========================================================
     _renderNPCDialog(container, msg) {
         const carData = msg.carData || {};
@@ -554,7 +792,6 @@ const AppM = {
         const carImg = (typeof resolveCarAssetUrl === 'function') ? resolveCarAssetUrl(rawImg) : rawImg;
         const fallbackImg = (typeof getCategoryFallback === 'function') ? getCategoryFallback(carData.type || 'economy') : "assets/cars/economy/2101/vaz-2101.jpg";
 
-        // Поиск актуального лота
         let lot = null;
         if (msg.carUid && Array.isArray(window.state?.salesLot)) {
             lot = window.state.salesLot.find(l => l && l.car && (l.car.uid === msg.carUid || l.car.id === msg.carUid));
@@ -667,7 +904,6 @@ const AppM = {
         const msg = (window.state?.player?.phoneMessages || []).find(m => m && m.id === msgId);
         if (!msg) return;
 
-        // Находим актуальный лот в state.salesLot
         let lot = null;
         let lotIndex = null;
 
@@ -700,12 +936,10 @@ const AppM = {
         if (!Array.isArray(msg.chatHistory)) msg.chatHistory = [];
         if (!Array.isArray(buyer.dialogHistory)) buyer.dialogHistory = [];
 
-        // Реплика игрока
         const playerText = `«За ${currentPrice.toLocaleString()} ₽ не отдам. Добавь хотя бы +${raiseAmount.toLocaleString()} ₽, и по рукам!»`;
         msg.chatHistory.push({ from: 'me', text: playerText });
         buyer.dialogHistory.push({ from: 'me', text: playerText });
 
-        // Расчет риска с учетом уровня и кармы
         const karma = window.state?.player?.karma || 50;
         const lvl = window.state?.player?.level || 1;
         let actualRisk = failRisk;
@@ -742,7 +976,6 @@ const AppM = {
                 if (typeof showToast === 'function') showToast('❌ Покупатель отказался накидывать цену!');
             }
         } else {
-            // Успех торга
             buyer.currentOffer = newTargetPrice;
             buyer.offeredPrice = newTargetPrice;
             msg.offerPrice = newTargetPrice;
@@ -820,9 +1053,9 @@ const AppM = {
                 <div style="width:40px;"></div>
             </div>
 
-            <div class="phone-app-body" style="padding:6px;">
+            <div class="phone-app-body" style="padding:6px; flex:1; display:flex; flex-direction:column;">
                 <div class="chat-thread-container" id="mChatScrollBox" 
-                     style="min-height:200px; max-height:400px; overflow-y:auto; padding:8px; background:#04070e; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
+                     style="flex:1; min-height:200px; max-height:400px; overflow-y:auto; padding:8px; background:#04070e; border-radius:12px; border:1px solid rgba(255,255,255,0.06);">
                     ${history.map(item => `
                         <div class="chat-msg ${item.from === 'me' ? 'msg-player' : 'msg-seller'}" style="margin-bottom:6px;">
                             ${this._escapeHtml(item.text)}
@@ -874,4 +1107,4 @@ const AppM = {
 window.AppM = AppM;
 window.AppMessenger = AppM;
 
-console.log('[💬 phone-m-core v9.4.0] Автономный торг в чате M+ с гарантированным обновлением суммы и цены ДКП ✓');
+console.log('[💬 phone-m-core v10.0.0] Редизайн M+ на 3 чистых раздела (Чаты, Сделки, Профиль) ✓');
