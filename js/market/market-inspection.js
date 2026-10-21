@@ -1,12 +1,12 @@
 // ========================================================
-// js/market/market-inspection.js — СИСТЕМА ПРОВЕРОК, ТЕСТ-ДРАЙВА И АВТОТЕКИ PRO (v2.6.0)
+// js/market/market-inspection.js — СИСТЕМА ПРОВЕРОК, ТЕСТ-ДРАЙВА И АВТОТЕКИ PRO (v2.7.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v2.6.0:
-//   - ДОБАВЛЕН ИНТЕРАКТИВНЫЙ ТЕСТ-ДРАЙВ: холодный запуск ДВС (дымность выхлопа, шумы гидриков/цепи/вкладышей),
-//     проверка поведения КПП (пинки автомата, хруст синхронизатора, пробуксовка сцепления).
-//   - РАСШИРЕННАЯ АВТОТЕКА PRO: хронология фиксаций техосмотра ЕАИСТО со скруткой,
-//     страховые расчеты ремонтов и ДТП, запреты ФССП с суммами и залоги МФО.
-//   - Сохранена полная совместимость с контекстным возвратом в окна и расходом заряда приборов.
+//
+// ⭐ v2.7.0 (АДАПТИВНАЯ АВТОТЕКА PRO ДЛЯ СМАРТФОНОВ PIXEL):
+//   1. Контейнер отчёта Автотеки оптимизирован под экраны смартфонов: max-height с внутренним скроллом.
+//   2. Кнопка «ЗАКРЫТЬ» всегда видна и не сползает под системную жестовую панель Android.
+//   3. Компактная верстка блоков ЕАИСТО, залогов и расчётов ДТП без потери информативности.
+//   4. Сохранены интерактивный тест-драйв, холодный пуск, прогон КПП и замеры ЛКП.
 // ========================================================
 
 let activeInspectCarId = null;
@@ -702,7 +702,7 @@ function closeOBD2Modal() {
 }
 
 // --------------------------------------------------------
-// 3. ИНТЕРАКТИВНЫЙ ТЕСТ-ДРАЙВ И ХОЛОДНЫЙ ПУСК (v2.6.0)
+// 3. ИНТЕРАКТИВНЫЙ ТЕСТ-ДРАЙВ И ХОЛОДНЫЙ ПУСК
 // --------------------------------------------------------
 function openTestDriveModal(carId) {
     activeInspectCarId = carId;
@@ -1349,7 +1349,7 @@ function closeInspectionResults() {
 }
 
 // --------------------------------------------------------
-// 5. РАСШИРЕННАЯ АВТОТЕКА PRO (v2.6.0)
+// 5. РАСШИРЕННАЯ АВТОТЕКА PRO (ОПТИМИЗИРОВАНА ПОД PIXEL)
 // --------------------------------------------------------
 function openAutotekaModal(carId) {
     let car = null;
@@ -1385,8 +1385,6 @@ function openAutotekaModal(carId) {
     const cPlate = car.customPlate || car.plate || "ТРАНЗИТ";
     const mVal = car.mileage || 85000;
     const actualMileage = car.actualMileage || (car.rolledOdometer ? Math.round(mVal * 1.8) : mVal);
-    const engWear = car.wear?.engine ? Math.round(car.wear.engine) : 85;
-    const transWear = car.wear?.transmission ? Math.round(car.wear.transmission) : 85;
 
     const pts = car.ptsData || {
         ownerName: "Иванов И.И.", ownerAvatar: "🧔",
@@ -1415,7 +1413,6 @@ function openAutotekaModal(carId) {
 
     const isOdometerTampered = Boolean(car.rolledOdometer || car.autotekaMileageDiscrepancy || autoReport.isRolledOdo);
 
-    // Хронология техосмотров
     let inspectionsHtml = '';
     const inspections = autoReport.inspections || [
         { date: "12.05.2021", mileage: Math.round(actualMileage * 0.35) },
@@ -1423,14 +1420,13 @@ function openAutotekaModal(carId) {
         { date: "15.01.2025", mileage: actualMileage }
     ];
 
-    inspectionsHtml = inspections.map((ins, i) => `
+    inspectionsHtml = inspections.map((ins) => `
         <div class="flex-between p-1 mb-1" style="background:#050914; border-radius:4px; font-size:8.5px;">
             <span><i class="fa-solid fa-wrench color-cyan mr-1"></i> ТО от ${ins.date}:</span>
             <b class="${isOdometerTampered && ins.mileage > mVal ? 'color-red' : 'color-green'}">${ins.mileage.toLocaleString()} км</b>
         </div>
     `).join('');
 
-    // Страховые расчеты и ДТП
     let accidentsHtml = '';
     const accidents = autoReport.accidents || [];
     const repairs = autoReport.repairCalculations || [];
@@ -1480,8 +1476,15 @@ function openAutotekaModal(carId) {
     const rep = document.getElementById("autotekaReportContent");
     if (!rep) return;
 
+    // Стилизация контейнера: отчет скроллится внутри, шапка и кнопка закрытия всегда видны на экране Pixel
+    rep.style.maxHeight = "calc(100dvh - 160px)";
+    rep.style.overflowY = "auto";
+    rep.style.overscrollBehavior = "contain";
+    rep.style.padding = "0";
+    rep.style.marginBottom = "8px";
+
     rep.innerHTML = `
-        <div class="autoteka-official-blank">
+        <div class="autoteka-official-blank" style="margin-bottom:0;">
             <div class="autoteka-watermark">АВТОТЕКА PRO</div>
 
             <div class="autoteka-blank-border">
@@ -1566,6 +1569,17 @@ function openAutotekaModal(carId) {
         </div>
     `;
 
+    // Принудительно задаём безопасные габариты для кнопки закрытия модалки
+    const closeBtn = document.querySelector("#modalAutoteka .modal-box > button:last-child");
+    if (closeBtn) {
+        closeBtn.style.height = "36px";
+        closeBtn.style.minHeight = "36px";
+        closeBtn.style.padding = "0";
+        closeBtn.style.fontSize = "11px";
+        closeBtn.style.fontWeight = "900";
+        closeBtn.style.letterSpacing = "0.5px";
+    }
+
     ModalManager.open("modalAutoteka");
     if (typeof playSound === 'function') playSound('tick');
     if (typeof renderMarketFeed === 'function') renderMarketFeed();
@@ -1610,4 +1624,4 @@ Object.assign(window, {
     closeTestDriveModal
 });
 
-console.log('[🔬 market-inspection v2.6.0] Тест-драйв у капота + Автотека PRO + ЕАИСТО ТО ✓');
+console.log('[🔬 market-inspection v2.7.0] Автотека PRO адаптирована под экран Pixel ✓');
