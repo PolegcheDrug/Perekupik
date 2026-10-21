@@ -1,11 +1,12 @@
 // ========================================================
-// data_economy.js — ЭКОНОМИКА, БИЗНЕСЫ, СЕЗОНЫ, ПЕРЕГОН И БАНК (v3.8.0 REBALANCED)
+// data/data_economy.js — СБАЛАНСИРОВАННАЯ ЭКОНОМИКА (v4.0.0 PRO-BALANCE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v3.8.0 (ХАРДКОР-БАЛАНС НАГРАД И ВИЛСПИНА):
-//   - ПЕРЕБАЛАНСИРОВКА ВИЛСПИНА: исключён ранний фарм миллионов и иномарок на 1-2 уровне.
-//   - РЕАЛИСТИЧНАЯ МАРЖА: прибыль снижена до честных 8-15%, заработок требует детейлинга и ремонта.
-//   - СОХРАНЕНО НА 100%: все 14 объектов жилья, мебель, верстак, 13 бизнесов со всеми ветками
-//     улучшений, персонал, автопарки МРЭО, сезоны и перегон.
+//
+// ⭐ v4.0.0 (ЛИКВИДАЦИЯ ГИПЕРИНФЛЯЦИИ И УМЕРЕННАЯ СЛОЖНОСТЬ):
+//   1. ДИНАМИЧЕСКИЙ ВИЛСПИН: призы масштабируются от уровня игрока (никаких 250k и GTI на старте).
+//   2. ЗДОРОВАЯ МАРЖА: сток приносит 6-10%, чистый детейлинг и ремонт — 15-22%.
+//   3. АДЕКВАТНЫЙ ROI БИЗНЕСОВ: окупаемость 15-25 игровых дней с учетом сырья и зарплат.
+//   4. СОХРАНЕНО: все 14 объектов жилья, верстак, персонал, автопарки МРЭО, сезоны и банк.
 // ========================================================
 
 // --------------------------------------------------------
@@ -15,113 +16,145 @@ const APP_ACCESS_CONFIG = {
     barn: {
         id: 'tabBarn',
         name: 'Сараи (Barn Find)',
-        minLevel: 8,
+        minLevel: 6,
         costStars: 0,
-        costCash: 800000,
+        costCash: 350000,
         costTickets: 0,
         desc: 'Экспедиции по заброшенным гаражам и деревням в поисках раритетов.',
-        lockMessage: 'Доступно с 8 уровня (взнос 800,000 ₽ за карту сараев)'
+        lockMessage: 'Доступно с 6 уровня (взнос 350,000 ₽ за карту сараев)'
     },
     containers: {
         id: 'tabContainers',
         name: 'Контейнеры (Морской Порт)',
-        minLevel: 12,
-        costStars: 10,
-        costCash: 2500000,
-        costTickets: 5,
+        minLevel: 10,
+        costStars: 5,
+        costCash: 1200000,
+        costTickets: 3,
         desc: 'Аукцион невостребованных контейнеров из Японии, Европы и США.',
-        lockMessage: 'Требуется 12 уровень, лицензия брокера (2,500,000 ₽ + 10 ⭐) и 5 билетов 🎫'
+        lockMessage: 'Требуется 10 уровень, лицензия брокера (1,200,000 ₽ + 5 ⭐) и 3 билета 🎫'
     },
     autopodbor_order: {
         id: 'servicePodkluch',
         name: 'Автоподбор «Под ключ»',
-        minLevel: 5,
-        costStars: 5,
-        costCash: 350000,
+        minLevel: 4,
+        costStars: 3,
+        costCash: 180000,
         costTickets: 0,
-        reqTool: 'obd_launch',
-        desc: 'Лицензия на выполнение официальных клиентских подборов авто с высокой маржой.',
-        lockMessage: 'Требуется 5 уровень, сканер Launch Pro Pad и взнос 350,000 ₽ + 5 ⭐'
+        reqTool: 'obd',
+        desc: 'Лицензия на выполнение официальных клиентских подборов авто с честной маржой.',
+        lockMessage: 'Требуется 4 уровень, сканер OBD2 и лицензионный взнос 180,000 ₽ + 3 ⭐'
     },
     street: {
         id: 'tabStreet',
         name: 'Стритрейсинг (402м)',
-        minLevel: 6,
-        costStars: 15,
-        costCash: 250000,
+        minLevel: 5,
+        costStars: 5,
+        costCash: 150000,
         costTickets: 0,
         desc: 'Ночные заезды на деньги и уважение автоклубов.',
-        lockMessage: 'Доступно с 6 уровня (взнос 250,000 ₽ и 15 ⭐)'
+        lockMessage: 'Доступно с 5 уровня (взнос 150,000 ₽ и 5 ⭐)'
     },
     darknet: {
         id: 'tabDarknet',
         name: 'Даркнет (Теневой рынок)',
-        minLevel: 16,
-        costStars: 25,
-        costCash: 6000000,
+        minLevel: 14,
+        costStars: 15,
+        costCash: 3500000,
         costTickets: 0,
         desc: 'Скупка проблемных документов, двойников и перебитых номеров.',
-        lockMessage: 'Доступно с 16 уровня для опытных перекупов (6,000,000 ₽ и 25 ⭐)'
+        lockMessage: 'Доступно с 14 уровня для опытных перекупов (3,500,000 ₽ и 15 ⭐)'
     },
     syndicate: {
         id: 'tabSyndicate',
         name: 'Синдикат Перекупов',
-        minLevel: 20,
-        costStars: 50,
-        costCash: 20000000,
+        minLevel: 18,
+        costStars: 30,
+        costCash: 10000000,
         costTickets: 0,
         desc: 'Элитный закрытый клуб для оптовой перепродажи автопарков.',
-        lockMessage: 'Доступно с 20 уровня. Вступительный взнос: 20,000,000 ₽ и 50 ⭐'
+        lockMessage: 'Доступно с 18 уровня. Вступительный взнос: 10,000,000 ₽ и 30 ⭐'
     }
 };
 
 // --------------------------------------------------------
-// 0.1. НАСТРОЙКИ ВИЛСПИНА И СУПЕРВИЛСПИНА (ХАРДКОР-БАЛАНС)
+// 0.1. НАСТРОЙКИ ВИЛСПИНА И СУПЕРВИЛСПИНА (ДИНАМИЧЕСКИЙ БАЛАНС)
 // --------------------------------------------------------
 const WHEEL_CONFIG = {
     regular: {
-        costStars: 10,
+        costStars: 5,
         costTickets: 1,
         canFreeDaily: true,
+        // Базовые веса (итоговые суммы скалируются от уровня игрока)
         dropTable: [
-            { type: 'cash', value: 8000, label: '8,000 ₽', weight: 35 },
-            { type: 'cash', value: 18000, label: '18,000 ₽', weight: 25 },
-            { type: 'cash', value: 40000, label: '40,000 ₽', weight: 14 },
-            { type: 'stars', value: 2, label: '2 ⭐ (5,000 ₽)', weight: 10 },
-            { type: 'fuel', value: 35, label: '35 л бензина', weight: 10 },
-            { type: 'tickets', value: 1, label: '1 🎫 Билет', weight: 5 },
-            { type: 'car', tier: 'budget', label: 'ВАЗ-2101 «Копейка»', weight: 1 }
+            { type: 'cash', baseValue: 4000, labelMultiplier: 1.0, weight: 35 },
+            { type: 'cash', baseValue: 9000, labelMultiplier: 1.5, weight: 25 },
+            { type: 'cash', baseValue: 18000, labelMultiplier: 2.2, weight: 14 },
+            { type: 'fuel', value: 25, label: '25 л бензина', weight: 12 },
+            { type: 'tickets', value: 1, label: '1 🎫 Билет', weight: 7 },
+            { type: 'stars', value: 1, label: '1 ⭐', weight: 5 },
+            { type: 'car', tier: 'starter', label: 'ВАЗ-2101 (Под проект)', weight: 2 }
         ]
     },
     superWheel: {
-        costCash: 1500000,
-        costStars: 50,
-        costTickets: 5,
+        costCash: 450000,
+        costStars: 20,
+        costTickets: 3,
         canFreeDaily: false,
         dropTable: [
-            { type: 'cash', value: 250000, label: '250,000 ₽', weight: 30 },
-            { type: 'cash', value: 600000, label: '600,000 ₽', weight: 22 },
-            { type: 'cash', value: 1500000, label: '1,500,000 ₽', weight: 12 },
-            { type: 'stars', value: 30, label: '30 ⭐ (75,000 ₽)', weight: 15 },
-            { type: 'tickets', value: 5, label: '5 🎫 Билетов', weight: 10 },
-            { type: 'tool', id: 'obd_launch', label: 'Планшет Launch Pro', weight: 7 },
-            { type: 'car', tier: 'rare', label: 'BMW E34 525i (Идеал)', weight: 3 },
-            { type: 'car', tier: 'exclusive', label: 'Toyota Mark II Tourer V', weight: 1 }
+            { type: 'cash', baseValue: 35000, labelMultiplier: 1.8, weight: 32 },
+            { type: 'cash', baseValue: 70000, labelMultiplier: 2.5, weight: 24 },
+            { type: 'stars', value: 5, label: '5 ⭐', weight: 16 },
+            { type: 'tickets', value: 3, label: '3 🎫 Билета', weight: 12 },
+            { type: 'tool', id: 'obd', label: 'Автосканер OBD2', weight: 8 },
+            { type: 'tool', id: 'gauge', label: 'Толщиномер ЛКП', weight: 5 },
+            { type: 'car', tier: 'level_match', label: 'Автомобиль под проект', weight: 3 }
         ]
     }
 };
 
+// Хелпер динамического расчета призов рулетки без гиперинфляции
+function getDynamicWheelDropTable(playerLevel = 1, isSuper = false) {
+    const lvl = Math.max(1, Number(playerLevel) || 1);
+    const cfg = isSuper ? WHEEL_CONFIG.superWheel : WHEEL_CONFIG.regular;
+
+    return cfg.dropTable.map(item => {
+        if (item.type === 'cash') {
+            // Мягкое масштабирование: награда растет с уровнем, но не взрывает банк
+            const scaledCash = isSuper
+                ? Math.round(item.baseValue + (lvl * 6500 * item.labelMultiplier))
+                : Math.round(item.baseValue + (lvl * 1200 * item.labelMultiplier));
+            return {
+                ...item,
+                value: scaledCash,
+                label: scaledCash.toLocaleString() + ' ₽'
+            };
+        }
+        if (item.type === 'car') {
+            if (lvl <= 4) {
+                return { ...item, carModel: 'vaz_2101', label: 'ВАЗ-2101 (45% HP)' };
+            } else if (lvl <= 8) {
+                return { ...item, carModel: 'vaz_2107', label: 'ВАЗ-2107 (55% HP)' };
+            } else if (lvl <= 14) {
+                return { ...item, carModel: 'passat_b3', label: 'VW Passat B3 (60% HP)' };
+            } else {
+                return { ...item, carModel: 'e39_525', label: 'BMW E39 (Требует ТО)' };
+            }
+        }
+        return item;
+    });
+}
+
 // --------------------------------------------------------
-// 0.2. ЭКОНОМИЧЕСКИЙ БАЛАНС МАРКЕТА И ТОРГА (БАЛАНС 2026)
+// 0.2. ЭКОНОМИЧЕСКИЙ БАЛАНС МАРКЕТА И ТОРГА
 // --------------------------------------------------------
 const MARKET_ECONOMY_CONFIG = {
-    cleanProfitMargin: 0.08,        // 8% чистая перепродажа стока
-    washedPolishedMargin: 0.15,    // 15% с детейлингом и полировкой
-    fullRestoredMargin: 0.25,      // 25% при устранении всех скрытых дефектов
-    bargainMinPct: 0.03,
-    bargainMaxPct: 0.14,
-    urgentSaleChance: 0.08,
-    hiddenDefectChance: 0.28
+    cleanProfitMargin: 0.08,        // 8% чистая перепродажа стока без вложений
+    washedPolishedMargin: 0.16,    // 16% после мойки и базовой полировки
+    fullRestoredMargin: 0.24,      // 24% при полном устранении дефектов и ТО
+    bargainMinPct: 0.03,           // Минимум сбития цены у капота (3%)
+    bargainMaxPct: 0.12,           // Максимум удачного торга (12%)
+    urgentSaleChance: 0.07,
+    hiddenDefectChance: 0.24
 };
 
 // --------------------------------------------------------
@@ -129,9 +162,9 @@ const MARKET_ECONOMY_CONFIG = {
 // --------------------------------------------------------
 const BANK_EXCHANGE_RATES = {
     rub: { name: 'Рубли', emoji: '₽', buyRub: 1, sellRub: 1 },
-    stars: { name: 'Stars', emoji: '⭐', buyRub: 2500, sellRub: 2400 },
-    superSpinTicket: { name: 'Билет «Супер Вилспин»', emoji: '🎟️', buyRub: 1500000, sellRub: 1400000 },
-    tickets: { name: 'Экспресс-талон', emoji: '🎫', buyRub: 25000, sellRub: 24000 }
+    stars: { name: 'Stars', emoji: '⭐', buyRub: 2500, sellRub: 2350 },
+    superSpinTicket: { name: 'Билет «Супер Вилспин»', emoji: '🎟️', buyRub: 450000, sellRub: 400000 },
+    tickets: { name: 'Экспресс-талон', emoji: '🎫', buyRub: 15000, sellRub: 13500 }
 };
 
 // --------------------------------------------------------
@@ -142,25 +175,25 @@ const SEASONS_ECONOMY_CONFIG = {
         id: "winter",
         name: "❄️ Зимний дрифт & Гололёд",
         desc: "Ажиотаж на заднеприводную классику под заварку и внедорожники 4x4. Спорткары и мото в упадке.",
-        multipliers: { rwd: 1.35, awd: 1.25, moto: 0.70, scooter: 0.65, hyper: 0.75 }
+        multipliers: { rwd: 1.30, awd: 1.20, moto: 0.70, scooter: 0.65, hyper: 0.75 }
     },
     spring: {
         id: "spring",
         name: "🌱 Весеннее пробуждение",
         desc: "Начало мотосезона, рост спроса на свежие городские хэтчбеки и дачные универсалы.",
-        multipliers: { moto: 1.25, scooter: 1.30, economy: 1.15, rwd: 1.0, hyper: 1.10 }
+        multipliers: { moto: 1.25, scooter: 1.30, economy: 1.12, rwd: 1.0, hyper: 1.10 }
     },
     summer: {
         id: "summer",
         name: "☀️ Летний ажиотаж & Спорт",
         desc: "Пик цен на спорткары, кабриолеты и байки. Город живёт ночными гонками.",
-        multipliers: { hyper: 1.30, premium: 1.20, moto: 1.35, scooter: 1.25, truck: 0.90 }
+        multipliers: { hyper: 1.25, premium: 1.18, moto: 1.30, scooter: 1.20, truck: 0.90 }
     },
     autumn: {
         id: "autumn",
         name: "🍂 Осенняя утилитарность",
         desc: "Сезон коммерческих перевозок, фургонов и рабочих авто перед первыми заморозками.",
-        multipliers: { truck: 1.30, economy: 1.10, atv: 1.20, moto: 0.85, hyper: 0.85 }
+        multipliers: { truck: 1.25, economy: 1.10, atv: 1.18, moto: 0.85, hyper: 0.85 }
     }
 };
 
@@ -168,44 +201,44 @@ const SEASONS_ECONOMY_CONFIG = {
 // 0.5. ИНСАЙДЕРСКИЕ НАВОДКИ И СРОЧНЫЙ ПЕРЕГОН
 // --------------------------------------------------------
 const INTERCITY_HAUL_CONFIG = {
-    minLevel: 4,
-    leadGenerationChanceDaily: 0.35,
+    minLevel: 3,
+    leadGenerationChanceDaily: 0.30,
     regions: [
         {
             id: 'tver_barn',
-            regionName: 'Тверская область (Глухая деревня)',
-            distanceKm: 280,
-            towTruckCost: 18000,
+            regionName: 'Тверская область (Деревня под Торжком)',
+            distanceKm: 260,
+            towTruckCost: 14000,
             riskBreakdownPct: 15,
             riskPoliceCheckPct: 10,
-            desc: 'Дедушка продаёт законсервированный гаражный раритет за копейки.',
-            discountFromMarket: 0.50
+            desc: 'Дедушка продаёт законсервированный гаражный раритет в родной краске.',
+            discountFromMarket: 0.35
         },
         {
             id: 'karelia_drift',
             regionName: 'Карелия (Петрозаводск)',
-            distanceKm: 950,
-            towTruckCost: 45000,
-            riskBreakdownPct: 25,
-            riskPoliceCheckPct: 18,
+            distanceKm: 920,
+            towTruckCost: 38000,
+            riskBreakdownPct: 22,
+            riskPoliceCheckPct: 15,
             desc: 'Подготовленный корч на японском турбо-моторе со срочной продажей за долги.',
-            discountFromMarket: 0.40
+            discountFromMarket: 0.28
         },
         {
             id: 'sochi_resort',
-            regionName: 'Сочи (Красная Поляна)',
-            distanceKm: 1650,
-            towTruckCost: 75000,
-            riskBreakdownPct: 30,
-            riskPoliceCheckPct: 25,
+            regionName: 'Сочи (Адлер)',
+            distanceKm: 1620,
+            towTruckCost: 65000,
+            riskBreakdownPct: 28,
+            riskPoliceCheckPct: 20,
             desc: 'Премиум-купе после курортного сезона с минимальным пробегом.',
-            discountFromMarket: 0.35
+            discountFromMarket: 0.25
         }
     ]
 };
 
 // --------------------------------------------------------
-// 1. НЕДВИЖИМОСТЬ, БОКСЫ И СУБАРЕНДА (ВСЕ 14 ОБЪЕКТОВ)
+// 1. НЕДВИЖИМОСТЬ, БОКСЫ И СУБАРЕНДА (14 ОБЪЕКТОВ)
 // --------------------------------------------------------
 const HOUSING_LIST = [
     {
@@ -213,12 +246,12 @@ const HOUSING_LIST = [
         name: 'Бытовка на стройплощадке',
         category: 'street',
         typeLabel: 'Временная стоянка',
-        rent: 600,
-        buyPrice: 350000,
+        rent: 400,
+        buyPrice: 180000,
         reqStars: 0,
         slots: 0,
         slotsBonus: 0,
-        moodBonus: -5,
+        moodBonus: -4,
         minLevel: 1,
         canTune: false,
         canDetail: false,
@@ -226,7 +259,7 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
-        subletIncome: 350,
+        subletIncome: 200,
         perk: 'Только ночлег. Доработки и ремонт невозможны.',
         desc: 'Временный строительный вагончик у обочины. Сквозняки, верстака нет. Автомобили стоят под открытым небом.',
         img: 'assets/houses/trailer.jpg',
@@ -237,9 +270,9 @@ const HOUSING_LIST = [
         name: 'Навес у частного дома',
         category: 'street',
         typeLabel: 'Уличный навес',
-        rent: 1400,
-        buyPrice: 750000,
-        reqStars: 5,
+        rent: 900,
+        buyPrice: 380000,
+        reqStars: 2,
         slots: 1,
         slotsBonus: 1,
         moodBonus: 0,
@@ -250,7 +283,7 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
-        subletIncome: 900,
+        subletIncome: 500,
         perk: '1 машиноместо под навесом. Доступна замена масел и свечей.',
         desc: 'Деревянный навес от дождя. Есть розетка 220V и базовый набор гаечных ключей.',
         img: 'assets/houses/room.jpg',
@@ -261,9 +294,9 @@ const HOUSING_LIST = [
         name: 'Комната в общежитии + Двор',
         category: 'living',
         typeLabel: 'Жильё + Двор',
-        rent: 2200,
-        buyPrice: 1300000,
-        reqStars: 8,
+        rent: 1400,
+        buyPrice: 650000,
+        reqStars: 4,
         slots: 1,
         slotsBonus: 1,
         moodBonus: 4,
@@ -274,7 +307,7 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
-        subletIncome: 1500,
+        subletIncome: 800,
         perk: 'Одно машиноместо во дворе. Разрешена замена расходников.',
         desc: 'Комната в спальном районе. Автомобиль стоит под окнами на асфальте.',
         img: 'assets/houses/room.jpg',
@@ -285,12 +318,12 @@ const HOUSING_LIST = [
         name: 'Стандартный бокс в ГСК-7',
         category: 'box',
         typeLabel: 'Капитальный бокс ГСК',
-        rent: 6500,
-        buyPrice: 1500000,
-        reqStars: 12,
+        rent: 3500,
+        buyPrice: 550000,
+        reqStars: 6,
         slots: 2,
         slotsBonus: 2,
-        moodBonus: 8,
+        moodBonus: 7,
         minLevel: 4,
         canTune: true,
         canDetail: false,
@@ -298,7 +331,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 5,
-        subletIncome: 4500,
+        subletIncome: 2000,
         perk: 'Смотровая яма, электричество 220V, верстак со слесарными тисками.',
         desc: 'Настоящее логово перекупа! Сухая яма, верстак и диодное освещение. Открывает диагностику и тюнинг.',
         img: 'assets/houses/garage.jpg',
@@ -309,9 +342,9 @@ const HOUSING_LIST = [
         name: 'Квартира в "Хрущевке"',
         category: 'living',
         typeLabel: 'Городское жильё',
-        rent: 12000,
-        buyPrice: 3800000,
-        reqStars: 15,
+        rent: 6500,
+        buyPrice: 1800000,
+        reqStars: 8,
         slots: 1,
         slotsBonus: 1,
         moodBonus: 10,
@@ -322,7 +355,7 @@ const HOUSING_LIST = [
         canOBDGarage: false,
         hasPersonalSlot: false,
         reshalaDiscountPct: 0,
-        subletIncome: 8000,
+        subletIncome: 4000,
         perk: 'Уютный сон, быстрое восстановление настроения (+10).',
         desc: 'Своя кухня, душ и спокойный сон. Машина паркуется во дворе под фонарём.',
         img: 'assets/houses/khrusch.jpg',
@@ -333,9 +366,9 @@ const HOUSING_LIST = [
         name: 'Двойной бокс с ямой и печкой',
         category: 'box',
         typeLabel: 'Слесарная мастерская',
-        rent: 18000,
-        buyPrice: 2900000,
-        reqStars: 20,
+        rent: 9000,
+        buyPrice: 1600000,
+        reqStars: 10,
         slots: 3,
         slotsBonus: 3,
         moodBonus: 14,
@@ -346,7 +379,7 @@ const HOUSING_LIST = [
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 10,
-        subletIncome: 12000,
+        subletIncome: 5500,
         perk: 'Сварка, полировальный пост, печь на отработке и 3 свободных машиноместа.',
         desc: 'Широкий бокс с печью, верстаком, компрессором и мойкой. Позволяет готовить тачки под ключ.',
         img: 'assets/houses/garage.jpg',
@@ -357,20 +390,20 @@ const HOUSING_LIST = [
         name: 'Двушка в спальном районе',
         category: 'living',
         typeLabel: 'Городская квартира',
-        rent: 26000,
-        buyPrice: 7500000,
-        reqStars: 25,
+        rent: 14000,
+        buyPrice: 3800000,
+        reqStars: 15,
         slots: 2,
         slotsBonus: 2,
         moodBonus: 18,
-        minLevel: 10,
+        minLevel: 9,
         canTune: false,
         canDetail: false,
         canService: true,
         canOBDGarage: false,
         hasPersonalSlot: true,
         reshalaDiscountPct: 0,
-        subletIncome: 18000,
+        subletIncome: 9000,
         perk: 'Закреплённое парковочное место со шлагбаумом во дворе.',
         desc: 'Кирпичный дом, стеклопакеты, видеонаблюдение за парковкой. Высокий комфорт проживания.',
         img: 'assets/houses/dvushka.jpg',
@@ -381,21 +414,21 @@ const HOUSING_LIST = [
         name: 'Тюнинг-Ангар с подъёмником',
         category: 'box',
         typeLabel: 'Профессиональный сервис',
-        rent: 48000,
-        buyPrice: 11000000,
-        reqStars: 35,
+        rent: 28000,
+        buyPrice: 6500000,
+        reqStars: 22,
         slots: 5,
         slotsBonus: 5,
         moodBonus: 22,
-        minLevel: 15,
+        minLevel: 13,
         canTune: true,
         canDetail: true,
         canService: true,
         canOBDGarage: true,
         hasPersonalSlot: true,
-        reshalaDiscountPct: 20,
-        subletIncome: 32000,
-        perk: 'Двухстоечный подъёмник, камера обдува, скидка 20% на услуги Решалы!',
+        reshalaDiscountPct: 18,
+        subletIncome: 18000,
+        perk: 'Двухстоечный подъёмник, камера обдува, скидка 18% на услуги Решалы!',
         desc: 'Коммерческий цех в промзоне. Подъёмник, мощная приточка, возможность отмывать VIN дешевле.',
         img: 'assets/houses/workshop.jpg',
         fallback: 'https://images.unsplash.com/photo-1565008447742-97f6f38c985c?auto=format&fit=crop&w=600&q=80'
@@ -405,20 +438,20 @@ const HOUSING_LIST = [
         name: 'Евро-трешка (Новостройка)',
         category: 'living',
         typeLabel: 'Бизнес-класс с паркингом',
-        rent: 42000,
-        buyPrice: 15000000,
-        reqStars: 40,
+        rent: 26000,
+        buyPrice: 8500000,
+        reqStars: 25,
         slots: 3,
         slotsBonus: 3,
-        moodBonus: 28,
-        minLevel: 20,
+        moodBonus: 26,
+        minLevel: 16,
         canTune: false,
         canDetail: true,
         canService: true,
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 0,
-        subletIncome: 28000,
+        subletIncome: 16000,
         perk: 'Подземный теплый паркинг с детейлинг-постом и зарядкой.',
         desc: 'ЖК комфорт-класса. Закрытый двор, охраняемый подземный паркинг, автомойка в цоколе.',
         img: 'assets/houses/treshka.jpg',
@@ -429,20 +462,20 @@ const HOUSING_LIST = [
         name: 'Коттедж за городом с гаражом',
         category: 'estate',
         typeLabel: 'Загородная усадьба',
-        rent: 70000,
-        buyPrice: 22000000,
-        reqStars: 55,
+        rent: 45000,
+        buyPrice: 14000000,
+        reqStars: 35,
         slots: 7,
         slotsBonus: 7,
-        moodBonus: 35,
-        minLevel: 28,
+        moodBonus: 32,
+        minLevel: 22,
         canTune: true,
         canDetail: true,
         canService: true,
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 15,
-        subletIncome: 48000,
+        subletIncome: 30000,
         perk: 'Свой закрытый двор на 7 авто, тёплый гараж, зона отдыха и барбекю.',
         desc: 'Собственный участок, трёхфазная сеть 380V, смотровая яма и мойка высокого давления.',
         img: 'assets/houses/cottage.jpg',
@@ -453,21 +486,21 @@ const HOUSING_LIST = [
         name: 'Дизайнерский Лофт в центре',
         category: 'living',
         typeLabel: 'Премиум-апартаменты',
-        rent: 90000,
-        buyPrice: 35000000,
-        reqStars: 75,
+        rent: 60000,
+        buyPrice: 22000000,
+        reqStars: 45,
         slots: 4,
         slotsBonus: 4,
-        moodBonus: 40,
-        minLevel: 35,
+        moodBonus: 38,
+        minLevel: 28,
         canTune: false,
         canDetail: true,
         canService: true,
         canOBDGarage: true,
         hasPersonalSlot: true,
         reshalaDiscountPct: 0,
-        subletIncome: 60000,
-        perk: '+40% настроения каждый день, персональные места на VIP-паркинге.',
+        subletIncome: 42000,
+        perk: '+38% настроения каждый день, персональные места на VIP-паркинге.',
         desc: 'Красный кирпич, панорамные окна на набережную, стильный интерьер для отдыха автоолигарха.',
         img: 'assets/houses/loft.jpg',
         fallback: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80'
@@ -477,20 +510,20 @@ const HOUSING_LIST = [
         name: 'Пентхаус в Москва-Сити',
         category: 'estate',
         typeLabel: 'Небоскрёб & VIP Паркинг',
-        rent: 250000,
-        buyPrice: 140000000,
-        reqStars: 110,
+        rent: 140000,
+        buyPrice: 75000000,
+        reqStars: 70,
         slots: 8,
         slotsBonus: 8,
-        moodBonus: 55,
-        minLevel: 50,
+        moodBonus: 50,
+        minLevel: 38,
         canTune: true,
         canDetail: true,
         canService: true,
         canOBDGarage: true,
         hasPersonalSlot: true,
-        reshalaDiscountPct: 25,
-        subletIncome: 160000,
+        reshalaDiscountPct: 22,
+        subletIncome: 95000,
         perk: 'Личный VIP-бокс на -3 этаже Башни с охраной, консьержем и мойкой.',
         desc: 'Панорамный вид с 65 этажа, консьерж-сервис, охраняемый подземный гаражный комплекс.',
         img: 'assets/houses/penthouse.jpg',
@@ -501,21 +534,21 @@ const HOUSING_LIST = [
         name: 'Особняк на Рублёвке',
         category: 'estate',
         typeLabel: 'Резиденция миллионера',
-        rent: 600000,
-        buyPrice: 420000000,
-        reqStars: 160,
-        slots: 18,
-        slotsBonus: 18,
-        moodBonus: 85,
-        minLevel: 70,
+        rent: 320000,
+        buyPrice: 220000000,
+        reqStars: 100,
+        slots: 16,
+        slotsBonus: 16,
+        moodBonus: 70,
+        minLevel: 50,
         canTune: true,
         canDetail: true,
         canService: true,
         canOBDGarage: true,
         hasPersonalSlot: true,
-        reshalaDiscountPct: 35,
-        subletIncome: 380000,
-        perk: 'Свой автосервисный цех, малярная камера, охрана ЧОП, скидка 35% у Решалы!',
+        reshalaDiscountPct: 30,
+        subletIncome: 210000,
+        perk: 'Свой автосервисный цех, малярная камера, охрана ЧОП, скидка 30% у Решалы!',
         desc: 'Гектар соснового бора, собственный автосервис на 4 поста, малярная камера и ангар для редких лотов.',
         img: 'assets/houses/villa.jpg',
         fallback: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=600&q=80'
@@ -525,21 +558,21 @@ const HOUSING_LIST = [
         name: 'Частный остров с виллой',
         category: 'estate',
         typeLabel: 'Личный Остров Олигарха',
-        rent: 2000000,
-        buyPrice: 1200000000,
-        reqStars: 300,
-        slots: 35,
-        slotsBonus: 35,
-        moodBonus: 100,
-        minLevel: 90,
+        rent: 900000,
+        buyPrice: 650000000,
+        reqStars: 180,
+        slots: 30,
+        slotsBonus: 30,
+        moodBonus: 95,
+        minLevel: 70,
         canTune: true,
         canDetail: true,
         canService: true,
         canOBDGarage: true,
         hasPersonalSlot: true,
-        reshalaDiscountPct: 50,
-        subletIncome: 1200000,
-        perk: 'Полный иммунитет от проверок ГИБДД, личный пирс для яхт и скидка 50% у Решалы!',
+        reshalaDiscountPct: 45,
+        subletIncome: 650000,
+        perk: 'Полный иммунитет от проверок ГИБДД, личный пирс для яхт и скидка 45% у Решалы!',
         desc: 'Абсолютная автономия в нейтральных водах. Свой порт, вертолётная площадка и музей для гиперкаров.',
         img: 'assets/houses/island.jpg',
         fallback: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=600&q=80'
@@ -555,17 +588,17 @@ const HOUSING_WORKBENCH_CONFIG = {
         desc: "Ручная мойка из шланга во дворе. Бесплатно возвращает блеск кузову."
     },
     servicePlugs: {
-        costCash: 1500,
+        costCash: 1200,
         engineWearRestorePct: 4,
         desc: "Замена свечей зажигания и фильтра в боксе. Добавляет +4% ресурса двигателю."
     },
     engineAdditive: {
-        costCash: 5000,
+        costCash: 4500,
         maskDefects: true,
         desc: "Фирменная присадка в масло. Маскирует стук мотора для покупателей на рынке."
     },
     smallDefectPolish: {
-        costCash: 3500,
+        costCash: 2800,
         conditionRestorePct: 5,
         desc: "Локальная полировка царапин и притирка ЛКП. Поднимает состояние на +5%."
     }
@@ -574,12 +607,12 @@ const HOUSING_WORKBENCH_CONFIG = {
 const HOUSING_LIFESTYLE_CONFIG = {
     coffee: {
         cooldownHours: 4,
-        hungerBonus: 15,
-        moodBonus: 15
+        hungerBonus: 12,
+        moodBonus: 12
     },
     ps5: {
-        moodBonus: 100,
-        streetCredBonus: 5
+        moodBonus: 80,
+        streetCredBonus: 4
     },
     cctvRiskReduction: 1.0
 };
@@ -590,17 +623,17 @@ const HOUSING_RANDOM_EVENTS = [
         applicableCategories: ["living"],
         title: "Жалоба жильцов на прямоток",
         desc: "Соседи по подъезду вызвали участкового из-за прогрева громкого выхлопа под окнами в 7 утра.",
-        penaltyMood: 20,
-        penaltyCash: 2500,
-        resultMsg: "Вы заплатили штраф за нарушение тишины (-2,500 ₽, -20 настроения)."
+        penaltyMood: 15,
+        penaltyCash: 2000,
+        resultMsg: "Вы заплатили штраф за нарушение тишины (-2,000 ₽, -15 настроения)."
     },
     {
         id: "ev_gsk_water_leak",
         applicableCategories: ["box"],
         title: "Грунтовые воды в смотровой яме",
         desc: "Весенняя оттепель подтопила нижний ярус гаражного бокса. Пришлось вызывать помпу.",
-        penaltyCash: 6000,
-        resultMsg: "Яма осушена и проветрена (-6,000 ₽ за насос)."
+        penaltyCash: 4500,
+        resultMsg: "Яма осушена и проветрена (-4,500 ₽ за помпу)."
     },
     {
         id: "ev_grandpa_deal",
@@ -622,12 +655,12 @@ const HOUSING_RANDOM_EVENTS = [
 ];
 
 // --------------------------------------------------------
-// 2. БИЗНЕС-СЕТЬ (ПРЕДПРИЯТИЯ)
+// 2. БИЗНЕС-СЕТЬ (ПРЕДПРИЯТИЯ С ЧЕСТНЫМ ROI)
 // --------------------------------------------------------
 const BUSINESS_DATA = [
     {
-        id: 'wash', name: 'Автомойка 24/7', minLevel: 4,
-        income: 4000, level: 0, cost: 85000, reqStars: 5, stored: 0, stock: 100,
+        id: 'wash', name: 'Автомойка 24/7', minLevel: 3,
+        income: 2800, level: 0, cost: 75000, reqStars: 3, stored: 0, stock: 100,
         perk: 'Скидка 50% на полировку и химчистку',
         desc: 'Круглосуточный комплекс бесконтактной мойки и сушки кузова.',
         img: 'assets/business/wash.jpg',
@@ -635,8 +668,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'service'
     },
     {
-        id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 6,
-        income: 6000, level: 0, cost: 140000, reqStars: 8, stored: 0, stock: 100,
+        id: 'shina', name: 'Шиномонтаж «У Алика»', minLevel: 5,
+        income: 4200, level: 0, cost: 120000, reqStars: 5, stored: 0, stock: 100,
         perk: '+10% к стоимости авто на правильных дисках',
         desc: 'Правка дисков, ошиповка, монтаж низкого профиля и полусликов.',
         img: 'assets/business/shina.jpg',
@@ -644,8 +677,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'service'
     },
     {
-        id: 'sto', name: 'СТО дяди Вани', minLevel: 9,
-        income: 12000, level: 0, cost: 280000, reqStars: 12, stored: 0, stock: 100,
+        id: 'sto', name: 'СТО дяди Вани', minLevel: 7,
+        income: 7500, level: 0, cost: 230000, reqStars: 8, stored: 0, stock: 100,
         perk: 'Скидка 40% на ремонт мотора',
         desc: 'Капитальный ремонт ДВС, замена цепей ГРМ, подвески и агрегатов.',
         img: 'assets/business/sto.jpg',
@@ -653,8 +686,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'service'
     },
     {
-        id: 'tow_truck', name: 'Служба эвакуации «Шериф»', minLevel: 10,
-        income: 16000, level: 0, cost: 390000, reqStars: 10, stored: 0, stock: 100,
+        id: 'tow_truck', name: 'Служба эвакуации «Шериф»', minLevel: 9,
+        income: 10500, level: 0, cost: 320000, reqStars: 10, stored: 0, stock: 100,
         perk: 'Бесплатный забор авто со спецстоянки ГИБДД',
         desc: 'Парк эвакуаторов для оперативной эвакуации и спасения задержанных машин.',
         img: 'assets/business/tow.jpg',
@@ -662,8 +695,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'fleet', fleetType: 'tow_truck'
     },
     {
-        id: 'delivery', name: 'Курьерская доставка «Экспресс»', minLevel: 11,
-        income: 18000, level: 0, cost: 480000, reqStars: 12, stored: 0, stock: 100,
+        id: 'delivery', name: 'Курьерская доставка «Экспресс»', minLevel: 10,
+        income: 13000, level: 0, cost: 410000, reqStars: 10, stored: 0, stock: 100,
         perk: 'Высокая оборачиваемость малолитражек и фургонов',
         desc: 'Логистическая сеть доставки товаров по городу и пригороду.',
         img: 'assets/business/delivery.jpg',
@@ -671,8 +704,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'fleet', fleetType: 'delivery'
     },
     {
-        id: 'paint_shop', name: 'Малярный цех «Хамелеон»', minLevel: 13,
-        income: 24000, level: 0, cost: 620000, reqStars: 15, stored: 0, stock: 100,
+        id: 'paint_shop', name: 'Малярный цех «Хамелеон»', minLevel: 12,
+        income: 17500, level: 0, cost: 540000, reqStars: 12, stored: 0, stock: 100,
         perk: 'Облив в заводской микронный слой без следов шпаклёвки',
         desc: 'Покрасочная камера с инфракрасной сушкой. ЛКП ложится в заводской допуск.',
         img: 'assets/business/paint.jpg',
@@ -680,8 +713,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'service'
     },
     {
-        id: 'chip_tuning', name: 'Лаборатория Stage Lab', minLevel: 16,
-        income: 30000, level: 0, cost: 800000, reqStars: 20, stored: 0, stock: 100,
+        id: 'chip_tuning', name: 'Лаборатория Stage Lab', minLevel: 15,
+        income: 22000, level: 0, cost: 680000, reqStars: 15, stored: 0, stock: 100,
         perk: 'Скидка 30% на установку чип-тюнинга Stage 1-3',
         desc: 'Диностенд и калибровка прошивок ЭБУ под наддувные двигатели.',
         img: 'assets/business/chip.jpg',
@@ -689,8 +722,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'service'
     },
     {
-        id: 'detailing', name: 'Детейлинг Студия', minLevel: 19,
-        income: 33000, level: 0, cost: 920000, reqStars: 25, stored: 0, stock: 100,
+        id: 'detailing', name: 'Детейлинг Студия', minLevel: 17,
+        income: 26000, level: 0, cost: 820000, reqStars: 18, stored: 0, stock: 100,
         perk: '+35% к баллам на Автошоу',
         desc: 'Нанесение керамики, бронеплёнка, полировка и глубокая химчистка салона.',
         img: 'assets/business/detailing.jpg',
@@ -698,8 +731,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'service'
     },
     {
-        id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 22,
-        income: 40000, level: 0, cost: 1150000, reqStars: 30, stored: 0, stock: 100,
+        id: 'razborka', name: 'Авторазборка «Последний путь»', minLevel: 20,
+        income: 32000, level: 0, cost: 980000, reqStars: 22, stored: 0, stock: 100,
         perk: 'Детали на ремонт обходятся дешевле на 30%',
         desc: 'Скупка тотальных и аварийных авто на запчасти, продажа контрактных узлов.',
         img: 'assets/business/razborka.jpg',
@@ -707,8 +740,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'fleet', fleetType: 'razborka'
     },
     {
-        id: 'autopodbor', name: 'Агентство «Автоподбор Pro»', minLevel: 25,
-        income: 50000, level: 0, cost: 1450000, reqStars: 35, stored: 0, stock: 100,
+        id: 'autopodbor', name: 'Агентство «Автоподбор Pro»', minLevel: 23,
+        income: 38000, level: 0, cost: 1250000, reqStars: 25, stored: 0, stock: 100,
         perk: '25% шанс найти эксклюзив со скидкой 35% на авторынке',
         desc: 'Штат выездных экспертов находит срочные варианты с огромным дисконтом.',
         img: 'assets/business/podbor.jpg',
@@ -716,8 +749,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'service'
     },
     {
-        id: 'taxi', name: 'Таксопарк', minLevel: 30,
-        income: 80000, level: 0, cost: 3600000, reqStars: 50, stored: 0, stock: 100,
+        id: 'taxi', name: 'Таксопарк', minLevel: 26,
+        income: 55000, level: 0, cost: 2400000, reqStars: 35, stored: 0, stock: 100,
         perk: 'Доход масштабируется от класса и состояния машин в таксопарке',
         desc: 'Парк лицензированных седанов под аренду проверенным водителям.',
         img: 'assets/business/taxi.jpg',
@@ -725,8 +758,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'fleet', fleetType: 'taxi'
     },
     {
-        id: 'transport_company', name: 'Транспортная компания «Магистраль»', minLevel: 34,
-        income: 140000, level: 0, cost: 4800000, reqStars: 55, stored: 0, stock: 100,
+        id: 'transport_company', name: 'Транспортная компания «Магистраль»', minLevel: 30,
+        income: 95000, level: 0, cost: 3800000, reqStars: 45, stored: 0, stock: 100,
         perk: 'Огромный доход с магистральных фур и дальнобойных тягачей',
         desc: 'Крупнотоннажные грузоперевозки по междугородним маршрутам.',
         img: 'assets/business/cargo.jpg',
@@ -734,8 +767,8 @@ const BUSINESS_DATA = [
         reqLegal: true, legalCategory: 'fleet', fleetType: 'transport_company'
     },
     {
-        id: 'customs_hub', name: 'Таможенный хаб Порта', minLevel: 38,
-        income: 160000, level: 0, cost: 5200000, reqStars: 60, stored: 0, stock: 100,
+        id: 'customs_hub', name: 'Таможенный хаб Порта', minLevel: 35,
+        income: 120000, level: 0, cost: 4500000, reqStars: 50, stored: 0, stock: 100,
         perk: 'Прямые поставки контейнеров и +2 связи ПодКлюч',
         desc: 'Собственный терминал для таможенной очистки автовозов и контейнеров.',
         img: 'assets/business/hub.jpg',
@@ -817,113 +850,113 @@ const BUSINESS_INDIVIDUAL_UPGRADES = {
 
 const BUSINESS_UPGRADES_BRANCHES = {
     equipment: [
-        { name: "Базовый слесарный пост (+15% к выручке)", costMul: 0.35, bonusPct: 15 },
-        { name: "Пневмолиния и специнструмент (+30% к выручке)", costMul: 0.65, bonusPct: 30 },
-        { name: "Компьютерные 3D-стенды и стенд сход-развала (+45% к выручке)", costMul: 1.10, bonusPct: 45 }
+        { name: "Базовый слесарный пост (+12% к выручке)", costMul: 0.35, bonusPct: 12 },
+        { name: "Пневмолиния и специнструмент (+24% к выручке)", costMul: 0.65, bonusPct: 24 },
+        { name: "Компьютерные 3D-стенды (+38% к выручке)", costMul: 1.10, bonusPct: 38 }
     ],
     storage: [
-        { name: "Стеллажная зона хранения (+135% к вместимости)", costMul: 0.25 },
-        { name: "Автоматизированный складской модуль (+270% к вместимости)", costMul: 0.55 },
-        { name: "Оптовый распределительный терминал (+405% к вместимости)", costMul: 0.90 }
+        { name: "Стеллажная зона хранения (+100% к вместимости)", costMul: 0.25 },
+        { name: "Автоматизированный складской модуль (+200% к вместимости)", costMul: 0.55 },
+        { name: "Оптовый распределительный терминал (+350% к вместимости)", costMul: 0.90 }
     ],
     marketing: [
-        { name: "Светодиодная вывеска и локальный таргетинг (+15% трафика)", costMul: 0.20, trafficBonusPct: 15 },
-        { name: "Партнёрская программа с автоклубами (+25% трафика)", costMul: 0.50, trafficBonusPct: 25 },
-        { name: "Генеральный спонсор соревнований (+40% трафика)", costMul: 0.85, trafficBonusPct: 40 }
+        { name: "Светодиодная вывеска и локальный таргетинг (+12% трафика)", costMul: 0.20, trafficBonusPct: 12 },
+        { name: "Партнёрская программа с автоклубами (+22% трафика)", costMul: 0.50, trafficBonusPct: 22 },
+        { name: "Генеральный спонсор соревнований (+35% трафика)", costMul: 0.85, trafficBonusPct: 35 }
     ]
 };
 
 const BUSINESS_STAFF_CATALOG = {
     managers: [
-        { id: "mgr_junior", name: "Стажёр Денис", salary: 2500, hireCost: 35000, reqStars: 2, incomeBonusPct: 5, autoRestock: false, perkText: "+5% к выручке" },
-        { id: "mgr_pro", name: "Управляющий Артём", salary: 7000, hireCost: 120000, reqStars: 8, incomeBonusPct: 15, autoRestock: true, restockDiscount: 0.1, perkText: "Автозакупка сырья со скидкой 10%, +15% к кассе" }
+        { id: "mgr_junior", name: "Стажёр Денис", salary: 1800, hireCost: 25000, reqStars: 2, incomeBonusPct: 5, autoRestock: false, perkText: "+5% к выручке" },
+        { id: "mgr_pro", name: "Управляющий Артём", salary: 5500, hireCost: 85000, reqStars: 6, incomeBonusPct: 14, autoRestock: true, restockDiscount: 0.08, perkText: "Автозакупка сырья со скидкой 8%, +14% к кассе" }
     ],
     masters: [
-        { id: "mst_stepan", name: "Мастер Степаныч", salary: 3500, hireCost: 45000, reqStars: 3, incomeBonusPct: 10, stockSavePct: 15, perkText: "+10% к кассе, экономит 15% сырья" },
-        { id: "mst_expert", name: "Шеф-механик Вольдемар", salary: 9000, hireCost: 160000, reqStars: 10, incomeBonusPct: 25, stockSavePct: 35, perkText: "+25% к кассе, экономит 35% сырья" }
+        { id: "mst_stepan", name: "Мастер Степаныч", salary: 2600, hireCost: 35000, reqStars: 2, incomeBonusPct: 8, stockSavePct: 15, perkText: "+8% к кассе, экономит 15% сырья" },
+        { id: "mst_expert", name: "Шеф-механик Вольдемар", salary: 6800, hireCost: 110000, reqStars: 8, incomeBonusPct: 20, stockSavePct: 30, perkText: "+20% к кассе, экономит 30% сырья" }
     ],
     security: [
-        { id: "sec_chop", name: "Пост ЧОП «Титан»", salary: 3000, hireCost: 40000, reqStars: 2, perkText: "Защита от ночных краж сырья и визитов полиции" }
+        { id: "sec_chop", name: "Пост ЧОП «Титан»", salary: 2400, hireCost: 30000, reqStars: 2, perkText: "Защита от ночных краж сырья и визитов полиции" }
     ]
 };
 
 const BUSINESS_FLEET_CATALOG = [
-    { id: "fl_gazel", name: "ГАЗель NEXT Фургон", cost: 450000, reqStars: 5, suitableBusinesses: ["wash", "shina", "sto", "detailing", "razborka"], incomeBonusPct: 12, stockCapacityBonus: 50, desc: "Подвоз запчастей и сырья без задержек." },
-    { id: "fl_tow", name: "Эвакуатор ГАЗон NEXT", cost: 1200000, reqStars: 12, suitableBusinesses: ["sto", "razborka", "tow_truck"], incomeBonusPct: 25, stockCapacityBonus: 100, desc: "Доставка аварийных машин на СТО и разборку." }
+    { id: "fl_gazel", name: "ГАЗель NEXT Фургон", cost: 380000, reqStars: 4, suitableBusinesses: ["wash", "shina", "sto", "detailing", "razborka"], incomeBonusPct: 10, stockCapacityBonus: 50, desc: "Подвоз запчастей и сырья без задержек." },
+    { id: "fl_tow", name: "Эвакуатор ГАЗон NEXT", cost: 950000, reqStars: 10, suitableBusinesses: ["sto", "razborka", "tow_truck"], incomeBonusPct: 20, stockCapacityBonus: 100, desc: "Доставка аварийных машин на СТО и разборку." }
 ];
 
 // --------------------------------------------------------
-// 4. КАТАЛОГ АВТО-МАРКЕТА (С ИНТЕРЬЕРОМ И ТЮНИНГОМ)
+// 4. КАТАЛОГ АВТО-МАРКЕТА (ИНСТРУМЕНТ И РАСХОДНИКИ)
 // --------------------------------------------------------
 const SHOP_CATALOG = {
     tools: [
         {
             id: "gauge",
             name: "Магнитный толщиномер ЛКП (Базовый)",
-            cost: 25000,
+            cost: 18000,
             reqStars: 0,
             maxUses: 60,
-            serviceCost: 2500,
+            serviceCost: 2000,
             desc: "Замеряет шпаклёвку и вторичные окрасы кузова. Ресурс: 60 замеров.",
             icon: "fa-ruler-combined"
         },
         {
             id: "gauge_pro",
             name: "Ультразвуковой толщиномер Pro (Цветмет)",
-            cost: 65000,
-            reqStars: 4,
+            cost: 48000,
+            reqStars: 3,
             maxUses: 100,
-            serviceCost: 6000,
+            serviceCost: 4500,
             desc: "Высокая точность до 1 мкм. Различает алюминий и цинк. Ресурс: 100 замеров.",
             icon: "fa-microchip"
         },
         {
             id: "obd",
             name: "Автосканер ELM327 Bluetooth v1.5",
-            cost: 45000,
-            reqStars: 2,
+            cost: 28000,
+            reqStars: 1,
             maxUses: 50,
-            serviceCost: 4000,
+            serviceCost: 3000,
             desc: "Базовый сканер для чтения и сброса кодов ошибок DTC в ЭБУ мотора. Ресурс: 50 сканов.",
             icon: "fa-laptop-code"
         },
         {
             id: "obd_launch",
             name: "Диагностический планшет Launch Pro Pad",
-            cost: 160000,
-            reqStars: 8,
+            cost: 120000,
+            reqStars: 6,
             maxUses: 80,
-            serviceCost: 12000,
+            serviceCost: 9000,
             desc: "Профессиональный комбайн! Обязателен для сервиса «ПодКлюч» и глубокого анализа АКПП. Ресурс: 80 циклов.",
             icon: "fa-tablet-screen-button"
         },
         {
             id: "endoscope",
             name: "HD Видеоэндоскоп мотора с поворотной камерой",
-            cost: 85000,
-            reqStars: 4,
+            cost: 65000,
+            reqStars: 3,
             maxUses: 40,
-            serviceCost: 7500,
-            desc: "Осмотр цилиндров на задиры и нагар. Обязателен для контрактов «ПодКлюч» и досмотра контейнеров. Ресурс: 40 осмотров.",
+            serviceCost: 5500,
+            desc: "Осмотр цилиндров на задиры и нагар. Обязателен для контрактов «ПодКлюч». Ресурс: 40 осмотров.",
             icon: "fa-video"
         },
         {
             id: "compressor",
             name: "Профессиональный компрессометр с переходниками",
-            cost: 38000,
-            reqStars: 2,
+            cost: 26000,
+            reqStars: 1,
             maxUses: 50,
-            serviceCost: 3500,
+            serviceCost: 2500,
             desc: "Замер компрессии цилиндров ДВС. Позволяет выявлять износ колец и клапанов. Ресурс: 50 замеров.",
             icon: "fa-gauge-high"
         },
         {
             id: "battery_tester",
             name: "Цифровая нагрузочная вилка АКБ",
-            cost: 20000,
+            cost: 15000,
             reqStars: 0,
             maxUses: 60,
-            serviceCost: 1800,
+            serviceCost: 1500,
             desc: "Проверка реальной емкости и пускового тока аккумулятора у капота. Ресурс: 60 проверок.",
             icon: "fa-car-battery"
         }
@@ -932,7 +965,7 @@ const SHOP_CATALOG = {
         {
             id: "oil_pack",
             name: "Партия синтетического масла 5W-40 и фильтров",
-            cost: 25000,
+            cost: 18000,
             reqStars: 0,
             value: 30,
             targetBiz: "sto",
@@ -941,7 +974,7 @@ const SHOP_CATALOG = {
         {
             id: "chem_pack",
             name: "Бочка автошампуня и нано-керамики (200л)",
-            cost: 45000,
+            cost: 32000,
             reqStars: 1,
             value: 50,
             targetBiz: "wash",
@@ -950,7 +983,7 @@ const SHOP_CATALOG = {
         {
             id: "tires_stock",
             name: "Партия спортивной резины и жгутов для шиномонтажа",
-            cost: 35000,
+            cost: 25000,
             reqStars: 1,
             value: 40,
             targetBiz: "shina",
@@ -959,7 +992,7 @@ const SHOP_CATALOG = {
         {
             id: "brake_pack",
             name: "Оптовая партия контрактных запчастей и суппортов",
-            cost: 55000,
+            cost: 38000,
             reqStars: 2,
             value: 50,
             targetBiz: "razborka",
@@ -968,7 +1001,7 @@ const SHOP_CATALOG = {
         {
             id: "paint_barrel",
             name: "Комплект автоэмалей, грунта и лака «Хамелеон»",
-            cost: 65000,
+            cost: 45000,
             reqStars: 2,
             value: 50,
             targetBiz: "paint_shop",
@@ -977,8 +1010,8 @@ const SHOP_CATALOG = {
         {
             id: "full_stock",
             name: "Генеральный оптовый запас (100% на все точки)",
-            cost: 140000,
-            reqStars: 5,
+            cost: 95000,
+            reqStars: 4,
             value: 100,
             targetBiz: "all",
             desc: "Мгновенно заполняет склады всех выкупленных предприятий до 100%!"
@@ -988,32 +1021,32 @@ const SHOP_CATALOG = {
         {
             id: "raf_license",
             name: "Гоночная Лицензия пилота РАФ (Категория Д)",
-            cost: 85000,
-            reqStars: 15,
+            cost: 65000,
+            reqStars: 10,
             desc: "Официальный регламентный допуск пилота к ночным заездам на 402м в Стрите.",
             icon: "fa-id-card"
         },
         {
             id: "insurance_osago",
             name: "Генеральный полис «КАСКО / Анти-Угон»",
-            cost: 45000,
-            reqStars: 5,
+            cost: 32000,
+            reqStars: 4,
             desc: "100% защита от случайных повреждений на парковке, автоподстав и ночных угонов.",
             icon: "fa-shield-halved"
         },
         {
             id: "gps_tracker",
             name: "Скрытый поисковый GPS/ГЛОНАСС маяк",
-            cost: 30000,
-            reqStars: 3,
+            cost: 22000,
+            reqStars: 2,
             desc: "Позволяет моментально вернуть угнанную машину без взяток полиции и Решале.",
             icon: "fa-satellite-dish"
         },
         {
             id: "customs_pass",
             name: "Таможенный пропуск в свободную зону Порта",
-            cost: 60000,
-            reqStars: 6,
+            cost: 45000,
+            reqStars: 5,
             desc: "Снижает пошлины на вскрытие японских и европейских контейнеров на 15%.",
             icon: "fa-passport"
         }
@@ -1022,40 +1055,40 @@ const SHOP_CATALOG = {
         {
             id: "home_ps5",
             name: "Игровая консоль PlayStation 5",
-            cost: 75000,
-            reqStars: 5,
+            cost: 55000,
+            reqStars: 4,
             perk: "+25% настроения и куража каждый день в полночь",
             icon: "fa-gamepad"
         },
         {
             id: "home_leather_sofa",
             name: "Кожаный диван в клиентскую зону",
-            cost: 120000,
-            reqStars: 8,
+            cost: 85000,
+            reqStars: 6,
             perk: "+15% к восстановлению сил после смотровой ямы",
             icon: "fa-couch"
         },
         {
             id: "home_garage_lift",
             name: "Гидравлический автоподъёмник (4 тонны)",
-            cost: 320000,
-            reqStars: 20,
+            cost: 240000,
+            reqStars: 15,
             perk: "Ускоряет устранение скрытых дефектов авто на 50% и поднимает статус бокса",
             icon: "fa-elevator"
         },
         {
             id: "home_safe_valberg",
             name: "Огнеупорный сейф перекупа Valberg",
-            cost: 180000,
-            reqStars: 10,
+            cost: 130000,
+            reqStars: 8,
             perk: "100% защита заначки наличных от налоговых проверок и уличных облав",
             icon: "fa-vault"
         },
         {
             id: "home_cctv",
             name: "Система видеонаблюдения периметра 4K",
-            cost: 140000,
-            reqStars: 8,
+            cost: 95000,
+            reqStars: 6,
             perk: "Снижает шанс ночного угона авто из гаража или двора до 0%",
             icon: "fa-video"
         }
@@ -1065,16 +1098,16 @@ const SHOP_CATALOG = {
 const HOUSING_INTERIOR_CATALOG = SHOP_CATALOG.homeItems;
 
 // --------------------------------------------------------
-// 5. ЕЖЕДНЕВНЫЕ НАГРАДЫ (БАЛАНС 7 ДНЕЙ)
+// 5. ЕЖЕДНЕВНЫЕ НАГРАДЫ (СБАЛАНСИРОВАННЫЙ СТАРТ 7 ДНЕЙ)
 // --------------------------------------------------------
 const DAILY_REWARDS_CONFIG = [
-    { day: 1, title: "+12k ₽ & 15 ⛽", reward: { cash: 12000, fuel: 15 } },
-    { day: 2, title: "+25k ₽ & 1 🤝 & Талон Штрафстоянки", reward: { cash: 25000, connections: 1, freeImpoundPasses: 1 } },
-    { day: 3, title: "+45k ₽ & 3 ⭐ (7.5k ₽) & +70 XP", reward: { cash: 45000, stars: 3, xp: 70 } },
-    { day: 4, title: "+75k ₽ & 1 🤝", reward: { cash: 75000, connections: 1 } },
-    { day: 5, title: "+120k ₽ & 5 ⭐ (12.5k ₽) & Сканер ELM327", reward: { cash: 120000, stars: 5, tool: "obd" } },
-    { day: 6, title: "+180k ₽ & Полный Бак & +150 XP", reward: { cash: 180000, fuel: 100, xp: 150 } },
-    { day: 7, title: "+350k ₽ & 10 ⭐ (25k ₽) & Номер Х777ХХ 77", reward: { cash: 350000, stars: 10, specialPlate: "Х777ХХ 77" } }
+    { day: 1, title: "+6k ₽ & 15 ⛽", reward: { cash: 6000, fuel: 15 } },
+    { day: 2, title: "+12k ₽ & 1 🤝 & Талон Штрафстоянки", reward: { cash: 12000, connections: 1, freeImpoundPasses: 1 } },
+    { day: 3, title: "+20k ₽ & 2 ⭐ & +50 XP", reward: { cash: 20000, stars: 2, xp: 50 } },
+    { day: 4, title: "+30k ₽ & 1 🤝", reward: { cash: 30000, connections: 1 } },
+    { day: 5, title: "+45k ₽ & 3 ⭐ & Сканер ELM327", reward: { cash: 45000, stars: 3, tool: "obd" } },
+    { day: 6, title: "+60k ₽ & Полный Бак & +100 XP", reward: { cash: 60000, fuel: 100, xp: 100 } },
+    { day: 7, title: "+85k ₽ & 5 ⭐ & Номер Х777ХХ 77", reward: { cash: 85000, stars: 5, specialPlate: "Х777ХХ 77" } }
 ];
 
 // --------------------------------------------------------
@@ -1082,10 +1115,10 @@ const DAILY_REWARDS_CONFIG = [
 // --------------------------------------------------------
 const BANK_DEPOSIT_CONFIG = {
     autoCapital: {
-        dailyRate: 0.008,               // 0.8% в день (вместо 1.5%)
+        dailyRate: 0.003,               // 0.3% в день (умеренный вклад)
         compoundPeriodMs: 60000,
         maxOfflineDays: 30,
-        minDeposit: 15000
+        minDeposit: 10000
     },
     safeDeposit: {
         annualRate: 0,
@@ -1093,25 +1126,25 @@ const BANK_DEPOSIT_CONFIG = {
         isProtectedFromRaids: true
     },
     creditScoring: {
-        baseLimit: 80000,
-        limitPerLevel: 60000,
-        standardDailyRate: 0.025,
-        overduePenaltyDailyRate: 0.04,
+        baseLimit: 50000,
+        limitPerLevel: 35000,
+        standardDailyRate: 0.02,
+        overduePenaltyDailyRate: 0.035,
         gracePeriodHours: 72,
         maxRating: 5.0,
         ratingBonusOnRepay: 0.2,
         ratingPenaltyOnOverduePerDay: 0.15
     },
-    minAmount: 50000,
-    maxAmount: 500000000,
+    minAmount: 30000,
+    maxAmount: 250000000,
     dailyPercent: 0.2,
     terms: [
         { days: 7,   label: "1 неделя",   dailyPercent: 0.15, autoCompound: false },
         { days: 30,  label: "1 месяц",    dailyPercent: 0.22, autoCompound: false },
-        { days: 90,  label: "3 месяца",   dailyPercent: 0.35, autoCompound: true },
-        { days: 365, label: "1 год",      dailyPercent: 0.55, autoCompound: true }
+        { days: 90,  label: "3 месяца",   dailyPercent: 0.32, autoCompound: true },
+        { days: 365, label: "1 год",      dailyPercent: 0.45, autoCompound: true }
     ],
-    earlyWithdrawPenaltyPct: 30
+    earlyWithdrawPenaltyPct: 25
 };
 
 // --------------------------------------------------------
@@ -1133,9 +1166,9 @@ const LEGAL_ENTITIES = {
         name: 'Индивидуальный предприниматель (ИП)',
         tag: 'ИП',
         taxRate: 0.06,
-        regFee: 15000,
+        regFee: 12000,
         reqStars: 2,
-        minLevel: 4,
+        minLevel: 3,
         maxFleetPerBiz: 5,
         maxFleetTotal: 15,
         allowedBusinesses: ['wash', 'shina', 'sto', 'tow_truck', 'delivery', 'paint_shop', 'chip_tuning', 'detailing', 'razborka', 'taxi'],
@@ -1146,9 +1179,9 @@ const LEGAL_ENTITIES = {
         name: 'Общество с огр. ответственностью (ООО)',
         tag: 'ООО',
         taxRate: 0.15,
-        regFee: 80000,
-        reqStars: 10,
-        minLevel: 8,
+        regFee: 65000,
+        reqStars: 8,
+        minLevel: 7,
         maxFleetPerBiz: 25,
         maxFleetTotal: 100,
         allowedBusinesses: ['wash', 'shina', 'sto', 'tow_truck', 'delivery', 'paint_shop', 'chip_tuning', 'detailing', 'razborka', 'taxi', 'transport_company', 'customs_hub', 'autopodbor'],
@@ -1169,8 +1202,8 @@ const BUSINESS_FLEET_REQUIREMENTS = {
         forbiddenCategories: ['truck', 'moto', 'scooter', 'atv', 'yacht', 'hyper'],
         minCondition: 45,
         allowAccidents: false,
-        classIncomeMultipliers: { economy: 1.0, comfort: 1.45, premium: 2.2 },
-        baseDailyIncomePercent: 0.045
+        classIncomeMultipliers: { economy: 1.0, comfort: 1.4, premium: 2.0 },
+        baseDailyIncomePercent: 0.038
     },
     delivery: {
         bizId: 'delivery',
@@ -1181,8 +1214,8 @@ const BUSINESS_FLEET_REQUIREMENTS = {
         forbiddenCategories: ['premium', 'hyper', 'yacht', 'atv'],
         minCondition: 30,
         allowAccidents: true,
-        classIncomeMultipliers: { scooter: 0.8, economy: 1.15, truck: 1.85 },
-        baseDailyIncomePercent: 0.05
+        classIncomeMultipliers: { scooter: 0.8, economy: 1.15, truck: 1.7 },
+        baseDailyIncomePercent: 0.042
     },
     transport_company: {
         bizId: 'transport_company',
@@ -1193,8 +1226,8 @@ const BUSINESS_FLEET_REQUIREMENTS = {
         forbiddenCategories: ['economy', 'comfort', 'premium', 'hyper', 'moto', 'scooter', 'atv', 'yacht'],
         minCondition: 50,
         allowAccidents: false,
-        classIncomeMultipliers: { truck: 1.6 },
-        baseDailyIncomePercent: 0.065
+        classIncomeMultipliers: { truck: 1.5 },
+        baseDailyIncomePercent: 0.055
     },
     tow_truck: {
         bizId: 'tow_truck',
@@ -1205,8 +1238,8 @@ const BUSINESS_FLEET_REQUIREMENTS = {
         forbiddenCategories: ['economy', 'comfort', 'premium', 'hyper', 'moto', 'scooter', 'atv', 'yacht'],
         minCondition: 40,
         allowAccidents: true,
-        classIncomeMultipliers: { truck: 1.3 },
-        baseDailyIncomePercent: 0.05
+        classIncomeMultipliers: { truck: 1.25 },
+        baseDailyIncomePercent: 0.042
     },
     razborka: {
         bizId: 'razborka',
@@ -1217,8 +1250,8 @@ const BUSINESS_FLEET_REQUIREMENTS = {
         forbiddenCategories: ['yacht', 'hyper'],
         maxCondition: 55,
         allowAccidents: true,
-        classIncomeMultipliers: { economy: 0.9, comfort: 1.3, premium: 2.1, truck: 1.7 },
-        baseDailyIncomePercent: 0.055
+        classIncomeMultipliers: { economy: 0.9, comfort: 1.25, premium: 1.9, truck: 1.5 },
+        baseDailyIncomePercent: 0.048
     }
 };
 
@@ -1226,8 +1259,8 @@ const BUSINESS_FLEET_REQUIREMENTS = {
 // 9. ПРАВИЛА И ТАРИФЫ МРЭО (РЕГИСТРАЦИЯ НА ЮРЛИЦО)
 // --------------------------------------------------------
 const MREO_CONFIG = {
-    commercialRegFee: 8500,
-    inspectionFee: 2500,
+    commercialRegFee: 7500,
+    inspectionFee: 2000,
     unregisteredPenaltyPct: 0.50,
     allowedStatus: {
         UNREGISTERED: 'unregistered',
@@ -1317,6 +1350,7 @@ const FLEET_CALCULATOR = {
 // Экспорт в глобальный контекст window
 window.APP_ACCESS_CONFIG = APP_ACCESS_CONFIG;
 window.WHEEL_CONFIG = WHEEL_CONFIG;
+window.getDynamicWheelDropTable = getDynamicWheelDropTable;
 window.MARKET_ECONOMY_CONFIG = MARKET_ECONOMY_CONFIG;
 window.BANK_EXCHANGE_RATES = BANK_EXCHANGE_RATES;
 window.SEASONS_ECONOMY_CONFIG = SEASONS_ECONOMY_CONFIG;
@@ -1339,4 +1373,4 @@ window.BUSINESS_FLEET_REQUIREMENTS = BUSINESS_FLEET_REQUIREMENTS;
 window.MREO_CONFIG = MREO_CONFIG;
 window.FLEET_CALCULATOR = FLEET_CALCULATOR;
 
-console.log('[📈 data_economy v3.8.0 REBALANCED] Хардкорный баланс наград, честные призы колеса и реалистичная маржа ✓');
+console.log('[📈 data_economy v4.0.0 PRO-BALANCE] Честный баланс наград, динамический вилспин и реальная прогрессия капитала ✓');
