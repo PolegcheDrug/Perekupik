@@ -1,13 +1,12 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.5.0)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.6.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.5.0 (ФИКС СКРОЛЛА КАТЕГОРИЙ + ИДЕАЛЬНЫЙ КАЛЕНДАРЬ НАГРАД):
-//   1. Сетка категорий не распахивается при обычном подъеме наверх!
-//   2. Реализовано открытие только при повторном pull-down свайпе вниз в самом верху.
-//   3. Полная переработка ежедневных наград: сбалансированная прогрессия 1-7 дней.
-//   4. Идеальная ровная геометрия календаря наград без съезжания шрифтов и плашек.
-//   5. Сохранены циклы налогов ФССП, пени +5%/д, сложные проценты по депозитам.
+// ⭐ v5.6.0 (ФИКС HTML-ТЕГОВ В МОДАЛКАХ + ПРЕМИАЛЬНЫЙ КАЛЕНДАРЬ НАГРАД):
+//   1. Устранены сырые теги <b> и спецсимволы в модалках (innerHTML + перенос строк).
+//   2. Кнопка модалки адаптируется: при блокировках/ошибках — «Понятно», при успехе — «Забрать ✓».
+//   3. Выровнена сетка календаря наград: читаемые шрифты, сочные иконки, чистый 7-й день.
+//   4. Сохранены pull-down свайп категорий, налоги ФССП, пени, сложные проценты и депозиты.
 // ========================================================
 
 // ========================================================
@@ -139,16 +138,16 @@ function closeModal(id) {
 }
 
 // ========================================================
-// 2. ЕЖЕДНЕВНЫЙ БОНУС (СБАЛАНСИРОВАННЫЙ КАЛЕНДАРЬ НАГРАД)
+// 2. ЕЖЕДНЕВНЫЙ БОНУС (ОТПОЛИРОВАННЫЙ КАЛЕНДАРЬ НАГРАД)
 // ========================================================
 const DEFAULT_DAILY_CALENDAR = [
-    { day: 1, title: "День 1", icon: "💰", rewardText: "30 000 ₽", subText: "+ Полный бак ⛽", cash: 30000, fuel: 100, xp: 25 },
-    { day: 2, title: "День 2", icon: "🎟️", rewardText: "60 000 ₽", subText: "+ 5 Талонов 🎟️", cash: 60000, tickets: 5, xp: 35 },
-    { day: 3, title: "День 3", icon: "💵", rewardText: "100 000 ₽", subText: "+ 5 Банкнот ⭐", cash: 100000, stars: 5, xp: 50 },
-    { day: 4, title: "День 4", icon: "🎖️", rewardText: "150 000 ₽", subText: "+ 150 Опыта XP", cash: 150000, xp: 150 },
+    { day: 1, title: "День 1", icon: "💰", rewardText: "30 000 ₽", subText: "Бак 100 ⛽", cash: 30000, fuel: 100, xp: 25 },
+    { day: 2, title: "День 2", icon: "🎟️", rewardText: "60 000 ₽", subText: "+5 Талонов", cash: 60000, tickets: 5, xp: 35 },
+    { day: 3, title: "День 3", icon: "💵", rewardText: "100 000 ₽", subText: "+5 ⭐ Stars", cash: 100000, stars: 5, xp: 50 },
+    { day: 4, title: "День 4", icon: "🎖️", rewardText: "150 000 ₽", subText: "+150 XP Опыта", cash: 150000, xp: 150 },
     { day: 5, title: "День 5", icon: "📦", rewardText: "220 000 ₽", subText: "10 ⭐ + 10 🎟️", cash: 220000, stars: 10, tickets: 10, xp: 75 },
-    { day: 6, title: "День 6", icon: "🎰", rewardText: "350 000 ₽", subText: "Вилспин 🎰 + 15 ⭐", cash: 350000, superSpinTickets: 1, stars: 15, xp: 100 },
-    { day: 7, title: "День 7", icon: "👑", rewardText: "600 000 ₽", subText: "25 ⭐ + Номер X777XX", cash: 600000, stars: 25, plate: "Х777ХХ 77", xp: 200 }
+    { day: 6, title: "День 6", icon: "🎰", rewardText: "350 000 ₽", subText: "1 Вилспин + 15 ⭐", cash: 350000, superSpinTickets: 1, stars: 15, xp: 100 },
+    { day: 7, title: "День 7", icon: "👑", rewardText: "600 000 ₽", subText: "25 ⭐ + Госномер Х777ХХ", cash: 600000, stars: 25, plate: "Х777ХХ 77", xp: 200 }
 ];
 
 window.DAILY_REWARDS_CONFIG = DEFAULT_DAILY_CALENDAR;
@@ -193,42 +192,42 @@ function renderDailyBonusGrid() {
             .daily-calendar-grid {
                 display: grid;
                 grid-template-columns: repeat(4, 1fr);
-                gap: 6px;
+                gap: 7px;
                 margin-bottom: 12px;
             }
             .daily-card-box {
-                background: #090e18;
+                background: rgba(13, 20, 36, 0.75);
                 border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 11px;
-                padding: 7px 4px;
+                border-radius: 12px;
+                padding: 8px 4px;
                 text-align: center;
                 position: relative;
-                min-height: 98px;
+                min-height: 102px;
                 display: flex;
                 flex-direction: column;
                 justify-content: space-between;
                 box-sizing: border-box;
-                transition: transform 0.15s ease, border-color 0.15s ease;
+                transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
             }
             .daily-card-box.claimed {
-                background: rgba(0, 230, 118, 0.06);
+                background: rgba(0, 230, 118, 0.05);
                 border-color: rgba(0, 230, 118, 0.35);
-                opacity: 0.8;
+                opacity: 0.75;
             }
             .daily-card-box.active-ready {
-                background: radial-gradient(circle at 50% 30%, rgba(255, 215, 0, 0.2), #090e18);
+                background: radial-gradient(circle at 50% 25%, rgba(255, 215, 0, 0.22), #090e18);
                 border: 1.5px solid #ffd700;
-                box-shadow: 0 0 14px rgba(255, 215, 0, 0.35);
+                box-shadow: 0 0 16px rgba(255, 215, 0, 0.4);
                 transform: translateY(-2px);
             }
             .daily-card-box.day-7-jackpot {
                 grid-column: span 2;
-                background: radial-gradient(circle at 50% 30%, rgba(192, 132, 252, 0.22), #090e18);
+                background: radial-gradient(circle at 50% 25%, rgba(192, 132, 252, 0.25), #090e18);
                 border: 1.5px solid #c084fc;
             }
             .daily-card-box.day-7-jackpot.active-ready {
                 border-color: #ffd700;
-                box-shadow: 0 0 18px rgba(255, 215, 0, 0.5);
+                box-shadow: 0 0 20px rgba(255, 215, 0, 0.55);
             }
         </style>
         <div class="daily-calendar-grid">
@@ -249,10 +248,10 @@ function renderDailyBonusGrid() {
         let dayColor = "#94a3b8";
 
         if (isClaimed) {
-            statusBadge = `<div style="position:absolute; top:3px; right:4px; font-size:9.5px; color:#00e676; font-weight:900;">✓</div>`;
+            statusBadge = `<div style="position:absolute; top:4px; right:5px; font-size:10px; color:#00e676; font-weight:900;">✓</div>`;
             dayColor = "#00e676";
         } else if (isCurrent && canClaim) {
-            statusBadge = `<div style="position:absolute; top:3px; right:4px; font-size:7.5px; background:#ffd700; color:#000; padding:1px 4px; border-radius:4px; font-weight:900;">ЖДЁТ</div>`;
+            statusBadge = `<div style="position:absolute; top:4px; right:5px; font-size:7.5px; background:#ffd700; color:#000; padding:1px 5px; border-radius:4px; font-weight:900;">ГОТОВО</div>`;
             dayColor = "#ffd700";
         }
 
@@ -262,13 +261,13 @@ function renderDailyBonusGrid() {
         html += `
             <div class="${cardClass}">
                 ${statusBadge}
-                <div style="font-size:8px; font-weight:900; color:${dayColor}; text-transform:uppercase; letter-spacing:0.3px;">
+                <div style="font-size:8px; font-weight:900; color:${dayColor}; text-transform:uppercase; letter-spacing:0.4px;">
                     ДЕНЬ ${dayNum}${isDay7 ? ' 👑 ДЖЕКПОТ' : ''}
                 </div>
-                <div style="font-size:20px; line-height:1; margin:3px 0;">${icon}</div>
+                <div style="font-size:24px; line-height:1; margin:4px 0;">${icon}</div>
                 <div>
-                    <b style="font-size:9.5px; line-height:1.2; color:#00e676; display:block;">${textVal}</b>
-                    <div style="font-size:7.5px; color:#94a3b8; margin-top:2px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    <b style="font-size:10px; line-height:1.2; color:#00e676; display:block;">${textVal}</b>
+                    <div style="font-size:8px; color:#cbd5e1; margin-top:2px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                         ${item.subText || ''}
                     </div>
                 </div>
@@ -292,7 +291,7 @@ function renderDailyBonusGrid() {
             btn.disabled = true;
             btn.style.opacity = "0.55";
             btn.style.cursor = "not-allowed";
-            btn.innerHTML = `✓ Награда за сегодня уже получена (Ждите 00:00)`;
+            btn.innerHTML = `✓ Награда получена (следующая в 00:00)`;
         }
     }
 }
@@ -378,7 +377,7 @@ function claimDailyReward() {
 }
 
 // ========================================================
-// 3. ВЕРДИКТ-МОДАЛКА
+// 3. ВЕРДИКТ-МОДАЛКА (ИСПРАВЛЕНО ЭКРАНИРОВАНИЕ HTML-ТЕГОВ)
 // ========================================================
 function renderPrizeTokensHTML(items) {
     if (!Array.isArray(items) || items.length === 0) return "";
@@ -523,24 +522,34 @@ function openVerdictModal(title, text, isSuccess, amount, profit, customTokens =
 
     const descEl = document.getElementById('verdictText');
     const tokensBox = document.getElementById('verdictTokensContainer');
+    const badgeEl = document.getElementById('verdictBadgeText');
+
+    if (badgeEl) {
+        badgeEl.innerText = isSuccess ? 'УСПЕХ' : 'ВНИМАНИЕ';
+        badgeEl.style.color = isSuccess ? 'var(--green)' : '#ff3366';
+        badgeEl.style.borderColor = isSuccess ? 'rgba(0,230,118,0.4)' : 'rgba(255,51,102,0.4)';
+    }
 
     let tokensToRender = customTokens;
     if (!tokensToRender && isSuccess) {
         tokensToRender = extractPrizesFromText(text);
     }
 
+    // ⭐ ИСПРАВЛЕНО: render через innerHTML без экранирования тегов <b> и с переносами <br>
+    const formattedHtml = String(text || '').replace(/\n/g, '<br>');
+
     if (tokensBox) {
         if (tokensToRender && tokensToRender.length > 0) {
             tokensBox.style.display = 'block';
             tokensBox.innerHTML = renderPrizeTokensHTML(tokensToRender);
-            if (descEl) descEl.innerText = text.split('\n')[0] || "";
+            if (descEl) descEl.innerHTML = formattedHtml.split('<br>')[0] || "";
         } else {
             tokensBox.style.display = 'none';
             tokensBox.innerHTML = '';
-            if (descEl) descEl.innerText = text || "";
+            if (descEl) descEl.innerHTML = formattedHtml;
         }
     } else if (descEl) {
-        descEl.innerText = text || "";
+        descEl.innerHTML = formattedHtml;
     }
 
     const amtEl = document.getElementById('verdictAmount');
@@ -569,6 +578,18 @@ function openVerdictModal(title, text, isSuccess, amount, profit, customTokens =
             }
         } else {
             profitEl.style.display = 'none';
+        }
+    }
+
+    // ⭐ ИСПРАВЛЕНО: контекстная кнопка закрытия модалки
+    const actionBtn = document.querySelector('#modalDealVerdict .modal-box > button:last-child');
+    if (actionBtn) {
+        if (isSuccess) {
+            actionBtn.className = 'btn btn-green w-full font-bold';
+            actionBtn.innerText = 'Забрать ✓';
+        } else {
+            actionBtn.className = 'btn btn-dark w-full font-bold';
+            actionBtn.innerText = 'Понятно';
         }
     }
 
@@ -1531,14 +1552,12 @@ function initMarketScrollListener() {
     let touchStartY = 0;
     let isAtTopBeforeTouch = false;
 
-    // Авто-сворачивание при скролле вниз (НЕ распахивает при подъеме вверх!)
     const onScroll = () => {
         const curScroll = mainContent.scrollTop !== undefined ? mainContent.scrollTop : window.scrollY;
 
         const marketTab = document.getElementById('tabMarket');
         if (!marketTab || !marketTab.classList.contains('active')) return;
 
-        // Сворачиваем только при движении вниз
         if (curScroll > lastScrollTop && curScroll > 60) {
             if (typeof window.collapseMarketCategories === 'function') {
                 window.collapseMarketCategories(true);
@@ -1551,7 +1570,6 @@ function initMarketScrollListener() {
     if (mainContent.addEventListener) {
         mainContent.addEventListener('scroll', onScroll, { passive: true });
 
-        // Тач-детектор: раскрытие ТОЛЬКО при повторном свайпе вниз в самом верху
         mainContent.addEventListener('touchstart', (e) => {
             if (e.touches && e.touches[0]) {
                 touchStartY = e.touches[0].clientY;
@@ -1569,7 +1587,6 @@ function initMarketScrollListener() {
                 const marketTab = document.getElementById('tabMarket');
                 if (!marketTab || !marketTab.classList.contains('active')) return;
 
-                // Если игрок УЖЕ был в самом верху и свайпнул вниз > 45px — раскрываем категории
                 if (isAtTopBeforeTouch && curScroll <= 5 && deltaY > 45) {
                     if (typeof window.toggleMarketCategories === 'function') {
                         window.toggleMarketCategories(false);
@@ -1635,4 +1652,4 @@ window.HudRevolver = HudRevolver;
 window._safeNumDeposit = _safeNumDeposit;
 window.initMarketScrollListener = initMarketScrollListener;
 
-console.log('[💠 app-game.js v5.5.0] Pull-down свайп категорий и сбалансированный календарь наград активированы ✓');
+console.log('[💠 app-game.js v5.6.0] Экранирование HTML-тегов исправлено, календарь наград отполирован ✓');
