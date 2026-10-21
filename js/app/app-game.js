@@ -1,12 +1,12 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.6.0)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.7.0 BALANCED)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.6.0 (ФИКС HTML-ТЕГОВ В МОДАЛКАХ + ПРЕМИАЛЬНЫЙ КАЛЕНДАРЬ НАГРАД):
-//   1. Устранены сырые теги <b> и спецсимволы в модалках (innerHTML + перенос строк).
-//   2. Кнопка модалки адаптируется: при блокировках/ошибках — «Понятно», при успехе — «Забрать ✓».
-//   3. Выровнена сетка календаря наград: читаемые шрифты, сочные иконки, чистый 7-й день.
-//   4. Сохранены pull-down свайп категорий, налоги ФССП, пени, сложные проценты и депозиты.
+// ⭐ v5.7.0 (РЕБАЛАНС ЕЖЕДНЕВНЫХ НАГРАД И КВЕСТОВ БЕЗ ИНФЛЯЦИИ):
+//   1. Устранена гиперинфляция календаря: награды синхронизированы с data_economy.js (никаких 600k на 7 день).
+//   2. Балансировка пула заданий: честные награды 6k–12k за квесты вместо 130k из воздуха.
+//   3. Сохранен чистый рендер вердикт-модалок (HTML-теги без экранирования, динамические кнопки).
+//   4. Сохранены налоги ФССП, пени, сложные проценты депозитов и тактильный HUD-револьвер.
 // ========================================================
 
 // ========================================================
@@ -118,7 +118,6 @@ function logBankTransaction(title, amount, isIncome) {
     }
 }
 
-// Универсальные модальные хелперы
 function openModal(id) {
     if (typeof ModalManager !== 'undefined' && typeof ModalManager.open === 'function') {
         ModalManager.open(id);
@@ -138,21 +137,32 @@ function closeModal(id) {
 }
 
 // ========================================================
-// 2. ЕЖЕДНЕВНЫЙ БОНУС (ОТПОЛИРОВАННЫЙ КАЛЕНДАРЬ НАГРАД)
+// 2. ЕЖЕДНЕВНЫЙ БОНУС (СБАЛАНСИРОВАННЫЙ КАЛЕНДАРЬ НАГРАД)
 // ========================================================
 const DEFAULT_DAILY_CALENDAR = [
-    { day: 1, title: "День 1", icon: "💰", rewardText: "30 000 ₽", subText: "Бак 100 ⛽", cash: 30000, fuel: 100, xp: 25 },
-    { day: 2, title: "День 2", icon: "🎟️", rewardText: "60 000 ₽", subText: "+5 Талонов", cash: 60000, tickets: 5, xp: 35 },
-    { day: 3, title: "День 3", icon: "💵", rewardText: "100 000 ₽", subText: "+5 ⭐ Stars", cash: 100000, stars: 5, xp: 50 },
-    { day: 4, title: "День 4", icon: "🎖️", rewardText: "150 000 ₽", subText: "+150 XP Опыта", cash: 150000, xp: 150 },
-    { day: 5, title: "День 5", icon: "📦", rewardText: "220 000 ₽", subText: "10 ⭐ + 10 🎟️", cash: 220000, stars: 10, tickets: 10, xp: 75 },
-    { day: 6, title: "День 6", icon: "🎰", rewardText: "350 000 ₽", subText: "1 Вилспин + 15 ⭐", cash: 350000, superSpinTickets: 1, stars: 15, xp: 100 },
-    { day: 7, title: "День 7", icon: "👑", rewardText: "600 000 ₽", subText: "25 ⭐ + Госномер Х777ХХ", cash: 600000, stars: 25, plate: "Х777ХХ 77", xp: 200 }
+    { day: 1, title: "День 1", icon: "💰", rewardText: "6 000 ₽", subText: "Бак 15 ⛽", cash: 6000, fuel: 15, xp: 20 },
+    { day: 2, title: "День 2", icon: "🤝", rewardText: "12 000 ₽", subText: "+1 Связь & Талон", cash: 12000, connections: 1, freeImpoundPasses: 1, xp: 25 },
+    { day: 3, title: "День 3", icon: "💵", rewardText: "20 000 ₽", subText: "+2 ⭐ Stars", cash: 20000, stars: 2, xp: 35 },
+    { day: 4, title: "День 4", icon: "🎖️", rewardText: "30 000 ₽", subText: "+1 Связь & 40 XP", cash: 30000, connections: 1, xp: 40 },
+    { day: 5, title: "День 5", icon: "📦", rewardText: "45 000 ₽", subText: "3 ⭐ + Сканер ELM", cash: 45000, stars: 3, tool: "obd", xp: 50 },
+    { day: 6, title: "День 6", icon: "⛽", rewardText: "60 000 ₽", subText: "Полный бак + 75 XP", cash: 60000, fuel: 100, xp: 75 },
+    { day: 7, title: "День 7", icon: "👑", rewardText: "85 000 ₽", subText: "5 ⭐ + Номер Х777ХХ", cash: 85000, stars: 5, plate: "Х777ХХ 77", xp: 120 }
 ];
 
-window.DAILY_REWARDS_CONFIG = DEFAULT_DAILY_CALENDAR;
-
 function getDailyRewardsList() {
+    if (window.DAILY_REWARDS_CONFIG && Array.isArray(window.DAILY_REWARDS_CONFIG) && window.DAILY_REWARDS_CONFIG[0]?.reward) {
+        return window.DAILY_REWARDS_CONFIG.map((cfg, idx) => {
+            const r = cfg.reward || {};
+            return {
+                day: cfg.day || (idx + 1),
+                title: `День ${cfg.day || (idx + 1)}`,
+                icon: idx === 6 ? '👑' : (r.tool ? '📦' : (r.stars ? '💵' : (r.fuel ? '⛽' : '💰'))),
+                rewardText: r.cash ? `${r.cash.toLocaleString()} ₽` : cfg.title,
+                subText: cfg.title,
+                ...r
+            };
+        });
+    }
     return DEFAULT_DAILY_CALENDAR;
 }
 
@@ -324,15 +334,20 @@ function claimDailyReward() {
         tokens.push({ icon: '⛽', title: 'Топливо в бак', value: `+${r.fuel} ⛽`, rarity: 'token-cyan' });
     }
 
-    if (r.tickets && r.tickets > 0) {
-        const maxTck = window.state.player.maxExpressTickets || 25;
-        window.state.player.expressTickets = Math.min(maxTck, (window.state.player.expressTickets || 0) + r.tickets);
-        tokens.push({ icon: '🎟️', title: 'Экспресс-пропуска', value: `+${r.tickets} 🎟️`, rarity: 'token-purple' });
+    if (r.connections && r.connections > 0) {
+        window.state.player.connections = (window.state.player.connections || 0) + r.connections;
+        tokens.push({ icon: '🤝', title: 'Полезные связи', value: `+${r.connections} 🤝`, rarity: 'token-cyan' });
     }
 
-    if (r.superSpinTickets && r.superSpinTickets > 0) {
-        window.state.player.superSpinTickets = (window.state.player.superSpinTickets || 0) + r.superSpinTickets;
-        tokens.push({ icon: '🎰', title: 'Билет Вилспина', value: `+${r.superSpinTickets} 🎟️`, rarity: 'token-amber' });
+    if (r.freeImpoundPasses && r.freeImpoundPasses > 0) {
+        window.state.player.freeImpoundPasses = (window.state.player.freeImpoundPasses || 0) + r.freeImpoundPasses;
+        tokens.push({ icon: '🚔', title: 'Талон штрафстоянки', value: `+${r.freeImpoundPasses} шт`, rarity: 'token-purple' });
+    }
+
+    if (r.tool) {
+        if (!window.state.player.tools) window.state.player.tools = {};
+        window.state.player.tools[r.tool] = true;
+        tokens.push({ icon: '📦', title: 'Диагностический прибор', value: 'ELM327 OBD2', rarity: 'token-cyan' });
     }
 
     if (r.plate) {
@@ -377,7 +392,7 @@ function claimDailyReward() {
 }
 
 // ========================================================
-// 3. ВЕРДИКТ-МОДАЛКА (ИСПРАВЛЕНО ЭКРАНИРОВАНИЕ HTML-ТЕГОВ)
+// 3. ВЕРДИКТ-МОДАЛКА
 // ========================================================
 function renderPrizeTokensHTML(items) {
     if (!Array.isArray(items) || items.length === 0) return "";
@@ -535,7 +550,6 @@ function openVerdictModal(title, text, isSuccess, amount, profit, customTokens =
         tokensToRender = extractPrizesFromText(text);
     }
 
-    // ⭐ ИСПРАВЛЕНО: render через innerHTML без экранирования тегов <b> и с переносами <br>
     const formattedHtml = String(text || '').replace(/\n/g, '<br>');
 
     if (tokensBox) {
@@ -581,7 +595,6 @@ function openVerdictModal(title, text, isSuccess, amount, profit, customTokens =
         }
     }
 
-    // ⭐ ИСПРАВЛЕНО: контекстная кнопка закрытия модалки
     const actionBtn = document.querySelector('#modalDealVerdict .modal-box > button:last-child');
     if (actionBtn) {
         if (isSuccess) {
@@ -648,7 +661,7 @@ function applyLanguageToDOM() {
 }
 
 // ========================================================
-// 5. ЗАДАНИЯ И ВЕХИ
+// 5. ЗАДАНИЯ И ВЕХИ (ПЕРЕБАЛАНСИРОВАННЫЕ НАГРАДЫ)
 // ========================================================
 function trackQuestProgress(actionType, count = 1) {
     if (!window.state.player || !Array.isArray(window.state.player.dailyQuests)) return;
@@ -696,9 +709,9 @@ function refreshDailyQuestsList() {
     window.state.player.dailyQuestsSuperClaimed = false;
     if (typeof DAILY_QUESTS_POOL === 'undefined' || !Array.isArray(DAILY_QUESTS_POOL)) {
         window.state.player.dailyQuests = [
-            { id: "q_inspect", text: "Осмотреть толщиномером 2 авто", cur: 0, max: 2, actionType: "gauge_check", reward: 40000, rewardXp: 40, done: false },
-            { id: "q_race", text: "Выиграть заезд 402м", cur: 0, max: 1, actionType: "win_drag", reward: 60000, rewardXp: 45, done: false },
-            { id: "q_biz", text: "Собрать кассу с предприятий", cur: 0, max: 1, actionType: "collect_biz", reward: 30000, rewardXp: 30, done: false }
+            { id: "q_inspect", text: "Осмотреть толщиномером 2 авто", cur: 0, max: 2, actionType: "gauge_check", reward: 8000, rewardXp: 25, done: false },
+            { id: "q_race", text: "Выиграть заезд 402м", cur: 0, max: 1, actionType: "win_drag", reward: 12000, rewardXp: 30, done: false },
+            { id: "q_biz", text: "Собрать кассу с предприятий", cur: 0, max: 1, actionType: "collect_biz", reward: 6000, rewardXp: 20, done: false }
         ];
         return;
     }
@@ -706,7 +719,10 @@ function refreshDailyQuestsList() {
     const shuffled = [...DAILY_QUESTS_POOL].sort(() => 0.5 - Math.random());
     window.state.player.dailyQuests = shuffled.slice(0, 3).map(q => ({
         id: q.id, text: q.text, cur: 0, max: q.target || 1,
-        actionType: q.actionType, reward: q.reward, rewardXp: q.rewardXp || 35, done: false
+        actionType: q.actionType,
+        reward: Math.min(15000, Math.round(Number(q.reward) * 0.25 || 8000)),
+        rewardXp: q.rewardXp || 25,
+        done: false
     }));
 }
 
@@ -715,20 +731,20 @@ function refreshDailyQuestsList() {
 // ========================================================
 function getMarketRefreshCost() {
     let lvl = window.state.player?.level || 1;
-    return 250 + (lvl * 450);
+    return 200 + (lvl * 300);
 }
 
 function getGarageSlotCost() {
     let bs = window.state.player?.baseSlots || 2;
     let extraSlots = Math.max(0, bs - 2);
-    return Math.round(300000 * Math.pow(1.65, extraSlots));
+    return Math.round(180000 * Math.pow(1.5, extraSlots));
 }
 
 function getExpressTicketUpgradeCost() {
     let m = window.state.player?.maxExpressTickets || 25;
     let extra = Math.max(0, m - 25);
     const steps = Math.floor(extra / 25);
-    return Math.round(75000 * Math.pow(1.5, steps));
+    return Math.round(50000 * Math.pow(1.4, steps));
 }
 
 function getTotalGarageSlots() {
@@ -813,7 +829,6 @@ function executeDayCycleMidnight(currentDateObj) {
         _updateDynamicStarRate();
         _syncStarRateToBank();
 
-        // НАЛОГОВЫЙ ЦИКЛ, ПЕНИ И АУКЦИОН ФССП
         if (!window.state.player.taxDueDay) {
             window.state.player.taxDueDay = curDay + 7;
         }
@@ -824,7 +839,7 @@ function executeDayCycleMidnight(currentDateObj) {
                 window.state.garage.forEach(c => {
                     let p = Number(c.power) || 100;
                     if (p > 250) {
-                        powerTax += (p - 250) * 150;
+                        powerTax += (p - 250) * 120;
                     }
                 });
             }
@@ -844,7 +859,7 @@ function executeDayCycleMidnight(currentDateObj) {
             window.state.player.taxOverdueDays = (window.state.player.taxOverdueDays || 0) + 1;
             const overdue = window.state.player.taxOverdueDays;
 
-            const dailyPenalty = Math.round(window.state.player.taxDebt * 0.05);
+            const dailyPenalty = Math.round(window.state.player.taxDebt * 0.04);
             window.state.player.taxPenalty = (window.state.player.taxPenalty || 0) + dailyPenalty;
 
             if (overdue >= 3 && !window.state.player.taxArrest) {
@@ -914,7 +929,7 @@ function executeDayCycleMidnight(currentDateObj) {
                 try {
                     if (!dep || typeof dep !== 'object') return;
                     const currentAmount = _safeNumDeposit(dep.currentAmount, 0);
-                    const dailyPercent = _safeNumDeposit(dep.dailyPercent, 0.3);
+                    const dailyPercent = _safeNumDeposit(dep.dailyPercent, 0.25);
                     const accumulatedProfit = _safeNumDeposit(dep.accumulatedProfit, 0);
                     const daysPassed = _safeNumDeposit(dep.daysPassed, 0);
 
@@ -1420,7 +1435,7 @@ function _performTabSwitch(tabId) {
 }
 
 // ========================================================
-// 12. ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР (БЕСКОНЕЧНЫЙ ЦИКЛ 360° + ТАЧ)
+// 12. ТАКТИЛЬНЫЙ HUD-РЕВОЛЬВЕР
 // ========================================================
 const HudRevolver = {
     container: null,
@@ -1514,8 +1529,6 @@ const HudRevolver = {
         slider.addEventListener('scroll', () => {
             this.checkLoop();
         }, { passive: true });
-
-        console.log('[HUD] Бесконечная карусель статов активирована ✓');
     },
 
     checkLoop() {
@@ -1652,4 +1665,4 @@ window.HudRevolver = HudRevolver;
 window._safeNumDeposit = _safeNumDeposit;
 window.initMarketScrollListener = initMarketScrollListener;
 
-console.log('[💠 app-game.js v5.6.0] Экранирование HTML-тегов исправлено, календарь наград отполирован ✓');
+console.log('[💠 app-game.js v5.7.0 BALANCED] Ежедневный календарь и задания согласованы со сбалансированной экономикой ✓');
