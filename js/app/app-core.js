@@ -624,45 +624,111 @@ if (typeof document !== 'undefined') {
 }
 
 // ========================================================
-// 6. СБРОС ПРОГРЕССА
+// НАДЁЖНЫЙ СБРОС ПРОГРЕССА (TELEGRAM WEBAPP + FIRESTORE SYNC)
 // ========================================================
-function resetGameData() {
-    if (!confirm("⚠️ Вы уверены, что хотите сбросить прогресс до честного старта (75,000 ₽, 1 уровень)?")) {
-        return;
+async function resetGameData() {
+    // Поддержка нативного диалога Telegram WebApp (если доступен)
+    const confirmMessage = "Вы уверены, что хотите сбросить прогресс до честного старта (75 000 ₽, 1 уровень)?";
+    
+    if (window.Telegram?.WebApp?.showConfirm) {
+        window.Telegram.WebApp.showConfirm(confirmMessage, (confirmed) => {
+            if (confirmed) _executeHardReset();
+        });
+    } else {
+        if (confirm("⚠️ " + confirmMessage)) {
+            _executeHardReset();
+        }
     }
+}
 
+async function _executeHardReset() {
     window.__IS_RESETTING__ = true;
+    showToast("⏳ Полная очистка профиля и облака...", "warning");
 
     try {
-        localStorage.clear();
-        sessionStorage.clear();
+        // 1. Формируем чистый честный профиль новичка
+        const cleanState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+        cleanState.player.uid = window.tgUserId || window.state?.player?.uid || "player_" + Date.now();
+        cleanState.player.name = window.tgUserData?.first_name || window.state?.player?.name || "Taktoje";
+        cleanState.player.cash = 75000;
+        cleanState.player.stars = 0;
+        cleanState.player.level = 1;
+        cleanState.player.xp = 0;
+        cleanState.player.superSpinTickets = 0;
+        cleanState.__saveVersion = SAVE_VERSION;
 
-        if (!window.isPcDevMode || !window.isPcDevMode()) {
-            (async () => {
-                try {
-                    if (window.FB_Bridge?.db && window.tgUserId) {
-                        const uid = String(window.tgUserId);
-                        const mod = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-                        const { doc, deleteDoc } = mod;
-                        const collectionsToWipe = ['players', 'garages', 'leaderboard'];
-                        for (const colName of collectionsToWipe) {
-                            try {
-                                await deleteDoc(doc(window.FB_Bridge.db, colName, uid));
-                            } catch (e) {}
-                        }
-                    }
-                } catch (e) {}
-            })();
+        // 2. Очищаем локальные хранилища
+        try {
+            localStorage.clear();
+            sessionStorage.clear();
+            // Записываем чистый сейв сразу под всеми возможными ключами
+            const cleanJson = JSON.stringify(cleanState);
+            if (window.tgUserId) {
+                localStorage.setItem("perekup_save_" + window.tgUserId, cleanJson);
+                localStorage.setItem(SAVE_KEY_PREFIX + window.tgUserId, cleanJson);
+            }
+        } catch (e) {
+            console.warn("[Reset] LocalStorage clear error:", e);
         }
 
+        // 3. Синхронная перезапись облака Telegram CloudStorage (чтобы не восстановил старое)
+        if (window.Telegram?.WebApp?.CloudStorage) {
+            try {
+                const tgCloud = window.Telegram.WebApp.CloudStorage;
+                tgCloud.getKeys((err, keys) => {
+                    if (!err && Array.isArray(keys)) {
+                        keys.forEach(k => {
+                            if (k && k.includes('perekup')) {
+                                tgCloud.removeItem(k);
+                            }
+                        });
+                    }
+                });
+            } catch (e) {}
+        }
+
+        // 4. Перезапись облака Firestore (принудительно накатываем чистый сейв)
+        if (window.FB_Bridge?.db && window.tgUserId) {
+            try {
+                const uid = String(window.tgUserId);
+                const mod = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+                const { doc, setDoc, deleteDoc } = mod;
+
+                // Удаляем старые записи автопарка и лидерборда
+                await Promise.allSettled([
+                    deleteDoc(doc(window.FB_Bridge.db, 'garages', uid)),
+                    deleteDoc(doc(window.FB_Bridge.db, 'leaderboard', uid)),
+                    // Перезаписываем профиль новичком
+                    setDoc(doc(window.FB_Bridge.db, 'players', uid), cleanState.player),
+                    setDoc(doc(window.FB_Bridge.db, 'users', uid), {
+                        uid: uid,
+                        name: cleanState.player.name,
+                        level: 1,
+                        cash: 75000,
+                        netWorth: 75000,
+                        updatedAt: Date.now()
+                    })
+                ]);
+            } catch (fsErr) {
+                console.warn("[Reset] Firestore wipe error:", fsErr);
+            }
+        }
+
+        // 5. Очищаем активную память JS
+        Object.keys(window.state).forEach(k => delete window.state[k]);
+        Object.assign(window.state, cleanState);
+
+        showToast("✅ Прогресс сброшен до 75 000 ₽! Перезагрузка...", "success");
+
+        // 6. Перезагрузка без кеша
         setTimeout(() => {
             const cleanUrl = window.location.href.split('?')[0];
-            window.location.href = cleanUrl + '?reset=' + Date.now();
-            setTimeout(() => { window.location.reload(true); }, 200);
-        }, 800);
+            window.location.replace(cleanUrl + '?t=' + Date.now());
+        }, 500);
 
-    } catch (e) {
-        window.location.reload();
+    } catch (err) {
+        console.error("[Reset Error]", err);
+        location.reload();
     }
 }
 
