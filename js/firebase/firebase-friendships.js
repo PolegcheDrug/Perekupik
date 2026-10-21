@@ -1,17 +1,13 @@
 // ========================================================
-// js/firebase/firebase-friendships.js — СИСТЕМА ДРУЗЕЙ & СОЦИАЛА (v1.3.0)
+// js/firebase/firebase-friendships.js — СИСТЕМА ДРУЗЕЙ & СОЦИАЛА (v1.4.0 NO-BOTS)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.3.0 (СОЦИУМ: ДРУЗЬЯ, ЗАГОТОВКИ ФРАЗ, P2P ОФФЕРЫ):
-//   - ПОЛНЫЙ ФИКС ВЗАИМНОГО ДОБАВЛЕНИЯ: если есть встречная заявка,
-//     она мгновенно переводится в статус 'accepted' без конфликта дублей.
-//   - ХРАНЕНИЕ МЕТАДАННЫХ: сохраняются аватары, никнеймы, уровни
-//     и машины игроков для быстрого рендера карточек друзей.
-//   - БЫСТРЫЕ ФРАЗЫ (sendQuickPhrase): мгновенная отправка заготовок
-//     с пушем и записью в документ дружбы/уведомлений.
-//   - ИНТЕГРАЦИЯ С ОФФЕРАМИ (sendDirectOffer): отправка предложения
-//     покупки авто напрямую другу.
-//   - ПОДПИСКИ REALTIME: подписка на список друзей и входящие заявки.
+// ⭐ v1.4.0 (РЕАЛЬНЫЕ ИГРОКИ И ПОИСК ПО БАЗЕ FIRESTORE):
+//   - ПОЛНЫЙ ОТКАЗ ОТ БОТОВ: никаких вымышленных перекупов в рекомендациях.
+//   - ЖИВОЙ ПОИСК (searchUsers): поиск по никнейму, username и ID в коллекции users.
+//   - РЕАЛЬНЫЕ РЕКОМЕНДАЦИИ (fetchRecommendedUsers): выборка живых игроков из Firestore.
+//   - ВЫБОРКА ЛИДЕРБОРДА (fetchLeaderboard): получение реальных игроков для Зала Славы.
+//   - Сохранена вся механика автопринятия, быстрых фраз и P2P-офферов.
 // ========================================================
 
 import {
@@ -76,15 +72,29 @@ function getCurrentPlayerProfile() {
     username: tgUser?.username || "",
     photoUrl: photoUrl,
     level: Number(player.level) || 1,
-    balance: Number(player.balance) || 0,
+    balance: Number(player.balance || player.cash) || 0,
     carName: currentCar ? (currentCar.name || currentCar.title || "Пешком") : "Пешком",
     isTelegram: isTelegram
   };
 }
 
-// ========================================================
-// 3. ХЕЛПЕР: детерминированный Pair ID
-// ========================================================
+// Поиск по возможным коллекциям пользователей в Firestore
+async function _fetchUsersCollectionDocs(limitCount = 100) {
+  const candidateCollections = ["users", "players", "leaderboard"];
+  for (const colName of candidateCollections) {
+    try {
+      const colRef = collection(db, colName);
+      const snap = await getDocs(query(colRef, limit(limitCount)));
+      if (!snap.empty) {
+        return snap.docs;
+      }
+    } catch (e) {
+      // Игнорируем отсутствие коллекции и пробуем следующую
+    }
+  }
+  return [];
+}
+
 function _buildPairId(uid1, uid2) {
   if (!uid1 || !uid2) return null;
   return [String(uid1), String(uid2)].sort().join("_");
@@ -114,14 +124,133 @@ function _filterAndSortDocs(items, opts = {}) {
 }
 
 // ========================================================
-// 4. FRIENDSHIPS & SOCIAL MANAGER
+// 3. FRIENDSHIPS & SOCIAL MANAGER
 // ========================================================
 const FriendshipsManager = {
   _listeners: [],
 
   /**
+   * Поиск РЕАЛЬНЫХ игроков в Firestore по нику, юзернейму или ID.
+   */
+  async searchUsers(searchQuery) {
+    const me = getCurrentPlayerProfile();
+    const myId = String(me?.id || "");
+    const qStr = String(searchQuery || "").trim().toLowerCase();
+    if (!qStr) return [];
+
+    try {
+      const docs = await _fetchUsersCollectionDocs(120);
+      const results = [];
+
+      docs.forEach(docSnap => {
+        const u = docSnap.data() || {};
+        const uid = String(u.uid || u.id || docSnap.id || "");
+        if (uid === myId || uid === "undefined" || !uid) return;
+
+        const name = String(u.name || u.displayName || "").toLowerCase();
+        const username = String(u.username || "").toLowerCase();
+        const tgId = String(u.telegram_id || u.telegramId || "");
+
+        if (name.includes(qStr) || username.includes(qStr) || uid.toLowerCase().includes(qStr) || tgId.includes(qStr)) {
+          results.push({
+            id: uid,
+            name: u.name || (u.username ? "@" + u.username : "Перекуп"),
+            level: Number(u.level) || 1,
+            carName: u.carName || u.bestCar || u.flagshipCar || "Пешком",
+            networth: Number(u.netWorth || u.networth || u.balance || u.cash || 0),
+            avatar: u.avatar || u.photoUrl || "👤",
+            isOnline: u.updatedAt ? (Date.now() - u.updatedAt < 600000) : true,
+            isBot: false
+          });
+        }
+      });
+
+      return results;
+    } catch (e) {
+      console.warn('[Friendship] Ошибка searchUsers:', e);
+      return [];
+    }
+  },
+
+  /**
+   * Выборка РЕАЛЬНЫХ игроков для блока «Рекомендуемые перекупы».
+   */
+  async fetchRecommendedUsers(limitCount = 10) {
+    const me = getCurrentPlayerProfile();
+    const myId = String(me?.id || "");
+
+    try {
+      // Исключаем себя, друзей и тех, кому уже отправлен инвайт
+      const { friends, outgoing, pending } = await this.fetchFriendships(myId);
+      const excludedIds = new Set([
+        myId,
+        ...friends.map(f => String(f.id)),
+        ...outgoing.map(o => String(o.id)),
+        ...pending.map(p => String(p.id))
+      ]);
+
+      const docs = await _fetchUsersCollectionDocs(50);
+      const list = [];
+
+      docs.forEach(docSnap => {
+        const u = docSnap.data() || {};
+        const uid = String(u.uid || u.id || docSnap.id || "");
+        if (!uid || uid === "undefined" || excludedIds.has(uid)) return;
+
+        list.push({
+          id: uid,
+          name: u.name || (u.username ? "@" + u.username : "Перекуп"),
+          level: Number(u.level) || 1,
+          carName: u.carName || u.bestCar || u.flagshipCar || "Пешком",
+          networth: Number(u.netWorth || u.networth || u.balance || u.cash || 0),
+          avatar: u.avatar || u.photoUrl || "👤",
+          isOnline: u.updatedAt ? (Date.now() - u.updatedAt < 600000) : false,
+          isBot: false
+        });
+      });
+
+      return list.slice(0, limitCount);
+    } catch (e) {
+      console.warn('[Friendship] Ошибка fetchRecommendedUsers:', e);
+      return [];
+    }
+  },
+
+  /**
+   * Загрузка живых игроков из Firestore для Зала Славы (без ботов).
+   */
+  async fetchLeaderboard(sortField = 'networth', limitCount = 50) {
+    try {
+      const docs = await _fetchUsersCollectionDocs(limitCount);
+      const players = [];
+
+      docs.forEach(docSnap => {
+        const u = docSnap.data() || {};
+        const uid = String(u.uid || u.id || docSnap.id || "");
+        if (!uid || uid === "undefined") return;
+
+        players.push({
+          id: uid,
+          name: u.name || (u.username ? "@" + u.username : "Перекуп"),
+          level: Number(u.level) || 1,
+          profit: Number(u.profit || u.totalNetProfit || u.stats?.totalNetProfit || 0),
+          networth: Number(u.netWorth || u.networth || u.balance || u.cash || 0),
+          car: u.carName || u.bestCar || u.flagshipCar || "Пешком",
+          avatar: u.avatar || u.photoUrl || "👤",
+          isOnline: u.updatedAt ? (Date.now() - u.updatedAt < 600000) : false,
+          isBot: false
+        });
+      });
+
+      return players;
+    } catch (e) {
+      console.warn('[Friendship] Ошибка fetchLeaderboard:', e);
+      return [];
+    }
+  },
+
+  /**
    * Отправить заявку в друзья.
-   * Если вторая сторона уже отправила заявку — мгновенное взаимное автопринятие.
    */
   async sendRequest(toUserId, toUserName = "Перекуп") {
     const me = getCurrentPlayerProfile();
@@ -142,29 +271,24 @@ const FriendshipsManager = {
       if (snap.exists()) {
         const data = snap.data();
 
-        // 1. Уже друзья
         if (data.status === 'accepted') {
           return { success: true, alreadyFriends: true, message: "Вы уже друзья!" };
         }
 
-        // 2. Мы уже отправляли запрос ранее, ждем
         if (data.status === 'pending' && String(data.fromUserId) === String(me.id)) {
           return { success: false, error: "Заявка уже отправлена и ожидает ответа" };
         }
 
-        // 3. ⭐ ВСТРЕЧНАЯ ЗАЯВКА (он уже отправил нам) -> Мгновенное взаимное принятие
         if (data.status === 'pending' && String(data.fromUserId) === targetId) {
-          devLogFirestore('Friendships: встречный запрос обнаружен -> автопринятие', pairId);
+          devLogFirestore('Friendships: встречный запрос -> автопринятие', pairId);
 
           await updateDoc(friendRef, {
             status: 'accepted',
             acceptedAt: Date.now(),
-            // обновляем статы обоих участников
             [`profiles.${me.id}`]: me,
             updatedAt: Date.now()
           });
 
-          // Шлем уведомление партнеру, что дружба подтверждена
           await this._sendSystemNotification({
             toUser: targetId,
             type: "friend_accepted",
@@ -177,7 +301,6 @@ const FriendshipsManager = {
           return { success: true, autoAccepted: true, message: "Вы теперь друзья!" };
         }
 
-        // 4. Если ранее была отклонена/удалена — возобновляем
         await setDoc(friendRef, {
           pairId,
           fromUserId: me.id,
@@ -194,7 +317,6 @@ const FriendshipsManager = {
         }, { merge: true });
 
       } else {
-        // Создаем новую заявку с нуля
         await setDoc(friendRef, {
           pairId,
           fromUserId: me.id,
@@ -211,7 +333,6 @@ const FriendshipsManager = {
         });
       }
 
-      // Создаем push-уведомление для адресата
       await this._sendSystemNotification({
         toUser: targetId,
         type: "friend_request",
@@ -221,7 +342,7 @@ const FriendshipsManager = {
         fromUserName: me.name
       });
 
-      devLogFirestore('Friendships.sendRequest: успешно отправлено', pairId);
+      devLogFirestore('Friendships.sendRequest OK', pairId);
       return { success: true, message: "Заявка отправлена" };
     } catch (e) {
       const errMsg = e?.code || e?.message || String(e);
@@ -230,9 +351,6 @@ const FriendshipsManager = {
     }
   },
 
-  /**
-   * Принять входящую заявку от игрока.
-   */
   async acceptRequest(fromUserId) {
     const me = getCurrentPlayerProfile();
     if (!me?.id) return { success: false, error: "Нет профиля" };
@@ -251,7 +369,6 @@ const FriendshipsManager = {
         updatedAt: Date.now()
       });
 
-      // Уведомление инициатору заявки
       await this._sendSystemNotification({
         toUser: String(fromUserId),
         type: "friend_accepted",
@@ -270,9 +387,6 @@ const FriendshipsManager = {
     }
   },
 
-  /**
-   * Отклонить входящую заявку.
-   */
   async declineRequest(fromUserId) {
     const me = getCurrentPlayerProfile();
     if (!me?.id) return { success: false, error: "Нет профиля" };
@@ -296,9 +410,6 @@ const FriendshipsManager = {
     }
   },
 
-  /**
-   * Удалить пользователя из списка друзей.
-   */
   async removeFriend(friendUserId) {
     const me = getCurrentPlayerProfile();
     if (!me?.id) return { success: false, error: "Нет профиля" };
@@ -322,9 +433,6 @@ const FriendshipsManager = {
     }
   },
 
-  /**
-   * Отправить заготовленную фразу другу (Quick Chat).
-   */
   async sendQuickPhrase(friendUserId, phraseText) {
     const me = getCurrentPlayerProfile();
     if (!me?.id) return { success: false, error: "Нет профиля" };
@@ -334,7 +442,6 @@ const FriendshipsManager = {
       const pairId = _buildPairId(me.id, friendUserId);
       const friendRef = doc(db, "friendships", pairId);
 
-      // Записываем последнюю фразу прямо в диалог дружбы
       await updateDoc(friendRef, {
         lastMessage: {
           fromUserId: me.id,
@@ -345,7 +452,6 @@ const FriendshipsManager = {
         updatedAt: Date.now()
       });
 
-      // Отправляем пуш-уведомление с репликой
       await this._sendSystemNotification({
         toUser: String(friendUserId),
         type: "chat_phrase",
@@ -362,9 +468,6 @@ const FriendshipsManager = {
     }
   },
 
-  /**
-   * Сделать прямое предложение авто другу (P2P Оффер).
-   */
   async sendDirectCarOffer(friendUserId, carData, offerPrice) {
     const me = getCurrentPlayerProfile();
     if (!me?.id) return { success: false, error: "Нет профиля" };
@@ -383,14 +486,13 @@ const FriendshipsManager = {
         buyerId: String(friendUserId),
         car: carData,
         price: Number(offerPrice),
-        status: "pending", // pending | accepted | rejected | expired
+        status: "pending",
         createdAt: Date.now(),
-        expireAt: Date.now() + (24 * 3600 * 1000) // 24 часа
+        expireAt: Date.now() + (24 * 3600 * 1000)
       };
 
       await setDoc(offerRef, payload);
 
-      // Шлем уведомление покупателю
       await this._sendSystemNotification({
         toUser: String(friendUserId),
         type: "p2p_offer",
@@ -408,9 +510,6 @@ const FriendshipsManager = {
     }
   },
 
-  /**
-   * Получить полный срез: друзья, входящие заявки, исходящие заявки.
-   */
   async fetchFriendships(userId) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
     if (!targetUid) return { friends: [], pending: [], outgoing: [] };
@@ -434,7 +533,6 @@ const FriendshipsManager = {
       const outgoing = [];
       const now = Date.now();
 
-      // Мои исходящие
       asFromSnap.forEach(d => {
         const data = d.data();
         if (data.expireAt && data.expireAt < now) return;
@@ -459,7 +557,6 @@ const FriendshipsManager = {
         }
       });
 
-      // Входящие ко мне
       asToSnap.forEach(d => {
         const data = d.data();
         if (data.expireAt && data.expireAt < now) return;
@@ -491,22 +588,16 @@ const FriendshipsManager = {
 
       return { friends, pending, outgoing };
     } catch (e) {
-      console.warn('[Friendship] Ошибка выборки fetchFriendships:', e);
+      console.warn('[Friendship] Ошибка fetchFriendships:', e);
       return { friends: [], pending: [], outgoing: [] };
     }
   },
 
-  /**
-   * Исходящие заявки (для кнопок "Ожидает" в таблице лидеров).
-   */
   async getOutgoingRequests(userId) {
     const res = await this.fetchFriendships(userId);
     return res.outgoing || [];
   },
 
-  /**
-   * Служебная отправка уведомления.
-   */
   async _sendSystemNotification(notifData) {
     try {
       const notifId = "notif_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
@@ -525,13 +616,10 @@ const FriendshipsManager = {
         expireAt: Date.now() + TTL_CONFIG.notifications
       });
     } catch (err) {
-      console.warn('[Friendship] Не удалось отправить push-нотификацию:', err);
+      console.warn('[Friendship] push notification error:', err);
     }
   },
 
-  /**
-   * Слушатель входящих заявок в реальном времени.
-   */
   subscribeToFriendships(userId, callback) {
     const targetUid = userId || FB_Core.Auth.getVerifiedUserId();
     if (!targetUid || typeof callback !== 'function') return () => {};
@@ -563,13 +651,12 @@ const FriendshipsManager = {
           sortDir: 'desc'
         });
 
-        try { callback(pending); } catch (e) { console.warn('[Friendship] callback error:', e); }
+        try { callback(pending); } catch (e) {}
       });
 
       this._listeners.push(unsubscribe);
       return unsubscribe;
     } catch (e) {
-      console.warn('[Friendship] subscribe exception:', e);
       return () => {};
     }
   },
@@ -582,12 +669,9 @@ const FriendshipsManager = {
   }
 };
 
-// ========================================================
-// 5. ЭКСПОРТ
-// ========================================================
-window.FB_Friendships = {
-  Friendships: FriendshipsManager
-};
+window.FB_Friendships = { Friendships: FriendshipsManager };
 window.FB_FriendshipsManager = FriendshipsManager;
+window.searchPlayersOnline = (q) => FriendshipsManager.searchUsers(q);
+window.getRecommendedPlayersOnline = () => FriendshipsManager.fetchRecommendedUsers();
 
-console.log('[👥 FB_Friendships v1.3.0] Дружба, Автопринятие, Заготовки фраз и Офферы готовы ✓');
+console.log('[👥 FB_Friendships v1.4.0] Поиск игроков и рекомендации переведены на реальную базу Firestore ✓');
