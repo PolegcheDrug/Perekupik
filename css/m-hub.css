@@ -1,360 +1,310 @@
 /* ========================================================
-   M+ HUB — ПРЕМИАЛЬНЫЙ ДИЗАЙН (v2.0)
-   Симметрия, анимации, неоновые кнопки
+   css/m-hub.css — M+ MESSENGER & DEALS (v10.0.0 CLEAN REDESIGN)
+   Премиальный неоновый стиль, микро-чипсы, стикеры диалогов,
+   гладкие анимации и адаптивность под мобильный экран.
    ======================================================== */
 
-/* --- 1. КОНТЕЙНЕР ПРИЛОЖЕНИЯ --- */
-#phoneAppContainer .phone-app-body {
-  padding: 12px 10px !important;
-  background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.05) 0%, transparent 70%);
-  min-height: 100%;
+/* --- 1. БАЗОВАЯ ОБОЛОЧКА И СКРОЛЛ --- */
+.m-app-shell {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  background: #050811;
+  color: #e2e8f0;
+  font-family: inherit;
+  overflow: hidden;
 }
 
-/* --- 2. ШАПКА M+ --- */
+#phoneAppContainer .phone-app-body {
+  padding: 8px 10px !important;
+  background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.05) 0%, transparent 70%);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+#phoneAppContainer .phone-app-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* --- 2. ШАПКА M+ И ЛОГОТИП --- */
 .m-network-logo {
   background: linear-gradient(135deg, #00f2fe 0%, #7928ca 100%);
-  padding: 4px 10px !important;
-  border-radius: 10px !important;
+  padding: 3px 8px !important;
+  border-radius: 8px !important;
   font-weight: 900;
   color: #000;
-  font-size: 12px;
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
-  letter-spacing: 0.5px;
+  font-size: 11px;
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.4);
+  letter-spacing: 0.4px;
   animation: logoPulse 3s infinite ease-in-out;
 }
 
 @keyframes logoPulse {
-  0%, 100% { box-shadow: 0 0 10px rgba(0, 242, 254, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(0, 242, 254, 0.6), 0 0 30px rgba(121, 40, 202, 0.4); }
+  0%, 100% { box-shadow: 0 0 8px rgba(0, 242, 254, 0.3); }
+  50% { box-shadow: 0 0 18px rgba(0, 242, 254, 0.6), 0 0 25px rgba(121, 40, 202, 0.4); }
 }
 
-/* --- 3. НАВИГАЦИОННЫЕ ПИЛЮЛИ (ГЛАВНЫЕ ТАБЫ) --- */
+/* --- 3. СЕГМЕНТНЫЙ ТАБ-БАР (3 РАЗДЕЛА: ЧАТЫ / СДЕЛКИ / ПРОФИЛЬ) --- */
+.m-clean-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(0, 242, 254, 0.15);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 4px;
+  margin-bottom: 8px;
+  backdrop-filter: blur(10px);
+  flex-shrink: 0;
+}
+
+.m-clean-tab-btn {
+  position: relative;
+  background: transparent;
+  border: 1px solid transparent;
+  outline: none;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 8px 4px;
+  border-radius: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.m-clean-tab-btn:hover {
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.m-clean-tab-btn.active {
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.18), rgba(121, 40, 202, 0.22)) !important;
+  color: #00f2fe !important;
+  border: 1px solid rgba(0, 242, 254, 0.4) !important;
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
+}
+
+.m-clean-tab-btn:active {
+  transform: scale(0.97);
+}
+
+.m-badge-pill {
+  background: #ff3366;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  padding: 1px 5px;
+  border-radius: 10px;
+  line-height: 1.1;
+  box-shadow: 0 0 8px rgba(255, 51, 102, 0.5);
+}
+
+.m-badge-pill-cyan {
+  background: #00f2fe;
+  color: #000;
+  box-shadow: 0 0 8px rgba(0, 242, 254, 0.5);
+}
+
+/* Совместимость с общими пилюлями приложения */
 .mplus-nav-scroll-bar {
-  display: flex !important;
-  gap: 8px !important;
-  overflow-x: auto !important;
-  padding: 4px 2px 10px 2px !important;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 6px 2px;
   scrollbar-width: none;
-  -ms-overflow-style: none;
-  scroll-behavior: smooth;
 }
 
 .mplus-nav-scroll-bar::-webkit-scrollbar {
   display: none;
 }
 
-.m-nav-pill {
-  flex-shrink: 0;
+/* --- 4. МИКРО-ЧИПСЫ ФИЛЬТРАЦИИ --- */
+.m-pill-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 8.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px !important;
-  border-radius: 20px !important;
-  font-size: 11px !important;
-  font-weight: 800 !important;
-  color: #94a3b8 !important;
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  gap: 4px;
+}
+
+.m-pill-chip:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #e2e8f0;
+}
+
+.m-pill-chip.active {
+  background: rgba(0, 242, 254, 0.15);
+  border-color: #00f2fe;
+  color: #00f2fe;
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.2);
+}
+
+/* --- 5. ДИАЛОГИ (КАРТОЧКИ В СПИСКЕ ЧАТОВ) --- */
+.m-dialog-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  background: rgba(13, 20, 36, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  margin-bottom: 7px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-  white-space: nowrap;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  animation: cardFadeIn 0.3s ease-out backwards;
 }
 
-.m-nav-pill::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(0, 242, 254, 0.15), rgba(121, 40, 202, 0.15));
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.m-nav-pill:hover::before {
-  opacity: 1;
-}
-
-.m-nav-pill:active {
-  transform: scale(0.95);
-}
-
-.m-nav-pill.active {
-  color: #fff !important;
-  background: linear-gradient(135deg, rgba(0, 242, 254, 0.25), rgba(121, 40, 202, 0.25)) !important;
-  border-color: rgba(0, 242, 254, 0.6) !important;
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.3), inset 0 0 10px rgba(0, 242, 254, 0.1);
-  animation: activeTabGlow 2s infinite alternate ease-in-out;
-}
-
-@keyframes activeTabGlow {
-  0% { box-shadow: 0 0 10px rgba(0, 242, 254, 0.2); }
-  100% { box-shadow: 0 0 20px rgba(0, 242, 254, 0.5), inset 0 0 12px rgba(0, 242, 254, 0.15); }
-}
-
-.m-nav-pill i {
-  font-size: 12px;
-}
-
-.m-pill-badge {
-  background: #ff3366;
-  color: #fff;
-  font-size: 9px;
-  font-weight: 900;
-  padding: 1px 5px;
-  border-radius: 10px;
-  margin-left: 2px;
-  box-shadow: 0 0 8px rgba(255, 51, 102, 0.6);
-  animation: badgePulse 1.5s infinite;
-}
-
-@keyframes badgePulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.15); }
-}
-
-/* --- 4. КАРТОЧКИ ДИАЛОГОВ И ЛОТОВ --- */
-#mDialogsListContainer .glass-card,
-#p2pLotsArea .glass-card {
-  background: linear-gradient(145deg, rgba(20, 27, 43, 0.95) 0%, rgba(10, 15, 25, 0.98) 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
-  border-radius: 16px !important;
-  padding: 12px !important;
-  margin-bottom: 10px !important;
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-  animation: cardFadeIn 0.4s ease-out backwards;
-}
-
-#mDialogsListContainer .glass-card:nth-child(1) { animation-delay: 0.05s; }
-#mDialogsListContainer .glass-card:nth-child(2) { animation-delay: 0.1s; }
-#mDialogsListContainer .glass-card:nth-child(3) { animation-delay: 0.15s; }
-#mDialogsListContainer .glass-card:nth-child(4) { animation-delay: 0.2s; }
+.m-dialog-item:nth-child(1) { animation-delay: 0.03s; }
+.m-dialog-item:nth-child(2) { animation-delay: 0.06s; }
+.m-dialog-item:nth-child(3) { animation-delay: 0.09s; }
+.m-dialog-item:nth-child(4) { animation-delay: 0.12s; }
 
 @keyframes cardFadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-#mDialogsListContainer .glass-card:hover,
-#p2pLotsArea .glass-card:hover {
-  border-color: rgba(0, 242, 254, 0.4) !important;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 242, 254, 0.15);
-  transform: translateY(-2px);
+.m-dialog-item:hover, .m-dialog-item:active {
+  transform: translateY(-1px);
+  background: rgba(18, 28, 51, 0.9);
+  border-color: rgba(0, 242, 254, 0.3);
 }
 
-/* Превью картинки */
-.car-img-wrap {
-  border-radius: 12px !important;
-  overflow: hidden !important;
+.m-dialog-item.unread {
+  border-left: 3px solid #00f2fe !important;
+  background: linear-gradient(90deg, rgba(0, 242, 254, 0.08), rgba(13, 20, 36, 0.85));
+}
+
+.m-dialog-avatar {
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.car-img-wrap::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%);
-  pointer-events: none;
-}
-
-/* --- 5. ПУСТОЕ СОСТОЯНИЕ (КРАСИВОЕ) --- */
-.empty-state-mhub {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  text-align: center;
-  background: radial-gradient(circle at 50% 30%, rgba(0, 242, 254, 0.06) 0%, transparent 70%);
-  border-radius: 20px;
-  border: 1px dashed rgba(0, 242, 254, 0.2);
-  margin-top: 20px;
-  animation: emptyFadeIn 0.6s ease;
-}
-
-@keyframes emptyFadeIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.empty-state-mhub i {
-  font-size: 42px;
-  color: #00f2fe;
-  margin-bottom: 16px;
-  opacity: 0.6;
-  animation: floatIcon 3s infinite ease-in-out;
-  filter: drop-shadow(0 0 10px rgba(0, 242, 254, 0.4));
-}
-
-@keyframes floatIcon {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-.empty-state-mhub .empty-title {
-  font-size: 14px;
-  font-weight: 800;
-  color: #e2e8f0;
-  margin-bottom: 6px;
-}
-
-.empty-state-mhub .empty-sub {
-  font-size: 11px;
-  color: #64748b;
-  max-width: 220px;
-  line-height: 1.5;
-}
-
-/* --- 6. КНОПКИ ДЕЙСТВИЙ (СИММЕТРИЯ И СТИЛЬ) --- */
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.btn-mhub {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 10px;
   overflow: hidden;
-}
-
-.btn-mhub::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.2) 50%, transparent 70%);
-  transform: translateX(-100%);
-  transition: transform 0.6s ease;
-}
-
-.btn-mhub:hover::after {
-  transform: translateX(100%);
-}
-
-.btn-mhub:active {
-  transform: scale(0.96);
-}
-
-.btn-mhub-cyan {
-  background: linear-gradient(135deg, #00f2fe, #0284c7);
-  color: #000;
-  box-shadow: 0 4px 15px rgba(0, 242, 254, 0.3);
-}
-
-.btn-mhub-cyan:hover {
-  box-shadow: 0 6px 20px rgba(0, 242, 254, 0.5);
-}
-
-.btn-mhub-green {
-  background: linear-gradient(135deg, #00e676, #059669);
-  color: #000;
-  box-shadow: 0 4px 15px rgba(0, 230, 118, 0.3);
-}
-
-.btn-mhub-green:hover {
-  box-shadow: 0 6px 20px rgba(0, 230, 118, 0.5);
-}
-
-.btn-mhub-dark {
-  background: rgba(255, 255, 255, 0.06);
-  color: #cbd5e1;
+  background: #000;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.btn-mhub-dark:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.2);
+.m-dialog-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-/* --- 7. КОМПОЗЕР ЧАТА (АККУРАТНЫЙ) --- */
-.p2p-compact-composer {
+/* --- 6. ИНДИКАТОРЫ И СТИКЕРЫ ТИПОВ ЧАТОВ --- */
+.m-sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 7.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.m-sticker-buyer { 
+  background: rgba(0, 230, 118, 0.15); 
+  color: #00e676; 
+  border: 1px solid rgba(0, 230, 118, 0.3); 
+}
+
+.m-sticker-p2p { 
+  background: rgba(168, 85, 247, 0.15); 
+  color: #c084fc; 
+  border: 1px solid rgba(168, 85, 247, 0.3); 
+}
+
+.m-sticker-friend { 
+  background: rgba(0, 242, 254, 0.15); 
+  color: #00f2fe; 
+  border: 1px solid rgba(0, 242, 254, 0.3); 
+}
+
+.m-sticker-system { 
+  background: rgba(255, 179, 0, 0.15); 
+  color: #ffb300; 
+  border: 1px solid rgba(255, 179, 0, 0.3); 
+}
+
+/* Универсальные теги */
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 8.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.bg-tag-cyan { background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.3); }
+.bg-tag-green { background: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.3); }
+.bg-tag-amber { background: rgba(255, 179, 0, 0.15); color: #ffb300; border: 1px solid rgba(255, 179, 0, 0.3); }
+.bg-tag-red { background: rgba(255, 51, 102, 0.15); color: #ff3366; border: 1px solid rgba(255, 51, 102, 0.3); }
+.bg-tag-purple { background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.3); }
+
+/* --- 7. КАРТОЧКА ПРЕВЬЮ ВНУТРИ ЧАТА --- */
+.deal-car-preview-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: #050914;
-  border: 1px solid rgba(0, 242, 254, 0.25);
-  border-radius: 14px;
-  padding: 6px 6px 6px 14px;
-  transition: all 0.3s ease;
+  gap: 10px;
 }
 
-.p2p-compact-composer:focus-within {
-  border-color: #00f2fe;
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.2);
+.deal-car-thumb {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.p2p-compact-input {
-  flex: 1;
-  background: transparent !important;
-  border: none !important;
-  color: #fff !important;
-  font-size: 12px !important;
-  outline: none !important;
-  padding: 8px 0 !important;
-}
-
-.p2p-compact-input::placeholder {
-  color: #475569;
-}
-
-.p2p-compact-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  border: none;
+/* --- 8. ОКНО ПЕРЕПИСКИ И СООБЩЕНИЯ --- */
+.chat-thread-container {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
+  flex-direction: column;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 242, 254, 0.2) transparent;
 }
 
-.p2p-compact-btn-send {
-  background: linear-gradient(135deg, #00f2fe, #0284c7);
-  color: #000;
-  box-shadow: 0 0 12px rgba(0, 242, 254, 0.4);
+.chat-thread-container::-webkit-scrollbar {
+  width: 4px;
 }
 
-.p2p-compact-btn-send:hover {
-  box-shadow: 0 0 20px rgba(0, 242, 254, 0.7);
-  transform: scale(1.05);
+.chat-thread-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 242, 254, 0.2);
+  border-radius: 4px;
 }
 
-.p2p-compact-btn-send:active {
-  transform: scale(0.92);
-}
-
-/* --- 8. ЧАТ-СООБЩЕНИЯ (ПЛАВНЫЕ) --- */
 .chat-msg {
-  padding: 10px 14px !important;
-  border-radius: 14px !important;
-  font-size: 12px !important;
-  line-height: 1.45 !important;
+  padding: 8px 12px !important;
+  border-radius: 12px !important;
+  font-size: 11.5px !important;
+  line-height: 1.4 !important;
   max-width: 85% !important;
-  animation: msgPop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: msgPop 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   word-wrap: break-word;
 }
 
 @keyframes msgPop {
-  from { opacity: 0; transform: translateY(8px) scale(0.95); }
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
@@ -372,67 +322,101 @@
   color: #fff !important;
 }
 
-/* --- 9. БЕЙДЖИ И ТЕГИ (СИММЕТРИЯ) --- */
-.tag-badge {
-  display: inline-flex;
+/* --- 9. КОМПОЗЕР (ПОЛЕ ВВОДА) --- */
+.p2p-compact-composer {
+  display: flex;
   align-items: center;
+  gap: 6px;
+  background: #050914;
+  border: 1px solid rgba(0, 242, 254, 0.25);
+  border-radius: 12px;
+  padding: 4px 4px 4px 12px;
+  transition: all 0.25s ease;
+}
+
+.p2p-compact-composer:focus-within {
+  border-color: #00f2fe;
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.25);
+}
+
+.p2p-compact-input {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  color: #fff !important;
+  font-size: 11.5px !important;
+  outline: none !important;
+  padding: 6px 0 !important;
+}
+
+.p2p-compact-input::placeholder {
+  color: #475569;
+}
+
+.p2p-compact-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.p2p-compact-btn-send {
+  background: linear-gradient(135deg, #00f2fe, #0284c7);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.4);
+}
+
+.p2p-compact-btn-send:hover {
+  box-shadow: 0 0 16px rgba(0, 242, 254, 0.7);
+  transform: scale(1.05);
+}
+
+.p2p-compact-btn-send:active {
+  transform: scale(0.92);
+}
+
+/* --- 10. КНОПКИ ДЕЙСТВИЙ И СЕТКИ --- */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 4px;
-  font-size: 9px;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
 }
 
-.bg-tag-cyan { background: rgba(0, 242, 254, 0.15); color: #00f2fe; border: 1px solid rgba(0, 242, 254, 0.3); }
-.bg-tag-green { background: rgba(0, 230, 118, 0.15); color: #00e676; border: 1px solid rgba(0, 230, 118, 0.3); }
-.bg-tag-amber { background: rgba(255, 179, 0, 0.15); color: #ffb300; border: 1px solid rgba(255, 179, 0, 0.3); }
-.bg-tag-red { background: rgba(255, 51, 102, 0.15); color: #ff3366; border: 1px solid rgba(255, 51, 102, 0.3); }
-.bg-tag-purple { background: rgba(192, 132, 252, 0.15); color: #c084fc; border: 1px solid rgba(192, 132, 252, 0.3); }
-
-/* --- 10. ПРОФИЛЬ (Я) --- */
-.profile-stat-card {
-  background: linear-gradient(145deg, rgba(20, 27, 43, 0.9), rgba(10, 15, 25, 0.95));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 14px;
-  padding: 12px;
-  text-align: center;
-  transition: all 0.3s ease;
+/* --- 11. АНИМАЦИИ --- */
+@keyframes radarSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-.profile-stat-card:hover {
-  border-color: rgba(0, 242, 254, 0.3);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+@keyframes pulseSlow {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
-.profile-stat-value {
-  font-size: 18px;
-  font-weight: 900;
-  color: #00f2fe;
-  margin-bottom: 4px;
-}
-
-.profile-stat-label {
-  font-size: 9px;
-  color: #64748b;
-  text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-/* --- 11. АДАПТИВНОСТЬ ДЛЯ МАЛЕНЬКИХ ЭКРАНОВ --- */
+/* --- 12. АДАПТИВНОСТЬ --- */
 @media (max-width: 360px) {
-  .m-nav-pill {
-    padding: 7px 12px !important;
-    font-size: 10px !important;
+  .m-clean-tab-btn {
+    font-size: 9px;
+    padding: 7px 2px;
   }
-  .m-nav-pill i {
-    font-size: 11px;
-  }
-  .btn-mhub {
+  .m-clean-tab-btn i {
     font-size: 10px;
-    padding: 8px 10px;
+  }
+  .m-pill-chip {
+    font-size: 8px;
+    padding: 3px 8px;
   }
 }
