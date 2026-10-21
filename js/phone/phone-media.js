@@ -1,11 +1,13 @@
 // ========================================================
-// js/phone/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v3.3.0-balanced)
+// js/phone/phone-media.js — МЕДИА, РАДИО, НАПЁРСТКИ И СУПЕРВИЛСПИН (v3.4.0 PRO-BALANCE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v3.3.0 (ХАРДКОРНЫЙ БАЛАНС СУПЕРВИЛСПИНА):
-//   - УРОВНЕВЫЙ ГЕЙТ ДРОПА: на 1-3 уровне исключено выпадение иномарок за миллионы (Golf, BMW)!
-//     Дроп масштабируется: новичкам выпадает классика ВАЗ/Ока (до 100k ₽), дорогие авто — с 10 ур.
-//   - БАЛАНС ДЖЕКПОТОВ: денежные награды соответствуют текущему рангу и прогрессии.
-//   - СОХРАНЕНО НА 100%: радиостанции, напёрстки, фикс порядка C3, компенсации Stars и почта.
+//
+// ⭐ v3.4.0 (СТРОГИЙ БАЛАНС ЭКОНОМИКИ СУПЕРВИЛСПИНА):
+//   1. УРОВНЕВЫЙ ДРОП АВТОМОБИЛЕЙ: на 1-5 уровнях выпадает только стартовая классика под ремонт.
+//      Легендарные иномарки (Golf GTI, Mark II, BMW E39) открываются строго с 10-15+ уровней.
+//   2. ДИНАМИЧЕСКИЕ ДЕНЕЖНЫЕ КУШИ: вместо мгновенных 250k-1.5M ₽ суммы масштабируются по уровню (15k-60k ₽).
+//   3. РЕБАЛАНС НАПЁРСТОК: адекватный выигрыш дня без поломки экономики (до 25 000 ₽).
+//   4. СОХРАНЕНО: живое радио, анимация 3 барабанов, косметика, компенсации Stars и Почта.
 // ========================================================
 
 const PhoneMedia = {
@@ -374,7 +376,7 @@ const PhoneMedia = {
         phase: 'bet',
         winningIndex: 1,
         selectedIndex: null,
-        currentBet: 50000,
+        currentBet: 25000,
         isFreeGame: false,
         shuffleStep: 0,
         shuffleTimer: null,
@@ -387,18 +389,18 @@ const PhoneMedia = {
 
         if (!cfg) {
             return {
-                costCash: 150000,
-                costStars: 60,
-                costTickets: 5,
+                costCash: 120000,
+                costStars: 20,
+                costTickets: 3,
                 canFreeDaily: false,
                 starRate
             };
         }
 
         return {
-            costCash: Number(cfg.costCash) || 150000,
-            costStars: Number(cfg.costStars) || 60,
-            costTickets: Number(cfg.costTickets) || 5,
+            costCash: Number(cfg.costCash) || 120000,
+            costStars: Number(cfg.costStars) || 20,
+            costTickets: Number(cfg.costTickets) || 3,
             canFreeDaily: !!cfg.canFreeDaily,
             starRate
         };
@@ -483,7 +485,7 @@ const PhoneMedia = {
                     <span class="tag-badge bg-tag-amber">ВЫДАЁТ 3 ПРИЗА СРАЗУ</span>
                 </div>
                 <div class="sub-label" style="font-size:9.5px;">
-                    Каждое вращение активирует <b>все 3 слота одновременно</b>. Все выигранные призы, машины и <b>косметика профиля</b> доставляются на вашу <b>Почту</b> или активируются сразу!
+                    Каждое вращение активирует <b>все 3 слота одновременно</b>. Все выигранные призы, машины и косметика доставляются на вашу <b>Почту</b> или активируются сразу!
                 </div>
             </div>
 
@@ -667,44 +669,72 @@ const PhoneMedia = {
                 window.EventBus.emit('media:super_spin_started', { usedFree: canFree, ticketsLeft: window.state.player.superSpinTickets });
             }
 
-            // ⭐ ХАРДКОР-ФИЛЬТРАЦИЯ ПРИЗОВ ПО УРОВНЮ ИГРОКА
+            // ⭐ УРОВНЕВЫЙ ДРОП: НАГРАДЫ ПРИВЯЗАНЫ К РАНГУ ИГРОКА БЕЗ ГИПЕРИНФЛЯЦИИ
             const playerLevel = window.state?.player?.level || 1;
 
-            const tiers = (typeof SUPER_SPIN_TIERS !== 'undefined') ? SUPER_SPIN_TIERS : {
-                reelCars: [
-                    { type: "car", name: "ВАЗ-2101", emoji: "🚗", basePrice: 45000, category: "economy", minLevel: 1 },
-                    { type: "car", name: "ВАЗ-2106", emoji: "🚗", basePrice: 65000, category: "economy", minLevel: 1 },
-                    { type: "car", name: "ИЖ-2126 «Ода»", emoji: "🚗", basePrice: 50000, category: "economy", minLevel: 1 },
-                    { type: "car", name: "Lada Samara 2109", emoji: "🚗", basePrice: 95000, category: "economy", minLevel: 2 },
-                    { type: "car", name: "Toyota Chaser (Сток)", emoji: "🏎️", basePrice: 280000, category: "comfort", minLevel: 6 },
-                    { type: "car", name: "VW Golf VI GTI", emoji: "🏎️", basePrice: 1350000, category: "comfort", minLevel: 10 },
-                    { type: "car", name: "BMW E34 525i", emoji: "🏎️", basePrice: 850000, category: "comfort", minLevel: 10 }
-                ],
-                reelResources: [
-                    { type: "cash", label: "25k ₽", amount: 25000, maxLevel: 3 },
-                    { type: "cash", label: "50k ₽", amount: 50000 },
-                    { type: "cash", label: "120k ₽", amount: 120000 },
-                    { type: "fuel", label: "+40 ⛽", amount: 40 },
-                    { type: "tickets", label: "+2 🎟️", amount: 2 }
-                ],
-                reelExclusives: [
-                    { type: "stars", label: "5 ⭐", amount: 5 },
-                    { type: "stars", label: "15 ⭐", amount: 15 },
+            // Барабан 1: строго по тиру уровня
+            let pool1 = [];
+            if (playerLevel <= 3) {
+                pool1 = [
+                    { type: "car", name: "ВАЗ-2101", emoji: "🚗", basePrice: 42000, category: "economy" },
+                    { type: "car", name: "ВАЗ-2106", emoji: "🚗", basePrice: 58000, category: "economy" },
+                    { type: "car", name: "ИЖ-2126 «Ода»", emoji: "🚗", basePrice: 48000, category: "economy" },
                     { type: "free_impound", label: "Талон ГИБДД", emoji: "👮" }
-                ]
-            };
-
-            // Фильтруем автомобили: на 1-3 ур. никаких Golf GTI и BMW!
-            let pool1 = (tiers.reelCars || []).filter(c => {
-                const reqLvl = c.minLevel || 1;
-                return playerLevel >= reqLvl;
-            });
-            if (pool1.length === 0) {
-                pool1 = [{ type: "car", name: "ВАЗ-2101", emoji: "🚗", basePrice: 45000, category: "economy" }];
+                ];
+            } else if (playerLevel <= 6) {
+                pool1 = [
+                    { type: "car", name: "ВАЗ-2107", emoji: "🚗", basePrice: 75000, category: "economy" },
+                    { type: "car", name: "Lada Samara 2109", emoji: "🚗", basePrice: 88000, category: "economy" },
+                    { type: "car", name: "Daewoo Nexia", emoji: "🚗", basePrice: 95000, category: "economy" },
+                    { type: "tool", name: "Толщиномер ЛКП", toolId: "gauge", emoji: "📱" }
+                ];
+            } else if (playerLevel <= 11) {
+                pool1 = [
+                    { type: "car", name: "VW Passat B3", emoji: "🚗", basePrice: 160000, category: "comfort" },
+                    { type: "car", name: "Ford Focus II", emoji: "🚗", basePrice: 280000, category: "comfort" },
+                    { type: "car", name: "Toyota Chaser (Сток)", emoji: "🏎️", basePrice: 350000, category: "comfort" },
+                    { type: "tool", name: "Сканер Launch", toolId: "obd_launch", emoji: "📱" }
+                ];
+            } else {
+                pool1 = [
+                    { type: "car", name: "VW Golf VI GTI", emoji: "🏎️", basePrice: 1100000, category: "comfort" },
+                    { type: "car", name: "BMW E39 525i", emoji: "🏎️", basePrice: 850000, category: "comfort" },
+                    { type: "car", name: "Toyota Mark II Tourer V", emoji: "🏎️", basePrice: 1250000, category: "comfort" }
+                ];
             }
 
-            const pool2 = tiers.reelResources || [];
-            const pool3 = tiers.reelExclusives || [];
+            // Барабан 2: адекватные суммы валюты
+            let pool2 = [];
+            if (playerLevel <= 4) {
+                pool2 = [
+                    { type: "cash", label: "15k ₽", amount: 15000 },
+                    { type: "cash", label: "25k ₽", amount: 25000 },
+                    { type: "fuel", label: "+35 ⛽", amount: 35 },
+                    { type: "tickets", label: "+2 🎟️", amount: 2 }
+                ];
+            } else if (playerLevel <= 9) {
+                pool2 = [
+                    { type: "cash", label: "35k ₽", amount: 35000 },
+                    { type: "cash", label: "50k ₽", amount: 50000 },
+                    { type: "fuel", label: "+50 ⛽", amount: 50 },
+                    { type: "tickets", label: "+3 🎟️", amount: 3 }
+                ];
+            } else {
+                pool2 = [
+                    { type: "cash", label: "60k ₽", amount: 60000 },
+                    { type: "cash", label: "90k ₽", amount: 90000 },
+                    { type: "fuel", label: "+100 ⛽", amount: 100 },
+                    { type: "tickets", label: "+5 🎟️", amount: 5 }
+                ];
+            }
+
+            // Барабан 3: эксклюзивы и косметика
+            const pool3 = [
+                { type: "stars", label: "3 ⭐", amount: 3 },
+                { type: "stars", label: "5 ⭐", amount: 5 },
+                { type: "cosmetic", label: "Cyber Scan", category: "scanner", itemId: "cyber_scan", emoji: "👾", isExclusive: true },
+                { type: "conn", label: "+1 🤝 Связь", amount: 1 }
+            ];
 
             const prize1 = pool1[Math.floor(Math.random() * pool1.length)];
             const prize2 = pool2[Math.floor(Math.random() * pool2.length)];
@@ -849,18 +879,18 @@ const PhoneMedia = {
                     power: p1.power || 75,
                     basePrice: p1.basePrice || 50000,
                     price: p1.basePrice || 50000,
-                    marketValue: Math.round((p1.basePrice || 50000) * 1.1),
+                    marketValue: Math.round((p1.basePrice || 50000) * 1.05),
                     img: mainImg,
                     images: carGallery,
                     fallback: fallbackImg,
                     plate: wonPlate,
                     customPlate: wonPlate,
-                    condition: 80,
-                    wear: { engine: 85, transmission: 85 },
+                    condition: 65,
+                    wear: { engine: 70, transmission: 75 },
                     isRegisteredOnPlayer: false,
                     ownershipDays: 0,
                     engineTemp: 90,
-                    tireWear: 90,
+                    tireWear: 80,
                     purchaseCost: 0,
                     tuning: {
                         chip: 0, exhaust: false, stance: false, bodykit: false,
@@ -932,41 +962,23 @@ const PhoneMedia = {
                     desc: "Посылка в Почтовом ящике",
                     rarity: "token-purple"
                 });
-            } else if (p1.type === 'xp_bundle') {
-                if (typeof window.pushToMailbox === 'function') {
-                    window.pushToMailbox({
-                        type: "xp",
-                        amount: p1.amount || 150,
-                        title: `Пакет Опыта (+${p1.amount || 150} XP)`,
-                        sender: "Клуб Фортуны",
-                        desc: "Грамота и авторитет перекупа. Распакуйте для получения уровня.",
-                        badge: "ОПЫТ"
-                    });
-                }
-                rewardTokens.push({
-                    icon: "🎖️",
-                    title: "Опыт в Почту",
-                    value: `+${p1.amount || 150} XP`,
-                    desc: "Посылка в Почтовом ящике",
-                    rarity: "token-cyan"
-                });
             }
 
             // 2. БАРАБАН 2: ВАЛЮТА И РЕСУРСЫ
-            if (p2.type === 'cash' || p2.type === 'jackpot') {
+            if (p2.type === 'cash') {
                 if (typeof window.pushToMailbox === 'function') {
                     window.pushToMailbox({
                         type: "cash",
                         amount: p2.amount,
-                        title: p2.type === 'jackpot' ? `💰 ДЖЕКПОТ ${p2.amount.toLocaleString()} ₽` : `Денежный перевод: +${p2.amount.toLocaleString()} ₽`,
+                        title: `Денежный перевод: +${p2.amount.toLocaleString()} ₽`,
                         sender: "Клуб Фортуны",
                         desc: "Денежный приз из барабана СуперВилспина. Распакуйте для зачисления на баланс.",
-                        badge: p2.type === 'jackpot' ? "ДЖЕКПОТ" : "ВАЛЮТА"
+                        badge: "ВАЛЮТА"
                     });
                 }
                 rewardTokens.push({
                     icon: "💰",
-                    title: p2.type === 'jackpot' ? "ДЖЕКПОТ в Почту" : "Деньги в Почту",
+                    title: "Деньги в Почту",
                     value: `+${p2.amount.toLocaleString()} ₽`,
                     desc: "Посылка ожидает распаковки в Почте",
                     rarity: "token-green"
@@ -1007,42 +1019,6 @@ const PhoneMedia = {
                     desc: "Посылка в Почтовом ящике",
                     rarity: "token-purple"
                 });
-            } else if (p2.type === 'conn') {
-                if (typeof window.pushToMailbox === 'function') {
-                    window.pushToMailbox({
-                        type: "connections",
-                        amount: p2.amount,
-                        title: `Теневые связи: +${p2.amount} 🤝`,
-                        sender: "Клуб Фортуны",
-                        desc: "Контакты от Решалы. Распакуйте для получения связей ПодКлюч.",
-                        badge: "СВЯЗИ"
-                    });
-                }
-                rewardTokens.push({
-                    icon: "🤝",
-                    title: "Связи в Почту",
-                    value: `+${p2.amount} Связь ПодКлюч`,
-                    desc: "Посылка в Почтовом ящике",
-                    rarity: "token-purple"
-                });
-            } else if (p2.type === 'xp') {
-                if (typeof window.pushToMailbox === 'function') {
-                    window.pushToMailbox({
-                        type: "xp",
-                        amount: p2.amount,
-                        title: `Пакет опыта: +${p2.amount} XP`,
-                        sender: "Клуб Фортуны",
-                        desc: "Распакуйте для зачисления опыта в авторитет.",
-                        badge: "ОПЫТ"
-                    });
-                }
-                rewardTokens.push({
-                    icon: "🎖️",
-                    title: "Опыт в Почту",
-                    value: `+${p2.amount} XP`,
-                    desc: "Посылка в Почтовом ящике",
-                    rarity: "token-cyan"
-                });
             }
 
             // 3. БАРАБАН 3: ЭКСКЛЮЗИВЫ И КОСМЕТИКА
@@ -1064,57 +1040,21 @@ const PhoneMedia = {
                     desc: "Посылка в Почтовом ящике",
                     rarity: "token-amber"
                 });
-            } else if (p3.type === 'plate') {
+            } else if (p3.type === 'conn') {
                 if (typeof window.pushToMailbox === 'function') {
                     window.pushToMailbox({
-                        type: "plate",
-                        plate: p3.plate,
-                        title: `Госномер: ${p3.plate}`,
+                        type: "connections",
+                        amount: p3.amount,
+                        title: `Теневые связи: +${p3.amount} 🤝`,
                         sender: "Клуб Фортуны",
-                        desc: "Редкий архивный госномер РФ. Распакуйте для добавления в гараж.",
-                        badge: "НОМЕР"
+                        desc: "Контакты от Решалы. Распакуйте для получения связей ПодКлюч.",
+                        badge: "СВЯЗИ"
                     });
                 }
                 rewardTokens.push({
-                    icon: "🏷️",
-                    title: "Госномер в Почту",
-                    value: p3.plate,
-                    desc: "Посылка в Почтовом ящике",
-                    rarity: "token-purple"
-                });
-            } else if (p3.type === 'mod_cert') {
-                if (typeof window.pushToMailbox === 'function') {
-                    window.pushToMailbox({
-                        type: "cash",
-                        amount: p3.cashValue,
-                        title: `Сертификат тюнинга: +${p3.cashValue.toLocaleString()} ₽`,
-                        sender: "Клуб Фортуны",
-                        desc: "Денежная выплата за сертификат Stage 2.",
-                        badge: "ТЮНИНГ"
-                    });
-                }
-                rewardTokens.push({
-                    icon: "🔧",
-                    title: "Сертификат в Почту",
-                    value: `+${p3.cashValue.toLocaleString()} ₽`,
-                    desc: "Посылка в Почтовом ящике",
-                    rarity: "token-green"
-                });
-            } else if (p3.type === 'free_impound') {
-                if (typeof window.pushToMailbox === 'function') {
-                    window.pushToMailbox({
-                        type: "free_impound",
-                        amount: 1,
-                        title: "Амнистия ГИБДД",
-                        sender: "Клуб Фортуны",
-                        desc: "Официальный талон на бесплатную выдачу задержанного авто.",
-                        badge: "ГИБДД"
-                    });
-                }
-                rewardTokens.push({
-                    icon: "👮",
-                    title: "Амнистия в Почту",
-                    value: "+1 Талон ГИБДД",
+                    icon: "🤝",
+                    title: "Связи в Почту",
+                    value: `+${p3.amount} Связь ПодКлюч`,
                     desc: "Посылка в Почтовом ящике",
                     rarity: "token-purple"
                 });
@@ -1175,7 +1115,7 @@ const PhoneMedia = {
 
                 rewardTokens.push({
                     icon: emoji,
-                    title: isExclusive ? "🎰 ГЛИТЧ РАЗБЛОКИРОВАН!" : "Косметика разблокирована!",
+                    title: isExclusive ? "🎰 ЭКСКЛЮЗИВ РАЗБЛОКИРОВАН!" : "Косметика разблокирована!",
                     value: itemName,
                     desc: "Открывается в «Стиле Перекупа» (телефон → Скин)",
                     rarity: isExclusive ? "token-amber" : "token-purple"
@@ -1230,7 +1170,7 @@ const PhoneMedia = {
             }
         }
 
-        const comp = 15;
+        const comp = 8;
         const itemName = p3.label || p3.name || 'Косметика';
 
         if (window.MoneyManager && typeof window.MoneyManager.earn === 'function') {
@@ -1252,7 +1192,7 @@ const PhoneMedia = {
             icon: "⭐",
             title: "Компенсация в Stars",
             value: `+${comp} ⭐`,
-            desc: `${itemName} — выдача недоступна, отправлена компенсация`,
+            desc: `${itemName} — отправлена компенсация`,
             rarity: "token-amber"
         });
 
@@ -1325,13 +1265,13 @@ const PhoneMedia = {
                 <div class="glass-card p-2 mb-2">
                     <div class="flex-between text-xs mb-1">
                         <span class="sub-label font-bold">Выберите ставку на кон:</span>
-                        <span class="color-amber font-bold">Коэффициент: x2.5 💰</span>
+                        <span class="color-amber font-bold">Коэффициент: x2.2 💰</span>
                     </div>
                     <div class="grid-4 mb-2">
+                        <button onclick="PhoneMedia.setThimbleBet(10000)" class="btn ${bet === 10000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">10k ₽</button>
                         <button onclick="PhoneMedia.setThimbleBet(25000)" class="btn ${bet === 25000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">25k ₽</button>
                         <button onclick="PhoneMedia.setThimbleBet(50000)" class="btn ${bet === 50000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">50k ₽</button>
                         <button onclick="PhoneMedia.setThimbleBet(100000)" class="btn ${bet === 100000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">100k ₽</button>
-                        <button onclick="PhoneMedia.setThimbleBet(250000)" class="btn ${bet === 250000 && !canFree ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:8.5px; padding:4px 2px;">250k ₽</button>
                     </div>
 
                     <button onclick="PhoneMedia.startThimblesGame()" class="${canFree ? 'btn-green' : 'btn-amber'} w-full">
@@ -1350,7 +1290,7 @@ const PhoneMedia = {
             controlArea = `
                 <div class="p-2 mb-2 text-center" style="background:rgba(0, 242, 254, 0.12); border-radius:10px; border:1px solid var(--cyan);">
                     <b class="text-xs color-cyan block mb-1">🎯 НАЖМИТЕ НА НАПЁРСТОК, ГДЕ СПРЯТАН ШАРИК!</b>
-                    <div class="sub-label" style="font-size:9px;">Один клик решает всё. Выигрыш составит +${Math.round(bet * 2.5).toLocaleString()} ₽</div>
+                    <div class="sub-label" style="font-size:9px;">Один клик решает всё. Выигрыш составит +${Math.round(bet * 2.2).toLocaleString()} ₽</div>
                 </div>
             `;
         }
@@ -1365,7 +1305,7 @@ const PhoneMedia = {
                             <div class="sub-label" style="font-size:8.5px;">Мастер стаканчиков Ашот</div>
                         </div>
                     </div>
-                    <span class="tag-badge bg-tag-amber">x2.5 КУШ</span>
+                    <span class="tag-badge bg-tag-amber">x2.2 КУШ</span>
                 </div>
                 <div class="seller-dialog-bubble my-1" style="margin:4px 0;">
                     <span class="seller-mood-icon">🧔</span>
@@ -1499,7 +1439,7 @@ const PhoneMedia = {
         const isFree = this.thimblesState.isFreeGame;
 
         if (isWin) {
-            let winCash = isFree ? 120000 : Math.round(bet * 2.5);
+            let winCash = isFree ? 25000 : Math.round(bet * 2.2);
 
             if (typeof window.pushToMailbox === 'function') {
                 window.pushToMailbox({
@@ -1518,7 +1458,7 @@ const PhoneMedia = {
                 }
             }
 
-            if (typeof addXp === 'function') addXp(45);
+            if (typeof addXp === 'function') addXp(25);
 
             if (typeof saveState === 'function') saveState();
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
@@ -1559,4 +1499,4 @@ const PhoneMedia = {
 
 window.PhoneMedia = PhoneMedia;
 
-console.log('[📻 phone-media v3.3.0] Хардкорный баланс наград: уровневый гейт иномарок и джекпотов ✓');
+console.log('[📻 phone-media v3.4.0 PRO-BALANCE] Уровневый дроп СуперВилспина и реалистичные куши активированы ✓');
