@@ -1,15 +1,16 @@
 // ========================================================
-// js/market/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v2.2.0)
+// js/market/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v3.0.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v2.2.0 (АВТОМАТИЧЕСКОЕ УЛЬТРАКОМПАКТНОЕ СВОРАЧИВАНИЕ КАТЕГОРИЙ):
-//   1. Умное авто-сворачивание при скролле ленты вниз и открытие в самом верху.
-//   2. Ультракомпактный режим: скрывает сетку и инфоблок, превращая шапку в аккуратную плашку.
-//   3. Умная фильтрация соответствия бизнесу только для реально купленных точек.
-//   4. Защита от спама звуками при скролле и полная совместимость с Автотекой и ДКП.
+// ⭐ v3.0.0 (ИНТЕГРАЦИЯ ЗАКАЗОВ КЛИЕНТОВ И БИРЖИ):
+//   1. Биржа перенесена из Приложения М прямо на Авторынок в виде вкладки «Заказы на подбор».
+//   2. Клиенты оставляют запросы на выкуп авто с фиксированным бюджетом и бонусом перекупу.
+//   3. Быстрая сдача подходящего авто прямо из гаража в 1 клик с зачислением выплаты.
+//   4. Сохранено ультракомпактное сворачивание категорий, Автотека, ДКП и проверка под бизнес.
 // ========================================================
 
 let marketSortOrder = 'asc';
+let marketViewMode = 'cars'; // 'cars' | 'orders'
 let activePendingDKPDeal = null;
 
 // Токены защиты от гонок
@@ -18,6 +19,52 @@ if (typeof window.__marketRenderToken !== 'number') window.__marketRenderToken =
 
 // Защита от двойного клика по категориям
 if (typeof window._setCategoryPending !== 'boolean') window._setCategoryPending = false;
+
+// Базовые заказы клиентов на случай отсутствия в state
+const DEFAULT_MARKET_ORDERS = [
+    {
+        id: 'ord_taxi_1',
+        customer: 'Таксопарк «Лидер»',
+        customerRole: 'Корпоративный клиент',
+        avatar: '🚖',
+        carRequirementText: 'Седан Comfort или Economy (Solaris, Rio, Logan, Vesta)',
+        acceptedTypes: ['economy', 'comfort'],
+        minCondition: 70,
+        maxMileage: 180000,
+        rewardBudget: 750000,
+        bonusFee: 45000,
+        desc: 'Срочно пополняем линию тарифа «Эконом/Комфорт». Нужен авто на ходу без сильных ударов по геометрии кузова.',
+        daysLeft: 2
+    },
+    {
+        id: 'ord_delivery_2',
+        customer: 'Курьерская служба «Метеор»',
+        customerRole: 'Малый бизнес',
+        avatar: '📦',
+        carRequirementText: 'Компактный хэтчбек или универсал (Matiz, Granta, Polo, Largus)',
+        acceptedTypes: ['economy'],
+        minCondition: 55,
+        maxMileage: 250000,
+        rewardBudget: 380000,
+        bonusFee: 25000,
+        desc: 'Ищем рабочую лошадку для развоза заказов по центру. Внешний вид не критичен, главное живой мотор и коробка.',
+        daysLeft: 3
+    },
+    {
+        id: 'ord_private_3',
+        customer: 'Иван Сергеевич',
+        customerRole: 'Частный покупатель',
+        avatar: '👨‍💼',
+        carRequirementText: 'Живой классический ВАЗ или японец под проект',
+        acceptedTypes: ['economy', 'comfort'],
+        minCondition: 80,
+        maxMileage: 120000,
+        rewardBudget: 320000,
+        bonusFee: 35000,
+        desc: 'Ищу первую машину для сына. Главное не гнилой кузов и родной пробег без криминала по базе.',
+        daysLeft: 1
+    }
+];
 
 // ========================================================
 // УПРАВЛЕНИЕ СВОРАЧИВАНИЕМ КАТЕГОРИЙ (РУЧНОЕ И АВТОМАТИЧЕСКОЕ)
@@ -61,9 +108,15 @@ function toggleMarketCategories(forceCollapse = null, isSilent = false) {
     }
 }
 
-// Прямой метод для автовызова из скролл-листенера
 function collapseMarketCategories(shouldCollapse) {
     toggleMarketCategories(shouldCollapse, true);
+}
+
+function switchMarketViewMode(mode) {
+    marketViewMode = mode;
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
+    renderMarketFeed();
 }
 
 function toggleMarketSortOrder() {
@@ -350,7 +403,7 @@ async function refreshMarketFeedManual() {
             container.innerHTML = `
                 <div class="glass-card text-center py-6" style="background:#090e18;">
                     <div class="radar-spinner-ring mb-2" style="margin: 0 auto;"></div>
-                    <div class="sub-label font-bold text-xs color-cyan">Обновление ленты рынка...</div>
+                    <div class="sub-label font-bold text-xs color-cyan">Обновление рынка...</div>
                 </div>
             `;
         }
@@ -387,7 +440,7 @@ function promptHiddenPlateAutotekaHint(event) {
 }
 
 // ========================================================
-// РЕНДЕР ЛЕНТЫ АВТОРЫНКА
+// РЕНДЕР ЛЕНТЫ АВТОРЫНКА И ЗАКАЗОВ
 // ========================================================
 function renderMarketFeed() {
     const container = document.getElementById('marketCardContainer');
@@ -406,8 +459,36 @@ function renderMarketFeed() {
         const scrollPos = mainContent ? mainContent.scrollTop : 0;
         const now = Date.now();
 
+        // Проверяем актуальность списка заказов
+        if (!state.marketOrders || !Array.isArray(state.marketOrders) || state.marketOrders.length === 0) {
+            state.marketOrders = JSON.parse(JSON.stringify(DEFAULT_MARKET_ORDERS));
+        }
+
+        // Переключатель режимов: Автомобили / Заказы на подбор
+        const ordersCount = (state.marketOrders || []).length;
+        const carsCount = (state.marketFeed || []).filter(c => c && !c.unavailable).length;
+
+        const modeSwitcherHtml = `
+            <div class="mb-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; background:rgba(15,23,42,0.85); padding:3px; border-radius:12px; border:1px solid rgba(0,242,254,0.18);">
+                <button onclick="switchMarketViewMode('cars')" class="btn ${marketViewMode === 'cars' ? 'btn-cyan' : 'btn-dark'} btn-sm" style="font-weight:800; font-size:10px; border-radius:9px; padding:6px 0;">
+                    <i class="fa-solid fa-car mr-1"></i> Автомобили (${carsCount})
+                </button>
+                <button onclick="switchMarketViewMode('orders')" class="btn ${marketViewMode === 'orders' ? 'btn-green' : 'btn-dark'} btn-sm" style="font-weight:800; font-size:10px; border-radius:9px; padding:6px 0;">
+                    <i class="fa-solid fa-clipboard-check mr-1"></i> Заказы клиентов (${ordersCount})
+                </button>
+            </div>
+        `;
+
+        // Если открыт режим заказов
+        if (marketViewMode === 'orders') {
+            container.innerHTML = modeSwitcherHtml + renderMarketOrdersHtml();
+            if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
+            return;
+        }
+
+        // Режим обычной ленты авторынка
         if (!state.marketFeed || state.marketFeed.length === 0) {
-            container.innerHTML = `
+            container.innerHTML = modeSwitcherHtml + `
                 <div class='glass-card text-center py-6 sub-label' style="background:#090e18;">
                     <div style="font-size:28px; margin-bottom:6px;">🚗</div>
                     <b class="text-xs color-cyan">Нет активных лотов в категории</b>
@@ -428,6 +509,7 @@ function renderMarketFeed() {
         }
 
         let sortBarHtml = `
+            ${modeSwitcherHtml}
             ${seasonBannerHtml}
             <div class="glass-card mb-2 p-2 flex-between" style="border-color: rgba(255, 255, 255, 0.08);">
                 <div style="display:flex; align-items:center; gap:8px;">
@@ -677,6 +759,152 @@ function renderMarketFeed() {
     }
 }
 
+// ========================================================
+// РЕНДЕР И ЛОГИКА ЗАКАЗОВ КЛИЕНТОВ (БЫВШАЯ БИРЖА)
+// ========================================================
+function renderMarketOrdersHtml() {
+    const orders = state.marketOrders || [];
+    const myGarage = state.garage || state.player?.garage || [];
+
+    if (orders.length === 0) {
+        return `
+            <div class="glass-card text-center py-6 sub-label" style="background:#090e18;">
+                <div style="font-size:32px; margin-bottom:8px;">📋</div>
+                <b class="text-xs color-green">Все заказы закрыты</b>
+                <div class="mt-1" style="font-size:10px;">Новые покупатели обратятся в ближайшее время</div>
+            </div>
+        `;
+    }
+
+    let html = `
+        <div class="glass-card mb-2 p-2" style="background:linear-gradient(135deg, rgba(0,230,118,0.1), #090e18); border-color:rgba(0,230,118,0.3);">
+            <div class="flex-between">
+                <div>
+                    <b class="text-xs color-green" style="font-size:12px;"><i class="fa-solid fa-briefcase mr-1"></i> Срочный выкуп и Подбор</b>
+                    <div class="sub-label" style="font-size:8.5px;">Сдавайте авто из гаража под требования клиентов и получайте премию</div>
+                </div>
+                <span class="tag-badge bg-tag-green">${orders.length} ЗАКАЗОВ</span>
+            </div>
+        </div>
+    `;
+
+    orders.forEach((ord, ordIdx) => {
+        // Проверяем, есть ли в гараже подходящая машина
+        const matchingCars = myGarage.filter(c => {
+            if (!c) return false;
+            const cType = String(c.type || c.category || 'economy').toLowerCase();
+            const typeMatch = ord.acceptedTypes.includes(cType);
+            const condMatch = (c.condition || 80) >= ord.minCondition;
+            const mileMatch = (c.mileage || 100000) <= ord.maxMileage;
+            return typeMatch && condMatch && mileMatch;
+        });
+
+        const hasMatch = matchingCars.length > 0;
+        const totalPayout = ord.rewardBudget + ord.bonusFee;
+
+        html += `
+            <div class="glass-card mb-3 p-3" style="background:#090e18; border:1px solid ${hasMatch ? 'rgba(0,230,118,0.4)' : 'rgba(255,255,255,0.06)'}; border-radius:14px;">
+                <div class="flex-between mb-2">
+                    <div class="flex-gap" style="align-items:center;">
+                        <span style="font-size:22px;">${ord.avatar || '👤'}</span>
+                        <div>
+                            <b class="text-xs color-main" style="font-size:12px;">${ord.customer}</b>
+                            <div class="sub-label" style="font-size:8.5px; color:#94a3b8;">${ord.customerRole} • Осталось: ${ord.daysLeft} дн.</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="sub-label" style="font-size:7.5px;">ВЫПЛАТА:</span>
+                        <div class="price-val text-xs color-green" style="font-size:13px;">${totalPayout.toLocaleString()} ₽</div>
+                    </div>
+                </div>
+
+                <div class="p-2 mb-2" style="background:#04070e; border-radius:8px; border:1px solid rgba(255,255,255,0.05);">
+                    <div class="sub-label mb-1" style="font-size:8.5px; color:#cbd5e1;"><b>Требование:</b> ${ord.carRequirementText}</div>
+                    <div class="flex-between text-xs" style="font-size:8.5px;">
+                        <span>Кузов: <b class="color-amber">&ge; ${ord.minCondition}%</b></span>
+                        <span>Пробег: <b class="color-cyan">&le; ${ord.maxMileage.toLocaleString()} км</b></span>
+                        <span>Премия: <b class="color-green">+${ord.bonusFee.toLocaleString()} ₽</b></span>
+                    </div>
+                </div>
+
+                <div class="sub-label mb-2" style="font-size:9.5px; line-height:1.35; color:#94a3b8;">
+                    ${ord.desc}
+                </div>
+
+                <div class="grid-2" style="gap:6px;">
+                    ${hasMatch ? `
+                        <button onclick="fulfillMarketOrderAction('${ord.id}')" class="btn btn-green btn-sm" style="font-size:10px; font-weight:800; padding:8px 0;">
+                            <i class="fa-solid fa-handshake mr-1"></i> СДАТЬ ИЗ ГАРАЖА (${matchingCars.length})
+                        </button>
+                    ` : `
+                        <button onclick="switchMarketViewMode('cars')" class="btn btn-cyan btn-sm" style="font-size:9.5px; padding:8px 0;">
+                            <i class="fa-solid fa-magnifying-glass mr-1"></i> НАЙТИ НА РЫНКЕ
+                        </button>
+                    `}
+                    <button onclick="showOrderDetailsToast('${ord.id}')" class="btn btn-dark btn-sm" style="font-size:9.5px; padding:8px 0;">
+                        ИНФОРМАЦИЯ
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    return html;
+}
+
+function fulfillMarketOrderAction(orderId) {
+    const orders = state.marketOrders || [];
+    const ordIndex = orders.findIndex(o => o.id === orderId);
+    if (ordIndex === -1) return;
+    const ord = orders[ordIndex];
+
+    const myGarage = state.garage || state.player?.garage || [];
+    const carIndex = myGarage.findIndex(c => {
+        if (!c) return false;
+        const cType = String(c.type || c.category || 'economy').toLowerCase();
+        return ord.acceptedTypes.includes(cType) && (c.condition || 80) >= ord.minCondition && (c.mileage || 100000) <= ord.maxMileage;
+    });
+
+    if (carIndex === -1) {
+        if (typeof showToast === 'function') showToast("⚠️ В гараже нет подходящего автомобиля под этот заказ!");
+        return;
+    }
+
+    const soldCar = myGarage[carIndex];
+    const payout = ord.rewardBudget + ord.bonusFee;
+
+    // Списание авто и начисление денег
+    myGarage.splice(carIndex, 1);
+    if (state.garage) state.garage = myGarage;
+    if (state.player?.garage) state.player.garage = myGarage;
+
+    state.player.cash = (state.player.cash || 0) + payout;
+    state.player.completedDeals = (state.player.completedDeals || 0) + 1;
+    state.player.karma = Math.min(100, (state.player.karma || 50) + 4);
+
+    // Удаляем выполненный заказ
+    orders.splice(ordIndex, 1);
+
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+
+    if (typeof showToast === 'function') {
+        showToast(`🤝 Заказ успешно закрыт! Автомобиль «${soldCar.name}» сдан клиенту (+${payout.toLocaleString()} ₽)!`);
+    }
+
+    renderMarketFeed();
+}
+
+function showOrderDetailsToast(orderId) {
+    const ord = (state.marketOrders || []).find(o => o.id === orderId);
+    if (!ord) return;
+    if (typeof showToast === 'function') {
+        showToast(`📋 ${ord.customer}: ${ord.desc}`);
+    }
+}
+
 function updateMarketTimers() {
     if (!state.marketFeed || !Array.isArray(state.marketFeed) || state.marketFeed.length === 0) return;
 
@@ -725,7 +953,10 @@ Object.assign(window, {
     onAutotekaClick,
     onPaidCallClick,
     getCarBusinessSuitability,
-    dispatchMarketAction
+    dispatchMarketAction,
+    switchMarketViewMode,
+    fulfillMarketOrderAction,
+    showOrderDetailsToast
 });
 
-console.log('[🏪 market v2.2.0] Ультракомпактное сворачивание категорий + авто-скролл активированы ✓');
+console.log('[🏪 market v3.0.0] Авторынок обновлен: Заказы на подбор интегрированы, быстрая сдача авто ✓');
