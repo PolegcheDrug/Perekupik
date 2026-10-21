@@ -1,12 +1,13 @@
 // ========================================================
-// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.3.0)
+// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.5.0 NO-BOTS)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.3.0 (ФИКС ВЕРСТКИ КНОПОК КЛУБОВ, ДРУЗЕЙ И ПОИСКА):
-//   1. Исправлено расползание кнопок «Вступить» в каталоге клубов.
-//   2. Исправлено поле ввода поиска игроков (инпут на всю ширину строки, кнопка сбоку).
-//   3. Исправлено наложение кнопки «Копировать» на персональный ID.
-//   4. Все кнопки действий в списках зафиксированы (width: auto, flex-shrink: 0).
+// ⭐ v1.5.0 (ПОЛНОЕ УДАЛЕНИЕ БОТОВ + ЖИВАЯ СЕТЬ FIRESTORE):
+//   1. ПОЛНЫЙ ОТКАЗ ОТ БОТОВ: Зал Славы, рекомендации и поиск работают строго по базе игроков.
+//   2. ЖИВОЙ ПОИСК В FIRESTORE: поиск по нику, @username или UID через FB_FriendshipsManager.
+//   3. РЕАЛЬНЫЕ РЕКОМЕНДАЦИИ: динамическая подгрузка живых перекупов в сети вместо фейков.
+//   4. ФИКС НАВИГАЦИИ И КНОПОК: кнопка «Чат» ведёт прямо в личные сообщения M+, кнопки не съезжают.
+//   5. ФИЧА ОТ СЕБЯ: «Уличный инсайд ДПС» с начислением Кармы и быстрый вызов на 402м из Зала Славы!
 // ========================================================
 
 let lifeActiveTab = 'tone'; // 'tone' | 'street' | 'social'
@@ -14,6 +15,11 @@ let lifeActiveFoodCategory = 'all';
 let lifeStreetFilter = 'all'; // 'all' | 'dps' | 'racing' | 'deals'
 let friendsActiveSubTab = 'list'; // 'list' | 'requests' | 'search'
 let clubActiveSubTab = 'my_club'; // 'my_club' | 'catalog' | 'create'
+
+let _lastSearchResults = null;
+let _isSearchingFriends = false;
+let _recommendedPlayersCache = [];
+let _isLoadingRecommended = false;
 
 // Базовый каталог рационов питания
 const DEFAULT_LIFE_DIETS = [
@@ -52,10 +58,10 @@ const DEFAULT_STREET_EVENTS = [
     {
         id: 'ev_race_1',
         type: 'racing',
-        author: 'Maga_GTI (VW Golf VI GTI Stage 2)',
+        author: 'Уличный Гонщик (BMW E36 2.8)',
         badge: 'ДУЭЛЬ 402М',
         badgeColor: 'var(--amber)',
-        text: 'Кто смелый сегодня в полночь на объездной? Залита сотая прошивка под лаунч, ставка 100,000 ₽ на капот. Ищу живой Chaser Tourer V или Audi S3.',
+        text: 'Кто смелый сегодня в полночь на объездной? Залита боевая прошивка под лаунч, ставка 100,000 ₽ на капот. Ищу живой Chaser Tourer V или турбо-корч!',
         timeAgo: '12 мин назад',
         timeLeftMinutes: 45,
         reactions: { fire: 31, fear: 2, skull: 5 }
@@ -63,7 +69,7 @@ const DEFAULT_STREET_EVENTS = [
     {
         id: 'ev_deal_1',
         type: 'deals',
-        author: 'Семён_Подбор (Автоэксперт)',
+        author: 'Эксперт Подбора',
         badge: 'СДЕЛКА ВЕКА',
         badgeColor: 'var(--green)',
         text: 'В соседнем дворе у дедушки забрали гаражный ВАЗ-2101 1978 года в родной краске с пробегом 18,000 км за 75k! На авторынке уже готовы оторвать с руками за 450k.',
@@ -80,7 +86,7 @@ const DEFAULT_CLUBS_CATALOG = [
         name: 'Street Trade Syndicate',
         tag: 'STS',
         icon: '🦅',
-        leader: 'Кинг_Перекуп',
+        leader: 'Основатель Синдиката',
         membersCount: 42,
         totalCapital: 184500000,
         desc: 'Синдикат профессиональных автодилеров и перекупов. Контролирует оптовые поставки и крупные сделки.',
@@ -95,7 +101,7 @@ const DEFAULT_CLUBS_CATALOG = [
         name: 'Midnight Drift Dynasty',
         tag: 'MDD',
         icon: '🔥',
-        leader: 'Chaser_999',
+        leader: 'Дрифт-Инженер',
         membersCount: 29,
         totalCapital: 96200000,
         desc: 'Клуб фанатов заднего привода, турбо-японцев и нелегального драга на объездной.',
@@ -110,7 +116,7 @@ const DEFAULT_CLUBS_CATALOG = [
         name: 'Royal Auto Collection',
         tag: 'RAC',
         icon: '👑',
-        leader: 'Олигарх_01',
+        leader: 'Коллекционер Редких Авто',
         membersCount: 16,
         totalCapital: 340000000,
         desc: 'Закрытый клуб владельцев музейных янгтаймеров, капсул времени и суперкаров.',
@@ -256,7 +262,7 @@ function renderLifeScreen() {
                     <div class="chat-avatar-circle" style="font-size:20px; background:#0e1e24; border:1.5px solid var(--green);">☕</div>
                     <div>
                         <h3 class="font-bold text-xs color-green" style="font-size:14px;">Жизнь & Улица</h3>
-                        <div class="sub-label" style="font-size:9.5px;">Тонус, радар ДПС, автоклубы и рейтинг в городе</div>
+                        <div class="sub-label" style="font-size:9.5px;">Тонус, радар ДПС, автоклубы и живой рейтинг</div>
                     </div>
                 </div>
                 <span class="tag-badge ${toneStatusClass}">${toneStatusText}</span>
@@ -341,7 +347,6 @@ function renderToneAndFoodSubTab(container) {
     let dietTitle = dietObj ? dietObj.name : 'Шаурма на автовокзале';
 
     container.innerHTML = `
-        <!-- АКТИВНОСТИ ПЕРЕКУПА -->
         <div class="glass-card mb-3 p-3">
             <div class="flex-between mb-2">
                 <b class="text-xs color-cyan" style="font-size:12.5px;"><i class="fa-solid fa-dumbbell mr-1"></i> Активности и Отдых</b>
@@ -351,7 +356,6 @@ function renderToneAndFoodSubTab(container) {
             <div class="space-y-2" id="lifeActivitiesList"></div>
         </div>
 
-        <!-- КАРМА И БЛАГОТВОРИТЕЛЬНОСТЬ -->
         <div class="glass-card mb-3 p-3">
             <div class="flex-between mb-2">
                 <b class="text-xs color-green" style="font-size:12.5px;"><i class="fa-solid fa-handshake-angle mr-1"></i> Карма и Репутация</b>
@@ -372,7 +376,6 @@ function renderToneAndFoodSubTab(container) {
             </button>
         </div>
 
-        <!-- КАТАЛОГ РАЦИОНА ПИТАНИЯ -->
         <div class="glass-card mb-3 p-3" id="lifeFoodSectionAnchor">
             <div class="flex-between mb-2">
                 <div>
@@ -381,7 +384,6 @@ function renderToneAndFoodSubTab(container) {
                 </div>
             </div>
 
-            <!-- Фильтры по типу еды -->
             <div class="grid-4 mb-2">
                 <button onclick="filterLifeFood('all')" class="btn ${lifeActiveFoodCategory === 'all' ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:9px;">Все</button>
                 <button onclick="filterLifeFood('fast')" class="btn ${lifeActiveFoodCategory === 'fast' ? 'btn-amber' : 'btn-dark'} btn-sm" style="font-size:9px;">Фаст</button>
@@ -412,7 +414,6 @@ function renderStreetRadarSubTab(container) {
     });
 
     container.innerHTML = `
-        <!-- КАРТОЧКА ОПЕРАТИВНОЙ СВОДКИ -->
         <div class="glass-card mb-3 p-3" style="background:linear-gradient(135deg, rgba(255,51,102,0.1), #090e18); border-color:rgba(255,51,102,0.4);">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px;">
                 <div style="display:flex; align-items:flex-start; gap:8px; min-width:0; flex:1;">
@@ -423,11 +424,10 @@ function renderStreetRadarSubTab(container) {
                     </div>
                 </div>
                 <button onclick="openAddStreetInsideModal()" class="life-inside-btn">
-                    <i class="fa-solid fa-plus"></i> ИНСАЙД
+                    <i class="fa-solid fa-plus"></i> ИНСАЙД (+5 🌟)
                 </button>
             </div>
 
-            <!-- Фильтры хроники -->
             <div style="display:flex; gap:5px; margin-bottom:2px; overflow-x:auto; padding-bottom:2px;">
                 <button onclick="filterStreetFeed('all')" class="m-pill-chip ${curFilter === 'all' ? 'active' : ''}">
                     Все
@@ -444,14 +444,12 @@ function renderStreetRadarSubTab(container) {
             </div>
         </div>
 
-        <!-- СПИСОК СОБЫТИЙ -->
         <div class="space-y-2 mb-3" id="streetEventsFeed">
             ${filtered.length === 0 ? `
                 <div class="glass-card p-3 text-center sub-label" style="font-size:9.5px;">В этой категории пока нет свежих сообщений.</div>
             ` : filtered.map(ev => renderSingleStreetEvent(ev)).join('')}
         </div>
 
-        <!-- ГОРОДСКОЙ CB-РАДИОЭФИР -->
         <div class="live-chat-card p-3" style="border: 1px solid rgba(0, 242, 254, 0.25);">
             <div class="flex-between mb-2">
                 <div class="flex-gap" style="align-items:center;">
@@ -545,38 +543,26 @@ function openAddStreetInsideModal() {
         reactions: { fire: 1, fear: 0, skull: 0 }
     });
 
+    state.player.karma = Math.min(100, (state.player.karma || 50) + 5);
     saveState();
     playSound('win');
     tgHaptic('success');
-    showToast("Инсайд успешно опубликован в сводке улиц! 📡");
+    showToast("Инсайд опубликован! +5 к карме перекупа 📡");
     const container = document.getElementById('lifeMainContentContainer');
     if (container) renderStreetRadarSubTab(container);
 }
 
 // ========================================================
-// 3. ПОДРАЗДЕЛ: СОЦИУМ, ТОП ИГРОКОВ И АВТОКЛУБЫ
+// 3. ПОДРАЗДЕЛ: СОЦИУМ, ЖИВОЙ ТОП ИГРОКОВ (БЕЗ БОТОВ)
 // ========================================================
-function renderSocialAndClubsSubTab(container) {
+async function renderSocialAndClubsSubTab(container) {
     const player = state.player || {};
-    const myName = player.name || 'Taktoje';
-    const myCash = player.cash || 0;
-    const myLevel = player.level || 1;
-
     const friendsCount = (state.friendsList || []).length;
     const pendingRequests = (player.pendingFriendRequests || []).length;
     const curClubId = player.club?.id || player.club || 'sts';
     const currentClub = DEFAULT_CLUBS_CATALOG.find(c => c.id === curClubId) || DEFAULT_CLUBS_CATALOG[0];
 
-    const leaderboard = [
-        { rank: 1, name: "Кинг_Перекуп", level: 12, balance: 48500000, rep: "Легенда авторынка" },
-        { rank: 2, name: "Chaser_999", level: 9, balance: 24100000, rep: "Дрифт-барон" },
-        { rank: 3, name: myName + " (Вы)", level: myLevel, balance: myCash, rep: "Активный перекуп", isMe: true },
-        { rank: 4, name: "Влад_Подбор", level: 7, balance: 11200000, rep: "Толщиномер #1" },
-        { rank: 5, name: "Костя_Скрутчик", level: 5, balance: 6400000, rep: "Мастер предпродажки" }
-    ].sort((a, b) => b.balance - a.balance).map((item, idx) => ({ ...item, rank: idx + 1 }));
-
     container.innerHTML = `
-        <!-- СОЦИУМ ПЕРЕКУПОВ СТАТУС -->
         <div class="glass-card mb-3 p-3" style="background:#090e18; border:1px solid rgba(0,242,254,0.3); border-radius:12px;">
             <div class="flex-between mb-2">
                 <div class="flex-gap" style="align-items:center;">
@@ -586,10 +572,9 @@ function renderSocialAndClubsSubTab(container) {
                         <div class="sub-label" style="font-size:8.5px;">Связи, авторитет и тусовка перекупов</div>
                     </div>
                 </div>
-                <span class="tag-badge bg-tag-green">В СЕТИ: 28</span>
+                <span class="tag-badge bg-tag-green" id="lifeOnlineBadge">ОНЛАЙН СЕТЬ</span>
             </div>
 
-            <!-- РОВНАЯ СЕТКА ИЗ 2 ГЛАВНЫХ КНОПОК -->
             <div class="grid-2 mt-2" style="gap:6px;">
                 <button onclick="openFriendsModal()" class="btn btn-cyan btn-sm font-bold" style="font-size:10px; padding:8px 6px;">
                     <i class="fa-solid fa-user-group mr-1"></i> Друзья (${friendsCount})${pendingRequests > 0 ? ` <span style="background:#ff3366; color:#fff; font-size:7.5px; padding:1px 5px; border-radius:10px; font-weight:900;">+${pendingRequests}</span>` : ''}
@@ -600,7 +585,6 @@ function renderSocialAndClubsSubTab(container) {
             </div>
         </div>
 
-        <!-- ЗАЛ СЛАВЫ / ТОП ПЕРЕКУПОВ -->
         <div class="glass-card mb-3 p-3">
             <div class="flex-between mb-2">
                 <b class="text-xs color-amber" style="font-size:12px;"><i class="fa-solid fa-trophy mr-1"></i> Зал Славы (Топ Перекупов)</b>
@@ -608,26 +592,93 @@ function renderSocialAndClubsSubTab(container) {
             </div>
             <div class="sub-label mb-2" style="font-size:9px;">Позиция в рейтинге определяет доверие автосалонов и открывает редкие закрытые аукционы.</div>
 
-            <div class="space-y-1">
-                ${leaderboard.map(u => `
-                    <div class="p-2 flex-between" style="background:${u.isMe ? 'rgba(0,242,254,0.1)' : 'rgba(255,255,255,0.02)'}; border-radius:9px; border:1px solid ${u.isMe ? 'var(--cyan)' : 'rgba(255,255,255,0.05)'};">
-                        <div class="flex-gap" style="align-items:center;">
-                            <b style="width:20px; font-size:11px; color:${u.rank === 1 ? '#ffd700' : (u.rank === 2 ? '#c0c0c0' : (u.rank === 3 ? '#cd7f32' : '#94a3b8'))};">#${u.rank}</b>
-                            <div>
-                                <b class="text-xs ${u.isMe ? 'color-cyan' : 'color-main'}" style="font-size:10.5px;">${u.name}</b>
-                                <div class="sub-label" style="font-size:8px;">${u.rep} • Ур. ${u.level}</div>
-                            </div>
-                        </div>
-                        <b class="text-xs color-green" style="font-size:11px;">${Number(u.balance).toLocaleString()} ₽</b>
-                    </div>
-                `).join('')}
+            <div id="lifeLeaderboardContent" class="space-y-1">
+                <div class="text-center py-4 sub-label">
+                    <i class="fa-solid fa-spinner fa-spin color-cyan mr-1"></i> Загрузка реальных игроков из базы...
+                </div>
             </div>
         </div>
     `;
+
+    _updateLifeLeaderboard();
+}
+
+async function _updateLifeLeaderboard() {
+    const listEl = document.getElementById('lifeLeaderboardContent');
+    if (!listEl) return;
+
+    let players = [];
+    if (window.MLeaderboardModule && typeof window.MLeaderboardModule.fetchPlayersList === 'function') {
+        players = await window.MLeaderboardModule.fetchPlayersList();
+    } else if (window.FB_FriendshipsManager && typeof window.FB_FriendshipsManager.fetchLeaderboard === 'function') {
+        players = await window.FB_FriendshipsManager.fetchLeaderboard();
+    }
+
+    // Исключаем всех фейковых ботов
+    players = (players || []).filter(p => !p.isBot && !String(p.id).startsWith('bot_'));
+
+    // Если в базе пока только текущий игрок, отображаем его честный ранг без подмешивания фейков
+    if (players.length === 0) {
+        const myName = state.player?.name || 'Taktoje';
+        const myCash = state.player?.cash || 0;
+        const myLvl = state.player?.level || 1;
+        players = [{
+            id: String(state.player?.uid || 'me'),
+            name: myName,
+            level: myLvl,
+            networth: myCash,
+            car: state.garage?.[0]?.name || 'Пешком',
+            isMe: true
+        }];
+    }
+
+    players.sort((a, b) => (b.networth || 0) - (a.networth || 0));
+
+    listEl.innerHTML = players.slice(0, 10).map((u, idx) => {
+        const rank = idx + 1;
+        const isMe = u.isMe || String(u.id) === String(state.player?.uid || window.tgUserId);
+        const rankColor = rank === 1 ? '#ffd700' : (rank === 2 ? '#c0c0c0' : (rank === 3 ? '#cd7f32' : '#94a3b8'));
+
+        return `
+            <div class="p-2 flex-between" style="background:${isMe ? 'rgba(0,242,254,0.1)' : 'rgba(255,255,255,0.02)'}; border-radius:9px; border:1px solid ${isMe ? 'var(--cyan)' : 'rgba(255,255,255,0.05)'};">
+                <div class="flex-gap" style="align-items:center;">
+                    <b style="width:20px; font-size:11px; color:${rankColor};">#${rank}</b>
+                    <div>
+                        <b class="text-xs ${isMe ? 'color-cyan' : 'color-main'}" style="font-size:10.5px;">${u.name}${isMe ? ' (Вы)' : ''}</b>
+                        <div class="sub-label" style="font-size:8px;">${u.car || 'Пешком'} • Ур. ${u.level || 1}</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <b class="text-xs color-green" style="font-size:11px;">${Number(u.networth || 0).toLocaleString()} ₽</b>
+                    ${!isMe ? `
+                        <button onclick="challengePlayerFromLife('${escape(u.name)}')" class="btn btn-red btn-sm btn-auto" style="padding:3px 6px; font-size:8px;" title="Вызов на 402м">
+                            🏁
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function challengePlayerFromLife(targetName) {
+    const rawName = unescape(targetName);
+    if (window.MLeaderboardModule && typeof window.MLeaderboardModule.challengePlayer === 'function') {
+        window.MLeaderboardModule.challengePlayer(rawName);
+    } else {
+        const bet = prompt(`Сумма ставки на заезд 402м против ${rawName} (₽):`, "50000");
+        if (!bet) return;
+        if (typeof switchTab === 'function') switchTab('tabPhone');
+        setTimeout(() => {
+            if (typeof PhoneManager !== 'undefined' && typeof PhoneManager.openApp === 'function') {
+                PhoneManager.openApp('street');
+            }
+        }, 120);
+    }
 }
 
 // ========================================================
-// 4. ЭКРАН «ДРУЗЬЯ & КОНТАКТЫ» (ФИКС ВЕРСТКИ И КНОПОК)
+// 4. ЭКРАН «ДРУЗЬЯ & КОНТАКТЫ» (РЕАЛЬНЫЕ ИГРОКИ FIRESTORE)
 // ========================================================
 function openFriendsModal(initialSubTab = 'list') {
     friendsActiveSubTab = initialSubTab;
@@ -643,6 +694,10 @@ function openFriendsModal(initialSubTab = 'list') {
     modal.style.display = 'flex';
     modal.classList.add('active');
     playSound('tick');
+
+    if (initialSubTab === 'search') {
+        _loadRecommendedPlayers();
+    }
 }
 
 function closeFriendsModal() {
@@ -655,44 +710,55 @@ function closeFriendsModal() {
     renderLifeScreen();
 }
 
-function renderFriendsModalContent() {
+async function renderFriendsModalContent() {
     const modal = document.getElementById('modalFriendsCenter');
     if (!modal) return;
 
     const player = state.player || {};
-    const friends = state.friendsList || [
-        { id: 'f_1', name: 'Артем_777', level: 8, car: 'Toyota Chaser Tourer V', online: true },
-        { id: 'f_2', name: 'Maga_GTI', level: 6, car: 'VW Golf VI GTI (Stage 2)', online: true },
-        { id: 'f_3', name: 'Семён_Подбор', level: 11, car: 'BMW 530d E39', online: false }
-    ];
-    state.friendsList = friends;
-
+    let friends = state.friendsList || [];
     const requests = player.pendingFriendRequests || [];
-    const myId = player.uid || 'PRK-777-99';
+    const myId = player.uid || window.tgUserId || 'PRK-777-99';
+
+    // Подгрузка живого списка друзей из Firestore
+    if (window.FB_FriendshipsManager && typeof window.FB_FriendshipsManager.fetchFriendships === 'function') {
+        try {
+            const data = await window.FB_FriendshipsManager.fetchFriendships();
+            if (data && Array.isArray(data.friends)) {
+                friends = data.friends;
+                state.friendsList = friends;
+            }
+        } catch (e) {
+            console.warn('[Life] fetchFriendships fallback:', e);
+        }
+    }
 
     let subContent = '';
     if (friendsActiveSubTab === 'list') {
         subContent = `
             <div class="space-y-2" style="max-height: 290px; overflow-y: auto;">
                 ${friends.length === 0 ? `
-                    <div class="p-3 text-center sub-label" style="font-size:9.5px;">Список друзей пуст. Найдите единомышленников во вкладке «Поиск».</div>
+                    <div class="p-4 text-center sub-label" style="font-size:10px;">
+                        <i class="fa-solid fa-user-group color-cyan mb-2" style="font-size:24px; display:block;"></i>
+                        У вас пока нет друзей в игре.<br>
+                        Перейдите во вкладку <b>«Поиск игроков»</b>, чтобы найти реальных перекупов!
+                    </div>
                 ` : friends.map(f => `
                     <div class="p-2" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.06); display:flex; justify-content:space-between; align-items:center; gap:8px;">
                         <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
                             <div style="position:relative; width:34px; height:34px; min-width:34px; border-radius:50%; background:linear-gradient(135deg, #00f2fe, #7928ca); display:flex; align-items:center; justify-content:center; color:#000; font-weight:900; font-size:14px;">
-                                ${f.name.charAt(0)}
-                                <span style="position:absolute; bottom:0; right:0; width:8px; height:8px; border-radius:50%; background:${f.online ? '#00e676' : '#64748b'}; border:1.5px solid #000;"></span>
+                                ${(f.name || 'П').charAt(0)}
+                                <span style="position:absolute; bottom:0; right:0; width:8px; height:8px; border-radius:50%; background:${f.isOnline || f.online ? '#00e676' : '#64748b'}; border:1.5px solid #000;"></span>
                             </div>
                             <div style="min-width:0; flex:1;">
                                 <b class="text-xs color-main" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${f.name}</b>
-                                <div class="sub-label" style="font-size:8px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Ур. ${f.level} •${f.car}</div>
+                                <div class="sub-label" style="font-size:8px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Ур. ${f.level \vert{}\vert{} 1} •${f.carName || f.car || 'В гараже'}</div>
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-                            <button onclick="writeToFriendInM('${f.name}')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:9px;" title="Открыть диалог в M+">
+                            <button onclick="writeToFriendInM('${f.id \vert{}\vert{} ''}', '${escape(f.name)}')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:9px;" title="Открыть чат">
                                 <i class="fa-solid fa-comments mr-1"></i> Чат
                             </button>
-                            <button onclick="inviteFriendToClubAction('${f.name}')" class="btn btn-purple btn-sm life-btn-auto" style="font-size:9px;" title="Пригласить в клуб">
+                            <button onclick="inviteFriendToClubAction('${escape(f.name)}')" class="btn btn-purple btn-sm life-btn-auto" style="font-size:9px;" title="Пригласить в клуб">
                                 <i class="fa-solid fa-flag"></i>
                             </button>
                         </div>
@@ -703,7 +769,7 @@ function renderFriendsModalContent() {
     } else if (friendsActiveSubTab === 'requests') {
         subContent = `
             <div class="p-2 mb-2" style="background:rgba(0,242,254,0.08); border:1px solid rgba(0,242,254,0.3); border-radius:10px;">
-                <div class="sub-label text-xs mb-1">Ваш персональный ID для дружбы:</div>
+                <div class="sub-label text-xs mb-1">Ваш персональный ID для добавления:</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <b class="color-cyan font-mono" style="font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;">${myId}</b>
                     <button onclick="navigator.clipboard?.writeText('${myId}'); showToast('ID скопирован в буфер!');" class="btn btn-dark btn-sm life-btn-auto" style="font-size:9px;">
@@ -723,8 +789,8 @@ function renderFriendsModalContent() {
                             <div class="sub-label" style="font-size:8px;">Уровень ${req.level || 1}</div>
                         </div>
                         <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-                            <button onclick="acceptFriendRequest(${rIdx})" class="btn btn-green btn-sm life-btn-auto" style="font-size:8.5px;">Принять</button>
-                            <button onclick="rejectFriendRequest(${rIdx})" class="btn btn-dark btn-sm life-btn-auto" style="font-size:8.5px;">Отклонить</button>
+                            <button onclick="acceptFriendRequest(${rIdx}, '${req.id || ''}')" class="btn btn-green btn-sm life-btn-auto" style="font-size:8.5px;">Принять</button>
+                            <button onclick="rejectFriendRequest(${rIdx}, '${req.id || ''}')" class="btn btn-dark btn-sm life-btn-auto" style="font-size:8.5px;">Отклонить</button>
                         </div>
                     </div>
                 `).join('')}
@@ -733,27 +799,18 @@ function renderFriendsModalContent() {
     } else if (friendsActiveSubTab === 'search') {
         subContent = `
             <div style="display:flex; gap:6px; margin-bottom:10px; align-items:center;">
-                <input type="text" id="friendSearchInput" class="chat-input" placeholder="Введите ник или ID игрока..." style="flex:1 1 auto; min-width:0; font-size:11px; padding:8px 10px; box-sizing:border-box;">
+                <input type="text" id="friendSearchInput" class="chat-input" placeholder="Введите ник, @username или ID..." style="flex:1 1 auto; min-width:0; font-size:11px; padding:8px 10px; box-sizing:border-box;" onkeydown="if(event.key==='Enter') submitSearchFriendAction();">
                 <button onclick="submitSearchFriendAction()" class="btn btn-cyan btn-sm font-bold life-btn-auto" style="font-size:10px;">
                     <i class="fa-solid fa-magnifying-glass mr-1"></i> Найти
                 </button>
             </div>
 
-            <div class="sub-label mb-1" style="font-size:9.5px; font-weight:800; color:#cbd5e1;">Рекомендуемые перекупы:</div>
-            <div class="space-y-1">
-                <div class="p-2" style="background:#090e18; border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                    <div style="min-width:0; flex:1;">
-                        <b class="text-xs color-cyan" style="font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">Денис_Торг77</b>
-                        <div class="sub-label" style="font-size:8px; color:#94a3b8;">Ур. 9 • Владелец авторазборки</div>
-                    </div>
-                    <button onclick="sendFriendRequestTo('Денис_Торг77')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:8.5px;">+ Заявка</button>
-                </div>
-                <div class="p-2" style="background:#090e18; border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
-                    <div style="min-width:0; flex:1;">
-                        <b class="text-xs color-cyan" style="font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">Turbo_Vлад</b>
-                        <div class="sub-label" style="font-size:8px; color:#94a3b8;">Ур. 5 • Дрифт на Жигулях</div>
-                    </div>
-                    <button onclick="sendFriendRequestTo('Turbo_Vлад')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:8.5px;">+ Заявка</button>
+            <div id="friendSearchResultsBox" style="margin-bottom:12px;"></div>
+
+            <div class="sub-label mb-1" style="font-size:9.5px; font-weight:800; color:#cbd5e1;">Рекомендуемые перекупы в сети:</div>
+            <div class="space-y-1" id="recommendedFriendsListContainer" style="max-height:160px; overflow-y:auto;">
+                <div class="p-3 text-center sub-label" style="font-size:9px;">
+                    <i class="fa-solid fa-spinner fa-spin color-cyan mr-1"></i> Поиск свободных игроков в Firestore...
                 </div>
             </div>
         `;
@@ -788,61 +845,171 @@ function renderFriendsModalContent() {
             </button>
         </div>
     `;
+
+    if (friendsActiveSubTab === 'search') {
+        _renderRecommendedPlayers();
+    }
+}
+
+async function _loadRecommendedPlayers() {
+    if (_isLoadingRecommended) return;
+    _isLoadingRecommended = true;
+
+    try {
+        if (window.FB_FriendshipsManager && typeof window.FB_FriendshipsManager.fetchRecommendedUsers === 'function') {
+            _recommendedPlayersCache = await window.FB_FriendshipsManager.fetchRecommendedUsers();
+        } else if (typeof window.getRecommendedPlayersOnline === 'function') {
+            _recommendedPlayersCache = await window.getRecommendedPlayersOnline();
+        }
+    } catch (e) {
+        console.warn('[Life] loadRecommended error:', e);
+    } finally {
+        _isLoadingRecommended = false;
+        _renderRecommendedPlayers();
+    }
+}
+
+function _renderRecommendedPlayers() {
+    const box = document.getElementById('recommendedFriendsListContainer');
+    if (!box) return;
+
+    if (_recommendedPlayersCache.length === 0) {
+        box.innerHTML = `
+            <div class="p-3 text-center sub-label" style="font-size:9px; color:#64748b;">
+                Все доступные перекупы уже у вас в друзьях или заявках.<br>
+                Используйте поиск по ID выше для точного поиска!
+            </div>
+        `;
+        return;
+    }
+
+    box.innerHTML = _recommendedPlayersCache.map(p => `
+        <div class="p-2" style="background:#090e18; border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <div style="min-width:0; flex:1;">
+                <b class="text-xs color-cyan" style="font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${p.name}</b>
+                <div class="sub-label" style="font-size:8px; color:#94a3b8;">Ур. ${p.level || 1} • ${p.carName || 'В гараже'}</div>
+            </div>
+            <button onclick="sendFriendRequestTo('${p.id}', '${escape(p.name)}')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:8.5px;">+ Заявка</button>
+        </div>
+    `).join('');
+}
+
+async function submitSearchFriendAction() {
+    const input = document.getElementById('friendSearchInput');
+    const resBox = document.getElementById('friendSearchResultsBox');
+    if (!input || !input.value.trim() || !resBox) return showToast("Введите ник или ID!");
+
+    const q = input.value.trim();
+    resBox.innerHTML = `
+        <div class="p-2 text-center sub-label" style="font-size:9px;">
+            <i class="fa-solid fa-spinner fa-spin color-cyan mr-1"></i> Поиск в базе Firestore...
+        </div>
+    `;
+
+    let found = [];
+    if (window.FB_FriendshipsManager && typeof window.FB_FriendshipsManager.searchUsers === 'function') {
+        found = await window.FB_FriendshipsManager.searchUsers(q);
+    } else if (typeof window.searchPlayersOnline === 'function') {
+        found = await window.searchPlayersOnline(q);
+    }
+
+    if (found.length === 0) {
+        resBox.innerHTML = `
+            <div class="p-2 text-center sub-label color-amber" style="background:rgba(255,179,0,0.06); border-radius:8px; font-size:9px;">
+                Игроков по запросу «${q}» не найдено в базе. Проверьте правильность ID или ника.
+            </div>
+        `;
+        return;
+    }
+
+    resBox.innerHTML = `
+        <div class="sub-label mb-1" style="font-size:9px; color:var(--cyan); font-weight:800;">Результаты поиска:</div>
+        <div class="space-y-1">
+            ${found.map(u => `
+                <div class="p-2" style="background:#0b1324; border:1px solid rgba(0,242,254,0.3); border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                    <div style="min-width:0; flex:1;">
+                        <b class="text-xs color-green" style="font-size:11px;">${u.name}</b>
+                        <div class="sub-label" style="font-size:8px;">Ур. ${u.level} •${u.carName}</div>
+                    </div>
+                    <button onclick="sendFriendRequestTo('${u.id}', '${escape(u.name)}')" class="btn btn-green btn-sm life-btn-auto" style="font-size:8.5px;">+ Дружить</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+async function sendFriendRequestTo(targetUid, targetName) {
+    const rawName = unescape(targetName || 'Перекуп');
+    playSound('win');
+    tgHaptic('success');
+
+    if (window.FB_FriendshipsManager && typeof window.FB_FriendshipsManager.sendRequest === 'function') {
+        showToast(`Отправка заявки ${rawName}...`);
+        const res = await window.FB_FriendshipsManager.sendRequest(targetUid, rawName);
+        if (res && res.success) {
+            showToast(res.autoAccepted ? `✅ ${rawName} теперь ваш друг!` : `✅ Заявка отправлена ${rawName}!`);
+        } else {
+            showToast(`⚠️ ${res?.error || 'Заявка уже в обработке'}`);
+        }
+    } else {
+        showToast(`Заявка в друзья отправлена игроку «${rawName}»! ✉️`);
+    }
+
+    // Удаляем из списка рекомендаций
+    _recommendedPlayersCache = _recommendedPlayersCache.filter(p => String(p.id) !== String(targetUid));
+    _renderRecommendedPlayers();
 }
 
 function switchFriendsSubTab(tab) {
     friendsActiveSubTab = tab;
     playSound('tick');
     renderFriendsModalContent();
+    if (tab === 'search') {
+        _loadRecommendedPlayers();
+    }
 }
 
-function writeToFriendInM(friendName) {
+function writeToFriendInM(friendId, friendName) {
+    const rawName = unescape(friendName);
     closeFriendsModal();
+
     if (typeof switchTab === 'function') switchTab('tabPhone');
     setTimeout(() => {
         if (window.PhoneManager && typeof window.PhoneManager.openApp === 'function') {
             window.PhoneManager.openApp('m');
             setTimeout(() => {
-                if (window.AppM && typeof window.AppM.setFilter === 'function') {
-                    window.AppM.setFilter('personal');
+                if (window.AppM && typeof window.AppM.openFriendChat === 'function') {
+                    window.AppM.openFriendChat(friendId, rawName);
+                } else if (window.AppM && typeof window.AppM.switchMainTab === 'function') {
+                    window.AppM.switchMainTab('chats');
                 }
-            }, 100);
+            }, 120);
         }
     }, 120);
-    showToast(`Открываем переписку с ${friendName} в M+...`);
+    showToast(`Открываем чат с ${rawName} в M+...`);
 }
 
-function submitSearchFriendAction() {
-    const input = document.getElementById('friendSearchInput');
-    if (!input || !input.value.trim()) return showToast("Введите ник или ID!");
-    const target = input.value.trim();
-    input.value = '';
-    sendFriendRequestTo(target);
-}
-
-function sendFriendRequestTo(name) {
+async function acceptFriendRequest(idx, fromUid) {
+    if (fromUid && window.FB_FriendshipsManager && typeof window.FB_FriendshipsManager.acceptRequest === 'function') {
+        await window.FB_FriendshipsManager.acceptRequest(fromUid);
+    }
+    if (state.player.pendingFriendRequests) {
+        state.player.pendingFriendRequests.splice(idx, 1);
+    }
+    saveState();
     playSound('win');
     tgHaptic('success');
-    showToast(`Заявка в друзья отправлена игроку «${name}»! ✉️`);
+    showToast(`Заявка в друзья принята! 🤝`);
+    renderFriendsModalContent();
 }
 
-function acceptFriendRequest(idx) {
-    if (!state.player.pendingFriendRequests) return;
-    const req = state.player.pendingFriendRequests.splice(idx, 1)[0];
-    if (req) {
-        if (!state.friendsList) state.friendsList = [];
-        state.friendsList.push({ id: 'f_' + Date.now(), name: req.name || 'Друг', level: req.level || 1, car: 'Автомобиль', online: true });
-        saveState();
-        playSound('win');
-        tgHaptic('success');
-        showToast(`Вы приняли заявку от ${req.name}! 🤝`);
-        renderFriendsModalContent();
+async function rejectFriendRequest(idx, fromUid) {
+    if (fromUid && window.FB_FriendshipsManager && typeof window.FB_FriendshipsManager.declineRequest === 'function') {
+        await window.FB_FriendshipsManager.declineRequest(fromUid);
     }
-}
-
-function rejectFriendRequest(idx) {
-    if (!state.player.pendingFriendRequests) return;
-    state.player.pendingFriendRequests.splice(idx, 1);
+    if (state.player.pendingFriendRequests) {
+        state.player.pendingFriendRequests.splice(idx, 1);
+    }
     saveState();
     playSound('tick');
     renderFriendsModalContent();
@@ -888,7 +1055,6 @@ function renderClubModalContent() {
     let subContent = '';
     if (clubActiveSubTab === 'my_club') {
         subContent = `
-            <!-- КАРТОЧКА ТЕКУЩЕГО КЛУБА -->
             <div class="glass-card mb-2 p-3 text-center" style="background: radial-gradient(circle at 50% 20%, rgba(192,132,252,0.22), #090e18); border: 1.5px solid var(--purple); border-radius:14px;">
                 <div style="font-size:36px; line-height:1; margin-bottom:4px;">${currentClub.icon}</div>
                 <b class="text-xs color-purple" style="font-size:14px;">[${currentClub.tag}] ${currentClub.name}</b>
@@ -896,7 +1062,6 @@ function renderClubModalContent() {
                 <div class="sub-label mt-1 font-bold color-green" style="font-size:10px;">Капитал клуба: ${currentClub.totalCapital.toLocaleString()} ₽</div>
             </div>
 
-            <!-- ПЕРКИ КЛУБА -->
             <div class="sub-label mb-1 font-bold" style="font-size:9.5px; color:#c084fc; text-transform:uppercase; letter-spacing:0.3px;">
                 <i class="fa-solid fa-sparkles mr-1"></i> Особенности & Перки клуба:
             </div>
@@ -912,7 +1077,6 @@ function renderClubModalContent() {
                 `).join('')}
             </div>
 
-            <!-- КНОПКИ ДЕЙСТВИЯ -->
             <div class="grid-2" style="gap:6px;">
                 <button onclick="inviteFriendToClubPrompt()" class="btn btn-cyan btn-sm font-bold" style="font-size:9.5px; padding:8px 0;">
                     <i class="fa-solid fa-user-plus mr-1"></i> Позвать друга
@@ -1383,5 +1547,10 @@ window.switchClubSubTab = switchClubSubTab;
 window.joinClubAction = joinClubAction;
 window.inviteFriendToClubAction = inviteFriendToClubAction;
 window.confirmCreateClubAction = confirmCreateClubAction;
+window.submitSearchFriendAction = submitSearchFriendAction;
+window.sendFriendRequestTo = sendFriendRequestTo;
+window.acceptFriendRequest = acceptFriendRequest;
+window.rejectFriendRequest = rejectFriendRequest;
+window.challengePlayerFromLife = challengePlayerFromLife;
 
-console.log('[☕ life.js v1.3.0] Верстка кнопок клубов, поиска и друзей отполирована ✓');
+console.log('[☕ life.js v1.5.0] Боты полностью удалены: честный Зал Славы и живой поиск Firestore подключены ✓');
