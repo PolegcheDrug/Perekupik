@@ -1,13 +1,13 @@
 // ========================================================
-// js/app/app-core.js — ЯДРО: STATE, SAVE, MIGRATE (v4.4.0 PRO-BALANCE)
+// js/app/app-core.js — ЯДРО: STATE, SAVE, MIGRATE (v4.5.0 FULL-STABLE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v4.4.0 (ЧЕСТНЫЙ СТАРТ ТИР-1):
-//   - Стартовый баланс игрока: 75 000 ₽ (честный старт на ВАЗ-2101).
-//   - 0 подарочных миллионов и билетов при создании профиля.
-//   - Сохранена вся архитектура: дебаунс сохранений, lifecycle Telegram WebApp, квоты localStorage.
+// ⭐ v4.5.0:
+//   - Полностью сохранены все миграции сейвов (v10, v11, v12, v13, v14) без пропусков.
+//   - Честный стартовый баланс для новичка: 75 000 ₽ (хватает на ВАЗ-2101 и толщиномер).
+//   - Полная совместимость со всеми модулями, квотами и дебаунсом сохранений.
 // ========================================================
 
-window.CURRENT_GAME_VERSION = "v4.4.0";
+window.CURRENT_GAME_VERSION = "v4.5.0";
 
 const SAVE_VERSION = 15;
 let SAVE_KEY_PREFIX = "perekup_v15_";
@@ -63,8 +63,8 @@ const DEFAULT_STATE = {
         uid: null,
         onboardingDone: false,
         avatarUrl: null,
-        cash: 75000,                  // ⭐ Честный старт на первый ВАЗ
-        stars: 0,                     // ⭐ 0 стартовых Stars
+        cash: 75000,                  // Честный старт на ВАЗ-2101
+        stars: 0,
         connections: 0,
         expressTickets: 25,
         maxExpressTickets: 25,
@@ -80,7 +80,7 @@ const DEFAULT_STATE = {
         club: null,
         karma: 50,
         streetCred: 100,
-        superSpinTickets: 0,          // ⭐ 0 подарочных билетов
+        superSpinTickets: 0,
         freeImpoundPasses: 0,
         traderTitle: "Быстрый выкуп за кэш 💸",
         phoneWidgetsCollapsed: { biz: false, quests: false },
@@ -168,10 +168,110 @@ window.__salesLotRenderToken = 0;
 window.__IS_RESETTING__ = false;
 
 // ========================================================
-// 2. МИГРАЦИЯ СЕЙВА
+// 2. ПОЛНЫЕ МИГРАЦИИ СЕЙВА (БЕЗ СОКРАЩЕНИЙ)
 // ========================================================
 function migrateSave(parsed) {
     if (!parsed || typeof parsed !== 'object') return parsed;
+    const currentVersion = parsed.__saveVersion || 9;
+
+    if (currentVersion < 10) {
+        if (parsed.player && typeof parsed.player === 'object') {
+            if (parsed.player.garageSlots !== undefined && parsed.player.garageSlots > 0) {
+                const oldBase = parsed.player.baseSlots || 2;
+                const oldGarage = parsed.player.garageSlots || 2;
+                parsed.player.baseSlots = Math.max(oldBase, oldGarage);
+                delete parsed.player.garageSlots;
+            }
+            if (!Array.isArray(parsed.player.unlockedApps)) parsed.player.unlockedApps = [];
+            if (typeof parsed.player.hasGpsTracker !== 'boolean') parsed.player.hasGpsTracker = false;
+            if (typeof parsed.player.hasCustomsPass !== 'boolean') parsed.player.hasCustomsPass = false;
+            if (!parsed.player.mEventReactions || typeof parsed.player.mEventReactions !== 'object') parsed.player.mEventReactions = {};
+            if (parsed.player.businessAdBonus === undefined) parsed.player.businessAdBonus = null;
+            if (!Array.isArray(parsed.player.businessAchievements)) parsed.player.businessAchievements = [];
+            if (typeof parsed.player.businessSalesCount !== 'number') parsed.player.businessSalesCount = 0;
+            if (!Array.isArray(parsed.player.ownedBizSkins)) parsed.player.ownedBizSkins = [];
+            if (!Array.isArray(parsed.player.ownedBizStickers)) parsed.player.ownedBizStickers = [];
+
+            if (!parsed.player.interior || typeof parsed.player.interior !== 'object') parsed.player.interior = {};
+            if (typeof parsed.player.housingRentDue !== 'number') parsed.player.housingRentDue = 0;
+            if (!Array.isArray(parsed.player.ownedHouses)) parsed.player.ownedHouses = [];
+            if (parsed.player.mortgage === undefined) parsed.player.mortgage = null;
+        }
+        if (!Array.isArray(parsed.mEventsFeed)) parsed.mEventsFeed = [];
+        if (!parsed.businessWorkshop || typeof parsed.businessWorkshop !== 'object') {
+            parsed.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
+        }
+        if (!parsed.businessStaff || typeof parsed.businessStaff !== 'object') {
+            parsed.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
+        }
+        if (!Array.isArray(parsed.businessFleet)) parsed.businessFleet = [];
+        parsed.marketFeedVersion = (parsed.marketFeedVersion || 0) + 1;
+    }
+
+    if (currentVersion < 11) {
+        if (parsed.player && typeof parsed.player === 'object') {
+            if (!Array.isArray(parsed.player.ownedThemes)) {
+                parsed.player.ownedThemes = ['cyber_neon'];
+                if (parsed.player.hudColorId && parsed.player.hudColorId !== 'cyber_neon') {
+                    parsed.player.ownedThemes.push(parsed.player.hudColorId);
+                }
+                if (parsed.player.themePresetId === 'cyber_black_neo') {
+                    parsed.player.ownedThemes.push('cyber_black_neo');
+                }
+            }
+            if (!Array.isArray(parsed.player.ownedNickEffects)) parsed.player.ownedNickEffects = ['none'];
+            if (!Array.isArray(parsed.player.ownedAvatarEffects)) parsed.player.ownedAvatarEffects = ['none'];
+            if (!Array.isArray(parsed.player.ownedTitles)) parsed.player.ownedTitles = ['cash_buyer'];
+            if (typeof parsed.player.streakDay !== 'number') parsed.player.streakDay = 1;
+        }
+    }
+
+    if (currentVersion < 12) {
+        if (parsed.player && typeof parsed.player === 'object') {
+            if (!parsed.player.paidParking || typeof parsed.player.paidParking !== 'object') {
+                parsed.player.paidParking = { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 };
+            } else {
+                if (!Array.isArray(parsed.player.paidParking.cars)) parsed.player.paidParking.cars = [];
+                if (typeof parsed.player.paidParking.maxCars !== 'number') parsed.player.paidParking.maxCars = 3;
+                if (typeof parsed.player.paidParking.dailyRate !== 'number') parsed.player.paidParking.dailyRate = 200;
+                if (typeof parsed.player.paidParking.lastChargeDay !== 'number') parsed.player.paidParking.lastChargeDay = 0;
+            }
+
+            if (!parsed.player.warehouse || typeof parsed.player.warehouse !== 'object') {
+                parsed.player.warehouse = { maxCars: 6, maxItems: 12, cars: [], items: [] };
+            } else {
+                if (!Array.isArray(parsed.player.warehouse.cars)) parsed.player.warehouse.cars = [];
+                if (!Array.isArray(parsed.player.warehouse.items)) parsed.player.warehouse.items = [];
+                if (typeof parsed.player.warehouse.maxCars !== 'number') parsed.player.warehouse.maxCars = 6;
+                if (typeof parsed.player.warehouse.maxItems !== 'number') parsed.player.warehouse.maxItems = 12;
+            }
+
+            if (!Array.isArray(parsed.player.platesInventory)) {
+                parsed.player.platesInventory = [];
+            }
+        }
+    }
+
+    if (currentVersion < 13) {
+        if (parsed.player && typeof parsed.player === 'object') {
+            if (!Array.isArray(parsed.player._processedNotifIds)) parsed.player._processedNotifIds = [];
+            if (!Array.isArray(parsed.player.pendingFriendRequests)) parsed.player.pendingFriendRequests = [];
+            if (!Array.isArray(parsed.player.incomingTradeOffers)) parsed.player.incomingTradeOffers = [];
+            if (!Array.isArray(parsed.player.platesInventory)) parsed.player.platesInventory = [];
+        }
+    }
+
+    if (currentVersion < 14) {
+        if (parsed.player && typeof parsed.player === 'object') {
+            if (typeof parsed.player.dynamicStarRate !== 'number') {
+                parsed.player.dynamicStarRate = STAR_RATE_DEFAULT;
+            }
+            if (!Array.isArray(parsed.player.dynamicStarRateHistory)) {
+                parsed.player.dynamicStarRateHistory = [];
+            }
+        }
+    }
+
     parsed.__saveVersion = SAVE_VERSION;
     return parsed;
 }
@@ -215,9 +315,7 @@ function sanitizeState() {
     if (!window.state.player.housingId) window.state.player.housingId = 'trailer';
     if (!window.state.player.housingType) window.state.player.housingType = 'own';
 
-    if (!Array.isArray(window.state.player.ownedThemes)) {
-        window.state.player.ownedThemes = ['cyber_neon'];
-    }
+    if (!Array.isArray(window.state.player.ownedThemes)) window.state.player.ownedThemes = ['cyber_neon'];
     if (!Array.isArray(window.state.player.ownedNickEffects)) window.state.player.ownedNickEffects = ['none'];
     if (!Array.isArray(window.state.player.ownedAvatarEffects)) window.state.player.ownedAvatarEffects = ['none'];
     if (!Array.isArray(window.state.player.ownedTitles)) window.state.player.ownedTitles = ['cash_buyer'];
@@ -264,6 +362,50 @@ function applyLoadedState(parsed) {
 
     if (parsed.player) {
         window.state.player = { ...DEFAULT_STATE.player, ...parsed.player };
+        if (parsed.player.stats) window.state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
+        if (parsed.player.tools) window.state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
+        if (parsed.player.toolsWear) window.state.player.toolsWear = { ...DEFAULT_STATE.player.toolsWear, ...parsed.player.toolsWear };
+        if (parsed.player.crypto) window.state.player.crypto = { ...DEFAULT_STATE.player.crypto, ...parsed.player.crypto };
+        if (parsed.player.bankReputation) window.state.player.bankReputation = { ...DEFAULT_STATE.player.bankReputation, ...parsed.player.bankReputation };
+        if (parsed.player.phoneWidgetsCollapsed) window.state.player.phoneWidgetsCollapsed = { ...DEFAULT_STATE.player.phoneWidgetsCollapsed, ...parsed.player.phoneWidgetsCollapsed };
+        if (parsed.player.club) window.state.player.club = parsed.player.club;
+
+        if (!window.state.player.interior || typeof window.state.player.interior !== 'object') window.state.player.interior = {};
+        if (!Array.isArray(window.state.player.ownedHouses)) window.state.player.ownedHouses = [];
+        if (typeof window.state.player.housingRentDue !== 'number') window.state.player.housingRentDue = 0;
+        if (window.state.player.mortgage === undefined) window.state.player.mortgage = null;
+
+        if (!Array.isArray(window.state.player.ownedThemes)) window.state.player.ownedThemes = ['cyber_neon'];
+        if (!Array.isArray(window.state.player.ownedNickEffects)) window.state.player.ownedNickEffects = ['none'];
+        if (!Array.isArray(window.state.player.ownedAvatarEffects)) window.state.player.ownedAvatarEffects = ['none'];
+        if (!Array.isArray(window.state.player.ownedTitles)) window.state.player.ownedTitles = ['cash_buyer'];
+
+        if (!Array.isArray(window.state.player.phoneMessages)) window.state.player.phoneMessages = [];
+        if (!Array.isArray(window.state.player.dailyQuests)) window.state.player.dailyQuests = [];
+        if (!Array.isArray(window.state.player.bankHistory)) window.state.player.bankHistory = [];
+        if (!Array.isArray(window.state.player.bankDeposits)) window.state.player.bankDeposits = [];
+        if (!Array.isArray(window.state.player.mailbox)) window.state.player.mailbox = [];
+        if (!Array.isArray(window.state.player.unlockedApps)) window.state.player.unlockedApps = [];
+        if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
+        if (!Array.isArray(window.state.player.ownedBizSkins)) window.state.player.ownedBizSkins = [];
+        if (!Array.isArray(window.state.player.ownedBizStickers)) window.state.player.ownedBizStickers = [];
+        if (!window.state.player.mEventReactions || typeof window.state.player.mEventReactions !== 'object') window.state.player.mEventReactions = {};
+
+        if (!Array.isArray(window.state.player._processedNotifIds)) window.state.player._processedNotifIds = [];
+        if (!Array.isArray(window.state.player.pendingFriendRequests)) window.state.player.pendingFriendRequests = [];
+        if (!Array.isArray(window.state.player.incomingTradeOffers)) window.state.player.incomingTradeOffers = [];
+        if (!Array.isArray(window.state.player.platesInventory)) window.state.player.platesInventory = [];
+
+        if (parsed.player.warehouse && typeof parsed.player.warehouse === 'object') {
+            window.state.player.warehouse = { ...DEFAULT_STATE.player.warehouse, ...parsed.player.warehouse };
+            if (!Array.isArray(window.state.player.warehouse.cars)) window.state.player.warehouse.cars = [];
+            if (!Array.isArray(window.state.player.warehouse.items)) window.state.player.warehouse.items = [];
+        }
+
+        if (parsed.player.paidParking && typeof parsed.player.paidParking === 'object') {
+            window.state.player.paidParking = { ...DEFAULT_STATE.player.paidParking, ...parsed.player.paidParking };
+            if (!Array.isArray(window.state.player.paidParking.cars)) window.state.player.paidParking.cars = [];
+        }
     }
 
     if (Array.isArray(parsed.garage)) window.state.garage = parsed.garage;
@@ -281,6 +423,14 @@ function applyLoadedState(parsed) {
     if (Array.isArray(parsed.officialPlateAuction)) window.state.officialPlateAuction = parsed.officialPlateAuction;
     if (Array.isArray(parsed.lifeChatMessages)) window.state.lifeChatMessages = parsed.lifeChatMessages;
     if (Array.isArray(parsed.friendsList)) window.state.friendsList = parsed.friendsList;
+
+    if (parsed.businessWorkshop && typeof parsed.businessWorkshop === 'object') {
+        window.state.businessWorkshop = { ...DEFAULT_STATE.businessWorkshop, ...parsed.businessWorkshop };
+    }
+    if (parsed.businessStaff && typeof parsed.businessStaff === 'object') {
+        window.state.businessStaff = { ...DEFAULT_STATE.businessStaff, ...parsed.businessStaff };
+    }
+    if (Array.isArray(parsed.businessFleet)) window.state.businessFleet = parsed.businessFleet;
 
     sanitizeState();
 
@@ -301,6 +451,8 @@ function loadFromLocalStorage() {
     if (!window.tgUserId) return false;
     try {
         let saved = localStorage.getItem("perekup_save_" + window.tgUserId);
+        if (!saved) saved = localStorage.getItem("perekup_v14_" + window.tgUserId);
+        if (!saved) saved = localStorage.getItem("perekup_v13_" + window.tgUserId);
         if (!saved) saved = localStorage.getItem(SAVE_KEY_PREFIX + window.tgUserId);
 
         if (saved) {
@@ -438,6 +590,40 @@ function saveState(immediate = false) {
 }
 
 // ========================================================
+// ЖИЗНЕННЫЙ ЦИКЛ (TELEGRAM WEBAPP)
+// ========================================================
+if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            saveState(true);
+        } else if (document.visibilityState === 'visible') {
+            try {
+                if (window.state?.player) {
+                    const now = Date.now();
+                    const lastActive = window.state.player.lastActiveTimestamp || now;
+                    const awaySeconds = Math.max(0, Math.floor((now - lastActive) / 1000));
+
+                    if (awaySeconds >= 15) {
+                        if (typeof checkRealTimeDayChange === 'function') {
+                            checkRealTimeDayChange();
+                        }
+                        if (window.PhoneBusiness && typeof window.PhoneBusiness.tickIncome === 'function') {
+                            window.PhoneBusiness.tickIncome();
+                        }
+                    }
+                    window.state.player.lastActiveTimestamp = now;
+                }
+                if (typeof updateHeaderUI === 'function') updateHeaderUI();
+            } catch (e) {}
+        }
+    });
+
+    window.addEventListener('pagehide', () => {
+        saveState(true);
+    });
+}
+
+// ========================================================
 // 6. СБРОС ПРОГРЕССА
 // ========================================================
 function resetGameData() {
@@ -513,4 +699,4 @@ window.ensureCarIdentity = ensureCarIdentity;
 window.isOwnerUser = _isOwner;
 window.SAVE_VERSION = SAVE_VERSION;
 
-console.log('[💠 app-core.js v4.4.0 PRO-BALANCE] Честный старт 75,000 ₽ активирован ✓');
+console.log('[💠 app-core.js v4.5.0 FULL-STABLE] Все миграции сохранены, честный баланс активирован ✓');
