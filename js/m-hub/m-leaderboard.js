@@ -1,11 +1,12 @@
 // ========================================================
-// js/m-hub/m-leaderboard.js — ОБЩАЯ СЕТЬ ИГРОКОВ M+ (v3.3.0 SAFE-NAV & CHAT)
+// js/m-hub/m-leaderboard.js — ОБЩАЯ СЕТЬ ИГРОКОВ M+ (v3.4.0 REAL-ONLY)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.3.0:
-//   - ФИКС НАВИГАЦИИ: рендер топа изолирован и больше НЕ затирает верхние табы социума.
-//   - ПЕРЕХОД В ЧАТ: клик по кнопке "Друг" сразу открывает экран переписки с быстрым чатом и офферами.
-//   - СОХРАНЕНО: живые игроки из Firestore, сортировки, пагинация и вызовы на 402м.
+// ⭐ v3.4.0 (ИСКЛЮЧИТЕЛЬНО ЖИВЫЕ ИГРОКИ):
+//   - ПОЛНОЕ УДАЛЕНИЕ БОТОВ: массив seedNames вырезан под ноль.
+//   - СИНХРОНИЗАЦИЯ С FIRESTORE: загрузка реальных профилей через FB_FriendshipsManager / FB_Core.
+//   - ФИЛЬТРАЦИЯ: фейковые аккаунты с признаком бота исключены из выборки.
+//   - ЭКСПОРТ ДЛЯ «ЖИЗНИ»: метод getTopPlayers() для единого Зала Славы.
 // ========================================================
 
 const MLeaderboardModule = {
@@ -21,7 +22,6 @@ const MLeaderboardModule = {
     _unsubscribeFriendships: null,
     _unsubscribeLeaderboard: null,
 
-    // Вспомогательный селектор: всегда рендеримся только во внутренний контентный бокс
     _getTargetContainer(passedContainer) {
         if (passedContainer && passedContainer.id !== 'phoneAppContainer' && passedContainer.id !== 'autodrotScreenContent') {
             return passedContainer;
@@ -32,7 +32,7 @@ const MLeaderboardModule = {
     },
 
     // ====================================================
-    // ЗАГРУЗКА СПИСКА ИГРОКОВ ИЗ FIRESTORE
+    // ЗАГРУЗКА СПИСКА РЕАЛЬНЫХ ИГРОКОВ ИЗ FIRESTORE
     // ====================================================
     async fetchPlayersList(force = false) {
         if (!force && this.cachedPlayers.length > 0) {
@@ -49,8 +49,10 @@ const MLeaderboardModule = {
 
             let cloudLeaders = null;
 
-            if (window.FB_Core?.Leaderboard?.fetchTop) {
-                cloudLeaders = await window.FB_Core.Leaderboard.fetchTop(sortField, 50);
+            if (window.FB_FriendshipsManager?.fetchLeaderboard) {
+                cloudLeaders = await window.FB_FriendshipsManager.fetchLeaderboard(sortField, 60);
+            } else if (window.FB_Core?.Leaderboard?.fetchTop) {
+                cloudLeaders = await window.FB_Core.Leaderboard.fetchTop(sortField, 60);
             } else if (window.FB_Bridge?.Leaderboard?.fetchTop) {
                 cloudLeaders = await window.FB_Bridge.Leaderboard.fetchTop(force);
             }
@@ -62,16 +64,17 @@ const MLeaderboardModule = {
                     level: Number(p.level) || 1,
                     profit: Number(p.profit) || 0,
                     networth: Number(p.netWorth || p.networth || 150000),
-                    car: p.bestCar || p.flagshipCar || "Пешком",
+                    car: p.bestCar || p.flagshipCar || p.car || "Пешком",
                     avatar: p.avatar || "👤",
-                    isOnline: p.updatedAt ? (Date.now() - p.updatedAt < 600000) : true,
+                    isOnline: p.updatedAt ? (Date.now() - p.updatedAt < 600000) : false,
                     isBot: false
-                })).filter(p => p.id && p.id !== 'undefined');
+                })).filter(p => p.id && p.id !== 'undefined' && !p.id.startsWith('bot_') && !p.isBot);
             }
         } catch (e) {
             console.warn("[MLeaderboard] Ошибка загрузки облачного топа:", e);
         }
 
+        // Данные текущего игрока
         const myUid = String(window.state?.player?.uid || window.tgUserId || "me");
         const myName = window.state?.player?.name || "Перекуп #777";
         const myLvl = Number(window.state?.player?.level) || 1;
@@ -109,48 +112,38 @@ const MLeaderboardModule = {
             existingMe.level = Math.max(existingMe.level, myLvl);
         }
 
-        if (players.length < 3) {
-            const seedNames = [
-                { name: "Синдикат_VIP", lvl: 45, car: "Porsche 911 Turbo", profit: 15000000, net: 26000000 },
-                { name: "Maga_GTI", lvl: 34, car: "VW Golf VI GTI (Stage 2)", profit: 7800000, net: 11200000 },
-                { name: "Чип_Тюнер", lvl: 31, car: "BMW M5 E39", profit: 6700000, net: 9900000 }
-            ];
-
-            seedNames.forEach((s, idx) => {
-                if (!players.some(p => p.name === s.name)) {
-                    players.push({
-                        id: "bot_seed_" + idx,
-                        name: s.name,
-                        level: s.lvl,
-                        profit: s.profit,
-                        networth: s.net,
-                        car: s.car,
-                        avatar: "🏎️",
-                        isOnline: true,
-                        isBot: true
-                    });
-                }
-            });
-        }
-
-        this.cachedPlayers = players;
+        // Финальная очистка от любых ботов
+        this.cachedPlayers = players.filter(p => !p.isBot && !String(p.id).startsWith('bot_'));
         this.isLoading = false;
 
         if (window.EventBus) {
-            window.EventBus.emit('leaderboard:updated', { count: players.length, force });
+            window.EventBus.emit('leaderboard:updated', { count: this.cachedPlayers.length, force });
         }
 
-        return players;
+        return this.cachedPlayers;
     },
 
-    // ====================================================
-    // СТАТУСЫ ДРУЖБЫ И ЗАЯВОК (СВЯЗКА С FIREBASE)
-    // ====================================================
+    getSortedPlayers() {
+        const list = [...this.cachedPlayers];
+        if (this.sortBy === 'level') {
+            list.sort((a, b) => (b.level || 0) - (a.level || 0));
+        } else if (this.sortBy === 'profit') {
+            list.sort((a, b) => (b.profit || 0) - (a.profit || 0));
+        } else {
+            list.sort((a, b) => (b.networth || 0) - (a.networth || 0));
+        }
+        return list;
+    },
+
+    getTopPlayers(count = 5) {
+        return this.getSortedPlayers().slice(0, count);
+    },
+
     async loadFriendshipStatuses() {
         const myUid = String(window.state?.player?.uid || window.tgUserId || "");
         if (!myUid) return;
 
-        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships || window.FB_Bridge?.Friendships;
+        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships;
 
         if (!manager?.fetchFriendships) {
             const localFriends = window.state?.friendsList || [];
@@ -175,13 +168,10 @@ const MLeaderboardModule = {
                 this.friendshipStatuses[String(o.id || o.toUserId)] = 'pending_out';
             });
         } catch (e) {
-            console.warn('[MLeaderboard] Ошибка получения статусов дружбы:', e);
+            console.warn('[MLeaderboard] Ошибка статусов дружбы:', e);
         }
     },
 
-    // ====================================================
-    // СОРТИРОВКА И ПАГИНАЦИЯ
-    // ====================================================
     setSort(sortType) {
         this.sortBy = sortType;
         this.currentPage = 1;
@@ -206,21 +196,6 @@ const MLeaderboardModule = {
         }
     },
 
-    getSortedPlayers() {
-        const list = [...this.cachedPlayers];
-        if (this.sortBy === 'level') {
-            list.sort((a, b) => (b.level || 0) - (a.level || 0));
-        } else if (this.sortBy === 'profit') {
-            list.sort((a, b) => (b.profit || 0) - (a.profit || 0));
-        } else {
-            list.sort((a, b) => (b.networth || 0) - (a.networth || 0));
-        }
-        return list;
-    },
-
-    // ====================================================
-    // REAL-TIME ПОДПИСКИ
-    // ====================================================
     _subscribeRealtime() {
         this._unsubscribeRealtime();
 
@@ -263,9 +238,6 @@ const MLeaderboardModule = {
         this._subscribeRealtime();
     },
 
-    // ====================================================
-    // ОТРИСОВКА ИНТЕРФЕЙСА (БЕЗОПАСНАЯ ДЛЯ НАВИГАЦИИ)
-    // ====================================================
     async renderScreen(container) {
         const target = this._getTargetContainer(container);
         if (!target) return;
@@ -276,7 +248,7 @@ const MLeaderboardModule = {
             target.innerHTML = `
                 <div class="glass-card text-center py-6" style="background:#090e18;">
                     <div class="radar-spinner-ring mb-2" style="margin: 0 auto;"></div>
-                    <div class="sub-label font-bold text-xs color-cyan">Синхронизация рейтинга перекупов...</div>
+                    <div class="sub-label font-bold text-xs color-cyan">Синхронизация рейтинга игроков...</div>
                 </div>
             `;
         }
@@ -325,15 +297,10 @@ const MLeaderboardModule = {
             const otherUid = String(p.id || "");
             const isMe = otherUid === myUid || p.isMe;
 
-            if (isMe) {
-                friendBtn = "";
-            } else if (p.isBot) {
-                friendBtn = `<button class="btn btn-dark btn-sm btn-auto opacity-50" disabled style="padding:4px 7px; font-size:8.5px;" title="Бот">🤖 БОТ</button>`;
-            } else {
+            if (!isMe) {
                 const status = this.friendshipStatuses[otherUid] || 'none';
 
                 if (status === 'friend') {
-                    // Клик сразу открывает полноценный чат с этим другом
                     friendBtn = `
                         <button onclick="AppM.openFriendChat('${otherUid}', '${this._escapeAttr(p.name)}')" class="btn btn-dark btn-sm btn-auto" style="padding:4px 8px; font-size:8.5px; border-color:var(--green); color:var(--green);">
                             <i class="fa-solid fa-comments mr-1"></i> Чат
@@ -418,7 +385,7 @@ const MLeaderboardModule = {
             </div>
 
             <div class="space-y-1 mb-2">
-                ${rowsHtml}
+                ${rowsHtml || '<div class="glass-card text-center py-6 sub-label">Нет данных о других игроках</div>'}
             </div>
 
             <div class="flex-between p-2 glass-card" style="background:#090e18;">
@@ -426,7 +393,7 @@ const MLeaderboardModule = {
                     <i class="fa-solid fa-chevron-left mr-1"></i> Назад
                 </button>
                 <span class="sub-label font-bold" style="font-size:9px;">
-                    Стр. ${this.currentPage} из ${totalPages} (${startIdx + 1}–${Math.min(startIdx + this.pageSize, totalPlayers)})
+                    Стр. ${this.currentPage} из ${totalPages}
                 </span>
                 <button onclick="MLeaderboardModule.nextPage()" class="btn btn-dark btn-sm btn-auto" ${this.currentPage >= totalPages ? 'disabled' : ''} style="font-size:9px; padding:4px 10px;">
                     Вперёд <i class="fa-solid fa-chevron-right ml-1"></i>
@@ -435,9 +402,6 @@ const MLeaderboardModule = {
         `;
     },
 
-    // ====================================================
-    // ДЕЙСТВИЯ: ДРУЖБА, ЧАТ И ВЫЗОВ
-    // ====================================================
     async addFriendAction(targetUid, targetName) {
         if (!window.state?.player) window.state.player = {};
         if (!targetUid) return showToast("⚠️ Некорректный игрок");
@@ -451,17 +415,11 @@ const MLeaderboardModule = {
         }
         this._processedFriendRequests.add(targetUid);
 
-        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships || window.FB_Bridge?.Friendships;
+        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships;
 
         try {
             if (!manager?.sendRequest) {
-                if (!Array.isArray(window.state.player.friendsList)) window.state.player.friendsList = [];
-                window.state.player.friendsList.push(targetName);
-                this.friendshipStatuses[String(targetUid)] = 'friend';
-                if (typeof window.saveState === 'function') window.saveState();
-                showToast(`🤝 ${targetName} добавлен в друзья!`);
-                this._renderUI(this._getTargetContainer());
-                return;
+                return showToast("⚠️ Модуль сети недоступен");
             }
 
             showToast(`⏳ Отправка заявки...`);
@@ -486,7 +444,7 @@ const MLeaderboardModule = {
         if (!targetUid) return;
         if (!confirm("Отозвать заявку в друзья?")) return;
 
-        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships || window.FB_Bridge?.Friendships;
+        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships;
 
         try {
             if (manager?.removeFriend) {
@@ -503,7 +461,7 @@ const MLeaderboardModule = {
     },
 
     async acceptFriendRequestFromLeaderboard(targetUid, targetName) {
-        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships || window.FB_Bridge?.Friendships;
+        const manager = window.FB_FriendshipsManager || window.FB_Friendships?.Friendships;
         if (!targetUid || !manager?.acceptRequest) return;
 
         try {
@@ -556,4 +514,4 @@ const MLeaderboardModule = {
 
 window.MLeaderboardModule = MLeaderboardModule;
 
-console.log('[🏆 m-leaderboard v3.3.0] Безопасная навигация без затирания табов + Прямой вход в чат ✓');
+console.log('[🏆 m-leaderboard v3.4.0] Боты полностью удалены из лидерборда, рейтинг переключен на Firestore ✓');
