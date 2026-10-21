@@ -1,11 +1,13 @@
 // ========================================================
-// js/garage/garage-services.js — ТЮНИНГ, ДЕТЕЙЛИНГ И СТРАХОВАНИЕ (v1.5.0-balanced)
+// js/garage/garage-services.js — ТЮНИНГ, ДЕТЕЙЛИНГ И СТРАХОВАНИЕ (v1.6.0-club)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.5.0-balanced:
-//   - ДОБАВЛЕНА ПЕРЕКУП-ПРЕДПРОДАЖКА: полировка фар, чернение резины, сухой туман (удаление табака),
-//     бюджетный подкрас из баллончика со шпаклей для скрытия ржавчины.
-//   - СМОТКА ПРОБЕГА С РИСКОМ: расчет процента риска раскрытия сканером на площадке.
-//   - ПОЛНЫЙ БАЛАНС: динамические цены, учет бизнесов и совместимость с автотекой.
+//
+// ⭐ v1.6.0-club (ИНТЕГРАЦИЯ ПЕРКА «ГАРАЖНОЕ БРАТСТВО»):
+//   - Перк клуба «Гаражное братство» [STS]: постоянная скидка 15% на все работы детейлинга,
+//     кузовной ремонт, покраску и установку спортивного тюнинга.
+//   - Визуальные индикаторы клубной скидки на всех процедурах и тюнинг-модах.
+//   - ПОЛНЫЙ БАЛАНС: динамические цены, учет бизнесов (Малярка, Чип-лаборатория)
+//     и совместимость с проверками Автотеки.
 // ========================================================
 
 let activeTuningCarIndex = null;
@@ -24,21 +26,36 @@ const DEFAULT_INSURANCE_OPTIONS = {
 
 let insuranceOptions = { ...DEFAULT_INSURANCE_OPTIONS };
 
-// Вспомогательный расчёт стоимости детейлинга от базовой цены авто
+// Проверка наличия перков автоклуба
+function _hasClubPerk(perkKey) {
+    if (typeof window.hasClubPerk === 'function') {
+        return window.hasClubPerk(perkKey);
+    }
+    const club = state?.player?.club;
+    const clubId = typeof club === 'string' ? club : club?.id;
+    if (clubId === 'sts') return true;
+    if (Array.isArray(club?.perks) && club.perks.some(p => (p.id === perkKey || String(p.title || '').includes('братство')))) {
+        return true;
+    }
+    return false;
+}
+
+// Вспомогательный расчёт стоимости детейлинга от базовой цены авто с учётом клубных перков
 function _getServiceCosts(car) {
     const baseVal = Math.max(50000, car.marketValue || car.basePrice || 100000);
     const hasPaintShop = (state.businesses || []).some(b => b.id === 'paint_shop' && b.level > 0);
+    const clubDiscount = _hasClubPerk('garage_brotherhood') ? 0.85 : 1.0;
 
     return {
-        polishCost: Math.max(4000, Math.round(baseVal * 0.035)),
-        headlightCost: Math.max(1200, Math.round(baseVal * 0.012)),
-        interiorCost: Math.max(3500, Math.round(baseVal * 0.025)),
-        fogOdorCost: Math.max(2200, Math.round(baseVal * 0.018)),
-        sprayCanCost: Math.max(3200, Math.round(baseVal * 0.022)),
-        paintCost: hasPaintShop ? Math.max(8000, Math.round(baseVal * 0.06)) : Math.max(15000, Math.round(baseVal * 0.10)),
-        chipsCost: Math.max(2800, Math.round(baseVal * 0.02)),
-        additiveCost: Math.max(4500, Math.round(baseVal * 0.028)),
-        odometerCost: Math.max(7500, Math.round(baseVal * 0.038))
+        polishCost: Math.max(3000, Math.round(baseVal * 0.035 * clubDiscount)),
+        headlightCost: Math.max(1000, Math.round(baseVal * 0.012 * clubDiscount)),
+        interiorCost: Math.max(2800, Math.round(baseVal * 0.025 * clubDiscount)),
+        fogOdorCost: Math.max(1800, Math.round(baseVal * 0.018 * clubDiscount)),
+        sprayCanCost: Math.max(2500, Math.round(baseVal * 0.022 * clubDiscount)),
+        paintCost: Math.round((hasPaintShop ? Math.max(8000, baseVal * 0.06) : Math.max(15000, baseVal * 0.10)) * clubDiscount),
+        chipsCost: Math.max(2200, Math.round(baseVal * 0.02 * clubDiscount)),
+        additiveCost: Math.max(3800, Math.round(baseVal * 0.028 * clubDiscount)),
+        odometerCost: Math.max(6000, Math.round(baseVal * 0.038 * clubDiscount))
     };
 }
 
@@ -288,7 +305,7 @@ function checkUninsuredDriveRisk(car) {
 }
 
 // ========================================================
-// --- ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (v1.5.0) ---
+// --- ДЕТЕЙЛИНГ И ПРЕДПРОДАЖНАЯ ПОДГОТОВКА (v1.6.0) ---
 // ========================================================
 function openPreSaleModal(idx) {
     if (idx === undefined || idx === null) return;
@@ -308,14 +325,26 @@ function openPreSaleModal(idx) {
     const costs = _getServiceCosts(car);
     const modal = ensureModal('modalPreSale');
     const hasPaintShop = (state.businesses || []).some(b => b.id === 'paint_shop' && b.level > 0);
+    const hasBrotherhood = _hasClubPerk('garage_brotherhood');
 
     modal.innerHTML = `
         <div class="modal-box text-left" style="max-width: 450px; max-height:88vh; display:flex; flex-direction:column;">
-            <div class="modal-glow-badge mb-1" style="color:var(--amber); border-color:rgba(255,179,0,0.4);">
-                ✨ ПЕРЕКУП-ДЕТЕЙЛИНГ & ЛОСК
+            <div class="flex-between mb-1">
+                <div class="modal-glow-badge" style="color:var(--amber); border-color:rgba(255,179,0,0.4);">
+                    ✨ ПЕРЕКУП-ДЕТЕЙЛИНГ & ЛОСК
+                </div>
+                ${hasBrotherhood ? `<span class="tag-badge bg-tag-purple" style="font-size:7.5px;">🛠️ [STS] -15% КЛУБ</span>` : ''}
             </div>
+
             <h3 class="font-bold color-cyan mb-1">${escapeHtml(car.name)}</h3>
             <div class="sub-label mb-2">Наводим марафет для наценки (+15–30% к чеку):</div>
+
+            ${hasBrotherhood ? `
+                <div class="p-2 mb-2 flex-between" style="background:rgba(192,132,252,0.12); border-radius:8px; border:1px solid rgba(192,132,252,0.4);">
+                    <div style="font-size:9px; color:#e2e8f0;"><i class="fa-solid fa-handshake mr-1 color-purple"></i> Перк Синдиката «Гаражное братство»:</div>
+                    <b class="color-purple text-xs">-15% на всё ✓</b>
+                </div>
+            ` : ''}
 
             <div class="space-y-2 mb-3" style="flex:1; overflow-y:auto; padding-right:2px;">
                 <!-- 1. ПОЛИРОВКА ФАР И РЕЗИНА -->
@@ -377,7 +406,7 @@ function openPreSaleModal(idx) {
                 <div class="glass-card p-2 flex-between">
                     <div>
                         <b class="text-xs color-amber">6. Полный облив кузова</b>
-                        <div class="sub-label" style="font-size:8.5px;">${hasPaintShop ? 'Цех «Хамелеон»: заводской микрослой 115 мкм (-40% скидка)' : 'Окрас в камере (+25% к HP)'}</div>
+                        <div class="sub-label" style="font-size:8.5px;">${hasPaintShop ? 'Цех «Хамелеон»: заводской микрослой 115 мкм' : 'Окрас в камере (+25% к HP)'}</div>
                     </div>
                     <button onclick="applyPreSaleMod('paint')" class="btn ${car.isRepainted ? 'btn-dark opacity-50' : 'btn-amber'} btn-sm btn-auto" ${car.isRepainted ? 'disabled' : ''}>
                         ${car.isRepainted ? 'Окрашено ✓' : costs.paintCost.toLocaleString() + ' ₽'}
@@ -526,7 +555,7 @@ function applyPreSaleMod(type) {
             car.mileage = Math.max(38000, Math.round(currentOdo * 0.52));
             car.rolledOdometer = true;
             car.autotekaMileageDiscrepancy = true;
-            car.odometerRiskPct = 35; // 35% шанс, что покупатель на площадке проверит блоки сканером
+            car.odometerRiskPct = 35;
 
             if (typeof recalculateCarMarketValue === 'function') recalculateCarMarketValue(car);
             showToast(`📉 Пробег смотан до ${car.mileage.toLocaleString()} км! Внимание: риск скандала на площадке 35%!`);
@@ -570,8 +599,10 @@ function openTuningModal(idx) {
         };
     }
 
+    const hasBrotherhood = _hasClubPerk('garage_brotherhood');
     if (typeof setTxt === 'function') {
-        setTxt('tuneCarTitle', `Мастерская: <b>${escapeHtml(car.name)}</b> (${car.power || 100} л.с.)`);
+        const clubBadge = hasBrotherhood ? ` <span class="tag-badge bg-tag-purple" style="font-size:7.5px;">🛠️ [STS] -15% КЛУБ</span>` : '';
+        setTxt('tuneCarTitle', `Мастерская: <b>${escapeHtml(car.name)}</b> (${car.power || 100} л.с.)${clubBadge}`);
     }
     switchTuneTab(activeTuneTab || 'engine');
 
@@ -604,10 +635,13 @@ function renderTuningItems() {
     const t = car.tuning || {};
 
     const hasChipLab = (state.businesses || []).some(b => b.id === 'chip_tuning' && b.level > 0);
+    const hasBrotherhood = _hasClubPerk('garage_brotherhood');
+    const clubDiscount = hasBrotherhood ? 0.85 : 1.0;
+
     let html = "";
 
     if (activeTuneTab === 'engine') {
-        const chipDiscount = hasChipLab ? 0.70 : 1.0;
+        const chipDiscount = (hasChipLab ? 0.70 : 1.0) * clubDiscount;
         const cCost1 = Math.round(30000 * chipDiscount);
         const cCost2 = Math.round(65000 * chipDiscount);
         const cCost3 = Math.round(180000 * chipDiscount);
@@ -615,9 +649,9 @@ function renderTuningItems() {
         const currentChip = t.chip || 0;
 
         const engChips = [
-            { id: 'chip_stage1', stage: 1, name: `⚡ Чип Stage 1${hasChipLab ? ' (-30%)' : ''}`, cost: cCost1, desc: '+25 л.с., оптимизация топливных карт.', bought: currentChip >= 1, action: `buyChipStage(1, ${cCost1}, 25)` },
-            { id: 'chip_stage2', stage: 2, name: `🔥 Stage 2 + Попкорн${hasChipLab ? ' (-30%)' : ''}`, cost: cCost2, desc: '+60 л.с., прошивка ЭБУ и отстрелы.', bought: currentChip >= 2, action: `buyChipStage(2, ${cCost2}, 60)` },
-            { id: 'chip_stage3', stage: 3, name: `🚀 Stage 3 Big Turbo Kit`, cost: cCost3, desc: '+150 л.с., кованая поршневая и наддув.', bought: currentChip >= 3, action: `buyChipStage(3, ${cCost3}, 150)` }
+            { id: 'chip_stage1', stage: 1, name: `⚡ Чип Stage 1${hasChipLab ? ' (-30%)' : ''}${hasBrotherhood ? ' [-15% STS]' : ''}`, cost: cCost1, desc: '+25 л.с., оптимизация топливных карт.', bought: currentChip >= 1, action: `buyChipStage(1, ${cCost1}, 25)` },
+            { id: 'chip_stage2', stage: 2, name: `🔥 Stage 2 + Попкорн${hasChipLab ? ' (-30%)' : ''}${hasBrotherhood ? ' [-15% STS]' : ''}`, cost: cCost2, desc: '+60 л.с., прошивка ЭБУ и отстрелы.', bought: currentChip >= 2, action: `buyChipStage(2, ${cCost2}, 60)` },
+            { id: 'chip_stage3', stage: 3, name: `🚀 Stage 3 Big Turbo Kit${hasBrotherhood ? ' [-15% STS]' : ''}`, cost: cCost3, desc: '+150 л.с., кованая поршневая и наддув.', bought: currentChip >= 3, action: `buyChipStage(3, ${cCost3}, 150)` }
         ];
 
         engChips.forEach(m => {
@@ -637,15 +671,16 @@ function renderTuningItems() {
 
         const engineMods = window.TUNING_CONFIG?.engine || [];
         engineMods.forEach(m => {
+            const modCost = Math.round(m.baseCost * clubDiscount);
             const bought = !!t[m.id];
             const btn = bought
                 ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Установлено ✓</button>"
-                : `<button onclick="buyTuningMod('${m.id}', ${m.baseCost}, ${m.power}, ${m.risk})" class="btn btn-cyan btn-sm btn-auto">${m.baseCost.toLocaleString()} ₽</button>`;
+                : `<button onclick="buyTuningMod('${m.id}', ${modCost}, ${m.power}, ${m.risk})" class="btn btn-cyan btn-sm btn-auto">${modCost.toLocaleString()} ₽</button>`;
 
             html += `
             <div class="glass-card p-2 flex-between mb-2">
                 <div style="flex:1; margin-right:8px;">
-                    <b class="text-xs color-cyan">${m.name}</b>
+                    <b class="text-xs color-cyan">${m.name}${hasBrotherhood ? ' <span class="color-purple" style="font-size:7.5px;">[-15%]</span>' : ''}</b>
                     <div class="sub-label" style="font-size:9.5px;">${m.desc}</div>
                 </div>
                 ${btn}
@@ -657,15 +692,16 @@ function renderTuningItems() {
         const textColorClass = activeTuneTab === 'drift' ? 'color-red' : (activeTuneTab === 'drag' ? 'color-amber' : 'color-purple');
 
         modsList.forEach(m => {
+            const modCost = Math.round(m.baseCost * clubDiscount);
             const bought = !!t[m.id];
             const btn = bought
                 ? "<button class='btn btn-dark btn-sm btn-auto opacity-50' disabled>Установлено ✓</button>"
-                : `<button onclick="buyTuningMod('${m.id}', ${m.baseCost}, ${m.power}, ${m.risk})" class="btn ${btnColorClass} btn-sm btn-auto">${m.baseCost.toLocaleString()} ₽</button>`;
+                : `<button onclick="buyTuningMod('${m.id}', ${modCost}, ${m.power}, ${m.risk})" class="btn ${btnColorClass} btn-sm btn-auto">${modCost.toLocaleString()} ₽</button>`;
 
             html += `
             <div class="glass-card p-2 flex-between mb-2">
                 <div style="flex:1; margin-right:8px;">
-                    <b class="text-xs ${textColorClass}">${m.name}</b>
+                    <b class="text-xs ${textColorClass}">${m.name}${hasBrotherhood ? ' <span class="color-purple" style="font-size:7.5px;">[-15%]</span>' : ''}</b>
                     <div class="sub-label" style="font-size:9.5px;">${m.desc}</div>
                 </div>
                 ${btn}
