@@ -1,11 +1,11 @@
 /* ========================================================
-   css/market.css — АВТОРЫНОК И КАРТОЧКИ КЛАССОВ (v2.3.1)
+   css/market.css — АВТОРЫНОК, ЗАКАЗЫ И АВТОТЕКА PRO (v2.4.0)
    Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-   ⭐ v2.3.1 (БИЗНЕС-БЕЙДЖИ И АВТОПАРКИ):
-   - Добавлены надежные стили для бейджей пригодности к бизнесу (Такси, Доставка, VIP и др.)
-   - Исправлен z-index плашки над фото авто (не перекрывается градиентом)
-   - Плавное сворачивание сетки категорий (max-height + opacity)
-   - Анимация пульсации и свечения для коммерческих лотов
+   ⭐ v2.4.0 (АДАПТИВНОСТЬ ПОД PIXEL + СТИЛИ ЗАКАЗОВ КЛИЕНТОВ):
+   - Оптимизирован контейнер отчёта Автотеки PRO под экраны Pixel (кнопка закрытия не срезается).
+   - Стили переключателя режимов «Автомобили / Заказы на подбор» и карточек контрактов.
+   - Фиксация кнопок звонка и инспекции на карточках авто без расползания.
+   - Плавное ультракомпактное сворачивание категорий без дергания интерфейса.
    ======================================================== */
 
 /* ========================================================
@@ -341,7 +341,48 @@
 }
 
 /* ========================================================
-   5. ШИЛЬДИКИ И МАРКИ АВТО
+   5. ПЕРЕКЛЮЧАТЕЛЬ: АВТОМОБИЛИ / ЗАКАЗЫ НА ПОДБОР
+   ======================================================== */
+.market-mode-switcher {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 6px !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  padding: 3px !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(0, 242, 254, 0.18) !important;
+  margin-bottom: 8px !important;
+}
+
+.market-mode-btn {
+  font-weight: 800 !important;
+  font-size: 10px !important;
+  border-radius: 9px !important;
+  padding: 7px 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  white-space: nowrap !important;
+}
+
+/* Карточки заказов клиентов */
+.market-order-card {
+  background: #090e18 !important;
+  border-radius: 14px !important;
+  padding: 12px !important;
+  margin-bottom: 10px !important;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s ease;
+}
+
+.market-order-card.ready-deal {
+  border-color: rgba(0, 230, 118, 0.45) !important;
+  box-shadow: 0 0 15px rgba(0, 230, 118, 0.15) !important;
+}
+
+/* ========================================================
+   6. ШИЛЬДИКИ И МАРКИ АВТО
    ======================================================== */
 .car-brand-title-wrap {
   display: flex;
@@ -392,7 +433,7 @@
 }
 
 /* ========================================================
-   6. ТЕГИ, БЕЙДЖИ И ГОСНОМЕРА
+   7. ТЕГИ, БЕЙДЖИ И ГОСНОМЕРА
    ======================================================== */
 .car-status-badges-row {
   display: flex;
@@ -516,7 +557,7 @@
 }
 
 /* ========================================================
-   7. ОБЛОЖКА АВТО И ВЕРХНИЕ БЕЙДЖИ
+   8. ОБЛОЖКА АВТО И ВЕРХНИЕ БЕЙДЖИ
    ======================================================== */
 .car-img-wrap {
   position: relative !important;
@@ -556,7 +597,6 @@
   z-index: 2;
 }
 
-/* Стили плашки соответствия бизнесу поверх фото */
 .biz-fleet-card-badge {
   position: absolute;
   top: 8px;
@@ -589,7 +629,7 @@
 }
 
 /* ========================================================
-   8. ВЕРХНИЙ БЛОК: ЦЕНА И МАРЖА
+   9. ВЕРХНИЙ БЛОК: ЦЕНА И МАРЖА
    ======================================================== */
 .car-header-row-volumetric {
   display: flex;
@@ -646,7 +686,7 @@
 }
 
 /* ========================================================
-   9. ХАРАКТЕРИСТИКИ (3 КОЛОНКИ)
+   10. ХАРАКТЕРИСТИКИ (3 КОЛОНКИ)
    ======================================================== */
 .car-specs-grid-volumetric {
   display: grid !important;
@@ -732,7 +772,7 @@
 .spec-tile-icon-unknown { background: rgba(148, 163, 184, 0.12); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.25); }
 
 /* ========================================================
-   10. ТЮНИНГ-ПЛАШКА
+   11. ТЮНИНГ-ПЛАШКА
    ======================================================== */
 .car-tuning-status-capsule {
   background: linear-gradient(145deg, rgba(16, 24, 38, 0.95), rgba(7, 11, 20, 0.95));
@@ -814,7 +854,7 @@
 }
 
 /* ========================================================
-   11. LED / СТРОБОСКОП / БЕЙДЖИ
+   12. LED / СТРОБОСКОП / БЕЙДЖИ
    ======================================================== */
 .badge-tag {
   background: rgba(8, 12, 20, 0.92) !important;
@@ -887,7 +927,7 @@
 }
 
 /* ========================================================
-   12. РЕПЛИКИ ПРОДАВЦА
+   13. РЕПЛИКИ ПРОДАВЦА
    ======================================================== */
 .seller-dialog-bubble {
   background: linear-gradient(135deg, rgba(14, 23, 40, 0.95), rgba(7, 12, 22, 0.95));
@@ -923,8 +963,53 @@
 }
 
 /* ========================================================
-   13. АВТОТЕКА И ТАЙМЕРЫ
+   14. АВТОТЕКА PRO: АДАПТАЦИЯ ПОД СМАРТФОНЫ (GOOGLE PIXEL)
    ======================================================== */
+#autotekaReportContent {
+  max-height: calc(100dvh - 150px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 0 2px !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 230, 118, 0.35) transparent;
+}
+
+#autotekaReportContent::-webkit-scrollbar {
+  width: 4px;
+}
+
+#autotekaReportContent::-webkit-scrollbar-thumb {
+  background: rgba(0, 230, 118, 0.35);
+  border-radius: 4px;
+}
+
+.autoteka-official-blank {
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: 420px !important;
+}
+
+.autoteka-section-compact {
+  background: #090e18;
+  border-radius: 8px;
+  padding: 7px 9px !important;
+  margin-bottom: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.autoteka-section-compact .autoteka-section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9.5px !important;
+  font-weight: 800;
+  color: var(--green, #00e676);
+  margin-bottom: 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 4px;
+}
+
 .autoteka-pts-card {
   background: linear-gradient(145deg, #090e18 0%, #060a12 100%);
   border: 1px solid var(--border-glow, rgba(0, 242, 254, 0.3));
@@ -1012,7 +1097,7 @@
 }
 
 /* ========================================================
-   14. ШКАЛА ТЕРПЕНИЯ ПРОДАВЦА
+   15. ШКАЛА ТЕРПЕНИЯ ПРОДАВЦА
    ======================================================== */
 .patience-meter-block {
   background: linear-gradient(160deg, rgba(9, 14, 24, 0.95), rgba(5, 8, 15, 0.98));
@@ -1124,7 +1209,7 @@
 }
 
 /* ========================================================
-   15. ПОДСКАЗКИ ШАНСОВ ТОРГА
+   16. ПОДСКАЗКИ ШАНСОВ ТОРГА
    ======================================================== */
 .haggle-chance-badge {
   display: inline-block;
@@ -1168,7 +1253,7 @@
 }
 
 /* ========================================================
-   16. ПАНЕЛЬ ТОРГА У КАПОТА
+   17. ПАНЕЛЬ ТОРГА У КАПОТА
    ======================================================== */
 .hood-deal-panel {
   background: #090e18;
@@ -1261,7 +1346,7 @@
 }
 
 /* ========================================================
-   17. БЛОК АРГУМЕНТОВ ДЕФЕКТОВ
+   18. БЛОК АРГУМЕНТОВ ДЕФЕКТОВ
    ======================================================== */
 .defect-argue-block {
   background: rgba(255, 179, 0, 0.08);
@@ -1336,7 +1421,7 @@
 }
 
 /* ========================================================
-   18. КАРТА РЫНКА
+   19. КАРТА РЫНКА
    ======================================================== */
 .market-container {
   width: 100%;
@@ -1593,7 +1678,7 @@
 
 @keyframes mapPreviewIn {
   from { opacity: 0; transform: translateY(12px) scale(0.95); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .map-pin-preview.hidden {
@@ -1671,39 +1756,16 @@
 }
 
 /* ========================================================
-   19. АВТОТЕКА
+   20. АДАПТИВНОСТЬ ПОД СМАРТФОНЫ (360px - 420px PIXEL)
    ======================================================== */
-.autoteka-section-compact {
-  background: #090e18;
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.autoteka-section-compact .autoteka-section-title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--cyan, #00f2fe);
-  margin-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 4px;
-}
-
-/* ========================================================
-   20. АДАПТИВНОСТЬ
-   ======================================================== */
-@media (max-width: 380px) {
+@media (max-width: 420px) {
   .market-categories-grid .cat-tile-icon { font-size: 20px; }
   .market-categories-grid .cat-tile-name { font-size: 9.5px; }
   .market-categories-grid .cat-tile-sub { font-size: 7.5px; }
-  .car-model-name { font-size: 13px; }
+  .car-model-name { font-size: 13.5px; }
   .car-price-value-3d { font-size: 14px; }
-  .car-specs-grid-volumetric { gap: 4px; }
-  .spec-tile-3d-col { padding: 5px 6px; min-height: 44px; }
+  .car-specs-grid-volumetric { gap: 4px !important; }
+  .spec-tile-3d-col { padding: 4px 5px !important; min-height: 40px !important; }
   .spec-tile-icon-wrap { width: 18px; height: 18px; font-size: 9px; }
   .spec-tile-col-data b { font-size: 9.5px; }
 
@@ -1720,5 +1782,10 @@
   .biz-fleet-card-badge {
     font-size: 8px !important;
     padding: 2px 6px !important;
+  }
+
+  .market-mode-btn {
+    font-size: 9px !important;
+    padding: 6px 2px !important;
   }
 }
