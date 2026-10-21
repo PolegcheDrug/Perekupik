@@ -1,15 +1,13 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.4.0)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.5.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.4.0 (БЕСКОНЕЧНЫЙ ТАКТИЛЬНЫЙ HUD 360° + ЗОЛОТОЙ УРОВЕНЬ):
-//   1. Бесконечная бесшовная карусель плашек статов без застреваний и упоров.
-//   2. Мягкий и плавный свайп пальцем с инерцией и виброоткликом в Telegram.
-//   3. Яркая неоновая золотая плашка уровня с короной (stat-pill-level).
-//   4. Автосворачивание категорий рынка при скролле вниз и открытие вверху.
-//   5. Восстановлен ежедневный бонус: календарь на 7 дней и claimDailyReward().
-//   6. Полная сохранность циклов налогов ФССП, пени +5%/д, аукционов за 50%,
-//      сложных процентов по депозитам, квестов и сейвов без сокращений.
+// ⭐ v5.5.0 (ФИКС СКРОЛЛА КАТЕГОРИЙ + ИДЕАЛЬНЫЙ КАЛЕНДАРЬ НАГРАД):
+//   1. Сетка категорий не распахивается при обычном подъеме наверх!
+//   2. Реализовано открытие только при повторном pull-down свайпе вниз в самом верху.
+//   3. Полная переработка ежедневных наград: сбалансированная прогрессия 1-7 дней.
+//   4. Идеальная ровная геометрия календаря наград без съезжания шрифтов и плашек.
+//   5. Сохранены циклы налогов ФССП, пени +5%/д, сложные проценты по депозитам.
 // ========================================================
 
 // ========================================================
@@ -92,9 +90,7 @@ function showToast(msg, type = 'default') {
     }
 
     t.innerText = msg;
-
     void t.offsetWidth;
-
     t.classList.add('show');
 
     if (_toastHideTimer) clearTimeout(_toastHideTimer);
@@ -143,25 +139,21 @@ function closeModal(id) {
 }
 
 // ========================================================
-// 2. ЕЖЕДНЕВНЫЙ БОНУС (КАЛЕНДАРЬ НАГРАД)
+// 2. ЕЖЕДНЕВНЫЙ БОНУС (СБАЛАНСИРОВАННЫЙ КАЛЕНДАРЬ НАГРАД)
 // ========================================================
 const DEFAULT_DAILY_CALENDAR = [
-    { day: 1, title: "День 1", icon: "💰", rewardText: "35,000 ₽", subText: "+25 XP", cash: 35000, xp: 25 },
-    { day: 2, title: "День 2", icon: "⛽", rewardText: "50,000 ₽", subText: "+35 ⛽ Топливо", cash: 50000, fuel: 35, xp: 35 },
-    { day: 3, title: "День 3", icon: "🎟️", rewardText: "65,000 ₽", subText: "+5 🎟️ Талонов", cash: 65000, tickets: 5, xp: 45 },
-    { day: 4, title: "День 4", icon: "💵", rewardText: "80,000 ₽", subText: "+5 ⭐ Stars", cash: 80000, stars: 5, xp: 55 },
-    { day: 5, title: "День 5", icon: "🤝", rewardText: "100,000 ₽", subText: "+1 🤝 Связь МРЭО", cash: 100000, connections: 1, xp: 65 },
-    { day: 6, title: "День 6", icon: "🛠️", rewardText: "140,000 ₽", subText: "+10 ⭐ Stars", cash: 140000, stars: 10, xp: 80 },
-    { day: 7, title: "День 7", icon: "🎰", rewardText: "250,000 ₽", subText: "1 🎟️ ВИЛСПИН + 15 ⭐", cash: 250000, superSpinTickets: 1, stars: 15, xp: 120 }
+    { day: 1, title: "День 1", icon: "💰", rewardText: "30 000 ₽", subText: "+ Полный бак ⛽", cash: 30000, fuel: 100, xp: 25 },
+    { day: 2, title: "День 2", icon: "🎟️", rewardText: "60 000 ₽", subText: "+ 5 Талонов 🎟️", cash: 60000, tickets: 5, xp: 35 },
+    { day: 3, title: "День 3", icon: "💵", rewardText: "100 000 ₽", subText: "+ 5 Банкнот ⭐", cash: 100000, stars: 5, xp: 50 },
+    { day: 4, title: "День 4", icon: "🎖️", rewardText: "150 000 ₽", subText: "+ 150 Опыта XP", cash: 150000, xp: 150 },
+    { day: 5, title: "День 5", icon: "📦", rewardText: "220 000 ₽", subText: "10 ⭐ + 10 🎟️", cash: 220000, stars: 10, tickets: 10, xp: 75 },
+    { day: 6, title: "День 6", icon: "🎰", rewardText: "350 000 ₽", subText: "Вилспин 🎰 + 15 ⭐", cash: 350000, superSpinTickets: 1, stars: 15, xp: 100 },
+    { day: 7, title: "День 7", icon: "👑", rewardText: "600 000 ₽", subText: "25 ⭐ + Номер X777XX", cash: 600000, stars: 25, plate: "Х777ХХ 77", xp: 200 }
 ];
 
+window.DAILY_REWARDS_CONFIG = DEFAULT_DAILY_CALENDAR;
+
 function getDailyRewardsList() {
-    if (typeof DAILY_REWARDS_CONFIG !== 'undefined' && Array.isArray(DAILY_REWARDS_CONFIG) && DAILY_REWARDS_CONFIG.length > 0) {
-        return DAILY_REWARDS_CONFIG;
-    }
-    if (typeof DAILY_REWARDS !== 'undefined' && Array.isArray(DAILY_REWARDS) && DAILY_REWARDS.length > 0) {
-        return DAILY_REWARDS;
-    }
     return DEFAULT_DAILY_CALENDAR;
 }
 
@@ -196,7 +188,51 @@ function renderDailyBonusGrid() {
     const { canClaim, streak } = getDailyBonusState();
     const rewards = getDailyRewardsList();
 
-    let html = `<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 12px;">`;
+    let html = `
+        <style>
+            .daily-calendar-grid {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 6px;
+                margin-bottom: 12px;
+            }
+            .daily-card-box {
+                background: #090e18;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 11px;
+                padding: 7px 4px;
+                text-align: center;
+                position: relative;
+                min-height: 98px;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                box-sizing: border-box;
+                transition: transform 0.15s ease, border-color 0.15s ease;
+            }
+            .daily-card-box.claimed {
+                background: rgba(0, 230, 118, 0.06);
+                border-color: rgba(0, 230, 118, 0.35);
+                opacity: 0.8;
+            }
+            .daily-card-box.active-ready {
+                background: radial-gradient(circle at 50% 30%, rgba(255, 215, 0, 0.2), #090e18);
+                border: 1.5px solid #ffd700;
+                box-shadow: 0 0 14px rgba(255, 215, 0, 0.35);
+                transform: translateY(-2px);
+            }
+            .daily-card-box.day-7-jackpot {
+                grid-column: span 2;
+                background: radial-gradient(circle at 50% 30%, rgba(192, 132, 252, 0.22), #090e18);
+                border: 1.5px solid #c084fc;
+            }
+            .daily-card-box.day-7-jackpot.active-ready {
+                border-color: #ffd700;
+                box-shadow: 0 0 18px rgba(255, 215, 0, 0.5);
+            }
+        </style>
+        <div class="daily-calendar-grid">
+    `;
 
     rewards.forEach((item, idx) => {
         const dayNum = idx + 1;
@@ -204,30 +240,38 @@ function renderDailyBonusGrid() {
         const isClaimed = idx < streak || (isCurrent && !canClaim);
         const isDay7 = (idx === 6);
 
-        let cardBg = "background:#090e18; border:1px solid rgba(255,255,255,0.08);";
+        let cardClass = "daily-card-box";
+        if (isDay7) cardClass += " day-7-jackpot";
+        if (isClaimed) cardClass += " claimed";
+        else if (isCurrent && canClaim) cardClass += " active-ready";
+
         let statusBadge = "";
-        let badgeColor = "var(--cyan)";
+        let dayColor = "#94a3b8";
 
         if (isClaimed) {
-            cardBg = "background:rgba(0, 230, 118, 0.08); border:1px solid rgba(0, 230, 118, 0.4); opacity:0.75;";
-            statusBadge = `<div style="position:absolute; top:3px; right:5px; font-size:10px; color:var(--green); font-weight:bold;">✓</div>`;
+            statusBadge = `<div style="position:absolute; top:3px; right:4px; font-size:9.5px; color:#00e676; font-weight:900;">✓</div>`;
+            dayColor = "#00e676";
         } else if (isCurrent && canClaim) {
-            cardBg = "background:radial-gradient(circle, rgba(255,215,0,0.18), #090e18); border:1.5px solid #ffd700; box-shadow:0 0 12px rgba(255,215,0,0.35);";
-            badgeColor = "#ffd700";
-            statusBadge = `<div style="position:absolute; top:3px; right:5px; font-size:8px; color:#ffd700; font-weight:bold;">ГОТОВО</div>`;
+            statusBadge = `<div style="position:absolute; top:3px; right:4px; font-size:7.5px; background:#ffd700; color:#000; padding:1px 4px; border-radius:4px; font-weight:900;">ЖДЁТ</div>`;
+            dayColor = "#ffd700";
         }
 
-        const gridCol = isDay7 ? 'grid-column: span 2;' : '';
-        const icon = item.icon || (isDay7 ? '🎰' : '🎁');
-        const textVal = item.rewardText || item.title || (item.cash ? `${item.cash.toLocaleString()} ₽` : 'Бонус');
+        const icon = item.icon || (isDay7 ? '👑' : '🎁');
+        const textVal = item.rewardText;
 
         html += `
-            <div style="${cardBg} ${gridCol} border-radius:10px; padding:8px 4px; text-align:center; position:relative;">
+            <div class="${cardClass}">
                 ${statusBadge}
-                <div class="sub-label font-bold" style="font-size:8.5px; color:${badgeColor}; text-transform:uppercase;">День ${dayNum}</div>
-                <div style="font-size:24px; margin:2px 0;">${icon}</div>
-                <b class="text-xs color-green block" style="font-size:10px; line-height:1.2;">${textVal}</b>
-                ${item.subText ? `<div class="sub-label" style="font-size:8px; color:#94a3b8; margin-top:2px;">${item.subText}</div>` : ''}
+                <div style="font-size:8px; font-weight:900; color:${dayColor}; text-transform:uppercase; letter-spacing:0.3px;">
+                    ДЕНЬ ${dayNum}${isDay7 ? ' 👑 ДЖЕКПОТ' : ''}
+                </div>
+                <div style="font-size:20px; line-height:1; margin:3px 0;">${icon}</div>
+                <div>
+                    <b style="font-size:9.5px; line-height:1.2; color:#00e676; display:block;">${textVal}</b>
+                    <div style="font-size:7.5px; color:#94a3b8; margin-top:2px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        ${item.subText || ''}
+                    </div>
+                </div>
             </div>
         `;
     });
@@ -242,7 +286,7 @@ function renderDailyBonusGrid() {
             btn.disabled = false;
             btn.style.opacity = "1";
             btn.style.cursor = "pointer";
-            btn.innerHTML = `<i class="fa-solid fa-gift mr-1"></i> Забрать награду (${rewards[streak]?.rewardText || 'Бонус'})!`;
+            btn.innerHTML = `<i class="fa-solid fa-gift mr-1"></i> Забрать награду (${rewards[streak]?.rewardText})!`;
         } else {
             btn.className = "btn btn-dark w-full font-bold mb-2";
             btn.disabled = true;
@@ -287,14 +331,21 @@ function claimDailyReward() {
         tokens.push({ icon: '🎟️', title: 'Экспресс-пропуска', value: `+${r.tickets} 🎟️`, rarity: 'token-purple' });
     }
 
-    if (r.connections && r.connections > 0) {
-        window.state.player.connections = (window.state.player.connections || 0) + r.connections;
-        tokens.push({ icon: '🤝', title: 'Связи в МРЭО', value: `+${r.connections} 🤝`, rarity: 'token-purple' });
-    }
-
     if (r.superSpinTickets && r.superSpinTickets > 0) {
         window.state.player.superSpinTickets = (window.state.player.superSpinTickets || 0) + r.superSpinTickets;
         tokens.push({ icon: '🎰', title: 'Билет Вилспина', value: `+${r.superSpinTickets} 🎟️`, rarity: 'token-amber' });
+    }
+
+    if (r.plate) {
+        if (!Array.isArray(window.state.player.platesInventory)) window.state.player.platesInventory = [];
+        if (!Array.isArray(window.state.ownedPlates)) window.state.ownedPlates = [];
+        if (!window.state.ownedPlates.includes(r.plate)) {
+            window.state.ownedPlates.push(r.plate);
+        }
+        if (!window.state.player.platesInventory.some(p => (typeof p === 'string' ? p === r.plate : p?.plate === r.plate))) {
+            window.state.player.platesInventory.push({ plate: r.plate, region: "77", isExclusive: true });
+        }
+        tokens.push({ icon: '🏷️', title: 'Эксклюзивный госномер', value: r.plate, rarity: 'token-purple' });
     }
 
     if (r.xp && r.xp > 0) {
@@ -932,7 +983,6 @@ function updateHeaderUI() {
         setTxt('ticketsAmount', tck + "/" + mTck);
         setTxt('playerName', pName);
         
-        // ⭐ ЯРКАЯ ЗОЛОТАЯ ИКОНКА УРОВНЯ
         const lvlBtn = document.querySelector('.stat-pill.stat-pill-level');
         if (lvlBtn) {
             lvlBtn.innerHTML = `<i class="fa-solid fa-crown" style="color:#ffe600; filter:drop-shadow(0 0 6px #ffd700); margin-right:4px;"></i> <span id="playerLvl" style="font-weight:900; color:#ffd700;">Ур. ${lvl}</span>`;
@@ -980,7 +1030,6 @@ function updateHeaderUI() {
         let hasWorkshop = typeof checkPlayerCapability === 'function' ? checkPlayerCapability('tune') : false;
         setTxt('garageHeaderSlots', hasWorkshop ? `${gLen}/${totalSlots}` : `${gLen}/${totalSlots} ⛺`);
 
-        // Неоновая подсветка кнопки «Бонус», если подарок доступен
         const bonusBtn = document.querySelector('.hud-btn.btn-bonus');
         if (bonusBtn) {
             const { canClaim } = getDailyBonusState();
@@ -1378,7 +1427,6 @@ const HudRevolver = {
         slider.style.cursor = 'grab';
         slider.style.scrollbarWidth = 'none';
 
-        // Создаем бесконечную карусель (клонируем плашки 2 раза)
         if (!this.row.dataset.cloned) {
             this.row.dataset.cloned = "true";
             const originalHTML = this.row.innerHTML;
@@ -1390,7 +1438,6 @@ const HudRevolver = {
             slider.scrollLeft = this.singleSetWidth;
         });
 
-        // Мышь (ПК)
         slider.addEventListener('mousedown', (e) => {
             this.isDown = true;
             slider.style.cursor = 'grabbing';
@@ -1415,7 +1462,6 @@ const HudRevolver = {
             this.checkLoop();
         });
 
-        // Тач-свайп (смартфон / Telegram)
         let touchStartX = 0;
         let lastX = 0;
 
@@ -1477,23 +1523,23 @@ const HudRevolver = {
 };
 
 // ========================================================
-// 13. СЛУШАТЕЛЬ СКРОЛЛА ЛЕНТЫ ДЛЯ АВТОСВОРАЧИВАНИЯ КАТЕГОРИЙ
+// 13. СЛУШАТЕЛЬ СКРОЛЛА И PULL-DOWN СВАЙПА КАТЕГОРИЙ
 // ========================================================
 function initMarketScrollListener() {
     const mainContent = document.querySelector('.main-content') || window;
     let lastScrollTop = 0;
+    let touchStartY = 0;
+    let isAtTopBeforeTouch = false;
 
+    // Авто-сворачивание при скролле вниз (НЕ распахивает при подъеме вверх!)
     const onScroll = () => {
         const curScroll = mainContent.scrollTop !== undefined ? mainContent.scrollTop : window.scrollY;
 
         const marketTab = document.getElementById('tabMarket');
         if (!marketTab || !marketTab.classList.contains('active')) return;
 
-        if (curScroll <= 15) {
-            if (typeof window.collapseMarketCategories === 'function') {
-                window.collapseMarketCategories(false);
-            }
-        } else if (curScroll > lastScrollTop && curScroll > 60) {
+        // Сворачиваем только при движении вниз
+        if (curScroll > lastScrollTop && curScroll > 60) {
             if (typeof window.collapseMarketCategories === 'function') {
                 window.collapseMarketCategories(true);
             }
@@ -1504,6 +1550,33 @@ function initMarketScrollListener() {
 
     if (mainContent.addEventListener) {
         mainContent.addEventListener('scroll', onScroll, { passive: true });
+
+        // Тач-детектор: раскрытие ТОЛЬКО при повторном свайпе вниз в самом верху
+        mainContent.addEventListener('touchstart', (e) => {
+            if (e.touches && e.touches[0]) {
+                touchStartY = e.touches[0].clientY;
+                const curScroll = mainContent.scrollTop !== undefined ? mainContent.scrollTop : window.scrollY;
+                isAtTopBeforeTouch = (curScroll <= 5);
+            }
+        }, { passive: true });
+
+        mainContent.addEventListener('touchend', (e) => {
+            if (e.changedTouches && e.changedTouches[0]) {
+                const touchEndY = e.changedTouches[0].clientY;
+                const deltaY = touchEndY - touchStartY;
+                const curScroll = mainContent.scrollTop !== undefined ? mainContent.scrollTop : window.scrollY;
+
+                const marketTab = document.getElementById('tabMarket');
+                if (!marketTab || !marketTab.classList.contains('active')) return;
+
+                // Если игрок УЖЕ был в самом верху и свайпнул вниз > 45px — раскрываем категории
+                if (isAtTopBeforeTouch && curScroll <= 5 && deltaY > 45) {
+                    if (typeof window.toggleMarketCategories === 'function') {
+                        window.toggleMarketCategories(false);
+                    }
+                }
+            }
+        }, { passive: true });
     }
 }
 
@@ -1562,4 +1635,4 @@ window.HudRevolver = HudRevolver;
 window._safeNumDeposit = _safeNumDeposit;
 window.initMarketScrollListener = initMarketScrollListener;
 
-console.log('[💠 app-game.js v5.4.0] Бесконечный свайп 360°, автоскролл и золотой уровень активированы ✓');
+console.log('[💠 app-game.js v5.5.0] Pull-down свайп категорий и сбалансированный календарь наград активированы ✓');
