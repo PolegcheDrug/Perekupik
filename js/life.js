@@ -1,12 +1,12 @@
 // ========================================================
-// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», ТОНУС И СОЦИУМ (v1.0.0)
+// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», ТОНУС И СОЦИУМ (v1.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.0.0 (CLEAN LIFE & SOCIAL INTEGRATION):
-//   - Полная интеграция Социума, Хроники ДПС (ст. 12.5.1), Гонок и Топа игроков из Приложения М.
-//   - 3 удобных подраздела: «Тонус & Быт», «Улица & ДПС», «Социум & Топ».
-//   - Интерактивная лента инсайдов, реакции на облавы, рейтинг перекупов и автоклубы.
-//   - Сохранены все механики рациона, активностей, бани, спортзала и кармы.
+// ⭐ v1.1.0 (ФИКС ВЕРСТКИ ИНСАЙДА + ТАЙМЕРЫ ОБЛАВ):
+//   1. Исправлена растянутая кнопка «+ Инсайд» (аккуратный размер, flex-shrink: 0).
+//   2. Добавлены таймеры действия рейдов ДПС (ст. 12.5.1) и уличных событий.
+//   3. Устранено разъезжание карточек на мобильных экранах.
+//   4. Сохранены все механики рациона, активностей, бани, спортзала и кармы.
 // ========================================================
 
 let lifeActiveTab = 'tone'; // 'tone' | 'street' | 'social'
@@ -34,7 +34,7 @@ const DEFAULT_LIFE_ACTIVITIES = [
     { id: 'spa_resort', name: 'Премиальный загородный СПА', cost: 75000, mood: 100, karma: 5, desc: 'Бассейн с подогревом, массаж и полный день восстановления без звонков с авторынка.' }
 ];
 
-// Базовая хроника городских событий и облав ДПС
+// Базовая хроника городских событий и облав ДПС с таймерами активности
 const DEFAULT_STREET_EVENTS = [
     {
         id: 'ev_dps_1',
@@ -44,6 +44,7 @@ const DEFAULT_STREET_EVENTS = [
         badgeColor: 'var(--red)',
         text: 'Внимание водителям! На выезде с проспекта Мира развернут спецбатальон технадзора. Проверяют прямоточные глушители, нештатный выворот и заварку редукторов. 4 корча уже погружены на эвакуаторы!',
         timeAgo: '3 мин назад',
+        timeLeftMinutes: 27,
         reactions: { fire: 8, fear: 24, skull: 19 }
     },
     {
@@ -54,6 +55,7 @@ const DEFAULT_STREET_EVENTS = [
         badgeColor: 'var(--amber)',
         text: 'Кто смелый сегодня в полночь на объездной? Залита сотая прошивка под лаунч, ставка 100,000 ₽ на капот. Ищу живой Chaser Tourer V или Audi S3.',
         timeAgo: '12 мин назад',
+        timeLeftMinutes: 45,
         reactions: { fire: 31, fear: 2, skull: 5 }
     },
     {
@@ -64,6 +66,7 @@ const DEFAULT_STREET_EVENTS = [
         badgeColor: 'var(--green)',
         text: 'В соседнем дворе у дедушки забрали гаражный ВАЗ-2101 1978 года в родной краске с пробегом 18,000 км за 75k! На авторынке уже готовы оторвать с руками за 450k.',
         timeAgo: '35 мин назад',
+        timeLeftMinutes: 15,
         reactions: { fire: 45, fear: 1, skull: 0 }
     }
 ];
@@ -118,6 +121,32 @@ function renderLifeScreen() {
                 color: #00e676;
                 border: 1px solid rgba(0, 230, 118, 0.4);
                 box-shadow: 0 0 10px rgba(0, 230, 118, 0.2);
+            }
+            .life-inside-btn {
+                background: linear-gradient(135deg, #00f2fe, #0284c7) !important;
+                color: #000 !important;
+                font-size: 10px !important;
+                font-weight: 900 !important;
+                padding: 6px 12px !important;
+                border-radius: 8px !important;
+                border: none !important;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 5px;
+                height: 32px;
+                flex-shrink: 0;
+                box-shadow: 0 0 12px rgba(0, 242, 254, 0.35);
+                transition: all 0.15s ease;
+                white-space: nowrap;
+            }
+            .life-inside-btn:hover {
+                filter: brightness(1.1);
+                box-shadow: 0 0 18px rgba(0, 242, 254, 0.6);
+            }
+            .life-inside-btn:active {
+                transform: scale(0.96);
             }
             .life-reaction-btn {
                 background: rgba(255, 255, 255, 0.04);
@@ -204,7 +233,6 @@ function switchLifeTab(tabKey) {
     tgHaptic('light');
     renderCurrentLifeSubTab();
 
-    // Обновляем подсветку кнопок табов
     document.querySelectorAll('.life-tab-btn').forEach(btn => btn.classList.remove('active'));
     event?.currentTarget?.classList.add('active');
 }
@@ -305,23 +333,23 @@ function renderStreetRadarSubTab(container) {
     });
 
     container.innerHTML = `
-        <!-- КАРТОЧКА ОПЕРАТИВНОЙ СВОДКИ -->
+        <!-- КАРТОЧКА ОПЕРАТИВНОЙ СВОДКИ (ИСПРАВЛЕНА РАСТЯНУТАЯ КНОПКА) -->
         <div class="glass-card mb-3 p-3" style="background:linear-gradient(135deg, rgba(255,51,102,0.1), #090e18); border-color:rgba(255,51,102,0.4);">
-            <div class="flex-between mb-2">
-                <div class="flex-gap" style="align-items:center;">
-                    <span style="font-size:16px;">🚨</span>
-                    <div>
-                        <b class="text-xs color-red" style="font-size:12px;">Хроника Улиц & Радар ДПС</b>
-                        <div class="sub-label" style="font-size:8.5px;">Облавы технадзора (ст. 12.5.1), заезды на 402м и инсайды</div>
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px;">
+                <div style="display:flex; align-items:flex-start; gap:8px; min-width:0; flex:1;">
+                    <span style="font-size:20px; line-height:1; margin-top:2px;">🚨</span>
+                    <div style="min-width:0;">
+                        <b class="text-xs color-red" style="font-size:12px; display:block; line-height:1.2;">Хроника Улиц & Радар ДПС</b>
+                        <div class="sub-label" style="font-size:8.5px; margin-top:2px; line-height:1.3;">Облавы технадзора (ст. 12.5.1), заезды на 402м и инсайды</div>
                     </div>
                 </div>
-                <button onclick="openAddStreetInsideModal()" class="btn btn-cyan btn-sm" style="font-size:9px; padding:5px 9px;">
-                    <i class="fa-solid fa-plus mr-1"></i> Инсайд
+                <button onclick="openAddStreetInsideModal()" class="life-inside-btn">
+                    <i class="fa-solid fa-plus"></i> ИНСАЙД
                 </button>
             </div>
 
             <!-- Фильтры хроники -->
-            <div style="display:flex; gap:5px; margin-bottom:8px; overflow-x:auto;">
+            <div style="display:flex; gap:5px; margin-bottom:2px; overflow-x:auto; padding-bottom:2px;">
                 <button onclick="filterStreetFeed('all')" class="m-pill-chip ${curFilter === 'all' ? 'active' : ''}">
                     Все
                 </button>
@@ -365,13 +393,20 @@ function renderStreetRadarSubTab(container) {
 }
 
 function renderSingleStreetEvent(ev) {
+    const timerBadge = ev.timeLeftMinutes
+        ? `<span class="sub-label" style="font-size:7.5px; color:#f59e0b; margin-left:6px;"><i class="fa-solid fa-stopwatch mr-1"></i>${ev.timeLeftMinutes} мин</span>`
+        : '';
+
     return `
         <div class="glass-card p-3" style="background:#090e18; border-left:3px solid ${ev.badgeColor || 'var(--cyan)'}; border-radius:12px;">
             <div class="flex-between mb-1">
                 <b class="text-xs color-main" style="font-size:11px;">${ev.author}</b>
-                <span class="tag-badge" style="background:${ev.badgeColor}22; color:${ev.badgeColor}; border:1px solid ${ev.badgeColor}55; font-size:7.5px;">
-                    ${ev.badge}
-                </span>
+                <div style="display:flex; align-items:center;">
+                    <span class="tag-badge" style="background:${ev.badgeColor}22; color:${ev.badgeColor}; border:1px solid ${ev.badgeColor}55; font-size:7.5px;">
+                        ${ev.badge}
+                    </span>
+                    ${timerBadge}
+                </div>
             </div>
             <div class="sub-label mb-2" style="font-size:9.5px; line-height:1.4; color:#e2e8f0;">
                 ${ev.text}
@@ -427,6 +462,7 @@ function openAddStreetInsideModal() {
         badgeColor: 'var(--cyan)',
         text: text.trim(),
         timeAgo: 'Только что',
+        timeLeftMinutes: 30,
         reactions: { fire: 1, fear: 0, skull: 0 }
     });
 
@@ -447,7 +483,6 @@ function renderSocialAndClubsSubTab(container) {
     const myCash = player.cash || 0;
     const myLevel = player.level || 1;
 
-    // Имитация таблицы лидеров перекупов
     const leaderboard = [
         { rank: 1, name: "Кинг_Перекуп", level: 12, balance: 48500000, rep: "Легенда авторынка" },
         { rank: 2, name: "Chaser_999", level: 9, balance: 24100000, rep: "Дрифт-барон" },
