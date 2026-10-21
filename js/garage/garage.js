@@ -1,9 +1,11 @@
 // ========================================================
-// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.7.5-fixed)
+// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.8.0-club)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v1.7.5-fixed:
-//   - Восстановлено управление номерами (кнопка «ГРЗ/Номера» + клик по номеру в инспекции)
-//   - Интерактивный расчет цены +-15% при выставлении на продажу
+//
+// ⭐ v1.8.0-club (ИНТЕГРАЦИЯ ПЕРКОВ АВТОКЛУБА И АДАПТИВНАЯ ВЕРСТКА):
+//   - Отображение активного клубного перка «Гаражное братство» [STS] (-15% на сервис и тюнинг).
+//   - Стабилизация кнопок действий под мобильные экраны (без расползания и срезов).
+//   - Сохранено управление госномерами ГРЗ и быстрый расчет цены продажи +-15%.
 // ========================================================
 
 window.previewCarIndex = null;
@@ -58,6 +60,19 @@ function _getFixedCarImage(car) {
         return car.images[0];
     }
     return "assets/cars/economy/2101/vaz-2101.jpg";
+}
+
+function _hasClubPerk(perkKey) {
+    if (typeof window.hasClubPerk === 'function') {
+        return window.hasClubPerk(perkKey);
+    }
+    const club = state?.player?.club;
+    const clubId = typeof club === 'string' ? club : club?.id;
+    if (clubId === 'sts') return true;
+    if (Array.isArray(club?.perks) && club.perks.some(p => (p.id === perkKey || String(p.title || '').includes('братство')))) {
+        return true;
+    }
+    return false;
 }
 
 function setGarageFilter(filter) {
@@ -189,6 +204,7 @@ function renderGarage() {
         }
 
         const canTune = Boolean(caps?.canTune);
+        const hasBrotherhood = _hasClubPerk('garage_brotherhood');
         const activeHouseTitle = caps?.activeHouseTitle || 'Гаражный бокс';
         const statusPillClass = canTune ? "color-green" : (caps?.category === 'street' ? "color-red" : "color-amber");
         const statusPillText = canTune
@@ -265,11 +281,6 @@ function renderGarage() {
             const cPlate = escapeHtml(car.customPlate || car.plate || "ТРАНЗИТ");
             const cPrice = (car.marketValue || car.basePrice || 100000).toLocaleString();
 
-            let grade = { grade: 'A', label: 'Отличное', color: 'color-green' };
-            try {
-                if (typeof getCarConditionGrade === 'function') grade = getCarConditionGrade(car) || grade;
-            } catch (e) {}
-
             const carImgAttrs = (typeof buildCarImageAttrs === 'function')
                 ? buildCarImageAttrs(rawImg, car)
                 : `src="${rawImg}" onerror="this.onerror=null; this.src='${car.fallback || 'assets/cars/economy/2101/vaz-2101.jpg'}'"`;
@@ -326,46 +337,54 @@ function renderGarage() {
             if (isImpounded) {
                 actionControlBlock = `
                     <div class="p-2 mb-2" style="background:rgba(220,38,38,0.15); border:1px solid var(--red); border-radius:10px;">
-                        <button onclick="openImpoundLotModal(${originalIdx})" class="btn btn-danger btn-sm w-full">
+                        <button onclick="openImpoundLotModal(${originalIdx})" class="btn btn-danger btn-sm w-full font-bold">
                             🚔 Штрафстоянка: Забрать автомобиль
                         </button>
                     </div>
                 `;
             } else {
                 const personalBtn = isPersonal
-                    ? `<button onclick="togglePersonalCar(${originalIdx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-crown color-amber"></i> Снять личку</button>`
-                    : `<button onclick="togglePersonalCar(${originalIdx})" class="btn btn-amber btn-sm" ${isAssignedToBiz ? 'disabled title="Сначала снимите авто с линии"' : ''}><i class="fa-solid fa-crown"></i> Сделать личным</button>`;
+                    ? `<button onclick="togglePersonalCar(${originalIdx})" class="btn btn-dark btn-sm" style="font-size:9.5px; padding:6px 4px;"><i class="fa-solid fa-crown color-amber mr-1"></i> Снять личку</button>`
+                    : `<button onclick="togglePersonalCar(${originalIdx})" class="btn btn-amber btn-sm" style="font-size:9.5px; padding:6px 4px;" ${isAssignedToBiz ? 'disabled title="Сначала снимите авто с линии"' : ''}><i class="fa-solid fa-crown mr-1"></i> Сделать личным</button>`;
 
                 let fleetActionBtn = "";
                 if (isAssignedToBiz) {
                     fleetActionBtn = `
-                        <div class="grid-2 mb-2">
-                            <button onclick="if(window.BusinessFleetModule) BusinessFleetModule.renderFleetManagerModal('${car.assignedBusinessId}')" class="btn btn-amber btn-sm">
-                                <i class="fa-solid fa-truck-ramp-box"></i> Автопарк точки
+                        <div class="grid-2 mb-2" style="gap:6px;">
+                            <button onclick="if(window.BusinessFleetModule) BusinessFleetModule.renderFleetManagerModal('${car.assignedBusinessId}')" class="btn btn-amber btn-sm font-bold" style="font-size:9.5px; padding:6px 0;">
+                                <i class="fa-solid fa-truck-ramp-box mr-1"></i> Автопарк точки
                             </button>
-                            <button onclick="unassignCarFromGarage(${originalIdx})" class="btn btn-dark btn-sm">
-                                <i class="fa-solid fa-arrow-right-from-bracket"></i> Снять с линии
+                            <button onclick="unassignCarFromGarage(${originalIdx})" class="btn btn-dark btn-sm font-bold" style="font-size:9.5px; padding:6px 0;">
+                                <i class="fa-solid fa-arrow-right-from-bracket mr-1"></i> Снять с линии
                             </button>
                         </div>
                     `;
                 }
 
                 actionControlBlock = `
-                    <div class="grid-3 mb-2">
-                        <button onclick="openCarPreviewModal(${originalIdx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-clipboard-check color-cyan"></i> Инспекция</button>
-                        <button onclick="openTuningModal(${originalIdx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-screwdriver-wrench ${canTune ? 'color-cyan' : ''}"></i> Тюнинг</button>
-                        <button onclick="openPreSaleModal(${originalIdx})" class="btn btn-dark btn-sm"><i class="fa-solid fa-wand-magic-sparkles"></i> Детейлинг</button>
+                    <div class="grid-3 mb-2" style="gap:5px;">
+                        <button onclick="openCarPreviewModal(${originalIdx})" class="btn btn-dark btn-sm font-bold" style="font-size:9.5px; padding:6px 2px;">
+                            <i class="fa-solid fa-clipboard-check color-cyan mr-1"></i> Инспекция
+                        </button>
+                        <button onclick="openTuningModal(${originalIdx})" class="btn btn-dark btn-sm font-bold" style="font-size:9.5px; padding:6px 2px;">
+                            <i class="fa-solid fa-screwdriver-wrench ${canTune ? 'color-cyan' : ''} mr-1"></i> Тюнинг
+                        </button>
+                        <button onclick="openPreSaleModal(${originalIdx})" class="btn btn-dark btn-sm font-bold" style="font-size:9.5px; padding:6px 2px;">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1 color-amber"></i> Детейлинг
+                        </button>
                     </div>
 
                     ${fleetActionBtn}
 
-                    <div class="grid-2 mb-2">
+                    <div class="grid-2 mb-2" style="gap:6px;">
                         ${personalBtn}
-                        <button onclick="selectCarForStreetDirect(${originalIdx})" class="btn btn-red btn-sm"><i class="fa-solid fa-flag-checkered"></i> В Стрит / Дрифт</button>
+                        <button onclick="selectCarForStreetDirect(${originalIdx})" class="btn btn-red btn-sm font-bold" style="font-size:9.5px; padding:6px 4px;">
+                            <i class="fa-solid fa-flag-checkered mr-1"></i> В Стрит / Дрифт
+                        </button>
                     </div>
 
                     <div>
-                        <button onclick="openPutOnLotModal(${originalIdx})" class="btn btn-green btn-sm w-full" ${(isPersonal || isAssignedToBiz) ? 'disabled title="Снимите статус личного авто или снимите с линии бизнеса"' : ''}>
+                        <button onclick="openPutOnLotModal(${originalIdx})" class="btn btn-green btn-sm w-full font-bold" style="font-size:10.5px; padding:8px 0;" ${(isPersonal || isAssignedToBiz) ? 'disabled title="Снимите статус личного авто или снимите с линии бизнеса"' : ''}>
                             ${isPersonal ? '🔒 Личный авто (Не продаётся)' : (isAssignedToBiz ? '💼 На линии бизнеса (Не продаётся)' : '🏪 Выставить на продажу')}
                         </button>
                     </div>
@@ -383,10 +402,11 @@ function renderGarage() {
                 <div class="car-header-row-volumetric">
                     <div style="flex:1; min-width:0; margin-right:8px;">
                         ${brandHeaderHtml}
-                        <div class="car-status-badges-row mt-1">
+                        <div class="car-status-badges-row mt-1" style="flex-wrap:wrap; gap:4px;">
                             <div class="plate-mini-capsule notranslate" translate="no">
                                 ${cPlate} <span class="plate-flag-mini">RUS</span>
                             </div>
+                            ${hasBrotherhood ? `<span class='tag-badge bg-tag-purple' style="font-size:7.5px;">🛠️ [STS] -15% КЛУБ</span>` : ''}
                             ${commercialBadge}
                             ${personalBadge}
                             ${legalBadge}
@@ -470,8 +490,7 @@ function openCarPreviewModal(idx) {
         <div class="modal-box text-left" style="max-width: 440px; max-height: 90vh; overflow-y: auto;">
             <div class="flex-between mb-2 pb-2" style="border-bottom: 1px solid rgba(255,255,255,0.08);">
                 <div>
-                    <h3 class="font-bold color-cyan mb-1">${escapeHtml(car.name)}</h3>
-                    <!-- Кликабельный бейдж номера для быстрой смены -->
+                    <h3 class="font-bold color-cyan mb-1" style="font-size:14px;">${escapeHtml(car.name)}</h3>
                     <div class="license-plate" onclick="openChangePlateModal()" style="font-size:10px; padding:2px 6px; cursor:pointer;" title="Нажмите, чтобы сменить или снять номера">
                         ${cPlate} <div class="license-flag">RUS</div>
                     </div>
@@ -503,14 +522,14 @@ function openCarPreviewModal(idx) {
                 </div>
             </div>
 
-            <div class="grid-2 mb-2">
-                <button onclick="openGaugeModalFromPreview()" class="btn btn-dark btn-sm"><i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер</button>
-                <button onclick="openOBD2ModalFromPreview()" class="btn btn-dark btn-sm"><i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> Launch OBD2</button>
+            <div class="grid-2 mb-2" style="gap:6px;">
+                <button onclick="openGaugeModalFromPreview()" class="btn btn-dark btn-sm font-bold" style="font-size:9.5px;"><i class="fa-solid fa-microchip color-cyan mr-1"></i> Толщиномер</button>
+                <button onclick="openOBD2ModalFromPreview()" class="btn btn-dark btn-sm font-bold" style="font-size:9.5px;"><i class="fa-solid fa-tablet-screen-button color-cyan mr-1"></i> Launch OBD2</button>
             </div>
-            <div class="grid-3 mb-2" style="gap:4px;">
-                <button onclick="openTuningFromPreview()" class="btn btn-dark btn-sm"><i class="fa-solid fa-screwdriver-wrench color-amber mr-1"></i> Тюнинг</button>
-                <button onclick="openChangePlateModal()" class="btn btn-dark btn-sm"><i class="fa-solid fa-id-card color-green mr-1"></i> Номера</button>
-                <button onclick="ModalManager.close('modalPreview')" class="btn btn-dark btn-sm">Закрыть</button>
+            <div class="grid-3 mb-2" style="gap:5px;">
+                <button onclick="openTuningFromPreview()" class="btn btn-dark btn-sm font-bold" style="font-size:9px;"><i class="fa-solid fa-screwdriver-wrench color-amber mr-1"></i> Тюнинг</button>
+                <button onclick="openChangePlateModal()" class="btn btn-dark btn-sm font-bold" style="font-size:9px;"><i class="fa-solid fa-id-card color-green mr-1"></i> Номера</button>
+                <button onclick="ModalManager.close('modalPreview')" class="btn btn-dark btn-sm font-bold" style="font-size:9px;">Закрыть</button>
             </div>
         </div>
     `;
@@ -615,7 +634,7 @@ function openPutOnLotModal(idx) {
             </div>
 
             <div class="p-3 mb-3" style="background: #090e18; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
-                <div class="font-bold text-sm color-cyan mb-1 text-center">${cName}</div>
+                <div class="font-bold text-sm color-cyan mb-1 text-center" style="font-size:13px;">${cName}</div>
                 <div class="text-xs sub-label mb-2 text-center">Госномер: <span class="license-plate" style="font-size: 10px; padding: 2px 6px;">${cPlate}</span></div>
                 <div class="flex-between text-xs px-2 py-1" style="background: rgba(0, 230, 118, 0.1); border-radius: 6px;">
                     <span class="sub-label">Оценка рынка:</span>
@@ -662,9 +681,9 @@ function openPutOnLotModal(idx) {
 
             <div id="lotPricePreview" class="p-2 mb-3 text-xs" style="background: rgba(0, 242, 254, 0.05); border-radius: 8px; border: 1px solid rgba(0, 242, 254, 0.2);"></div>
 
-            <div class="grid-2">
-                <button onclick="confirmPutOnLot()" class="btn btn-green">Выставить</button>
-                <button onclick="ModalManager.close('modalPutOnLot')" class="btn btn-dark">Отмена</button>
+            <div class="grid-2" style="gap:6px;">
+                <button onclick="confirmPutOnLot()" class="btn btn-green font-bold">Выставить</button>
+                <button onclick="ModalManager.close('modalPutOnLot')" class="btn btn-dark font-bold">Отмена</button>
             </div>
         </div>
     `;
@@ -785,4 +804,4 @@ Object.assign(window, {
     setGarageFilter, unassignCarFromGarage, setLotPrice, updateLotPricePreview
 });
 
-console.log('[🏠 garage v1.7.5-fixed] Инспекция с кнопками ГРЗ и авторасчет цены продажи ✓');
+console.log('[🏠 garage v1.8.0-club] Адаптивная верстка кнопок и перки синдиката активированы ✓');
