@@ -1,11 +1,11 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.5.0 CLOUD-FIRST & WIPE EPOCH)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.6.0 RESET-FIX)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.5.0:
-//   - Внедрена система serverEpoch для управляемого вайпа через DEV.
-//   - Публикация реальных игроков в коллекцию leaderboard.
-//   - Защита от воскрешения сейвов из localStorage после вайпа.
+// ⭐ v1.6.0:
+//   - ДОБАВЛЕН resetPlayerCloud: принудительный сброс игрока прямо в облаке Firestore.
+//   - Полная перезапись коллекций players, garages, leaderboard стартовыми данными.
+//   - Защита от воскрешения старых миллионов при перезагрузке страницы.
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -52,7 +52,7 @@ const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
 });
 
-console.log('[🔥 Firebase Core] Firestore инициализирован (v1.5.0)');
+console.log('[🔥 Firebase Core] Firestore инициализирован (v1.6.0)');
 
 const DEFAULT_AUTH_SERVER_URL = window.AUTH_SERVER_URL || null;
 
@@ -222,7 +222,6 @@ const SystemConfigManager = {
       if (snap.exists()) {
         return Number(snap.data().serverEpoch) || 1;
       }
-      // Если документа еще нет, создаем начальную эпоху
       await setDoc(doc(db, "system", "server_config"), { serverEpoch: 1, updatedAt: Date.now() }, { merge: true });
       return 1;
     } catch (e) {
@@ -241,7 +240,6 @@ const SystemConfigManager = {
         wipedBy: verifiedUserId || 'owner'
       }, { merge: true });
 
-      // Очищаем рынок и P2P
       await AdminManager.wipeMarketOnly(true);
 
       console.log(`[Wipe] 🚨 Глобальная эпоха сервера повышена до: ${newEpoch}`);
@@ -255,7 +253,7 @@ const SystemConfigManager = {
 };
 
 // ========================================================
-// 6. LEADERBOARD MANAGER (РЕАЛЬНЫЕ ИГРОКИ)
+// 6. LEADERBOARD MANAGER
 // ========================================================
 const LeaderboardManager = {
   async publishEntry(userId, gameState) {
@@ -320,7 +318,6 @@ const PlayersStorageManager = {
     const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
     if (!targetUid) return;
 
-    // Публикуем в лидерборд при сохранениях
     LeaderboardManager.publishEntry(targetUid, gameState);
 
     const playerDoc = {
@@ -346,7 +343,7 @@ const PlayersStorageManager = {
       mood: gameState.player?.mood || 85,
       day: gameState.player?.day || 1,
       club: gameState.player?.club || null,
-      hudColorId: gameState.player?.hudColorId || 'lightning',
+      hudColorId: gameState.player?.hudColorId || 'cyber_neon',
       nickEffect: gameState.player?.nickEffect || 'none',
       avatarEffect: gameState.player?.avatarEffect || 'none',
       tools: gameState.player?.tools || {},
@@ -388,35 +385,9 @@ const PlayersStorageManager = {
         lastSavedHash = currentHash;
         console.log(`[☁️ Firestore] Синхронизировано в облако: ${targetUid}`);
       } catch (e) {
-        console.warn("[☁️ Firestore] Ошибка записи в облако, сохраняем в fallback localStorage:", e);
-        try {
-          localStorage.setItem('perekup_save_' + targetUid, JSON.stringify(gameState));
-        } catch(lsErr) {}
+        console.warn("[☁️ Firestore] Ошибка записи в облако:", e);
       }
     }, 3000);
-  },
-
-  async pushSaveForce(userId, gameState) {
-    const targetUid = userId || TelegramAuthManager.getVerifiedUserId();
-    if (!targetUid) return false;
-
-    try {
-      const minimalDoc = {
-        telegram_id: String(targetUid),
-        serverEpoch: Number(gameState.player?.serverEpoch) || 1,
-        name: gameState.player?.name || "Перекуп",
-        level: gameState.player?.level || 1,
-        cash: gameState.player?.cash || 0,
-        onboardingDone: gameState.player?.onboardingDone === true,
-        uid: gameState.player?.uid || String(targetUid),
-        updatedAt: Date.now()
-      };
-      await setDoc(doc(db, "players", String(targetUid)), minimalDoc, { merge: true });
-      LeaderboardManager.publishEntry(targetUid, gameState);
-      return true;
-    } catch (e) {
-      return false;
-    }
   },
 
   async pullSave(userId) {
@@ -448,6 +419,89 @@ const PlayersStorageManager = {
       console.warn("[☁️ Firestore] Ошибка загрузки облачного сейва:", e);
     }
     return null;
+  },
+
+  // ⭐ ПРИНУДИТЕЛЬНАЯ ПЕРЕЗАПИСЬ ОБЛАКА ЧИСТЫМ СТАРТОВЫМ ПРОФИЛЕМ
+  async resetPlayerCloud(userId, customName = null) {
+    const targetUid = String(userId || TelegramAuthManager.getVerifiedUserId() || window.tgUserId || "");
+    if (!targetUid) return false;
+
+    try {
+      const pName = customName || window.tgUserData?.first_name || window.state?.player?.name || "Taktoje";
+      
+      const cleanPlayerDoc = {
+        telegram_id: targetUid,
+        serverEpoch: 1,
+        name: pName,
+        avatar: window.state?.player?.avatarUrl || null,
+        level: 1,
+        xp: 0,
+        maxXp: 120,
+        cash: 75000,
+        stars: 0,
+        fuel: 100,
+        tickets: 25,
+        maxTickets: 25,
+        karma: 50,
+        streetCred: 100,
+        connections: 0,
+        safeDeposit: 0,
+        loanDebt: 0,
+        taxDebt: 0,
+        hunger: 80,
+        mood: 85,
+        day: 1,
+        club: null,
+        hudColorId: 'cyber_neon',
+        nickEffect: 'none',
+        avatarEffect: 'none',
+        tools: {},
+        toolsWear: {},
+        crypto: {},
+        bankDeposits: [],
+        ownedHouses: [],
+        housingId: 'trailer',
+        stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0 },
+        foundedCorporations: [],
+        onboardingDone: true,
+        updatedAt: Date.now()
+      };
+
+      const cleanGarageDoc = {
+        telegram_id: targetUid,
+        cars: [],
+        salesLot: [],
+        ownedPlates: [],
+        platesInventory: [],
+        businesses: [],
+        warehouse: { maxCars: 6, maxItems: 12, cars: [], items: [] },
+        paidParking: { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 },
+        updatedAt: Date.now()
+      };
+
+      const cleanLeaderDoc = {
+        uid: targetUid,
+        name: pName,
+        avatar: cleanPlayerDoc.avatar,
+        level: 1,
+        netWorth: 75000,
+        profit: 0,
+        bestCar: "Пешком",
+        updatedAt: Date.now()
+      };
+
+      await Promise.all([
+        setDoc(doc(db, "players", targetUid), cleanPlayerDoc),
+        setDoc(doc(db, "garages", targetUid), cleanGarageDoc),
+        setDoc(doc(db, "leaderboard", targetUid), cleanLeaderDoc)
+      ]);
+
+      console.log(`[☁️ Firestore] Профиль игрока ${targetUid} успешно сброшен в облаке до 75,000 ₽.`);
+      return true;
+    } catch (e) {
+      console.error("[☁️ Firestore] Ошибка сброса профиля в облаке:", e);
+      return false;
+    }
   }
 };
 
@@ -479,45 +533,12 @@ const AdminManager = {
       for (const col of targetCols) {
         total += await this._deleteEntireCollection(col);
       }
-      if (!silent) showToast(`Рынок очищен (${total} лотов)`, 'success');
+      if (!silent && typeof showToast === 'function') showToast(`Рынок очищен (${total} лотов)`, 'success');
       return true;
     } catch (e) {
-      if (!silent) showToast(`Ошибка: ${e.message}`, 'error');
+      if (!silent && typeof showToast === 'function') showToast(`Ошибка: ${e.message}`, 'error');
       return false;
     }
-  },
-
-  async wipeAllGlobal() {
-    const confirmation = prompt("🚨 ВНИМАНИЕ: Это проведёт глобальный ВАЙП сервера!\nВсе игроки начнут заново с 1 уровня.\nВведите «ВАЙП» для подтверждения:");
-    if (confirmation !== "ВАЙП") {
-      if (typeof showToast === 'function') showToast("Вайп отменён");
-      return false;
-    }
-
-    try {
-      if (typeof showToast === 'function') showToast('⏳ Запуск глобального вайпа...');
-      
-      // Повышаем эпоху сервера (это автоматически сбросит всех игроков при следующем входе)
-      const newEpoch = await SystemConfigManager.triggerGlobalWipe();
-
-      // Очищаем локальные данные на текущем устройстве
-      try { localStorage.clear(); } catch(e) {}
-      try { sessionStorage.clear(); } catch(e) {}
-
-      alert(`✅ Глобальный вайп успешно проведён! Начата эпоха #${newEpoch}. Игра будет перезагружена.`);
-      window.location.reload();
-      return true;
-    } catch (e) {
-      alert(`Ошибка вайпа: ${e.message}`);
-      return false;
-    }
-  },
-
-  resetCurrentPlayerLocal() {
-    if (!confirm("Сбросить сохранение на этом телефоне?")) return;
-    try { localStorage.clear(); } catch(e) {}
-    try { sessionStorage.clear(); } catch(e) {}
-    window.location.reload();
   }
 };
 
@@ -552,7 +573,7 @@ const CleanupManager = {
 };
 
 // ========================================================
-// 10. ЭКСПОРТ В WINDOW И BRIDGE
+// 10. ЭКСПОРТ
 // ========================================================
 window.FB_Core = {
   app,
@@ -571,7 +592,6 @@ window.FB_Core = {
   LIMITS
 };
 
-// Экспортируем в FB_Bridge для удобной связи модулей
 if (!window.FB_Bridge) window.FB_Bridge = {};
 window.FB_Bridge.Players = PlayersStorageManager;
 window.FB_Bridge.System = SystemConfigManager;
@@ -579,4 +599,4 @@ window.FB_Bridge.Leaderboard = LeaderboardManager;
 window.FB_Bridge.Auth = TelegramAuthManager;
 window.TelegramAuthManager = TelegramAuthManager;
 
-console.log("[☁️ FB_Core v1.5.0] Ядро Firebase загружено. Система эпох и Leaderboard активны ✓");
+console.log("[☁️ FB_Core v1.6.0] Облачный сброс resetPlayerCloud активирован ✓");
