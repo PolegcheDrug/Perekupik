@@ -1,8 +1,10 @@
 // ========================================================
-// data_core.js — ЯДРО, СИСТЕМНЫЕ ДАННЫЕ И КАСТОМИЗАЦИЯ (v3.1.0 BALANCED)
-// ⭐ v3.1.0: СБАЛАНСИРОВАННЫЙ SUPER_SPIN_TIERS
-//   - Исключена раздача иномарок за миллионы и безумных джекпотов
-//   - Сохранена полная коллекция косметики, ауры, ник-эффекты и темы
+// data_core.js — ЯДРО, СИСТЕМНЫЕ ДАННЫЕ И КАСТОМИЗАЦИЯ (v3.2.0 FULL)
+// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// ⭐ v3.2.0:
+//   - Полный состав SUPER_SPIN_TIERS сохранён (все 13 суперкаров + вся косметика).
+//   - Для машин добавлены честные minLevel, чтобы рулетка не ломала баланс новичкам.
+//   - Все темы, ник-эффекты, ауры и титулы сохранены в полном объёме.
 // ========================================================
 
 const GITHUB_ASSETS_BASE = "https://raw.githubusercontent.com/PolegcheDrug/Perekupik/main/";
@@ -24,21 +26,21 @@ window.resolveCarAssetUrl = resolveCarAssetUrl;
 // --------------------------------------------------------
 const GAME_METADATA = {
     version: "v4.0.0",
-    build: 405,
+    build: 406,
     authors: "Tak Toje, Max, Sergo, gemini, Илья Чепиль",
     releaseDate: "2026-10-21",
     patchNotes: [
         {
-            title: "⚖️ ЧЕСТНАЯ ЭКОНОМИКА И БАЛАНС",
-            text: "Вилспины перебалансированы: исключен дроп иномарок и миллионов на старте. Маржа перекупа теперь честная (8-16%), деньги требуют работы у капота!"
+            title: "⚖️ СБАЛАНСИРОВАННЫЙ ВИЛСПИН",
+            text: "Дроп колеса фортуны теперь динамический: на ранних уровнях дропаются авто начального класса, а экзотика и суперкары открываются по мере роста ранга авторитета."
         },
         {
             title: "💰 ПЛАТНАЯ КАСТОМИЗАЦИЯ ПРОФИЛЯ",
             text: "Все темы HUD, ник-эффекты, ауры аватара и титулы покупаются за рубли, Stars и Билеты."
         },
         {
-            title: "👥 РЕАЛЬНЫЕ ИГРОКИ",
-            text: "Боты полностью удалены из лидерборда и поиска друзей — игра работает с живой базой Firestore."
+            title: "👥 РЕАЛЬНЫЕ ИГРОКИ FIRESTORE",
+            text: "Боты полностью удалены из лидерборда и поиска друзей — игра подключена к живой базе игроков."
         }
     ]
 };
@@ -60,36 +62,48 @@ const WHEEL_SECTORS = [
 ];
 
 // --------------------------------------------------------
-// SUPER_SPIN_TIERS (СБАЛАНСИРОВАННЫЙ ДРОП)
+// SUPER_SPIN_TIERS (ПОЛНЫЙ ПУЛ ТЕХНИКИ И КОСМЕТИКИ С MIN_LEVEL)
 // --------------------------------------------------------
 const SUPER_SPIN_TIERS = {
     reelCars: [
-        { type: "car", barnId: "barn_vaz_2101",     name: "ВАЗ-2101 «Копейка»",              category: "economy", basePrice: 45000,   power: 64,  emoji: "🚗", minLevel: 1 },
-        { type: "car", barnId: "barn_vaz_2106",     name: "ВАЗ-2106 «Шаха»",                 category: "economy", basePrice: 58000,   power: 75,  emoji: "🚗", minLevel: 1 },
-        { type: "car", barnId: "barn_oda",          name: "ИЖ-2126 «Ода»",                   category: "economy", basePrice: 48000,   power: 72,  emoji: "🚗", minLevel: 1 },
-        { type: "car", barnId: "barn_vaz_2107",     name: "ВАЗ-2107 «Семёрка»",              category: "economy", basePrice: 75000,   power: 74,  emoji: "🚗", minLevel: 3 },
-        { type: "car", barnId: "barn_samara",       name: "Lada Samara 2109",               category: "economy", basePrice: 88000,   power: 78,  emoji: "🚗", minLevel: 4 },
-        { type: "car", barnId: "barn_passat",       name: "VW Passat B3",                    category: "comfort", basePrice: 160000,  power: 90,  emoji: "🚗", minLevel: 8 },
-        { type: "tool", toolId: "obd", name: "Сканер ELM327 OBD2", emoji: "📱" },
-        { type: "free_impound", name: "Талон ГИБДД", emoji: "🚔" },
-        { type: "xp_bundle", name: "Пакет Опыта (+75 XP)", amount: 75, emoji: "🎖️" }
+        { type: "car", barnId: "barn_vaz_2101",     name: "ВАЗ-2101 «Копейка»",              category: "economy", basePrice: 45000,    power: 85,  emoji: "🚗", minLevel: 1 },
+        { type: "car", barnId: "barn_mark2",        name: "Toyota Mark II (JZX90 / JZX100)", category: "economy", basePrice: 350000,   power: 280, emoji: "🏎️", minLevel: 5 },
+        { type: "car", barnId: "barn_golf6_gti",    name: "Volkswagen Golf VI GTI",          category: "comfort", basePrice: 1100000,  power: 211, emoji: "🏎️", minLevel: 10 },
+        { type: "car", barnId: "barn_silvia",       name: "Nissan Silvia (S15)",             category: "comfort", basePrice: 1400000,  power: 250, emoji: "🏎️", minLevel: 12 },
+        { type: "car", barnId: "barn_corvette_c6",  name: "Chevrolet Corvette C6 Z06",       category: "premium", basePrice: 3200000,  power: 505, emoji: "🏎️", minLevel: 15 },
+        { type: "car", barnId: "barn_bmw_m340i",    name: "BMW M340i xDrive (G20)",          category: "premium", basePrice: 4200000,  power: 387, emoji: "🏎️", minLevel: 18 },
+        { type: "car", barnId: "barn_c63_amg",      name: "Mercedes-Benz C63 AMG (W205)",    category: "premium", basePrice: 4800000,  power: 510, emoji: "🏎️", minLevel: 20 },
+        { type: "car", barnId: "barn_supra_mk5",    name: "Toyota GR Supra (A90 Mk5)",       category: "comfort", basePrice: 4500000,  power: 340, emoji: "🏎️", minLevel: 22 },
+        { type: "car", barnId: "barn_charger_srt",  name: "Dodge Charger SRT Hellcat",       category: "premium", basePrice: 5500000,  power: 717, emoji: "🏎️", minLevel: 25 },
+        { type: "car", barnId: "barn_mercedes_s63", name: "Mercedes-AMG S63 (W222)",         category: "premium", basePrice: 8500000,  power: 612, emoji: "🏎️", minLevel: 30 },
+        { type: "car", barnId: "barn_ghost",        name: "Rolls-Royce Ghost",               category: "premium", basePrice: 16000000, power: 571, emoji: "👑", minLevel: 40 },
+        { type: "car", barnId: "barn_ferrari_458",  name: "Ferrari 458 Italia",              category: "hyper",   basePrice: 22000000, power: 570, emoji: "🐎", minLevel: 50 },
+        { type: "car", barnId: "barn_huracan",      name: "Lamborghini Huracán EVO",         category: "hyper",   basePrice: 26000000, power: 640, emoji: "⚡", minLevel: 55 },
+        { type: "tool", toolId: "obd", name: "Сканер ELM327 OBD2", emoji: "📱", minLevel: 1 },
+        { type: "tool", toolId: "obd_launch", name: "Сканер Launch Pro", emoji: "📱", minLevel: 6 },
+        { type: "tool", toolId: "endoscope", name: "HD Видеоэндоскоп", emoji: "📹", minLevel: 8 },
+        { type: "free_impound", name: "Талон ГИБДД", emoji: "🚔", minLevel: 1 },
+        { type: "xp_bundle", name: "Пакет Опыта (+100 XP)", amount: 100, emoji: "🎖️", minLevel: 1 }
     ],
     reelResources: [
-        { type: "cash",     label: "15,000 ₽",        amount: 15000 },
         { type: "cash",     label: "25,000 ₽",        amount: 25000 },
-        { type: "cash",     label: "45,000 ₽",        amount: 45000 },
-        { type: "fuel",     label: "Бак 50 ⛽",        amount: 50 },
-        { type: "tickets",  label: "+3 Талона 🎟️",     amount: 3 },
+        { type: "cash",     label: "50,000 ₽",        amount: 50000 },
+        { type: "cash",     label: "100,000 ₽",       amount: 100000 },
+        { type: "fuel",     label: "Полный бак 100 ⛽", amount: 100 },
+        { type: "tickets",  label: "+5 Талонов 🎟️",    amount: 5 },
         { type: "conn",     label: "+1 Связь 🤝",      amount: 1 },
-        { type: "xp",       label: "+50 XP",          amount: 50 }
+        { type: "xp",       label: "+100 XP",          amount: 100 }
     ],
     reelExclusives: [
-        { type: "stars",     label: "3 ⭐ (7,500 ₽)",         amount: 3,   emoji: "⭐" },
-        { type: "stars",     label: "5 ⭐ (12,500 ₽)",        amount: 5,   emoji: "⭐" },
-        { type: "mod_cert",  label: "Сертификат ТО",          cashValue: 20000, emoji: "🔧" },
+        // ─── Валюта и документы ───
+        { type: "stars",     label: "5 ⭐ (12,500 ₽)",       amount: 5,   emoji: "⭐" },
+        { type: "stars",     label: "15 ⭐ (37,500 ₽)",      amount: 15,  emoji: "⭐" },
+        { type: "plate",     label: "Номер А777АА 77",       plate: "А777АА 77",  emoji: "🏷️" },
+        { type: "plate",     label: "Номер В888ВВ 777",      plate: "В888ВВ 777", emoji: "🏷️" },
+        { type: "mod_cert",  label: "Сертификат на Stage 2", cashValue: 50000, emoji: "🔧" },
         { type: "free_impound", label: "Амнистия ГИБДД", emoji: "👮" },
 
-        // Косметика
+        // ─── Косметика: темы ───
         { type: "cosmetic", category: "themes",       itemId: "midnight_purple", label: "Тема: Midnight Purple",   emoji: "🌌" },
         { type: "cosmetic", category: "themes",       itemId: "tokyo_night",     label: "Тема: Tokyo Night",       emoji: "🌸" },
         { type: "cosmetic", category: "themes",       itemId: "synthwave_86",    label: "Тема: Synthwave '86",     emoji: "🌆" },
@@ -98,24 +112,32 @@ const SUPER_SPIN_TIERS = {
         { type: "cosmetic", category: "themes",       itemId: "regal_gold",      label: "Тема: Regal Gold",        emoji: "👑" },
         { type: "cosmetic", category: "themes",       itemId: "neon_cyberpunk",  label: "🌃 Тема: NEON CYBERPUNK", emoji: "🌃", isExclusive: true },
 
+        // ─── Косметика: ник-эффекты ───
         { type: "cosmetic", category: "nickEffects",  itemId: "holographic_shift", label: "Ник: Holographic",     emoji: "🔮" },
         { type: "cosmetic", category: "nickEffects",  itemId: "liquid_chrome",     label: "Ник: Liquid Chrome",   emoji: "🪞" },
         { type: "cosmetic", category: "nickEffects",  itemId: "cyber_glitch",      label: "👾 Ник: CYBER GLITCH", emoji: "👾", isExclusive: true },
         { type: "cosmetic", category: "nickEffects",  itemId: "aurora_flow",       label: "Ник: Aurora Flow",     emoji: "🌌" },
         { type: "cosmetic", category: "nickEffects",  itemId: "plasma_storm",      label: "Ник: Plasma Storm",    emoji: "⚡" },
         { type: "cosmetic", category: "nickEffects",  itemId: "ember_sparks",      label: "Ник: Ember Sparks",    emoji: "🔥" },
+        { type: "cosmetic", category: "nickEffects",  itemId: "quantum_nick",      label: "🔮 Ник: QUANTUM",      emoji: "🔮", isExclusive: true },
 
+        // ─── Косметика: ауры аватара ───
         { type: "cosmetic", category: "avatarEffects", itemId: "holographic_ring", label: "Аура: Holographic",   emoji: "🔮" },
         { type: "cosmetic", category: "avatarEffects", itemId: "plasma_core",      label: "Аура: Plasma Core",   emoji: "⚡" },
         { type: "cosmetic", category: "avatarEffects", itemId: "ember_orbit",      label: "Аура: Ember Orbit",   emoji: "🔥" },
         { type: "cosmetic", category: "avatarEffects", itemId: "aurora_halo",      label: "Аура: Aurora Halo",   emoji: "🌌" },
         { type: "cosmetic", category: "avatarEffects", itemId: "cyber_scan",       label: "Аура: Cyber Scan",    emoji: "👾" },
         { type: "cosmetic", category: "avatarEffects", itemId: "quantum_shield",   label: "💎 Аура: QUANTUM",    emoji: "💎", isExclusive: true },
+        { type: "cosmetic", category: "avatarEffects", itemId: "supernova_aura",   label: "💫 Аура: SUPERNOVA",  emoji: "💫", isExclusive: true },
 
+        // ─── Косметика: титулы ───
         { type: "cosmetic", category: "titles",       itemId: "classic_king",    label: "Титул: Король Классики",    emoji: "👑" },
         { type: "cosmetic", category: "titles",       itemId: "hood_master",     label: "Титул: Торг у капота",     emoji: "🤝" },
         { type: "cosmetic", category: "titles",       itemId: "pro_scanner",     label: "Титул: Автоподбор от Бога", emoji: "🔍" },
-        { type: "cosmetic", category: "titles",       itemId: "ghost_trader",    label: "🎭 Титул: GHOST TRADER",  emoji: "🎭", isExclusive: true }
+        { type: "cosmetic", category: "titles",       itemId: "syndicate_boss",  label: "Титул: Синдикат 777",      emoji: "⚡" },
+        { type: "cosmetic", category: "titles",       itemId: "ghost_trader",    label: "🎭 Титул: GHOST TRADER",  emoji: "🎭", isExclusive: true },
+        { type: "cosmetic", category: "titles",       itemId: "imperator",       label: "👑 Титул: ИМПЕРАТОР",     emoji: "👑", isExclusive: true },
+        { type: "cosmetic", category: "titles",       itemId: "oligarch",        label: "💠 Титул: ОЛИГАРХ",       emoji: "💠", isExclusive: true }
     ]
 };
 
@@ -282,4 +304,4 @@ window.STREET_RACE_ANIM_CONFIG = STREET_RACE_ANIM_CONFIG;
 window.calculatePlateValue = calculatePlateValue;
 window.I18N_TRANSLATIONS = I18N_TRANSLATIONS;
 
-console.log('[💠 data_core v3.1.0] SUPER_SPIN сбалансирован: иномарки и гиперинфляция исключены ✓');
+console.log('[💠 data_core v3.2.0 FULL] Полный пул суперкаров и косметики с уровневым доступом сохранён ✓');
