@@ -1,12 +1,13 @@
 // ========================================================
-// js/market/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v3.0.0)
+// js/market/market.js — ГЛАВНЫЙ КОНТРОЛЛЕР АВТОРЫНКА (v3.1.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.0.0 (ИНТЕГРАЦИЯ ЗАКАЗОВ КЛИЕНТОВ И БИРЖИ):
-//   1. Биржа перенесена из Приложения М прямо на Авторынок в виде вкладки «Заказы на подбор».
-//   2. Клиенты оставляют запросы на выкуп авто с фиксированным бюджетом и бонусом перекупу.
-//   3. Быстрая сдача подходящего авто прямо из гаража в 1 клик с зачислением выплаты.
-//   4. Сохранено ультракомпактное сворачивание категорий, Автотека, ДКП и проверка под бизнес.
+// ⭐ v3.1.0 (ФИКС СКРОЛЛА И СИНХРОНИЗАЦИЯ С «ПОДКЛЮЧ»):
+//   1. Устранено автоматическое назойливое распахивание классов при скролле наверх.
+//      Сетка раскрывается только при явном клике игрока на кнопку/шеврон.
+//   2. Вкладка «Заказы клиентов» заблокирована до 20-го уровня и покупки лицензии «ПодКлюч».
+//   3. При попытке войти без допуска открывается окно условий вступления в синдикат.
+//   4. Сохранена быстрая сдача авто из гаража под требования клиентов и проверка под бизнес.
 // ========================================================
 
 let marketSortOrder = 'asc';
@@ -67,7 +68,52 @@ const DEFAULT_MARKET_ORDERS = [
 ];
 
 // ========================================================
-// УПРАВЛЕНИЕ СВОРАЧИВАНИЕМ КАТЕГОРИЙ (РУЧНОЕ И АВТОМАТИЧЕСКОЕ)
+// ПРОВЕРКА ДОСТУПА К ЗАКАЗАМ КЛИЕНТОВ («ПОДКЛЮЧ» / СИНДИКАТ)
+// ========================================================
+function checkSyndicateAccess() {
+    const p = window.state?.player;
+    if (!p) return false;
+
+    const minLevel = 20;
+    const pLvl = Number(p.level) || 1;
+    const isUnlocked = (p.unlockedApps && p.unlockedApps.includes('syndicate')) ||
+                       (p.unlockedFeatures && p.unlockedFeatures.includes('syndicate'));
+
+    return pLvl >= minLevel && isUnlocked;
+}
+
+function promptSyndicateUnlockForOrders() {
+    const p = window.state?.player || {};
+    const pLvl = Number(p.level) || 1;
+
+    if (pLvl < 20) {
+        if (typeof window.openVerdictModal === 'function') {
+            window.openVerdictModal(
+                "ЗАКАЗЫ ЗАБЛОКИРОВАНЫ 🔒",
+                `Спецзаказы на подбор автомобилей доступны только перекупам Синдиката с <b>20 уровня</b>!\nВаш текущий уровень: <b>${pLvl}</b>.\n\nЗарабатывайте репутацию, продавайте автомобили на рынке и прокачивайте мастерство, чтобы получать прямые контракты с крупными бюджетами.`,
+                false
+            );
+        } else if (typeof showToast === 'function') {
+            showToast(`🔒 Заказы клиентов доступны с 20 уровня (у вас ${pLvl})!`);
+        }
+        if (typeof playSound === 'function') playSound('error');
+        return;
+    }
+
+    // Если уровень 20+, но не выкуплена лицензия
+    if (window.PhoneManager && typeof window.PhoneManager.showAppUnlockPrompt === 'function') {
+        const config = (window.APP_ACCESS_CONFIG && window.APP_ACCESS_CONFIG.syndicate)
+            ? window.APP_ACCESS_CONFIG.syndicate
+            : { name: 'Спецзаказы «ПодКлюч»', desc: 'Прямые контракты с клиентами и корпоративными парками.', costCash: 20000000, costStars: 50 };
+        window.PhoneManager.showAppUnlockPrompt('syndicate', 'syndicate', config);
+    } else {
+        if (typeof showToast === 'function') showToast("Требуется лицензия Синдиката «ПодКлюч»!");
+    }
+    if (typeof playSound === 'function') playSound('error');
+}
+
+// ========================================================
+// УПРАВЛЕНИЕ СВОРАЧИВАНИЕМ КАТЕГОРИЙ (РУЧНОЕ)
 // ========================================================
 function toggleMarketCategories(forceCollapse = null, isSilent = false) {
     const card = document.querySelector('.market-filter-card');
@@ -108,11 +154,19 @@ function toggleMarketCategories(forceCollapse = null, isSilent = false) {
     }
 }
 
+// Умный метод: только сворачивает при скролле вниз, никогда не распахивает автоматически
 function collapseMarketCategories(shouldCollapse) {
-    toggleMarketCategories(shouldCollapse, true);
+    if (shouldCollapse) {
+        toggleMarketCategories(true, true);
+    }
 }
 
 function switchMarketViewMode(mode) {
+    if (mode === 'orders' && !checkSyndicateAccess()) {
+        promptSyndicateUnlockForOrders();
+        return;
+    }
+
     marketViewMode = mode;
     if (typeof playSound === 'function') playSound('tick');
     if (typeof tgHaptic === 'function') tgHaptic('light');
@@ -464,9 +518,29 @@ function renderMarketFeed() {
             state.marketOrders = JSON.parse(JSON.stringify(DEFAULT_MARKET_ORDERS));
         }
 
-        // Переключатель режимов: Автомобили / Заказы на подбор
+        const hasSyndicateAccess = checkSyndicateAccess();
         const ordersCount = (state.marketOrders || []).length;
         const carsCount = (state.marketFeed || []).filter(c => c && !c.unavailable).length;
+
+        // Проверяем, есть ли готовые к сдаче авто в гараже
+        let readyMatchesCount = 0;
+        if (hasSyndicateAccess) {
+            const myGarage = state.garage || state.player?.garage || [];
+            (state.marketOrders || []).forEach(ord => {
+                const match = myGarage.some(c => {
+                    if (!c) return false;
+                    const cType = String(c.type || c.category || 'economy').toLowerCase();
+                    return ord.acceptedTypes.includes(cType) &&
+                           (c.condition || 80) >= ord.minCondition &&
+                           (c.mileage || 100000) <= ord.maxMileage;
+                });
+                if (match) readyMatchesCount++;
+            });
+        }
+
+        const ordersBtnLabel = hasSyndicateAccess
+            ? `<i class="fa-solid fa-clipboard-check mr-1"></i> Заказы (${ordersCount})${readyMatchesCount > 0 ? ` <span style="background:#00e676; color:#000; font-size:7.5px; padding:1px 5px; border-radius:10px; font-weight:900;">+${readyMatchesCount}</span>` : ''}`
+            : `<i class="fa-solid fa-lock mr-1" style="color:#f59e0b;"></i> Заказы (с 20 ур.)`;
 
         const modeSwitcherHtml = `
             <div class="mb-2" style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; background:rgba(15,23,42,0.85); padding:3px; border-radius:12px; border:1px solid rgba(0,242,254,0.18);">
@@ -474,16 +548,21 @@ function renderMarketFeed() {
                     <i class="fa-solid fa-car mr-1"></i> Автомобили (${carsCount})
                 </button>
                 <button onclick="switchMarketViewMode('orders')" class="btn ${marketViewMode === 'orders' ? 'btn-green' : 'btn-dark'} btn-sm" style="font-weight:800; font-size:10px; border-radius:9px; padding:6px 0;">
-                    <i class="fa-solid fa-clipboard-check mr-1"></i> Заказы клиентов (${ordersCount})
+                    ${ordersBtnLabel}
                 </button>
             </div>
         `;
 
         // Если открыт режим заказов
         if (marketViewMode === 'orders') {
-            container.innerHTML = modeSwitcherHtml + renderMarketOrdersHtml();
-            if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
-            return;
+            if (!hasSyndicateAccess) {
+                marketViewMode = 'cars';
+                promptSyndicateUnlockForOrders();
+            } else {
+                container.innerHTML = modeSwitcherHtml + renderMarketOrdersHtml();
+                if (mainContent) requestAnimationFrame(() => { mainContent.scrollTop = scrollPos; });
+                return;
+            }
         }
 
         // Режим обычной ленты авторынка
@@ -780,7 +859,7 @@ function renderMarketOrdersHtml() {
         <div class="glass-card mb-2 p-2" style="background:linear-gradient(135deg, rgba(0,230,118,0.1), #090e18); border-color:rgba(0,230,118,0.3);">
             <div class="flex-between">
                 <div>
-                    <b class="text-xs color-green" style="font-size:12px;"><i class="fa-solid fa-briefcase mr-1"></i> Срочный выкуп и Подбор</b>
+                    <b class="text-xs color-green" style="font-size:12px;"><i class="fa-solid fa-briefcase mr-1"></i> Срочный выкуп и Подбор (Синдикат)</b>
                     <div class="sub-label" style="font-size:8.5px;">Сдавайте авто из гаража под требования клиентов и получайте премию</div>
                 </div>
                 <span class="tag-badge bg-tag-green">${orders.length} ЗАКАЗОВ</span>
@@ -789,7 +868,6 @@ function renderMarketOrdersHtml() {
     `;
 
     orders.forEach((ord, ordIdx) => {
-        // Проверяем, есть ли в гараже подходящая машина
         const matchingCars = myGarage.filter(c => {
             if (!c) return false;
             const cType = String(c.type || c.category || 'economy').toLowerCase();
@@ -853,6 +931,11 @@ function renderMarketOrdersHtml() {
 }
 
 function fulfillMarketOrderAction(orderId) {
+    if (!checkSyndicateAccess()) {
+        promptSyndicateUnlockForOrders();
+        return;
+    }
+
     const orders = state.marketOrders || [];
     const ordIndex = orders.findIndex(o => o.id === orderId);
     if (ordIndex === -1) return;
@@ -873,7 +956,6 @@ function fulfillMarketOrderAction(orderId) {
     const soldCar = myGarage[carIndex];
     const payout = ord.rewardBudget + ord.bonusFee;
 
-    // Списание авто и начисление денег
     myGarage.splice(carIndex, 1);
     if (state.garage) state.garage = myGarage;
     if (state.player?.garage) state.player.garage = myGarage;
@@ -882,7 +964,6 @@ function fulfillMarketOrderAction(orderId) {
     state.player.completedDeals = (state.player.completedDeals || 0) + 1;
     state.player.karma = Math.min(100, (state.player.karma || 50) + 4);
 
-    // Удаляем выполненный заказ
     orders.splice(ordIndex, 1);
 
     if (typeof saveState === 'function') saveState();
@@ -956,7 +1037,9 @@ Object.assign(window, {
     dispatchMarketAction,
     switchMarketViewMode,
     fulfillMarketOrderAction,
-    showOrderDetailsToast
+    showOrderDetailsToast,
+    checkSyndicateAccess,
+    promptSyndicateUnlockForOrders
 });
 
-console.log('[🏪 market v3.0.0] Авторынок обновлен: Заказы на подбор интегрированы, быстрая сдача авто ✓');
+console.log('[🏪 market v3.1.0] Скролл оптимизирован, авто-распахивание убрано, допуск к заказам синхронизирован ✓');
