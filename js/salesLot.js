@@ -1,14 +1,12 @@
 // ========================================================
-// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ДЕТЕЙЛИНГ И СКРЫТЫЕ СХЕМЫ (v3.6.0-hardcore)
+// js/salesLot.js — ПЛОЩАДКА ПРОДАЖ, ДЕТЕЙЛИНГ И КЛУБНЫЙ СБЫТ (v3.7.0-hardcore)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v3.6.0 (ХАРДКОР-БАЛАНС ЭКОНОМИКИ + ЗАЩИТА ОТ ОВЕРПРАЙСА):
-//   - ФИКС ЭКСПЛОЙТА МАРЖИ: покупатели больше НЕ пляшут от дикой цены игрока!
-//     База торга рассчитывается СТРОГО от реальной рыночной оценки (marketValue).
-//   - ЗАЩИТА ОТ ЗАВЫШЕНИЯ: если цена завышена на 30%+, клиент сбивает её до реального
-//     рынка или отказывается от сделки, прекращая мгновенное обогащение.
-//   - СОХРАНЕНО: обложка авто строго из гаража, бонусы детейлинга, риски скрутки,
-//     таймеры Date.now(), VIP-покупатели и чаты M+.
+// ⭐ v3.7.0 (СИНХРОНИЗАЦИЯ С КЛУБОМ СИНДИКАТА И M+):
+//   1. Интегрирован клубный перк «Синдикат-Сбыт» (+6% к предложению покупателей).
+//   2. Фирменный бейдж синдиката на карточках лотов и особые реплики покупателей.
+//   3. Полная синхронизация со стикерами и диалогами 3-секционного мессенджера M+.
+//   4. Сохранён хардкор-баланс рынка (marketValue), риски скрутки и таймеры.
 // ========================================================
 
 let salesLotTimerInterval = null;
@@ -20,6 +18,46 @@ let _lastSalesLotTickTimestamp = Date.now();
 // --------------------------------------------------------
 function _isStateReady() {
     return typeof state !== 'undefined' && state !== null && !!state.player;
+}
+
+// --------------------------------------------------------
+// ПРОВЕРКА ПЕРКОВ АВТОКЛУБА
+// --------------------------------------------------------
+function getPlayerClubPerks() {
+    if (!_isStateReady()) return [];
+    const club = state.player?.club;
+    if (!club) return [];
+    const clubId = typeof club === 'string' ? club : club.id;
+
+    if (clubId === 'sts') {
+        return ['syndicate_sell', 'garage_brotherhood', 'dps_inside'];
+    }
+    if (clubId === 'mdd') {
+        return ['turbo_boost', 'drift_discount', 'fuel_discount'];
+    }
+    if (clubId === 'rac') {
+        return ['retro_hunt', 'archive_plates', 'vip_deposit'];
+    }
+    if (Array.isArray(club.perks)) {
+        return club.perks.map(p => p.id || p.title || p);
+    }
+    return [];
+}
+
+function hasClubPerk(perkKey) {
+    if (!_isStateReady()) return false;
+    const perks = getPlayerClubPerks();
+    if (perks.includes(perkKey)) return true;
+
+    if (perkKey === 'syndicate_sell') {
+        const club = state.player?.club;
+        const clubId = typeof club === 'string' ? club : club?.id;
+        if (clubId === 'sts') return true;
+        if (Array.isArray(club?.perks) && club.perks.some(p => String(p.title || '').includes('Сбыт'))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // --------------------------------------------------------
@@ -325,6 +363,7 @@ function renderSalesLot() {
         return;
     }
 
+    const hasSyndicatePerk = hasClubPerk('syndicate_sell');
     let html = "";
 
     state.salesLot.forEach((lot, idx) => {
@@ -337,20 +376,18 @@ function renderSalesLot() {
         let margin = askingPrice - purchaseCost;
         let marginClass = margin >= 0 ? "color-green" : "color-red";
 
-        // Честная рыночная оценка авто
         const marketVal = car.marketValue || car.baseMarketValue || car.basePrice || 100000;
         const priceRatio = askingPrice / Math.max(1000, marketVal);
         let defaultTimer = 45;
 
-        // Если оверпрайс — время ожидания вырастает многократно
         if (priceRatio > 1.35) {
-            defaultTimer = 160; // Сильный оверпрайс (+35%+) ищет покупателя очень долго
+            defaultTimer = 160;
         } else if (priceRatio > 1.15) {
             defaultTimer = 90;
         } else if (priceRatio > 1.05) {
             defaultTimer = 55;
         } else if (priceRatio < 0.90) {
-            defaultTimer = 25; // Слив ниже рынка — моментальный покупатель
+            defaultTimer = 25;
         }
 
         let detailBonusTime = 0;
@@ -449,6 +486,7 @@ function renderSalesLot() {
         let condColorClass = condVal >= 80 ? 'color-green' : (condVal >= 50 ? 'color-amber' : 'color-red');
 
         let detailingBadges = [];
+        if (hasSyndicatePerk) detailingBadges.push(`<span class="tag-badge bg-tag-purple" style="font-size:7.5px;">🦅 [STS] +6% СБЫТ</span>`);
         if (car.headlightsPolished) detailingBadges.push(`<span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">✨ ФАРЫ/ШИНЫ</span>`);
         if (car.isPolished) detailingBadges.push(`<span class="tag-badge bg-tag-cyan" style="font-size:7.5px;">💎 ПОЛИРОВКА</span>`);
         if (car.odorFree) detailingBadges.push(`<span class="tag-badge bg-tag-green" style="font-size:7.5px;">💨 СУХОЙ ТУМАН</span>`);
@@ -465,7 +503,7 @@ function renderSalesLot() {
                             <span class="car-brand-pill brand-default">ЛОТ</span>
                             <h3 class="font-bold text-xs" style="font-size:15px;">${car.name}</h3>
                         </div>
-                        <div class="mt-1 flex-gap" style="align-items:center;">
+                        <div class="mt-1 flex-gap" style="align-items:center; flex-wrap:wrap; gap:4px;">
                             <span class="license-plate" style="font-size:9.5px; padding:2px 6px;">${plateText} <span class="license-flag">RUS</span></span>
                             <span class="tag-badge bg-tag-green">НА ПЛОЩАДКЕ</span>
                             ${detailingBadges.join(' ')}
@@ -578,7 +616,7 @@ function renderBuyerCardActions(lot, idx) {
 }
 
 // --------------------------------------------------------
-// ⭐ ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ: СТРОГИЙ РАСЧЕТ ОТ РЫНКА (ХАРДКОР)
+// ⭐ ГЕНЕРАЦИЯ ПОКУПАТЕЛЯ: РАСЧЕТ С УЧЕТОМ ПЕРКА СИНДИКАТА
 // --------------------------------------------------------
 function generateRandomLotBuyer(car, askingPrice) {
     if (!car) car = { name: 'Автомобиль', type: 'economy' };
@@ -591,16 +629,20 @@ function generateRandomLotBuyer(car, askingPrice) {
     const archetypePool = isVIP ? VIP_BUYER_ARCHETYPES : BUYER_ARCHETYPES;
     const archetype = archetypePool[Math.floor(Math.random() * archetypePool.length)];
 
-    // ⭐ 1. БАЗА РАСЧЕТА — СТРОГО РЕАЛЬНЫЙ РЫНОК (marketValue), А НЕ ЦЕНА ИГРОКА!
     let marketPrice = Number(car.marketValue || car.baseMarketValue || car.basePrice || 100000);
     if (marketPrice <= 1000) marketPrice = 50000;
 
-    // Коэффициент адекватности предложения
     let baseRatio = isVIP
         ? archetype.bonusMultiplier * (0.95 + Math.random() * 0.10)
         : (0.84 + Math.random() * 0.10);
 
-    // Бонусы детейлинга добавляют процент К РЫНКУ
+    // ⭐ ПЕРК КЛУБА: СИНДИКАТ-СБЫТ (+6%)
+    let syndicateRemark = '';
+    if (hasClubPerk('syndicate_sell')) {
+        baseRatio += 0.06;
+        syndicateRemark = "«Слышал, ты состоишь в Синдикате [STS] — ценник уважаю, накинул +6%!»";
+    }
+
     let preSaleRemarks = [];
     if (car.headlightsPolished) {
         baseRatio += 0.04;
@@ -615,28 +657,21 @@ function generateRandomLotBuyer(car, askingPrice) {
         preSaleRemarks.push("«В салоне свежо, табаком не разит.»");
     }
 
-    // Исходное предложение от реальной рыночной цены
     let rawPrice = marketPrice * baseRatio;
 
-    // ⭐ 2. ПРОВЕРКА ОВЕРПРАЙСА: СТОП-КРАН ПРИ ЗАВЫШЕННОМ ЦЕННИКЕ
     const priceRatio = askingPrice / marketPrice;
     let overpriceNotice = '';
 
     if (priceRatio > 1.35) {
-        // Игрок завысил цену на 35%+ (например, жигуль за 800к)
-        // Бот с порога срезает предложение до 75-80% от РЕАЛЬНОГО рынка и возмущается
         rawPrice = marketPrice * (0.75 + Math.random() * 0.08);
         overpriceNotice = ` «Ты откуда такой ценник (${askingPrice.toLocaleString()} ₽) взял?! На авторынке этой машине красная цена ${marketPrice.toLocaleString()} ₽. Предлагаю по факту!»`;
     } else if (priceRatio > 1.15) {
-        // Небольшой оверпрайс (на 15-30% выше рынка)
         rawPrice = Math.min(askingPrice * 0.88, marketPrice * 0.95);
         overpriceNotice = ` «Цену ты задрал, конечно. По верху рынка отдаешь. Давайте торговаться.»`;
     } else if (askingPrice <= marketPrice * 0.92) {
-        // Игрок продает ниже рынка — покупатель готов дать близко к цене игрока
         rawPrice = Math.min(askingPrice, marketPrice * 0.95);
     }
 
-    // ⭐ 3. ДЕФЕКТЫ И СКРЫТЫЕ КОСЯКИ
     let bondoWarning = '';
     if (car.hasBondoBalloons && (archetype.inspectionSkill === 'high' || archetype.inspectionSkill === 'mid')) {
         rawPrice *= 0.82;
@@ -670,14 +705,13 @@ function generateRandomLotBuyer(car, askingPrice) {
         state.player.karma = Math.max(0, (state.player.karma || 50) - 8);
     }
 
-    // Предложение покупателя никогда не превышает цену продавца
     rawPrice = Math.min(rawPrice, askingPrice);
     const offeredPrice = Math.max(5000, Math.round(rawPrice / 1000) * 1000);
     const isOnlineChat = isVIP ? false : (Math.random() < 0.50);
 
-    let initialDialogue = archetype.moodPhrase + (preSaleRemarks[0] ? ' ' + preSaleRemarks[0] : '') + overpriceNotice + bondoWarning + defectWarning + odometerBustText;
+    let initialDialogue = archetype.moodPhrase + (syndicateRemark ? ' ' + syndicateRemark : '') + (preSaleRemarks[0] ? ' ' + preSaleRemarks[0] : '') + overpriceNotice + bondoWarning + defectWarning + odometerBustText;
     if (isOnlineChat) {
-        initialDialogue = `«Здравствуйте! По объявлению «${car.name}». За ${offeredPrice.toLocaleString()} ₽ отдадите?»` + overpriceNotice + bondoWarning + defectWarning + odometerBustText;
+        initialDialogue = `«Здравствуйте! По объявлению «${car.name}». За ${offeredPrice.toLocaleString()} ₽ отдадите?»` + (syndicateRemark ? ' ' + syndicateRemark : '') + overpriceNotice + bondoWarning + defectWarning + odometerBustText;
     }
 
     return {
@@ -833,10 +867,14 @@ function openLotHoodHaggleModal(idx) {
     if (!buyer) return showToast("❌ У лота нет покупателя");
 
     activeSalesLotHaggleIndex = idx;
-    const modal = ensureModal('modalLotHoodDeal');
+    const modal = (typeof ensureModal === 'function') ? ensureModal('modalLotHoodDeal') : document.getElementById('modalLotHoodDeal');
 
     renderLotHoodHaggleModalContent();
-    ModalManager.open('modalLotHoodDeal');
+    if (typeof ModalManager !== 'undefined') {
+        ModalManager.open('modalLotHoodDeal');
+    } else if (modal) {
+        modal.classList.add('active');
+    }
     if (typeof playSound === 'function') playSound('tick');
 }
 
@@ -847,7 +885,7 @@ function renderLotHoodHaggleModalContent() {
 
     const lot = state.salesLot[activeSalesLotHaggleIndex];
     if (!lot || !lot.buyer) {
-        ModalManager.close('modalLotHoodDeal');
+        if (typeof ModalManager !== 'undefined') ModalManager.close('modalLotHoodDeal');
         activeSalesLotHaggleIndex = null;
         return;
     }
@@ -1010,7 +1048,7 @@ function executeModalHaggleStep(percent, failRisk) {
             lot._buyerTimerActive = false;
             removeDialogByCarIndex(activeSalesLotHaggleIndex);
             setTimeout(() => {
-                ModalManager.close('modalLotHoodDeal');
+                if (typeof ModalManager !== 'undefined') ModalManager.close('modalLotHoodDeal');
                 activeSalesLotHaggleIndex = null;
                 renderSalesLot();
             }, 1200);
@@ -1042,7 +1080,7 @@ function executeModalHaggleStep(percent, failRisk) {
 function confirmLotHoodDKP() {
     if (activeSalesLotHaggleIndex === null) return;
     const idx = activeSalesLotHaggleIndex;
-    ModalManager.close('modalLotHoodDeal');
+    if (typeof ModalManager !== 'undefined') ModalManager.close('modalLotHoodDeal');
     acceptLotBuyerDeal(idx);
 }
 
@@ -1085,6 +1123,14 @@ function finishSalesLotDeal(idx, price, profit, costPrice = 0) {
             logBankTransaction(`Продажа авто на площадке${isVIP ? ' (VIP)' : ''}: ${car.name}`, price, true);
         }
 
+        if (typeof trackQuestProgress === 'function') {
+            trackQuestProgress('sell_car', 1);
+        }
+
+        if (window.EventBus) {
+            window.EventBus.emit('saleslot:deal_completed', { car, price, profit });
+        }
+
         if (window.FB_Bridge?.Plates && car.plate) {
             try {
                 window.FB_Bridge.Plates.releasePlate(car.plate, null, false);
@@ -1109,7 +1155,7 @@ function finishSalesLotDeal(idx, price, profit, costPrice = 0) {
         } else if (typeof openVerdictModal === 'function') {
             openVerdictModal(
                 "АВТОМОБИЛЬ ПРОДАН! 🤝",
-                `Машина «${car.name}» успешно передана новому владельцу!\nВыручка: +${price.toLocaleString()} ₽\nЧистая прибыль: +${profit.toLocaleString()} ₽`,
+                `Машина «<b>${car.name}</b>» успешно передана новому владельцу!\nВыручка: +${price.toLocaleString()} ₽\nЧистая прибыль: +${profit.toLocaleString()} ₽`,
                 true
             );
         }
@@ -1134,7 +1180,7 @@ function rejectLotBuyer(idx) {
 
     if (activeSalesLotHaggleIndex === idx) {
         activeSalesLotHaggleIndex = null;
-        try { ModalManager.close('modalLotHoodDeal'); } catch (e) {}
+        try { if (typeof ModalManager !== 'undefined') ModalManager.close('modalLotHoodDeal'); } catch (e) {}
     }
 
     saveState();
@@ -1244,7 +1290,7 @@ function updateSalesLotTimers() {
 
                 if (activeSalesLotHaggleIndex === idx) {
                     activeSalesLotHaggleIndex = null;
-                    try { ModalManager.close('modalLotHoodDeal'); } catch (e) {}
+                    try { if (typeof ModalManager !== 'undefined') ModalManager.close('modalLotHoodDeal'); } catch (e) {}
                 }
 
                 needReRender = true;
@@ -1337,6 +1383,8 @@ window.removeDialogByCarIndex = removeDialogByCarIndex;
 window.shiftDialogIndicesAfterRemoval = shiftDialogIndicesAfterRemoval;
 window.cleanupOrphanedDialogs = cleanupOrphanedDialogs;
 window._adjustHaggleIndexAfterRemoval = _adjustHaggleIndexAfterRemoval;
+window.getPlayerClubPerks = getPlayerClubPerks;
+window.hasClubPerk = hasClubPerk;
 
 window.renderSalesLot = renderSalesLot;
 window.initSalesLotTimer = initSalesLotTimer;
@@ -1358,4 +1406,4 @@ if (document.readyState === 'loading') {
     _startSalesLotTimerWhenReady();
 }
 
-console.log('[🏪 salesLot v3.6.0-hardcore] Хардкор-баланс цен покупателей + защита от оверпрайса ✓');
+console.log('[🏪 salesLot v3.7.0-hardcore] Перк синдиката [STS] (+6% сбыт) и синхронизация с M+ активированы ✓');
