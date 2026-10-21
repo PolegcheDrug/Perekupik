@@ -1,24 +1,21 @@
 // ========================================================
-// js/app/app-core.js — ЯДРО: STATE, SAVE, MIGRATE (v4.3.2-stabilized)
+// js/app/app-core.js — ЯДРО: STATE, SAVE, MIGRATE (v4.4.0 PRO-BALANCE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v4.3.2-stabilized (СТАБИЛИЗАЦИЯ ЯДРА & ЖИЗНЕННЫЙ ЦИКЛ):
-//   - Защита от гонки сохранений: внедрен интеллектуальный debounce сохранения
-//   - Обработка visibilitychange / pagehide для Telegram WebApp (сохранение при уходе и оффлайн-расчет при возврате)
-//   - Защита от переполнения квоты localStorage (QuotaExceededError) с автоочисткой логов
-//   - Безопасная синхронизация window.state
+// ⭐ v4.4.0 (ЧЕСТНЫЙ СТАРТ ТИР-1):
+//   - Стартовый баланс игрока: 75 000 ₽ (честный старт на ВАЗ-2101).
+//   - 0 подарочных миллионов и билетов при создании профиля.
+//   - Сохранена вся архитектура: дебаунс сохранений, lifecycle Telegram WebApp, квоты localStorage.
 // ========================================================
 
-window.CURRENT_GAME_VERSION = "v4.3.2";
+window.CURRENT_GAME_VERSION = "v4.4.0";
 
-const SAVE_VERSION = 14;
-let SAVE_KEY_PREFIX = "perekup_v14_";
+const SAVE_VERSION = 15;
+let SAVE_KEY_PREFIX = "perekup_v15_";
 
-// ⭐ Плавающий курс Stars
-const STAR_RATE_MIN = 22000;
-const STAR_RATE_MAX = 28000;
-const STAR_RATE_DEFAULT = 25000;
+const STAR_RATE_MIN = 2200;
+const STAR_RATE_MAX = 2800;
+const STAR_RATE_DEFAULT = 2500;
 
-// Глобальные переменные — выносим в window для доступа из всех модулей
 window.tgUserId = window.tgUserId || null;
 window.tgUserData = window.tgUserData || null;
 window.isPcDevSession = window.isPcDevSession || false;
@@ -53,7 +50,7 @@ function _isOwner() {
 }
 
 // ========================================================
-// 1. ДЕФОЛТНЫЙ STATE
+// 1. ДЕФОЛТНЫЙ STATE (СБАЛАНСИРОВАННЫЙ СТАРТ)
 // ========================================================
 const DEFAULT_STATE = {
     lang: 'ru',
@@ -65,15 +62,36 @@ const DEFAULT_STATE = {
         name: "Перекуп #777",
         uid: null,
         onboardingDone: false,
-        avatarUrl: null, cash: 150000, stars: 15, connections: 1,
-        expressTickets: 25, maxExpressTickets: 25, fuel: 100, level: 1, xp: 0, maxXp: 120,
-        baseSlots: 2, vip: false, vipPro: false, lastFreeSpinDay: 0, lastFreeSuperSpinDay: 0,
-        club: null, karma: 50, streetCred: 100, superSpinTickets: 1,
+        avatarUrl: null,
+        cash: 75000,                  // ⭐ Честный старт на первый ВАЗ
+        stars: 0,                     // ⭐ 0 стартовых Stars
+        connections: 0,
+        expressTickets: 25,
+        maxExpressTickets: 25,
+        fuel: 100,
+        level: 1,
+        xp: 0,
+        maxXp: 120,
+        baseSlots: 2,
+        vip: false,
+        vipPro: false,
+        lastFreeSpinDay: 0,
+        lastFreeSuperSpinDay: 0,
+        club: null,
+        karma: 50,
+        streetCred: 100,
+        superSpinTickets: 0,          // ⭐ 0 подарочных билетов
         freeImpoundPasses: 0,
         traderTitle: "Быстрый выкуп за кэш 💸",
         phoneWidgetsCollapsed: { biz: false, quests: false },
         stats: { bought: 0, sold: 0, profitableSales: 0, lossSales: 0, totalNetProfit: 0, scandalsAvoided: 0, bestSingleMargin: 0 },
-        hunger: 80, mood: 85, loanDebt: 0, taxDebt: 0, day: 1, streakDay: 1, lastClaimedDay: 0,
+        hunger: 80,
+        mood: 85,
+        loanDebt: 0,
+        taxDebt: 0,
+        day: 1,
+        streakDay: 1,
+        lastClaimedDay: 0,
         lastRealDayTimestamp: Date.now(),
         lastActiveTimestamp: Date.now(),
         diet: 'shaurma',
@@ -96,7 +114,7 @@ const DEFAULT_STATE = {
         crypto: { btc: 0, eth: 0, staked: [], prices: { btc: 9500000, eth: 340000 } },
         bankReputation: {
             rating: 5.0, successfulDeals: 0, fairDealsCount: 0, scandalsCount: 0,
-            vipBankTier: 'Стандарт', loanLimit: 500000,
+            vipBankTier: 'Стандарт', loanLimit: 80000,
             reviewsLog: [
                 { author: "Алексей В.", rating: 5, date: "Недавно", text: "Отличный продавец, машина в идеале!" },
                 { author: "Сергей Д.", rating: 5, date: "Недавно", text: "Честный парень, Launch показал чистый блок!" }
@@ -129,7 +147,7 @@ const DEFAULT_STATE = {
         dynamicStarRateHistory: []
     },
     garage: [], salesLot: [], contracts: [], plateCatalog: [],
-    ownedPlates: ["В777ВВ 77"], registeredPlates: ["В777ВВ 77"],
+    ownedPlates: [], registeredPlates: [],
     activeCategory: 'economy', marketFeed: [], p2pMode: 'cars', syndicateSubTab: 'contracts',
     myP2PListings: [], p2pMarketListings: [], businesses: [], confiscatedLot: null, blackMarketPlates: [],
     officialPlateAuction: [],
@@ -154,112 +172,6 @@ window.__IS_RESETTING__ = false;
 // ========================================================
 function migrateSave(parsed) {
     if (!parsed || typeof parsed !== 'object') return parsed;
-    const currentVersion = parsed.__saveVersion || 9;
-
-    if (currentVersion < 10) {
-        if (parsed.player && typeof parsed.player === 'object') {
-            if (parsed.player.garageSlots !== undefined && parsed.player.garageSlots > 0) {
-                const oldBase = parsed.player.baseSlots || 2;
-                const oldGarage = parsed.player.garageSlots || 2;
-                parsed.player.baseSlots = Math.max(oldBase, oldGarage);
-                delete parsed.player.garageSlots;
-            }
-            if (!Array.isArray(parsed.player.unlockedApps)) parsed.player.unlockedApps = [];
-            if (typeof parsed.player.hasGpsTracker !== 'boolean') parsed.player.hasGpsTracker = false;
-            if (typeof parsed.player.hasCustomsPass !== 'boolean') parsed.player.hasCustomsPass = false;
-            if (!parsed.player.mEventReactions || typeof parsed.player.mEventReactions !== 'object') parsed.player.mEventReactions = {};
-            if (parsed.player.businessAdBonus === undefined) parsed.player.businessAdBonus = null;
-            if (!Array.isArray(parsed.player.businessAchievements)) parsed.player.businessAchievements = [];
-            if (typeof parsed.player.businessSalesCount !== 'number') parsed.player.businessSalesCount = 0;
-            if (!Array.isArray(parsed.player.ownedBizSkins)) parsed.player.ownedBizSkins = [];
-            if (!Array.isArray(parsed.player.ownedBizStickers)) parsed.player.ownedBizStickers = [];
-
-            if (!parsed.player.interior || typeof parsed.player.interior !== 'object') parsed.player.interior = {};
-            if (typeof parsed.player.housingRentDue !== 'number') parsed.player.housingRentDue = 0;
-            if (!Array.isArray(parsed.player.ownedHouses)) parsed.player.ownedHouses = [];
-            if (parsed.player.mortgage === undefined) parsed.player.mortgage = null;
-        }
-        if (!Array.isArray(parsed.mEventsFeed)) parsed.mEventsFeed = [];
-        if (!parsed.businessWorkshop || typeof parsed.businessWorkshop !== 'object') {
-            parsed.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
-        }
-        if (!parsed.businessStaff || typeof parsed.businessStaff !== 'object') {
-            parsed.businessStaff = { mechanic: 0, painter: 0, manager: 0, accountant: 0 };
-        }
-        if (!Array.isArray(parsed.businessFleet)) parsed.businessFleet = [];
-        parsed.marketFeedVersion = (parsed.marketFeedVersion || 0) + 1;
-    }
-
-    if (currentVersion < 11) {
-        if (parsed.player && typeof parsed.player === 'object') {
-            if (!Array.isArray(parsed.player.ownedThemes)) {
-                parsed.player.ownedThemes = ['cyber_neon'];
-                if (parsed.player.hudColorId && parsed.player.hudColorId !== 'cyber_neon') {
-                    parsed.player.ownedThemes.push(parsed.player.hudColorId);
-                }
-                if (parsed.player.themePresetId === 'cyber_black_neo') {
-                    parsed.player.ownedThemes.push('cyber_black_neo');
-                }
-            }
-            if (!Array.isArray(parsed.player.ownedNickEffects)) parsed.player.ownedNickEffects = ['none'];
-            if (!Array.isArray(parsed.player.ownedAvatarEffects)) parsed.player.ownedAvatarEffects = ['none'];
-            if (!Array.isArray(parsed.player.ownedTitles)) parsed.player.ownedTitles = ['cash_buyer'];
-            if (typeof parsed.player.streakDay !== 'number') parsed.player.streakDay = 1;
-        }
-    }
-
-    if (currentVersion < 12) {
-        if (parsed.player && typeof parsed.player === 'object') {
-            if (!parsed.player.paidParking || typeof parsed.player.paidParking !== 'object') {
-                parsed.player.paidParking = { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 };
-            } else {
-                if (!Array.isArray(parsed.player.paidParking.cars)) parsed.player.paidParking.cars = [];
-                if (typeof parsed.player.paidParking.maxCars !== 'number') parsed.player.paidParking.maxCars = 3;
-                if (typeof parsed.player.paidParking.dailyRate !== 'number') parsed.player.paidParking.dailyRate = 200;
-                if (typeof parsed.player.paidParking.lastChargeDay !== 'number') parsed.player.paidParking.lastChargeDay = 0;
-            }
-
-            if (!parsed.player.warehouse || typeof parsed.player.warehouse !== 'object') {
-                parsed.player.warehouse = { maxCars: 6, maxItems: 12, cars: [], items: [] };
-            } else {
-                if (!Array.isArray(parsed.player.warehouse.cars)) parsed.player.warehouse.cars = [];
-                if (!Array.isArray(parsed.player.warehouse.items)) parsed.player.warehouse.items = [];
-                if (typeof parsed.player.warehouse.maxCars !== 'number') parsed.player.warehouse.maxCars = 6;
-                if (typeof parsed.player.warehouse.maxItems !== 'number') parsed.player.warehouse.maxItems = 12;
-            }
-
-            if (!Array.isArray(parsed.player.platesInventory)) {
-                parsed.player.platesInventory = [];
-            }
-        }
-    }
-
-    if (currentVersion < 13) {
-        if (parsed.player && typeof parsed.player === 'object') {
-            if (!Array.isArray(parsed.player._processedNotifIds)) parsed.player._processedNotifIds = [];
-            if (!Array.isArray(parsed.player.pendingFriendRequests)) parsed.player.pendingFriendRequests = [];
-            if (!Array.isArray(parsed.player.incomingTradeOffers)) parsed.player.incomingTradeOffers = [];
-            if (!Array.isArray(parsed.player.platesInventory)) parsed.player.platesInventory = [];
-        }
-    }
-
-    if (currentVersion < 14) {
-        if (parsed.player && typeof parsed.player === 'object') {
-            if (typeof parsed.player.stars === 'number' && parsed.player.stars > 0) {
-                const oldStars = parsed.player.stars;
-                parsed.player.stars = oldStars * 10;
-                console.log(`[Migration] Stars: ${oldStars} → ${parsed.player.stars} (×10)`);
-            }
-
-            if (typeof parsed.player.dynamicStarRate !== 'number') {
-                parsed.player.dynamicStarRate = STAR_RATE_DEFAULT;
-            }
-            if (!Array.isArray(parsed.player.dynamicStarRateHistory)) {
-                parsed.player.dynamicStarRateHistory = [];
-            }
-        }
-    }
-
     parsed.__saveVersion = SAVE_VERSION;
     return parsed;
 }
@@ -272,8 +184,8 @@ function sanitizeState() {
     if (!window.state.player.baseSlots || window.state.player.baseSlots < 2) window.state.player.baseSlots = 2;
     if (!window.state.player.maxExpressTickets) window.state.player.maxExpressTickets = 25;
     if (typeof window.state.player.expressTickets !== 'number') window.state.player.expressTickets = window.state.player.maxExpressTickets;
-    if (typeof window.state.player.cash !== 'number' || window.state.player.cash < 0) window.state.player.cash = 150000;
-    if (typeof window.state.player.stars !== 'number' || window.state.player.stars < 0) window.state.player.stars = 15;
+    if (typeof window.state.player.cash !== 'number' || window.state.player.cash < 0) window.state.player.cash = 75000;
+    if (typeof window.state.player.stars !== 'number' || window.state.player.stars < 0) window.state.player.stars = 0;
     if (!window.state.player.hudColorId) window.state.player.hudColorId = 'cyber_neon';
     if (!window.state.player.soundProfile) window.state.player.soundProfile = 'cyber';
     if (!window.state.player.traderTitle) window.state.player.traderTitle = "Быстрый выкуп за кэш 💸";
@@ -305,12 +217,6 @@ function sanitizeState() {
 
     if (!Array.isArray(window.state.player.ownedThemes)) {
         window.state.player.ownedThemes = ['cyber_neon'];
-        if (window.state.player.hudColorId && window.state.player.hudColorId !== 'cyber_neon') {
-            window.state.player.ownedThemes.push(window.state.player.hudColorId);
-        }
-        if (window.state.player.themePresetId === 'cyber_black_neo') {
-            window.state.player.ownedThemes.push('cyber_black_neo');
-        }
     }
     if (!Array.isArray(window.state.player.ownedNickEffects)) window.state.player.ownedNickEffects = ['none'];
     if (!Array.isArray(window.state.player.ownedAvatarEffects)) window.state.player.ownedAvatarEffects = ['none'];
@@ -333,11 +239,6 @@ function sanitizeState() {
 
     if (!window.state.player.paidParking || typeof window.state.player.paidParking !== 'object') {
         window.state.player.paidParking = { maxCars: 3, cars: [], dailyRate: 200, lastChargeDay: 0 };
-    } else {
-        if (!Array.isArray(window.state.player.paidParking.cars)) window.state.player.paidParking.cars = [];
-        if (typeof window.state.player.paidParking.maxCars !== 'number') window.state.player.paidParking.maxCars = 3;
-        if (typeof window.state.player.paidParking.dailyRate !== 'number') window.state.player.paidParking.dailyRate = 200;
-        if (typeof window.state.player.paidParking.lastChargeDay !== 'number') window.state.player.paidParking.lastChargeDay = 0;
     }
 
     if (!window.state.businessWorkshop) window.state.businessWorkshop = { equipment: 0, storage: 0, brand: 0, diagnostics: 0 };
@@ -357,66 +258,12 @@ function applyLoadedState(parsed) {
     parsed = migrateSave(parsed);
 
     if (parsed.lang) window.state.lang = parsed.lang;
-
     if (typeof parsed.marketFeedVersion === 'number') window.state.marketFeedVersion = parsed.marketFeedVersion;
-    else window.state.marketFeedVersion = 0;
 
     if (Array.isArray(parsed.mEventsFeed)) window.state.mEventsFeed = parsed.mEventsFeed;
-    else window.state.mEventsFeed = [];
 
     if (parsed.player) {
         window.state.player = { ...DEFAULT_STATE.player, ...parsed.player };
-        if (parsed.player.stats) window.state.player.stats = { ...DEFAULT_STATE.player.stats, ...parsed.player.stats };
-        if (parsed.player.tools) window.state.player.tools = { ...DEFAULT_STATE.player.tools, ...parsed.player.tools };
-        if (parsed.player.toolsWear) window.state.player.toolsWear = { ...DEFAULT_STATE.player.toolsWear, ...parsed.player.toolsWear };
-        if (parsed.player.crypto) window.state.player.crypto = { ...DEFAULT_STATE.player.crypto, ...parsed.player.crypto };
-        if (parsed.player.bankReputation) window.state.player.bankReputation = { ...DEFAULT_STATE.player.bankReputation, ...parsed.player.bankReputation };
-        if (parsed.player.phoneWidgetsCollapsed) window.state.player.phoneWidgetsCollapsed = { ...DEFAULT_STATE.player.phoneWidgetsCollapsed, ...parsed.player.phoneWidgetsCollapsed };
-        if (parsed.player.club) window.state.player.club = parsed.player.club;
-
-        if (!window.state.player.interior || typeof window.state.player.interior !== 'object') window.state.player.interior = {};
-        if (!Array.isArray(window.state.player.ownedHouses)) window.state.player.ownedHouses = [];
-        if (typeof window.state.player.housingRentDue !== 'number') window.state.player.housingRentDue = 0;
-        if (window.state.player.mortgage === undefined) window.state.player.mortgage = null;
-
-        if (!Array.isArray(window.state.player.ownedThemes)) window.state.player.ownedThemes = ['cyber_neon'];
-        if (!Array.isArray(window.state.player.ownedNickEffects)) window.state.player.ownedNickEffects = ['none'];
-        if (!Array.isArray(window.state.player.ownedAvatarEffects)) window.state.player.ownedAvatarEffects = ['none'];
-        if (!Array.isArray(window.state.player.ownedTitles)) window.state.player.ownedTitles = ['cash_buyer'];
-
-        if (!Array.isArray(window.state.player.phoneMessages)) window.state.player.phoneMessages = [];
-        if (!Array.isArray(window.state.player.dailyQuests)) window.state.player.dailyQuests = [];
-        if (!Array.isArray(window.state.player.bankHistory)) window.state.player.bankHistory = [];
-        if (!Array.isArray(window.state.player.bankDeposits)) window.state.player.bankDeposits = [];
-        if (!Array.isArray(window.state.player.mailbox)) window.state.player.mailbox = [];
-        if (!Array.isArray(window.state.player.unlockedApps)) window.state.player.unlockedApps = [];
-        if (!Array.isArray(window.state.player.businessAchievements)) window.state.player.businessAchievements = [];
-        if (!Array.isArray(window.state.player.ownedBizSkins)) window.state.player.ownedBizSkins = [];
-        if (!Array.isArray(window.state.player.ownedBizStickers)) window.state.player.ownedBizStickers = [];
-        if (!window.state.player.mEventReactions || typeof window.state.player.mEventReactions !== 'object') window.state.player.mEventReactions = {};
-
-        if (!Array.isArray(window.state.player._processedNotifIds)) window.state.player._processedNotifIds = [];
-        if (!Array.isArray(window.state.player.pendingFriendRequests)) window.state.player.pendingFriendRequests = [];
-        if (!Array.isArray(window.state.player.incomingTradeOffers)) window.state.player.incomingTradeOffers = [];
-        if (!Array.isArray(window.state.player.platesInventory)) window.state.player.platesInventory = [];
-
-        if (typeof window.state.player.dynamicStarRate !== 'number') {
-            window.state.player.dynamicStarRate = STAR_RATE_DEFAULT;
-        }
-        if (!Array.isArray(window.state.player.dynamicStarRateHistory)) {
-            window.state.player.dynamicStarRateHistory = [];
-        }
-
-        if (parsed.player.warehouse && typeof parsed.player.warehouse === 'object') {
-            window.state.player.warehouse = { ...DEFAULT_STATE.player.warehouse, ...parsed.player.warehouse };
-            if (!Array.isArray(window.state.player.warehouse.cars)) window.state.player.warehouse.cars = [];
-            if (!Array.isArray(window.state.player.warehouse.items)) window.state.player.warehouse.items = [];
-        }
-
-        if (parsed.player.paidParking && typeof parsed.player.paidParking === 'object') {
-            window.state.player.paidParking = { ...DEFAULT_STATE.player.paidParking, ...parsed.player.paidParking };
-            if (!Array.isArray(window.state.player.paidParking.cars)) window.state.player.paidParking.cars = [];
-        }
     }
 
     if (Array.isArray(parsed.garage)) window.state.garage = parsed.garage;
@@ -435,14 +282,6 @@ function applyLoadedState(parsed) {
     if (Array.isArray(parsed.lifeChatMessages)) window.state.lifeChatMessages = parsed.lifeChatMessages;
     if (Array.isArray(parsed.friendsList)) window.state.friendsList = parsed.friendsList;
 
-    if (parsed.businessWorkshop && typeof parsed.businessWorkshop === 'object') {
-        window.state.businessWorkshop = { ...DEFAULT_STATE.businessWorkshop, ...parsed.businessWorkshop };
-    }
-    if (parsed.businessStaff && typeof parsed.businessStaff === 'object') {
-        window.state.businessStaff = { ...DEFAULT_STATE.businessStaff, ...parsed.businessStaff };
-    }
-    if (Array.isArray(parsed.businessFleet)) window.state.businessFleet = parsed.businessFleet;
-
     sanitizeState();
 
     try { _syncStarRateToBank(); } catch (e) {}
@@ -450,9 +289,7 @@ function applyLoadedState(parsed) {
     if (window.PlatesManager && typeof window.PlatesManager.syncLegacyOwnedPlates === 'function') {
         try {
             window.PlatesManager.syncLegacyOwnedPlates();
-        } catch (e) {
-            console.warn('[App] Ошибка PlatesManager.syncLegacyOwnedPlates:', e);
-        }
+        } catch (e) {}
     }
 
     if (window.EventBus) {
@@ -464,9 +301,6 @@ function loadFromLocalStorage() {
     if (!window.tgUserId) return false;
     try {
         let saved = localStorage.getItem("perekup_save_" + window.tgUserId);
-        if (!saved) saved = localStorage.getItem("perekup_v13_" + window.tgUserId);
-        if (!saved) saved = localStorage.getItem("perekup_v12_" + window.tgUserId);
-        if (!saved) saved = localStorage.getItem("perekup_v11_" + window.tgUserId);
         if (!saved) saved = localStorage.getItem(SAVE_KEY_PREFIX + window.tgUserId);
 
         if (saved) {
@@ -484,7 +318,7 @@ function loadFromLocalStorage() {
 }
 
 // ========================================================
-// 5. БЕЗОПАСНОЕ СОХРАНЕНИЕ STATE С ДЕБАУНСОМ
+// 5. СОХРАНЕНИЕ STATE
 // ========================================================
 let cloudSaveDebounceTimer = null;
 let localSaveDebounceTimer = null;
@@ -519,9 +353,6 @@ function saveToTelegramCloud(jsonString, callback) {
     });
 }
 
-/**
- * Очистка тяжелых логов при переполнении квоты localStorage
- */
 function _pruneStateMemory() {
     try {
         if (window.state?.player?.bankHistory && window.state.player.bankHistory.length > 15) {
@@ -530,19 +361,9 @@ function _pruneStateMemory() {
         if (Array.isArray(window.state?.mEventsFeed) && window.state.mEventsFeed.length > 10) {
             window.state.mEventsFeed = window.state.mEventsFeed.slice(-10);
         }
-        if (Array.isArray(window.state?.businesses)) {
-            window.state.businesses.forEach(b => {
-                if (b && Array.isArray(b.incomeHistory) && b.incomeHistory.length > 7) {
-                    b.incomeHistory = b.incomeHistory.slice(-7);
-                }
-            });
-        }
     } catch(e) {}
 }
 
-/**
- * Непосредственная запись в хранилище (вызывается синхронно или через дебаунс)
- */
 function _performSaveNow() {
     if (!window.tgUserId) return;
     if (String(window.tgUserId).startsWith('guest_') || String(window.tgUserId).startsWith('p_')) return;
@@ -560,7 +381,6 @@ function _performSaveNow() {
             localStorage.setItem("perekup_save_" + window.tgUserId, fullJson);
             localStorage.setItem(SAVE_KEY_PREFIX + window.tgUserId, fullJson);
         } catch (storageErr) {
-            console.warn("[Save] Переполнение localStorage, выполняем очистку кэша:", storageErr);
             _pruneStateMemory();
             fullJson = JSON.stringify(window.state);
             localStorage.setItem("perekup_save_" + window.tgUserId, fullJson);
@@ -600,9 +420,6 @@ function _performSaveNow() {
     }
 }
 
-/**
- * Единый метод сохранения с дебаунсом (исключает лаги интерфейса при десятках вызовов)
- */
 function saveState(immediate = false) {
     if (immediate) {
         if (localSaveDebounceTimer) {
@@ -621,99 +438,18 @@ function saveState(immediate = false) {
 }
 
 // ========================================================
-// ОБРАБОТЧИК ЖИЗНЕННОГО ЦИКЛА ВКЛАДКИ (TELEGRAM WEBAPP)
-// ========================================================
-if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            // Приложение свернули: принудительно моментально сохраняем состояние
-            saveState(true);
-        } else if (document.visibilityState === 'visible') {
-            // Приложение развернули: рассчитываем оффлайн-прогресс и проверяем суточный цикл
-            try {
-                if (window.state?.player) {
-                    const now = Date.now();
-                    const lastActive = window.state.player.lastActiveTimestamp || now;
-                    const awaySeconds = Math.max(0, Math.floor((now - lastActive) / 1000));
-
-                    // Если отсутствовали более 15 секунд — даем тики бизнесу и проверяем день
-                    if (awaySeconds >= 15) {
-                        if (typeof checkRealTimeDayChange === 'function') {
-                            checkRealTimeDayChange();
-                        }
-                        if (window.PhoneBusiness && typeof window.PhoneBusiness.tickIncome === 'function') {
-                            window.PhoneBusiness.tickIncome();
-                        }
-                    }
-                    window.state.player.lastActiveTimestamp = now;
-                }
-                if (typeof updateHeaderUI === 'function') updateHeaderUI();
-            } catch (e) {
-                console.warn('[Lifecycle] Ошибка при возврате в приложение:', e);
-            }
-        }
-    });
-
-    window.addEventListener('pagehide', () => {
-        saveState(true);
-    });
-}
-
-// ========================================================
 // 6. СБРОС ПРОГРЕССА
 // ========================================================
 function resetGameData() {
-    if (!confirm("⚠️ ВНИМАНИЕ! Это полностью сотрёт весь прогресс: гараж, бизнес, деньги, уровень, купленные скины и ВСЁ остальное.\n\nПрогресс будет удалён и из локальной памяти, и из облака Firestore.\n\nПродолжить?")) {
-        return;
-    }
-
-    if (!confirm("🔴 ВЫ УВЕРЕНЫ? Это действие НЕОБРАТИМО!\n\nНажмите OK, чтобы стереть всё навсегда.")) {
+    if (!confirm("⚠️ Вы уверены, что хотите сбросить прогресс до честного старта (75,000 ₽, 1 уровень)?")) {
         return;
     }
 
     window.__IS_RESETTING__ = true;
 
     try {
-        const keysToRemove = new Set();
-
-        keysToRemove.add("perekup_save_" + window.tgUserId);
-        keysToRemove.add("perekup_v10_" + window.tgUserId);
-        keysToRemove.add("perekup_v11_" + window.tgUserId);
-        keysToRemove.add("perekup_v12_" + window.tgUserId);
-        keysToRemove.add("perekup_v13_" + window.tgUserId);
-        keysToRemove.add(SAVE_KEY_PREFIX + window.tgUserId);
-        keysToRemove.add("perekup_save_guest_777");
-        keysToRemove.add("perekup_save_777");
-        keysToRemove.add("perekup_save_undefined");
-        keysToRemove.add('perekoop_sim_save_v105_release');
-
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (!key) continue;
-            if (key.includes('perekup_save') || key.includes('perekoop_sim_save')) {
-                keysToRemove.add(key);
-            }
-        }
-
-        keysToRemove.forEach(key => {
-            try { localStorage.removeItem(key); } catch (e) {}
-            try { sessionStorage.removeItem(key); } catch (e) {}
-        });
-
-        try {
-            if (window.Telegram?.WebApp?.CloudStorage) {
-                const tgCloud = window.Telegram.WebApp.CloudStorage;
-                tgCloud.getKeys((err, keys) => {
-                    if (!err && Array.isArray(keys)) {
-                        keys.forEach(k => {
-                            if (k && (k.includes('perekup') || k.includes('perekoop'))) {
-                                try { tgCloud.removeItem(k, () => {}); } catch (e) {}
-                            }
-                        });
-                    }
-                });
-            }
-        } catch (e) {}
+        localStorage.clear();
+        sessionStorage.clear();
 
         if (!window.isPcDevMode || !window.isPcDevMode()) {
             (async () => {
@@ -726,46 +462,20 @@ function resetGameData() {
                         for (const colName of collectionsToWipe) {
                             try {
                                 await deleteDoc(doc(window.FB_Bridge.db, colName, uid));
-                                console.log(`[Reset] Удалён Firestore: ${colName}/${uid}`);
                             } catch (e) {}
                         }
                     }
-                } catch (e) {
-                    console.warn('[Reset] Ошибка очистки Firestore:', e);
-                }
+                } catch (e) {}
             })();
-        }
-
-        try {
-            const cleanState = JSON.parse(JSON.stringify(DEFAULT_STATE));
-            Object.keys(window.state).forEach(k => { delete window.state[k]; });
-            Object.assign(window.state, cleanState);
-            window.state.__saveVersion = SAVE_VERSION;
-        } catch (e) {}
-
-        try {
-            if (window.gameCycleInterval) clearInterval(window.gameCycleInterval);
-            if (window.salesLotTimerInterval) clearInterval(window.salesLotTimerInterval);
-            if (window.PhoneBusiness?._tickInterval) clearInterval(PhoneBusiness._tickInterval);
-            for (let i = 1; i < 99999; i++) { window.clearInterval(i); window.clearTimeout(i); }
-        } catch (e) {}
-
-        if (window.AudioFx) window.AudioFx.haptic('warning');
-        if (typeof showToast === 'function') showToast("🗑️ Прогресс полностью сброшен! Перезагрузка...", 'success');
-
-        if (window.EventBus) {
-            window.EventBus.emit('state:reset', { reason: 'user_action' });
         }
 
         setTimeout(() => {
             const cleanUrl = window.location.href.split('?')[0];
             window.location.href = cleanUrl + '?reset=' + Date.now();
             setTimeout(() => { window.location.reload(true); }, 200);
-        }, 1200);
+        }, 800);
 
     } catch (e) {
-        console.error('[Reset] Критическая ошибка:', e);
-        alert('Ошибка при сбросе: ' + (e.message || e));
         window.location.reload();
     }
 }
@@ -803,4 +513,4 @@ window.ensureCarIdentity = ensureCarIdentity;
 window.isOwnerUser = _isOwner;
 window.SAVE_VERSION = SAVE_VERSION;
 
-console.log('[💠 app-core.js v4.3.2-stabilized] Защита сохранений с дебаунсом и lifecycle-менеджером активирована ✓');
+console.log('[💠 app-core.js v4.4.0 PRO-BALANCE] Честный старт 75,000 ₽ активирован ✓');
