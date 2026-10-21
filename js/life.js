@@ -1,12 +1,12 @@
 // ========================================================
-// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.2.0)
+// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.3.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.2.0 (ЦЕНТР УПРАВЛЕНИЯ КЛУБАМИ И ДРУЗЬЯМИ):
-//   1. Экран «Мой Клуб»: просмотр перков синдиката, смена/вступление, создание своего клуба и инвайты.
-//   2. Экран «Друзья & Связи»: поиск по нику/ID, список друзей с кнопкой чата в M+, перенос заявок.
-//   3. Устранена отдельная кнопка «Заявки» из общего ряда (аккуратная сетка на 2 кнопки).
-//   4. Сохранены таймеры облав технадзора 12.5.1, рацион, отдых, спортзал и карма.
+// ⭐ v1.3.0 (ФИКС ВЕРСТКИ КНОПОК КЛУБОВ, ДРУЗЕЙ И ПОИСКА):
+//   1. Исправлено расползание кнопок «Вступить» в каталоге клубов.
+//   2. Исправлено поле ввода поиска игроков (инпут на всю ширину строки, кнопка сбоку).
+//   3. Исправлено наложение кнопки «Копировать» на персональный ID.
+//   4. Все кнопки действий в списках зафиксированы (width: auto, flex-shrink: 0).
 // ========================================================
 
 let lifeActiveTab = 'tone'; // 'tone' | 'street' | 'social'
@@ -83,7 +83,7 @@ const DEFAULT_CLUBS_CATALOG = [
         leader: 'Кинг_Перекуп',
         membersCount: 42,
         totalCapital: 184500000,
-        desc: 'Синдикат профессиональных автодилеров и перекупов. Контролирует оптовые поставки и сделки.',
+        desc: 'Синдикат профессиональных автодилеров и перекупов. Контролирует оптовые поставки и крупные сделки.',
         perks: [
             { icon: '📈', title: 'Синдикат-Сбыт', desc: '+6% к цене продажи автомобилей клиентам на площадке' },
             { icon: '🛠️', title: 'Гаражное братство', desc: '-15% на закупку запчастей и диагностику авто' },
@@ -198,6 +198,18 @@ function renderLifeScreen() {
             }
             .life-inside-btn:active {
                 transform: scale(0.96);
+            }
+            .life-btn-auto {
+                width: auto !important;
+                min-width: 82px !important;
+                flex-shrink: 0 !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                white-space: nowrap !important;
+                height: 30px !important;
+                padding: 0 12px !important;
+                box-sizing: border-box !important;
             }
             .life-reaction-btn {
                 background: rgba(255, 255, 255, 0.04);
@@ -615,7 +627,7 @@ function renderSocialAndClubsSubTab(container) {
 }
 
 // ========================================================
-// 4. ЭКРАН «ДРУЗЬЯ & КОНТАКТЫ»
+// 4. ЭКРАН «ДРУЗЬЯ & КОНТАКТЫ» (ФИКС ВЕРСТКИ И КНОПОК)
 // ========================================================
 function openFriendsModal(initialSubTab = 'list') {
     friendsActiveSubTab = initialSubTab;
@@ -665,22 +677,22 @@ function renderFriendsModalContent() {
                 ${friends.length === 0 ? `
                     <div class="p-3 text-center sub-label" style="font-size:9.5px;">Список друзей пуст. Найдите единомышленников во вкладке «Поиск».</div>
                 ` : friends.map(f => `
-                    <div class="p-2 flex-between" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.06);">
-                        <div class="flex-gap" style="align-items:center;">
-                            <div style="position:relative; width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, #00f2fe, #7928ca); display:flex; align-items:center; justify-content:center; color:#000; font-weight:900; font-size:14px;">
+                    <div class="p-2" style="background:#090e18; border-radius:10px; border:1px solid rgba(255,255,255,0.06); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                        <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+                            <div style="position:relative; width:34px; height:34px; min-width:34px; border-radius:50%; background:linear-gradient(135deg, #00f2fe, #7928ca); display:flex; align-items:center; justify-content:center; color:#000; font-weight:900; font-size:14px;">
                                 ${f.name.charAt(0)}
                                 <span style="position:absolute; bottom:0; right:0; width:8px; height:8px; border-radius:50%; background:${f.online ? '#00e676' : '#64748b'}; border:1.5px solid #000;"></span>
                             </div>
-                            <div>
-                                <b class="text-xs color-main" style="font-size:11px;">${f.name}</b>
-                                <div class="sub-label" style="font-size:8px; color:#94a3b8;">Ур. ${f.level} •${f.car}</div>
+                            <div style="min-width:0; flex:1;">
+                                <b class="text-xs color-main" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${f.name}</b>
+                                <div class="sub-label" style="font-size:8px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Ур. ${f.level} •${f.car}</div>
                             </div>
                         </div>
-                        <div class="flex-gap" style="gap:4px;">
-                            <button onclick="writeToFriendInM('${f.name}')" class="btn btn-cyan btn-sm" style="font-size:9px; padding:5px 8px;" title="Открыть диалог в M+">
-                                <i class="fa-solid fa-comments"></i> Чат
+                        <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                            <button onclick="writeToFriendInM('${f.name}')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:9px;" title="Открыть диалог в M+">
+                                <i class="fa-solid fa-comments mr-1"></i> Чат
                             </button>
-                            <button onclick="inviteFriendToClubAction('${f.name}')" class="btn btn-purple btn-sm" style="font-size:9px; padding:5px 8px;" title="Пригласить в клуб">
+                            <button onclick="inviteFriendToClubAction('${f.name}')" class="btn btn-purple btn-sm life-btn-auto" style="font-size:9px;" title="Пригласить в клуб">
                                 <i class="fa-solid fa-flag"></i>
                             </button>
                         </div>
@@ -692,10 +704,10 @@ function renderFriendsModalContent() {
         subContent = `
             <div class="p-2 mb-2" style="background:rgba(0,242,254,0.08); border:1px solid rgba(0,242,254,0.3); border-radius:10px;">
                 <div class="sub-label text-xs mb-1">Ваш персональный ID для дружбы:</div>
-                <div class="flex-between">
-                    <b class="color-cyan font-mono" style="font-size:12px;">${myId}</b>
-                    <button onclick="navigator.clipboard?.writeText('${myId}'); showToast('ID скопирован в буфер!');" class="btn btn-dark btn-sm" style="font-size:8.5px; padding:3px 8px;">
-                        Копировать
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                    <b class="color-cyan font-mono" style="font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;">${myId}</b>
+                    <button onclick="navigator.clipboard?.writeText('${myId}'); showToast('ID скопирован в буфер!');" class="btn btn-dark btn-sm life-btn-auto" style="font-size:9px;">
+                        <i class="fa-solid fa-copy mr-1"></i> Копировать
                     </button>
                 </div>
             </div>
@@ -705,14 +717,14 @@ function renderFriendsModalContent() {
                 ${requests.length === 0 ? `
                     <div class="p-3 text-center sub-label" style="font-size:9px;">Новых заявок в друзья пока нет.</div>
                 ` : requests.map((req, rIdx) => `
-                    <div class="p-2 flex-between" style="background:#090e18; border-radius:8px;">
-                        <div>
-                            <b class="text-xs color-main" style="font-size:10.5px;">${req.name || 'Игрок'}</b>
+                    <div class="p-2" style="background:#090e18; border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                        <div style="min-width:0; flex:1;">
+                            <b class="text-xs color-main" style="font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${req.name || 'Игрок'}</b>
                             <div class="sub-label" style="font-size:8px;">Уровень ${req.level || 1}</div>
                         </div>
-                        <div class="flex-gap" style="gap:4px;">
-                            <button onclick="acceptFriendRequest(${rIdx})" class="btn btn-green btn-sm" style="font-size:8.5px; padding:4px 7px;">Принять</button>
-                            <button onclick="rejectFriendRequest(${rIdx})" class="btn btn-dark btn-sm" style="font-size:8.5px; padding:4px 7px;">Отклонить</button>
+                        <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                            <button onclick="acceptFriendRequest(${rIdx})" class="btn btn-green btn-sm life-btn-auto" style="font-size:8.5px;">Принять</button>
+                            <button onclick="rejectFriendRequest(${rIdx})" class="btn btn-dark btn-sm life-btn-auto" style="font-size:8.5px;">Отклонить</button>
                         </div>
                     </div>
                 `).join('')}
@@ -720,28 +732,28 @@ function renderFriendsModalContent() {
         `;
     } else if (friendsActiveSubTab === 'search') {
         subContent = `
-            <div style="display:flex; gap:6px; margin-bottom:10px;">
-                <input type="text" id="friendSearchInput" class="chat-input" placeholder="Введите ник или ID игрока..." style="font-size:11px; padding:8px 10px;">
-                <button onclick="submitSearchFriendAction()" class="btn btn-cyan btn-sm font-bold" style="font-size:10px; padding:0 12px;">
-                    Найти
+            <div style="display:flex; gap:6px; margin-bottom:10px; align-items:center;">
+                <input type="text" id="friendSearchInput" class="chat-input" placeholder="Введите ник или ID игрока..." style="flex:1 1 auto; min-width:0; font-size:11px; padding:8px 10px; box-sizing:border-box;">
+                <button onclick="submitSearchFriendAction()" class="btn btn-cyan btn-sm font-bold life-btn-auto" style="font-size:10px;">
+                    <i class="fa-solid fa-magnifying-glass mr-1"></i> Найти
                 </button>
             </div>
 
             <div class="sub-label mb-1" style="font-size:9.5px; font-weight:800; color:#cbd5e1;">Рекомендуемые перекупы:</div>
             <div class="space-y-1">
-                <div class="p-2 flex-between" style="background:#090e18; border-radius:8px;">
-                    <div>
-                        <b class="text-xs color-cyan" style="font-size:10.5px;">Денис_Торг77</b>
-                        <div class="sub-label" style="font-size:8px;">Ур. 9 • Владелец авторазборки</div>
+                <div class="p-2" style="background:#090e18; border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                    <div style="min-width:0; flex:1;">
+                        <b class="text-xs color-cyan" style="font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">Денис_Торг77</b>
+                        <div class="sub-label" style="font-size:8px; color:#94a3b8;">Ур. 9 • Владелец авторазборки</div>
                     </div>
-                    <button onclick="sendFriendRequestTo('Денис_Торг77')" class="btn btn-cyan btn-sm" style="font-size:8.5px; padding:4px 8px;">+ Заявка</button>
+                    <button onclick="sendFriendRequestTo('Денис_Торг77')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:8.5px;">+ Заявка</button>
                 </div>
-                <div class="p-2 flex-between" style="background:#090e18; border-radius:8px;">
-                    <div>
-                        <b class="text-xs color-cyan" style="font-size:10.5px;">Turbo_Vлад</b>
-                        <div class="sub-label" style="font-size:8px;">Ур. 5 • Дрифт на Жигулях</div>
+                <div class="p-2" style="background:#090e18; border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                    <div style="min-width:0; flex:1;">
+                        <b class="text-xs color-cyan" style="font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">Turbo_Vлад</b>
+                        <div class="sub-label" style="font-size:8px; color:#94a3b8;">Ур. 5 • Дрифт на Жигулях</div>
                     </div>
-                    <button onclick="sendFriendRequestTo('Turbo_Vлад')" class="btn btn-cyan btn-sm" style="font-size:8.5px; padding:4px 8px;">+ Заявка</button>
+                    <button onclick="sendFriendRequestTo('Turbo_Vлад')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:8.5px;">+ Заявка</button>
                 </div>
             </div>
         `;
@@ -837,7 +849,7 @@ function rejectFriendRequest(idx) {
 }
 
 // ========================================================
-// 5. ЭКРАН «АВТОКЛУБ И СИНДИКАТ»
+// 5. ЭКРАН «АВТОКЛУБ И СИНДИКАТ» (ФИКС ВЕРСТКИ КАТАЛОГА)
 // ========================================================
 function openClubModal(initialSubTab = 'my_club') {
     clubActiveSubTab = initialSubTab;
@@ -918,26 +930,28 @@ function renderClubModalContent() {
                     const isMy = c.id === currentClub.id;
                     return `
                         <div class="p-2" style="background:#090e18; border:1px solid ${isMy ? 'var(--purple)' : 'rgba(255,255,255,0.06)'}; border-radius:10px;">
-                            <div class="flex-between mb-1">
-                                <div class="flex-gap" style="align-items:center;">
-                                    <span style="font-size:18px;">${c.icon}</span>
-                                    <div>
-                                        <b class="text-xs color-main" style="font-size:11px;">[${c.tag}]${c.name}</b>
-                                        <div class="sub-label" style="font-size:8px;">${c.membersCount} участников</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:4px;">
+                                <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
+                                    <span style="font-size:20px; flex-shrink:0;">${c.icon}</span>
+                                    <div style="min-width:0; flex:1;">
+                                        <b class="text-xs color-main" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">[${c.tag}]${c.name}</b>
+                                        <div class="sub-label" style="font-size:8px; color:#94a3b8;">${c.membersCount} участников</div>
                                     </div>
                                 </div>
-                                ${isMy ? `<span class="tag-badge bg-tag-purple" style="font-size:7px;">МОЙ КЛУБ</span>` : `
-                                    <button onclick="joinClubAction('${c.id}')" class="btn btn-purple btn-sm" style="font-size:8.5px; padding:4px 8px;">
-                                        Вступить
-                                    </button>
-                                `}
+                                <div style="flex-shrink:0;">
+                                    ${isMy ? `<span class="tag-badge bg-tag-purple" style="font-size:7.5px;">МОЙ КЛУБ</span>` : `
+                                        <button onclick="joinClubAction('${c.id}')" class="btn btn-purple btn-sm life-btn-auto" style="font-size:9px;">
+                                            Вступить
+                                        </button>
+                                    `}
+                                </div>
                             </div>
-                            <div class="sub-label" style="font-size:8.5px; color:#94a3b8; line-height:1.3;">${c.desc}</div>
+                            <div class="sub-label" style="font-size:8.5px; color:#cbd5e1; line-height:1.3;">${c.desc}</div>
                         </div>
                     `;
                 }).join('')}
             </div>
-            <button onclick="switchClubSubTab('create')" class="btn btn-cyan btn-sm w-full font-bold" style="font-size:10px; padding:7px 0;">
+            <button onclick="switchClubSubTab('create')" class="btn btn-cyan btn-sm w-full font-bold" style="font-size:10px; padding:8px 0;">
                 <i class="fa-solid fa-plus mr-1"></i> Зарегистрировать свой клуб
             </button>
         `;
@@ -1370,4 +1384,4 @@ window.joinClubAction = joinClubAction;
 window.inviteFriendToClubAction = inviteFriendToClubAction;
 window.confirmCreateClubAction = confirmCreateClubAction;
 
-console.log('[☕ life.js v1.2.0] Центр управления клубом и экран друзей успешно активированы ✓');
+console.log('[☕ life.js v1.3.0] Верстка кнопок клубов, поиска и друзей отполирована ✓');
