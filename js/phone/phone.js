@@ -1,13 +1,12 @@
 // ========================================================
-// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v2.1.0)
+// js/phone/phone.js — ОПЕРАЦИОННАЯ СИСТЕМА PEREKUP OS (v2.2.0)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v2.1.0 (ФИКС ОТОБРАЖЕНИЯ ТОВАРОВ В АВТО-МАРКЕТЕ):
-//   - Встроен автономный надежный DEFAULT_SHOP_CATALOG в AppShop.
-//   - Товары (приборы, сырье, документы, мебель) гарантированно
-//     отображаются во всех 4-х вкладках без рассинхрона модулей.
-//   - Полная интеграция уровней и платных разрешений APP_ACCESS_CONFIG.
-//   - Сохранены все виджеты, AppShop, AppNotepad и P2P-функционал.
+// ⭐ v2.2.0 (M+ 3-TAB SYNC & ENHANCED INTEGRATION):
+//   - Полная синхронизация с обновленным 3-секционным Приложением M (Чаты / Сделки / Профиль).
+//   - Корректный сброс активных диалогов при закрытии/возврате на главный экран (goHome).
+//   - Интеллектуальный расчет непрочитанных уведомлений и P2P-офферов для бейджей.
+//   - Сохранены все магазины AppShop, Блокнот целей AppNotepad, виджеты и лицензии доступа.
 // ========================================================
 
 const PhoneManager = {
@@ -299,7 +298,11 @@ const PhoneManager = {
     },
 
     _onAppClosed(appId) {
-        // Фоновое воспроизведение радио
+        if (appId === 'm' || appId === 'm-hub' || appId === 'messages') {
+            if (window.AppM) {
+                window.AppM.activeDialogId = null;
+            }
+        }
     },
 
     // --------------------------------------------------------
@@ -335,10 +338,13 @@ const PhoneManager = {
 
             this._onAppOpened(appId);
 
-            // 1. СЕТЬ M+ & P2P БИРЖА (AppM)
+            // 1. ПРИЛОЖЕНИЕ M+ (3-СЕКЦИОННЫЙ ХАБ СВЯЗИ И СДЕЛОК)
             if (appId === 'm' || appId === 'm-hub' || appId === 'messages') {
                 if (window.AppM && typeof window.AppM.render === 'function') {
                     try {
+                        if (typeof window.AppM.syncSalesLotBuyersToMessages === 'function') {
+                            window.AppM.syncSalesLotBuyersToMessages();
+                        }
                         window.AppM.render(appContainer);
                     } catch (e) {
                         console.error('[Phone] AppM.render error:', e);
@@ -869,7 +875,6 @@ const PhoneManager = {
 
 // ========================================================
 // АВТОНОМНЫЙ АВТО-МАРКЕТ (AppShop)
-// Встроен надежный автономный DEFAULT_SHOP_CATALOG
 // ========================================================
 const DEFAULT_SHOP_CATALOG = {
     tools: [
@@ -1559,4 +1564,4 @@ if (document.readyState === 'loading') {
     PhoneManager.init();
 }
 
-console.log('[📱 phone.js v2.1.0] Товары Авто-Маркета восстановлены на 100% ✓');
+console.log('[📱 phone.js v2.2.0] Переход на 3-секционный AppM и умные бейджи завершены ✓');
