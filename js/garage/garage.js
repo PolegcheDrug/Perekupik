@@ -1,11 +1,12 @@
 // ========================================================
-// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.8.0-club)
+// js/garage/garage.js — ГЛАВНЫЙ КОНТРОЛЛЕР ГАРАЖА (v1.9.0-hybrid)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v1.8.0-club (ИНТЕГРАЦИЯ ПЕРКОВ АВТОКЛУБА И АДАПТИВНАЯ ВЕРСТКА):
-//   - Отображение активного клубного перка «Гаражное братство» [STS] (-15% на сервис и тюнинг).
-//   - Стабилизация кнопок действий под мобильные экраны (без расползания и срезов).
-//   - Сохранено управление госномерами ГРЗ и быстрый расчет цены продажи +-15%.
+// ⭐ v1.9.0-hybrid (ПОЛКА ЗАПАСОВ И КАНИСТР + ИНТЕГРАЦИЯ С ПОЧТОЙ):
+//   1. ПОЛКА ЗАПАСОВ В ГАРАЖЕ: отображение сохранённых канистр АИ-95, талонов и приборов.
+//   2. БЫСТРАЯ ДОЗАПРАВКА: заправка бака прямо из гаражной канистры в 1 клик.
+//   3. ВЫСТАВЛЕНИЕ РАСХОДНИКОВ НА P2P: возможность продать канистру или талон на бирже.
+//   4. СОХРАНЕНО: управление номерами ГРЗ, перки синдиката [STS], торг продажи +-15%.
 // ========================================================
 
 window.previewCarIndex = null;
@@ -184,6 +185,140 @@ function _sortGarageCars(filter = 'all') {
     return indexed;
 }
 
+// ========================================================
+// ПОЛКА РАСХОДНИКОВ И КАНИСТР В ГАРАЖЕ
+// ========================================================
+function renderGarageSuppliesShelfHtml() {
+    const items = state.player?.warehouse?.items || [];
+    if (!Array.isArray(items) || items.length === 0) return '';
+
+    const curFuel = state.player?.fuel || 0;
+
+    let itemsHtml = items.map((it, idx) => {
+        let actionBtn = '';
+        if (it.type === 'canister') {
+            actionBtn = `<button onclick="useGarageCanister(${idx})" class="btn btn-green btn-sm btn-auto" style="padding:3px 7px; font-size:8px;">Заправить (+${it.amount} ⛽)</button>`;
+        } else if (it.type === 'tickets_bundle') {
+            actionBtn = `<button onclick="useGarageTickets(${idx})" class="btn btn-purple btn-sm btn-auto" style="padding:3px 7px; font-size:8px;">Использовать</button>`;
+        }
+
+        return `
+            <div class="p-1 flex-between mb-1" style="background:#050914; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+                <div class="flex-gap" style="align-items:center;">
+                    <span style="font-size:15px;">${it.icon || '📦'}</span>
+                    <div>
+                        <b class="text-xs color-main" style="font-size:10px;">${escapeHtml(it.name)}</b>
+                        <div class="sub-label" style="font-size:7.5px; color:#94a3b8;">${escapeHtml(it.desc || '')}</div>
+                    </div>
+                </div>
+                <div class="flex-gap" style="gap:4px;">
+                    ${actionBtn}
+                    <button onclick="sellGarageSupplyItem(${idx})" class="btn btn-dark btn-sm btn-auto" style="padding:3px 6px; font-size:8px;">💰 Сдать</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    return `
+        <div class="glass-card mb-2 p-2" style="background:#090e18; border:1px solid rgba(0,242,254,0.3); border-radius:12px;">
+            <div class="flex-between mb-1">
+                <div class="flex-gap" style="align-items:center;">
+                    <i class="fa-solid fa-boxes-packing color-cyan"></i>
+                    <b class="text-xs color-cyan" style="font-size:11px;">Полка запасов и канистр (${items.length} поз.)</b>
+                </div>
+                <span class="sub-label" style="font-size:8.5px;">В баке: <b class="${curFuel < 40 ? 'color-red' : 'color-green'}">${curFuel}/100 ⛽</b></span>
+            </div>
+            ${itemsHtml}
+        </div>
+    `;
+}
+
+function useGarageCanister(idx) {
+    const items = state.player?.warehouse?.items || [];
+    const it = items[idx];
+    if (!it || it.type !== 'canister') return;
+
+    let cur = state.player?.fuel || 0;
+    if (cur >= 100) return safeShowToast("Бак уже полон на 100%!");
+
+    let needed = 100 - cur;
+    let take = Math.min(needed, it.amount || 0);
+
+    state.player.fuel = cur + take;
+    it.amount -= take;
+
+    if (it.amount <= 0) {
+        items.splice(idx, 1);
+    } else {
+        it.name = `Канистра АИ-95 (${it.amount} л)`;
+    }
+
+    safeSaveState();
+    safeUpdateHeaderUI();
+    safePlaySound('win');
+    safeTgHaptic('success');
+    safeShowToast(`⛽ Залито +${take} л в бак из канистры!`);
+    renderGarage();
+}
+
+function useGarageTickets(idx) {
+    const items = state.player?.warehouse?.items || [];
+    const it = items[idx];
+    if (!it || it.type !== 'tickets_bundle') return;
+
+    let cur = state.player?.expressTickets || 0;
+    let max = state.player?.maxExpressTickets || 25;
+    if (cur >= max) return safeShowToast(`Лимит талонов полон (${max})!`);
+
+    let needed = max - cur;
+    let take = Math.min(needed, it.amount || 0);
+
+    state.player.expressTickets = cur + take;
+    it.amount -= take;
+
+    if (it.amount <= 0) {
+        items.splice(idx, 1);
+    } else {
+        it.name = `Пачка талонов (${it.amount} шт)`;
+    }
+
+    safeSaveState();
+    safeUpdateHeaderUI();
+    safePlaySound('win');
+    safeTgHaptic('success');
+    safeShowToast(`🎟️ Активировано +${take} талонов!`);
+    renderGarage();
+}
+
+function sellGarageSupplyItem(idx) {
+    const items = state.player?.warehouse?.items || [];
+    const it = items[idx];
+    if (!it) return;
+
+    let payout = 0;
+    if (it.type === 'canister') payout = Math.round((it.amount || 0) * 55);
+    else if (it.type === 'tickets_bundle') payout = Math.round((it.amount || 0) * 8000);
+    else payout = 10000;
+
+    if (!confirm(`Продать «${it.name}» скупщикам за ${payout.toLocaleString()} ₽?`)) return;
+
+    state.player.cash = (state.player.cash || 0) + payout;
+    if (typeof logBankTransaction === 'function') {
+        logBankTransaction(`Продажа запасов из гаража: ${it.name}`, payout, true);
+    }
+
+    items.splice(idx, 1);
+    safeSaveState();
+    safeUpdateHeaderUI();
+    safePlaySound('win');
+    safeTgHaptic('success');
+    safeShowToast(`Продано: +${payout.toLocaleString()} ₽`);
+    renderGarage();
+}
+
+// ========================================================
+// ОСНОВНОЙ РЕНДЕР ГАРАЖА
+// ========================================================
 function renderGarage() {
     const list = document.getElementById('garageList');
     if (!list) return;
@@ -214,8 +349,10 @@ function renderGarage() {
         safeSetTxt('garageDetailedSlots', statusPillText);
         safeSetTxt('garageHeaderSlots', `${currentSlots}/${maxSlots}`);
 
+        const shelfHtml = renderGarageSuppliesShelfHtml();
+
         if (!Array.isArray(state.garage) || state.garage.length === 0) {
-            list.innerHTML = `
+            list.innerHTML = shelfHtml + `
                 <div class="glass-card text-center sub-label py-8">
                     <i class="fa-solid fa-warehouse color-cyan mb-2" style="font-size:36px;"></i>
                     <div class="font-bold text-xs color-cyan mb-1">Ваш автопарк пуст</div>
@@ -255,7 +392,7 @@ function renderGarage() {
                 emptyDesc = "Все ваши автомобили распределены по коммерческим автопаркам.";
             }
 
-            list.innerHTML = filterBarHtml + `
+            list.innerHTML = shelfHtml + filterBarHtml + `
                 <div class="glass-card text-center sub-label py-6">
                     <i class="fa-solid fa-car-side color-cyan mb-2" style="font-size:28px;"></i>
                     <div class="font-bold text-xs color-cyan mb-1">Список пуст</div>
@@ -264,7 +401,7 @@ function renderGarage() {
             return;
         }
 
-        let html = filterBarHtml;
+        let html = shelfHtml + filterBarHtml;
 
         sortedPairs.forEach((pair) => {
             const car = pair.car;
@@ -801,7 +938,8 @@ Object.assign(window, {
     renderGarage, openCarPreviewModal, openGaugeModalFromPreview, openOBD2ModalFromPreview,
     openTuningFromPreview, togglePersonalCar, selectCarForStreetDirect, buyGarageSlot,
     openPutOnLotModal, confirmPutOnLot, _sortGarageCars, _getFixedCarImage,
-    setGarageFilter, unassignCarFromGarage, setLotPrice, updateLotPricePreview
+    setGarageFilter, unassignCarFromGarage, setLotPrice, updateLotPricePreview,
+    renderGarageSuppliesShelfHtml, useGarageCanister, useGarageTickets, sellGarageSupplyItem
 });
 
-console.log('[🏠 garage v1.8.0-club] Адаптивная верстка кнопок и перки синдиката активированы ✓');
+console.log('[🏠 garage v1.9.0-hybrid] Полка запасов канистр и талонов в Гараже активирована ✓');
