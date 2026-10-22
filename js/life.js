@@ -1,5 +1,5 @@
 // ========================================================
-// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.5.3)
+// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.5.4)
 // ========================================================
 
 let lifeActiveTab = 'tone'; // 'tone' | 'street' | 'social'
@@ -127,6 +127,8 @@ function _ensureSafePlayerState() {
     if (p.hunger === undefined) p.hunger = 80;
     if (p.mood === undefined) p.mood = 85;
     if (p.karma === undefined) p.karma = 50;
+    if (p.cash === undefined) p.cash = 0;
+    if (p.fuel === undefined) p.fuel = 100;
     if (!p.diet) p.diet = 'shaurma';
     if (!window.state.friendsList) window.state.friendsList = [];
     if (!p.pendingFriendRequests) p.pendingFriendRequests = [];
@@ -135,8 +137,18 @@ function _ensureSafePlayerState() {
     }
 }
 
+function _getLifeContainer() {
+    return document.getElementById('tabLife') ||
+           document.getElementById('tab-life') ||
+           document.getElementById('life') ||
+           document.querySelector('[data-tab="life"]') ||
+           document.querySelector('[data-tab="tabLife"]') ||
+           document.querySelector('.tab-pane#tabLife') ||
+           document.querySelector('.tab-pane#tab-life');
+}
+
 function renderLifeScreen() {
-    const tab = document.getElementById('tabLife') || document.querySelector('[data-tab="life"]') || document.querySelector('.tab-pane#tabLife');
+    const tab = _getLifeContainer();
     if (!tab) return;
 
     _ensureSafePlayerState();
@@ -638,7 +650,7 @@ async function _updateLifeLeaderboard() {
                 <div style="display:flex; align-items:center; gap:8px;">
                     <b class="text-xs color-green" style="font-size:11px;">${Number(u.networth || 0).toLocaleString()} ₽</b>
                     ${!isMe ? `
-                        <button onclick="challengePlayerFromLife('${escape(u.name)}')" class="btn btn-red btn-sm btn-auto" style="padding:3px 6px; font-size:8px;" title="Вызов на 402м">
+                        <button onclick="challengePlayerFromLife('${encodeURIComponent(u.name)}')" class="btn btn-red btn-sm btn-auto" style="padding:3px 6px; font-size:8px;" title="Вызов на 402м">
                             🏁
                         </button>
                     ` : ''}
@@ -649,7 +661,7 @@ async function _updateLifeLeaderboard() {
 }
 
 function challengePlayerFromLife(targetName) {
-    const rawName = unescape(targetName);
+    const rawName = decodeURIComponent(targetName);
     if (window.MLeaderboardModule && typeof window.MLeaderboardModule.challengePlayer === 'function') {
         window.MLeaderboardModule.challengePlayer(rawName);
     } else {
@@ -740,10 +752,10 @@ async function renderFriendsModalContent() {
                             </div>
                         </div>
                         <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-                            <button onclick="writeToFriendInM('${f.id \vert{}\vert{} ''}', '${escape(f.name)}')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:9px;" title="Открыть чат">
+                            <button onclick="writeToFriendInM('${f.id \vert{}\vert{} ''}', '${encodeURIComponent(f.name)}')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:9px;" title="Открыть чат">
                                 <i class="fa-solid fa-comments mr-1"></i> Чат
                             </button>
-                            <button onclick="inviteFriendToClubAction('${escape(f.name)}')" class="btn btn-purple btn-sm life-btn-auto" style="font-size:9px;" title="Пригласить в клуб">
+                            <button onclick="inviteFriendToClubAction('${encodeURIComponent(f.name)}')" class="btn btn-purple btn-sm life-btn-auto" style="font-size:9px;" title="Пригласить в клуб">
                                 <i class="fa-solid fa-flag"></i>
                             </button>
                         </div>
@@ -874,7 +886,7 @@ function _renderRecommendedPlayers() {
                 <b class="text-xs color-cyan" style="font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">${p.name}</b>
                 <div class="sub-label" style="font-size:8px; color:#94a3b8;">Ур. ${p.level || 1} • ${p.carName || 'В гараже'}</div>
             </div>
-            <button onclick="sendFriendRequestTo('${p.id}', '${escape(p.name)}')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:8.5px;">+ Заявка</button>
+            <button onclick="sendFriendRequestTo('${p.id}', '${encodeURIComponent(p.name)}')" class="btn btn-cyan btn-sm life-btn-auto" style="font-size:8.5px;">+ Заявка</button>
         </div>
     `).join('');
 }
@@ -919,7 +931,7 @@ async function submitSearchFriendAction() {
                         <b class="text-xs color-green" style="font-size:11px;">${u.name}</b>
                         <div class="sub-label" style="font-size:8px;">Ур. ${u.level \vert{}\vert{} 1} •${u.carName || 'В гараже'}</div>
                     </div>
-                    <button onclick="sendFriendRequestTo('${u.id}', '${escape(u.name)}')" class="btn btn-green btn-sm life-btn-auto" style="font-size:8.5px;">+ Дружить</button>
+                    <button onclick="sendFriendRequestTo('${u.id}', '${encodeURIComponent(u.name)}')" class="btn btn-green btn-sm life-btn-auto" style="font-size:8.5px;">+ Дружить</button>
                 </div>
             `).join('')}
         </div>
@@ -927,7 +939,7 @@ async function submitSearchFriendAction() {
 }
 
 async function sendFriendRequestTo(targetUid, targetName) {
-    const rawName = unescape(targetName || 'Перекуп');
+    const rawName = decodeURIComponent(targetName || 'Перекуп');
     if (typeof playSound === 'function') playSound('win');
     if (typeof tgHaptic === 'function') tgHaptic('success');
 
@@ -957,7 +969,7 @@ function switchFriendsSubTab(tab) {
 }
 
 function writeToFriendInM(friendId, friendName) {
-    const rawName = unescape(friendName);
+    const rawName = decodeURIComponent(friendName);
     closeFriendsModal();
 
     if (typeof switchTab === 'function') switchTab('tabPhone');
@@ -1577,7 +1589,7 @@ window.challengePlayerFromLife = challengePlayerFromLife;
 
 // 8. АВТОМАТИЧЕСКИЙ СЛУШАТЕЛЬ (MUTATION OBSERVER + CLICK)
 function _setupLifeAutoMount() {
-    const tabLife = document.getElementById('tabLife') || document.querySelector('[data-tab="life"]');
+    const tabLife = _getLifeContainer();
     if (tabLife) {
         if (tabLife.classList.contains('active')) {
             renderLifeScreen();
@@ -1597,11 +1609,11 @@ function _setupLifeAutoMount() {
     }
 
     document.addEventListener('click', e => {
-        const target = e.target.closest('#bnav-tabLife, .need-track, [onclick*="tabLife"], [data-tab="life"], [data-tab="tabLife"]');
+        const target = e.target.closest('#bnav-tabLife, #bnav-life, .need-track, [onclick*="tabLife"], [onclick*="life"], [data-tab="life"], [data-tab="tabLife"], .nav-item[data-target*="life"]');
         if (target) {
             setTimeout(() => {
                 renderLifeScreen();
-            }, 20);
+            }, 30);
         }
     });
 }
@@ -1612,4 +1624,4 @@ if (document.readyState === 'loading') {
     _setupLifeAutoMount();
 }
 
-console.log('[☕ life.js v1.5.3] Зарегистрирован и готов к работе ✓');
+console.log('[☕ life.js v1.5.4] Зарегистрирован и готов к работе ✓');
