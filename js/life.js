@@ -1,6 +1,5 @@
 // ========================================================
-// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.5.2 AUTO-MOUNT)
-// Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
+// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.5.3)
 // ========================================================
 
 let lifeActiveTab = 'tone'; // 'tone' | 'street' | 'social'
@@ -137,7 +136,7 @@ function _ensureSafePlayerState() {
 }
 
 function renderLifeScreen() {
-    const tab = document.getElementById('tabLife');
+    const tab = document.getElementById('tabLife') || document.querySelector('[data-tab="life"]') || document.querySelector('.tab-pane#tabLife');
     if (!tab) return;
 
     _ensureSafePlayerState();
@@ -1085,7 +1084,7 @@ function renderClubModalContent() {
                                 <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
                                     <span style="font-size:20px; flex-shrink:0;">${c.icon}</span>
                                     <div style="min-width:0; flex:1;">
-                                        <b class="text-xs color-main" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">[${c.tag}] ${c.name}</b>
+                                        <b class="text-xs color-main" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">[${c.tag}]${c.name}</b>
                                         <div class="sub-label" style="font-size:8px; color:#94a3b8;">${c.membersCount} участников</div>
                                     </div>
                                 </div>
@@ -1578,7 +1577,7 @@ window.challengePlayerFromLife = challengePlayerFromLife;
 
 // 8. АВТОМАТИЧЕСКИЙ СЛУШАТЕЛЬ (MUTATION OBSERVER + CLICK)
 function _setupLifeAutoMount() {
-    const tabLife = document.getElementById('tabLife');
+    const tabLife = document.getElementById('tabLife') || document.querySelector('[data-tab="life"]');
     if (tabLife) {
         if (tabLife.classList.contains('active')) {
             renderLifeScreen();
@@ -1598,11 +1597,11 @@ function _setupLifeAutoMount() {
     }
 
     document.addEventListener('click', e => {
-        const target = e.target.closest('#bnav-tabLife, .need-track, [onclick*="tabLife"]');
+        const target = e.target.closest('#bnav-tabLife, .need-track, [onclick*="tabLife"], [data-tab="life"], [data-tab="tabLife"]');
         if (target) {
             setTimeout(() => {
                 renderLifeScreen();
-            }, 15);
+            }, 20);
         }
     });
 }
@@ -1613,4 +1612,4 @@ if (document.readyState === 'loading') {
     _setupLifeAutoMount();
 }
 
-console.log('[☕ life.js v1.5.2] Зарегистрирован с авто-монтированием (Observer + Click listener) ✓');
+console.log('[☕ life.js v1.5.3] Зарегистрирован и готов к работе ✓');
