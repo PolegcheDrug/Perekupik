@@ -1,10 +1,10 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.6.0 RESET-FIX)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.6.0 RESET & CLOUD-WIPE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
 // ⭐ v1.6.0:
-//   - ДОБАВЛЕН resetPlayerCloud: принудительный сброс игрока прямо в облаке Firestore.
-//   - Полная перезапись коллекций players, garages, leaderboard стартовыми данными.
+//   - Встроен нативный внутриигровой модал подтверждения сброса (без window.confirm).
+//   - Добавлен метод resetPlayerCloud: принудительная очистка коллекций в Firestore.
 //   - Защита от воскрешения старых миллионов при перезагрузке страницы.
 // ========================================================
 
@@ -421,9 +421,9 @@ const PlayersStorageManager = {
     return null;
   },
 
-  // ⭐ ПРИНУДИТЕЛЬНАЯ ПЕРЕЗАПИСЬ ОБЛАКА ЧИСТЫМ СТАРТОВЫМ ПРОФИЛЕМ
+  // ⭐ ПРИНУДИТЕЛЬНАЯ ПЕРЕЗАПИСЬ ОБЛАКА ЧИСТЫМ СТАРТОВЫМ ПРОФИЛЕМ 75 000 ₽
   async resetPlayerCloud(userId, customName = null) {
-    const targetUid = String(userId || TelegramAuthManager.getVerifiedUserId() || window.tgUserId || "");
+    const targetUid = String(userId || TelegramAuthManager.getVerifiedUserId() || window.tgUserId || window.state?.player?.uid || "102125050");
     if (!targetUid) return false;
 
     try {
@@ -506,7 +506,111 @@ const PlayersStorageManager = {
 };
 
 // ========================================================
-// 8. ADMIN MANAGER
+// 8. НАДЁЖНЫЙ ВНУТРИИГРОВОЙ СБРОС (БЕЗ WINDOW.CONFIRM)
+// ========================================================
+function resetGameData() {
+    let modal = document.getElementById('modalHardResetConfirm');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalHardResetConfirm';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="modal-box text-center" style="max-width: 380px; background: #070b14; border: 1.5px solid var(--red); border-radius: 16px; padding: 18px; box-shadow: 0 0 30px rgba(255, 51, 102, 0.35);">
+            <div style="font-size: 38px; margin-bottom: 6px;">⚠️</div>
+            <div class="modal-glow-badge mb-2" style="color:var(--red); border-color:var(--red); display:inline-block;">
+                ПОЛНЫЙ СБРОС ПРОФИЛЯ
+            </div>
+            <h3 class="font-bold mb-2 color-red" style="font-size:15px;">Начать с 75 000 ₽ (1 ур.)?</h3>
+            <p class="sub-label mb-3" style="font-size:10px; line-height:1.45; color:#cbd5e1;">
+                Все накопленные миллионы, автопарк, купленные бизнесы и недвижимость будут <b>безвозвратно удалены</b> и в памяти телефона, и в базе Firestore.
+            </p>
+
+            <div class="space-y-2">
+                <button id="btnConfirmResetAction" onclick="window._executeHardResetFinal()" class="btn btn-danger w-full font-bold" style="padding:10px 0; font-size:11px;">
+                    <i class="fa-solid fa-trash-can mr-1"></i> ДА, СТЕРЕТЬ И НАЧАТЬ СНАЧАЛА
+                </button>
+                <button onclick="document.getElementById('modalHardResetConfirm').classList.remove('active'); document.getElementById('modalHardResetConfirm').style.display='none';" class="btn btn-dark w-full" style="padding:8px 0; font-size:10px;">
+                    Отмена
+                </button>
+            </div>
+        </div>
+    `;
+
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+    if (window.AudioFx) window.AudioFx.play('error');
+}
+
+async function _executeHardResetFinal() {
+    const btn = document.getElementById('btnConfirmResetAction');
+    if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Очистка базы Firestore...';
+        btn.disabled = true;
+    }
+
+    window.__IS_RESETTING__ = true;
+    const uid = String(TelegramAuthManager.getVerifiedUserId() || window.tgUserId || window.state?.player?.uid || "102125050");
+    const pName = window.tgUserData?.first_name || window.state?.player?.name || "Taktoje";
+
+    try {
+        // 1. Очистка и перезапись в облаке Firestore
+        await PlayersStorageManager.resetPlayerCloud(uid, pName);
+
+        // 2. Очистка Telegram CloudStorage
+        if (window.Telegram?.WebApp?.CloudStorage) {
+            try {
+                const tgCloud = window.Telegram.WebApp.CloudStorage;
+                tgCloud.getKeys((err, keys) => {
+                    if (!err && Array.isArray(keys)) {
+                        keys.forEach(k => {
+                            if (k && (k.includes('perekup') || k.includes('save'))) {
+                                tgCloud.removeItem(k);
+                            }
+                        });
+                    }
+                });
+            } catch(e) {}
+        }
+
+        // 3. Очистка локальных хранилищ
+        try {
+            localStorage.clear();
+            sessionStorage.clear();
+        } catch(e) {}
+
+        // 4. Очистка памяти игры
+        if (window.DEFAULT_STATE) {
+            const clean = JSON.parse(JSON.stringify(window.DEFAULT_STATE));
+            clean.player.cash = 75000;
+            clean.player.level = 1;
+            clean.player.name = pName;
+            clean.player.uid = uid;
+            Object.keys(window.state).forEach(k => delete window.state[k]);
+            Object.assign(window.state, clean);
+        }
+
+        if (typeof showToast === 'function') {
+            showToast("✅ Прогресс сброшен до 75 000 ₽! Перезагрузка...", "success");
+        }
+
+        // 5. Перезагрузка страницы
+        setTimeout(() => {
+            const cleanUrl = window.location.href.split('?')[0];
+            window.location.replace(cleanUrl + '?reset=' + Date.now());
+        }, 400);
+
+    } catch (err) {
+        console.error("[Reset Error]", err);
+        localStorage.clear();
+        window.location.reload();
+    }
+}
+
+// ========================================================
+// 9. ADMIN MANAGER
 // ========================================================
 const AdminManager = {
   async _deleteEntireCollection(colName) {
@@ -539,11 +643,13 @@ const AdminManager = {
       if (!silent && typeof showToast === 'function') showToast(`Ошибка: ${e.message}`, 'error');
       return false;
     }
-  }
+  },
+
+  resetCurrentPlayerLocal: resetGameData
 };
 
 // ========================================================
-// 9. CLEANUP MANAGER (TTL)
+// 10. CLEANUP MANAGER (TTL)
 // ========================================================
 const CleanupManager = {
   _lastCleanup: 0,
@@ -573,7 +679,7 @@ const CleanupManager = {
 };
 
 // ========================================================
-// 10. ЭКСПОРТ
+// 11. ЭКСПОРТ
 // ========================================================
 window.FB_Core = {
   app,
@@ -598,5 +704,8 @@ window.FB_Bridge.System = SystemConfigManager;
 window.FB_Bridge.Leaderboard = LeaderboardManager;
 window.FB_Bridge.Auth = TelegramAuthManager;
 window.TelegramAuthManager = TelegramAuthManager;
+
+window.resetGameData = resetGameData;
+window._executeHardResetFinal = _executeHardResetFinal;
 
 console.log("[☁️ FB_Core v1.6.0] Облачный сброс resetPlayerCloud активирован ✓");
