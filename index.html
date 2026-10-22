@@ -11,38 +11,37 @@
 
 <script>
     window.AUTH_SERVER_URL = window.AUTH_SERVER_URL || '';
-    window.__LOADER_VERSION__ = '4.4.0';
+    window.__LOADER_VERSION__ = '4.4.1';
     console.log('[Loader] v' + window.__LOADER_VERSION__ + ' стартует. AUTH_SERVER_URL =', window.AUTH_SERVER_URL || '(не задан, fallback на Telegram ID)');
 </script>
 
 <!-- ═══════════ СТИЛИ ═══════════ -->
-<link rel="stylesheet" href="style.css?v=432">
-<link rel="stylesheet" href="css/base.css?v=432">
-<link rel="stylesheet" href="css/hud.css?v=432">
-<link rel="stylesheet" href="css/market.css?v=432">
-<link rel="stylesheet" href="css/phone.css?v=432">
-<link rel="stylesheet" href="css/m-hub.css?v=432">
-<link rel="stylesheet" href="css/radio.css?v=432">
-<link rel="stylesheet" href="css/modals.css?v=432">
-<link rel="stylesheet" href="css/p2p-deals.css?v=432">
-<link rel="stylesheet" href="css/nav.css?v=432">
+<link rel="stylesheet" href="style.css?v=433">
+<link rel="stylesheet" href="css/base.css?v=433">
+<link rel="stylesheet" href="css/hud.css?v=433">
+<link rel="stylesheet" href="css/market.css?v=433">
+<link rel="stylesheet" href="css/phone.css?v=433">
+<link rel="stylesheet" href="css/m-hub.css?v=433">
+<link rel="stylesheet" href="css/radio.css?v=433">
+<link rel="stylesheet" href="css/modals.css?v=433">
+<link rel="stylesheet" href="css/p2p-deals.css?v=433">
+<link rel="stylesheet" href="css/nav.css?v=433">
 
 <!-- ═══════════ БИБЛИОТЕКИ ═══════════ -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
 <!-- ═══════════ FIREBASE МОДУЛИ ═══════════ -->
-<script type="module" src="js/firebase/firebase-core.js?v=432"></script>
-<script type="module" src="js/firebase/firebase-market.js?v=432"></script>
-<script type="module" src="js/firebase/firebase-friendships.js?v=432"></script>
-<script type="module" src="js/firebase/firebase-notifications.js?v=432"></script>
-<script type="module" src="js/firebase/firebase-p2p.js?v=432"></script>
+<script type="module" src="js/firebase/firebase-core.js?v=433"></script>
+<script type="module" src="js/firebase/firebase-market.js?v=433"></script>
+<script type="module" src="js/firebase/firebase-friendships.js?v=433"></script>
+<script type="module" src="js/firebase/firebase-notifications.js?v=433"></script>
+<script type="module" src="js/firebase/firebase-p2p.js?v=433"></script>
 </head>
 <body>
 
 <!-- ═══════════ ИНТЕРАКТИВНЫЙ СПЛЭШ-СКРИН С НЕОНОВОЙ АНИМАЦИЕЙ ═══════════ -->
 <div id="appLoadingScreen" class="loading-screen-overlay" style="display:none;">
-  <!-- Неоновые линии и кибер-сетка на фоне -->
   <div class="loading-bg-grid"></div>
   <div class="loading-neon-glow-sphere"></div>
   <div class="loading-neon-line loading-neon-line-1"></div>
@@ -93,7 +92,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Если вы играете через Telegram — просто откройте бота заново.</div>
-      <div class="pc-auth-version">v4.4.0 // BUILD 432</div>
+      <div class="pc-auth-version">v4.4.1 // BUILD 433</div>
     </div>
   </div>
 </div>
@@ -118,7 +117,7 @@
     </button>
 
     <div class="pc-auth-footer">
-      <div class="pc-auth-version">v4.4.0 // BUILD 432</div>
+      <div class="pc-auth-version">v4.4.1 // BUILD 433</div>
     </div>
   </div>
 </div>
@@ -150,7 +149,7 @@
 
     <div class="pc-auth-footer">
       <div class="pc-auth-hint">💡 Инвайт-код выдаёт владелец игры в личном сообщении.</div>
-      <div class="pc-auth-version">v4.4.0 // BUILD 432</div>
+      <div class="pc-auth-version">v4.4.1 // BUILD 433</div>
     </div>
   </div>
 </div>
@@ -234,13 +233,13 @@
 
     <div class="hud-card hud-bottom-row">
       <div class="needs-container">
-        <div class="need-track" onclick="switchTab('tabLife')" title="Сытость">
+        <div class="need-track" onclick="switchTab('tabLife'); if(typeof renderLifeScreen==='function') renderLifeScreen();" title="Сытость">
           <div class="need-icon-wrap hunger-wrap"><i class="fa-solid fa-drumstick-bite"></i></div>
           <div class="rp-bar-bg"><div id="hungerFill" class="rp-bar-fill fill-hunger" style="width: 80%;"></div></div>
           <span id="hungerText" class="need-text">80%</span>
         </div>
 
-        <div class="need-track" onclick="switchTab('tabLife')" title="Настроение">
+        <div class="need-track" onclick="switchTab('tabLife'); if(typeof renderLifeScreen==='function') renderLifeScreen();" title="Настроение">
           <div class="need-icon-wrap mood-wrap"><i class="fa-solid fa-masks-theater"></i></div>
           <div class="rp-bar-bg"><div id="moodFill" class="rp-bar-fill fill-mood" style="width: 85%;"></div></div>
           <span id="moodText" class="need-text">85%</span>
@@ -519,7 +518,7 @@
     <div class="b-nav-item" onclick="switchTab('tabSalesLot')" id="bnav-tabSalesLot">
       <i class="fa-solid fa-car-on"></i><span>Площадка</span>
     </div>
-    <div class="b-nav-item" onclick="switchTab('tabLife')" id="bnav-tabLife">
+    <div class="b-nav-item" onclick="switchTab('tabLife'); if(typeof renderLifeScreen==='function') renderLifeScreen();" id="bnav-tabLife">
       <i class="fa-solid fa-mug-hot"></i><span>Жизнь</span>
     </div>
     <div class="b-nav-item phone-nav-item" onclick="switchTab('tabPhone')" id="bnav-tabPhone">
@@ -702,7 +701,6 @@
 <div id="modalCreateStreetPost" class="modal-overlay"></div>
 <div id="modalPlayerOnboarding" class="modal-overlay"></div>
 
-<!-- ДИНАМИЧЕСКИЙ КОНТЕЙНЕР ПАТЧНОУТА (заполняется из data_patchnotes.js) -->
 <div id="modalPatchNotes" class="modal-overlay"></div>
 
 <div id="modalInsurance" class="modal-overlay">
@@ -1007,9 +1005,7 @@
   </div>
 </div>
 
-<!-- Модалка выставления на продажу (заполняется из garage.js) -->
 <div id="modalPutOnLot" class="modal-overlay"></div>
-
 <div id="modalPreview" class="modal-overlay"></div>
 <div id="modalChangePlate" class="modal-overlay"></div>
 
@@ -1141,7 +1137,8 @@
 
     const PC_DEV_PASSWORD = "perekup2026";
     const PC_AUTH_STORAGE_KEY = "perekup_pc_auth_ok";
-    const CACHE_VER = '432';
+    // Обновляем версию кэша для сброса старых закэшированных скриптов
+    const CACHE_VER = '433';
     const FIREBASE_READY_TIMEOUT_MS = 8000;
 
     let isPcAuthenticated = false;
