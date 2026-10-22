@@ -1,5 +1,5 @@
 // ========================================================
-// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.5.1 FIX)
+// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.5.2 AUTO-MOUNT)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 // ========================================================
 
@@ -345,9 +345,7 @@ function renderCurrentLifeSubTab() {
     }
 }
 
-// ========================================================
-// 1. ПОДРАЗДЕЛ: ТОНУС, РАЦИОН И АКТИВНОСТИ
-// ========================================================
+// 1. ТОНУС, РАЦИОН И АКТИВНОСТИ
 function renderToneAndFoodSubTab(container) {
     _ensureSafePlayerState();
     let curDietId = state.player.diet || 'shaurma';
@@ -410,9 +408,7 @@ function renderToneAndFoodSubTab(container) {
     renderLifeFoodList();
 }
 
-// ========================================================
-// 2. ПОДРАЗДЕЛ: УЛИЦА, РАДАР ДПС И ГОНКИ
-// ========================================================
+// 2. УЛИЦА, РАДАР ДПС И ГОНКИ
 function renderStreetRadarSubTab(container) {
     _ensureSafePlayerState();
 
@@ -547,9 +543,7 @@ function openAddStreetInsideModal() {
     if (container) renderStreetRadarSubTab(container);
 }
 
-// ========================================================
-// 3. ПОДРАЗДЕЛ: СОЦИУМ И ЖИВОЙ ТОП ИГРОКОВ
-// ========================================================
+// 3. СОЦИУМ И ЖИВОЙ ТОП ИГРОКОВ
 async function renderSocialAndClubsSubTab(container) {
     _ensureSafePlayerState();
     const player = state.player;
@@ -671,9 +665,7 @@ function challengePlayerFromLife(targetName) {
     }
 }
 
-// ========================================================
-// 4. ЭКРАН «ДРУЗЬЯ & КОНТАКТЫ»
-// ========================================================
+// 4. ДРУЗЬЯ & КОНТАКТЫ
 function openFriendsModal(initialSubTab = 'list') {
     friendsActiveSubTab = initialSubTab;
     let modal = document.getElementById('modalFriendsCenter');
@@ -841,7 +833,7 @@ async function renderFriendsModalContent() {
     `;
 
     if (friendsActiveSubTab === 'search') {
-        _renderRecommendedPlayers();
+        _loadRecommendedPlayers();
     }
 }
 
@@ -1011,9 +1003,7 @@ async function rejectFriendRequest(idx, fromUid) {
     renderFriendsModalContent();
 }
 
-// ========================================================
-// 5. ЭКРАН «АВТОКЛУБ И СИНДИКАТ»
-// ========================================================
+// 5. АВТОКЛУБ И СИНДИКАТ
 function openClubModal(initialSubTab = 'my_club') {
     clubActiveSubTab = initialSubTab;
     let modal = document.getElementById('modalClubCenter');
@@ -1267,9 +1257,7 @@ function confirmCreateClubAction() {
     switchClubSubTab('my_club');
 }
 
-// ========================================================
-// ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ АКТИВНОСТЕЙ И ЕДЫ
-// ========================================================
+// 6. ВСПОМОГАТЕЛЬНЫЕ ДЕЙСТВИЯ
 function renderLifeActivities() {
     const box = document.getElementById('lifeActivitiesList');
     if (!box) return;
@@ -1551,9 +1539,14 @@ function renderDiets() {
     renderLifeScreen();
 }
 
-// Экспорт всех интерфейсных функций в window
+// 7. ВСЕВОЗМОЖНЫЕ АЛИАСЫ ЭКСПОРТА В WINDOW
 window.renderLifeScreen = renderLifeScreen;
+window.renderLife = renderLifeScreen;
 window.renderDiets = renderDiets;
+window.initLife = renderLifeScreen;
+window.updateLifeUI = renderLifeScreen;
+window.updateLife = renderLifeScreen;
+
 window.switchLifeTab = switchLifeTab;
 window.filterLifeFood = filterLifeFood;
 window.renderLifeFoodList = renderLifeFoodList;
@@ -1583,4 +1576,41 @@ window.acceptFriendRequest = acceptFriendRequest;
 window.rejectFriendRequest = rejectFriendRequest;
 window.challengePlayerFromLife = challengePlayerFromLife;
 
-console.log('[☕ life.js v1.5.1] Раздел «Жизнь» успешно зарегистрирован и готов к рендеру ✓');
+// 8. АВТОМАТИЧЕСКИЙ СЛУШАТЕЛЬ (MUTATION OBSERVER + CLICK)
+function _setupLifeAutoMount() {
+    const tabLife = document.getElementById('tabLife');
+    if (tabLife) {
+        if (tabLife.classList.contains('active')) {
+            renderLifeScreen();
+        }
+        if (window.MutationObserver) {
+            const obs = new MutationObserver(mutations => {
+                for (let m of mutations) {
+                    if (m.type === 'attributes' && m.attributeName === 'class') {
+                        if (tabLife.classList.contains('active')) {
+                            renderLifeScreen();
+                        }
+                    }
+                }
+            });
+            obs.observe(tabLife, { attributes: true, attributeFilter: ['class'] });
+        }
+    }
+
+    document.addEventListener('click', e => {
+        const target = e.target.closest('#bnav-tabLife, .need-track, [onclick*="tabLife"]');
+        if (target) {
+            setTimeout(() => {
+                renderLifeScreen();
+            }, 15);
+        }
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _setupLifeAutoMount);
+} else {
+    _setupLifeAutoMount();
+}
+
+console.log('[☕ life.js v1.5.2] Зарегистрирован с авто-монтированием (Observer + Click listener) ✓');
