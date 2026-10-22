@@ -1,13 +1,6 @@
 // ========================================================
-// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.5.0 NO-BOTS)
+// js/life.js — РАЗДЕЛ «ЖИЗНЬ ПЕРЕКУПА», СОЦИУМ И АВТОКЛУБЫ (v1.5.1 FIX)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-//
-// ⭐ v1.5.0 (ПОЛНОЕ УДАЛЕНИЕ БОТОВ + ЖИВАЯ СЕТЬ FIRESTORE):
-//   1. ПОЛНЫЙ ОТКАЗ ОТ БОТОВ: Зал Славы, рекомендации и поиск работают строго по базе игроков.
-//   2. ЖИВОЙ ПОИСК В FIRESTORE: поиск по нику, @username или UID через FB_FriendshipsManager.
-//   3. РЕАЛЬНЫЕ РЕКОМЕНДАЦИИ: динамическая подгрузка живых перекупов в сети вместо фейков.
-//   4. ФИКС НАВИГАЦИИ И КНОПОК: кнопка «Чат» ведёт прямо в личные сообщения M+, кнопки не съезжают.
-//   5. ФИЧА ОТ СЕБЯ: «Уличный инсайд ДПС» с начислением Кармы и быстрый вызов на 402м из Зала Славы!
 // ========================================================
 
 let lifeActiveTab = 'tone'; // 'tone' | 'street' | 'social'
@@ -42,7 +35,7 @@ const DEFAULT_LIFE_ACTIVITIES = [
     { id: 'spa_resort', name: 'Премиальный загородный СПА', cost: 75000, mood: 100, karma: 5, desc: 'Бассейн с подогревом, массаж и полный день восстановления без звонков с авторынка.' }
 ];
 
-// Базовая хроника городских событий и облав ДПС с таймерами активности
+// Хроника городских событий
 const DEFAULT_STREET_EVENTS = [
     {
         id: 'ev_dps_1',
@@ -128,13 +121,29 @@ const DEFAULT_CLUBS_CATALOG = [
     }
 ];
 
+function _ensureSafePlayerState() {
+    if (!window.state) window.state = {};
+    if (!window.state.player) window.state.player = {};
+    const p = window.state.player;
+    if (p.hunger === undefined) p.hunger = 80;
+    if (p.mood === undefined) p.mood = 85;
+    if (p.karma === undefined) p.karma = 50;
+    if (!p.diet) p.diet = 'shaurma';
+    if (!window.state.friendsList) window.state.friendsList = [];
+    if (!p.pendingFriendRequests) p.pendingFriendRequests = [];
+    if (!window.state.streetEvents || !Array.isArray(window.state.streetEvents)) {
+        window.state.streetEvents = JSON.parse(JSON.stringify(DEFAULT_STREET_EVENTS));
+    }
+}
+
 function renderLifeScreen() {
     const tab = document.getElementById('tabLife');
     if (!tab) return;
 
-    let hunger = state.player?.hunger !== undefined ? state.player.hunger : 80;
-    let mood = state.player?.mood !== undefined ? state.player.mood : 85;
-    let karma = state.player?.karma !== undefined ? state.player.karma : 50;
+    _ensureSafePlayerState();
+
+    const hunger = state.player.hunger;
+    const mood = state.player.mood;
 
     let toneStatusText = "В норме";
     let toneStatusClass = "bg-tag-green";
@@ -255,7 +264,6 @@ function renderLifeScreen() {
             }
         </style>
 
-        <!-- ВЕРХНИЙ ДАШБОРД САМОЧУВСТВИЯ ПЕРЕКУПА -->
         <div class="glass-card mb-3 p-3" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.12), #090e18); border-color: rgba(0, 230, 118, 0.35);">
             <div class="flex-between mb-2">
                 <div class="flex-gap" style="align-items:center;">
@@ -268,7 +276,6 @@ function renderLifeScreen() {
                 <span class="tag-badge ${toneStatusClass}">${toneStatusText}</span>
             </div>
 
-            <!-- Шкалы голода и настроения -->
             <div class="space-y-2 my-2">
                 <div>
                     <div class="flex-between text-xs mb-1">
@@ -292,7 +299,6 @@ function renderLifeScreen() {
             </div>
         </div>
 
-        <!-- НАВИГАЦИОННЫЙ ТАБ-БАР ЖИЗНИ -->
         <div class="life-nav-tabs">
             <button onclick="switchLifeTab('tone')" class="life-tab-btn ${lifeActiveTab === 'tone' ? 'active' : ''}">
                 <i class="fa-solid fa-mug-hot"></i> Тонус & Быт
@@ -305,7 +311,6 @@ function renderLifeScreen() {
             </button>
         </div>
 
-        <!-- ОСНОВНОЙ КОНТЕНТНЫЙ БОКС -->
         <div id="lifeMainContentContainer"></div>
     `;
 
@@ -314,12 +319,17 @@ function renderLifeScreen() {
 
 function switchLifeTab(tabKey) {
     lifeActiveTab = tabKey;
-    playSound('tick');
-    tgHaptic('light');
-    renderCurrentLifeSubTab();
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
 
-    document.querySelectorAll('.life-tab-btn').forEach(btn => btn.classList.remove('active'));
-    event?.currentTarget?.classList.add('active');
+    document.querySelectorAll('.life-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('onclick')?.includes(`'${tabKey}'`)) {
+            btn.classList.add('active');
+        }
+    });
+
+    renderCurrentLifeSubTab();
 }
 
 function renderCurrentLifeSubTab() {
@@ -339,8 +349,9 @@ function renderCurrentLifeSubTab() {
 // 1. ПОДРАЗДЕЛ: ТОНУС, РАЦИОН И АКТИВНОСТИ
 // ========================================================
 function renderToneAndFoodSubTab(container) {
-    let curDietId = state.player?.diet || 'shaurma';
-    let karma = state.player?.karma !== undefined ? state.player.karma : 50;
+    _ensureSafePlayerState();
+    let curDietId = state.player.diet || 'shaurma';
+    let karma = state.player.karma;
 
     const diets = (typeof DIETS !== 'undefined' && Array.isArray(DIETS) && DIETS.length > 0) ? DIETS : DEFAULT_LIFE_DIETS;
     let dietObj = diets.find(d => d.id === curDietId);
@@ -400,12 +411,10 @@ function renderToneAndFoodSubTab(container) {
 }
 
 // ========================================================
-// 2. ПОДРАЗДЕЛ: УЛИЦА, РАДАР ДПС (12.5.1) И ГОНКИ
+// 2. ПОДРАЗДЕЛ: УЛИЦА, РАДАР ДПС И ГОНКИ
 // ========================================================
 function renderStreetRadarSubTab(container) {
-    if (!state.streetEvents || !Array.isArray(state.streetEvents)) {
-        state.streetEvents = JSON.parse(JSON.stringify(DEFAULT_STREET_EVENTS));
-    }
+    _ensureSafePlayerState();
 
     const curFilter = lifeStreetFilter;
     let filtered = state.streetEvents.filter(ev => {
@@ -429,18 +438,10 @@ function renderStreetRadarSubTab(container) {
             </div>
 
             <div style="display:flex; gap:5px; margin-bottom:2px; overflow-x:auto; padding-bottom:2px;">
-                <button onclick="filterStreetFeed('all')" class="m-pill-chip ${curFilter === 'all' ? 'active' : ''}">
-                    Все
-                </button>
-                <button onclick="filterStreetFeed('dps')" class="m-pill-chip ${curFilter === 'dps' ? 'active' : ''}">
-                    🚨 ДПС / 12.5.1
-                </button>
-                <button onclick="filterStreetFeed('racing')" class="m-pill-chip ${curFilter === 'racing' ? 'active' : ''}">
-                    🏁 Гонки
-                </button>
-                <button onclick="filterStreetFeed('deals')" class="m-pill-chip ${curFilter === 'deals' ? 'active' : ''}">
-                    💸 Сделки
-                </button>
+                <button onclick="filterStreetFeed('all')" class="m-pill-chip ${curFilter === 'all' ? 'active' : ''}">Все</button>
+                <button onclick="filterStreetFeed('dps')" class="m-pill-chip ${curFilter === 'dps' ? 'active' : ''}">🚨 ДПС / 12.5.1</button>
+                <button onclick="filterStreetFeed('racing')" class="m-pill-chip ${curFilter === 'racing' ? 'active' : ''}">🏁 Гонки</button>
+                <button onclick="filterStreetFeed('deals')" class="m-pill-chip ${curFilter === 'deals' ? 'active' : ''}">💸 Сделки</button>
             </div>
         </div>
 
@@ -491,15 +492,9 @@ function renderSingleStreetEvent(ev) {
             <div class="flex-between" style="align-items:center;">
                 <span class="sub-label" style="font-size:8px; color:#64748b;">${ev.timeAgo}</span>
                 <div class="flex-gap" style="gap:5px;">
-                    <button onclick="reactToStreetEvent('${ev.id}', 'fire')" class="life-reaction-btn">
-                        🔥 ${ev.reactions?.fire || 0}
-                    </button>
-                    <button onclick="reactToStreetEvent('${ev.id}', 'fear')" class="life-reaction-btn">
-                        😱 ${ev.reactions?.fear || 0}
-                    </button>
-                    <button onclick="reactToStreetEvent('${ev.id}', 'skull')" class="life-reaction-btn">
-                        💀 ${ev.reactions?.skull || 0}
-                    </button>
+                    <button onclick="reactToStreetEvent('${ev.id}', 'fire')" class="life-reaction-btn">🔥 ${ev.reactions?.fire || 0}</button>
+                    <button onclick="reactToStreetEvent('${ev.id}', 'fear')" class="life-reaction-btn">😱 ${ev.reactions?.fear || 0}</button>
+                    <button onclick="reactToStreetEvent('${ev.id}', 'skull')" class="life-reaction-btn">💀 ${ev.reactions?.skull || 0}</button>
                 </div>
             </div>
         </div>
@@ -508,7 +503,7 @@ function renderSingleStreetEvent(ev) {
 
 function filterStreetFeed(cat) {
     lifeStreetFilter = cat;
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
     const container = document.getElementById('lifeMainContentContainer');
     if (container) renderStreetRadarSubTab(container);
 }
@@ -519,9 +514,9 @@ function reactToStreetEvent(eventId, reactionType) {
     if (!ev) return;
     if (!ev.reactions) ev.reactions = { fire: 0, fear: 0, skull: 0 };
     ev.reactions[reactionType] = (ev.reactions[reactionType] || 0) + 1;
-    saveState();
-    playSound('tick');
-    tgHaptic('light');
+    if (typeof saveState === 'function') saveState();
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
     const container = document.getElementById('lifeMainContentContainer');
     if (container) renderStreetRadarSubTab(container);
 }
@@ -544,19 +539,20 @@ function openAddStreetInsideModal() {
     });
 
     state.player.karma = Math.min(100, (state.player.karma || 50) + 5);
-    saveState();
-    playSound('win');
-    tgHaptic('success');
-    showToast("Инсайд опубликован! +5 к карме перекупа 📡");
+    if (typeof saveState === 'function') saveState();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof showToast === 'function') showToast("Инсайд опубликован! +5 к карме перекупа 📡");
     const container = document.getElementById('lifeMainContentContainer');
     if (container) renderStreetRadarSubTab(container);
 }
 
 // ========================================================
-// 3. ПОДРАЗДЕЛ: СОЦИУМ, ЖИВОЙ ТОП ИГРОКОВ (БЕЗ БОТОВ)
+// 3. ПОДРАЗДЕЛ: СОЦИУМ И ЖИВОЙ ТОП ИГРОКОВ
 // ========================================================
 async function renderSocialAndClubsSubTab(container) {
-    const player = state.player || {};
+    _ensureSafePlayerState();
+    const player = state.player;
     const friendsCount = (state.friendsList || []).length;
     const pendingRequests = (player.pendingFriendRequests || []).length;
     const curClubId = player.club?.id || player.club || 'sts';
@@ -614,10 +610,8 @@ async function _updateLifeLeaderboard() {
         players = await window.FB_FriendshipsManager.fetchLeaderboard();
     }
 
-    // Исключаем всех фейковых ботов
     players = (players || []).filter(p => !p.isBot && !String(p.id).startsWith('bot_'));
 
-    // Если в базе пока только текущий игрок, отображаем его честный ранг без подмешивания фейков
     if (players.length === 0) {
         const myName = state.player?.name || 'Taktoje';
         const myCash = state.player?.cash || 0;
@@ -678,7 +672,7 @@ function challengePlayerFromLife(targetName) {
 }
 
 // ========================================================
-// 4. ЭКРАН «ДРУЗЬЯ & КОНТАКТЫ» (РЕАЛЬНЫЕ ИГРОКИ FIRESTORE)
+// 4. ЭКРАН «ДРУЗЬЯ & КОНТАКТЫ»
 // ========================================================
 function openFriendsModal(initialSubTab = 'list') {
     friendsActiveSubTab = initialSubTab;
@@ -693,7 +687,7 @@ function openFriendsModal(initialSubTab = 'list') {
     renderFriendsModalContent();
     modal.style.display = 'flex';
     modal.classList.add('active');
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
 
     if (initialSubTab === 'search') {
         _loadRecommendedPlayers();
@@ -706,7 +700,7 @@ function closeFriendsModal() {
         modal.style.display = 'none';
         modal.classList.remove('active');
     }
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
     renderLifeScreen();
 }
 
@@ -714,12 +708,12 @@ async function renderFriendsModalContent() {
     const modal = document.getElementById('modalFriendsCenter');
     if (!modal) return;
 
-    const player = state.player || {};
+    _ensureSafePlayerState();
+    const player = state.player;
     let friends = state.friendsList || [];
     const requests = player.pendingFriendRequests || [];
     const myId = player.uid || window.tgUserId || 'PRK-777-99';
 
-    // Подгрузка живого списка друзей из Firestore
     if (window.FB_FriendshipsManager && typeof window.FB_FriendshipsManager.fetchFriendships === 'function') {
         try {
             const data = await window.FB_FriendshipsManager.fetchFriendships();
@@ -772,7 +766,7 @@ async function renderFriendsModalContent() {
                 <div class="sub-label text-xs mb-1">Ваш персональный ID для добавления:</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
                     <b class="color-cyan font-mono" style="font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1;">${myId}</b>
-                    <button onclick="navigator.clipboard?.writeText('${myId}'); showToast('ID скопирован в буфер!');" class="btn btn-dark btn-sm life-btn-auto" style="font-size:9px;">
+                    <button onclick="navigator.clipboard?.writeText('${myId}'); if(typeof showToast==='function') showToast('ID скопирован в буфер!');" class="btn btn-dark btn-sm life-btn-auto" style="font-size:9px;">
                         <i class="fa-solid fa-copy mr-1"></i> Копировать
                     </button>
                 </div>
@@ -897,7 +891,10 @@ function _renderRecommendedPlayers() {
 async function submitSearchFriendAction() {
     const input = document.getElementById('friendSearchInput');
     const resBox = document.getElementById('friendSearchResultsBox');
-    if (!input || !input.value.trim() || !resBox) return showToast("Введите ник или ID!");
+    if (!input || !input.value.trim() || !resBox) {
+        if (typeof showToast === 'function') showToast("Введите ник или ID!");
+        return;
+    }
 
     const q = input.value.trim();
     resBox.innerHTML = `
@@ -929,7 +926,7 @@ async function submitSearchFriendAction() {
                 <div class="p-2" style="background:#0b1324; border:1px solid rgba(0,242,254,0.3); border-radius:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
                     <div style="min-width:0; flex:1;">
                         <b class="text-xs color-green" style="font-size:11px;">${u.name}</b>
-                        <div class="sub-label" style="font-size:8px;">Ур. ${u.level} •${u.carName}</div>
+                        <div class="sub-label" style="font-size:8px;">Ур. ${u.level \vert{}\vert{} 1} •${u.carName || 'В гараже'}</div>
                     </div>
                     <button onclick="sendFriendRequestTo('${u.id}', '${escape(u.name)}')" class="btn btn-green btn-sm life-btn-auto" style="font-size:8.5px;">+ Дружить</button>
                 </div>
@@ -940,29 +937,28 @@ async function submitSearchFriendAction() {
 
 async function sendFriendRequestTo(targetUid, targetName) {
     const rawName = unescape(targetName || 'Перекуп');
-    playSound('win');
-    tgHaptic('success');
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
 
     if (window.FB_FriendshipsManager && typeof window.FB_FriendshipsManager.sendRequest === 'function') {
-        showToast(`Отправка заявки ${rawName}...`);
+        if (typeof showToast === 'function') showToast(`Отправка заявки ${rawName}...`);
         const res = await window.FB_FriendshipsManager.sendRequest(targetUid, rawName);
         if (res && res.success) {
-            showToast(res.autoAccepted ? `✅ ${rawName} теперь ваш друг!` : `✅ Заявка отправлена ${rawName}!`);
+            if (typeof showToast === 'function') showToast(res.autoAccepted ? `✅ ${rawName} теперь ваш друг!` : `✅ Заявка отправлена ${rawName}!`);
         } else {
-            showToast(`⚠️ ${res?.error || 'Заявка уже в обработке'}`);
+            if (typeof showToast === 'function') showToast(`⚠️ ${res?.error || 'Заявка уже в обработке'}`);
         }
     } else {
-        showToast(`Заявка в друзья отправлена игроку «${rawName}»! ✉️`);
+        if (typeof showToast === 'function') showToast(`Заявка в друзья отправлена игроку «${rawName}»! ✉️`);
     }
 
-    // Удаляем из списка рекомендаций
     _recommendedPlayersCache = _recommendedPlayersCache.filter(p => String(p.id) !== String(targetUid));
     _renderRecommendedPlayers();
 }
 
 function switchFriendsSubTab(tab) {
     friendsActiveSubTab = tab;
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
     renderFriendsModalContent();
     if (tab === 'search') {
         _loadRecommendedPlayers();
@@ -986,7 +982,7 @@ function writeToFriendInM(friendId, friendName) {
             }, 120);
         }
     }, 120);
-    showToast(`Открываем чат с ${rawName} в M+...`);
+    if (typeof showToast === 'function') showToast(`Открываем чат с ${rawName} в M+...`);
 }
 
 async function acceptFriendRequest(idx, fromUid) {
@@ -996,10 +992,10 @@ async function acceptFriendRequest(idx, fromUid) {
     if (state.player.pendingFriendRequests) {
         state.player.pendingFriendRequests.splice(idx, 1);
     }
-    saveState();
-    playSound('win');
-    tgHaptic('success');
-    showToast(`Заявка в друзья принята! 🤝`);
+    if (typeof saveState === 'function') saveState();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof showToast === 'function') showToast(`Заявка в друзья принята! 🤝`);
     renderFriendsModalContent();
 }
 
@@ -1010,13 +1006,13 @@ async function rejectFriendRequest(idx, fromUid) {
     if (state.player.pendingFriendRequests) {
         state.player.pendingFriendRequests.splice(idx, 1);
     }
-    saveState();
-    playSound('tick');
+    if (typeof saveState === 'function') saveState();
+    if (typeof playSound === 'function') playSound('tick');
     renderFriendsModalContent();
 }
 
 // ========================================================
-// 5. ЭКРАН «АВТОКЛУБ И СИНДИКАТ» (ФИКС ВЕРСТКИ КАТАЛОГА)
+// 5. ЭКРАН «АВТОКЛУБ И СИНДИКАТ»
 // ========================================================
 function openClubModal(initialSubTab = 'my_club') {
     clubActiveSubTab = initialSubTab;
@@ -1031,7 +1027,7 @@ function openClubModal(initialSubTab = 'my_club') {
     renderClubModalContent();
     modal.style.display = 'flex';
     modal.classList.add('active');
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
 }
 
 function closeClubModal() {
@@ -1040,7 +1036,7 @@ function closeClubModal() {
         modal.style.display = 'none';
         modal.classList.remove('active');
     }
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
     renderLifeScreen();
 }
 
@@ -1048,7 +1044,8 @@ function renderClubModalContent() {
     const modal = document.getElementById('modalClubCenter');
     if (!modal) return;
 
-    const player = state.player || {};
+    _ensureSafePlayerState();
+    const player = state.player;
     const curClubId = player.club?.id || player.club || 'sts';
     const currentClub = DEFAULT_CLUBS_CATALOG.find(c => c.id === curClubId) || DEFAULT_CLUBS_CATALOG[0];
 
@@ -1098,7 +1095,7 @@ function renderClubModalContent() {
                                 <div style="display:flex; align-items:center; gap:8px; min-width:0; flex:1;">
                                     <span style="font-size:20px; flex-shrink:0;">${c.icon}</span>
                                     <div style="min-width:0; flex:1;">
-                                        <b class="text-xs color-main" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">[${c.tag}]${c.name}</b>
+                                        <b class="text-xs color-main" style="font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;">[${c.tag}] ${c.name}</b>
                                         <div class="sub-label" style="font-size:8px; color:#94a3b8;">${c.membersCount} участников</div>
                                     </div>
                                 </div>
@@ -1181,26 +1178,26 @@ function renderClubModalContent() {
 
 function switchClubSubTab(tab) {
     clubActiveSubTab = tab;
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
     renderClubModalContent();
 }
 
 function joinClubAction(clubId) {
     const club = DEFAULT_CLUBS_CATALOG.find(c => c.id === clubId);
     if (!club) return;
-    if (!state.player) state.player = {};
+    _ensureSafePlayerState();
     state.player.club = { id: club.id, name: club.name, tag: club.tag };
-    saveState();
-    playSound('win');
-    tgHaptic('success');
-    showToast(`Вы вступили в автоклуб «[${club.tag}] ${club.name}»! Перки активированы 🔥`);
+    if (typeof saveState === 'function') saveState();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof showToast === 'function') showToast(`Вы вступили в автоклуб «[${club.tag}] ${club.name}»! Перки активированы 🔥`);
     switchClubSubTab('my_club');
 }
 
 function inviteFriendToClubPrompt() {
     const friends = state.friendsList || [];
     if (friends.length === 0) {
-        showToast("У вас пока нет друзей для приглашения. Добавьте их во вкладке «Друзья».");
+        if (typeof showToast === 'function') showToast("У вас пока нет друзей для приглашения. Добавьте их во вкладке «Друзья».");
         return;
     }
     const friendName = prompt(`Введите имя друга для приглашения в клуб (из ваших друзей: ${friends.map(f => f.name).join(', ')}):`);
@@ -1210,25 +1207,36 @@ function inviteFriendToClubPrompt() {
 }
 
 function inviteFriendToClubAction(friendName) {
-    playSound('win');
-    tgHaptic('success');
-    showToast(`Приглашение в клуб отправлено игроку «${friendName}»! 🚩`);
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof showToast === 'function') showToast(`Приглашение в клуб отправлено игроку «${friendName}»! 🚩`);
 }
 
 function confirmCreateClubAction() {
     const nameInput = document.getElementById('newClubNameInput');
     const tagInput = document.getElementById('newClubTagInput');
     if (!nameInput || !nameInput.value.trim() || !tagInput || !tagInput.value.trim()) {
-        return showToast("Заполните название и тег клуба!");
+        if (typeof showToast === 'function') showToast("Заполните название и тег клуба!");
+        return;
     }
 
-    const lvl = state.player?.level || 1;
-    if (lvl < 10) return showToast("Создание клуба доступно только с 10 уровня!");
+    _ensureSafePlayerState();
+    const lvl = state.player.level || 1;
+    if (lvl < 10) {
+        if (typeof showToast === 'function') showToast("Создание клуба доступно только с 10 уровня!");
+        return;
+    }
 
-    const cash = state.player?.cash || 0;
-    const stars = state.player?.stars || 0;
-    if (cash < 1500000) return showToast("Не хватает рублей (нужно 1,500,000 ₽)!");
-    if (stars < 10) return showToast("Не хватает банкнот (нужно 10 ⭐)!");
+    const cash = state.player.cash || 0;
+    const stars = state.player.stars || 0;
+    if (cash < 1500000) {
+        if (typeof showToast === 'function') showToast("Не хватает рублей (нужно 1,500,000 ₽)!");
+        return;
+    }
+    if (stars < 10) {
+        if (typeof showToast === 'function') showToast("Не хватает банкнот (нужно 10 ⭐)!");
+        return;
+    }
 
     state.player.cash -= 1500000;
     state.player.stars -= 10;
@@ -1251,11 +1259,11 @@ function confirmCreateClubAction() {
     DEFAULT_CLUBS_CATALOG.push(newClub);
     state.player.club = { id: newClub.id, name: newClub.name, tag: newClub.tag };
 
-    saveState();
-    updateHeaderUI();
-    playSound('win');
-    tgHaptic('success');
-    showToast(`Клуб «[${newClub.tag}] ${newClub.name}» успешно зарегистрирован! 👑`);
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof showToast === 'function') showToast(`Клуб «[${newClub.tag}] ${newClub.name}» успешно зарегистрирован! 👑`);
     switchClubSubTab('my_club');
 }
 
@@ -1299,8 +1307,12 @@ function doLifeActivityAction(actId) {
     const act = list.find(a => a.id === actId);
     if (!act) return;
 
-    let cash = state.player?.cash || 0;
-    if (act.cost > 0 && cash < act.cost) return showToast("Не хватает денег на эту активность!");
+    _ensureSafePlayerState();
+    let cash = state.player.cash || 0;
+    if (act.cost > 0 && cash < act.cost) {
+        if (typeof showToast === 'function') showToast("Не хватает денег на эту активность!");
+        return;
+    }
 
     if (act.cost > 0) {
         state.player.cash -= act.cost;
@@ -1314,29 +1326,30 @@ function doLifeActivityAction(actId) {
         state.player.karma = Math.min(100, (state.player.karma || 50) + act.karma);
     }
 
-    saveState();
-    updateHeaderUI();
-    playSound('win');
-    tgHaptic('success');
-    showToast(`Вы отлично провели время: «${act.name}»! Настроение поднялось 🔥`);
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof showToast === 'function') showToast(`Вы отлично провели время: «${act.name}»! Настроение поднялось 🔥`);
     renderLifeScreen();
 }
 
 function filterLifeFood(cat) {
     lifeActiveFoodCategory = cat;
     renderLifeFoodList();
-    playSound('tick');
+    if (typeof playSound === 'function') playSound('tick');
 }
 
 function renderLifeFoodList() {
     const box = document.getElementById('lifeFoodListContainer');
     if (!box) return;
 
+    _ensureSafePlayerState();
     const diets = (typeof DIETS !== 'undefined' && Array.isArray(DIETS) && DIETS.length > 0)
         ? DIETS
         : DEFAULT_LIFE_DIETS;
 
-    let curDiet = state.player?.diet || 'shaurma';
+    let curDiet = state.player.diet || 'shaurma';
     let filtered = diets.filter(d => lifeActiveFoodCategory === 'all' || d.category === lifeActiveFoodCategory);
 
     let html = "";
@@ -1377,15 +1390,17 @@ function renderLifeFoodList() {
 }
 
 function setBaseDietAction(dietId) {
+    _ensureSafePlayerState();
     state.player.diet = dietId;
-    saveState();
-    playSound('tick');
-    tgHaptic('light');
-    showToast("Базовый рацион обновлен! Питание будет списываться в полночь.");
+    if (typeof saveState === 'function') saveState();
+    if (typeof playSound === 'function') playSound('tick');
+    if (typeof tgHaptic === 'function') tgHaptic('light');
+    if (typeof showToast === 'function') showToast("Базовый рацион обновлен! Питание будет списываться в полночь.");
     renderLifeScreen();
 }
 
 function eatFoodOnceAction(dietId) {
+    _ensureSafePlayerState();
     const diets = (typeof DIETS !== 'undefined' && Array.isArray(DIETS) && DIETS.length > 0)
         ? DIETS
         : DEFAULT_LIFE_DIETS;
@@ -1393,8 +1408,11 @@ function eatFoodOnceAction(dietId) {
     const d = diets.find(item => item.id === dietId);
     if (!d) return;
 
-    let cash = state.player?.cash || 0;
-    if (d.cost > 0 && cash < d.cost) return showToast("Не хватает денег на этот обед!");
+    let cash = state.player.cash || 0;
+    if (d.cost > 0 && cash < d.cost) {
+        if (typeof showToast === 'function') showToast("Не хватает денег на этот обед!");
+        return;
+    }
 
     if (d.cost > 0) {
         state.player.cash -= d.cost;
@@ -1406,60 +1424,72 @@ function eatFoodOnceAction(dietId) {
     state.player.hunger = Math.min(100, (state.player.hunger || 80) + d.hunger);
     state.player.mood = Math.max(10, Math.min(100, (state.player.mood || 85) + d.mood));
 
-    saveState();
-    updateHeaderUI();
-    playSound('win');
-    tgHaptic('success');
-    showToast(`Вы вкусно поели: «${d.name}» (+${d.hunger}% сытости)!`);
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof showToast === 'function') showToast(`Вы вкусно поели: «${d.name}» (+${d.hunger}% сытости)!`);
     renderLifeScreen();
 }
 
 function roadAssistanceAction() {
-    let fuel = state.player?.fuel || 0;
-    if (fuel < 10) return showToast("Не хватает топлива в баке для выезда!");
+    _ensureSafePlayerState();
+    let fuel = state.player.fuel || 0;
+    if (fuel < 10) {
+        if (typeof showToast === 'function') showToast("Не хватает топлива в баке для выезда!");
+        return;
+    }
 
     state.player.fuel -= 10;
     state.player.karma = Math.min(100, (state.player.karma || 50) + 8);
     state.player.mood = Math.min(100, (state.player.mood || 85) + 10);
 
-    saveState();
-    updateHeaderUI();
-    playSound('win');
-    tgHaptic('success');
-    showToast("Вы помогли заглохшему водителю на трассе (-10 ⛽, +8 к карме)! 🤝");
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof showToast === 'function') showToast("Вы помогли заглохшему водителю на трассе (-10 ⛽, +8 к карме)! 🤝");
     renderLifeScreen();
 }
 
 function donatePartsToMechanic() {
+    _ensureSafePlayerState();
     let cost = 45000;
-    let cash = state.player?.cash || 0;
-    if (cash < cost) return showToast("Нужно 45,000 ₽ на покупку запчастей для СТО!");
+    let cash = state.player.cash || 0;
+    if (cash < cost) {
+        if (typeof showToast === 'function') showToast("Нужно 45,000 ₽ на покупку запчастей для СТО!");
+        return;
+    }
 
     state.player.cash -= cost;
     state.player.connections = (state.player.connections || 0) + 1;
     state.player.karma = Math.min(100, (state.player.karma || 50) + 5);
 
-    saveState();
-    updateHeaderUI();
-    playSound('win');
-    tgHaptic('success');
-    showToast("Запчасти переданы дяде Ване на СТО (+1 🤝 Связь, +5 Кармы)!");
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
+    if (typeof showToast === 'function') showToast("Запчасти переданы дяде Ване на СТО (+1 🤝 Связь, +5 Кармы)!");
     renderLifeScreen();
 }
 
 function bigCharityDonate() {
+    _ensureSafePlayerState();
     let cost = 150000;
-    let cash = state.player?.cash || 0;
-    if (cash < cost) return showToast("Нужно 150,000 ₽ на меценатство!");
+    let cash = state.player.cash || 0;
+    if (cash < cost) {
+        if (typeof showToast === 'function') showToast("Нужно 150,000 ₽ на меценатство!");
+        return;
+    }
 
     state.player.cash -= cost;
     state.player.karma = Math.min(100, (state.player.karma || 50) + 25);
     state.player.mood = 100;
 
-    saveState();
-    updateHeaderUI();
-    playSound('win');
-    tgHaptic('success');
+    if (typeof saveState === 'function') saveState();
+    if (typeof updateHeaderUI === 'function') updateHeaderUI();
+    if (typeof playSound === 'function') playSound('win');
+    if (typeof tgHaptic === 'function') tgHaptic('success');
     if (typeof openVerdictModal === 'function') {
         openVerdictModal(
             "БЛАГОТВОРИТЕЛЬНОСТЬ ПЕРЕКУПА 🕊️",
@@ -1512,8 +1542,8 @@ function sendChatMessageFromInput() {
         warning: false
     });
 
-    saveState();
-    playSound('tick');
+    if (typeof saveState === 'function') saveState();
+    if (typeof playSound === 'function') playSound('tick');
     renderLifeChat();
 }
 
@@ -1521,7 +1551,7 @@ function renderDiets() {
     renderLifeScreen();
 }
 
-// Экспорт функций в window
+// Экспорт всех интерфейсных функций в window
 window.renderLifeScreen = renderLifeScreen;
 window.renderDiets = renderDiets;
 window.switchLifeTab = switchLifeTab;
@@ -1553,4 +1583,4 @@ window.acceptFriendRequest = acceptFriendRequest;
 window.rejectFriendRequest = rejectFriendRequest;
 window.challengePlayerFromLife = challengePlayerFromLife;
 
-console.log('[☕ life.js v1.5.0] Боты полностью удалены: честный Зал Славы и живой поиск Firestore подключены ✓');
+console.log('[☕ life.js v1.5.1] Раздел «Жизнь» успешно зарегистрирован и готов к рендеру ✓');
