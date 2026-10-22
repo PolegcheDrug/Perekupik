@@ -1,12 +1,12 @@
 // ========================================================
-// js/phone-post.js — ПОЧТА & СКЛАДСКОЙ ХАБ ПЕРЕКУПА (v2.1.0)
+// js/phone/phone-post.js — ПОЧТА & СКЛАДСКОЙ ХАБ ПЕРЕКУПА (v2.2.0 HYBRID)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-// ⭐ v2.1.0 (ЕДИНЫЙ PLATESMANAGER):
-//   - claimSingleMailItem → PlatesManager.addPlate для номеров
-//   - claimAllMailAction → PlatesManager.addPlate для номеров
-//   - УБРАНА прямая запись в state.ownedPlates
-//   - Каскад Склад → Парковка → Гараж → Продажа
-//   - Fallback на pushToMailbox без потери данных
+//
+// ⭐ v2.2.0 (ГИБРИДНАЯ СИСТЕМА: УМНАЯ РАСПАКОВКА + КАНИСТРЫ НА СКЛАД):
+//   1. Топливо не сгорает при полном баке: можно упаковать в канистру на склад или слить за кэш.
+//   2. Частичная дозаправка: если бак 80/100, остаток посылки превращается в канистру на складе.
+//   3. Талоны и приборы при переполнении/дубликате сохраняются как предметы или сдаются скупщикам.
+//   4. Забрать всё: излишки автоматически консервируются в канистры на складе без потерь.
 // ========================================================
 
 const AppPost = {
@@ -104,7 +104,7 @@ const AppPost = {
         if (!state.player.warehouse) {
             state.player.warehouse = {
                 maxCars: 6,
-                maxItems: 12,
+                maxItems: 20,
                 cars: [],
                 items: []
             };
@@ -164,7 +164,7 @@ const AppPost = {
     },
 
     // ========================================================
-    // 1. INBOX
+    // 1. INBOX (УМНЫЕ КАРТОЧКИ С ВЫБОРОМ ДЕЙСТВИЯ)
     // ========================================================
     renderInboxScreen: function(container) {
         if (!container) return;
@@ -186,6 +186,10 @@ const AppPost = {
                 '</div>';
             return;
         }
+
+        var curFuel = state.player?.fuel !== undefined ? state.player.fuel : 100;
+        var curTickets = state.player?.expressTickets !== undefined ? state.player.expressTickets : 25;
+        var maxTickets = state.player?.maxExpressTickets || 25;
 
         var html =
             '<div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(0, 230, 118, 0.12), #090e18); border-color: var(--green);">' +
@@ -254,6 +258,53 @@ const AppPost = {
                     '<button onclick="AppPost.sellMailCarInstantly(\'' + itemId + '\')" class="btn btn-dark btn-sm w-full mt-1" style="font-size:9px; padding:6px 2px;">' +
                         '<i class="fa-solid fa-ruble-sign"></i> Продать скупщикам' +
                     '</button>';
+            } else if (item.type === 'fuel') {
+                var fuelAmt = item.amount || 35;
+                var sellPrice = Math.round(fuelAmt * 55); // 55 ₽ за литр скупщикам
+
+                if (curFuel >= 100) {
+                    // БАК ПОЛОН: выбор сохранить в канистру или сдать за кэш
+                    actionButtons =
+                        '<div class="p-1 mb-1 text-center" style="background:rgba(255,179,0,0.08); border-radius:6px; font-size:8.5px; color:#f59e0b;">' +
+                            '⚠️ Бак полон (100/100)! Выберите действие с излишком:' +
+                        '</div>' +
+                        '<div class="grid-2 mt-1" style="gap:4px;">' +
+                            '<button onclick="AppPost.packFuelToWarehouseCanister(\'' + itemId + '\')" class="btn btn-cyan btn-sm font-bold" style="font-size:9px; padding:6px 0;">' +
+                                '📦 Канистра на склад' +
+                            '</button>' +
+                            '<button onclick="AppPost.sellFuelSurplus(\'' + itemId + '\')" class="btn btn-amber btn-sm font-bold" style="font-size:9px; padding:6px 0;">' +
+                                '💰 Слить (+ ' + sellPrice.toLocaleString() + ' ₽)' +
+                            '</button>' +
+                        '</div>';
+                } else if (curFuel + fuelAmt > 100) {
+                    // БАК ЗАПОЛНИТСЯ ЧАСТИЧНО: заправить до 100, а остаток в канистру
+                    var fits = 100 - curFuel;
+                    var surplus = fuelAmt - fits;
+                    actionButtons =
+                        '<button onclick="AppPost.claimHybridFuelItem(\'' + itemId + '\')" class="btn btn-green btn-sm w-full mt-2 font-bold" style="font-size:9.5px;">' +
+                            'Заправить +' + fits + ' ⛽ (Остаток ' + surplus + ' л в канистру) ✓' +
+                        '</button>';
+                } else {
+                    actionButtons =
+                        '<button onclick="AppPost.claimSingleMailItem(\'' + itemId + '\')" class="btn btn-green btn-sm w-full mt-2 font-bold" style="font-size:10px;">' +
+                            'Заправить бак (+' + fuelAmt + ' ⛽) ✓' +
+                        '</button>';
+                }
+            } else if (item.type === 'tickets' && curTickets >= maxTickets) {
+                var tckAmt = item.amount || 1;
+                var sellTckPrice = Math.round(tckAmt * 8000);
+                actionButtons =
+                    '<div class="p-1 mb-1 text-center" style="background:rgba(192,132,252,0.08); border-radius:6px; font-size:8.5px; color:#c084fc;">' +
+                        'Лимит талонов полон (' + curTickets + '/' + maxTickets + ')!' +
+                    '</div>' +
+                    '<div class="grid-2 mt-1" style="gap:4px;">' +
+                        '<button onclick="AppPost.packTicketsToWarehouse(\'' + itemId + '\')" class="btn btn-purple btn-sm" style="font-size:9px; padding:6px 0;">' +
+                            '📦 Убрать на склад' +
+                        '</button>' +
+                        '<button onclick="AppPost.sellTicketsSurplus(\'' + itemId + '\')" class="btn btn-dark btn-sm" style="font-size:9px; padding:6px 0;">' +
+                            '💰 Сдать (+ ' + sellTckPrice.toLocaleString() + ' ₽)' +
+                        '</button>' +
+                    '</div>';
             } else {
                 actionButtons =
                     '<button onclick="AppPost.claimSingleMailItem(\'' + itemId + '\')" class="btn btn-green btn-sm w-full mt-2" style="font-size:10px;">' +
@@ -262,7 +313,7 @@ const AppPost = {
             }
 
             html +=
-                '<div class="glass-card p-2" style="border-left: 3px solid ' + (isVehicle ? 'var(--amber)' : 'var(--cyan)') + ';">' +
+                '<div class="glass-card p-2" style="border-left: 3px solid ' + (isVehicle ? 'var(--amber)' : (item.type === 'fuel' ? 'var(--cyan)' : 'var(--green)')) + ';">' +
                     '<div class="flex-between mb-1">' +
                         '<div class="flex-gap" style="align-items:center;">' +
                             '<span style="font-size:20px;">' + icon + '</span>' +
@@ -284,8 +335,149 @@ const AppPost = {
     },
 
     // ========================================================
-    // 2. РАСПАКОВКА ПОСЫЛОК
-    // ⭐ v2.1.0: номера через PlatesManager
+    // 2. ГИБРИДНЫЕ МЕТОДЫ РАСПАКОВКИ И КОНВЕРТАЦИИ
+    // ========================================================
+
+    // Упаковать топливо в канистру на складе
+    packFuelToWarehouseCanister: function(itemId) {
+        var item = this._findMailItemById(itemId);
+        if (!item) return;
+
+        var amount = item.amount || 35;
+        this.addWarehouseItem({
+            id: 'item_canister_' + Date.now(),
+            type: 'canister',
+            name: 'Канистра АИ-95 (' + amount + ' л)',
+            amount: amount,
+            icon: '⛽',
+            desc: 'Запас бензина на случай дальних перегонов или ночных гонок.'
+        });
+
+        state.player.mailbox = state.player.mailbox.filter(m => m && m.id !== itemId);
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast('📦 Канистра (' + amount + ' л) сохранена на Складе!');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // Продать топливо скупщикам на месте
+    sellFuelSurplus: function(itemId) {
+        var item = this._findMailItemById(itemId);
+        if (!item) return;
+
+        var amount = item.amount || 35;
+        var payout = Math.round(amount * 55);
+
+        state.player.cash = (state.player.cash || 0) + payout;
+        logBankTransaction('Продажа топлива таксистам (' + amount + ' л)', payout, true);
+
+        state.player.mailbox = state.player.mailbox.filter(m => m && m.id !== itemId);
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast('💰 Топливо продано: +' + payout.toLocaleString() + ' ₽!');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // Гибридная заправка: бак до 100, остаток в канистру
+    claimHybridFuelItem: function(itemId) {
+        var item = this._findMailItemById(itemId);
+        if (!item) return;
+
+        var amount = item.amount || 35;
+        var cur = state.player.fuel || 0;
+        var fits = Math.max(0, 100 - cur);
+        var surplus = amount - fits;
+
+        state.player.fuel = 100;
+
+        if (surplus > 0) {
+            this.addWarehouseItem({
+                id: 'item_canister_' + Date.now(),
+                type: 'canister',
+                name: 'Канистра АИ-95 (' + surplus + ' л)',
+                amount: surplus,
+                icon: '⛽',
+                desc: 'Остаток бензина от посылки.'
+            });
+        }
+
+        state.player.mailbox = state.player.mailbox.filter(m => m && m.id !== itemId);
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast('⛽ Бак заправлен до 100%! Остаток ' + surplus + ' л убран в канистру.');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // Упаковать талоны на склад
+    packTicketsToWarehouse: function(itemId) {
+        var item = this._findMailItemById(itemId);
+        if (!item) return;
+
+        var amount = item.amount || 1;
+        this.addWarehouseItem({
+            id: 'item_tickets_' + Date.now(),
+            type: 'tickets_bundle',
+            name: 'Пачка экспресс-талонов (' + amount + ' шт)',
+            amount: amount,
+            icon: '🎟️',
+            desc: 'Запас пропусков для мгновенного призыва клиентов на площадку.'
+        });
+
+        state.player.mailbox = state.player.mailbox.filter(m => m && m.id !== itemId);
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast('📦 Талоны убраны в запас на Склад!');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // Продать талоны перекупам
+    sellTicketsSurplus: function(itemId) {
+        var item = this._findMailItemById(itemId);
+        if (!item) return;
+
+        var amount = item.amount || 1;
+        var payout = Math.round(amount * 8000);
+
+        state.player.cash = (state.player.cash || 0) + payout;
+        logBankTransaction('Продажа талонов коллегам (' + amount + ' шт)', payout, true);
+
+        state.player.mailbox = state.player.mailbox.filter(m => m && m.id !== itemId);
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast('💰 Талоны выкуплены: +' + payout.toLocaleString() + ' ₽!');
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // Вспомогательное добавление предмета на склад
+    addWarehouseItem: function(itemObj) {
+        if (!state.player.warehouse) state.player.warehouse = { cars: [], items: [] };
+        if (!Array.isArray(state.player.warehouse.items)) state.player.warehouse.items = [];
+
+        // Если такая канистра уже есть — объединяем литраж
+        if (itemObj.type === 'canister') {
+            var existing = state.player.warehouse.items.find(i => i.type === 'canister');
+            if (existing) {
+                existing.amount = (existing.amount || 0) + itemObj.amount;
+                existing.name = 'Канистра АИ-95 (' + existing.amount + ' л)';
+                return;
+            }
+        }
+
+        state.player.warehouse.items.push(itemObj);
+    },
+
+    // ========================================================
+    // 3. СТАНДАРТНАЯ РАСПАКОВКА ПОСЫЛКИ
     // ========================================================
     claimSingleMailItem: function(itemId) {
         var item = this._findMailItemById(itemId);
@@ -317,13 +509,11 @@ const AppPost = {
             if (!state.player.tools) state.player.tools = {};
             if (!state.player.toolsWear) state.player.toolsWear = {};
             state.player.tools[item.toolId] = true;
-            state.player.toolsWear[item.toolId] = 80;
+            state.player.toolsWear[item.toolId] = 100;
         } else if (item.type === 'plate') {
-            // ⭐ v2.1.0: ЕДИНЫЙ МЕНЕДЖЕР НОМЕРОВ
             if (window.PlatesManager) {
                 window.PlatesManager.addPlate(item.plate || "А777АА 77", 'mail_claim', { silent: false });
             } else {
-                // Fallback: пишем в platesInventory напрямую (без state.ownedPlates)
                 if (!state.player.platesInventory) state.player.platesInventory = [];
                 state.player.platesInventory.push({
                     id: 'plate_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
@@ -348,10 +538,16 @@ const AppPost = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
+    // Массовая умная распаковка
     claimAllMailAction: function() {
         var box = state.player && state.player.mailbox ? state.player.mailbox : [];
         var claimedCount = 0;
         var toRemoveIds = [];
+        var packedSurplusMsg = [];
+
+        var curFuel = state.player.fuel || 0;
+        var curTickets = state.player.expressTickets || 0;
+        var maxTickets = state.player.maxExpressTickets || 25;
 
         for (var i = 0; i < box.length; i++) {
             var item = box[i];
@@ -359,10 +555,41 @@ const AppPost = {
             if (item.type === 'car' || item.type === 'vehicle') continue;
 
             if (item.type === 'fuel') {
-                state.player.fuel = Math.min(100, (state.player.fuel || 0) + (item.amount || 10));
+                var famt = item.amount || 10;
+                var fits = Math.max(0, 100 - curFuel);
+                if (fits >= famt) {
+                    curFuel += famt;
+                } else {
+                    curFuel = 100;
+                    var surplus = famt - fits;
+                    this.addWarehouseItem({
+                        id: 'item_canister_' + Date.now() + '_' + i,
+                        type: 'canister',
+                        name: 'Канистра АИ-95 (' + surplus + ' л)',
+                        amount: surplus,
+                        icon: '⛽',
+                        desc: 'Запас бензина.'
+                    });
+                    packedSurplusMsg.push('Канистра ' + surplus + ' л');
+                }
             } else if (item.type === 'tickets') {
-                var maxT = state.player.maxExpressTickets || 25;
-                state.player.expressTickets = Math.min(maxT, (state.player.expressTickets || 0) + (item.amount || 1));
+                var tamt = item.amount || 1;
+                var tfits = Math.max(0, maxTickets - curTickets);
+                if (tfits >= tamt) {
+                    curTickets += tamt;
+                } else {
+                    curTickets = maxTickets;
+                    var tsurplus = tamt - tfits;
+                    this.addWarehouseItem({
+                        id: 'item_tickets_' + Date.now() + '_' + i,
+                        type: 'tickets_bundle',
+                        name: 'Пачка талонов (' + tsurplus + ' шт)',
+                        amount: tsurplus,
+                        icon: '🎟️',
+                        desc: 'Запас талонов.'
+                    });
+                    packedSurplusMsg.push(tsurplus + ' талона(ов)');
+                }
             } else if (item.type === 'stars') {
                 state.player.stars = (state.player.stars || 0) + (item.amount || 5);
             } else if (item.type === 'cash') {
@@ -381,23 +608,10 @@ const AppPost = {
                 if (!state.player.tools) state.player.tools = {};
                 if (!state.player.toolsWear) state.player.toolsWear = {};
                 state.player.tools[item.toolId] = true;
-                state.player.toolsWear[item.toolId] = 80;
+                state.player.toolsWear[item.toolId] = 100;
             } else if (item.type === 'plate') {
-                // ⭐ v2.1.0: ЕДИНЫЙ МЕНЕДЖЕР НОМЕРОВ
                 if (window.PlatesManager) {
                     window.PlatesManager.addPlate(item.plate || "А777АА 77", 'mail_claim_all', { silent: true });
-                } else {
-                    if (!state.player.platesInventory) state.player.platesInventory = [];
-                    state.player.platesInventory.push({
-                        id: 'plate_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
-                        number: String(item.plate || "А777АА 77").trim().toUpperCase(),
-                        region: 77,
-                        status: 'inventory',
-                        installedCarId: null,
-                        ownerId: state.player.uid || 'player_local',
-                        source: 'mail_claim_all_fallback',
-                        createdAt: Date.now()
-                    });
                 }
             }
 
@@ -406,6 +620,9 @@ const AppPost = {
                 claimedCount++;
             }
         }
+
+        state.player.fuel = curFuel;
+        state.player.expressTickets = curTickets;
 
         if (toRemoveIds.length > 0) {
             state.player.mailbox = state.player.mailbox.filter(m => m && !toRemoveIds.includes(m.id));
@@ -416,7 +633,12 @@ const AppPost = {
             if (typeof updateHeaderUI === 'function') updateHeaderUI();
             if (typeof playSound === 'function') playSound('win');
             if (typeof tgHaptic === 'function') tgHaptic('success');
-            if (typeof showToast === 'function') showToast("Распаковано посылок: +" + claimedCount + " шт.");
+
+            var finalMsg = "Распаковано посылок: +" + claimedCount + " шт.";
+            if (packedSurplusMsg.length > 0) {
+                finalMsg += "\nНа склад убрано: " + packedSurplusMsg.join(', ');
+            }
+            if (typeof showToast === 'function') showToast(finalMsg);
         } else {
             if (typeof showToast === 'function') showToast("Остался только транспорт — выберите место стоянки вручную.");
         }
@@ -425,8 +647,7 @@ const AppPost = {
     },
 
     // ========================================================
-    // 3. РАСПАКОВКА МАШИНЫ
-    // ⭐ v2.1.0: Каскад Склад → Парковка → Гараж → Продажа
+    // 4. РАСПАКОВКА МАШИНЫ
     // ========================================================
     unpackMailCarToGarage: function(itemId) {
         var item = this._findMailItemById(itemId);
@@ -465,7 +686,6 @@ const AppPost = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // ⭐ v2.1.0: Каскад — если нет бизнеса или склад переполнен
     unpackMailCarToWarehouse: function(itemId) {
         var item = this._findMailItemById(itemId);
         if (!item || !item.carData) {
@@ -473,7 +693,6 @@ const AppPost = {
             return;
         }
 
-        // Если нет бизнеса — сразу на парковку
         if (!this._hasAnyBusiness()) {
             if (typeof showToast === 'function') {
                 showToast("⚠️ Склад доступен только владельцам бизнеса! Перенаправляю на Платную парковку.");
@@ -503,7 +722,6 @@ const AppPost = {
         this.render(document.getElementById('phoneAppContainer'));
     },
 
-    // ⭐ v2.1.0: Каскад — если парковка переполнена, идём в гараж
     unpackMailCarToParking: function(itemId) {
         var item = this._findMailItemById(itemId);
         if (!item || !item.carData) {
@@ -560,12 +778,13 @@ const AppPost = {
     },
 
     // ========================================================
-    // 4. СКЛАД
+    // 5. СКЛАД (С ПОЛКОЙ КАНИСТР И РАСХОДНИКОВ)
     // ========================================================
     renderWarehouseScreen: function(container) {
         if (!container) return;
 
         var storedCars = state.player.warehouse.cars || [];
+        var storedItems = state.player.warehouse.items || [];
         var maxCars = state.player.warehouse.maxCars || 6;
         var hasBiz = this._hasAnyBusiness();
 
@@ -573,20 +792,53 @@ const AppPost = {
             '<div class="glass-card mb-2 p-2 flex-between" style="background: radial-gradient(circle at 50% 0%, rgba(0, 242, 254, 0.14), #090e18); border-color: var(--cyan);">' +
                 '<div>' +
                     '<b class="text-xs color-cyan"><i class="fa-solid fa-warehouse"></i> Складской Терминал:</b>' +
-                    '<div class="sub-label" style="font-size:8.5px;">Занято: <b>' + storedCars.length + ' из ' + maxCars + '</b> ' + (hasBiz ? '(Бизнес активен ✓)' : '(Требуется бизнес)') + '</div>' +
+                    '<div class="sub-label" style="font-size:8.5px;">Авто: <b>' + storedCars.length + '/' + maxCars + '</b> | Вещи: <b>' + storedItems.length + ' шт.</b></div>' +
                 '</div>' +
                 '<button onclick="AppPost.upgradeWarehouseCapacity()" class="btn btn-cyan btn-auto btn-sm" style="font-size:9px;">' +
                     '+2 Места (120k)' +
                 '</button>' +
-            '</div>' +
-            '<div class="sub-label mb-1" style="font-size:9px;">Законсервированные автомобили на складе:</div>';
+            '</div>';
 
-        if (storedCars.length === 0) {
+        // Полка предметов (канистры и талоны)
+        var itemsHtml = '';
+        if (storedItems.length > 0) {
+            itemsHtml = `
+                <div class="glass-card mb-2 p-2" style="background:#060a12; border-color:rgba(0,242,254,0.3);">
+                    <b class="text-xs color-cyan mb-1 block" style="font-size:10px;"><i class="fa-solid fa-boxes-packing mr-1"></i> Полка запасов и канистр:</b>
+                    <div class="space-y-1">
+                        ${storedItems.map((it, idx) => `
+                            <div class="p-1 flex-between" style="background:#090e18; border-radius:6px; border:1px solid rgba(255,255,255,0.06); font-size:9px;">
+                                <div class="flex-gap" style="align-items:center;">
+                                    <span style="font-size:14px;">${it.icon || '📦'}</span>
+                                    <div>
+                                        <b class="color-main">${it.name}</b>
+                                        <div class="sub-label" style="font-size:7.5px;">${it.desc || ''}</div>
+                                    </div>
+                                </div>
+                                <div class="flex-gap" style="gap:4px;">
+                                    ${it.type === 'canister' ? `
+                                        <button onclick="AppPost.useWarehouseCanister(${idx})" class="btn btn-green btn-sm btn-auto" style="padding:3px 6px; font-size:8px;">Заправить</button>
+                                    ` : ''}
+                                    ${it.type === 'tickets_bundle' ? `
+                                        <button onclick="AppPost.useWarehouseTickets(${idx})" class="btn btn-purple btn-sm btn-auto" style="padding:3px 6px; font-size:8px;">Применить</button>
+                                    ` : ''}
+                                    <button onclick="AppPost.sellWarehouseItem(${idx})" class="btn btn-dark btn-sm btn-auto" style="padding:3px 5px; font-size:8px;">Продать</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        var carsHeader = '<div class="sub-label mb-1" style="font-size:9px;">Законсервированные автомобили на складе:</div>';
+
+        if (storedCars.length === 0 && storedItems.length === 0) {
             container.innerHTML = headerHtml +
                 '<div class="glass-card text-center sub-label py-6">' +
                     '<i class="fa-solid fa-box-archive color-cyan mb-2" style="font-size:26px;"></i>' +
-                    '<div>На складе нет законсервированных машин.</div>' +
-                    '<div style="font-size:9px; margin-top:3px;">Отправляйте сюда машины с Почты, если у вас есть бизнес.</div>' +
+                    '<div>На складе нет машин и запасов.</div>' +
+                    '<div style="font-size:9px; margin-top:3px;">Отправляйте сюда канистры с Почты или консервируйте автомобили.</div>' +
                 '</div>';
             return;
         }
@@ -620,7 +872,91 @@ const AppPost = {
         }
         listHtml += '</div>';
 
-        container.innerHTML = headerHtml + listHtml;
+        container.innerHTML = headerHtml + itemsHtml + carsHeader + listHtml;
+    },
+
+    // Заправка машины из канистры на складе
+    useWarehouseCanister: function(idx) {
+        var items = state.player.warehouse.items || [];
+        var it = items[idx];
+        if (!it) return;
+
+        var cur = state.player.fuel || 0;
+        if (cur >= 100) return showToast("Бак уже полон на 100%!");
+
+        var needed = 100 - cur;
+        var take = Math.min(needed, it.amount);
+
+        state.player.fuel = cur + take;
+        it.amount -= take;
+
+        if (it.amount <= 0) {
+            items.splice(idx, 1);
+        } else {
+            it.name = 'Канистра АИ-95 (' + it.amount + ' л)';
+        }
+
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast("Залито +" + take + " ⛽ из канистры!");
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // Активация талонов со склада
+    useWarehouseTickets: function(idx) {
+        var items = state.player.warehouse.items || [];
+        var it = items[idx];
+        if (!it) return;
+
+        var cur = state.player.expressTickets || 0;
+        var max = state.player.maxExpressTickets || 25;
+        if (cur >= max) return showToast("Лимит талонов полон (" + max + ")!");
+
+        var needed = max - cur;
+        var take = Math.min(needed, it.amount);
+
+        state.player.expressTickets = cur + take;
+        it.amount -= take;
+
+        if (it.amount <= 0) {
+            items.splice(idx, 1);
+        } else {
+            it.name = 'Пачка талонов (' + it.amount + ' шт)';
+        }
+
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast("Активировано +" + take + " талонов!");
+        this.render(document.getElementById('phoneAppContainer'));
+    },
+
+    // Продажа предмета со склада за кэш
+    sellWarehouseItem: function(idx) {
+        var items = state.player.warehouse.items || [];
+        var it = items[idx];
+        if (!it) return;
+
+        var payout = 0;
+        if (it.type === 'canister') payout = Math.round(it.amount * 50);
+        else if (it.type === 'tickets_bundle') payout = Math.round(it.amount * 7500);
+        else payout = 10000;
+
+        if (!confirm("Продать «" + it.name + "» за " + payout.toLocaleString() + " ₽?")) return;
+
+        state.player.cash = (state.player.cash || 0) + payout;
+        logBankTransaction("Продажа со склада: " + it.name, payout, true);
+
+        items.splice(idx, 1);
+        saveState();
+        updateHeaderUI();
+        playSound('win');
+        tgHaptic('success');
+        showToast("Продано: +" + payout.toLocaleString() + " ₽");
+        this.render(document.getElementById('phoneAppContainer'));
     },
 
     moveWarehouseCarToGarage: function(idx) {
@@ -719,7 +1055,7 @@ const AppPost = {
     },
 
     // ========================================================
-    // 5. ПЛАТНАЯ ПАРКОВКА
+    // 6. ПЛАТНАЯ ПАРКОВКА
     // ========================================================
     renderPaidParkingScreen: function(container) {
         if (!container) return;
@@ -886,7 +1222,7 @@ const AppPost = {
     },
 
     // ========================================================
-    // 6. ЕЖЕДНЕВНОЕ СПИСАНИЕ ЗА ПАРКОВКУ
+    // 7. ЕЖЕДНЕВНОЕ СПИСАНИЕ ЗА ПАРКОВКУ
     // ========================================================
     chargeDailyParking: function() {
         if (!state.player || !state.player.paidParking) return { charged: 0, lostCars: 0 };
@@ -932,7 +1268,7 @@ const AppPost = {
 };
 
 // ========================================================
-// ГЛОБАЛЬНАЯ ФУНКЦИЯ pushToMailbox (каноническая версия)
+// ГЛОБАЛЬНАЯ ФУНКЦИЯ pushToMailbox
 // ========================================================
 window.pushToMailbox = function(mailItem) {
     if (!state.player) state.player = {};
@@ -964,4 +1300,4 @@ window.pushToMailbox = function(mailItem) {
 
 window.AppPost = AppPost;
 
-console.log('[📬 phone-post v2.1.0] PlatesManager + каскад Склад→Парковка→Гараж + ежедневное списание ✓');
+console.log('[📬 phone-post v2.2.0 HYBRID] Умная распаковка + склад канистр и талонов активированы ✓');
