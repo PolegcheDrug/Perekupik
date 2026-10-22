@@ -1357,9 +1357,9 @@ async function _executeHardResetFinal() {
             cleanState.player.onboardingDone = true;
         }
 
-        // 2. Перезаписываем облако Firestore
+        // 2. Перезаписываем облако Firestore[span_2](start_span)[span_2](end_span)
         if (window.FB_Core?.Players?.resetPlayerCloud) {
-            await window.FB_Core.Players.resetPlayerCloud(uid, pName);
+            await window.FB_Core.Players.resetPlayerCloud(uid, pName); //[span_3](start_span)[span_3](end_span)
         } else if (window.FB_Bridge?.db) {
             const mod = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
             await Promise.allSettled([
