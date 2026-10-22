@@ -1,11 +1,6 @@
 // ========================================================
-// js/firebase-core.js — ЯДРО FIREBASE (v1.6.0 RESET & CLOUD-WIPE)
+// js/firebase-core.js — ЯДРО FIREBASE (v1.6.1 RESET PROGRESS & AUTO-CLOSE)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
-//
-// ⭐ v1.6.0:
-//   - Встроен нативный внутриигровой модал подтверждения сброса (без window.confirm).
-//   - Добавлен метод resetPlayerCloud: принудительная очистка коллекций в Firestore.
-//   - Защита от воскрешения старых миллионов при перезагрузке страницы.
 // ========================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -52,7 +47,7 @@ const db = initializeFirestore(app, {
   experimentalForceLongPolling: true
 });
 
-console.log('[🔥 Firebase Core] Firestore инициализирован (v1.6.0)');
+console.log('[🔥 Firebase Core] Firestore инициализирован (v1.6.1)');
 
 const DEFAULT_AUTH_SERVER_URL = window.AUTH_SERVER_URL || null;
 
@@ -490,11 +485,15 @@ const PlayersStorageManager = {
         updatedAt: Date.now()
       };
 
-      await Promise.all([
+      // Таймаут безопасности 3.5 секунды, чтобы процесс не висел при медленной сети
+      const savePromise = Promise.all([
         setDoc(doc(db, "players", targetUid), cleanPlayerDoc),
         setDoc(doc(db, "garages", targetUid), cleanGarageDoc),
         setDoc(doc(db, "leaderboard", targetUid), cleanLeaderDoc)
       ]);
+
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 3500));
+      await Promise.race([savePromise, timeoutPromise]);
 
       console.log(`[☁️ Firestore] Профиль игрока ${targetUid} успешно сброшен в облаке до 75,000 ₽.`);
       return true;
@@ -506,7 +505,7 @@ const PlayersStorageManager = {
 };
 
 // ========================================================
-// 8. НАДЁЖНЫЙ ВНУТРИИГРОВОЙ СБРОС (БЕЗ WINDOW.CONFIRM)
+// 8. НАДЁЖНЫЙ ВНУТРИИГРОВОЙ СБРОС (СО ШКАЛОЙ ПРОГРЕССА И АВТОЗАКРЫТИЕМ)
 // ========================================================
 function resetGameData() {
     let modal = document.getElementById('modalHardResetConfirm');
@@ -518,7 +517,7 @@ function resetGameData() {
     }
 
     modal.innerHTML = `
-        <div class="modal-box text-center" style="max-width: 380px; background: #070b14; border: 1.5px solid var(--red); border-radius: 16px; padding: 18px; box-shadow: 0 0 30px rgba(255, 51, 102, 0.35);">
+        <div class="modal-box text-center" style="max-width: 380px; background: #070b14; border: 1.5px solid var(--red); border-radius: 16px; padding: 20px; box-shadow: 0 0 30px rgba(255, 51, 102, 0.35);">
             <div style="font-size: 38px; margin-bottom: 6px;">⚠️</div>
             <div class="modal-glow-badge mb-2" style="color:var(--red); border-color:var(--red); display:inline-block;">
                 ПОЛНЫЙ СБРОС ПРОФИЛЯ
@@ -528,11 +527,11 @@ function resetGameData() {
                 Все накопленные миллионы, автопарк, купленные бизнесы и недвижимость будут <b>безвозвратно удалены</b> и в памяти телефона, и в базе Firestore.
             </p>
 
-            <div class="space-y-2">
+            <div id="resetActionBox" class="space-y-2">
                 <button id="btnConfirmResetAction" onclick="window._executeHardResetFinal()" class="btn btn-danger w-full font-bold" style="padding:10px 0; font-size:11px;">
                     <i class="fa-solid fa-trash-can mr-1"></i> ДА, СТЕРЕТЬ И НАЧАТЬ СНАЧАЛА
                 </button>
-                <button onclick="document.getElementById('modalHardResetConfirm').classList.remove('active'); document.getElementById('modalHardResetConfirm').style.display='none';" class="btn btn-dark w-full" style="padding:8px 0; font-size:10px;">
+                <button id="btnCancelResetAction" onclick="document.getElementById('modalHardResetConfirm').classList.remove('active'); document.getElementById('modalHardResetConfirm').style.display='none';" class="btn btn-dark w-full" style="padding:8px 0; font-size:10px;">
                     Отмена
                 </button>
             </div>
@@ -545,21 +544,47 @@ function resetGameData() {
 }
 
 async function _executeHardResetFinal() {
-    const btn = document.getElementById('btnConfirmResetAction');
-    if (btn) {
-        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Очистка базы Firestore...';
-        btn.disabled = true;
+    const actionBox = document.getElementById('resetActionBox');
+    if (actionBox) {
+        actionBox.innerHTML = `
+            <div style="padding: 10px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; margin-bottom:6px;">
+                    <span id="resetProgressStatus" style="color:#00f2fe; font-weight:700;">Очистка локальных сейвов...</span>
+                    <b id="resetProgressPct" style="color:#00e676; font-family:monospace;">0%</b>
+                </div>
+                <div style="height: 10px; background: rgba(255,255,255,0.06); border-radius: 6px; overflow: hidden; border: 1px solid rgba(0,242,254,0.3); padding: 1px;">
+                    <div id="resetProgressBarFill" style="width: 5%; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #ff3366, #f59e0b, #00e676); transition: width 0.25s ease-out; box-shadow: 0 0 10px rgba(0,230,118,0.5);"></div>
+                </div>
+                <div class="sub-label mt-2" style="font-size: 8.5px; color:#94a3b8;">Пожалуйста, не закрывайте окно, идёт перезапись профиля...</div>
+            </div>
+        `;
     }
+
+    const setProgress = (pct, text) => {
+        const fill = document.getElementById('resetProgressBarFill');
+        const pctEl = document.getElementById('resetProgressPct');
+        const statusEl = document.getElementById('resetProgressStatus');
+        if (fill) fill.style.width = pct + '%';
+        if (pctEl) pctEl.innerText = pct + '%';
+        if (statusEl) statusEl.innerText = text;
+    };
 
     window.__IS_RESETTING__ = true;
     const uid = String(TelegramAuthManager.getVerifiedUserId() || window.tgUserId || window.state?.player?.uid || "102125050");
     const pName = window.tgUserData?.first_name || window.state?.player?.name || "Taktoje";
 
     try {
-        // 1. Очистка и перезапись в облаке Firestore
-        await PlayersStorageManager.resetPlayerCloud(uid, pName);
+        // Шаг 1: Очистка локальных хранилищ
+        setProgress(20, "Очистка кэша и хранилища...");
+        await new Promise(r => setTimeout(r, 200));
+        try {
+            localStorage.clear();
+            sessionStorage.clear();
+        } catch(e) {}
 
-        // 2. Очистка Telegram CloudStorage
+        // Шаг 2: Очистка Telegram CloudStorage
+        setProgress(40, "Сброс данных Telegram Cloud...");
+        await new Promise(r => setTimeout(r, 200));
         if (window.Telegram?.WebApp?.CloudStorage) {
             try {
                 const tgCloud = window.Telegram.WebApp.CloudStorage;
@@ -575,13 +600,17 @@ async function _executeHardResetFinal() {
             } catch(e) {}
         }
 
-        // 3. Очистка локальных хранилищ
+        // Шаг 3: Перезапись облака Firestore
+        setProgress(65, "Очистка автопарка и базы Firestore...");
         try {
-            localStorage.clear();
-            sessionStorage.clear();
-        } catch(e) {}
+            await PlayersStorageManager.resetPlayerCloud(uid, pName);
+        } catch (fsErr) {
+            console.warn("[Reset] Firestore sync error:", fsErr);
+        }
 
-        // 4. Очистка памяти игры
+        // Шаг 4: Инициализация нового стартового профиля 75 000 ₽
+        setProgress(90, "Формирование стартового баланса 75 000 ₽...");
+        await new Promise(r => setTimeout(r, 250));
         if (window.DEFAULT_STATE) {
             const clean = JSON.parse(JSON.stringify(window.DEFAULT_STATE));
             clean.player.cash = 75000;
@@ -590,22 +619,40 @@ async function _executeHardResetFinal() {
             clean.player.uid = uid;
             Object.keys(window.state).forEach(k => delete window.state[k]);
             Object.assign(window.state, clean);
+
+            // Сохраняем чистый стартовый сейв
+            try {
+                const cleanJson = JSON.stringify(clean);
+                localStorage.setItem("perekup_save_" + uid, cleanJson);
+                localStorage.setItem("perekup_v15_" + uid, cleanJson);
+            } catch (lsErr) {}
         }
 
-        if (typeof showToast === 'function') {
-            showToast("✅ Прогресс сброшен до 75 000 ₽! Перезагрузка...", "success");
+        // Шаг 5: Завершение, закрытие модалки и перезапуск
+        setProgress(100, "Готово! Перезапуск игры...");
+        if (window.AudioFx) window.AudioFx.play('win');
+        await new Promise(r => setTimeout(r, 500));
+
+        const modal = document.getElementById('modalHardResetConfirm');
+        if (modal) {
+            modal.style.transition = 'opacity 0.3s ease';
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.classList.remove('active');
+                modal.remove();
+            }, 300);
         }
 
-        // 5. Перезагрузка страницы
         setTimeout(() => {
             const cleanUrl = window.location.href.split('?')[0];
             window.location.replace(cleanUrl + '?reset=' + Date.now());
-        }, 400);
+        }, 350);
 
     } catch (err) {
         console.error("[Reset Error]", err);
+        setProgress(100, "Перезагрузка...");
         localStorage.clear();
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 300);
     }
 }
 
@@ -708,4 +755,4 @@ window.TelegramAuthManager = TelegramAuthManager;
 window.resetGameData = resetGameData;
 window._executeHardResetFinal = _executeHardResetFinal;
 
-console.log("[☁️ FB_Core v1.6.0] Облачный сброс resetPlayerCloud активирован ✓");
+console.log("[☁️ FB_Core v1.6.1] Облачный сброс со шкалой прогресса и автозакрытием активирован ✓");
