@@ -1,11 +1,11 @@
 // ========================================================
-// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.7.0 BALANCED)
+// js/app/app-game.js — ИГРОВЫЕ ЦИКЛЫ, КВЕСТЫ, РОЛЛЕРЫ (v5.8.0 HARD-RESET-FIX)
 // Разработчики: Tak Toje, Max, Sergo, gemini, Илья Чепиль
 //
-// ⭐ v5.7.0 (РЕБАЛАНС ЕЖЕДНЕВНЫХ НАГРАД И КВЕСТОВ БЕЗ ИНФЛЯЦИИ):
-//   1. Устранена гиперинфляция календаря: награды синхронизированы с data_economy.js (никаких 600k на 7 день).
-//   2. Балансировка пула заданий: честные награды 6k–12k за квесты вместо 130k из воздуха.
-//   3. Сохранен чистый рендер вердикт-модалок (HTML-теги без экранирования, динамические кнопки).
+// ⭐ v5.8.0 (ИСПРАВЛЕН СБРОС ПРОФИЛЯ + БАЛАНС ЭКОНОМИКИ):
+//   1. Вырезан блокируемый в Telegram WebApp window.confirm(): встроен нативный модал подтверждения.
+//   2. Подключён прямой вызов облачной очистки Firestore (resetPlayerCloud) перед перезагрузкой.
+//   3. Сбалансированный календарь наград (6k–85k ₽) и квесты (6k–12k ₽) без гиперинфляции.
 //   4. Сохранены налоги ФССП, пени, сложные проценты депозитов и тактильный HUD-револьвер.
 // ========================================================
 
@@ -1294,16 +1294,126 @@ function renderProfileAnalytics() {
 }
 
 // ========================================================
-// 10. CLOUD / SAVE MANAGER / RESET
+// 10. CLOUD / SAVE MANAGER / НАДЁЖНЫЙ ВНУТРИИГРОВОЙ СБРОС
 // ========================================================
 function resetGameData() {
-    if (!confirm("⚠️ Вы уверены, что хотите сбросить весь прогресс перекупа? Это действие необратимо!")) return;
+    let modal = document.getElementById('modalHardResetConfirm');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'modalHardResetConfirm';
+        modal.className = 'modal-overlay';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="modal-box text-center" style="max-width: 380px; background: #070b14; border: 1.5px solid var(--red); border-radius: 16px; padding: 18px; box-shadow: 0 0 30px rgba(255, 51, 102, 0.35);">
+            <div style="font-size: 38px; margin-bottom: 6px;">⚠️</div>
+            <div class="modal-glow-badge mb-2" style="color:var(--red); border-color:var(--red); display:inline-block;">
+                ПОЛНЫЙ СБРОС ПРОФИЛЯ
+            </div>
+            <h3 class="font-bold mb-2 color-red" style="font-size:15px;">Начать с 75 000 ₽ (1 ур.)?</h3>
+            <p class="sub-label mb-3" style="font-size:10px; line-height:1.45; color:#cbd5e1;">
+                Все накопленные миллионы, автопарк, купленные бизнесы и недвижимость будут <b>безвозвратно удалены</b> и в памяти телефона, и в базе Firestore.
+            </p>
+
+            <div class="space-y-2">
+                <button id="btnConfirmResetAction" onclick="_executeHardResetFinal()" class="btn btn-danger w-full font-bold" style="padding:10px 0; font-size:11px;">
+                    <i class="fa-solid fa-trash-can mr-1"></i> ДА, СТЕРЕТЬ И НАЧАТЬ СНАЧАЛА
+                </button>
+                <button onclick="document.getElementById('modalHardResetConfirm').classList.remove('active'); document.getElementById('modalHardResetConfirm').style.display='none';" class="btn btn-dark w-full" style="padding:8px 0; font-size:10px;">
+                    Отмена
+                </button>
+            </div>
+        </div>
+    `;
+
+    modal.classList.add('active');
+    modal.style.display = 'flex';
+    if (window.AudioFx) window.AudioFx.play('error');
+}
+
+async function _executeHardResetFinal() {
+    const btn = document.getElementById('btnConfirmResetAction');
+    if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Очистка базы Firestore...';
+        btn.disabled = true;
+    }
+
+    window.__IS_RESETTING__ = true;
+    const uid = String(window.tgUserId || window.state?.player?.uid || "102125050");
+    const pName = window.tgUserData?.first_name || window.state?.player?.name || "Taktoje";
+
     try {
+        // 1. Формируем чистый профиль 1 уровня с 75 000 ₽
+        const cleanState = JSON.parse(JSON.stringify(window.DEFAULT_STATE || {}));
+        if (cleanState.player) {
+            cleanState.player.uid = uid;
+            cleanState.player.name = pName;
+            cleanState.player.cash = 75000;
+            cleanState.player.stars = 0;
+            cleanState.player.level = 1;
+            cleanState.player.xp = 0;
+            cleanState.player.superSpinTickets = 0;
+            cleanState.player.onboardingDone = true;
+        }
+
+        // 2. Перезаписываем облако Firestore
+        if (window.FB_Core?.Players?.resetPlayerCloud) {
+            await window.FB_Core.Players.resetPlayerCloud(uid, pName);
+        } else if (window.FB_Bridge?.db) {
+            const mod = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+            await Promise.allSettled([
+                mod.setDoc(mod.doc(window.FB_Bridge.db, 'players', uid), cleanState.player),
+                mod.setDoc(mod.doc(window.FB_Bridge.db, 'garages', uid), { cars: [], businesses: [], salesLot: [] }),
+                mod.setDoc(mod.doc(window.FB_Bridge.db, 'leaderboard', uid), {
+                    uid: uid, name: pName, level: 1, netWorth: 75000, profit: 0, bestCar: "Пешком"
+                })
+            ]);
+        }
+
+        // 3. Очищаем Telegram CloudStorage
+        if (window.Telegram?.WebApp?.CloudStorage) {
+            try {
+                const tgCloud = window.Telegram.WebApp.CloudStorage;
+                tgCloud.getKeys((err, keys) => {
+                    if (!err && Array.isArray(keys)) {
+                        keys.forEach(k => {
+                            if (k && (k.includes('perekup') || k.includes('save'))) {
+                                tgCloud.removeItem(k);
+                            }
+                        });
+                    }
+                });
+            } catch(e) {}
+        }
+
+        // 4. Очищаем локальные хранилища и прописываем чистый сейв
+        try {
+            localStorage.clear();
+            sessionStorage.clear();
+            const cleanJson = JSON.stringify(cleanState);
+            localStorage.setItem("perekup_save_" + uid, cleanJson);
+            localStorage.setItem("perekup_v15_" + uid, cleanJson);
+        } catch (lsErr) {}
+
+        // 5. Очищаем активную память
+        Object.keys(window.state).forEach(k => delete window.state[k]);
+        Object.assign(window.state, cleanState);
+
+        if (typeof showToast === 'function') {
+            showToast("✅ Прогресс сброшен до 75 000 ₽! Перезагрузка...", "success");
+        }
+
+        // 6. Перезагрузка страницы
+        setTimeout(() => {
+            const cleanUrl = window.location.href.split('?')[0];
+            window.location.replace(cleanUrl + '?reset=' + Date.now());
+        }, 300);
+
+    } catch (err) {
+        console.error("[Reset Error]", err);
         localStorage.clear();
-        sessionStorage.clear();
-        location.reload();
-    } catch(e) {
-        location.reload();
+        window.location.reload();
     }
 }
 
@@ -1651,6 +1761,7 @@ window.exportSaveCodeAction = exportSaveCodeAction;
 window.importSaveCodeAction = importSaveCodeAction;
 window.syncCloudStorageManual = syncCloudStorageManual;
 window.resetGameData = resetGameData;
+window._executeHardResetFinal = _executeHardResetFinal;
 window.renderProfileAnalytics = renderProfileAnalytics;
 window.executeDayCycleMidnight = executeDayCycleMidnight;
 window.updateHeaderUI = updateHeaderUI;
@@ -1665,4 +1776,4 @@ window.HudRevolver = HudRevolver;
 window._safeNumDeposit = _safeNumDeposit;
 window.initMarketScrollListener = initMarketScrollListener;
 
-console.log('[💠 app-game.js v5.7.0 BALANCED] Ежедневный календарь и задания согласованы со сбалансированной экономикой ✓');
+console.log('[💠 app-game.js v5.8.0 HARD-RESET-FIX] Внутриигровой сброс и облачная очистка Firestore активированы ✓');
